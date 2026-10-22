@@ -11,7 +11,7 @@ import sys
 NAME = re.compile(r'[a-z][a-z0-9-]*\Z')
 DIGEST = re.compile(r'sha256:[0-9a-f]{64}\Z')
 TAGS = ('layout', 'navigation', 'content', 'naming', 'style', 'behaviour')
-LOOK = re.compile(r'check/look-(?:structure|style)/([^/]+)/([^/]+)/(.+)\Z')
+LOOK = re.compile(r'check/(?:look-(?:structure|style)|gallery)/([^/]+)/([^/]+)/(.+)\Z')
 
 
 def canonical(value):
@@ -29,12 +29,15 @@ def _file(value):
 def picture_digest(width):
     """Hash viewport then region shot digests, canonical JSON WITHOUT a newline.
 
+    Shared by look and look-live. Live viewports contribute None because their
+    conversation carries the clock; region crops still stand for the judgement.
     Missing parts, null shots and refusals contribute None, in record order.
     """
     def shot(side):
         value = side.get('shot') if type(side) is dict else None
         return value['sha256'] if _file(value) else None
-    shots = [shot(width.get(side)) for side in ('mockup', 'page')]
+    live = type(width.get('page')) is dict and 'focus' in width['page']
+    shots = [None, None] if live else [shot(width.get(side)) for side in ('mockup', 'page')]
     for region in width['regions']:
         shots.extend(shot(region.get(side)) for side in ('mockup', 'page'))
     return 'sha256:' + hashlib.sha256(canonical(shots)[:-1]).hexdigest()
@@ -189,12 +192,24 @@ def _runs(lab, name, key):
         for run in seed['judged']:
             directory = root / 'runs' / run
             record = _read(directory / 'run.json')
-            capture_dir = directory / 'collected/capture/capture'
-            capture = _read(capture_dir / 'capture.json')
-            if capture['format'] != 'look-capture/1':
-                raise ValueError(f'{capture_dir}: expected look-capture/1')
-            runs.append(dict(id=run, record=record, capture=capture,
-                             directory=capture_dir,
+            capture_dir = directory / ('collected/look' if name == 'look-live'
+                                       else 'collected/capture/capture')
+            paths = sorted(capture_dir.glob('*/capture.json')) if name == 'look-live' else [capture_dir / 'capture.json']
+            if not paths:
+                raise ValueError(f'{capture_dir}: no captures')
+            scenes, directories = [], {}
+            for path in paths:
+                capture = _read(path)
+                if capture['format'] != 'look-capture/1':
+                    raise ValueError(f'{path}: expected look-capture/1')
+                for scene in capture['scenes']:
+                    if scene['name'] in directories:
+                        raise ValueError(f"{path}: repeated scene {scene['name']}")
+                    scenes.append(scene)
+                    directories[scene['name']] = path.parent
+            runs.append(dict(id=run, record=record,
+                             capture=dict(format='look-capture/1', scenes=scenes),
+                             directory=capture_dir, directories=directories,
                              signatures={f['signature'] for f in record['failures']}))
         groups.append(runs)
     return groups
@@ -282,12 +297,13 @@ def _picture_paths(run, scene, difference):
     page_only = width.get('mockup') is None
     label = 'Page' if page_only else 'Pair'
     files = [(r.get('page') or {}).get('shot') if page_only else r['pair'] for r in records]
+    directory = run.get('directories', {}).get(scene, run['directory'])
     paths = []
     for file in files:
         if file is None:
             continue
-        path = (run['directory'] / file['path']).resolve()
-        if not path.is_relative_to(run['directory'].resolve()) or not path.is_file():
+        path = (directory / file['path']).resolve()
+        if not path.is_relative_to(directory.resolve()) or not path.is_file():
             raise ValueError(f'{label.lower()} path missing or outside capture: {path}')
         paths.append(str(path))
     return label, paths

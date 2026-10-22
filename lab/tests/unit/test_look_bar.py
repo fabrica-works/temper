@@ -102,6 +102,60 @@ class BarTests(unittest.TestCase):
         expected = [None, 'sha256:' + 'b' * 64, None, None]
         self.assertEqual(look.picture_digest(w), 'sha256:' + hashlib.sha256(look.canonical(expected)[:-1]).hexdigest())
 
+    def test_served_picture_digest_and_bar_unchanged(self):
+        expected = ['sha256:' + c * 64 for c in 'abcd']
+        self.assertEqual(look.picture_digest(width()),
+                         'sha256:' + hashlib.sha256(look.canonical(expected)[:-1]).hexdigest())
+        self.judge()
+        self.assertEqual(self.bar(), ('chat: r0: fail 1; r1: fail 1; r2: fail 1; same\n'
+                                      'unjudged: none\n', True))
+
+    def test_live_digest_uses_only_region_crops(self):
+        w = width()
+        w['page']['focus'] = dict(role='textbox', name='Message')
+        expected = [None, None, 'sha256:' + 'c' * 64, 'sha256:' + 'd' * 64]
+        digest = 'sha256:' + hashlib.sha256(look.canonical(expected)[:-1]).hexdigest()
+        self.assertEqual(look.picture_digest(w), digest)
+        w['mockup']['shot'] = file('another.png', 'e')
+        w['page']['shot'] = file('later.png', 'f')
+        self.assertEqual(look.picture_digest(w), digest)
+        w['regions'][0]['page']['shot'] = file('changed.png', 'e')
+        self.assertNotEqual(look.picture_digest(w), digest)
+
+    def test_live_bar_batch_and_gallery_signature(self):
+        source = self.lab / 'keys/look/key'
+        target = self.lab / 'keys/look-live/key'
+        target.parent.mkdir(parents=True)
+        source.rename(target)
+        self.write(self.experiment / 'experiment.json', dict(name='look-live', planted=[]))
+        value = judgements()
+        value['widths'][0]['pictures'][0]['digest'] = look.picture_digest(
+            dict(width(), page=dict(shot=file('page.png', 'b'), focus=None)))
+        value['differences'].append(judgement('mockup', 'gallery', 'gallery/missing/button/Send'))
+        gallery_sig = 'check/gallery/chat/desktop/gallery/missing/button/Send'
+        for run in sorted((target / 'runs').iterdir()):
+            old = run / 'collected/capture/capture'
+            live = run / 'collected/look/chat'
+            live.parent.mkdir(parents=True)
+            old.rename(live)
+            capture = json.loads((live / 'capture.json').read_bytes())
+            capture['scenes'][0]['widths'][0]['page']['focus'] = None
+            self.write(live / 'capture.json', capture)
+            # Another capture proves the scene list comes from all records.
+            self.write(run / 'collected/look/closing/capture.json', dict(format='look-capture/1',
+                scenes=[dict(name='closing', widths=[width()])]))
+            self.write(run / 'run.json', dict(failures=[dict(signature=SIG), dict(signature=gallery_sig)],
+                                               undecided=[]))
+        self.judge(value)
+        text, holds = self.bar()
+        self.assertTrue(holds)
+        self.assertIn('chat: r0: fail 2;', text)
+        self.assertIn('closing: r0: pass;', text)
+        self.assertIn('unjudged: none', text)
+        text = look.batch(self.judged, self.lab, 'look-live', 'key')
+        self.assertIn(str(target / 'runs/r0/collected/look/chat/chat/desktop/pair.png'), text)
+        self.assertIn('gallery/missing/button/Send', text)
+
     def test_finding_judges_signature(self):
         self.judge()
         self.assertIn('unjudged: none', self.bar()[0])

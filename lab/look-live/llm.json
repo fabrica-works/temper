@@ -1,0 +1,25 @@
+{{
+  "listen": {{"socket": "127.0.0.1:0"}},
+  "key": "{proc.llm.dir}/llm.key",
+  "tls": null,
+  "models": [{{"name": "fake", "window": 1048576, "output": 1024}}],
+  "cued": [
+    {{"cue": "look-live-chat", "turns": [{{"lines": [{{"text": "First reply."}}, {{"call": "wait", "arguments": {{}}}}], "finish": "tool_calls", "tokens": 1}}, {{"lines": [{{"text": "Second reply."}}, {{"call": "wait", "arguments": {{}}}}], "finish": "tool_calls", "tokens": 1}}, {{"lines": [{{"call": "finish", "arguments": {{"form": "report", "text": "Live chat closed.", "fields": {{}}}}}}], "finish": "tool_calls", "tokens": 1}}]}},
+    {{"cue": "cluster-first-chat", "turns": [{{
+      "lines": [{{"text": "First worker replied."}}, {{"call": "wait", "arguments": {{}}}}],
+      "finish": "tool_calls", "tokens": 1
+    }}, {{
+      "lines": [{{"call": "finish", "arguments": {{"form": "report", "text": "First chat closed.", "fields": {{}}}}}}],
+      "finish": "tool_calls", "tokens": 1
+    }}]}},
+    {{"cue": "cluster-second-chat", "turns": [{{
+      "lines": [{{"text": "Second worker replied."}}, {{"call": "wait", "arguments": {{}}}}],
+      "finish": "tool_calls", "tokens": 1
+    }}, {{
+      "lines": [{{"call": "finish", "arguments": {{"form": "report", "text": "Second chat closed.", "fields": {{}}}}}}],
+      "finish": "tool_calls", "tokens": 1
+    }}]}}
+  ],
+  "asked": [],
+  "otherwise": ["Hello."]
+}}

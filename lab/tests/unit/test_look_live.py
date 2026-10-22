@@ -1,0 +1,399 @@
+"""Pure live experiment contracts and gallery frame decisions."""
+from contextlib import redirect_stdout
+import copy
+import hashlib
+import importlib.machinery
+import importlib.util
+import io
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import Mock, patch
+import types
+
+ROOT = Path(__file__).resolve().parents[3]
+LIVE = ROOT / 'lab/look-live'
+WEB = ROOT / 'lab/cluster-web'
+LOOK = ROOT / 'lab/look'
+SCENES = ('chat-sent', 'chat-reloaded', 'chat-closing')
+loader = importlib.machinery.SourceFileLoader('look_live_gallery', str(LIVE / 'checks/gallery'))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+gallery = importlib.util.module_from_spec(spec)
+loader.exec_module(gallery)
+
+
+def read(path):
+    return json.loads(path.read_bytes())
+
+
+def canonical(value):
+    return (json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False) + '\n').encode()
+
+
+def template(path):
+    # Leave placeholders alone; the copied templates double their JSON braces.
+    return json.loads(path.read_text().replace('{{', '{').replace('}}', '}'))
+
+
+class FilesTests(unittest.TestCase):
+    def test_copies_and_only_two_charter_changes(self):
+        copies = ['agent.json', 'chat.txt', 'relink', 'w1.json', 'w1.digest', 'w1.secret',
+                  'w2.json', 'w2.digest', 'w2.secret', 'forge-1.api-token',
+                  'forge-1.user', 'forge-1.git-token']
+        for name in copies:
+            with self.subTest(name=name):
+                self.assertEqual((LIVE / name).read_bytes(), (WEB / name).read_bytes())
+        self.assertEqual((LIVE / 'stage').read_bytes(), (LOOK / 'stage').read_bytes())
+        expected = (WEB / 'engine.json').read_bytes().replace(
+            b'"waiting_ms": 60000', b'"waiting_ms": 300000').replace(
+            b'"time_ms": 65000', b'"time_ms": 305000')
+        self.assertEqual((LIVE / 'engine.json').read_bytes(), expected)
+        before, after = template(WEB / 'engine.json'), template(LIVE / 'engine.json')
+        before['engine']['charters'][0].update(waiting_ms=300000, time_ms=305000)
+        self.assertEqual(before, after)
+        self.assertFalse((LIVE / 'checks/trouble').exists())
+        self.assertEqual({p.relative_to(LIVE).as_posix() for p in LIVE.rglob('*') if p.is_file()},
+                         set(copies) | {'engine.json', 'llm.json', 'stage', 'steps', 'experiment.json',
+                                        'checks/gallery', 'gallery/chat.json', 'gallery/chat-closing.json'} |
+                         {'scenes/' + name + '.json' for name in SCENES})
+
+    def test_cue_is_the_only_model_change(self):
+        expected = template(WEB / 'llm.json')
+        actual = template(LIVE / 'llm.json')
+        cue = next(c for c in actual['cued'] if c['cue'] == 'look-live-chat')
+        self.assertEqual(cue, dict(cue='look-live-chat', turns=[
+            dict(lines=[dict(text='First reply.'), dict(call='wait', arguments={})], finish='tool_calls', tokens=1),
+            dict(lines=[dict(text='Second reply.'), dict(call='wait', arguments={})], finish='tool_calls', tokens=1),
+            dict(lines=[dict(call='finish', arguments=dict(form='report', text='Live chat closed.', fields={}))],
+                 finish='tool_calls', tokens=1)]))
+        actual['cued'].remove(cue)
+        self.assertEqual(actual, expected)
+
+    def test_live_and_gallery_scenes(self):
+        chat = read(LOOK / 'scenes/chat.json')
+        names = [n for n in chat['names'] if n not in ('Accept', 'Accept goal', 'Reject with reason')]
+        composer = dict(role='textbox', name='Message', match='exact')
+        dialog = dict(role='dialog', name='Close', match='exact')
+        focuses = [composer, dict(role='heading', name='', match='words'),
+                   dict(role='button', name='', match='words')]
+        for name, focus in zip(SCENES, focuses):
+            with self.subTest(scene=name):
+                path = LIVE / 'scenes' / (name + '.json')
+                scene = read(path)
+                self.assertEqual(path.read_bytes(), canonical(scene))
+                self.assertEqual(scene['format'], 'look-scene/1')
+                self.assertEqual(scene['name'], name)
+                self.assertEqual(scene['widths'], chat['widths'])
+                self.assertEqual(scene['names'], names)
+                self.assertEqual(scene['expectations'], [])
+                self.assertEqual(scene['departures'], [])
+                self.assertEqual(scene['page'], dict(live='/chats/1', ready=dialog if name == 'chat-closing'
+                                                    else composer, focus=focus))
+                if name == 'chat-closing':
+                    self.assertIsNone(scene['mockup'])
+                    self.assertEqual(scene['regions'], [
+                        dict(name='banner', page=dict(role='banner', name='', match='words'), mockup=None),
+                        dict(name='dialog', page=dialog, mockup=None)])
+                else:
+                    self.assertEqual(scene['mockup'], dict(path='/chat.html?world=solo&task=T6&bare',
+                                                         ready=chat['mockup']['ready']))
+                    self.assertTrue((ROOT / 'docs/design/client/mockups' /
+                                     scene['mockup']['path'].split('?')[0][1:]).is_file())
+                    regions = [copy.deepcopy(r) for r in chat['regions']
+                               if r['name'] in ('banner', 'navigation', 'chatbar', 'composer')]
+                    next(r for r in regions if r['name'] == 'chatbar')['page'] = dict(
+                        role='region', name='T1', match='words')
+                    self.assertEqual(scene['regions'], regions)
+        gallery_names = (ROOT / 'tools/gallery/names.txt').read_text().splitlines()
+        for name in ('chat', 'chat-closing'):
+            path = LIVE / 'gallery' / (name + '.json')
+            scene = read(path)
+            self.assertEqual(path.read_bytes(), canonical(scene))
+            self.assertEqual(scene, dict(format='look-scene/1', name=name, widths=chat['widths'],
+                                        names=names, mockup=None, regions=[], expectations=[], departures=[],
+                                        page=dict(path='/chat-solo-T6.html' if name == 'chat' else '/chat-closing.html',
+                                                  ready=dict(role='main', name='', match='words'))))
+            self.assertIn(scene['page']['path'][1:-5], gallery_names)
+
+    def test_experiment_commands_and_environments(self):
+        exp = read(LIVE / 'experiment.json')
+        base = read(WEB / 'experiment.json')
+        self.assertEqual((LIVE / 'experiment.json').read_bytes(), canonical(exp))
+        self.assertEqual(set(exp), set(base))
+        for field in ('format', 'cost', 'driver', 'faults', 'planted', 'processes'):
+            self.assertEqual(exp[field], base[field])
+        self.assertEqual(exp['name'], 'look-live')
+        self.assertEqual(exp['dirs'], ['client', 'hand', 'look', 'page', 'spent'])
+        self.assertEqual(exp['actions'][:6], base['actions'][:6])
+        browse = ['{runner}/hand/browse', '{proc.browser.ready.address}']
+        env = {'PATH': '/usr/bin:/bin'}
+        capture = ['{runner}/look/capture', '--browser', '{browser.program}', '--chromium',
+                   '{browser.chromium}', '--fonts', '{browser.fonts}']
+        expected = [dict(name='drain', argv=browse + ['trouble'], env=env),
+                    read(LOOK / 'experiment.json')['actions'][0]]
+        for phase, scene in zip(('send', 'reload', 'close'), SCENES):
+            expected.extend([
+                dict(name=phase, argv=['/bin/sh', '{experiment}/steps', phase] + browse, env=env),
+                dict(name='capture-' + scene[5:], env=env, argv=capture + [
+                    '--mockups', '{source}/docs/design/client/mockups', '--live',
+                    '{proc.browser.ready.address}', '--live-out', '{dir.hand}', '--ready-seconds', '20',
+                    '--out', '{dir.look}/' + scene, '{experiment}/scenes/' + scene + '.json'])])
+        self.assertEqual(exp['actions'][6:], expected)
+        self.assertEqual(exp['collect'], [
+            dict(name='look', env={}, scan=[], argv=['/bin/cp', '-R', '--', '{dir.look}/.', '{collect.dir}/.']),
+            base['collect'][0], dict(name='gallery', env=env, scan=[], argv=capture + [
+                '--page', '{dir.page}/gallery', '--ready-seconds', '20', '--out', '{collect.dir}/capture',
+                '{experiment}/gallery/chat.json', '{experiment}/gallery/chat-closing.json'])])
+        captures = [a for scene in SCENES for a in ('--capture', '{collected.look}/' + scene)]
+        scenes = ['{experiment}/scenes/' + scene + '.json' for scene in SCENES]
+        self.assertEqual(exp['checks'], [
+            dict(name='look-' + kind, env=env, argv=['{runner}/look/check', kind] + captures + scenes)
+            for kind in ('structure', 'style')] + [dict(name='gallery', env={}, argv=[
+                '/usr/bin/python3', '-I', '-B', '-S', '{experiment}/checks/gallery', '--live',
+                '{collected.look}', '--gallery', '{collected.gallery}/capture',
+                'chat-sent=chat', 'chat-reloaded=chat', 'chat-closing=chat-closing'])])
+
+
+class LauncherTests(unittest.TestCase):
+    """Construct the real commands without invoking a build or a lab run."""
+    def launcher(self, *, dirty=False, codes=None):
+        path = ROOT / 'lab/look-live-judge'
+        source = path.read_text().split("<<'PYTHON'\n", 1)[1].rsplit('\nPYTHON', 1)[0]
+        namespace = {}
+        exec(compile(source[:source.index('\ntry:\n')], str(path), 'exec'), namespace)
+        calls = []
+        codes = codes or {}
+        def run(argv, repository, **kwargs):
+            words = list(map(str, argv))
+            calls.append(words)
+            verb = words[1]
+            output = {'status': ' M invented\n' if dirty else '', 'rev-parse': 'commit-C\n',
+                      'subject': 'subject-D\n', 'validate': 'key-K\n', 'judge': 'pass\n'}.get(verb, '')
+            return types.SimpleNamespace(returncode=codes.get(verb, 0), stdout=output)
+        namespace['run'] = run
+        namespace['sys'] = types.SimpleNamespace(
+            argv=[str(path), str(path), '/invented/skein'], path=[], stderr=Mock())
+        namespace['os'] = types.SimpleNamespace(X_OK=1, access=lambda *args: True,
+                                                environ={'CARGO_TARGET_DIR': 'target'})
+        scratch = Mock()
+        scratch.__enter__ = Mock(return_value='/invented/scratch')
+        scratch.__exit__ = Mock(return_value=False)
+        namespace['tempfile'] = types.SimpleNamespace(TemporaryDirectory=lambda **kw: scratch)
+        copy = Mock()
+        namespace['shutil'] = types.SimpleNamespace(copyfile=copy)
+        pack = Mock(return_value=b'invented tar bytes')
+        pack_module = types.ModuleType('look_pack')
+        pack_module.pack = pack
+        bar = Mock(return_value=('live bar\n', True))
+        bar_module = types.ModuleType('look_bar')
+        bar_module.bar = bar
+        with patch.dict('sys.modules', look_pack=pack_module, look_bar=bar_module), \
+                patch.object(Path, 'is_file', return_value=True), patch.object(Path, 'write_bytes'), \
+                patch.object(Path, 'chmod'), patch('sys.stdout'):
+            status = namespace['main']()
+        return status, calls, pack, copy, bar
+
+    def test_build_pack_subject_validate_judge_bar(self):
+        status, calls, pack, copy, bar = self.launcher()
+        self.assertEqual(status, 0)
+        self.assertEqual(calls[:5], [
+            ['git', 'status', '--porcelain'], ['git', 'rev-parse', 'HEAD'],
+            ['heavy', 'cargo', 'build', '--release', '-p', 'temper', '-p', 'temper-client-gallery'],
+            ['heavy', 'scripts/bundle.sh', '--release', '/invented/scratch/bundle'],
+            [str(ROOT / 'target/release/temper-client-gallery'), '/invented/scratch/gallery']])
+        self.assertEqual(calls[5][1:], [
+            'subject', '--repository', str(ROOT), '--commit', 'commit-C', '--exclude', 'lab',
+            '--artifact', 'temper=/invented/scratch/temper', '--artifact', 'bundle=/invented/scratch/bundle.tar',
+            '--artifact', 'gallery=/invented/scratch/gallery.tar'])
+        self.assertEqual([call[1:] for call in calls[6:]], [
+            ['validate', 'lab/look-live', '--subject', 'subject-D'],
+            ['judge', 'lab/look-live', '--subject', 'subject-D']])
+        self.assertEqual([call.args for call in pack.call_args_list], [
+            (Path('/invented/scratch/gallery'),), (Path('/invented/scratch/bundle'),)])
+        copy.assert_called_once_with(ROOT / 'target/release/temper', Path('/invented/scratch/temper'))
+        bar.assert_called_once_with(Path.home() / 'src/rust/tmp/lab', ROOT / 'lab/look-live', 'key-K',
+                                    Path.home() / 'src/rust/tmp/lab/judgements/look-live')
+
+    def test_dirty_build_and_validation_failures_stop(self):
+        status, calls, _, _, bar = self.launcher(dirty=True)
+        self.assertEqual((status, len(calls)), (2, 1))
+        bar.assert_not_called()
+        status, calls, _, _, bar = self.launcher(codes={'cargo': 1})
+        self.assertEqual((status, len(calls)), (4, 3))
+        status, calls, _, _, bar = self.launcher(codes={'validate': 2})
+        self.assertEqual((status, calls[-1][1]), (2, 'validate'))
+        bar.assert_not_called()
+        for code, expected in ((1, 0), (2, 2), (3, 3), (4, 4)):
+            with self.subTest(code=code):
+                self.assertEqual(self.launcher(codes={'judge': code})[0], expected)
+
+
+FRAME = '''banner
+  navigation "Main navigation"
+    link "Chats"
+  button "Sign out"
+main
+  region
+    heading 1
+    button "Close"
+  textbox "Message"
+  button "Send"
+dialog "Close"
+  button "Close"
+'''
+CONTENT = '''  region "Conversation"
+    list (2)
+    button "Close"
+    button "Folded call"
+    region "Delegate"
+      heading 2
+      button "Chats"
+'''
+
+
+class GalleryTests(unittest.TestCase):
+    def compare(self, live=FRAME, reference=FRAME):
+        return gallery.compare(live, reference, 'chat-sent', 'desktop')
+
+    def test_agrees_and_ignores_whole_conversation(self):
+        self.assertEqual(self.compare(), [])
+        live = FRAME.replace('  textbox', CONTENT + '  textbox')
+        reference = FRAME.replace('  textbox', '  region\n    button "Different content"\n  textbox')
+        self.assertEqual(self.compare(live, reference), [])
+        entries = gallery.frame(live)
+        self.assertNotIn('main', entries)
+        self.assertEqual(entries['main > region > button "Close"'], 1)
+        self.assertEqual(entries['dialog "Close" > button "Close"'], 1)
+        self.assertNotIn('main > region "Conversation" > button "Close"', entries)
+
+    def test_missing_extra_and_counts(self):
+        records = self.compare(FRAME.replace('    link "Chats"\n', '').replace(
+            '  button "Send"\n', '  button "Send"\n  button "Send"\n'))
+        self.assertEqual(records, [
+            dict(fail='chat-sent/desktop/gallery/missing/link/Chats',
+                 summary='banner > navigation "Main navigation" > link "Chats": live 0, gallery 1'),
+            dict(fail='chat-sent/desktop/gallery/extra/button/Send',
+                 summary='main > button "Send": live 2, gallery 1')])
+
+    def test_landmarks_are_distinct(self):
+        live = FRAME.replace('  button "Sign out"\n', '').replace(
+            '    link "Chats"\n', '    link "Chats"\n    button "Sign out"\n')
+        self.assertEqual({r['fail'] for r in self.compare(live)}, {
+            'chat-sent/desktop/gallery/extra/button/Sign%20out',
+            'chat-sent/desktop/gallery/missing/button/Sign%20out'})
+
+    def test_composer_at_any_depth_and_multiple_dialogs(self):
+        text = 'main\n  region\n  form\n    textbox "Message"\n    button "Send"\n'
+        self.assertEqual(gallery.frame(text), {
+            'main > region': 1, 'main > form > textbox "Message"': 1,
+            'main > form > button "Send"': 1})
+        self.assertEqual(gallery.frame('dialog\n  button\ndialog\n  button\n'),
+                         {'dialog': 2, 'dialog > button': 2})
+
+    def test_signature_encoding_and_roles(self):
+        for entry, signature in [('banner > button "a > é/\\\""', 'button/a%20%3E%20%C3%A9%2F%22'),
+                                  ('main > region > heading 1', 'heading-1'),
+                                  ('banner > list (2)', 'list-2')]:
+            self.assertEqual(gallery.entry_signature('extra', entry), 'extra/' + signature)
+
+    def test_unreadable_outline(self):
+        for text in ('   button\n', '  button\n', 'banner\n    button\n', 'banner\n  button "bad\\q"\n'):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                gallery.frame(text)
+
+
+class GalleryInputsTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.live = self.root / 'live'
+        self.reference = self.root / 'gallery'
+        self.pairs = ['chat-sent=chat']
+        self.capture(self.live / 'chat-sent', 'chat-sent')
+        self.capture(self.reference, 'chat')
+
+    def capture(self, directory, scene, text=FRAME, widths=('desktop', 'phone')):
+        directory.mkdir(parents=True, exist_ok=True)
+        records = []
+        for width in widths:
+            data = text.encode()
+            path = scene + '/' + width + '/page/outline.txt'
+            output = directory / path
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(data)
+            records.append(dict(name=width, page=dict(outline=dict(
+                path=path, bytes=len(data), sha256='sha256:' + hashlib.sha256(data).hexdigest()))))
+        (directory / 'capture.json').write_bytes(canonical(dict(format='look-capture/1', scenes=[
+            dict(name=scene, widths=records)])))
+
+    def judge(self):
+        return gallery.judge(self.live, self.reference, self.pairs)
+
+    def test_success_and_status_one_with_undecided(self):
+        self.assertEqual(self.judge(), (0, []))
+        self.capture(self.live / 'chat-sent', 'chat-sent', FRAME.replace('  button "Send"\n', ''))
+        self.pairs.append('absent=chat')
+        status, records = self.judge()
+        self.assertEqual(status, 1)
+        self.assertEqual(len([r for r in records if 'fail' in r]), 2)
+        self.assertIn('undecided', records[-1])
+
+    def test_absent_or_unreadable_record_scene_and_width(self):
+        path = self.live / 'chat-sent/capture.json'
+        original = path.read_bytes()
+        for data in (None, b'{', b'\xff', b'[]', b'{}', canonical(dict(format='other')),
+                     canonical(dict(format='look-capture/1', scenes=[]))):
+            with self.subTest(data=data):
+                if data is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(data)
+                status, records = self.judge()
+                self.assertEqual(status, 2)
+                self.assertIn('undecided', records[0])
+                path.write_bytes(original)
+        self.capture(self.live / 'chat-sent', 'chat-sent', widths=('desktop',))
+        status, records = self.judge()
+        self.assertEqual(status, 2)
+        self.assertIn('phone', records[0]['undecided'])
+        self.pairs = ['bad-pair', '../escape=chat', 'chat-sent=absent']
+        self.assertEqual(self.judge()[0], 2)
+
+    def test_outline_missing_unreadable_size_and_digest(self):
+        directory = self.live / 'chat-sent'
+        record = read(directory / 'capture.json')
+        width = record['scenes'][0]['widths'][0]
+        outline = width['page']['outline']
+        path = directory / outline['path']
+        original = path.read_bytes()
+        for data in (None, b'wrong size', b'x' * len(original)):
+            with self.subTest(data=data):
+                if data is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(data)
+                self.assertEqual(self.judge()[0], 2)
+                path.write_bytes(original)
+        for data in (b'\xff', b'   button\n'):
+            self.capture(directory, 'chat-sent', text=data.decode('latin1'))
+            if data == b'\xff':
+                current = read(directory / 'capture.json')
+                file = current['scenes'][0]['widths'][0]['page']['outline']
+                (directory / file['path']).write_bytes(data)
+                file.update(bytes=len(data), sha256='sha256:' + hashlib.sha256(data).hexdigest())
+                (directory / 'capture.json').write_bytes(canonical(current))
+            self.assertEqual(self.judge()[0], 2)
+
+    def test_output_contract(self):
+        self.capture(self.live / 'chat-sent', 'chat-sent', FRAME.replace('    link "Chats"\n', ''))
+        output = io.StringIO()
+        with redirect_stdout(output):
+            status = gallery.main(['--live', str(self.live), '--gallery', str(self.reference), *self.pairs])
+        self.assertEqual(status, 1)
+        self.assertTrue(all(set(json.loads(line)) == {'fail', 'summary'} for line in output.getvalue().splitlines()))
+
+
+if __name__ == '__main__':
+    unittest.main()
