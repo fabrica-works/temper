@@ -192,8 +192,9 @@ mod memory_literal;
 // Naming navigation and cards adds two phrases (296 B).
 // The forge side's kept change panel (client/README.md 4.6): its handle, its box
 // and the panel's bounded heap add 4,976 B.
+// A task's name over its words in a chat adds one phrase (148 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 262198989125;
+const WEB_BYTES: u64 = 262198989273;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
