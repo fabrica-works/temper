@@ -1,6 +1,6 @@
 # The protocol layer
 
-Provisional, 2026-10-03, revised 2026-10-21. temper's protocol layer:
+Provisional, 2026-10-03, revised 2026-10-22. temper's protocol layer:
 how temper composes jig's protocol layer with components of its own (its
 forge's, its checkout's, its client's) into the processes of one binary.
 jig owns the layer's shape (jig's `protocol/README.md`) and the services'
@@ -849,7 +849,7 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   stopped, and done once the engine has every turn and answer, or past
   its grace (jig's `protocol/service.md`, section 6), exiting 0; then
   the engine, drained, exiting 0; then the fakes. A process not ended
-  within the description's `stop_seconds` is killed, its tree with it,
+  within its cost class's `stop_seconds` (15.5) is killed, its tree with it,
   and the stop fails.
 - **No survivors:** each process in a cgroup of its own, its agents and
   git within it; a stop is done once its cgroup is empty, and a process
@@ -891,6 +891,31 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   the processes stopped in reverse, a termination signal, then
   `stop_seconds`, then the tree killed. It reads none of the lab's own
   members (actions, faults, collection, checks), and refuses none.
+- **The reader's bindings,** where the lab's runner has its own (skein's
+  `lab.md`, 4.2): `{artifact.temper}` is the absolute path of the
+  `temper` binary the tier built, as Cargo names it to the test
+  (`CARGO_BIN_EXE_temper`); `{experiment}` is the absolute
+  `lab/cluster/`; `{proc.P.dir}` is P's own directory under the test's
+  scratch, each made `0700` before any process starts; and
+  `{proc.P.ready.C}` is the capture, known once P is ready. A name of any
+  other kind (a seed's, a run's, a run directory's, the browser's) fails
+  the test, naming it: the description uses none.
+- **Its cost class,** `temper-cluster`, is the binding's (`../qa.md`,
+  10.1), as every experiment's is (skein's `lab.md`, 6.5): the reader
+  holds its `ready_seconds` and `stop_seconds` as that table gives
+  them, the first bounding each process's ready lines from its start,
+  the second each process's stop.
+- **The fake forge waits** on `temper serve` reconciling a fake forge at
+  its start (setup.md, 5.1). Until then an engine on a fake forge needs
+  `temper forge reconcile` run once before it, a step the lab's format
+  has no place for, as `../qa.md` (4.3 and section 11) waits on the same.
+  So `lab/cluster/` holds the fake LLM, the engine and the workers, the
+  engine's one forge connected and unreached, as the process tier's
+  other documents have theirs; its tasks are chats, and its stories'
+  referee the tasks' ends on their named workers and no survivor. The
+  fake forge joins the description, after which the engine starts, once
+  serve reconciles at its start: the change of serve's command line's
+  owner.
 - **Why a description,** not one program both call: the lab's runner is
   Python and the process tier is Rust; the lab's format is literal so
   that readers in any language agree (skein's `lab.md`, 4.3); and a
