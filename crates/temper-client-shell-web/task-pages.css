@@ -37,9 +37,10 @@
 .temper-task-budget > [role=term]:not(:has(~ [role=term])), .temper-task-budget > [role=definition]:not(:has(~ [role=term])) { border-bottom: 0; }
 .temper-task-budget > [role=term]:not(:has(~ [role=term])), .temper-task-budget > [role=definition]:last-child { padding-bottom: 0; }
 .temper-task-budget a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
-/* A heard result's "Task N" in Latest activity, drawn as the plan's task links. */
-.temper-events > li > div > a { font-weight: 700; }
-.temper-events > li > div > a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
+/* A heard result's "Task N" in Latest activity: in a line of text, a link in
+   the accent, as the lineage bar's and the chat card's task links are. */
+.temper-events > li > div > a { color: var(--temper-accent-dark); font-weight: 700; }
+.temper-events > li > div > a:hover { text-decoration: underline; }
 /* .tree-row at 1100px: the reference narrows kind, state and spend. */
 @media (max-width: 1100px) {
   .temper-plan-row:has(> .temper-plan-spend) { grid-template-columns: minmax(0, 1fr) 130px 220px max-content; }
