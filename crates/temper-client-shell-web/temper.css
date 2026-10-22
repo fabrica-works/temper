@@ -422,7 +422,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-updates > .temper-card > * { grid-column: 2; min-width: 0; }
 .temper-kind-result::before { content: "✓" / ""; color: var(--temper-green); }
 .temper-kind-reply::before { content: "✳" / ""; color: var(--temper-green); }
-.temper-page .temper-updates .temper-title { font-size: 11px; }
+.temper-page .temper-updates .temper-title { font-size: 11px; margin-bottom: 0; }
 .temper-page .temper-updates p { color: var(--temper-muted); margin: 4px 0 0; }
 .temper-page .temper-updates .temper-meta p { margin: 0; }
 .temper-page .temper-updates .temper-update-time { color: var(--temper-faint); font-size: 10px; }
