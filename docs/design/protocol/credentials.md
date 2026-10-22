@@ -274,6 +274,10 @@ sources in its holder's order. temper configures the LLM providers
   never in a root, temper's records, a fact, a request or an answer. A
   key reaches the engine in a request the client sends once and never
   keeps (jig's `domain/accounts.md`, section 5).
+- **Nothing handed in.** No record is read from a file or from another
+  program's login: a ChatGPT account comes only from a sign-in (jig's
+  `protocol/llm.md`, 5.4), and its grant is a bearer with no account's
+  id (jig's `protocol/llm.md`, 5.3).
 - **The sources** (jig's `domain/accounts.md`, 3.4):
   - **signed in:** the person's sign-in with the LLM provider, asked
     from the client. The engine binds a loopback listener for each

@@ -313,8 +313,8 @@ in the lower world that owns it, never here.
   3.4; ../client/tools.md, 11.3). The real loop and process tier (2.6)
   use runtime key adoption. Lower domain worlds first keep temper's real
   first-start rows at receipt one, then preseed restored fixture keys at receipt two; configuration
-  names providers only. D2 is private fixture input, never configuration;
-  fallback D leaves the live tier off until JP13.
+  names providers only, and no world hands a record in; the live tier
+  is off until temper offers ChatGPT's sign-in (2.7).
 - **LLM accounts' stories** (../protocol/credentials.md, section 7),
   one path per source beside the key every story adds first (above),
   each scripted on the fake peers, never by chance:
@@ -794,11 +794,12 @@ and 10).
 
 ### 2.7 The live tier
 
-**Off until JP13 (fallback D).** The retained test is ignored and
-`scripts/proof-live.sh` exits nonzero before live-login or any credential
-copy. Production accepts no D2 input; JP13 must prove live sign-in before
-this tier can run. The following describes that deferred tier (accounts-2
-`later.md`, JP13 and "live tier off until JP13").
+**Off until temper offers ChatGPT's sign-in** (accounts-jp13b's M3).
+The retained test is ignored and `scripts/proof-live.sh` exits nonzero
+before any sign-in. Nothing is handed in: no input takes a record, no
+tool reads another program's login, and a ChatGPT account comes only
+from a sign-in (../protocol/credentials.md, section 3). The following
+describes the tier as it will run.
 
 `crates/temper/tests/live.rs`, after jig's (jig's `protocol/service.md`,
 section 8; testing-strategy.md, 2.9).
