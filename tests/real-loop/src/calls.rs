@@ -29,6 +29,14 @@ pub enum Step {
     /// Finish runtime fixture provisioning before recording the story calls.
     FixtureReady,
     Advance,
+    /// Drain a named worker while retaining its root for a restart.
+    StopWorker {
+        name: &'static str,
+    },
+    /// Start a drained worker again on its retained directories.
+    StartWorker {
+        name: &'static str,
+    },
     AddWorker {
         name: &'static str,
     },
@@ -78,6 +86,16 @@ pub enum Step {
 #[must_use]
 pub fn add_worker(name: &'static str) -> Step {
     Step::AddWorker { name }
+}
+/// Terminate one worker and wait until its service and ring I/O settle.
+#[must_use]
+pub fn stop_worker(name: &'static str) -> Step {
+    Step::StopWorker { name }
+}
+/// Restart a settled worker on its own directories and wait for its new link.
+#[must_use]
+pub fn start_worker(name: &'static str) -> Step {
+    Step::StartWorker { name }
 }
 #[must_use]
 pub fn advance() -> Step {
@@ -223,6 +241,7 @@ pub(crate) struct Caller {
     pub(crate) released: bool,
     pub(crate) advanced: Cell<bool>,
     pub(crate) added: Cell<bool>,
+    pub(crate) worker_ready: Cell<bool>,
     pub(crate) held: Cell<bool>,
     pub(crate) links: Cell<u32>,
     retry_link: Option<u32>,
@@ -250,6 +269,8 @@ impl Caller {
         self.steps.iter().filter_map(|step| match step {
             Step::Held { name } => Some(*name),
             Step::FixtureReady
+            | Step::StopWorker { .. }
+            | Step::StartWorker { .. }
             | Step::AddWorker { .. }
             | Step::Advance
             | Step::SignIn { .. }
@@ -270,6 +291,12 @@ impl Caller {
             Some(Step::AddWorker { name }) => Some(*name),
             _ => None,
         }
+    }
+    pub(crate) fn stopping_worker(&self) -> Option<&'static str> {
+        if let Some(Step::StopWorker { name }) = self.steps.get(self.next) { Some(*name) } else { None }
+    }
+    pub(crate) fn starting_worker(&self) -> Option<&'static str> {
+        if let Some(Step::StartWorker { name }) = self.steps.get(self.next) { Some(*name) } else { None }
     }
     pub(crate) fn advancing(&self) -> bool {
         matches!(self.steps.get(self.next), Some(Step::Advance))
@@ -307,6 +334,7 @@ impl Caller {
             released: false,
             advanced: Cell::new(false),
             added: Cell::new(false),
+            worker_ready: Cell::new(false),
             held: Cell::new(false),
             links: Cell::new(0),
             retry_link: None,
@@ -361,6 +389,8 @@ impl Caller {
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
             Step::FixtureReady
+            | Step::StopWorker { .. }
+            | Step::StartWorker { .. }
             | Step::AddWorker { .. }
             | Step::Advance
             | Step::Join { .. }
@@ -387,6 +417,7 @@ impl Caller {
                         serde_json::from_slice(&self.calls[*call].stdout).expect("activity JSON");
                     value
                         .pointer("/activity/before/value")
+                        .or_else(|| value.pointer("/before/value"))
                         .and_then(serde_json::Value::as_str)
                         .expect("previous activity page")
                         .as_bytes()
@@ -601,8 +632,9 @@ impl Caller {
             Step::FixtureReady if self.running.iter().any(Option::is_some) => return,
             Step::FixtureReady => self.fixture_ready(),
             Step::AddWorker { .. } if !self.added.replace(false) => return,
+            Step::StopWorker { .. } | Step::StartWorker { .. } if !self.worker_ready.replace(false) => return,
             Step::Advance if !self.advanced.get() => return,
-            Step::AddWorker { .. } | Step::Advance => {}
+            Step::StopWorker { .. } | Step::StartWorker { .. } | Step::AddWorker { .. } | Step::Advance => {}
             Step::Held { .. } => return,
             Step::Kill { call } => {
                 let index = *call;
@@ -691,6 +723,7 @@ impl Caller {
     fn can_advance(&self) -> bool {
         match self.steps.get(self.next) {
             Some(Step::FixtureReady) => self.running.iter().all(Option::is_none),
+            Some(Step::StopWorker { .. } | Step::StartWorker { .. }) => self.worker_ready.get(),
             Some(Step::Advance) => self.advanced.get(),
             Some(Step::AddWorker { .. }) => self.added.get(),
             Some(Step::Held { .. }) => self.held.get(),
