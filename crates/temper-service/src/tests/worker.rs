@@ -339,16 +339,10 @@ impl LinkPeer {
                 | engine_link::Request::Closed) => panic!("engine request: {other:?}"),
             }
         }
-        if let Some(read) = self.engine_read
-            && let Some(bytes) = self.engine_bytes.meet(read)
-        {
-            self.engine_read = None;
+        if let Some(bytes) = demanded_bytes(&mut self.engine_read, &mut self.engine_bytes) {
             self.lower(LowerEvent::Read(stream::Up::Bytes(bytes)));
         }
-        if let Some(read) = self.worker_read
-            && let Some(bytes) = self.worker_bytes.meet(read)
-        {
-            self.worker_read = None;
+        if let Some(bytes) = demanded_bytes(&mut self.worker_read, &mut self.worker_bytes) {
             worker.up(fixtures::NOW, io::Event::Stream { owner: self.owner, up: stream::Up::Bytes(bytes) });
         }
         None
@@ -360,6 +354,439 @@ impl LinkPeer {
             &mut self.out,
         );
     }
+}
+
+// Both concrete peers use the same stream contract: a delivery spends a real
+// demand, and everything else stays in the intake below the component.
+fn demanded_bytes(read: &mut Option<stream::Read>, intake: &mut Intake) -> Option<Box<[u8]>> {
+    let bytes = intake.meet((*read)?)?;
+    *read = None;
+    Some(bytes)
+}
+
+const AGENT_OWNER: Token = Token::new(23);
+const AGENT_CHILD: Token = Token::new(101);
+const AGENT_INPUT: Token = Token::new(102);
+const AGENT_OUTPUT: Token = Token::new(103);
+const AGENT_ERROR: Token = Token::new(104);
+const ADMITTED: u16 = 0x0106;
+const TURN: u16 = 0x0109;
+const ANSWER: u16 = 0x0110;
+const LIVE: u16 = 0x0112;
+const FRAME_HEADER_BYTES: u32 = 8; // skein's channel frame header.
+const PEER_FRAMES: u32 = 6; // Accept, Terms, Admitted, Live, Turn, Answer.
+const PEER_STEPS: u16 = 1000; // The existing LinkPeer's finite settling bound.
+
+// Private agent peer for the Worker's Process IO, without a root assignment.
+// The ledger measures actual frame writes and demanded byte deliveries; it
+// neither supplies process events nor stands in for Worker::process_read.
+struct AgentPeer {
+    component: smith_protocol_channel::Component,
+    events: Queue<smith_protocol_channel::OpenEvent>,
+    out: Queue<Lower>,
+    agent_bytes: Intake,
+    worker_bytes: Intake,
+    agent_read: Option<stream::Read>,
+    worker_read: Option<stream::Read>,
+    writes: skein_lib::List<(u16, u64)>,
+    written: u64,
+    consumed: u64,
+    stdout_demands: u64,
+    finished: bool,
+    ends: u32,
+    input_finishes: u32,
+    output_closes: u32,
+}
+impl AgentPeer {
+    fn start(worker: &mut crate::Worker) -> Self {
+        let agent = fixtures::worker_agent();
+        let host = agent.limits;
+        // The host's output bound prices initiator frames. The new responder
+        // needs its own directional frame bound; Worker keeps its existing one.
+        let mut channel = host.channel;
+        for version in &smith_protocol_channel::schema_for_start(&host.bodies, host.start_bytes).unwrap().versions {
+            for kind in &version.kinds {
+                if kind.direction == skein_channel::Direction::FromResponder {
+                    channel.output_bytes =
+                        channel.output_bytes.max(kind.largest.checked_add(FRAME_HEADER_BYTES).unwrap());
+                }
+            }
+        }
+        let limits = smith_protocol_channel::Limits {
+            bodies: host.bodies,
+            start_bytes: host.start_bytes,
+            charter: host.charter,
+            transcript: host.transcript,
+            channel,
+            endpoints: host.endpoints,
+            calls: host.calls,
+            resume_turns: agent.host_limits.turns,
+            search_hits: host.transcript.found_hits,
+            turns: agent.host_limits.turns,
+            fact_reserve_frames: 1,
+            fact_reserve_bytes: 128,
+            grants: agent.host_limits.accounts,
+        };
+        let mut peer = Self {
+            component: smith_protocol_channel::Component::new(
+                &limits,
+                skein_channel::StreamMode::Two,
+                agent.endpoints.clone(),
+            )
+            .unwrap(),
+            events: Queue::with_capacity(smith_protocol_channel::max_out(&limits).to_domain),
+            out: Queue::with_capacity(smith_protocol_channel::max_out(&limits).below),
+            agent_bytes: Intake::with_capacity(host.channel.output_bytes),
+            worker_bytes: Intake::with_capacity(channel.output_bytes),
+            agent_read: None,
+            worker_read: None,
+            writes: skein_lib::List::with_capacity(PEER_FRAMES),
+            written: 0,
+            consumed: 0,
+            stdout_demands: 0,
+            finished: false,
+            ends: 0,
+            input_finishes: 0,
+            output_closes: 0,
+        };
+        worker.route(root::Request::Process(Box::new(smith_host_domain::process::Request::Spawn {
+            owner: AGENT_OWNER,
+            workspace: None,
+            deadline: Time::from_nanos(u64::MAX),
+        })));
+        let io::Request::Spawn { owner, .. } = worker.io().pop().expect("process spawn IO") else {
+            panic!("agent spawn");
+        };
+        worker.up(
+            fixtures::NOW,
+            io::Event::Spawned { owner, child: AGENT_CHILD, pipes: Box::new([AGENT_INPUT, AGENT_OUTPUT, AGENT_ERROR]) },
+        );
+        peer.settle(worker);
+        let opened = peer.events.pop();
+        let Some(smith_protocol_channel::OpenEvent::Opened { .. }) = opened else {
+            panic!("agent opening: {opened:?}");
+        };
+        let mut start = decoded_chat_start(&agent);
+        start.live = Some(smith_host_domain::channel::LiveAsk { text: true, reasoning: false, input: false });
+        Self::send(
+            worker,
+            smith_host_domain::Down::Start {
+                start: *start,
+                window: smith_host_domain::Window {
+                    turns: agent.host_limits.turns,
+                    bytes: agent.host_limits.unacknowledged_bytes,
+                },
+            },
+        );
+        peer.settle(worker);
+        let Some(smith_protocol_channel::OpenEvent::Start { .. }) = peer.events.pop() else {
+            panic!("agent receives Start");
+        };
+        peer.component.send_admitted(AGENT_OWNER, &mut peer.events, &mut peer.out).unwrap();
+        peer.settle(worker);
+        peer
+    }
+    fn send(worker: &mut crate::Worker, message: smith_host_domain::Down) {
+        worker.route(root::Request::Process(Box::new(smith_host_domain::process::Request::Send {
+            owner: AGENT_OWNER,
+            process: AGENT_CHILD,
+            message,
+        })));
+    }
+    fn read(&mut self, worker: &mut crate::Worker) {
+        worker.route(root::Request::Process(Box::new(smith_host_domain::process::Request::Read {
+            owner: AGENT_OWNER,
+            process: AGENT_CHILD,
+        })));
+        self.settle(worker);
+    }
+    fn lower(&mut self, event: LowerEvent) {
+        self.component.from_below(event, &mut self.events, &mut self.out);
+    }
+    fn consumed_frames(&self) -> Box<[u16]> {
+        let mut kinds = skein_lib::List::with_capacity(PEER_FRAMES);
+        for &(kind, end) in &self.writes {
+            if kind >= ADMITTED && end <= self.consumed {
+                kinds.push(kind).unwrap();
+            }
+        }
+        kinds.into_boxed()
+    }
+    fn worker_request(&mut self, worker: &mut crate::Worker, request: io::Request) {
+        match request {
+            io::Request::Output { stream, down: stream::OutputDown::Room { right, .. } } => {
+                assert_eq!(stream, AGENT_INPUT);
+                worker.up(
+                    fixtures::NOW,
+                    io::Event::Output {
+                        owner: AGENT_INPUT,
+                        up: stream::OutputUp::Settled { right, outcome: stream::OutputOutcome::Granted },
+                    },
+                );
+            }
+            io::Request::Output { stream, down: stream::OutputDown::Send { bytes, .. } } => {
+                assert_eq!(stream, AGENT_INPUT);
+                self.agent_bytes.append(&bytes).unwrap();
+            }
+            io::Request::Stream { stream, down: stream::Down::Demand { read, room: 0 } } => {
+                if stream == AGENT_OUTPUT {
+                    if read == stream::Read::Nothing {
+                        self.worker_read = None;
+                    } else {
+                        assert!(self.worker_read.is_none(), "one outstanding stdout demand");
+                        self.stdout_demands = self.stdout_demands.checked_add(1).unwrap();
+                        self.worker_read = Some(read);
+                    }
+                } else {
+                    assert_eq!(stream, AGENT_ERROR, "only stderr is independent of the channel");
+                }
+            }
+            io::Request::Stream { stream, down: stream::Down::Finish } => {
+                assert_eq!(stream, AGENT_INPUT);
+                self.input_finishes = self.input_finishes.checked_add(1).unwrap();
+            }
+            io::Request::Close { entity } => {
+                assert_eq!(entity, AGENT_OUTPUT);
+                self.output_closes = self.output_closes.checked_add(1).unwrap();
+            }
+            other @ (io::Request::Listen { .. }
+            | io::Request::Connect { .. }
+            | io::Request::Bind { .. }
+            | io::Request::Reject { .. }
+            | io::Request::Stream { .. }
+            | io::Request::Output { .. }
+            | io::Request::Spawn { .. }
+            | io::Request::Signal { .. }
+            | io::Request::Usage { .. }
+            | io::Request::Window { .. }
+            | io::Request::Abort { .. }) => panic!("agent IO: {other:?}"),
+        }
+    }
+    fn settle(&mut self, worker: &mut crate::Worker) {
+        for _ in 0..PEER_STEPS {
+            worker.iterate(fixtures::NOW, Wall::EPOCH);
+            self.component.fire(&mut self.events, &mut self.out);
+            let mut progressed = false;
+            while let Some(request) = worker.io().pop() {
+                progressed = true;
+                self.worker_request(worker, request);
+            }
+            while let Some(request) = self.out.pop() {
+                progressed = true;
+                match request {
+                    Lower::Write(stream::OutputDown::Room { right, .. }) => {
+                        self.lower(LowerEvent::Write(stream::OutputUp::Settled {
+                            right,
+                            outcome: stream::OutputOutcome::Granted,
+                        }));
+                    }
+                    Lower::Write(stream::OutputDown::Send { bytes, .. }) => {
+                        let header = skein_channel::parse_header(
+                            bytes.get(..usize::try_from(FRAME_HEADER_BYTES).unwrap()).unwrap(),
+                        )
+                        .unwrap();
+                        assert_eq!(
+                            u32::try_from(bytes.len()).unwrap(),
+                            FRAME_HEADER_BYTES.checked_add(header.body_len).unwrap(),
+                            "one whole frame per channel write"
+                        );
+                        self.written = self.written.checked_add(u64::try_from(bytes.len()).unwrap()).unwrap();
+                        self.writes.push((header.kind, self.written)).unwrap();
+                        self.worker_bytes.append(&bytes).unwrap();
+                    }
+                    Lower::Read(stream::Down::Demand { read, room: 0 }) => self.agent_read = Some(read),
+                    Lower::FinishWrite => self.finished = true,
+                    other @ (Lower::Read(_)
+                    | Lower::Write(stream::OutputDown::Cancel { .. } | stream::OutputDown::Release { .. })) => {
+                        panic!("agent lower: {other:?}")
+                    }
+                }
+            }
+            if let Some(bytes) = demanded_bytes(&mut self.agent_read, &mut self.agent_bytes) {
+                progressed = true;
+                self.lower(LowerEvent::Read(stream::Up::Bytes(bytes)));
+            }
+            if let Some(bytes) = demanded_bytes(&mut self.worker_read, &mut self.worker_bytes) {
+                progressed = true;
+                self.consumed = self.consumed.checked_add(u64::try_from(bytes.len()).unwrap()).unwrap();
+                worker.up(fixtures::NOW, io::Event::Stream { owner: AGENT_OUTPUT, up: stream::Up::Bytes(bytes) });
+            } else if self.worker_read.is_some() && self.worker_bytes.is_empty() && self.finished && self.ends == 0 {
+                progressed = true;
+                self.ends = self.ends.checked_add(1).unwrap();
+                worker.up(fixtures::NOW, io::Event::Stream { owner: AGENT_OUTPUT, up: stream::Up::End });
+            }
+            if !progressed {
+                return;
+            }
+        }
+        panic!("agent channel settles within the existing peer bound");
+    }
+}
+
+#[test]
+fn the_worker_demands_each_cancellation_record_and_end() {
+    use smith_domain_run as run;
+    let mut worker = fixtures::started_worker().worker;
+    let mut peer = AgentPeer::start(&mut worker);
+    let opening_reads = peer.stdout_demands;
+    assert!(peer.consumed_frames().is_empty(), "admission waits below Worker for Read");
+    assert!(peer.worker_read.is_none());
+    peer.read(&mut worker);
+    assert_eq!(peer.consumed_frames().as_ref(), [ADMITTED], "Read must consume the queued admission");
+    assert!(peer.stdout_demands > opening_reads, "admission is consumed through actual stdout demands");
+
+    // A real demand waits through a Send/Cancel and is then spent by Live.
+    peer.read(&mut worker);
+    assert!(peer.worker_read.is_some(), "Read leaves a real stdout demand pending");
+    let waiting = (peer.consumed, peer.stdout_demands, peer.worker_read);
+    AgentPeer::send(&mut worker, smith_host_domain::Down::Cancel);
+    peer.settle(&mut worker);
+    let Some(smith_protocol_channel::OpenEvent::Cancel) = peer.events.pop() else {
+        panic!("agent receives Cancel");
+    };
+    assert!(peer.events.is_empty(), "one Cancel reaches the real agent peer");
+    assert_eq!(
+        (peer.consumed, peer.stdout_demands, peer.worker_read),
+        waiting,
+        "Cancel preserves the outstanding demand"
+    );
+    assert!(
+        peer.component
+            .send_live(
+                smith_protocol_channel::Piece { turn: 1, retry: 0, offset: 0, bytes: b"last text" },
+                AGENT_OWNER,
+                &mut peer.events,
+                &mut peer.out,
+            )
+            .unwrap()
+    );
+    peer.settle(&mut worker);
+    assert_eq!(peer.consumed_frames().as_ref(), [ADMITTED, LIVE]);
+    assert!(peer.worker_read.is_none(), "Live spends exactly one demand");
+
+    let agent = fixtures::worker_agent();
+    let body = cancellation_turn(&agent);
+    let turn = smith_protocol_channel::decode_turn(&body, 1, &agent.limits.transcript, &agent.endpoints).unwrap();
+    peer.component
+        .send_turn(1, None, run::Spend::ZERO, true, &turn, AGENT_OWNER, &mut peer.events, &mut peer.out)
+        .unwrap();
+    peer.component
+        .send_answer(
+            fixtures::NOW,
+            run::Answer::Failed { failure: run::Failure::Cancelled, spent: run::Spend::ZERO, turns: 1 },
+            None,
+            AGENT_OWNER,
+            &mut peer.events,
+            &mut peer.out,
+        )
+        .unwrap();
+    let held = (peer.consumed, peer.stdout_demands);
+    peer.settle(&mut worker);
+    assert_eq!(
+        (peer.consumed, peer.stdout_demands),
+        held,
+        "queued final records cannot consume even a header without Read"
+    );
+    assert_eq!(peer.consumed_frames().as_ref(), [ADMITTED, LIVE]);
+    assert!(!peer.worker_bytes.is_empty(), "final Turn and Answer are held below Worker");
+    let mut written = peer.writes.iter().rev();
+    assert_eq!(written.next().unwrap().0, ANSWER, "both final frames reached the byte stream");
+    assert_eq!(written.next().unwrap().0, TURN);
+
+    peer.read(&mut worker);
+    assert_eq!(peer.consumed_frames().as_ref(), [ADMITTED, LIVE, TURN]);
+    assert!(peer.worker_read.is_none());
+    assert_eq!(
+        (peer.input_finishes, peer.ends, peer.output_closes),
+        (0, 0, 0),
+        "Turn cannot also deliver Answer or end"
+    );
+    let after_turn = (peer.consumed, peer.stdout_demands, peer.worker_bytes.len());
+    peer.settle(&mut worker);
+    assert_eq!(
+        (peer.consumed, peer.stdout_demands, peer.worker_bytes.len()),
+        after_turn,
+        "the second frame stays untouched"
+    );
+
+    peer.read(&mut worker);
+    assert_eq!(peer.consumed_frames().as_ref(), [ADMITTED, LIVE, TURN, ANSWER]);
+    assert_eq!(
+        (peer.input_finishes, peer.ends, peer.output_closes),
+        (1, 0, 0),
+        "the real Answer finishes stdin, leaving end for Read"
+    );
+    assert!(peer.worker_read.is_none());
+    let reads_before_end = peer.stdout_demands;
+    peer.read(&mut worker);
+    assert_eq!((peer.ends, peer.output_closes), (1, 1), "one demanded end closes stdout");
+    assert_eq!(peer.stdout_demands, reads_before_end + 1, "one actual IO demand receives EOF");
+    assert_eq!(peer.consumed, peer.written, "all queued bytes were demanded");
+    peer.settle(&mut worker);
+    assert_eq!((peer.ends, peer.output_closes), (1, 1), "end settles only once");
+}
+
+fn cancellation_turn(agent: &crate::settings::Agent) -> Box<[u8]> {
+    use smith_transcript::v6 as transcript;
+    let limits = &agent.limits.transcript;
+    let mut blocks = skein_lib::List::with_capacity(1);
+    blocks
+        .push(transcript::Block::Text(
+            transcript::Text::new(limits, transcript::TextParts { text: b"last text".as_slice().into(), replay: None })
+                .unwrap(),
+        ))
+        .unwrap();
+    let mut messages = skein_lib::List::with_capacity(1);
+    messages
+        .push(
+            transcript::Message::new(limits, transcript::MessageParts { role: transcript::Role::Assistant, blocks })
+                .unwrap(),
+        )
+        .unwrap();
+    let turn = transcript::Turn::new(
+        limits,
+        transcript::TurnParts {
+            kind: transcript::TurnKind::Ordinary,
+            opening: Some(
+                transcript::Opening::new(
+                    limits,
+                    transcript::OpeningParts {
+                        affinity: transcript::Affinity::new(
+                            limits,
+                            transcript::AffinityParts { key: [0; 16], thread: 0 },
+                        )
+                        .unwrap(),
+                        account: None,
+                        backend: transcript::Backend::Direct,
+                    },
+                )
+                .unwrap(),
+            ),
+            endpoint: b"fake".as_slice().into(),
+            model: b"small".as_slice().into(),
+            effort: None,
+            dialect: fixtures::DIALECT,
+            place: 1,
+            usage: transcript::Usage::new(
+                limits,
+                transcript::UsageParts {
+                    input: None,
+                    output: None,
+                    cache_read: None,
+                    cache_write: None,
+                    reasoning: None,
+                },
+            )
+            .unwrap(),
+            spent: 0,
+            jobs: 0,
+            messages,
+        },
+    )
+    .unwrap();
+    let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).unwrap());
+    turn.encode(&mut writer).unwrap();
+    writer.finish()
 }
 
 #[test]
