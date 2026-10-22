@@ -1,7 +1,8 @@
 use super::fixtures;
 use jig_client::contract::*;
-use skein_lib::{List, Wall};
+use skein_lib::{Env, List, Queue, Time, Token, Wall};
 use skein_ui::{Builder, Role};
+use temper_client_domain::{Domain, Request};
 const TASK: u64 = 9;
 const TEXT: u32 = 32;
 const SPENT: u64 = 7;
@@ -188,7 +189,7 @@ pub(super) fn status_rows() -> [(TaskLine, skein_ui::Style); 11] {
         }
         if (4..=6).contains(&index) {
             details.observation = Some(OwnerChipObservation {
-                channel: skein_lib::Token::new(1),
+                channel: Token::new(1),
                 work: match index {
                     4 => OwnerChipWork::Writing,
                     5 => OwnerChipWork::Tool { call: Box::from(*b"call"), tool: Box::from(*b"search") },
@@ -250,34 +251,13 @@ fn a_row_shows_the_real_activity_or_end_time() {
     assert!(skein_lib::bytes::find(&fixtures::text(&shown), b"01-01 00:00Z").is_some());
 }
 
-pub(super) fn listed_root() -> temper_client_domain::Domain {
-    use skein_lib::{Env, Queue, Time};
-    use temper_client_domain::{Address, Event, Request};
-    let limits = fixtures::domain_limits();
-    let (mut root, me_watch, _) =
-        fixtures::root_at(Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, &limits);
-    let template = fixtures::chat::messaging_root();
-    let me = template.pages().me(template.client()).expect("me").clone();
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
-    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+fn open_chats(root: &mut Domain, env: &Env<temper_client_domain::Limits>, out: &mut Queue<Request>) -> (Token, Token) {
+    use temper_client_domain::{Address, Event};
     temper_client_domain::step(
-        &mut root,
-        &env,
-        Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched {
-                    watch: me_watch,
-                    event: WatchEvent::Delivered(Delivery::Me(Box::new(me))),
-                },
-            },
-        },
-        &mut out,
-    );
-    temper_client_domain::step(
-        &mut root,
-        &env,
+        root,
+        env,
         Event::Went { place: temper_client_domain::Place::Address(Address::Chats) },
-        &mut out,
+        out,
     );
     let mut watch = None;
     let mut read = None;
@@ -301,22 +281,58 @@ pub(super) fn listed_root() -> temper_client_domain::Domain {
             read = Some(token);
         }
     }
+    (watch.expect("live watch"), read.expect("closed read"))
+}
+fn deliver_live(
+    root: &mut Domain,
+    env: &Env<temper_client_domain::Limits>,
+    out: &mut Queue<Request>,
+    watch: Token,
+    rows: List<TaskLine>,
+) {
+    use temper_client_domain::Event;
+    temper_client_domain::step(
+        root,
+        env,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: false }))),
+                },
+            },
+        },
+        out,
+    );
+}
 
-    let mut live = List::with_capacity(1);
-    live.push(line()).expect("live row");
+pub(super) fn listed_root() -> Domain {
+    use temper_client_domain::{Address, Event};
+    let limits = fixtures::domain_limits();
+    let (mut root, me_watch, _) =
+        fixtures::root_at(Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, &limits);
+    let template = fixtures::chat::messaging_root();
+    let me = template.pages().me(template.client()).expect("me").clone();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
     temper_client_domain::step(
         &mut root,
         &env,
         Event::Client {
             event: jig_client::Event::Up {
                 up: jig_client::Up::Watched {
-                    watch: watch.expect("live watch"),
-                    event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows: live, more: false }))),
+                    watch: me_watch,
+                    event: WatchEvent::Delivered(Delivery::Me(Box::new(me))),
                 },
             },
         },
         &mut out,
     );
+    let (watch, read) = open_chats(&mut root, &env, &mut out);
+
+    let mut live = List::with_capacity(1);
+    live.push(line()).expect("live row");
+    deliver_live(&mut root, &env, &mut out, watch, live);
     let mut closed = List::with_capacity(1);
     let mut ended = line();
     ended.chip.task = 8;
@@ -328,7 +344,7 @@ pub(super) fn listed_root() -> temper_client_domain::Domain {
         Event::Client {
             event: jig_client::Event::Up {
                 up: jig_client::Up::ReadDone {
-                    read: read.expect("closed read"),
+                    read,
                     result: jig_client::Readout::Jig(ReadResult::Value(ReadValue::Tasks(Box::new(TaskPage {
                         live: List::with_capacity(0),
                         live_after: None,
@@ -377,47 +393,19 @@ fn an_empty_demo_start_has_only_its_invitation_heading() {
 
 #[test]
 fn a_live_demo_chat_brings_back_its_section_heading() {
-    use skein_lib::{Env, Queue, Time};
-    use temper_client_domain::{Address, Event, Request};
+    use temper_client_domain::Address;
     let mut root = fixtures::demo_root(
         Address::Inbox { filter: temper_client_domain::address::Filter::ALL },
         fixtures::PROJECT,
         true,
     );
     let limits = fixtures::domain_limits();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
-    temper_client_domain::step(
-        &mut root,
-        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-        Event::Went { place: temper_client_domain::Place::Address(Address::Chats) },
-        &mut out,
-    );
-    let mut watch = None;
-    while let Some(request) = out.pop() {
-        if let Request::Client {
-            request:
-                jig_client::Request::Down {
-                    down:
-                        jig_client::Down::Open { watch: token, subject: jig_client::Watchable::Jig(Subject::Tasks { .. }) },
-                },
-        } = request
-        {
-            watch = Some(token);
-        }
-    }
+    let (watch, _) = open_chats(&mut root, &env, &mut out);
     let mut rows = List::with_capacity(1);
     rows.push(line()).expect("live row");
-    fixtures::root_event(
-        &mut root,
-        Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched {
-                    watch: watch.expect("live watch"),
-                    event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: false }))),
-                },
-            },
-        },
-    );
+    deliver_live(&mut root, &env, &mut out, watch, rows);
     let view = fixtures::page_view(&root);
     assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Live chats").is_some());
     assert!(fixtures::find(view.tree(), Role::Link, b"Chat 9").is_some());
