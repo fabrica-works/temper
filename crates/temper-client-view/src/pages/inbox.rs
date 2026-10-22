@@ -237,7 +237,7 @@ fn entry(
         if has_facts(page) {
             b.open(Role::Slot);
             b.style(look::DETAILS);
-            crate::confirm::facts(b, page, words, rows);
+            crate::confirm::facts(b, page, words, rows, false);
             b.close();
         }
         crate::confirm::controls(b, root, card, words, bindings);

@@ -191,6 +191,8 @@ pub const NAV_COUNT: Style = Style { owner: owner(), token: 92 };
 pub const PROPOSAL_FACTS: Style = Style { owner: owner(), token: 93 };
 /// An empty list's words, in a dashed box.
 pub const EMPTY: Style = Style { owner: owner(), token: 94 };
+/// The proposal type above its title.
+pub const PROPOSAL_KICKER: Style = Style { owner: owner(), token: 95 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -291,6 +293,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-nav-count",
         b"temper-proposal-facts",
         b"temper-empty",
+        b"temper-proposal-kicker",
     ],
     regions: &[b"temper-link"],
 };

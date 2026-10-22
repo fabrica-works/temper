@@ -1235,7 +1235,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::AskedByDeployment => (&[b"Asked by deployment of project ", b""], &[Number]),
         Word::Deadline => (&[b"Due ", b""], &[HoleKind::Date]),
         Word::DeadlineMoment => (&[b"Due ", b" UTC"], &[HoleKind::Moment]),
-        Word::Priority => (&[b"Priority ", b""], &[Number]),
+        Word::Priority => (&[b"priority ", b""], &[Number]),
         Word::Folded => (&[b"Folded: ", b" ", b""], &[Number, Name]),
         Word::HeldBelow => (&[b"Held below: ", b""], &[Number]),
         Word::ActivityAt => (&[b"", b""], &[HoleKind::Moment]),

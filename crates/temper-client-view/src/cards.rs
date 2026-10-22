@@ -270,15 +270,15 @@ impl Words {
         ending(b, value, self);
     }
 }
-pub fn proposal(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
-    proposal::draw(b, page, words, rows);
+pub fn proposal(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
+    proposal::draw(b, page, words, rows, kicker);
 }
 
 pub(crate) fn proposal_reason(b: &mut Builder, page: &c::ReadValue) {
     proposal::reason(b, page);
 }
-pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
-    proposal::facts(b, page, words, rows);
+pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
+    proposal::facts(b, page, words, rows, kicker);
 }
 
 pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {

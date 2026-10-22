@@ -725,8 +725,10 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 }
 @media (max-width: 430px) {
   .temper-chat .temper-chatbar { flex-wrap: nowrap; gap: 9px; }
+  .temper-chat:not(:has(> .temper-agent-lineage)) .temper-chatbar { height: 37px; padding-block: 0; gap: 18px; }
   .temper-chat .temper-chatbar > div:first-child { flex-wrap: nowrap; width: auto; flex: 1 1 auto; }
   .temper-chat .temper-chatbar > div:last-child { flex-wrap: nowrap; gap: 6px; white-space: nowrap; }
+  .temper-chat:not(:has(> .temper-agent-lineage)) .temper-chatbar > div:last-child { gap: 18px; }
   .temper-chat .temper-chatbar > div:last-child > * { flex: none; }
   .temper-chat .temper-chatbar [role=status] { max-width: none; white-space: nowrap; overflow-wrap: normal; }
   /* The mockup hides the narrow status and spend, keeping the title and acts. */
@@ -740,11 +742,11 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-navigation .temper-nav-count { color: var(--temper-accent); }
 
 /* Proposal facts retain their labels on both the chat and inbox cards. */
-.temper-proposal-facts { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 6px 10px; margin: 10px 0; }
+.temper-proposal-facts { font-size: 11px; display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 6px 10px; margin: 10px 0; }
 .temper-proposal-facts > [role=term] { color: var(--temper-muted); font-size: 11px; }
 .temper-proposal-facts > [role=definition] { min-width: 0; }
 .temper-proposal-facts [role=definition] > p { margin: 0; font-size: 11px; }
-.temper-kind-proposal h2 { font: 700 14px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 6px 0; }
+.temper-kind-proposal h2 { color: var(--temper-ink); font: 700 14px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 6px 0; }
 .temper-chat .temper-turn > .temper-kind-proposal { margin: 4px 0 22px 109px; border: 0; border-left: 2px solid var(--temper-accent); border-radius: 0; box-shadow: none; background: #f8f5f0; padding: 14px 18px 15px; }
 .temper-chat .temper-cards { padding: 0; }
 .temper-chat .temper-kind-proposal > a { display: inline-block; margin-top: 13px; color: var(--temper-accent-dark); font-size: 11px; }
@@ -756,6 +758,17 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 
 /* Rejection's editor stays folded until the person asks for it. */
 .temper-kind-proposal > details { display: inline-block; margin: 13px 8px 0 0; vertical-align: top; }
-.temper-kind-proposal > details > summary { cursor: pointer; color: var(--temper-accent-dark); font-size: 11px; }
-.temper-kind-proposal > details[open] { display: block; }
+.temper-kind-proposal > details > summary { display: inline-block; list-style: none; cursor: pointer; border: 1px solid #ddd6cb; background: transparent; border-radius: 5px; min-height: 30px; padding: 5px 9px; color: #6a6258; font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.temper-kind-proposal > details > summary::-webkit-details-marker { display: none; }
+.temper-kind-proposal > details > summary:hover { border-color: #ba9c89; color: #9d5139; }
+.temper-kind-proposal > details > summary:focus-visible { outline: 2px solid var(--temper-accent); outline-offset: 2px; }
+/* Open, the editor takes the row's width left beside the buttons before it, its summary where it was folded. */
+.temper-kind-proposal > button:has(~ details[open]) { float: left; margin-top: 13px; }
+.temper-kind-proposal > details[open] { display: flow-root; margin-top: 0; padding-top: 13px; min-width: 14em; max-width: 30em; }
+.temper-kind-proposal > details[open] > textarea { width: 100%; }
 .temper-chat .temper-kind-proposal > details button { background: transparent; border-color: #ddd6cb; color: #6a6258; }
+
+.temper-proposal-kicker, .temper-main .temper-kind-proposal .temper-proposal-kicker { margin: 0; color: #a55b43; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+
+/* Shared proposal headings and rows keep the card’s own surface in the inbox. */
+.temper-kind-proposal > .temper-details:has(> .temper-proposal-facts) { display: contents; }

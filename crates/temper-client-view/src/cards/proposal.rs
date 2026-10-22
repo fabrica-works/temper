@@ -3,9 +3,9 @@ use super::{P, phrase, specification, status, text};
 use crate::words::{Word, Words};
 use jig_client::contract as c;
 use skein_ui::{Builder, Role, phrases::Hole};
-pub(super) fn draw(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
+pub(super) fn draw(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
     reason(b, page);
-    facts(b, page, words, rows);
+    facts(b, page, words, rows, kicker);
 }
 fn batch(page: &c::ReadValue) -> Option<&skein_lib::List<c::ProposedTask>> {
     match page {
@@ -50,17 +50,29 @@ fn batch(page: &c::ReadValue) -> Option<&skein_lib::List<c::ProposedTask>> {
     }
 }
 pub(super) fn reason(b: &mut Builder, page: &c::ReadValue) {
-    if let Some(tasks) = batch(page) {
-        for task in tasks {
-            let written = task.spec.specification.words.bytes();
-            let end = skein_lib::bytes::find(written, b"\n").unwrap_or(written.len());
-            text(b, Role::Heading { level: 2 }, written.get(..end).expect("title prefix"));
-            if end < written.len() {
-                skein_ui::markdown::read(written.get(end..).expect("spec body"), 3, b);
-            }
-        }
-    } else {
+    // Batch headings need the phrasebook; facts draws them before its rows.
+    if batch(page).is_none() {
         why(b, page);
+    }
+}
+/// The kicker is the caller's: a chat's card says its kind above its title,
+/// an inbox card's tag says it already.
+fn title(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &Words, kicker: bool) {
+    if kicker {
+        b.open(Role::Paragraph);
+        b.style(crate::look::PROPOSAL_KICKER);
+        let kicker = words.say(Word::Proposal, &[]);
+        b.name(&kicker);
+        b.text(skein_ui::Run::Plain, &kicker);
+        b.close();
+    }
+    for task in tasks {
+        let written = task.spec.specification.words.bytes();
+        let end = skein_lib::bytes::find(written, b"\n").unwrap_or(written.len());
+        text(b, Role::Heading { level: 2 }, written.get(..end).expect("title prefix"));
+        if end < written.len() {
+            skein_ui::markdown::read(written.get(end..).expect("spec body"), 3, b);
+        }
     }
 }
 fn why(b: &mut Builder, page: &c::ReadValue) {
@@ -93,8 +105,9 @@ fn why(b: &mut Builder, page: &c::ReadValue) {
         | c::ReadValue::OwnerDeployment(_) => {}
     }
 }
-pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
+pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, kicker: bool) {
     if let Some(tasks) = batch(page) {
+        title(b, tasks, words, kicker);
         batch_facts(b, page, tasks, words, rows);
         return;
     }
@@ -185,25 +198,34 @@ fn batch_facts(
     proposed(b, tasks, words, rows);
     text(b, Role::Term, &words.say(Word::ProposalBudget, &[]));
     b.open(Role::Description);
-    super::decision(b, words, Some(page), c::ActKind::Accept);
-    b.close();
-    b.close();
-    for task in window(b, words, tasks.as_slice(), rows) {
-        phrase(b, words, P::ProposalBudget, &[Hole::Number(task.budget)]);
+    b.open(Role::Paragraph);
+    let facts = jig_client::facts::decision(Some(page), c::ActKind::Accept);
+    let mut first = true;
+    for fact in &jig_client::words::decision(&facts, &words.book, words.language) {
+        if !first {
+            separator(b);
+        }
+        b.text(skein_ui::Run::Plain, fact);
+        first = false;
     }
     if let c::ReadValue::Proposal(proposal) = page {
-        phrase(b, words, P::Spend, &[Hole::Number(proposal.needs.budget)]);
-        phrase(
+        fact(b, words, P::Spend, &[Hole::Number(proposal.needs.budget)], true);
+        fact(
             b,
             words,
             P::Delegation,
             &[Hole::Number(u64::from(proposal.needs.tasks)), Hole::Number(u64::from(proposal.needs.depth))],
+            true,
         );
-        for grant in window(b, words, proposal.needs.grants.as_slice(), rows) {
+        for grant in window_facts(b, words, proposal.needs.grants.as_slice(), rows, true) {
+            separator(b);
             crate::forge::drawn(b, &c::Part::Kind { connector: grant.connector, kind: grant.kind }, words);
-            pattern(b, &grant.pattern, words, rows);
+            pattern_facts(b, &grant.pattern, words, rows, true);
         }
     }
+    b.close();
+    b.close();
+    b.close();
 }
 
 fn task_hold(b: &mut Builder, task: &c::Task, words: &Words, rows: u32) {
@@ -221,33 +243,47 @@ fn proposed(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &W
     for task in window(b, words, tasks.as_slice(), rows) {
         text(b, Role::Term, &words.say(Word::Goal, &[]));
         b.open(Role::Description);
-        phrase(b, words, P::ProposalTask, &[Hole::Number(task.number)]);
-        super::specification_facts(b, &task.spec, words);
+        b.open(Role::Paragraph);
+        b.text(skein_ui::Run::Plain, &words.say_card(P::ProposalTask, &[Hole::Number(task.number)]));
+        specification_facts(b, &task.spec, words);
         match task.executor {
-            c::OwnerExecutor::Agent { charter } => phrase(b, words, P::Charter, &[Hole::Number(u64::from(charter))]),
-            c::OwnerExecutor::Procedure { code, .. } => {
-                phrase(b, words, P::ProcedureCode, &[Hole::Number(u64::from(code))]);
+            c::OwnerExecutor::Agent { charter } => {
+                fact(b, words, P::Charter, &[Hole::Number(u64::from(charter))], true);
             }
-            c::OwnerExecutor::Person(_) => words.text(b, Word::PersonTask, &[]),
+            c::OwnerExecutor::Procedure { code, .. } => {
+                fact(b, words, P::ProcedureCode, &[Hole::Number(u64::from(code))], true);
+            }
+            c::OwnerExecutor::Person(_) => {
+                separator(b);
+                b.text(skein_ui::Run::Plain, &words.say(Word::PersonTask, &[]));
+            }
         }
-        authority(b, &task.authority, words, rows);
+        authority_facts(b, &task.authority, words, rows, true);
+        fact(b, words, P::ProposalBudget, &[Hole::Number(task.budget)], true);
         for dependency in &task.dependencies {
-            phrase(b, words, P::Input, &[Hole::Number(*dependency)]);
+            fact(b, words, P::Input, &[Hole::Number(*dependency)], true);
         }
         if task.cut {
-            status(b, words, P::Cut, &[]);
+            fact(b, words, P::Cut, &[], true);
         }
+        b.close();
         b.close();
         text(b, Role::Term, &words.say(Word::ProposalLanding, &[]));
         b.open(Role::Description);
-        for resource in window(b, words, task.resources.as_slice(), rows) {
-            b.open(Role::Paragraph);
+        b.open(Role::Paragraph);
+        for (at, resource) in window_facts(b, words, task.resources.as_slice(), rows, true).iter().enumerate() {
+            if at != 0 {
+                separator(b);
+            }
             crate::forge::owner_part(b, resource, words);
-            b.close();
         }
         if let Some(priority) = task.priority {
-            text(b, Role::Paragraph, &words.say(Word::Priority, &[Hole::Number(u64::from(priority))]));
+            if !task.resources.is_empty() {
+                separator(b);
+            }
+            b.text(skein_ui::Run::Plain, &words.say(Word::Priority, &[Hole::Number(u64::from(priority))]));
         }
+        b.close();
         b.close();
     }
 }
@@ -267,53 +303,114 @@ fn authority_change(
     authority(b, after, words, rows);
 }
 fn authority(b: &mut Builder, document: &c::OwnerAuthorityDocument, words: &Words, rows: u32) {
+    authority_facts(b, document, words, rows, false);
+}
+fn authority_facts(b: &mut Builder, document: &c::OwnerAuthorityDocument, words: &Words, rows: u32, inline: bool) {
     let value = &document.authority;
-    phrase(b, words, P::Spend, &[Hole::Number(value.spend)]);
-    phrase(b, words, P::Tools, &[Hole::Number(value.tools)]);
-    phrase(b, words, P::NoteBits, &[Hole::Number(u64::from(value.notes))]);
-    phrase(
+    fact(b, words, P::Spend, &[Hole::Number(value.spend)], inline);
+    fact(b, words, P::Tools, &[Hole::Number(value.tools)], inline);
+    fact(b, words, P::NoteBits, &[Hole::Number(u64::from(value.notes))], inline);
+    fact(
         b,
         words,
         P::Delegation,
         &[Hole::Number(u64::from(value.delegation.tasks)), Hole::Number(u64::from(value.delegation.depth))],
+        inline,
     );
     if let Some(deadline) = value.deadline {
+        if inline {
+            separator(b);
+        }
         b.text(skein_ui::Run::Plain, &words.deadline(deadline));
     }
-    for kind in window(b, words, value.delegation.kinds.as_slice(), rows) {
+    for kind in window_facts(b, words, value.delegation.kinds.as_slice(), rows, inline) {
         let (word, number) = match kind {
             c::OwnerAuthorityExecutor::Charter(number) => (P::Charter, *number),
             c::OwnerAuthorityExecutor::Procedure(number) => (P::ProcedureCode, *number),
             c::OwnerAuthorityExecutor::Role(number) => (P::PersonRole, *number),
         };
-        phrase(b, words, word, &[Hole::Number(u64::from(number))]);
+        fact(b, words, word, &[Hole::Number(u64::from(number))], inline);
     }
-    for grant in window(b, words, value.grants.as_slice(), rows) {
+    for grant in window_facts(b, words, value.grants.as_slice(), rows, inline) {
+        if inline {
+            separator(b);
+        }
         crate::forge::drawn(b, &c::Part::Kind { connector: grant.connector, kind: grant.kind }, words);
-        pattern(b, &grant.pattern, words, rows);
+        pattern_facts(b, &grant.pattern, words, rows, inline);
     }
-    for scope in window(b, words, value.note_resources.as_slice(), rows) {
-        pattern(b, &scope.pattern, words, rows);
+    for scope in window_facts(b, words, value.note_resources.as_slice(), rows, inline) {
+        pattern_facts(b, &scope.pattern, words, rows, inline);
     }
     if document.cut {
-        status(b, words, P::Cut, &[]);
+        if inline {
+            fact(b, words, P::Cut, &[], true);
+        } else {
+            status(b, words, P::Cut, &[]);
+        }
     }
 }
-fn pattern(b: &mut Builder, pattern: &c::OwnerPattern, words: &Words, _rows: u32) {
+fn pattern(b: &mut Builder, pattern: &c::OwnerPattern, words: &Words, rows: u32) {
+    pattern_facts(b, pattern, words, rows, false);
+}
+fn pattern_facts(b: &mut Builder, pattern: &c::OwnerPattern, words: &Words, _rows: u32, inline: bool) {
     for segment in &pattern.segments {
-        phrase(b, words, P::PatternSegment, &[super::name(segment)]);
+        fact(b, words, P::PatternSegment, &[super::name(segment)], inline);
     }
     let (word, bytes) = match &pattern.last {
         c::OwnerPatternEnd::Exact(bytes) => (P::PatternExact, bytes),
         c::OwnerPatternEnd::Open(bytes) => (P::PatternOpen, bytes),
     };
-    phrase(b, words, word, &[super::name(bytes)]);
+    fact(b, words, word, &[super::name(bytes)], inline);
 }
 
 fn window<'a, T>(b: &mut Builder, words: &Words, values: &'a [T], rows: u32) -> &'a [T] {
+    window_facts(b, words, values, rows, false)
+}
+fn window_facts<'a, T>(b: &mut Builder, words: &Words, values: &'a [T], rows: u32, inline: bool) -> &'a [T] {
     let count = values.len().min(usize::try_from(rows).expect("row bound fits"));
     if count < values.len() {
-        status(b, words, P::Cut, &[]);
+        if inline {
+            fact(b, words, P::Cut, &[], true);
+        } else {
+            status(b, words, P::Cut, &[]);
+        }
     }
     values.get(..count).expect("bounded prefix")
+}
+
+fn separator(b: &mut Builder) {
+    b.text(skein_ui::Run::Plain, " · ".as_bytes());
+}
+fn fact(b: &mut Builder, words: &Words, word: P, holes: &[Hole], inline: bool) {
+    if inline {
+        separator(b);
+        b.text(skein_ui::Run::Plain, &words.say_card(word, holes));
+    } else {
+        phrase(b, words, word, holes);
+    }
+}
+fn specification_facts(b: &mut Builder, document: &c::SpecificationDocument, words: &Words) {
+    for parameter in &document.specification.parameters {
+        match parameter {
+            c::ParameterDocument::Number { name, value } => {
+                fact(b, words, P::ParameterNumber, &[Hole::Number(u64::from(*name)), Hole::Number(*value)], true);
+            }
+            c::ParameterDocument::Bytes { name, value } => {
+                fact(b, words, P::ParameterBytes, &[Hole::Number(u64::from(*name)), super::name(value.bytes())], true);
+            }
+            c::ParameterDocument::Resource { name, connector, resource } => fact(
+                b,
+                words,
+                P::ParameterResource,
+                &[Hole::Number(u64::from(*name)), Hole::Number(*resource), Hole::Number(u64::from(*connector))],
+                true,
+            ),
+        }
+    }
+    for task in &document.specification.inputs {
+        fact(b, words, P::Input, &[Hole::Number(*task)], true);
+    }
+    if document.has_loss() {
+        fact(b, words, P::Cut, &[], true);
+    }
 }

@@ -138,7 +138,7 @@ pub(super) fn batch_proposal() -> c::ReadValue {
 fn a_proposals_title_and_labelled_facts_follow_the_mockup() {
     use skein_ui::Role;
     let mut builder = Builder::new(&fixtures::tree_limits());
-    crate::cards::proposal(&mut builder, &batch_proposal(), &fixtures::words(), 4);
+    crate::cards::proposal(&mut builder, &batch_proposal(), &fixtures::words(), 4, true);
     let tree = builder.finish();
     assert!(fixtures::find(&tree, Role::Heading { level: 2 }, b"Ship update").is_some());
     assert!(fixtures::find(&tree, Role::Heading { level: 3 }, b"Proposed tasks").is_none());
@@ -160,9 +160,7 @@ fn a_proposals_title_and_labelled_facts_follow_the_mockup() {
         assert_eq!(tree.nodes()[description].role, Role::Description);
         assert!(skein_lib::bytes::find(&fixtures::node_text(&tree, description), expected).is_some());
     }
-    let priority = super::chat::named_position(tree.nodes(), Role::Paragraph, Some(b"Priority 2"))
-        .expect("separate priority paragraph");
-    assert!(!fixtures::node_text(&tree, priority).starts_with(b"branch"));
+    assert!(fixtures::find(&tree, Role::Paragraph, b"Priority 2").is_none());
 }
 
 fn document_proposal() -> c::ReadValue {
@@ -244,5 +242,107 @@ fn proposal_titles_head_the_cards_and_funding_is_said_once_in_both_pages() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn a_proposal_kicker_precedes_the_title_in_a_chat_but_not_in_the_inbox() {
+    use skein_ui::Role;
+    let page = batch_proposal();
+    for (root, kicked) in [
+        (fixtures::chat::proposal_root_with_document(None, Some(page.clone())), true),
+        (
+            fixtures::inbox_with_document(
+                temper_client_domain::address::Filter::ALL,
+                Some((
+                    c::Read::Proposal {
+                        proposal: c::ProposalKey {
+                            proposer: c::Proposer::Task(fixtures::INBOX_TASK),
+                            number: fixtures::INBOX_QUESTION,
+                        },
+                    },
+                    page,
+                )),
+            ),
+            false,
+        ),
+    ] {
+        let view = fixtures::page_view(&root);
+        let tree = view.tree();
+        let title =
+            super::chat::named_position(tree.nodes(), Role::Heading { level: 2 }, Some(b"Ship update")).unwrap();
+        let mut kickers = 0_u32;
+        let mut first = None;
+        for (at, node) in tree.nodes().iter().enumerate() {
+            if node.styles.as_slice().contains(&crate::look::PROPOSAL_KICKER) {
+                kickers += 1;
+                first = first.or(Some(at));
+            }
+        }
+        if kicked {
+            assert_eq!(kickers, 1, "one Proposal kicker in a chat");
+            let kicker = first.expect("Proposal kicker");
+            assert_eq!(fixtures::node_text(tree, kicker).as_ref(), b"Proposal");
+            assert!(kicker < title);
+        } else {
+            assert_eq!(kickers, 0, "the inbox's tag says the kind: no kicker");
+        }
+    }
+}
+
+#[test]
+fn proposal_facts_are_labelled_joined_and_contained_in_their_rows() {
+    use skein_ui::Role;
+    let owner = batch_proposal();
+    let mut document = document_proposal();
+    let c::ReadValue::OwnerProposal(source) = &owner else { panic!("owner proposal") };
+    let c::OwnerProposalAction::Batch(tasks) = &source.action else { panic!("batch") };
+    let c::ReadValue::Proposal(target) = &mut document else { panic!("document proposal") };
+    let mut tasks = tasks.clone();
+    let task = tasks.get_mut(0).unwrap();
+    task.authority.authority.delegation.tasks = 0;
+    task.authority.authority.delegation.depth = 0;
+    target.action = c::ProposalAction::Batch { tasks, own: true };
+    for (page, delegation, budget) in [
+        (
+            owner,
+            "1 tasks, depth 1",
+            "Funded by pool in project 1, person 73, period 1 · Funding needed: 40 · Funding left: 120 · Funding after: 80",
+        ),
+        (
+            document,
+            "0 tasks, depth 0",
+            "Funds 40 from your pool · 120 left, 80 after · May spend 40 · May delegate 1 tasks, depth 1",
+        ),
+    ] {
+        let mut builder = Builder::new(&fixtures::tree_limits());
+        crate::cards::proposal(&mut builder, &page, &fixtures::words(), 4, true);
+        let tree = builder.finish();
+        let mut rows = None;
+        for (at, node) in tree.nodes().iter().enumerate() {
+            if node.styles.as_slice().contains(&crate::look::PROPOSAL_FACTS) {
+                rows = Some(at);
+                break;
+            }
+        }
+        let rows = rows.unwrap();
+        let goal = alloc::fmt::format(format_args!(
+            "Make task 1 yours · Agent charter 2 · May spend 6 · Tool permissions 7 · Note permissions 7 · May delegate {delegation} · Budget 6"
+        ));
+        for (label, expected) in [
+            (b"Goal".as_slice(), goal.as_str()),
+            (b"Landing", "branch main of robin/tally on github.com · priority 2"),
+            (b"Budget", budget),
+        ] {
+            let at = super::chat::named_position(tree.nodes(), Role::Term, Some(label)).unwrap();
+            let description = at + usize::try_from(tree.nodes()[at].size).unwrap();
+            assert_eq!(tree.nodes()[description].role, Role::Description);
+            assert_eq!(fixtures::node_text(&tree, description).as_ref(), expected.as_bytes(), "row {label:?}");
+        }
+        assert_eq!(
+            rows + usize::try_from(tree.nodes()[rows].size).unwrap(),
+            tree.nodes().len(),
+            "no loose fact after the rows"
+        );
     }
 }

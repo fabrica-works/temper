@@ -923,32 +923,28 @@ fn committed(
                 b.close();
                 b.close();
             }
-            for (block_at, block) in blocks.iter().enumerate() {
+            for block in blocks {
                 if let c::Block::Call(call) = block {
                     tasks.clear();
                     delegation::delegated(call, tasks);
                     cards(b, tasks, delegations, shown, words, bindings);
-                    if let Some((root, name)) = proposals {
-                        let chat = root.pages().chat().expect("chat page");
-                        for card in &chat.cards {
-                            if call.objects.as_slice().contains(&card.object)
-                                && proposal_anchor(chat, card.object, rows) == Some((name, message_at, block_at))
-                            {
-                                proposal_card(
-                                    b,
-                                    root,
-                                    card,
-                                    words,
-                                    bindings,
-                                    (rows, times.as_deref_mut()),
-                                    Role::Region,
-                                );
-                            }
+                }
+            }
+            folded_calls(b, blocks, tasks, delegations, words);
+            for (block_at, block) in blocks.iter().enumerate() {
+                if let c::Block::Call(call) = block
+                    && let Some((root, name)) = proposals
+                {
+                    let chat = root.pages().chat().expect("chat page");
+                    for card in &chat.cards {
+                        if call.objects.as_slice().contains(&card.object)
+                            && proposal_anchor(chat, card.object, rows) == Some((name, message_at, block_at))
+                        {
+                            proposal_card(b, root, card, words, bindings, (rows, times.as_deref_mut()), Role::Region);
                         }
                     }
                 }
             }
-            folded_calls(b, blocks, tasks, delegations, words);
         }
         // Input messages have no shell. Their results can still be the first
         // retained anchor of a delegated task (client/README.md, 3.5 and 5.7).

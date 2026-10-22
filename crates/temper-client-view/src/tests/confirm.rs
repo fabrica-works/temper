@@ -166,6 +166,8 @@ fn proposal_rows_and_task_release_keep_their_own_shapes() {
         (
             fixtures::chat::proposal_root(),
             &[
+                Role::Paragraph,
+                Role::Text,
                 Role::Slot,
                 Role::Term,
                 Role::Text,
@@ -175,6 +177,7 @@ fn proposal_rows_and_task_release_keep_their_own_shapes() {
                 Role::Term,
                 Role::Text,
                 Role::Description,
+                Role::Paragraph,
                 Role::Button,
                 Role::Disclosure,
                 Role::TextArea,

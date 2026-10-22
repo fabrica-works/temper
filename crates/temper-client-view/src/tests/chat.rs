@@ -1386,7 +1386,7 @@ fn the_chatbar_draws_the_supplied_budget_including_zero() {
 }
 
 #[test]
-fn a_proposal_stands_once_at_its_first_call_after_the_messages_text() {
+fn a_proposals_fold_precedes_its_card_after_the_message() {
     use fixtures::first_run as run;
     let object = c::ObjectKey::Proposal(fixtures::chat::PROPOSAL);
     let mut proposal = run::call(3, b"propose", b"{}", None);
@@ -1451,6 +1451,9 @@ fn a_proposal_stands_once_at_its_first_call_after_the_messages_text() {
     let card = style_position(children, crate::look::CARD).expect("proposal inside first turn");
     let message = style_position(children, crate::look::MESSAGE).expect("message");
     assert!(card >= message + usize::try_from(children[message].size).unwrap());
+    let fold = style_position(children, crate::look::WORK).expect("fold in the same turn");
+    assert!(fold >= message + usize::try_from(children[message].size).unwrap());
+    assert!(fold + usize::try_from(children[fold].size).unwrap() <= card, "fold before proposal card");
     assert_eq!(named_count(&tree, Role::Button, b"Accept"), 1);
     assert!(fixtures::find(&tree, Role::Paragraph, b"2 tool calls").is_some());
     let said = fixtures::text(&tree);
