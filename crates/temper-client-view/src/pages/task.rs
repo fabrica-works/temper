@@ -9,7 +9,11 @@ use skein_lib::{List, bytes::copy_of};
 use skein_ui::{Builder, Role, Run, phrases::Hole};
 use temper_client_domain::{
     Address, Domain,
-    pages::{Act, task::Shape},
+    pages::{
+        Act,
+        delegation::{self, Kind, State},
+        task::Shape,
+    },
 };
 fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.open(role);
@@ -40,6 +44,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         crate::choice::composer(b, root, Some(task), words, bindings);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
+            result(b, task, words);
         }
         if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
@@ -48,6 +53,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         }
         if page.shape == Shape::Tracked {
             latest(b, page.latest.as_deref(), words);
+            budget(b, task, root.pages().me(root.client()), words, bindings);
         }
     }
     crate::confirm::main(b, root, words, bindings, rows);
@@ -90,9 +96,6 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     b.style(look::META);
     phase(b, task.chip.phase, words);
     requester(b, task.requester, me, words);
-    if let Some(deadline) = task.budget.deadline {
-        text(b, Role::Paragraph, &words.deadline(deadline));
-    }
     b.close();
     b.close();
 }
@@ -145,6 +148,18 @@ fn phase_token(phase: c::Phase) -> skein_ui::Style {
 pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {
     region(b, Word::Asked, words);
     b.style(look::TASK_CARD);
+    b.open(Role::Paragraph);
+    b.style(look::TASK_CONTRACT);
+    let kind = match delegation::facts(task).kind {
+        Kind::Report => Word::GoalReport,
+        Kind::Change => Word::GoalChange,
+        Kind::Verdict => Word::GoalVerdict,
+        Kind::Approval => Word::GoalApproval,
+    };
+    let name = words.say(kind, &[]);
+    b.name(&name);
+    b.text(Run::Plain, &name);
+    b.close();
     skein_ui::markdown::read(task.spec.specification.words.bytes(), 3, b);
     let parts = !task.resources.is_empty()
         || match &task.context {
@@ -168,6 +183,104 @@ pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {
     }
     if parts {
         b.close();
+    }
+    b.close();
+}
+pub(crate) fn result(b: &mut Builder, task: &c::Task, words: &Words) {
+    let facts = delegation::facts(task);
+    match facts.state {
+        State::Running | State::Held => return,
+        State::Done | State::Landed | State::Failed | State::Cancelled | State::Ended => {}
+    }
+    region(b, Word::GoalResult, words);
+    b.style(look::TASK_CARD);
+    crate::cards::delegation::status(b, facts.state, words);
+    if let Some(said) = facts.said {
+        crate::cards::delegation::said(b, said, words);
+    }
+    b.close();
+}
+pub(crate) fn budget(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words, bindings: &mut Bindings) {
+    region(b, Word::BudgetAuthority, words);
+    b.style(look::TASK_CARD);
+    b.style(look::TASK_BUDGET);
+    let budget = &task.budget;
+    let authority = &task.authority.authority;
+    text(
+        b,
+        Role::Paragraph,
+        &words.say(
+            Word::BudgetLeft,
+            &[Hole::Number(budget.numbers.spent), Hole::Number(budget.left), Hole::Number(budget.numbers.budget)],
+        ),
+    );
+    for (term, amount) in
+        [(Word::DelegatesSpent, budget.numbers.spent_below), (Word::ReservedDelegates, budget.numbers.reserved)]
+    {
+        text(b, Role::Term, &words.say(term, &[]));
+        text(b, Role::Description, &words.say(Word::Amount, &[Hole::Number(amount)]));
+    }
+    text(b, Role::Term, &words.say(Word::FundedBy, &[]));
+    match budget.funder {
+        c::Funder::Task(number) => {
+            b.open(Role::Description);
+            task_link(b, number, words, bindings);
+            b.close();
+        }
+        c::Funder::Pool { person, .. } => {
+            let mine = match me {
+                Some(me) => me.party.number == person,
+                None => false,
+            };
+            let name = if mine {
+                words.say(Word::YourPool, &[])
+            } else {
+                words.say(Word::PersonPool, &[Hole::Number(person)])
+            };
+            text(b, Role::Description, &name);
+        }
+        c::Funder::Recurring { task, .. } => {
+            text(b, Role::Description, &words.say(Word::RecurringBudget, &[Hole::Number(task)]));
+        }
+        c::Funder::Period { project, .. } => {
+            text(b, Role::Description, &words.say(Word::ProjectBudget, &[Hole::Number(u64::from(project))]));
+        }
+    }
+    text(b, Role::Term, &words.say(Word::BudgetDeadline, &[]));
+    let deadline = match budget.deadline {
+        Some(at) => words.deadline(at),
+        None => words.say(Word::NoDeadline, &[]),
+    };
+    text(b, Role::Description, &deadline);
+    text(b, Role::Term, &words.say(Word::MaySpend, &[]));
+    text(b, Role::Description, &words.say(Word::Amount, &[Hole::Number(authority.spend)]));
+    text(b, Role::Term, &words.say(Word::MayDelegate, &[]));
+    let delegation = &authority.delegation;
+    let bounds = if delegation.tasks == 1 {
+        words.say(Word::DelegateOne, &[Hole::Number(u64::from(delegation.depth))])
+    } else {
+        words.say(
+            Word::DelegateBounds,
+            &[Hole::Number(u64::from(delegation.tasks)), Hole::Number(u64::from(delegation.depth))],
+        )
+    };
+    text(b, Role::Description, &bounds);
+    if let Some(models) = &authority.models {
+        text(b, Role::Term, &words.say(Word::Models, &[]));
+        match models {
+            c::AuthorityModels::All => text(b, Role::Description, &words.say(Word::AllModels, &[])),
+            c::AuthorityModels::Named(names) if names.is_empty() => {
+                text(b, Role::Description, &words.say(Word::NoModels, &[]));
+            }
+            c::AuthorityModels::Named(names) => {
+                for name in names {
+                    text(b, Role::Description, name);
+                }
+            }
+        }
+    }
+    if task.authority.cut {
+        text(b, Role::Paragraph, &words.say(Word::AuthorityCut, &[]));
     }
     b.close();
 }

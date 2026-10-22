@@ -36,6 +36,7 @@ pub fn page() -> skein_ui::Tree {
     }
     b.close();
     region(&mut b, b"What was asked");
+    text(&mut b, Role::Paragraph, "Result · report".as_bytes());
     text(&mut b, Role::Paragraph, b"Rotate tokens safely.");
     text(&mut b, Role::Paragraph, b"Shown on the forge.");
     b.close();
@@ -55,6 +56,21 @@ pub fn page() -> skein_ui::Tree {
     text(&mut b, Role::Paragraph, b"Jan 1, 00:00");
     text(&mut b, Role::Paragraph, b"The review needs attention.");
     b.close();
+    b.close();
+    region(&mut b, b"Budget and authority");
+    text(&mut b, Role::Paragraph, "7 spent · 493 left of 500".as_bytes());
+    for (term, description) in [
+        (b"Delegates spent".as_slice(), b"0".as_slice()),
+        (b"Reserved for delegates", b"0"),
+        (b"Funded by", b"Your pool"),
+        (b"Deadline", b"None"),
+        (b"May spend", b"500"),
+        (b"May delegate", b"Up to 1 task, 1 deep"),
+        (b"Models", b"All"),
+    ] {
+        text(&mut b, Role::Term, term);
+        text(&mut b, Role::Description, description);
+    }
     b.close();
     b.close();
     b.close();

@@ -1189,8 +1189,9 @@ or difference of their amounts (jig's `client/domain/contract.md`,
     names its person by number where the mockup names them; a
     recurring task's, "Task N's recurring budget"; a project's,
     "Project N's budget";
-  - "Deadline": its time, as the header said it ("Due …"), or "None"
-    (a default the user may change, section 11);
+  - "Deadline": its date, or its date and time in universal time when
+    it is not at midnight, or "None" (a default the user may change,
+    section 11);
   - from its authority, which the mockup's card leaves out: "May
     spend", what its subtree may spend; "May delegate", "Up to N
     tasks, M deep"; "Models", "All", their names, or "None", and no

@@ -55,9 +55,19 @@ impl Limits {
             .checked_mul(4)?
             .checked_add(temper_client_domain::pages::choice::EFFORTS)?
             .checked_add(32)?;
+        // A goal's result: region, heading, status, their text and words slot plus
+        // markdown; its contract paragraph and text. Budget: region, heading, balance,
+        // six term/description pairs, a funder link, models term and cut line,
+        // including text leaves: 34 nodes, plus two per allowed model name.
+        let goal = markdown
+            .checked_add(6)?
+            .checked_add(2)?
+            .checked_add(34)?
+            .checked_add(jig_client::contract::AUTHORITY_MODELS.checked_mul(2)?)?;
         let nodes = cards
             .checked_add(turns)?
             .checked_add(delegated)?
+            .checked_add(goal)?
             .checked_add(receiving.rows.checked_mul(32)?)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?

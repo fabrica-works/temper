@@ -32,20 +32,7 @@ pub(crate) fn card(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mu
     b.text(Run::Plain, facts.title);
     b.close();
     if let Some(said) = facts.said {
-        match said {
-            Said::Merge(commit) => {
-                b.open(Role::Paragraph);
-                b.style(look::DETAILS);
-                words.text(b, Word::LandedMerge, &[name(commit)]);
-                b.close();
-            }
-            Said::Words(bytes) => {
-                b.open(Role::Slot);
-                b.style(look::DETAILS);
-                skein_ui::markdown::read(bytes, 3, b);
-                b.close();
-            }
-        }
+        self::said(b, said, words);
     }
     if let Some(done) = facts.steps {
         b.open(Role::List);
@@ -67,7 +54,7 @@ pub(crate) fn card(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mu
     crate::pages::task::task_link(b, facts.task, words, bindings);
     b.close();
 }
-fn status(b: &mut Builder, state: State, words: &Words) {
+pub(crate) fn status(b: &mut Builder, state: State, words: &Words) {
     let (phase, token) = match state {
         State::Running => (c::Phase::Running, look::STATUS_ACTIVE),
         State::Held => (c::Phase::Held, look::STATUS_HELD),
@@ -86,4 +73,21 @@ fn status(b: &mut Builder, state: State, words: &Words) {
     b.name(&name);
     b.text(Run::Plain, &name);
     b.close();
+}
+
+pub(crate) fn said(b: &mut Builder, said: Said<'_>, words: &Words) {
+    match said {
+        Said::Merge(commit) => {
+            b.open(Role::Paragraph);
+            b.style(look::DETAILS);
+            words.text(b, Word::LandedMerge, &[name(commit)]);
+            b.close();
+        }
+        Said::Words(bytes) => {
+            b.open(Role::Slot);
+            b.style(look::DETAILS);
+            skein_ui::markdown::read(bytes, 3, b);
+            b.close();
+        }
+    }
 }

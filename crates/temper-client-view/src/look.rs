@@ -139,6 +139,10 @@ pub const STEP_DONE: Style = Style { owner: owner(), token: 66 };
 pub const CONTEXT: Style = Style { owner: owner(), token: 67 };
 /// The existing guidance when the application is unavailable.
 pub const UNAVAILABLE: Style = Style { owner: owner(), token: 68 };
+/// The result a goal gives.
+pub const TASK_CONTRACT: Style = Style { owner: owner(), token: 69 };
+/// A goal's budget and authority.
+pub const TASK_BUDGET: Style = Style { owner: owner(), token: 70 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -213,6 +217,8 @@ pub const NAMES: Names<'static> = Names {
         b"temper-step-done",
         b"temper-context",
         b"temper-unavailable",
+        b"temper-task-contract",
+        b"temper-task-budget",
     ],
     regions: &[b"temper-link"],
 };

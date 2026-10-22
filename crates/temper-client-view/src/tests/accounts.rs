@@ -441,8 +441,10 @@ mod memory_literal;
 // nodes x 574,364 B + 5 x 8 B of carded tasks = 229,745,640 B, so 4,824,814,379 B.
 // Cards remembered across the window: 5 x 8 B = 40 B, so 4,824,814,419 B.
 // The live delegates' trailing region adds 574,364 B, so 4,825,388,783 B.
+// Goal cards add 236 nodes x 574,364 B and 4,736 B for the larger phrasebook,
+// giving 4,960,943,423 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 4825388783;
+const ACCOUNT_BYTES: u64 = 4960943423;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

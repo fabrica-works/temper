@@ -1,6 +1,6 @@
 use super::fixtures::{self, task as f};
 use jig_client::contract as c;
-use skein_lib::List;
+use skein_lib::{Decimal, List, Writer};
 use skein_ui::{Builder, Role};
 const TASK: u64 = 9;
 const CHILD: u64 = 12;
@@ -10,7 +10,7 @@ const PROCEDURE: u32 = 2;
 const PARTY: u64 = 73;
 const ONE: u32 = 1;
 const NO_ROWS: u32 = 0;
-const HEADINGS: u32 = 4;
+const HEADINGS: u32 = 5;
 fn page(executor: c::Executor, priority: Option<u32>) -> crate::View {
     let root = f::root(executor, priority);
     let mut view = fixtures::view();
@@ -24,6 +24,8 @@ fn assert_header_and_plan(executor: c::Executor) {
     assert!(fixtures::find(tree, Role::Heading { level: 2 }, b"Plan").is_some());
     assert_eq!(fixtures::find(tree, Role::Heading { level: 2 }, b"What was asked"), None);
     assert_eq!(fixtures::find(tree, Role::Heading { level: 2 }, b"Latest activity"), None);
+    assert_eq!(fixtures::find(tree, Role::Region, b"Result"), None);
+    assert_eq!(fixtures::find(tree, Role::Region, b"Budget and authority"), None);
 }
 #[test]
 fn a_procedures_task_shows_its_header_and_plan_only() {
@@ -38,16 +40,19 @@ fn an_agents_task_shows_its_header_and_plan_only() {
     assert_header_and_plan(c::Executor::Agent { charter: CHARTER });
 }
 #[test]
-fn a_tracked_task_has_the_mockups_four_regions_in_order() {
+fn a_tracked_task_has_its_regions_in_order() {
     let view = page(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY));
     let tree = view.tree();
     let mut headings = List::with_capacity(HEADINGS);
     for node in tree.nodes() {
         if node.role == (Role::Heading { level: 2 }) {
-            headings.push(node.name.as_deref().expect("heading named")).expect("four headings");
+            headings.push(node.name.as_deref().expect("heading named")).expect("page headings");
         }
     }
-    assert_eq!(headings.as_slice(), [b"Task details".as_slice(), b"What was asked", b"Plan", b"Latest activity"]);
+    assert_eq!(
+        headings.as_slice(),
+        [b"Task details".as_slice(), b"What was asked", b"Plan", b"Latest activity", b"Budget and authority"]
+    );
 }
 #[test]
 fn a_plans_chip_links_to_its_tasks_page_by_number() {
@@ -292,20 +297,37 @@ fn the_title_sits_between_the_headers_two_meta_rows_without_a_title_paragraph() 
     let second = subtree(&tree, parts[3]);
     assert!(named(second, Role::Paragraph, b"Asked by Pat"));
     assert_eq!(second[1].role, Role::Status);
-    assert!(named(second, Role::Paragraph, b"Due Jan 1"));
+    assert!(!named(second, Role::Paragraph, b"Due Jan 1"));
+    assert_eq!(children(&tree, parts[3]).len(), 2);
 }
 #[test]
-fn a_deadline_names_the_utc_date_and_keeps_the_time_unless_it_is_midnight() {
-    let rows: [(u64, &[u8]); 4] = [
-        (0, b"Due Jan 1"),
-        (86_399, b"Due Jan 1, 23:59 UTC"),
-        (86_400, b"Due Jan 2"),
-        (86_401, b"Due Jan 2, 00:00 UTC"),
-    ];
-    for (seconds, expected) in rows {
+#[expect(clippy::manual_map, reason = "the client matches without a closure")]
+fn the_budget_deadline_names_the_utc_date_or_moment_and_none() {
+    for (seconds, expected) in [
+        (Some(0), b"Jan 1".as_slice()),
+        (Some(86_399), b"Jan 1, 23:59 UTC"),
+        (Some(86_400), b"Jan 2"),
+        (Some(86_401), b"Jan 2, 00:00 UTC"),
+        (None, b"None"),
+    ] {
         let mut task = titled();
-        task.budget.deadline = Some(skein_lib::Wall::from_nanos(seconds * 1_000_000_000));
-        assert!(named(header(&task, None).nodes(), Role::Paragraph, expected), "deadline {seconds}");
+        task.budget.deadline = match seconds {
+            Some(seconds) => Some(skein_lib::Wall::from_nanos(seconds * 1_000_000_000)),
+            None => None,
+        };
+        let view = goal(task.clone());
+        let tree = view.tree();
+        let budget = region_index(tree, b"Budget and authority");
+        let parts = children(tree, budget);
+        let parts = parts.as_slice();
+        assert_eq!(tree.nodes()[parts[8]].name.as_deref(), Some(b"Deadline".as_slice()));
+        let deadline = &tree.nodes()[parts[9]];
+        assert_eq!(deadline.role, Role::Description);
+        assert_eq!(deadline.name.as_deref(), Some(expected));
+        assert_eq!(fixtures::node_text(tree, parts[9]).as_ref(), expected);
+        let header = header(&task, None);
+        let rows = children(&header, styled(&header, look::TASK_HEADING));
+        assert_eq!(children(&header, rows.as_slice()[3]).len(), 2, "header has status and requester only");
     }
 }
 #[test]
@@ -541,4 +563,319 @@ fn a_kept_activity_is_parked() {
         &fixtures::words(),
     );
     assert_eq!(fixtures::text(&builder.finish()).as_ref(), b"parked");
+}
+
+fn goal(task: c::Task) -> crate::View {
+    fixtures::page_view(&f::root_with(task))
+}
+fn region_index(tree: &Tree, name: &[u8]) -> usize {
+    let id = fixtures::find(tree, Role::Region, name).expect("page region");
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.id == id {
+            return index;
+        }
+    }
+    panic!("region index");
+}
+fn result_words(bytes: &[u8]) -> c::Text {
+    c::Text::new(Box::from(bytes), 256).expect("result words")
+}
+fn document_words(bytes: &[u8]) -> c::DocumentText {
+    c::DocumentText::complete(result_words(bytes))
+}
+#[test]
+fn a_goal_names_the_result_it_gives() {
+    let part =
+        c::OwnerPart { connector: fixtures::FORGE, kind: c::OwnerPartKind::Result, key: c::OwnerPartKey::Number(TASK) };
+    for (contract, name) in [
+        (c::TaskContractDocument::Report { words: 256 }, "Result · report".as_bytes()),
+        (
+            c::TaskContractDocument::Change { connector: fixtures::FORGE, kind: 1, words: 256 },
+            "Result · change".as_bytes(),
+        ),
+        (
+            c::TaskContractDocument::Verdict { choices: List::with_capacity(0), cut: false },
+            "Result · verdict".as_bytes(),
+        ),
+        (
+            c::TaskContractDocument::Approval { state: Box::from(b"ready".as_slice()), part },
+            "Result · approval".as_bytes(),
+        ),
+    ] {
+        let mut task = f::document();
+        task.result_contract = contract;
+        let view = goal(task);
+        let tree = view.tree();
+        let asked = region_index(tree, b"What was asked");
+        let parts = children(tree, asked);
+        assert_eq!(tree.nodes()[parts.as_slice()[0]].role, Role::Heading { level: 2 });
+        let contract = &tree.nodes()[parts.as_slice()[1]];
+        assert_eq!(contract.role, Role::Paragraph);
+        assert_eq!(contract.name.as_deref(), Some(name));
+        assert_eq!(contract.styles.as_slice(), [look::TASK_CONTRACT]);
+        assert_eq!(fixtures::node_text(tree, parts.as_slice()[1]).as_ref(), name);
+    }
+}
+#[test]
+#[expect(clippy::manual_map, reason = "the client matches without a closure")]
+fn an_ended_goal_shows_its_result() {
+    for (ending, name, token, said) in [
+        (c::Ending::Done, b"Completed".as_slice(), look::STATUS_DONE, Some(b"A **useful** report".as_slice())),
+        (c::Ending::Failed { reason: Some(result_words(b"Checks failed")) }, b"Failed", look::STATUS_HELD, None),
+        (
+            c::Ending::Cancelled {
+                reason: Some(result_words(b"No longer needed")),
+                by: c::Actor::Party(PARTY),
+                at: None,
+            },
+            b"Cancelled",
+            look::STATUS_QUIET,
+            None,
+        ),
+        (c::Ending::Deleted, b"Ended", look::STATUS_QUIET, None),
+    ] {
+        let mut task = f::document();
+        task.result_contract = c::TaskContractDocument::Report { words: 256 };
+        task.result = Some(c::TaskResult::Document(Box::new(c::Result {
+            task: task.chip.clone(),
+            ending,
+            value: match said {
+                Some(bytes) => Some(c::ResultValue::Report(document_words(bytes))),
+                None => None,
+            },
+            at: None,
+            details: None,
+            acts: List::with_capacity(0),
+        })));
+        let view = goal(task);
+        let tree = view.tree();
+        let index = region_index(tree, b"Result");
+        assert!(region_index(tree, b"What was asked") < index);
+        assert!(index < region_index(tree, b"Plan"));
+        assert_eq!(tree.nodes()[index].styles.as_slice(), [look::TASK_CARD]);
+        let nodes = subtree(tree, index);
+        assert!(named(nodes, Role::Status, name));
+        for node in nodes {
+            if node.role == Role::Status {
+                assert_eq!(node.styles.as_slice(), [token]);
+            }
+        }
+        let expected = match name {
+            b"Completed" => b"A useful report".as_slice(),
+            b"Failed" => b"Checks failed",
+            b"Cancelled" => b"No longer needed",
+            _ => b"Ended",
+        };
+        assert!(skein_lib::bytes::find(&fixtures::text(tree), expected).is_some());
+    }
+    let mut task = f::document();
+    task.result_contract = c::TaskContractDocument::Change { connector: fixtures::FORGE, kind: 1, words: 256 };
+    task.result = Some(c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Done(c::ResultValue::Change {
+        kind: 1,
+        part: c::OwnerPart {
+            connector: fixtures::FORGE,
+            kind: c::OwnerPartKind::Result,
+            key: c::OwnerPartKey::Number(TASK),
+        },
+        words: document_words(b"1a2b3c4abcdef0123456789abcdef0123456789abcd"),
+    }))));
+    let view = goal(task);
+    assert!(named(subtree(view.tree(), region_index(view.tree(), b"Result")), Role::Status, b"Landed"));
+    assert!(
+        skein_lib::bytes::find(&fixtures::text(view.tree()), "CI passed. Landed · merge commit 1a2b3c4".as_bytes())
+            .is_some()
+    );
+}
+#[test]
+fn a_live_goal_has_no_result_region() {
+    for view in [goal(f::document()), fixtures::page_view(&f::held_root())] {
+        assert!(fixtures::find(view.tree(), Role::Region, b"Result").is_none());
+    }
+}
+#[test]
+fn a_goals_budget_card_shows_its_budget_as_supplied() {
+    let mut task = f::document();
+    task.budget.numbers = c::OwnerNumbers { budget: 913, spent: 37, spent_below: 83, reserved: 29 };
+    task.budget.left = 641;
+    task.authority.authority.spend = 877;
+    task.authority.authority.delegation.tasks = 11;
+    task.authority.authority.delegation.depth = 3;
+    let view = goal(task.clone());
+    let tree = view.tree();
+    let index = region_index(tree, b"Budget and authority");
+    assert!(region_index(tree, b"Latest activity") < index);
+    assert_eq!(tree.nodes()[index].styles.as_slice(), [look::TASK_CARD, look::TASK_BUDGET]);
+    for node in &tree.nodes()[index.checked_add(1).expect("next")..] {
+        assert_ne!(node.role, Role::Region, "budget is the last region");
+    }
+    let parts = children(tree, index);
+    let parts = parts.as_slice();
+    let balance = joined(&[
+        Decimal::of(task.budget.numbers.spent).as_bytes(),
+        " spent · ".as_bytes(),
+        Decimal::of(task.budget.left).as_bytes(),
+        b" left of ",
+        Decimal::of(task.budget.numbers.budget).as_bytes(),
+    ]);
+    assert_eq!(tree.nodes()[parts[1]].name.as_deref(), Some(balance.as_ref()));
+    assert_eq!(fixtures::node_text(tree, parts[1]).as_ref(), balance.as_ref());
+    assert!(!named(subtree(tree, index), Role::Term, b"Spent"));
+    let bounds = joined(&[
+        b"Up to ",
+        Decimal::of(u64::from(task.authority.authority.delegation.tasks)).as_bytes(),
+        b" tasks, ",
+        Decimal::of(u64::from(task.authority.authority.delegation.depth)).as_bytes(),
+        b" deep",
+    ]);
+    for (offset, term, value) in [
+        (2, b"Delegates spent".as_slice(), Box::from(Decimal::of(task.budget.numbers.spent_below).as_bytes())),
+        (4, b"Reserved for delegates", Box::from(Decimal::of(task.budget.numbers.reserved).as_bytes())),
+        (10, b"May spend", Box::from(Decimal::of(task.authority.authority.spend).as_bytes())),
+        (12, b"May delegate", bounds),
+    ] {
+        let label = &tree.nodes()[parts[offset]];
+        let description = &tree.nodes()[parts[offset + 1]];
+        assert_eq!(label.role, Role::Term);
+        assert_eq!(label.name.as_deref(), Some(term));
+        assert_eq!(fixtures::node_text(tree, parts[offset]).as_ref(), term);
+        assert_eq!(description.role, Role::Description);
+        assert_eq!(description.name.as_deref(), Some(value.as_ref()));
+        assert_eq!(fixtures::node_text(tree, parts[offset + 1]).as_ref(), value.as_ref());
+    }
+    assert_eq!(tree.nodes()[parts[6]].name.as_deref(), Some(b"Funded by".as_slice()));
+}
+#[test]
+fn the_budget_card_names_one_task_and_other_delegation_bounds() {
+    for tasks in [0, 1, 2] {
+        let mut task = f::document();
+        task.authority.authority.delegation.tasks = tasks;
+        task.authority.authority.delegation.depth = 7;
+        let delegation = &task.authority.authority.delegation;
+        let noun = if tasks == 1 { b" task, ".as_slice() } else { b" tasks, ".as_slice() };
+        let expected = joined(&[
+            b"Up to ",
+            Decimal::of(u64::from(delegation.tasks)).as_bytes(),
+            noun,
+            Decimal::of(u64::from(delegation.depth)).as_bytes(),
+            b" deep",
+        ]);
+        let view = goal(task);
+        let tree = view.tree();
+        let parts = children(tree, region_index(tree, b"Budget and authority"));
+        let parts = parts.as_slice();
+        assert_eq!(tree.nodes()[parts[12]].name.as_deref(), Some(b"May delegate".as_slice()));
+        assert_eq!(tree.nodes()[parts[13]].role, Role::Description);
+        assert_eq!(tree.nodes()[parts[13]].name.as_deref(), Some(expected.as_ref()));
+        assert_eq!(fixtures::node_text(tree, parts[13]).as_ref(), expected.as_ref());
+    }
+}
+#[test]
+fn the_budget_card_names_each_funder() {
+    let root = f::held_root();
+    let person = root.pages().me(root.client()).expect("signed in").party.number;
+    for funder in [
+        c::Funder::Task(CHILD),
+        c::Funder::Pool { project: fixtures::PROJECT, person, period: 1 },
+        c::Funder::Pool { project: fixtures::PROJECT, person: person + 1, period: 1 },
+        c::Funder::Recurring { project: fixtures::PROJECT, task: CHILD, period: 1 },
+        c::Funder::Period { project: fixtures::PROJECT, period: 1 },
+    ] {
+        let mut task = f::document();
+        task.budget.funder = funder;
+        let mut view = goal(task);
+        let expected = match funder {
+            c::Funder::Task(task) => joined(&[b"Task ", Decimal::of(task).as_bytes()]),
+            c::Funder::Pool { person: owner, .. } if owner == person => Box::from(b"Your pool".as_slice()),
+            c::Funder::Pool { person, .. } => joined(&[b"Person ", Decimal::of(person).as_bytes(), b"'s pool"]),
+            c::Funder::Recurring { task, .. } => {
+                joined(&[b"Task ", Decimal::of(task).as_bytes(), b"'s recurring budget"])
+            }
+            c::Funder::Period { project, .. } => {
+                joined(&[b"Project ", Decimal::of(u64::from(project)).as_bytes(), b"'s budget"])
+            }
+        };
+        let tree = view.tree();
+        let nodes = subtree(tree, region_index(tree, b"Budget and authority"));
+        let role = if let c::Funder::Task(_) = funder { Role::Link } else { Role::Description };
+        assert!(named(nodes, role, expected.as_ref()));
+        if let c::Funder::Task(task) = funder {
+            let mut link = None;
+            for node in nodes {
+                if node.role == Role::Link {
+                    link = Some(node.id);
+                }
+            }
+            let id = link.expect("funder link");
+            assert_eq!(
+                crate::act(&mut view, id, skein_ui::Act::Press),
+                Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
+                    address: temper_client_domain::Address::Task { task }
+                }))
+            );
+        }
+    }
+}
+#[test]
+fn the_budget_card_names_its_models() {
+    let mut names = List::with_capacity(2);
+    for name in [b"first".as_slice(), b"second"] {
+        names.push(Box::from(name)).expect("two model names");
+    }
+    for (models, expected) in [
+        (Some(c::AuthorityModels::All), [b"All".as_slice()].as_slice()),
+        (Some(c::AuthorityModels::Named(names)), [b"first".as_slice(), b"second"].as_slice()),
+        (Some(c::AuthorityModels::Named(List::with_capacity(0))), [b"None".as_slice()].as_slice()),
+        (None, [].as_slice()),
+    ] {
+        let mut task = f::document();
+        task.authority.authority.models = models;
+        let view = goal(task);
+        let tree = view.tree();
+        let index = region_index(tree, b"Budget and authority");
+        let nodes = subtree(tree, index);
+        assert_eq!(named(nodes, Role::Term, b"Models"), !expected.is_empty());
+        let parts = children(tree, index);
+        let mut actual = List::with_capacity(2);
+        let mut after_models = false;
+        for part in parts.as_slice() {
+            let node = &tree.nodes()[*part];
+            if after_models {
+                assert_eq!(node.role, Role::Description);
+                let name = node.name.as_deref().expect("model description");
+                assert_eq!(fixtures::node_text(tree, *part).as_ref(), name);
+                actual.push(name).expect("model descriptions");
+            }
+            after_models |= node.role == Role::Term && node.name.as_deref() == Some(b"Models");
+        }
+        assert_eq!(actual.as_slice(), expected);
+    }
+}
+#[test]
+fn a_cut_authority_ends_the_card_with_its_line() {
+    for cut in [false, true] {
+        let mut task = f::document();
+        task.authority.cut = cut;
+        let view = goal(task);
+        let tree = view.tree();
+        let name = b"Some of its authority is not shown.";
+        assert_eq!(fixtures::find(tree, Role::Paragraph, name).is_some(), cut);
+        if cut {
+            let parts = children(tree, region_index(tree, b"Budget and authority"));
+            let last = &tree.nodes()[*parts.as_slice().last().expect("last child")];
+            assert_eq!(last.name.as_deref(), Some(name.as_slice()));
+            assert_eq!(fixtures::node_text(tree, *parts.as_slice().last().expect("last child")).as_ref(), name);
+        }
+    }
+}
+
+fn joined(parts: &[&[u8]]) -> Box<[u8]> {
+    let mut len = 0_usize;
+    for part in parts {
+        len = len.checked_add(part.len()).expect("expected words fit");
+    }
+    let mut writer = Writer::new(len);
+    for part in parts {
+        writer.put(part).expect("measured expected words");
+    }
+    writer.finish()
 }

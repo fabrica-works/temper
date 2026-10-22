@@ -40,10 +40,6 @@ pub fn held_root() -> temper_client_domain::Domain {
     root_with_hold(c::Executor::Agent { charter: 1 }, Some(1), true)
 }
 fn root_with_hold(executor: c::Executor, priority: Option<u32>, held: bool) -> temper_client_domain::Domain {
-    use jig_client::{Event as E, Up};
-    let limits = domain_limits();
-    let (mut root, _, watch, tree_watch) =
-        root_at_with_tree(temper_client_domain::Address::Task { task: TASK }, &limits);
     let mut document = document();
     document.chip.task = TASK;
     document.chip.executor = executor;
@@ -70,6 +66,19 @@ fn root_with_hold(executor: c::Executor, priority: Option<u32>, held: bool) -> t
             })
             .expect("release");
     }
+    supplied_root(document, held)
+}
+pub fn root_with(mut document: c::Task) -> temper_client_domain::Domain {
+    document.chip.task = TASK;
+    document.chip.executor = c::Executor::Agent { charter: 1 };
+    document.priority = Some(1);
+    supplied_root(document, false)
+}
+fn supplied_root(document: c::Task, held: bool) -> temper_client_domain::Domain {
+    use jig_client::{Event as E, Up};
+    let limits = domain_limits();
+    let (mut root, _, watch, tree_watch) =
+        root_at_with_tree(temper_client_domain::Address::Task { task: TASK }, &limits);
     let card = document.clone();
     let mut tree = tree();
     if held && let c::Delivery::OwnerTree(value) = &mut tree {
