@@ -1,6 +1,6 @@
 # temper's root
 
-Provisional, 2026-10-04, revised 2026-10-20. What temper's engine root
+Provisional, 2026-10-04, revised 2026-10-22. What temper's engine root
 is and does: `temper-engine-domain`, the top-level domain of temper's
 engine, which composes jig's core with the forge connector in the shape
 jig's `domain/root.md` gives every application's root. It says what the
@@ -220,8 +220,15 @@ to the forge; a timer to the child that armed it. What temper adds:
   section 8), goes to the forge, which admits it by the forge's
   connection (forge.md, 4.1), then out to the protocol layer's box link,
   admitted or refused, which asks the box or refuses it, and answers it
-  (`../protocol/forge.md`, 2.8). Nothing of it is committed: the states
-  it moves are in memory, as every connection's is.
+  (`../protocol/forge.md`, 2.8). It is keyed: the core admits it by key,
+  of the deployment's scope, first, and its answer comes back from the
+  link to the forge, which keeps it as the request's outcome, in memory
+  alone. Nothing of it is committed: the states it moves are in memory,
+  as every connection's is.
+- **A watch of the deployment's forges,** the subject `forges`
+  (`../client/forge.md`, 5.4), goes to the core to admit on the party's
+  deployment role, and its documents come from the forge as a change's
+  panel's do (below).
 - **A hint that comes before decisions open** is dropped, since the
   restart reads afresh (9.1).
 - **A watch of the forge's subject,** a change's panel

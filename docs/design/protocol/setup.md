@@ -1,6 +1,6 @@
 # The forge's setup
 
-Provisional, 2026-10-16, revised 2026-10-20. How a forge comes to be
+Provisional, 2026-10-16, revised 2026-10-22. How a forge comes to be
 ready for temper, in three modes: connected, where a person runs and sets
 up the forge and gives temper only what it strictly needs; managed,
 where a person runs it and temper sets itself up on it, with a Forgejo
@@ -711,8 +711,8 @@ its own for any other host.
 - **A mirror,** the owned entry's `mirror`, absent by default (section
   8): an `https` origin for each binary, in place of codeberg.org's and
   code.forgejo.org's, its paths and digests the pins' still. A host that
-  keeps its own copies names it, and the process tier its local file
-  server (13.4).
+  keeps its own copies names it; the process tier needs none, its
+  binaries placed where the fetch looks (13.4).
 - **TLS with the machine's roots,** read at the command's start as
   skein's shell reads them (skein's `shell.md`, 6.2): the bundle
   `SSL_CERT_FILE` names, or the first of the distributions' bundles that
@@ -2278,17 +2278,22 @@ it checks of this document:
   clone holds the seeded head, since the fake keeps no state across
   its starts.
 - **A first run set up for real,** a test of its own: `temper box` on
-  three empty scratch directories, forge 3's `mirror` a local file
-  server over TLS with skein's test root, serving at the pinned paths
-  the binaries `TEMPER_FORGEJO` and `TEMPER_FORGEJO_RUNNER` name, which
-  the test checks against the pins first. The owner asks "Set up a
-  Forgejo here" through the client; forge 3's row goes through "Setting
-  up" and "Connecting" to connected, with no restart; the person's
+  three empty scratch directories, with the binaries `TEMPER_FORGEJO`
+  and `TEMPER_FORGEJO_RUNNER` name placed where the fetch looks,
+  `<cache>/forgejo/VERSION/forgejo` and
+  `<cache>/forgejo-runner/RUNNER_VERSION/forgejo-runner`, so that the
+  fetch hashes them against the pins and fetches nothing (6.6): no
+  mirror, no TLS and no call off the machine. The owner asks "Set up a
+  Forgejo here" through the client, `temper ctl DIRECTORY forge-setup
+  3`, answered setting up; forge 3's row, followed by `wait forges
+  --until settled`, goes through "Setting up" and "Connecting" to
+  connected, with no restart; the person's
   repository, made on Forgejo's API as the person, is adopted, and a
   worker clones it by the machine's git. Until temper-15, "Connecting"
   is the engine's connect from the files the group's reconcile wrote
   (6.5). A second box on the same directories starts the group at once,
-  by its record, and fetches nothing.
+  by its record, before `temper serve`, which starts with forge 3
+  connected from its files.
 
 ## 15. Later
 

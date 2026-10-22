@@ -1,6 +1,6 @@
 # The forge connector
 
-Provisional, 2026-10-04, revised 2026-10-20. How temper drives a forge,
+Provisional, 2026-10-04, revised 2026-10-22. How temper drives a forge,
 Forgejo or GitHub: the forge as a connector on jig's contract (jig's
 `domain/connectors.md`), with its resources, effects, topics, procedures,
 requirements and reads; a forge connected or not; adopting repositories,
@@ -287,7 +287,17 @@ temper-engine-domain-forge              the connector's top: resources and holds
   it goes out to the routing's box link, which asks the box or refuses
   it, "not under the box" or "busy", and answers it
   (`../protocol/forge.md`, 2.8). The connector changes no state at the
-  ask: the routing tells it each, as it does the others.
+  ask: the routing tells it each, as it does the others. `SetUp` is a
+  keyed request, admitted by the core first (`../client/README.md`,
+  section 8): the connector keeps its answer as its outcome, in memory
+  alone, the latest per forge under its request's token, and answers
+  unknown for a token it no longer holds.
+- **The deployment's forges,** the subject `forges`
+  (`../client/forge.md`, 5.4): the connector makes its document from
+  each configured forge's connection, as the routing last told it, and
+  marks the subject at each connection it is told, so that a watch
+  follows a set up through its steps and a connect to its end. Nothing
+  of it is kept.
 - **An adoption on a forge not connected** is refused as such, before
   any read, and the client offers Connect; the picker offers none of
   that forge's repositories (4.3).

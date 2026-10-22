@@ -329,7 +329,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   | `tree N` | `ended` |
   | `run N` | `ended` |
   | `accounts` | `usable` (an account the party's work may use has a source usable on a host); `settled` (no sign-in or check the party asked is in progress) |
-  | `forges` | `settled` (no connect or install the deployment asked is in progress); `connected:F` (forge F is connected) |
+  | `forges` | `settled` (no forge setting up or connecting: no set up, connect or install the deployment asked is in progress); `connected:F` (forge F is connected) |
 
 - **`replied`** holds while a chat's status (jig's
   `client/domain/client.md`, section 19, its facts) is parked, waiting
@@ -362,7 +362,10 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   failed, or its link's state past its life (`setup.state_life_ms`,
   `../protocol/configuration.md`); `forge-connect 1 github --key gh`,
   then `wait forges --until settled`, then the forge's row in its
-  answer. `connected:F` is met by a delivery where forge F is
+  answer. A set up is in progress from its request's answer, setting
+  up, until the forge's row leaves setting up and connecting: set up
+  failed, connected, stopped, or not connected; `forge-setup 3`, then
+  `wait forges --until settled`. `connected:F` is met by a delivery where forge F is
   connected, whoever connected it.
 - **`usable`** counts the party's own accounts, those whose uses name
   the party, and the deployment's (jig's `domain/accounts.md`, 4.3), on
@@ -551,9 +554,15 @@ area lands with its stories (section 11).
    | `forge-install F` | prints a fresh link to install temper's App on another account, GitHub alone; the installation shows on `forges` once the person's browser comes back | `Install { forge }` | |
    | `forge-replace F FILE` | replaces what a person pasted: on GitHub, FILE the App's new key; on a connected Forgejo, a tokens file naming `api`, `git` or both; it must answer as the forge's user, and the old is erased once the new is kept | `Replace { forge, value }` | |
    | `forge-forget F` | erases a managed forge's admin's token; the forge is connected, its bot and tokens kept | `Forget { forge }` | |
-   | `forge-setup F` | sets up an owned Forgejo here, under the box: the box fetches its binaries, prepares it and starts Forgejo and its runner, then temper takes its handover (`../protocol/setup.md`, 6.5); then `wait forges --until settled`. Without the box, refused "not under the box", with the commands to run | `SetUp { forge }` | |
+   | `forge-setup F` | sets up an owned Forgejo here, under the box: the box fetches its binaries, prepares it and starts Forgejo and its runner, then temper takes its handover (`../protocol/setup.md`, 6.5); prints `setting up` and the call that follows it, `wait forges --until settled`, and exits 0 once answered. Refused, exit 2: "not offered" (the forge is not an owned one whose setup says `"start": "asked"`, or it is set up, setting up or connecting), "busy" (the box is setting up another forge), or, without the box, "not under the box", with the commands to run (`../client/forge.md`, 5.4) | `SetUp { forge }` | |
    | `repositories F [--installation I] [--page N]` | the picker's page N, from 1 (`README.md`, 4.4): a line per row, `OWNER/NAME`, `private` where it is, and `R/U`, its repository id and owner id for `adopt --ids`; then the call that reads page N plus one while more follow, or that none do. `--installation I` is an accepted installation's id, as `forges` prints it, GitHub alone | `Reachable { forge, installation?, page }` | |
 
+   - **`forges`' text,** one line per forge, in number order: `forge N
+     · KIND · MODE · STATE`, the state in the row's words
+     (`../client/forge.md`, 5.4), such as `forge 3 · Forgejo · owned ·
+     Setting up: preparing`; then the digest (5.4). Its JSON is the
+     rows' fields, the state by its name with its step, its why, or its
+     user.
    - **The names are the forge's and the page's.** A `forge-` prefix
      keeps them apart from area 5's `connect`, `forget` and
      `replace-key`, which are an LLM account's; `forges` and
@@ -1184,7 +1193,11 @@ the last answering no rows, and one row adopted with `--ids`; a second
 picker's read while one runs, busy; a call by a party whose role does
 not hold the deployment's connectors, exit 2; `forge-forget` on a
 managed Forgejo; `forge-setup` without the box, refused naming the
-commands. After each, no pasted value in DIRECTORY's store or
+commands; `forge-setup` on an asked owned forge, answered `setting up`,
+then `wait forges --until settled` following the routing's told states,
+setting up at each step to not connected, and to set up failed with its
+why; a `forge-setup` of the same forge while it sets up, not offered,
+and of another asked forge while one sets up, busy. After each, no pasted value in DIRECTORY's store or
 in any document the tools print.
 
 ### 11.3 The real loop
@@ -1297,7 +1310,9 @@ section 10, and a key's file refused when it is not private, as a
 forge's pasted value's file is), an act
 cut by a termination signal, its status 128 plus the signal's number
 (8.2), then asked again under its key, made once, and agent process
-launch. One landing on the owned Forgejo proves a change against real
+launch. Under `temper box`, `forge-setup` of the default document's
+forge 3 and `wait forges --until settled` against the real Forgejo and
+runner (`../domain/testing.md`, 2.6). One landing on the owned Forgejo proves a change against real
 git and CI (`../domain/testing.md`, 2.6). The lock, DIRECTORY's files
 and a call's exit are the real loop's (11.3).
 

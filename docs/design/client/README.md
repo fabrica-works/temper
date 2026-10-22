@@ -851,7 +851,8 @@ for its kind, its user's login and its installations. Its nodes:
   subjects, so no request, read or subject of their own reaches the
   engine.
 - **`CLIENT_VERSION`:** the version of every record below, 1 at first,
-  2 since the demo's read, 3 since a change's panel, moved as
+  2 since the demo's read, 3 since a change's panel, 4 since a forge's
+  set up and the deployment's forges, moved as
   `../protocol/README.md`, section 9 says: at most once in a plan, at
   its first landing that changes one of these records, and shared by
   plans that run at once. A request, an outcome, a read, a subject or a
@@ -862,7 +863,11 @@ for its kind, its user's login and its installations. Its nodes:
   version (jig's `protocol/client.md`, section 9): a client of another
   is out of date for the forge (4.4), and its kept adoption is dropped
   as kept work at start (6.6; jig's `protocol/client.md`, section 10).
-- **The request, `Adopt`:** the project (u32); the forge's number
+- **The request, `Requesting`:** which of the family's requests it is,
+  `Request`, as `Reading` names a read: `adopt`, `Adopt`, or `set_up`,
+  `SetUp` (below). Each is answered by its own record, `AdoptAnswer` or
+  `SetUpAnswer`, which the client decodes by the request it sent.
+- **`Adopt`:** the project (u32); the forge's number
   (u16); the owner, the name, the prefix and the landing branch (byte
   strings); the role (owned, fork or context); home and ci (booleans);
   the checks (a list of u32); and, when the owner and name are a picker
@@ -891,7 +896,14 @@ for its kind, its user's login and its installations. Its nodes:
   it is jig's answer, which never reaches the connector (jig's
   `client/domain/contract.md`, 3.3), and the form shows it in jig's
   words.
-- **The small store's record of a pending adoption** is `jig-client`'s
+- **`SetUp`:** the forge's number (u16), of the deployment's scope
+  (section 8). Its outcome, `SetUpAnswer`: *setting up*, the box asked
+  for the forge's group; *refused*, with why: not offered (the forge's
+  connection does not offer it, or no such forge), not under the box,
+  or busy (`../protocol/forge.md`, 2.8); or *unknown*, its outcome no
+  longer held (section 8). A refusal at admission is jig's answer, as
+  for `Adopt`.
+- **The small store's record of a pending request** is `jig-client`'s
   kept request, its request encoded by this crate as the family's bytes
   at `CLIENT_VERSION` (jig's `protocol/client.md`, section 10).
 - **The FORGE requests and their outcomes:** `Connect`, `Install`,
@@ -936,9 +948,22 @@ for its kind, its user's login and its installations. Its nodes:
     head: none, pending, approved, or changes asked;
   - its repairs, its resolutions and its updates, each used of its
     limit (u32 each).
-- **The forge's documents' records:** its reads, subjects and
-  documents, and its other requests, beside `Adopt` (`forge.md`,
-  section 9).
+- **The deployment's forges, the subject `forges`** (`forge.md`, 5.4
+  and section 9): of the deployment's scope, with no fields, its window
+  unused; on the wire `Watching`'s `forges`. Its document, `Forges`, a
+  row for each configured forge, at most `FORGES` (16), in number
+  order: its number (u16); its kind (Forgejo or GitHub); its mode
+  (connected, managed, owned or fake); and its connection: not
+  connected; not set up; setting up, with its step when the box has
+  named one (fetch, prepare or run); set up failed, with why (text of
+  at most 256 bytes, the box's line bound); connecting; connected, with
+  the user's id (u64) and login (a byte string bounded as `Adopt`'s);
+  or stopped, with the component's reason. The read of the forges, the
+  tools' `forges` (`tools.md`, 5.5, area 6), is the watch's first
+  document.
+- **The forge's documents' records:** its other reads, subjects and
+  documents, and its other requests, beside `Adopt` and `SetUp`
+  (`forge.md`, section 9).
 - **Bounds:** the schema's ceilings bound every record at both ends,
   and the generated worst cases price each. Within them, the client
   bounds its fields by its own limits (4.4), and the engine's forge
@@ -2556,7 +2581,28 @@ does for the client:
   carries a link is kept in memory alone, until its state's life ends
   (`setup.state_life_ms` after `Done`): the same key sent again while it
   lives answers the same link and starts no run; after its end, or a
-  restart, the key is unknown, as one past the retention is.
+  restart, the key is unknown, as one past the retention is. A
+  `SetUp`'s outcome is kept in memory alone too, as the ask it answers
+  is (`../protocol/forge.md`, 2.8): the forge connector holds the
+  latest per forge, under its request's token, and the same key sent
+  again while it is held answers the same outcome and asks the box
+  nothing; once a later `SetUp` of that forge replaces it, or after a
+  restart, the key answers unknown.
+- **A forge's set up, answered** (`../protocol/forge.md`, 2.8): the
+  root admits `SetUp` by key, of the deployment's scope, and the forge
+  connector by the forge's connection; the routing's box link then
+  answers it, the connector's own refusal among what it answers: the
+  box asked, *setting up*, or refused, *not under the box* or *busy*,
+  or the connector's *not offered*. The answer is the request's
+  outcome, and the set up's course, its steps, its `started` and its
+  `failed`, is the forge's row's (`forge.md`, 5.4), never the answer's.
+- **The deployment's forges, watched** (4.6; `forge.md`, 5.4): the
+  routing hands the root the watch of `forges`, with the deployment's
+  scope; the core admits it on the party's deployment role and asks the
+  forge for the document, and again each time the forge marks it: at
+  every connection the routing tells it (`../domain/forge.md`, 4.1).
+  The routing encodes each document, adding each forge's kind and mode
+  from the configuration.
 - **The forge's reads and watches** are decoded by
   `temper-client-protocol-wire` the same way and go to the root
   (`../domain/root.md`, 5.3; `forge.md`, section 9). One the wire has
