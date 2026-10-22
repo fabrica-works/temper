@@ -301,7 +301,10 @@ temper-engine-domain-forge              the connector's top: resources and holds
   close comes to the connector as the root's `BoxClosed`: each offer
   becomes not under the box, and a forge setting up becomes set up
   failed, "the box closed the pipe". The connector changes no state at
-  the ask: the routing tells it each, as it does the others. `SetUp` is a
+  the ask: the routing tells it each, as it does the others: at the
+  box's `started`, connecting, then connected, or set up failed when the
+  forge's access cannot be read (`../protocol/forge.md`, 2.8), offered
+  again. `SetUp` is a
   keyed request, admitted by the core first (`../client/README.md`,
   section 8): the connector keeps its answer as its outcome, in memory
   alone, the latest per configured forge under its request's token and

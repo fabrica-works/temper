@@ -656,7 +656,26 @@ files: at a first preparation, and for a runner older than its pin
   group, so that the box answers `started` only once it has exited 0
   (7.1): `started` means connectable. The engine then reads those files,
   builds the forge's access from them as its start does, and sends
-  `Request::Connect` (forge.md, 2.2). At start, an owned forge whose
+  `Request::Connect` (forge.md, 2.2), with no restart:
+  - *the read is the service's io,* never the engine's loop: beneath the
+    forge's `directory`, which the setup host keeps from its start, each
+    file the forge's members name read as a private file with the
+    checks and bounds of the start's reads (configuration.md, section
+    6), each in one request, its bytes going to the setup host and from
+    it only into the access and the git identity's value;
+  - *the forge goes connecting* while the files are read and the
+    connect runs, then connected as its user (forge.md, 2.2), and its
+    git token becomes its git identity's value (forge.md, 2.5), so that
+    a worker clones and pushes its repositories with no restart;
+  - *a file absent or unreadable* (not private, past its bound, a
+    `user` its decoder refuses) sets the forge up failed, naming
+    the file and why, never its bytes: "forge 3's api_token is absent",
+    "forge 3's user is unreadable: not private". Nothing is connected
+    and nothing is kept; the person's "Set up again" asks the box once
+    more, which answers a started group `started` at once (7.1), and
+    the files are read again.
+
+  At start, an owned forge whose
   setup says `"start": "asked"` and whose files are absent, any of them,
   is not set up: no access and no connect, never a refusal, and every
   other forge starts as it would; any other forge's absent file refuses
@@ -2287,11 +2306,16 @@ it checks of this document:
   Forgejo here" through the client, `temper ctl DIRECTORY forge-setup
   3`, answered setting up; forge 3's row, followed by `wait forges
   --until settled`, goes through "Setting up" and "Connecting" to
-  connected, with no restart; the person's
-  repository, made on Forgejo's API as the person, is adopted, and a
-  worker clones it by the machine's git. Until temper-15, "Connecting"
-  is the engine's connect from the files the group's reconcile wrote
-  (6.5). A second box on the same directories starts the group at once,
+  connected as temper's user, with no restart; the person's
+  repository, made in the person's org on Forgejo's API as the person
+  (its password made usable on Forgejo's command line, standing for the
+  person's first sign-in on the web, 6.5), is adopted through the
+  client, and cloned by the machine's git as a worker runs it, with
+  forge 3's git token. Until temper-15, "Connecting" is the engine's
+  connect from the files the group's reconcile wrote (6.5). The value
+  the engine serves its workers after that connect is the one-process
+  world's to show (forge.md, section 10, the box's link). A second box
+  on the same directories starts the group at once,
   by its record, before `temper serve`, which starts with forge 3
   connected from its files.
 

@@ -366,7 +366,10 @@ and author are the configuration's, its value the forge's.
 
 - **Forgejo's value** is the `GitToken` row, its login the bot's (the
   `User` row's): generation 1 at start, and a new generation when the
-  row is replaced.
+  row is replaced. An owned forge set up from the client has none at
+  start: its value is put at the connect after the box's `started`, the
+  next generation of its number (1 when none), before its
+  `Event::Credential` and before `Request::Connect` (2.2, 2.8).
 - **GitHub's value** is a list of `(account id, account login, token,
   expires)`, one per accepted installation, built from `Event::GitToken
   { forge, installation, account, token, expires }` and held in memory
@@ -555,7 +558,14 @@ service's io.
 - **The box's lines,** for the forge asked:
   - `step FORGE STEP`, `STEP` one of `fetch`, `prepare` and `run`: the
     forge setting up, at that step;
-  - `started FORGE`: the ask ends, and the forge connects as 2.2 says;
+  - `started FORGE`: the ask ends, and the forge connects as 2.2 says:
+    until temper-15, the link tells the setup host, whose io reads the
+    forge's files (setup.md, 6.5) while the root shows it connecting;
+    once all are read, their values become the forge's git identity's
+    (2.5) and its access, as at start, and `Request::Connect` follows;
+    a file absent or unreadable sets the forge up failed, naming the
+    file, and a later ask, which the box answers `started` at once,
+    reads them again;
   - `failed FORGE WHY`: the ask ends, and the forge's set up failed,
     with `WHY` as the box wrote it, which holds no secret (setup.md,
     7.1).
@@ -934,6 +944,13 @@ The tiers, the fakes and the layout are `../domain/testing.md`'s (sections 2,
     a pipe pair: an ask, `start 3`, `step 3 prepare`, `failed 3 prepare
     3 exited 1`, the ask again and `start 3` again, a third refused
     "busy", a stray `started 9` dropped, and the root told each state;
+    and, until temper-15, the connect at `started` (2.8; setup.md,
+    6.5) in the service's one-process world: the forge's files written
+    by the test, `started 3` making it connecting, then
+    `Request::Connect` with the access they give and its git identity's
+    value put at generation 1 and announced; each file absent, or not
+    private, setting it up failed with the file named, and the next
+    ask, answered `started 3`, connecting it;
   - **GitHub's three routes** on the clients' listener (the manifest
     page, the redirect and the setup address; `../client/forge.md`,
     9.1): requests through `fixtures::http::Peer` to the service's
