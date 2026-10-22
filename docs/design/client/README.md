@@ -297,7 +297,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
 | `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
-| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel; an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), its composer, Amend and Stop later | `task`, `tree`, `activity` a page at a time; `run` while one is live | amend, stop, cancel, release a held task of the plan; an agent's task's later (5.9) |
+| `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live | as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | each configured forge: its connection, its mode, on GitHub temper's App and its installations, a connect under way and how the last ended, its load | the forge's, through the forge's side (4.2) | connect; replace a key or tokens; install on another account; forget the admin's token (section 8) |
@@ -422,7 +422,8 @@ keeps (`../protocol/configuration.md`, section 2).
   3). Setting a goal names its planner's model and effort, the
   template's by default. A goal's page shows its model, effort and
   account, changed by amending the task, and an agent's task's page
-  not yet (5.9); a task waiting for its account
+  shows them in its composer's line, as a chat's (5.11); a task waiting
+  for its account
   says so, with the account's acts (5.5; jig's `domain/authority.md`,
   8.3).
 
@@ -447,7 +448,9 @@ keeps (`../protocol/configuration.md`, section 2).
   facts, as `jig-client`'s `facts` reads them): what accepting grants
   and costs and the pool after it, what cancelling ends, what releasing
   does (jig's `client/domain/objects.md`, section 1; jig's
-  `client/domain/contract.md`, 5.4). Where the document offers an act
+  `client/domain/contract.md`, 5.4). On a task's page, stopping is
+  confirmed too, since it holds the task until it is released (5.11);
+  a chat's Stop is sent at once. Where the document offers an act
   as proposable (jig's `client/domain/contract.md`, 5.3), the card says
   so, and to whom; where it offers it as refused, the card says why and
   sends nothing.
@@ -1177,8 +1180,10 @@ and each state as the documents supply it: it computes no sum, share
 or difference of their amounts (jig's `client/domain/contract.md`,
 5.1).
 
-- **Its parts, in order:** the bar; the header, "Task details"; the
-  model choice (3.5); "What was asked", with the result the goal gives;
+- **Its parts, in order:** the bar; the header, "Task details"; its
+  acts' toolbar, then their outcome, and its own held card while it is
+  held (5.11); the model choice (3.5); "What was asked", with the result
+  the goal gives;
   "Result", once it has ended; "Plan"; "Latest activity"; "Budget and
   authority". The confirmation follows while one is open (3.6). The
   mockup's tabs, and its cards for findings (a gap,
@@ -1303,13 +1308,16 @@ change's procedure makes, a task an agent's task delegated. It shows
 its task document, its conversation as a chat's page holds one, and its
 owner tree's held cards, as `mockups/task.html` draws its agent kind,
 in the chat's look. It draws each amount and each state as the
-documents supply them (jig's `client/domain/contract.md`, 5.1), and no
-act but a held task's card (3.6): its acts come later (section 11).
+documents supply them (jig's `client/domain/contract.md`, 5.1), and
+acts on it as its document offers (5.11).
 
-- **Its parts, in order:** the lineage bar; the taskbar; "Task brief";
-  the run's heading; the conversation; "Result", once it has ended;
-  "Plan", while its tree holds a delegate or a held task's card; then
-  the confirmation while one is open (3.6). At phone width the order is
+- **Its parts, in order:** the lineage bar; the taskbar, with its acts
+  (5.11); "Task brief"; the run's heading, then its own held card while
+  it is held (5.11); "Older" while an older page remains; the
+  conversation; its acts' outcome; "Result", once it has ended; "Plan",
+  while its tree holds a delegate or a held task's card; the composer
+  while Message is offered (5.11); then the confirmation while one is
+  open (3.6). At phone width the order is
   the same: the lineage bar keeps one line, its titles cut short, and
   the taskbar is a chat's chatbar at that width.
 - **The lineage bar:** its parent, the last of its lineage
@@ -1381,9 +1389,7 @@ act but a held task's card (3.6): its acts come later (section 11).
     spent so far"); and, needing the clock the view does not keep, a
     turn's time (section 11). Nor its context (`Task.context`), which
     is optional;
-  - not drawn yet (section 11): its acts, the composer ("Steer this
-    task"), Amend and Stop; the model choice (3.5), an amendment of the
-    task's; "Older", which reads an earlier window.
+  - its acts are 5.11's, with their own departures there.
 - **Where it is decided:** the domain's task page has the shape
   `Agent`: an agent's executor, no priority, not the chat label, which
   opens as `Chat { task }` (3.5). It holds the task's thread as the
@@ -1427,6 +1433,115 @@ does, and two things more, after `task.html`'s change:
 - **Its words and look:** "Goal", the existing word, and "Its tasks",
   a new phrase; no new token, since the slot sits in the header's META
   line and the link is the plan's.
+
+### 5.11 A task's page's acts
+
+A goal's page (5.8) and an agent's task's page (5.9) act on their task
+as a chat's page acts on its chat (3.5): through the acts its document
+offers (`Task.acts`, read through `acts::offers`), each sent as 3.6
+says. An act the document does not offer is not drawn, not even
+disabled. One it offers is drawn by its admission (jig's
+`client/domain/contract.md`, 5.3), as a held task's card draws its own
+(3.6):
+
+- *allowed* or *bounded:* its button;
+- *proposable:* its name, then the card's "This needs a proposal to"
+  and to whom, and no button: the page proposes none of these acts;
+- *refused:* its name, then the refusal in jig's words, and no button:
+  the page sends nothing.
+
+Its rules:
+
+- **Where they are.** On a goal's page, a toolbar after the header, as
+  the mockup's: "Amend", "Stop", "Cancel", in that order. On an agent's
+  task's page, in its taskbar after its spend, as a chat's chatbar
+  holds Stop and Close: "Amend", "Stop"; and its composer last (below).
+  At phone width the goal's toolbar is a line of its own under the
+  header, in the same order, and the taskbar's acts wrap as a chat's
+  do. While the page's confirmation is open, the toolbar and the
+  taskbar draw no act: the dialog is the one place to answer, and its
+  "Cancel" the only one on the page.
+- **Its own held card.** While the page's task is held, stopped among
+  the reasons, its held task's card (3.6), with Release and its
+  confirmation, follows the goal's toolbar, or the agent's run heading.
+  The task is no row of its own plan, so its plan never draws it; a
+  delegate's held card stays in its row (5.8). Release names the
+  hold's revision, and a moved one's refusal asks the person to look
+  again (3.6).
+- **The composer,** on an agent's task's page only, while Message is
+  offered: the chat's composer (3.5, 5.1), with its model choice line,
+  its text area "Message", its hint and "Send", preceded by the note
+  "Steer this task · words reach its live run at the next turn." A
+  message sent shows in the conversation as a chat's person's words
+  do, "Being sent", then "Sent". The engine offers Message on every
+  live agent's task and refuses it while the task waits to start
+  (`NotWaiting`): the composer's place then holds "Message" and the
+  refusal, and its model choice line alone. A goal's page has no
+  composer, as the mockup draws none; its model choice is 5.8's.
+- **Stop,** confirmed (3.6): a dialog "Stop" saying "Its run stops, and
+  the task is held until it is released.", then "Confirm" and "Cancel".
+  It is sent as `Ask::Stop`. The engine holds the task, stopped by the
+  person, so Release is offered next, its effect said as 3.6 says ("The
+  next run resumes its conversation; tries count again from zero").
+- **Cancel,** on a goal's page, confirmed (3.6): a dialog "Cancel"
+  saying what cancelling ends, from the offer's effect
+  (`Effect::Cancel`, jig's `Impact`, over its tasks below it), in jig's
+  words, as closing a chat says it: "Dangerous action: review its
+  consequences", its waiting, running, held and closing tasks, its
+  live runs and pending proposals, and that their effects settle;
+  then "Confirm" and "Cancel". It is sent as `Ask::Cancel`, with no
+  grace and the reason "Cancelled from its page"; its delegates end
+  with it.
+- **Amend** opens the amendment's editor, laid out after the goal's
+  toolbar or the agent's taskbar: a region "Amend task N" holding the
+  specification's words as a text area, "Specification", then on a
+  goal "Tracked", a check, and "Priority", a number; then "Send
+  amendment" and "Discard". Its draft, its base revision, the moved
+  check and the delta to jig's `Amendment` are the domain's `amend`
+  module's, which `temper ctl amend` shares (o/controls'); the page
+  holds no editor of its own. A refusal as moved keeps the draft and
+  asks the person to look again. The model choice for the next runs
+  is the choice line's (3.5), an amendment too, and not repeated in
+  the editor. Instructions, dependencies, wake, authority and an
+  addressee are `temper ctl amend`'s alone.
+- **Their outcome.** One request per kind of act at a time; a double
+  press joins the pending one (3.6). Pending, its progress as a card
+  says it; answered, the outcome in jig's words, or the refusal in
+  jig's words, with "Look again" after a moved one; past the engine's
+  retention, "Unknown". On a goal's page it follows the toolbar; on an
+  agent's task's page it follows the conversation, as a chat's.
+- **"Older,"** on an agent's task's page, the chat's (5.4): before the
+  conversation while an older page remains, reading the page before
+  through the same read of its activity, no other.
+- **Against the mockup,** the page's way:
+  - the composer's text area is named "Message", the chat's, where the
+    mockup's is "Write to agent task" with a placeholder "Write to
+    T12…" (section 11, the composer's placeholder); its hint is the
+    chat's;
+  - the composer carries the chat's model choice line, which the
+    mockup's agent page does not draw (3.5);
+  - the composer shows while Message is offered, the mockup's while the
+    task lives, and a refused Message says why in its place (3.6);
+  - each confirmation, and an act's outcome and refusal, are 3.6's: the
+    mockup's buttons do nothing;
+  - its own held card, which no mockup world draws;
+  - the acts hidden while the confirmation is open.
+- **Where it is decided:** the domain's task page holds the composer's
+  words, its pending requests by kind and the last outcome, as a chat's
+  page does, and the chat's acts (`Act::MessageWords`, `Send`, `Stop`,
+  `Older`) are routed to whichever of the two pages is open; a task
+  page's Stop and Cancel open its confirmation first, as `Confirm` with
+  the page's task as its object, and `Act::Confirm` sends them. The
+  page reads a card for its own task when its document is held, as it
+  reads one for a held row. The view draws each act by
+  `acts::offers` and `acts::allowed`, and words what cancelling ends
+  through the cards' decision facts, as a chat's close does.
+- **The look:** TASK_ACTS on the goal's toolbar, the mockup's
+  `.task-toolbar`, which draws its Cancel as `.button.danger`;
+  AGENT_STEER on the composer's note, the mockup's
+  `.agent-steer-note`; TASK_AMEND on the editor's region. The taskbar's
+  acts and the composer keep the chat's tokens. `task-pages.css` draws
+  them (`browser.md`, 2.5).
 
 ## 6. The terminal shell
 
@@ -1905,8 +2020,12 @@ own tests:
   dependency's from each kind of link; an agent's task's, 5.9: its
   shape from its executor, priority and label, its thread as a chat's
   (opened, a page, a document's change, a run's text and its end), and
-  its run's heading in each phase, with an attempt and none); the
-  forge side's steps
+  its run's heading in each phase, with an attempt and none; a task's
+  page's acts, 5.11: Message, Stop, Cancel and Release each as its
+  request, Stop and Cancel only once confirmed, one request per kind
+  at a time, an act not offered, proposable or refused sending
+  nothing, a card read for its own task once held, and "Older" as the
+  chat's read); the forge side's steps
   (the form's rules, its request, every outcome, the version check; the
   picker's pages by number, "Next" asking the shown page's number plus
   one, a full last page's "Next" and a page past the last answering no
@@ -1926,8 +2045,15 @@ own tests:
   lineage bar with a parent's chip, a requester alone and neither, its
   brief with dependencies and none, its run's heading in each phase
   with a start and none, its conversation as a chat's, its result in
-  each state and none before it ends, its plan only with a delegate or
-  a card, and no act but a held task's card; a procedure's task's
+  each state and none before it ends, and its plan only with a
+  delegate or a card; a task's page's acts, 5.11: each act by its
+  admission (a button, proposable, refused, and not offered: not
+  drawn), the goal's toolbar in order, the taskbar's acts, both gone
+  while the confirmation is open, the composer with its note and a
+  refused Message in its place, the Stop dialog's words, the Cancel
+  dialog's from each count of the effect, its own held card where 5.11
+  puts it, and each outcome: pending, done, refused, moved; a
+  procedure's task's
   page, 5.10: its goal's link when it serves another task and none
   when it serves itself or none, and "Its tasks" over its plan where a
   person task's says "Plan"; the forge's words for every
@@ -1975,7 +2101,14 @@ own tests:
   goal's result; a goal's delegate opened from its plan, showing its
   brief, its run's heading and its committed turn, the goal reached
   again by its lineage bar, and, once the delegate has reported, its
-  run ended and its result; a repository adopted from the
+  run ended and its result; from a running delegate's page, a message
+  sent and read by its scripted run's next turn; that delegate stopped,
+  confirmed, its own held card shown, and released, running again; a
+  goal cancelled from its page, confirmed with what it ends, and its
+  delegates ended; a waiting delegate's Message refused, its page
+  saying why and sending nothing; an amendment of a goal's
+  specification from its page, and one refused as moved asking to look
+  again; a repository adopted from the
   navigation's link, its outcome read and the engine holding it;
   refused: not found, a second home, a field the form refuses; a part
   of the forge's saying "Shown on the forge."; the banner with no
@@ -2223,6 +2356,18 @@ own tests:
     page too;
   - its plan: drawn while its tree holds a delegate or a held card,
     where the mockup draws none;
-  - its acts, the composer ("Steer this task · words reach its live
-    run at the next turn."), Amend, Stop, the model choice and
-    "Older": not drawn yet; they come as one, with their requests.
+  - its acts are 5.11's.
+- **A task's page's acts** (5.11), each a default the user may change:
+  - Stop confirmed on a task's page, where a chat's Stop is sent at
+    once: stopping holds the task until it is released, and the task's
+    page acts on work the person may not be watching. The chat
+    confirming its Stop too is the candidate;
+  - Cancel on a goal's page only, as the mockup draws it; an agent's
+    task's Cancel, which the engine offers the person its requesters
+    lead to, is reached from its goal or `temper ctl`;
+  - the amendment's editor on the pages: the specification's words
+    and, on a goal, its tracking and priority, the model choice being
+    the choice line's; the rest of an amendment is `temper ctl
+    amend`'s;
+  - a goal's page has no composer, as the mockup, though the engine
+    offers Message on a goal.
