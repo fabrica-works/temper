@@ -62,59 +62,58 @@ pub fn step_4_1() -> Vec<calls::Step> {
     ]
 }
 
-const REFUSED_DIRECTOR_ENDED: usize = 8;
+// The two held slices share their reads; the refused one adds the person's act.
+const HELD_A_ENDED: usize = 3;
 const A_WAITING: usize = 5;
-const REFUSED: usize = 6;
-const REFUSED_A_ENDED: usize = 3;
+const HELD_ACCOUNTS: usize = 6;
+const REFUSED_DIRECTOR_ENDED: usize = 8;
+const LIMITED_DIRECTOR_ENDED: usize = 7;
 pub const READS_4_5_REFUSED: &[(Read, usize)] = &[
     (Read::DirectorEnded, REFUSED_DIRECTOR_ENDED),
     (Read::AWaiting, A_WAITING),
-    (Read::Refused, REFUSED),
-    (Read::AEnded, REFUSED_A_ENDED),
+    (Read::Refused, HELD_ACCOUNTS),
+    (Read::AEnded, HELD_A_ENDED),
+];
+pub const READS_4_5_LIMITED: &[(Read, usize)] = &[
+    (Read::DirectorEnded, LIMITED_DIRECTOR_ENDED),
+    (Read::AWaiting, A_WAITING),
+    (Read::Limited, HELD_ACCOUNTS),
+    (Read::AEnded, HELD_A_ENDED),
 ];
 
 #[must_use]
 pub fn step_4_5_refused() -> Vec<calls::Step> {
-    use super::{FIRST_ACCOUNT, REFUSED_PERSON, SECOND_KEY_FILE};
-    vec![
+    use super::{FIRST_ACCOUNT, SECOND_KEY_FILE};
+    held("refused", Some(call(D1, argv!["replace-key", number(FIRST_ACCOUNT), calls::file(SECOND_KEY_FILE)])))
+}
+
+#[must_use]
+pub fn step_4_5_limited() -> Vec<calls::Step> {
+    // Only reads and waits follow the chat: the engine lifts the limit.
+    held("limited", None)
+}
+
+fn held(key: &'static str, act: Option<calls::Step>) -> Vec<calls::Step> {
+    let mut steps = vec![
         sign_in(D1),
-        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "refused", REFUSED_PERSON]),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", key, super::HELD_PERSON]),
         call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "replied"]),
-        // Arm A before replacement: after its result the requester can end
+        // Arm A before the act: after its result the requester can end
         // before a new watch has hydrated A through that historical parent.
         start(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
         call(D1, argv!["wait", "task", number(A), "--until", "phase:due"]),
         call(D1, argv!["task", number(A), "--json"]),
         call(D1, argv!["accounts", "--json"]),
-        call(D1, argv!["replace-key", number(FIRST_ACCOUNT), calls::file(SECOND_KEY_FILE)]),
-        join(REFUSED_A_ENDED),
-        calls::until(D1, argv!["task", number(DIRECTOR), "--json"], b"\"phase\":\"ended\"", b"\"phase\":\"running\""),
-    ]
-}
-
-// These reads occupy the same positions as the refused slice up to accounts.
-const LIMITED_DIRECTOR_ENDED: usize = 7;
-pub const READS_4_5_LIMITED: &[(Read, usize)] = &[
-    (Read::DirectorEnded, LIMITED_DIRECTOR_ENDED),
-    (Read::AWaiting, A_WAITING),
-    (Read::Limited, REFUSED),
-    (Read::AEnded, REFUSED_A_ENDED),
-];
-
-#[must_use]
-pub fn step_4_5_limited() -> Vec<calls::Step> {
-    vec![
-        sign_in(D1),
-        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "limited", super::REFUSED_PERSON]),
-        call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "replied"]),
-        start(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
-        call(D1, argv!["wait", "task", number(A), "--until", "phase:due"]),
-        call(D1, argv!["task", number(A), "--json"]),
-        call(D1, argv!["accounts", "--json"]),
-        // Only reads and waits follow the chat: the engine lifts the limit.
-        join(REFUSED_A_ENDED),
-        calls::until(D1, argv!["task", number(DIRECTOR), "--json"], b"\"phase\":\"ended\"", b"\"phase\":\"running\""),
-    ]
+    ];
+    steps.extend(act);
+    steps.push(join(HELD_A_ENDED));
+    steps.push(calls::until(
+        D1,
+        argv!["task", number(DIRECTOR), "--json"],
+        b"\"phase\":\"ended\"",
+        b"\"phase\":\"running\"",
+    ));
+    steps
 }
 
 const PACE_DIRECTOR_ENDED: usize = 3;
@@ -148,18 +147,4 @@ pub fn step_4_4() -> Vec<calls::Step> {
         call(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
         join(PACE_DIRECTOR_ENDED),
     ]
-}
-
-/// Command verbs from the ctl argv submitted to the story, in order.
-#[must_use]
-pub fn commands(steps: &[calls::Step]) -> Vec<String> {
-    let mut commands = Vec::new();
-    for step in steps {
-        if let calls::Step::Call { argv, .. } | calls::Step::Start { argv, .. } | calls::Step::Until { argv, .. } = step
-            && let Some(calls::Arg::Lit(command)) = argv.0.first()
-        {
-            commands.push((*command).into());
-        }
-    }
-    commands
 }

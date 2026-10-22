@@ -28,8 +28,8 @@ pub const PACE_NOTE: &str = "Pace";
 pub const PACE_PENDING: &str = "The pace question is waiting for your answer.";
 pub const PACE_A_SPEC: &str =
     "@case_a Ask the director whether to keep the pace; on its direction, have a survey delegated and report.";
-pub const REFUSED_PERSON: &str = "@case_director Delegate A's report and wait for it.";
-pub const REFUSED_A_SPEC: &str = "@case_a Report when your account allows the work to continue.";
+pub const HELD_PERSON: &str = "@case_director Delegate A's report and wait for it.";
+pub const HELD_A_SPEC: &str = "@case_a Report when your account allows the work to continue.";
 pub const SURVEY_SPEC: &str = "@case_survey Survey the work that needs no taste and report.";
 pub const RESUMED_REPORT: &str = "The work continued on its account.";
 pub const PACE_REPORT: &str = "The pace is kept and the survey is done.";

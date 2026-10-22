@@ -134,7 +134,7 @@ pub fn step_4_5_limited(_forge: SocketAddr) -> Box<[Script]> {
 }
 
 fn account_wait(failure: Line) -> Box<[Script]> {
-    use super::{REFUSED_A_SPEC, RESUMED_REPORT};
+    use super::{HELD_A_SPEC, RESUMED_REPORT};
     let mut resumed = report(RESUMED_REPORT);
     let mut lines = vec![failure];
     lines.extend(resumed.lines);
@@ -142,7 +142,7 @@ fn account_wait(failure: Line) -> Box<[Script]> {
     Box::new([
         Script {
             cue: Agent::Director.cue().into(),
-            turns: Box::new([owner(REFUSED_A_SPEC, false), wait("A delegated."), report(RESUMED_REPORT)]),
+            turns: Box::new([owner(HELD_A_SPEC, false), wait("A delegated."), report(RESUMED_REPORT)]),
         },
         Script { cue: Agent::A.cue().into(), turns: Box::new([resumed]) },
     ])

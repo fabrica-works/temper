@@ -3,7 +3,7 @@ use super::{
     A, A_REPORT, Agent, DESIGN, DESIGN_DOC, DESIGN_REPORT, DESIGN_WORDS, DIRECTOR, DIRECTOR_REPORT, DRAFT, DRAFT_WORDS,
     GREEN_LIGHT, OWNER_EFFORT, OWNER_MODEL, PROJECT, QUESTION, acts::Read, draft_commit, kit_tree,
 };
-use crate::{Exit, Ran};
+use crate::{Exit, Ran, calls};
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -77,6 +77,21 @@ impl Observed {
             told,
             kit: Kit { main: ran.forge().main().clone(), merged_green: ran.forge().merged_green() },
         }
+    }
+}
+impl Observed {
+    /// The command verbs of the story's ctl argv, in order, for checks on which acts it made.
+    #[must_use]
+    pub fn with_commands(mut self, steps: &[calls::Step]) -> Self {
+        for step in steps {
+            if let calls::Step::Call { argv, .. } | calls::Step::Start { argv, .. } | calls::Step::Until { argv, .. } =
+                step
+                && let Some(calls::Arg::Lit(command)) = argv.0.first()
+            {
+                self.commands.push((*command).into());
+            }
+        }
+        self
     }
 }
 fn cued(system: &[u8]) -> Option<Agent> {
@@ -486,7 +501,7 @@ fn task_document(observed: &Observed, read: Read) -> &Value {
 
 #[must_use]
 pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
-    use super::{FIRST_ACCOUNT, REFUSED_A_SPEC};
+    use super::{FIRST_ACCOUNT, HELD_A_SPEC};
     let mut misses = Vec::new();
     let waiting = document(observed, Read::AWaiting);
     let accounts = document(observed, Read::Refused);
@@ -517,11 +532,9 @@ pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
         "4.5",
         resumed.is_some_and(|at| {
             let told = &observed.told[at];
-            contains(&told.words, REFUSED_A_SPEC)
+            contains(&told.words, HELD_A_SPEC)
                 && observed.told[..at].iter().all(|told| told.credential == Some(0))
-                && observed.told[..at]
-                    .iter()
-                    .any(|told| told.agent == Agent::A && contains(&told.words, REFUSED_A_SPEC))
+                && observed.told[..at].iter().any(|told| told.agent == Agent::A && contains(&told.words, HELD_A_SPEC))
         }),
         SURVIVES,
         "A's resumed query must retain its spec on credential 1, after queries on credential 0",
@@ -568,7 +581,7 @@ fn account_survives(misses: &mut Vec<Miss>, observed: &Observed) {
 
 #[must_use]
 pub fn step_4_5_limited(observed: &Observed) -> Vec<Miss> {
-    use super::{FIRST_ACCOUNT, REFUSED_A_SPEC};
+    use super::{FIRST_ACCOUNT, HELD_A_SPEC};
     let mut misses = Vec::new();
     let waiting = document(observed, Read::AWaiting);
     let until = number(waiting, "/run_wait/account/why/limited/until");
@@ -625,15 +638,15 @@ pub fn step_4_5_limited(observed: &Observed) -> Vec<Miss> {
     // receive the spec that was in the first query, on the original credential.
     let mut queries = observed.told.iter().filter(|told| told.agent == Agent::A);
     let first = queries.next();
-    let resumed = queries.last();
+    let resumed = queries.next_back();
     step_check(
         &mut misses,
         "4.5",
         first.zip(resumed).is_some_and(|(first, resumed)| {
             first.credential == Some(0)
                 && resumed.credential == Some(0)
-                && contains(&first.words, REFUSED_A_SPEC)
-                && contains(&resumed.words, REFUSED_A_SPEC)
+                && contains(&first.words, HELD_A_SPEC)
+                && contains(&resumed.words, HELD_A_SPEC)
         }),
         SURVIVES,
         "A's resumed query must retain its spec on credential 0 after its failed query",
@@ -657,7 +670,7 @@ mod account_tests {
         ACCOUNT_WAIT, Agent, BTreeMap, DIRECTOR, Kit, Observed, PROJECTION, Read, SURVIVES, Told, Value, assert_met,
         later, step_4_5_limited, step_4_5_refused,
     };
-    use crate::case::{A, FIRST_ACCOUNT, REFUSED_A_SPEC, RESUMED_REPORT};
+    use crate::case::{A, FIRST_ACCOUNT, HELD_A_SPEC, RESUMED_REPORT};
     use serde_json::json;
 
     fn told(agent: Agent, words: &str, credential: u32) -> Told {
@@ -689,7 +702,7 @@ mod account_tests {
                 ),
             ]),
             commands: Vec::new(),
-            told: vec![told(Agent::A, REFUSED_A_SPEC, 0), told(Agent::A, REFUSED_A_SPEC, 1)],
+            told: vec![told(Agent::A, HELD_A_SPEC, 0), told(Agent::A, HELD_A_SPEC, 1)],
             kit: Kit { main: BTreeMap::new(), merged_green: false },
         }
     }
@@ -730,7 +743,7 @@ mod account_tests {
         );
         observed.documents.get_mut(&Read::AEnded).expect("ended")["task"]["result"]["at"] = (RESET + 1).into();
         observed.commands = ["chat", "wait", "wait", "task", "accounts", "task"].map(String::from).into();
-        observed.told = vec![told(Agent::A, REFUSED_A_SPEC, 0), told(Agent::A, REFUSED_A_SPEC, 0)];
+        observed.told = vec![told(Agent::A, HELD_A_SPEC, 0), told(Agent::A, HELD_A_SPEC, 0)];
         observed
     }
     #[test]
@@ -753,13 +766,13 @@ mod account_tests {
     }
     #[test]
     fn limited_checkpoint_checks_both_account_and_source() {
+        const MISSES: usize = 1;
         for path in ["/state/until", "/sources/0/state/until", "/sources/0/number", "/usable", "/sources/0/usable"] {
             let mut observed = limited_met();
             *observed.documents.get_mut(&Read::Limited).expect("limited")["accounts"]["deployment"][0]
                 .pointer_mut(path)
                 .expect("account field") = Value::Null;
             let misses = step_4_5_limited(&observed);
-            const MISSES: usize = 1;
             assert_eq!(misses.len(), MISSES, "{path}");
             assert!(misses.iter().all(|miss| miss.promise == ACCOUNT_WAIT && miss.what.contains("unusable")));
         }
