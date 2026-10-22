@@ -217,10 +217,17 @@ pub enum Word {
     PhaseRetrying,
     PhaseClosing,
     PhaseHeld,
+
+    TaskBrief,
+    RunLive,
+    RunWaiting,
+    RunOver,
+    NoRun,
+    RunStarted,
 }
 // Room for temper, jig, account, card and forge phrases.
 const PHRASES: u32 = 576;
-const ALL: [Word; 202] = [
+const ALL: [Word; 208] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -423,6 +430,12 @@ const ALL: [Word; 202] = [
     Word::PhaseRetrying,
     Word::PhaseClosing,
     Word::PhaseHeld,
+    Word::TaskBrief,
+    Word::RunLive,
+    Word::RunWaiting,
+    Word::RunOver,
+    Word::NoRun,
+    Word::RunStarted,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -635,6 +648,12 @@ impl Word {
             Self::PhaseRetrying => 341,
             Self::PhaseClosing => 342,
             Self::PhaseHeld => 343,
+            Self::TaskBrief => 1031,
+            Self::RunLive => 1032,
+            Self::RunWaiting => 1033,
+            Self::RunOver => 1034,
+            Self::NoRun => 1035,
+            Self::RunStarted => 1036,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -758,6 +777,11 @@ impl Words {
     /// Absolute UTC time: the view has delivered instants, but no current clock.
     pub(crate) fn chat_time(&self, at: skein_lib::Wall) -> Box<[u8]> {
         self.say(Word::ChatTime, &[Hole::Name(copy_of(&chat_clock(at)))])
+    }
+
+    /// A run's supplied placement time in absolute UTC.
+    pub(crate) fn run_started(&self, at: skein_lib::Wall) -> Box<[u8]> {
+        self.say(Word::RunStarted, &[Hole::Name(copy_of(&chat_clock(at)))])
     }
 
     pub fn text(&self, builder: &mut Builder, word: Word, holes: &[Hole]) {
@@ -1000,6 +1024,12 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::PhaseRetrying => (&[b"retrying"], &[]),
         Word::PhaseClosing => (&[b"closing"], &[]),
         Word::PhaseHeld => (&[b"held"], &[]),
+        Word::TaskBrief => (&[b"Task brief"], &[]),
+        Word::RunLive => (&[b"Run ", b" \xc2\xb7 live now"], &[Number]),
+        Word::RunWaiting => (&[b"Run ", b" \xc2\xb7 waiting"], &[Number]),
+        Word::RunOver => (&[b"Run ", b" \xc2\xb7 ended"], &[Number]),
+        Word::NoRun => (&[b"No run now"], &[]),
+        Word::RunStarted => (&[b"Started ", b""], &[Name]),
     }
 }
 

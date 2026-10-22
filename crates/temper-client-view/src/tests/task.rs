@@ -36,10 +36,6 @@ fn a_person_tasks_page_shows_its_header_and_plan_only() {
     assert_header_and_plan(c::Executor::Party { party: PARTY });
 }
 #[test]
-fn an_agents_task_shows_its_header_and_plan_only() {
-    assert_header_and_plan(c::Executor::Agent { charter: CHARTER });
-}
-#[test]
 fn a_tracked_task_has_its_regions_in_order() {
     let view = page(c::Executor::Agent { charter: CHARTER }, Some(PRIORITY));
     let tree = view.tree();
@@ -360,6 +356,7 @@ fn the_bar_links_only_a_requesting_task_before_the_current_task_paragraph() {
         let limits = fixtures::domain_limits();
         let (mut root, _, watch, _) = fixtures::root_at_with_tree(Address::Task { task: TASK }, &limits);
         let mut task = titled();
+        task.priority = Some(PRIORITY);
         task.requester = requester;
         fixtures::root_event(
             &mut root,
@@ -1236,4 +1233,274 @@ fn both_plan_shapes_omit_the_goal_and_keep_its_hold_and_folds() {
         assert_eq!(nodes[top.as_slice()[2]].role, Role::TreeItem);
         assert_eq!(nodes[top.as_slice()[2]].name.as_deref(), Some(b"Task 12".as_slice()));
     }
+}
+
+fn has_role(nodes: &[Node], role: Role) -> bool {
+    for node in nodes {
+        if node.role == role {
+            return true;
+        }
+    }
+    false
+}
+fn has_style(nodes: &[Node], style: skein_ui::Style) -> bool {
+    for node in nodes {
+        if node.styles.as_slice().contains(&style) {
+            return true;
+        }
+    }
+    false
+}
+fn agent(task: c::Task) -> crate::View {
+    fixtures::page_view(&f::agent_root(task, Some(f::tree()), true))
+}
+#[test]
+fn an_agents_task_has_its_parts_in_order() {
+    let view = agent(f::delegate());
+    let tree = view.tree();
+    let lineage = styled(tree, look::AGENT_LINEAGE);
+    let bar = styled(tree, look::CHATBAR);
+    let brief = styled(tree, look::AGENT_BRIEF);
+    let run = styled(tree, look::AGENT_RUN);
+    let log = index_of(tree, Role::Log, b"Conversation");
+    assert!(lineage < bar && bar < brief && brief < run && run < log);
+    for name in [b"Task details".as_slice(), b"What was asked", b"Latest activity", b"Budget and authority"] {
+        assert!(!named(tree.nodes(), Role::Heading { level: 2 }, name));
+    }
+    for node in tree.nodes() {
+        assert!(!node.styles.as_slice().contains(&look::CHOICE));
+        assert!(!node.styles.as_slice().contains(&look::COMPOSER));
+        assert!(!node.styles.as_slice().contains(&look::COMPOSER_AREA));
+        assert_ne!(node.role, Role::TextArea);
+        for name in [b"Stop".as_slice(), b"Older", b"Mark seen"] {
+            assert!(!(node.role == Role::Button && node.name.as_deref() == Some(name)));
+        }
+    }
+}
+#[test]
+fn the_lineage_bar_links_the_parent_by_number_with_its_title() {
+    for (lineage, requester, parent, title) in [
+        (true, c::OwnerRequester::Task(23), Some(b"Task 12".as_slice()), true),
+        (false, c::OwnerRequester::Task(23), Some(b"Task 23".as_slice()), false),
+        (false, c::OwnerRequester::Person(PARTY), None, false),
+    ] {
+        let mut task = f::delegate();
+        task.requester = requester;
+        if !lineage {
+            task.lineage_chips.clear();
+        }
+        let mut view = agent(task);
+        let tree = view.tree();
+        let bar = styled(tree, look::AGENT_LINEAGE);
+        let parts = children(tree, bar);
+        assert_eq!(parts.len(), if parent.is_some() { 2 } else { 1 });
+        let nodes = subtree(tree, bar);
+        assert!(named(nodes, Role::Paragraph, b"Task 9"));
+        assert!(named(nodes, Role::Paragraph, b"Refresh token handling"));
+        assert_eq!(named(nodes, Role::Paragraph, b"Rotate the credentials"), title);
+        assert!(!named(nodes, Role::Link, b"Task 3"), "only the immediate parent");
+        if let Some(name) = parent {
+            let link = &tree.nodes()[index_of(tree, Role::Link, name)];
+            assert!(link.binding.is_some(), "parent link navigates");
+            assert!(named(subtree(tree, parts.as_slice()[0]), Role::Link, name));
+            let id = link.id;
+            let number = if lineage { CHILD } else { OTHER_DEPENDENCY };
+            assert_eq!(
+                crate::act(&mut view, id, skein_ui::Act::Press),
+                Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
+                    address: temper_client_domain::Address::Task { task: number },
+                })),
+            );
+        }
+    }
+}
+#[test]
+fn the_taskbar_says_number_title_state_executor_and_own_spend() {
+    let mut task = f::delegate();
+    task.budget.numbers.spent = 7;
+    task.budget.numbers.spent_below = 91;
+    let view = agent(task);
+    let tree = view.tree();
+    let nodes = subtree(tree, styled(tree, look::CHATBAR));
+    assert!(named(nodes, Role::Heading { level: 1 }, "T9 · Refresh token handling".as_bytes()));
+    assert!(named(nodes, Role::Status, "running · writing".as_bytes()));
+    assert!(named(nodes, Role::Paragraph, b"Agent"));
+    assert!(named(nodes, Role::Paragraph, b"7 spent"));
+    assert!(!named(nodes, Role::Paragraph, b"91 spent"));
+    for node in nodes {
+        if node.role == Role::Status {
+            assert_eq!(node.styles.as_slice(), [look::STATUS_ACTIVE]);
+        }
+    }
+}
+#[test]
+fn the_brief_says_its_spec_who_asked_and_its_dependencies() {
+    for dependencies in [false, true] {
+        let mut task = f::delegate();
+        task.cut = true;
+        if dependencies {
+            task.dependencies = List::with_capacity(2);
+            task.dependencies.push(c::OwnerTaskLink::Live(row().chip)).expect("live dependency");
+            task.dependencies
+                .push(c::OwnerTaskLink::Stored { number: GRANDCHILD, status: Some(c::OwnerTaskStatus::Done) })
+                .expect("ended dependency");
+        }
+        let view = agent(task);
+        let tree = view.tree();
+        let index = styled(tree, look::AGENT_BRIEF);
+        let nodes = subtree(tree, index);
+        assert!(named(nodes, Role::Heading { level: 2 }, b"Task brief"));
+        assert!(skein_lib::bytes::find(&fixtures::node_text(tree, index), b"Rotate tokens safely.").is_some());
+        assert!(named(nodes, Role::Paragraph, b"Asked by task 12"));
+        assert_eq!(named(nodes, Role::List, b"Dependencies of task 9"), dependencies);
+        assert!(!named(nodes, Role::Paragraph, b"More dependencies not shown."));
+        if dependencies {
+            let list = index_of(tree, Role::List, b"Dependencies of task 9");
+            let items = children(tree, list);
+            assert_eq!(items.len(), 2);
+            for (item, number, name) in [
+                (items.as_slice()[0], CHILD, b"Task 12".as_slice()),
+                (items.as_slice()[1], GRANDCHILD, b"Task 13".as_slice()),
+            ] {
+                assert_eq!(tree.nodes()[item].key, Some(crate::pages::inbox::card_key(c::ObjectKey::Task(number))));
+                assert!(named(subtree(tree, item), Role::Link, name));
+                assert!(has_role(subtree(tree, item), Role::Status));
+            }
+            assert!(named(subtree(tree, items.as_slice()[1]), Role::Status, b"Completed"));
+        }
+    }
+}
+#[test]
+fn the_run_heading_says_each_phase() {
+    for (phase, attempt, heading, started) in [
+        (c::OwnerChipPhase::Active(c::RunStage::Claimed { attempt: 2 }), Some(1), Some("Run 2 · live now"), true),
+        (c::OwnerChipPhase::Active(c::RunStage::Running { attempt: 2 }), Some(2), Some("Run 2 · live now"), true),
+        (c::OwnerChipPhase::Closing(c::ClosingStage::Run { attempt: 2 }), Some(2), Some("Run 2 · live now"), true),
+        (c::OwnerChipPhase::Active(c::RunStage::Idle), Some(2), Some("Run 2 · waiting"), true),
+        (c::OwnerChipPhase::Ended, Some(2), Some("Run 2 · ended"), false),
+        (c::OwnerChipPhase::Active(c::RunStage::Idle), None, Some("No run now"), false),
+        (c::OwnerChipPhase::Ended, None, None, false),
+    ] {
+        let mut task = f::delegate();
+        f::phase(&mut task, phase);
+        let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+        details.attempt = attempt;
+        let view = agent(task);
+        let tree = view.tree();
+        assert_eq!(has_style(tree.nodes(), look::AGENT_RUN), heading.is_some());
+        if let Some(heading) = heading {
+            let nodes = subtree(tree, styled(tree, look::AGENT_RUN));
+            assert!(named(nodes, Role::Heading { level: 2 }, heading.as_bytes()));
+            assert_eq!(named(nodes, Role::Paragraph, b"Started 10-22 03:48Z"), started);
+        }
+    }
+    let mut task = f::delegate();
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    details.run_since = None;
+    let view = agent(task);
+    let tree = view.tree();
+    assert!(!has_role(subtree(tree, styled(tree, look::AGENT_RUN)), Role::Paragraph));
+}
+#[test]
+fn an_agents_conversation_is_drawn_as_a_chats() {
+    let view = agent(f::delegate());
+    let tree = view.tree();
+    let log = index_of(tree, Role::Log, b"Conversation");
+    let nodes = subtree(tree, log);
+    assert!(named(nodes, Role::Paragraph, b"Temper"));
+    assert!(skein_lib::bytes::find(&fixtures::node_text(tree, log), b"Checking the credentials.").is_some());
+    assert!(has_style(nodes, look::WORK));
+    assert!(named(nodes, Role::Paragraph, b"delegate"));
+    assert!(!has_style(nodes, look::CARD));
+    let mut thread = jig_client::thread::Thread::new(
+        TASK,
+        &temper_client_domain::pages::chat::thread_limits(&fixtures::domain_limits()),
+    );
+    thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
+    thread.page(f::activity(true));
+    let chat = fixtures::chat::tree(&thread);
+    let chat_log = index_of(&chat, Role::Log, b"Conversation");
+    assert_eq!(fixtures::node_text(tree, log), fixtures::node_text(&chat, chat_log));
+}
+#[test]
+fn an_ended_agents_task_shows_its_result() {
+    let mut task = f::delegate();
+    f::phase(&mut task, c::OwnerChipPhase::Ended);
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    details.ending =
+        Some(c::OwnerChipEnding::Done(c::ResultValue::Report(f::document_words(b"Tokens rotated safely."))));
+    let view = agent(task);
+    let tree = view.tree();
+    let result = region_index(tree, b"Result");
+    assert_eq!(tree.nodes()[result].styles.as_slice(), [look::AGENT_RESULT]);
+    assert!(named(subtree(tree, result), Role::Status, b"Completed"));
+    assert!(skein_lib::bytes::find(&fixtures::node_text(tree, result), b"Tokens rotated safely.").is_some());
+    assert!(index_of(tree, Role::Log, b"Conversation") < result);
+    assert!(!named(agent(f::delegate()).tree().nodes(), Role::Region, b"Result"));
+}
+#[test]
+fn an_agents_plan_shows_only_with_a_delegate_or_a_card() {
+    let mut delegates = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut delegates else { panic!("owner tree") };
+    tree.rows = List::with_capacity(1);
+    tree.rows.push(row()).expect("delegate");
+    let mut held_tree = f::tree();
+    let c::Delivery::OwnerTree(tree) = &mut held_tree else { panic!("owner tree") };
+    tree.root.phase = c::Phase::Held;
+    let counts =
+        c::PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
+    let mut legacy = c::Tree { task: TASK, nodes: List::with_capacity(2), folded: counts, held_below: 0 };
+    legacy
+        .nodes
+        .push(c::TreeNode {
+            chip: f::delegate().chip,
+            parent: None,
+            dependencies: List::with_capacity(0),
+            proposals: List::with_capacity(0),
+            spend: 0,
+            folded: counts,
+            held_below: 0,
+        })
+        .expect("root node");
+    let single = c::Delivery::Tree(Box::new(legacy.clone()));
+    legacy
+        .nodes
+        .push(c::TreeNode {
+            chip: row().chip,
+            parent: Some(TASK),
+            dependencies: List::with_capacity(0),
+            proposals: List::with_capacity(0),
+            spend: 0,
+            folded: counts,
+            held_below: 0,
+        })
+        .expect("delegate node");
+    for (delivery, plan) in [
+        (Some(f::tree()), false),
+        (None, false),
+        (Some(delegates), true),
+        (Some(held_tree), true),
+        (Some(single), false),
+        (Some(c::Delivery::Tree(Box::new(legacy))), true),
+    ] {
+        let root = f::agent_root(f::delegate(), delivery, true);
+        let view = fixtures::page_view(&root);
+        assert_eq!(named(view.tree().nodes(), Role::Heading { level: 2 }, b"Plan"), plan);
+    }
+}
+#[test]
+fn an_agents_page_carries_its_tokens_on_their_roles() {
+    let live = agent(f::delegate());
+    assert_eq!(fixtures::styles(live.tree(), Role::Main).as_ref(), [Box::from([look::MAIN, look::CHAT])]);
+    for (token, role) in
+        [(look::AGENT_LINEAGE, Role::Slot), (look::AGENT_BRIEF, Role::Region), (look::AGENT_RUN, Role::Slot)]
+    {
+        assert_eq!(live.tree().nodes()[styled(live.tree(), token)].role, role);
+    }
+    let mut task = f::delegate();
+    task.result = Some(c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Done(c::ResultValue::Report(
+        f::document_words(b"Done"),
+    )))));
+    let ended = agent(task);
+    assert_eq!(ended.tree().nodes()[styled(ended.tree(), look::AGENT_RESULT)].role, Role::Region);
 }

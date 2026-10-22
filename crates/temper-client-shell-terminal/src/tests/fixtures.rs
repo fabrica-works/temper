@@ -442,6 +442,9 @@ const INBOX_CARDS: [(&[u8], &[u8]); 6] = [
 pub fn task_page() -> skein_ui::Tree {
     task::page()
 }
+pub fn agent_task_page() -> skein_ui::Tree {
+    task::agent_task_page()
+}
 pub fn signed_out_page() -> skein_ui::Tree {
     page(&temper_client_domain::Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, true)
 }

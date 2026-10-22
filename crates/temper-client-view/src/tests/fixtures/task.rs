@@ -140,3 +140,168 @@ fn supplied_root(document: c::Task, held: bool) -> temper_client_domain::Domain 
 
 pub const HOLD_REVISION: c::Revision = c::Revision { value: 7 };
 const ONE_OFFER: u32 = 1;
+
+pub const RUN_ATTEMPT: u64 = 2;
+pub const RUN_SINCE: Wall = Wall::from_nanos(1_792_640_880_000_000_000);
+pub fn delegate() -> c::Task {
+    let mut task = document();
+    task.chip.task = TASK;
+    task.chip.executor = c::Executor::Agent { charter: 1 };
+    task.chip.title = document_words(b"Refresh token handling");
+    task.priority = None;
+    task.requester = c::OwnerRequester::Task(12);
+    task.lineage_chips = List::with_capacity(2);
+    let mut ancestor = task.chip.clone();
+    ancestor.task = 3;
+    ancestor.title = document_words(b"The root goal");
+    task.lineage_chips.push(ancestor).expect("ancestor");
+    let mut parent = task.chip.clone();
+    parent.task = 12;
+    parent.title = document_words(b"Rotate the credentials");
+    task.lineage_chips.push(parent).expect("parent");
+    task.spec.specification.words = document_words(b"Rotate tokens **safely**.");
+    task.waits_on = c::WaitsOn::Nothing;
+    task.hold = None;
+    task.result = None;
+    task.dependencies = List::with_capacity(0);
+    task.activity = 1;
+    phase(&mut task, c::OwnerChipPhase::Active(c::RunStage::Running { attempt: RUN_ATTEMPT }));
+    let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    details.attempt = Some(RUN_ATTEMPT);
+    details.run_since = Some(RUN_SINCE);
+    details.ending = None;
+    details.observation = Some(c::OwnerChipObservation {
+        channel: Token::new(1),
+        work: c::OwnerChipWork::Writing,
+        since: RUN_SINCE,
+        reported_at: RUN_SINCE,
+        started: None,
+    });
+    task
+}
+pub fn document_words(bytes: &[u8]) -> c::DocumentText {
+    c::DocumentText::complete(c::Text::new(Box::from(bytes), 32).expect("document words"))
+}
+pub fn phase(task: &mut c::Task, phase: c::OwnerChipPhase) {
+    task.chip.phase = phase.compact();
+    let c::ChipPhase::Owner { phase: old, .. } = task.chip.details.as_mut() else { panic!("owner") };
+    *old = phase;
+}
+pub fn agent_root(document: c::Task, tree: Option<c::Delivery>, conversation: bool) -> temper_client_domain::Domain {
+    use jig_client::{Event as E, Up};
+    use temper_client_domain::{Event, Request};
+    let limits = domain_limits();
+    let env = Env { now: NO_TIME, wall: AT_EPOCH, limits };
+    let mut root = temper_client_domain::unlinked(&limits, SEED);
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Start { address: temper_client_domain::Address::Task { task: TASK }, kept: List::with_capacity(0) },
+        &mut out,
+    );
+    for event in [
+        E::StartUnlinked { kept: List::with_capacity(0) },
+        E::SignIn { with: jig_client::With::Transport },
+        E::Up { up: Up::Served { served: true, versions: None } },
+    ] {
+        temper_client_domain::step(&mut root, &env, Event::Client { event }, &mut out);
+    }
+    while let Some(request) = out.pop() {
+        let up = match request {
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(subject) },
+                    },
+            } => {
+                let value = match subject {
+                    c::Subject::Me => Some(c::Delivery::Me(Box::new(fixture_me(b"Shop")))),
+                    c::Subject::Task { task: TASK } => Some(c::Delivery::Task(Box::new(document.clone()))),
+                    c::Subject::Tree { .. } => tree.clone(),
+                    c::Subject::Task { .. }
+                    | c::Subject::Chips { .. }
+                    | c::Subject::Inbox { .. }
+                    | c::Subject::Tasks { .. }
+                    | c::Subject::Run { .. }
+                    | c::Subject::Deployment
+                    | c::Subject::Accounts => None,
+                };
+                let Some(value) = value else { continue };
+                Some(Up::Watched { watch, event: c::WatchEvent::Delivered(value) })
+            }
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Activity { .. }) },
+                    },
+            } => Some(Up::ReadDone {
+                read,
+                result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(activity(
+                    conversation,
+                ))))),
+            }),
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Read { read, what: jig_client::Readable::Jig(c::Read::Task { task: TASK }) },
+                    },
+            } => Some(Up::ReadDone {
+                read,
+                result: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(document.clone())))),
+            }),
+            Request::Client { .. }
+            | Request::Show { .. }
+            | Request::SignOut
+            | Request::Dropped { .. }
+            | Request::Fact { .. } => None,
+        };
+        if let Some(up) = up {
+            temper_client_domain::step(&mut root, &env, Event::Client { event: E::Up { up } }, &mut out);
+        }
+    }
+    root
+}
+pub fn activity(conversation: bool) -> c::ActivityPage {
+    let mut rows = List::with_capacity(1);
+    if conversation {
+        let mut blocks = List::with_capacity(2);
+        blocks
+            .push(c::Block::Text(c::Text::new(Box::from(*b"Checking the credentials."), 32).expect("turn text")))
+            .expect("text");
+        blocks
+            .push(c::Block::Call(c::Call {
+                number: 1,
+                tool: c::Text::new(Box::from(*b"delegate"), 32).expect("tool"),
+                input: c::Text::new(Box::from(*b"Review the change"), 32).expect("input"),
+                outcome: Some(c::Text::new(Box::from(*b"Delegated tasks: 17"), 32).expect("outcome")),
+                failed: false,
+                objects: {
+                    let mut objects = List::with_capacity(1);
+                    objects.push(c::ObjectKey::Task(17)).expect("delegate");
+                    objects
+                },
+                parts: List::with_capacity(0),
+            }))
+            .expect("call");
+        let mut messages = List::with_capacity(1);
+        messages.push(c::Message { speaker: c::Speaker::Assistant, blocks }).expect("message");
+        rows.push(c::ActivityLine {
+            position: 1,
+            at: RUN_SINCE,
+            event: c::Activity::Turn {
+                name: c::TurnName { attempt: RUN_ATTEMPT, number: 1 },
+                turn: c::TurnRead::Decoded(c::Turn {
+                    messages,
+                    used: c::Usage { input: 0, output: 0, cached: 0, cache_written: 0 },
+                    spent: 0,
+                    read_through: None,
+                    cut: false,
+                }),
+            },
+        })
+        .expect("turn");
+    }
+    c::ActivityPage { rows, before: None, after: None, cut: false }
+}

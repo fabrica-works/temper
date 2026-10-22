@@ -69,10 +69,16 @@ impl Limits {
         // dependency adds an item, link and status with text: five nodes,
         // bounded by jig's receiving rows count per row.
         let dependencies = receiving.rows.checked_mul(5)?.checked_add(6)?.checked_mul(receiving.rows)?;
+        // An agent's lineage, taskbar, brief and run: 32 fixed nodes including
+        // text leaves, plus the spec's markdown and a dependency list. Jig's
+        // task translation bounds dependencies by the receiving rows count:
+        // one item, link and status (five nodes with text) per dependency.
+        let agent = markdown.checked_add(33)?.checked_add(receiving.rows.checked_mul(5)?)?;
         let nodes = cards
             .checked_add(turns)?
             .checked_add(delegated)?
             .checked_add(goal)?
+            .checked_add(agent)?
             .checked_add(receiving.rows.checked_mul(32)?)?
             .checked_add(dependencies)?
             .checked_add(receiving.projects.checked_mul(4)?)?

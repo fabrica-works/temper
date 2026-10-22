@@ -549,7 +549,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             u64::from(u32::try_from(limits.client.domain.document_bytes).ok()?.checked_add(1)?).checked_mul(11)?,
         )
 }
-fn page_task(page: Readout, task: u64) -> Option<Box<c::Task>> {
+pub(crate) fn page_task(page: Readout, task: u64) -> Option<Box<c::Task>> {
     match page {
         Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => Some(task),
         Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(value)))

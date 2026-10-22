@@ -99,3 +99,96 @@ pub fn page() -> skein_ui::Tree {
     b.close();
     b.finish()
 }
+
+/// A live delegate's brief and conversation (client/README.md, 5.9).
+pub fn agent_task_page() -> skein_ui::Tree {
+    use temper_client_view::look;
+    let mut b = skein_ui::Builder::new(&tree_limits());
+    synthetic_frame(&mut b, false);
+    b.open(Role::Main);
+    b.style(look::MAIN);
+    b.style(look::CHAT);
+    b.open(Role::Slot);
+    b.style(look::AGENT_LINEAGE);
+    b.open(Role::Slot);
+    task_link(&mut b, b"Task 12");
+    text(&mut b, Role::Paragraph, b"Rotate the credentials");
+    b.close();
+    b.open(Role::Slot);
+    text(&mut b, Role::Paragraph, b"Task 34");
+    text(&mut b, Role::Paragraph, b"Refresh token handling");
+    b.close();
+    b.close();
+    b.open(Role::Slot);
+    b.style(look::CHATBAR);
+    b.open(Role::Slot);
+    text(&mut b, Role::Heading { level: 1 }, "T34 · Refresh token handling".as_bytes());
+    b.open(Role::Status);
+    b.style(look::STATUS_ACTIVE);
+    b.text(Run::Plain, "running · writing".as_bytes());
+    b.close();
+    b.close();
+    b.open(Role::Slot);
+    text(&mut b, Role::Paragraph, b"Agent");
+    text(&mut b, Role::Paragraph, b"7 spent");
+    b.close();
+    b.close();
+    b.open(Role::Slot);
+    b.style(look::THREAD);
+    region(&mut b, b"Task brief");
+    b.style(look::AGENT_BRIEF);
+    skein_ui::markdown::read(b"Rotate tokens **safely**.", 3, &mut b);
+    text(&mut b, Role::Paragraph, b"Asked by task 12");
+    b.open(Role::List);
+    b.name(b"Dependencies of task 34");
+    b.style(look::DEPENDENCIES);
+    b.open(Role::Item);
+    b.key(skein_ui::Key { owner: temper_client_view::frame::owner(), kind: 0, a: 17, b: 0 });
+    task_link(&mut b, b"Task 17");
+    b.open(Role::Status);
+    b.style(look::STATUS_DONE);
+    b.text(Run::Plain, b"Completed");
+    b.close();
+    b.close();
+    b.close();
+    b.close();
+    b.open(Role::Slot);
+    b.style(look::AGENT_RUN);
+    text(&mut b, Role::Heading { level: 2 }, "Run 1 · live now".as_bytes());
+    text(&mut b, Role::Paragraph, b"Started 10-22 03:48Z");
+    b.close();
+    b.open(Role::Log);
+    b.name(b"Conversation");
+    b.open(Role::Region);
+    b.style(look::TURN);
+    b.open(Role::Slot);
+    b.style(look::MESSAGE);
+    b.style(look::BY_AGENT);
+    b.open(Role::Slot);
+    b.style(look::WHO);
+    text(&mut b, Role::Paragraph, b"Temper");
+    b.close();
+    b.open(Role::Slot);
+    b.style(look::SAYS);
+    skein_ui::markdown::read(b"Checking the credentials.", 3, &mut b);
+    b.open(Role::Slot);
+    b.style(look::WORK);
+    text(&mut b, Role::Paragraph, b"read_file");
+    text(&mut b, Role::Paragraph, b"Read token.rs");
+    b.close();
+    b.close();
+    b.close();
+    b.close();
+    b.close();
+    b.close();
+    b.close();
+    b.close();
+    b.finish()
+}
+fn task_link(b: &mut skein_ui::Builder, name: &[u8]) {
+    b.open(Role::Link);
+    b.name(name);
+    b.text(Run::Plain, name);
+    b.bind(binding());
+    b.close();
+}

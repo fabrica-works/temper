@@ -28,6 +28,12 @@ fn region(b: &mut Builder, word: Word, words: &Words) {
     text(b, Role::Heading { level: 2 }, &words.say(word, &[]));
 }
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
+    if let Some(page) = root.pages().task()
+        && page.shape == Shape::Agent
+    {
+        super::agent::main(b, root, words, bindings, rows);
+        return;
+    }
     b.open(Role::Main);
     b.style(look::MAIN);
     b.style(look::PAGE);
@@ -45,7 +51,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         crate::choice::composer(b, root, Some(task), words, bindings);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
-            result(b, task, words);
+            result(b, task, words, look::TASK_CARD);
         }
         if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
@@ -101,7 +107,7 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     b.close();
 }
 
-fn executor(b: &mut Builder, executor: c::Executor, words: &Words) {
+pub(crate) fn executor(b: &mut Builder, executor: c::Executor, words: &Words) {
     let word = match executor {
         c::Executor::Agent { .. } => Word::Agent,
         c::Executor::Procedure { .. } => Word::Procedure,
@@ -109,7 +115,7 @@ fn executor(b: &mut Builder, executor: c::Executor, words: &Words) {
     };
     text(b, Role::Paragraph, &words.say(word, &[]));
 }
-fn requester(b: &mut Builder, by: c::OwnerRequester, me: Option<&c::Me>, words: &Words) {
+pub(crate) fn requester(b: &mut Builder, by: c::OwnerRequester, me: Option<&c::Me>, words: &Words) {
     let (word, number) = match by {
         c::OwnerRequester::Person(number) => {
             if let Some(me) = me
@@ -125,7 +131,7 @@ fn requester(b: &mut Builder, by: c::OwnerRequester, me: Option<&c::Me>, words: 
     };
     text(b, Role::Paragraph, &words.say(word, &[Hole::Number(number)]));
 }
-fn state(b: &mut Builder, state: State, words: &Words) {
+pub(crate) fn state(b: &mut Builder, state: State, words: &Words) {
     let (name, token) = match state {
         State::Phase(phase) => (phase_word(phase, words), phase_token(phase)),
         State::WaitingFor(number) => (words.say(Word::WaitingForTask, &[Hole::Number(number)]), look::STATUS_WAITING),
@@ -239,7 +245,7 @@ pub(crate) fn asked(b: &mut Builder, task: &c::Task, words: &Words) {
     }
     b.close();
 }
-pub(crate) fn result(b: &mut Builder, task: &c::Task, words: &Words) {
+pub(crate) fn result(b: &mut Builder, task: &c::Task, words: &Words, style: skein_ui::Style) {
     let facts = delegation::facts(task);
     match facts.state {
         ResultState::Running | ResultState::Held => return,
@@ -247,7 +253,7 @@ pub(crate) fn result(b: &mut Builder, task: &c::Task, words: &Words) {
         }
     }
     region(b, Word::GoalResult, words);
-    b.style(look::TASK_CARD);
+    b.style(style);
     crate::cards::delegation::status(b, facts.state, words);
     if let Some(said) = facts.said {
         crate::cards::delegation::said(b, said, words);
@@ -425,7 +431,7 @@ pub(crate) fn plan(
             for row in &tree.rows {
                 parent(b, &mut stack, Some(row.parent));
                 chip(b, &row.chip, words, bindings);
-                dependencies(b, row, words, bindings);
+                dependencies(b, row.chip.task, &row.dependencies, row.cut, words, bindings);
                 controls(b, &row.chip, root, words, bindings, rows);
                 stack.push(row.chip.task).expect("tree stack fits");
                 owner_folds(b, tree, row.chip.task, words);
@@ -466,14 +472,21 @@ pub(crate) fn plan(
     b.close();
     b.close();
 }
-fn dependencies(b: &mut Builder, row: &c::OwnerTreeRow, words: &Words, bindings: &mut Bindings) {
-    if row.dependencies.is_empty() && !row.cut {
+pub(crate) fn dependencies(
+    b: &mut Builder,
+    task: u64,
+    links: &List<c::OwnerTaskLink>,
+    cut: bool,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    if links.is_empty() && !cut {
         return;
     }
     b.open(Role::List);
-    b.name(&words.say(Word::Dependencies, &[Hole::Number(row.chip.task)]));
+    b.name(&words.say(Word::Dependencies, &[Hole::Number(task)]));
     b.style(look::DEPENDENCIES);
-    for link in &row.dependencies {
+    for link in links {
         b.open(Role::Item);
         b.key(super::inbox::card_key(c::ObjectKey::Task(link.number())));
         task_link(b, link.number(), words, bindings);
@@ -482,7 +495,7 @@ fn dependencies(b: &mut Builder, row: &c::OwnerTreeRow, words: &Words, bindings:
         }
         b.close();
     }
-    if row.cut {
+    if cut {
         b.open(Role::Item);
         text(b, Role::Paragraph, &words.say(Word::DependenciesCut, &[]));
         b.close();

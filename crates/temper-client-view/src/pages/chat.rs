@@ -119,7 +119,7 @@ pub(crate) struct Speakers {
     pub(crate) requester: bool,
 }
 
-fn speakers(task: &c::Task, me: Option<&c::Me>) -> Speakers {
+pub(crate) fn speakers(task: &c::Task, me: Option<&c::Me>) -> Speakers {
     #[expect(clippy::manual_map, reason = "view code spells out the signed-in person")]
     let person = match me {
         Some(me) => Some(me.party.number),

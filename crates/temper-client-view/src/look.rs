@@ -149,6 +149,14 @@ pub const PLAN_SPEND: Style = Style { owner: owner(), token: 71 };
 pub const DEPENDENCIES: Style = Style { owner: owner(), token: 72 };
 /// A task waiting on its dependencies, delegates, an answer or news.
 pub const STATUS_WAITING: Style = Style { owner: owner(), token: 73 };
+/// An agent task's parent and own identity.
+pub const AGENT_LINEAGE: Style = Style { owner: owner(), token: 74 };
+/// An agent task's specification, requester and dependencies.
+pub const AGENT_BRIEF: Style = Style { owner: owner(), token: 75 };
+/// An agent task's current or last run heading.
+pub const AGENT_RUN: Style = Style { owner: owner(), token: 76 };
+/// An ended agent task's result.
+pub const AGENT_RESULT: Style = Style { owner: owner(), token: 77 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -228,6 +236,10 @@ pub const NAMES: Names<'static> = Names {
         b"temper-plan-spend",
         b"temper-dependencies",
         b"temper-status-waiting",
+        b"temper-agent-lineage",
+        b"temper-agent-brief",
+        b"temper-agent-run",
+        b"temper-agent-result",
     ],
     regions: &[b"temper-link"],
 };

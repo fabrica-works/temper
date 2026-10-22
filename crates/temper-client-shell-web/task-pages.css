@@ -53,3 +53,40 @@
   .temper-plan-row:has(> .temper-plan-spend) > :nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
   .temper-main.temper-page > .temper-task-budget { width: calc(100% - 28px); margin-left: 14px; }
 }
+
+/* An agent's task's page (client/README.md, 5.9). */
+.temper-chat:has(> .temper-agent-lineage) > .temper-agent-lineage { flex: none; min-height: 31px; display: flex; align-items: center; gap: 9px; padding: 5px 25px; border-bottom: 1px solid var(--temper-line); color: #989084; font-size: 10px; white-space: nowrap; overflow: hidden; }
+.temper-agent-lineage > div { display: flex; align-items: baseline; gap: 9px; min-width: 0; overflow: hidden; }
+.temper-agent-lineage > div > p { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.temper-agent-lineage > div > :first-child { flex: none; }
+.temper-agent-lineage a { color: #8e5542; flex: none; }
+.temper-agent-lineage a::before { content: "← " / ""; }
+.temper-agent-lineage a:hover { text-decoration: underline; }
+.temper-agent-lineage > div + div::before { content: "/" / ""; flex: none; }
+.temper-chat:has(> .temper-agent-lineage) .temper-chatbar .temper-status-waiting { color: #8b7957; }
+.temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+/* One scrolling column keeps brief, run, conversation and result in order. */
+.temper-chat:has(> .temper-agent-lineage) > .temper-thread { overflow-y: auto; overflow-x: hidden; padding-top: 18px; scrollbar-width: thin; scrollbar-color: #d9d1c5 transparent; }
+.temper-chat:has(> .temper-agent-lineage) > .temper-thread > [role=log] { flex: none; min-height: 0; padding-top: 0; overflow: visible; }
+.temper-chat .temper-thread > .temper-agent-brief { margin-bottom: 20px; padding: 11px 15px; border-left: 2px solid #d8bba5; background: #f8f5f0; }
+.temper-agent-brief > h2 { margin: 0; color: #a15a43; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.temper-agent-brief p { margin: 5px 0 7px; font-size: 12px; }
+.temper-agent-brief > p:last-of-type { color: #91887c; font-size: 10px; }
+.temper-agent-run > h2 { display: flex; align-items: center; gap: 12px; margin: 20px 0 17px; color: #605a51; font-size: 10px; font-weight: 700; }
+.temper-agent-run > h2::after { content: ''; height: 1px; flex: 1; background: var(--temper-line); }
+.temper-agent-run > p { margin: -11px 0 19px; color: #a39b90; font-size: 10px; }
+.temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: min(931px, calc(100% - 173px)); margin: 2px max(32px, calc((100% - 1040px) / 2)) 18px auto; padding: 10px 13px; border-left: 2px solid #84a98f; background: #f2f7f1; font-size: 11px; }
+.temper-agent-result > h2 { display: block; margin: 0 0 4px; color: #477b59; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.temper-agent-result p { margin: 0; }
+@media (max-width: 760px) {
+  .temper-chat:has(> .temper-agent-lineage) > .temper-agent-lineage { padding-inline: 16px; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:first-child { min-width: 0; width: auto; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:last-child { flex: none; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: 42vw; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: calc(100% - 102px); margin-right: 16px; }
+}
+@media (max-width: 430px) {
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar > div:first-child { max-width: calc(100% - 87px); }
+  .temper-chat:has(> .temper-agent-lineage) .temper-chatbar h1 { max-width: 34vw; }
+  .temper-chat:has(> .temper-agent-lineage) .temper-thread > .temper-agent-result { width: calc(100% - 32px); }
+}

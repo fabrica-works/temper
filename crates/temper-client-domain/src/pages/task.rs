@@ -3,7 +3,7 @@ use super::{Request, inbox::Card};
 use crate::{Address, Limits, owner::Owner};
 use alloc::boxed::Box;
 use jig_client::{Client, Handle, Latest, Readable, Readout, Told, Watchable, contract as c};
-use skein_lib::{List, Queue};
+use skein_lib::{List, Queue, Wall};
 /// A task's state as a goal's page says it (client/README.md, 5.8).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum State {
@@ -145,6 +145,42 @@ pub fn header_state(task: &c::Task, me: Option<&c::Me>) -> State {
         c::WaitsOn::Nothing => row_state(&task.chip),
     }
 }
+/// A task's run heading (client/README.md, 5.9).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Run {
+    /// A run is out: claimed, running, or its run closing.
+    Live { attempt: u64, since: Option<Wall> },
+    /// The task lives and no run is out: its last run's attempt.
+    Waiting { attempt: u64, since: Option<Wall> },
+    /// The task has ended: its last run's attempt.
+    Ended { attempt: u64 },
+    /// The task lives and has had no run.
+    NoRun,
+}
+/// None when the task ended without a run, or its chip is not an owner's.
+#[must_use]
+#[expect(clippy::manual_map, reason = "the client's domain matches without a closure")]
+pub fn run(task: &c::Task) -> Option<Run> {
+    let c::ChipPhase::Owner { phase, details } = task.chip.details.as_ref() else { return None };
+    match phase {
+        c::OwnerChipPhase::Active(c::RunStage::Claimed { attempt } | c::RunStage::Running { attempt })
+        | c::OwnerChipPhase::Closing(c::ClosingStage::Run { attempt }) => {
+            Some(Run::Live { attempt: *attempt, since: details.run_since })
+        }
+        c::OwnerChipPhase::Ended => match details.attempt {
+            Some(attempt) => Some(Run::Ended { attempt }),
+            None => None,
+        },
+        c::OwnerChipPhase::Active(_)
+        | c::OwnerChipPhase::Waiting { .. }
+        | c::OwnerChipPhase::Person { .. }
+        | c::OwnerChipPhase::Closing(_)
+        | c::OwnerChipPhase::Held { .. } => Some(match details.attempt {
+            Some(attempt) => Run::Waiting { attempt, since: details.run_since },
+            None => Run::NoRun,
+        }),
+    }
+}
 // Jig's facts::reader is private; keep its person and project-role identity rule.
 fn reader(whom: c::Whom, project: u32, me: &c::Me) -> bool {
     match whom {
@@ -182,6 +218,8 @@ pub fn link_state(link: &c::OwnerTaskLink) -> Option<State> {
 pub enum Shape {
     Unknown,
     Tracked,
+    /// An agent's task with no priority, not the chat label (client/README.md, 5.9).
+    Agent,
     HeaderAndPlan,
 }
 #[derive(Debug)]
@@ -193,6 +231,7 @@ pub struct Task {
     pub run: Option<Handle>,
     pub shape: Shape,
     pub latest: Option<Box<c::ActivityPage>>,
+    pub thread: jig_client::thread::Thread,
     pub final_task: Option<Box<c::Task>>,
     pub next: u64,
     pub through: Option<u64>,
@@ -209,6 +248,8 @@ impl Task {
         ] {
             out.push(Request::Client(jig_client::Event::Watch { handle, subject: Watchable::Jig(subject) }));
         }
+        let mut thread = jig_client::thread::Thread::new(number, &super::chat::thread_limits(limits));
+        thread.reading = Some(jig_client::thread::Reading::Latest { known: 0 });
         read(activity, c::Read::Activity { task: number, before: None }, out);
         Self {
             number,
@@ -218,6 +259,7 @@ impl Task {
             run: None,
             shape: Shape::Unknown,
             latest: None,
+            thread,
             final_task: None,
             next: first.checked_add(3).expect("task handles fit"),
             through: None,
@@ -252,6 +294,9 @@ impl Task {
                         card.project = Some(task.project);
                     }
                     card.page = Some(value.clone());
+                    if self.shape == Shape::Agent && self.run.is_none() && self.thread.loaded >= self.thread.committed {
+                        self.thread.end_run();
+                    }
                     return true;
                 }
             }
@@ -268,27 +313,22 @@ impl Task {
                 read(handle, c::Read::Task { task: self.number }, out);
             }
             Told::Page { handle, page } if handle == self.document => {
-                let task = match page {
-                    Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => Some(task),
-                    Readout::Jig(c::ReadResult::Value(c::ReadValue::Historical(value))) => {
-                        if let c::OwnerHistoricalValue::Task { document, .. } = value.value
-                            && document.chip.task == self.number
-                        {
-                            Some(document)
-                        } else {
-                            None
-                        }
-                    }
-                    Readout::Limit | Readout::NotServed { .. } | Readout::Jig(_) | Readout::Family { .. } => None,
-                };
-                if let Some(task) = task {
+                if let Some(task) = super::chat::page_task(page, self.number) {
                     self.changed(&task, out);
                     self.final_task = Some(task);
                 }
             }
             Told::Page { handle, page } if handle == self.activity => {
                 if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = page {
-                    self.latest = Some(page);
+                    if self.shape == Shape::Agent {
+                        if let Some(reading) = self.thread.page(*page) {
+                            read(self.activity, reading, out);
+                        }
+                    } else {
+                        self.latest = Some(page);
+                    }
+                } else {
+                    self.thread.failed();
                 }
             }
             Told::Changed { handle } if handle == self.tree => match latest(client, handle) {
@@ -306,7 +346,13 @@ impl Task {
                 Some(Latest::Jig(_) | Latest::Family(_)) | None => {}
             },
             Told::Text { handle } if handle == self.tree => {}
-            Told::Changed { handle } | Told::Text { handle } if Some(handle) == self.run => {}
+            Told::Changed { handle } | Told::Text { handle } if Some(handle) == self.run => {
+                if self.shape == Shape::Agent
+                    && let Some(Latest::Jig(c::Delivery::RunState(run))) = latest(client, handle)
+                {
+                    self.thread.run(run, client.text(handle).or(run.writing.as_ref()));
+                }
+            }
             Told::Ended { handle, .. } if handle == self.tree || Some(handle) == self.run => {}
             Told::Link { .. }
             | Told::Pending { .. }
@@ -317,6 +363,9 @@ impl Task {
             | Told::Text { .. }
             | Told::Ended { .. }
             | Told::Page { .. } => return false,
+        }
+        if self.shape == Shape::Agent && self.run.is_none() && self.thread.loaded >= self.thread.committed {
+            self.thread.end_run();
         }
         true
     }
@@ -350,17 +399,28 @@ impl Task {
     fn changed(&mut self, task: &c::Task, out: &mut Queue<Request>) {
         self.shape = match task.chip.executor {
             c::Executor::Agent { .. } if task.priority.is_some() => Shape::Tracked,
-            c::Executor::Agent { .. }
-            | c::Executor::Procedure { .. }
-            | c::Executor::Party { .. }
-            | c::Executor::Role { .. } => Shape::HeaderAndPlan,
+            c::Executor::Agent { .. } => Shape::Agent,
+            c::Executor::Procedure { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => {
+                Shape::HeaderAndPlan
+            }
         };
-        if let Some(through) = self.through
-            && through != task.activity
-        {
-            read(self.activity, c::Read::Activity { task: self.number, before: None }, out);
+        if self.shape == Shape::Agent {
+            if let Some(page) = self.latest.take()
+                && let Some(reading) = self.thread.page(*page)
+            {
+                read(self.activity, reading, out);
+            }
+            if let Some(reading) = self.thread.document(task) {
+                read(self.activity, reading, out);
+            }
+        } else {
+            if let Some(through) = self.through
+                && through != task.activity
+            {
+                read(self.activity, c::Read::Activity { task: self.number, before: None }, out);
+            }
+            self.through = Some(task.activity);
         }
-        self.through = Some(task.activity);
         let running = match task.chip.details.as_ref() {
             c::ChipPhase::Owner {
                 phase:
@@ -415,11 +475,16 @@ fn latest(client: &Client, handle: Handle) -> Option<&Latest> {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Activity, the final task, and bounded held-task cards and their words.
+    // An agent's task also retains a chat's thread and its borrowed view lines.
     limits
         .client
         .domain
         .document_bytes
         .checked_mul(u64::from(limits.client.domain.reads).checked_add(2)?)?
         .checked_add(List::<Card>::worst_case(limits.client.domain.reads)?)?
-        .checked_add(u64::from(limits.client.domain.reads).checked_mul(u64::from(limits.client.domain.text))?)
+        .checked_add(u64::from(limits.client.domain.reads).checked_mul(u64::from(limits.client.domain.text))?)?
+        .checked_add(jig_client::thread::worst_case(&super::chat::thread_limits(limits))?)?
+        .checked_add(List::<jig_client::thread::Line<'_>>::worst_case(
+            limits.client.domain.rows.checked_mul(4)?.checked_add(1)?,
+        )?)
 }
