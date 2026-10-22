@@ -557,6 +557,20 @@ impl Joint {
             self.send(event);
         }
     }
+    fn callback(&mut self, client: ClientId, mut event: RootEvent) {
+        if let RootEvent::Client {
+            event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope, answer, why } },
+        } = &mut event
+            && self.lose_answers != 0
+        {
+            self.lost_answer = Some((client, *attempt));
+            self.lose_answers -= 1;
+            *envelope = RequestEnvelope::Lost;
+            *answer = None;
+            *why = None;
+        }
+        self.callbacks.push((client, event.into()));
+    }
     fn incoming(&mut self, packet: packets::Incoming) {
         match packet {
             packets::Incoming::Authenticated { client, .. } => {
@@ -565,22 +579,7 @@ impl Joint {
                 }
             }
             packets::Incoming::Callback { client, event } => {
-                let event = translate::callback(event);
-                if matches!(
-                    event,
-                    RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { .. } } }
-                ) && self.lose_answers != 0
-                {
-                    if let RootEvent::Client {
-                        event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, .. } },
-                    } = &event
-                    {
-                        self.lost_answer = Some((client, *attempt));
-                    }
-                    self.lose_answers -= 1;
-                } else {
-                    self.callbacks.push((client, event.into()));
-                }
+                self.callback(client, translate::callback(event));
             }
             packets::Incoming::SignedOut { client, sign_in } => {
                 self.observed.push(Observed::SignInEnded { client });
@@ -597,11 +596,7 @@ impl Joint {
     fn packet(&mut self, request: engine::Request) {
         match translate::forge::incoming(&mut self.transport, request, &self.limits.client.domain) {
             Ok(Some((client, event))) => {
-                if self.lose_answers != 0 {
-                    self.lose_answers -= 1;
-                } else {
-                    self.callbacks.push((client, event.into()));
-                }
+                self.callback(client, event);
             }
             Ok(None) => {}
             Err(request) => {
@@ -870,6 +865,9 @@ impl Front<Temper> for Joint {
                 self.drop_watches();
             }
             FrontFault::Slow { span } => self.due = Some(now.saturating_add(span)),
+            // The engine receives the request but its answer is lost on a live link.
+            // Report Lost immediately: this front has no exchange deadline to wait for
+            // (jig's client/domain/client.md, 16); jig-client owns the retry backoff.
             FrontFault::NoAnswer => self.lose_answers = self.lose_answers.checked_add(1).expect("finite lost answers"),
             FrontFault::DropWatch => self.drop_watches(),
             FrontFault::Busy => self.keyed_fault = Some(RequestEnvelope::Again),
