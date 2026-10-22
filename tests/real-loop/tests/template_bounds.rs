@@ -8,8 +8,10 @@ static HEAP: Counting = Counting;
 #[test]
 fn reads_answer_at_the_templates_bounds() {
     let seen = Rc::new(RefCell::new(Seen::default()));
-    template_bounds::run(seen.clone());
+    template_bounds::run(&seen);
     let seen = seen.borrow();
+    assert!(seen.completions <= 4, "delegation and wait, plus two reports: {} completions", seen.completions);
+    assert!(seen.activity.len() >= 2, "ended activity spans multiple pages");
     assert!(seen.activity.iter().map(|page| page["rows"].as_array().expect("rows").len()).sum::<usize>() >= 3);
     let tree = seen.tree.split_once("tree:\n").expect("tree").1.split_once("digest:").expect("tree digest").0;
     assert_eq!(tree.lines().filter(|line| line.contains(" · ")).count(), 3, "root and two rows: {tree}");

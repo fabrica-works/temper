@@ -12,7 +12,7 @@ use skein_world::{
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 enum Proc {
-    Llm(Box<skein_fake_peers::llm::Peer>),
+    Llm { peer: Box<skein_fake_peers::llm::Peer>, release: bool },
     Hosted(crate::world::Proc),
     Page { caller: Box<calls::Caller>, path: PathBuf, root: Fd, pending: Option<PageCommand> },
 }
@@ -25,19 +25,19 @@ impl Proc {
     fn caller(&self) -> &calls::Caller {
         match self {
             Self::Hosted(Caller(caller)) | Self::Page { caller, .. } => caller,
-            Self::Llm(_) | Self::Hosted(_) => panic!("caller"),
+            Self::Llm { .. } | Self::Hosted(_) => panic!("caller"),
         }
     }
     fn host(&self) -> &dyn Host {
         match self {
-            Self::Llm(peer) => peer.as_ref(),
+            Self::Llm { peer, .. } => peer.as_ref(),
             Self::Hosted(proc) => proc,
             Self::Page { caller, .. } => caller.as_ref(),
         }
     }
     fn host_mut(&mut self) -> &mut dyn Host {
         match self {
-            Self::Llm(peer) => peer.as_mut(),
+            Self::Llm { peer, .. } => peer.as_mut(),
             Self::Hosted(proc) => proc,
             Self::Page { caller, .. } => caller.as_mut(),
         }
@@ -45,6 +45,12 @@ impl Proc {
 }
 impl Host for Proc {
     fn iterate(&mut self, now: Time, wall: skein_lib::Wall) {
+        if let Self::Llm { peer, release } = self
+            && std::mem::take(release)
+        {
+            // The release name is allocated under the peer's own heap meter.
+            peer.release(WATCH).expect("release root after task watch delivery");
+        }
         if let Self::Page { caller, path, root, pending } = self
             && let Some(command) = pending.take()
         {
@@ -81,7 +87,8 @@ impl Host for Proc {
         self.host_mut().submissions()
     }
     fn work_pending(&self, now: Time) -> bool {
-        matches!(self, Self::Page { pending: Some(_), .. }) || self.host().work_pending(now)
+        matches!(self, Self::Page { pending: Some(_), .. } | Self::Llm { release: true, .. })
+            || self.host().work_pending(now)
     }
     fn next_deadline(&self) -> Option<Time> {
         self.host().next_deadline()
@@ -122,12 +129,19 @@ fn fixture() -> crate::forge::Fixture {
             value["engine"]["projects"][0]["policy"]["roles"][0]["authority"]["grants"] = json!([]);
             value["engine"]["projects"][0]["policy"]["projections"] = json!([]);
             value["engine"]["limits"]["overrides"]["documents.rows"] = 2.into();
-            // The root task document must carry every live direct delegate whole.
+            // At the read, the root document carries all three live delegates whole.
             // Its line allowance is independent of the two-row tree/page window.
             value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
             for name in ["tasks.batch", "authority.batch"] {
-                value["engine"]["limits"]["overrides"][name] = 2.into();
+                value["engine"]["limits"]["overrides"][name] = 4.into();
             }
+            value["engine"]["limits"]["overrides"]["tasks.delegates"] = 5.into();
+            agent["profile"]["declared"]["calls_per_response"] = 2.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
+            // These report-only members carry no forge grants or parameters.
+            value["engine"]["limits"]["overrides"]["tasks.authority_grants"] = 1.into();
+            // Five delegates and the root's goal operation fit the same admission.
+            value["engine"]["limits"]["overrides"]["people.operations"] = 6.into();
             let kinds = json!([{"kind":"charter","number":1},{"kind":"role","number":0}]);
             value["engine"]["rules"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
             value["engine"]["projects"][0]["policy"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
@@ -170,11 +184,27 @@ fn turn(name: &[u8], value: &Value) -> skein_fake_llm_domain::api::Turn {
         tokens: 1,
     }
 }
+// Hold the root's wait response until task 3's live watch is installed.
+const WATCH: &[u8] = b"bounds-watch";
 fn ready() -> skein_fake_llm_domain::api::Turn {
-    use skein_fake_llm_domain::api::Line;
+    use skein_fake_llm_domain::api::{Line, Piece};
     let mut turn = turn(b"wait", &json!({}));
-    turn.lines = vec![Line::Text { text: b"Bounds ready".as_slice().into() }, turn.lines[0].clone()].into_boxed_slice();
+    turn.lines = vec![
+        Line::Pieces {
+            pieces: Box::new([Piece { text: b"Bounds ready".as_slice().into(), hold: Some(WATCH.into()) }]),
+        },
+        turn.lines[0].clone(),
+    ]
+    .into_boxed_slice();
     turn
+}
+fn batch_created(peer: &skein_fake_peers::llm::Peer) -> bool {
+    peer.observations().iter().any(|observation| {
+        let skein_fake_peers::llm::Observation::Query { query, .. } = observation else { return false };
+        query.messages.iter().any(|message| {
+            message.parts.iter().any(|part| matches!(part, skein_fake_llm_domain::api::Part::ToolOutput { .. }))
+        })
+    })
 }
 fn scripts() -> Box<[skein_fake_llm_domain::api::Script]> {
     use skein_fake_llm_domain::api::Script;
@@ -187,25 +217,23 @@ fn scripts() -> Box<[skein_fake_llm_domain::api::Script]> {
         })
     };
     let agent = json!({"kind":"agent","charter":1});
-    let reports = json!({"batch":[
+    let delegates = json!({"batch":[
         member("@bounds-dependency", agent.clone(), json!([])),
-        member("@bounds-ended", agent.clone(), json!([{"kind":"batch","number":0}]))
-    ]});
-    let live = json!({"batch":[
+        member("@bounds-ended", agent.clone(), json!([{"kind":"batch","number":0}])),
         member("Bounds person", json!({"kind":"role","role":0}), json!([])),
-        member("Bounds waiting one", agent.clone(), json!([{"kind":"batch","number":0}]))
+        member("Bounds waiting one", agent.clone(), json!([{"kind":"batch","number":2}]))
     ]});
     let last = json!({"batch":[member("Bounds waiting last", agent, json!([{"kind":"existing","number":4}]))]});
+    // The store's batch ceiling is four. Both write calls run in order in
+    // one model completion, so the second can name person task 4.
+    let mut opening = turn(b"delegate", &delegates);
+    opening.lines = vec![opening.lines[0].clone(), turn(b"delegate", &last).lines[0].clone()].into_boxed_slice();
     Box::new([
         Script {
             cue: b"@bounds-root".as_slice().into(),
-            turns: Box::new([
-                turn(b"delegate", &reports),
-                turn(b"wait", &json!({})),
-                turn(b"delegate", &live),
-                turn(b"delegate", &last),
-                ready(),
-            ]),
+            // The three live delegates keep both reports from being the last
+            // result, so the root's default wake policy leaves it parked.
+            turns: Box::new([opening, ready()]),
         },
         Script {
             cue: b"@bounds-dependency".as_slice().into(),
@@ -222,6 +250,7 @@ fn scripts() -> Box<[skein_fake_llm_domain::api::Script]> {
 #[derive(Default)]
 pub struct Seen {
     pub activity_elapsed: Option<Duration>,
+    pub completions: usize,
     pub activity: Vec<Value>,
     pub activity_text: Vec<String>,
     pub tree: String,
@@ -246,6 +275,7 @@ struct Judge {
     wake: Option<Time>,
     stopping: bool,
     finished: bool,
+    watch_released: bool,
 }
 impl Judge {
     fn next(&mut self, procs: &mut [Proc], words: &[&str], json: bool) {
@@ -356,17 +386,32 @@ impl Referee<Proc> for Judge {
                 "task 1 --tree did not answer within one second"
             }
         );
-        let Proc::Llm(peer) = &procs[0] else { panic!("LLM") };
+        let Proc::Llm { peer, .. } = &procs[0] else { panic!("LLM") };
         let address = peer.address();
+        let created = batch_created(peer);
+        let watching = procs[2].caller().watching;
         let Proc::Hosted(Service(service)) = &mut procs[1] else { panic!("service") };
         service.address = address;
         // The fixture makes no forge calls; a bound loopback address is sufficient.
         service.forge_address = address;
+        if let Some(call) = watching {
+            service.arm_watch(call);
+        }
+        let delivered = service.delivered();
         let links = service.links();
         let linked = links != 0;
         let Proc::Hosted(Caller(caller)) = &mut procs[2] else { panic!("initial caller") };
         caller.links.set(links);
+        caller.advanced.set(created);
+        if watching.is_some() {
+            caller.watched = delivered;
+        }
         caller.released |= linked;
+        if delivered && !self.watch_released {
+            let Proc::Llm { release, .. } = &mut procs[0] else { panic!("LLM") };
+            *release = true;
+            self.watch_released = true;
+        }
         let caller = procs[2 + self.current].caller();
         if caller.is_empty() && !matches!(self.stage, Stage::Done) {
             if self.current == 0 {
@@ -379,12 +424,20 @@ impl Referee<Proc> for Judge {
                         String::from_utf8_lossy(&call.stderr)
                     );
                 }
-                let task: Value = serde_json::from_slice(&caller.calls[3].stdout).expect("ended task JSON");
+                // An ended wait finishes with the same historical task read.
+                let waited: Value = serde_json::from_slice(&caller.calls[2].stdout).expect("ended wait JSON");
+                assert_eq!(waited["met"], true);
+                let task = waited["task"].clone();
                 assert_eq!(task["chip"]["task"], ENDED);
                 assert_eq!(task["chip"]["phase"], "ended");
                 assert_eq!(task["dependencies"][0]["retained"]["chip"]["task"], 2);
                 assert_eq!(task["dependencies"][0]["retained"]["chip"]["phase"], "ended");
                 assert_eq!(task["lineage_chips"][0]["details"]["owner"]["details"]["live_delegates"], 3);
+                for (call, number) in caller.calls[3..6].iter().zip(4..=6) {
+                    let live: Value = serde_json::from_slice(&call.stdout).expect("live delegate JSON");
+                    assert_eq!(live["chip"]["task"], number);
+                    assert_ne!(live["chip"]["phase"], "ended");
+                }
                 self.seen.borrow_mut().task = Some(task);
             }
             self.answered(now, procs);
@@ -396,19 +449,21 @@ impl Referee<Proc> for Judge {
         }
         let Proc::Hosted(Service(service)) = &procs[1] else { panic!("service") };
         if service.is_empty() && !self.finished {
-            let Proc::Llm(peer) = &mut procs[0] else { panic!("LLM") };
+            let Proc::Llm { peer, .. } = &mut procs[0] else { panic!("LLM") };
             peer.shutdown();
             self.deadline = None;
             self.finished = true;
         }
     }
     fn observe(&mut self, now: Time, procs: &[Proc]) {
-        let Proc::Llm(peer) = &procs[0] else { panic!("LLM") };
+        let Proc::Llm { peer, .. } = &procs[0] else { panic!("LLM") };
         let Proc::Hosted(Service(service)) = &procs[1] else { panic!("service") };
         let Proc::Hosted(Caller(caller)) = &procs[2] else { panic!("initial caller") };
         let current = procs[2 + self.current].caller();
         if (peer.address().is_some() && service.address.is_none())
             || (service.links() != 0 && !caller.released)
+            || (!caller.advanced.get() && batch_created(peer))
+            || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))
             || (current.is_empty() && !matches!(self.stage, Stage::Done))
             || (matches!(self.stage, Stage::Done) && !self.stopping && procs[2..2 + PAGES].iter().all(Host::is_empty))
             || (service.is_empty() && !self.finished)
@@ -428,13 +483,13 @@ impl Referee<Proc> for Judge {
 }
 
 /// Hosted ctl calls read each supplied continuation in the same running service.
-pub fn run(seen: Rc<RefCell<Seen>>) {
+pub fn run(seen: &Rc<RefCell<Seen>>) {
     use calls::{D1, call, sign_in};
     let scratch = crate::Scratch::new("template-bounds");
     let mut world = World::new_controlled_checked(|controls| Judge {
         controls,
         started: None,
-        seen,
+        seen: seen.clone(),
         path: scratch.path().into(),
         current: 0,
         stage: Stage::Activity,
@@ -442,8 +497,12 @@ pub fn run(seen: Rc<RefCell<Seen>>) {
         wake: None,
         stopping: false,
         finished: false,
+        watch_released: false,
     });
-    world.spawn(|| Proc::Llm(Box::new(llm::peer(llm::scripted(scripts())).expect("scripted peer"))));
+    world.spawn(|| Proc::Llm {
+        peer: Box::new(llm::peer(llm::scripted(scripts())).expect("scripted peer")),
+        release: false,
+    });
     world.spawn_signals(|signals| {
         Proc::Hosted(Service(Box::new(ServiceHost::configured(scratch.path().into(), signals, Some(fixture()), false))))
     });
@@ -455,10 +514,15 @@ pub fn run(seen: Rc<RefCell<Seen>>) {
                     vec![
                         sign_in(D1),
                         call(D1, crate::argv!["chat", "--project", "1", "--key", "bounds", "@bounds-root"]),
-                        // This marker follows both report results and all three live delegates.
-                        // A live-task watch opened after a report ended can answer unknown.
-                        calls::until(D1, crate::argv!["chat", "1"], b"Bounds ready", b"Bounds"),
-                        call(D1, crate::argv!["task", "3", "--json"]),
+                        // The next model query carries both committed delegate results.
+                        // Hold its wait response until this live task watch is delivered.
+                        calls::advance(),
+                        calls::start(D1, crate::argv!["wait", "task", "3", "--until", "ended", "--json"]),
+                        calls::watching(2),
+                        calls::join(2),
+                        call(D1, crate::argv!["task", "4", "--json"]),
+                        call(D1, crate::argv!["task", "5", "--json"]),
+                        call(D1, crate::argv!["task", "6", "--json"]),
                         call(D1, crate::argv!["activity", "3", "--json"]),
                     ],
                     scratch.path().into(),
@@ -499,6 +563,14 @@ pub fn run(seen: Rc<RefCell<Seen>>) {
         agent::roots,
     );
     let outcome = world.run(&skein_shell::Clock::new(), crate::PATIENCE);
+    let Proc::Llm { peer, .. } = &outcome.procs[0] else { panic!("LLM") };
+    seen.borrow_mut().completions = peer
+        .observations()
+        .iter()
+        .filter(|observation| {
+            matches!(observation, skein_fake_peers::llm::Observation::Answered { result: Ok(()), .. })
+        })
+        .count();
     let Proc::Hosted(Service(service)) = &outcome.procs[1] else { panic!("service") };
     assert_eq!(service.service.as_ref().and_then(temper_service::Service::end), Some(&crate::End::Drained));
     assert!(outcome.killed.is_empty(), "no requested kills");
