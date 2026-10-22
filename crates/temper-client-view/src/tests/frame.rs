@@ -379,6 +379,41 @@ fn the_banner_menu_holds_projects_navigation_and_corner_in_order() {
 }
 
 #[test]
+fn projects_me_leaves_unnamed_take_their_numbers_in_the_banner() {
+    let (mut root, watch) = fixtures::root_with_watch(Some(fixtures::PROJECT));
+    let mut me = root.pages().me(root.client()).expect("me").clone();
+    for index in 0..me.projects.len() {
+        me.projects.get_mut(index).expect("project").name = None;
+    }
+    fixtures::root_event(
+        &mut root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(Box::new(
+                        me,
+                    ))),
+                },
+            },
+        },
+    );
+    let view = fixtures::page_view(&root);
+    assert_menu(
+        &view,
+        &[
+            (Role::Button, Some(b"Project 1")),
+            (Role::Button, Some(b"Project 2")),
+            (Role::Navigation, Some(b"Main navigation")),
+            (Role::Slot, None),
+        ],
+    );
+    for name in [b"Project 1", b"Project 2"] {
+        assert!(fixtures::person_find(view.tree(), Role::Button, name).is_some(), "a person finds {name:?}");
+    }
+}
+
+#[test]
 fn the_banner_menu_keeps_navigation_and_corner_while_connecting() {
     assert_menu(&fixtures::built(), &[(Role::Navigation, Some(b"Main navigation")), (Role::Slot, None)]);
 }

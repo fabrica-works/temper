@@ -465,6 +465,12 @@ impl Person {
         }
     }
 }
+/// The banner's button for a project `me` leaves unnamed, "Project N"
+/// (client/README.md, 5.1).
+fn an_unnamed_project(name: Option<&[u8]>) -> bool {
+    let Some(number) = name.and_then(|name| name.strip_prefix(b"Project ".as_slice())) else { return false };
+    !number.is_empty() && number.iter().all(u8::is_ascii_digit)
+}
 // Channel fixtures offer project zero and one. Init offers just one, already
 // selected. The demo uses that button; older scripts still choose the other one.
 fn select_project(client: &mut NativeClient, begin: Begin) -> bool {
@@ -474,7 +480,7 @@ fn select_project(client: &mut NativeClient, begin: Begin) -> bool {
         .iter()
         .find(|node| {
             node.role == skein_ui::Role::Button
-                && node.name.as_deref() == Some(b"Project".as_slice())
+                && an_unnamed_project(node.name.as_deref())
                 && (begin == Begin::Link || !node.states.as_slice().contains(&skein_ui::State::Pressed))
         })
         .map(|node| node.id);
