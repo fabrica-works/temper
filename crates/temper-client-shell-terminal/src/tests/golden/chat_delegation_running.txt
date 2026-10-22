@@ -12,9 +12,12 @@ T1 · Add CSV export to widget:
   * waiting on 1 delegate
   Spent 0; delegates spent 0
 Conversation:
+  Today · Thursday 1 January
   You
+  00:00
   Add CSV export to widget
   Temper
+  00:00
   I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.
   Task 2:
     T2 · CHANGE

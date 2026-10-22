@@ -19,9 +19,12 @@ Demo:
 demo · demo/widget on Demo forge
 Signed in as the deployment’s owner
 Conversation:
+  Today · Thursday 1 January
   You
+  00:00
   Add CSV export to widget
   Temper
+  00:00
   I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.
   Task 2:
     T2 · CHANGE
@@ -37,6 +40,7 @@ Conversation:
   1 tool call
   wait
   Temper
+  00:00
   CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.
   1 tool call
   wait

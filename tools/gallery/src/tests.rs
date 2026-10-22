@@ -414,6 +414,8 @@ fn times_read_against_each_mockup_worlds_fixed_now() {
         ("inbox-solo", "Waiting 12 min"),
         ("inbox-solo", "Waiting 18 min"),
         ("chat-solo-T10", "waiting 12 min"),
+        ("chat-reference-T1", "Today · Thursday 22 October"),
+        ("chat-solo-T10", "Today · Tuesday 27 October"),
         ("chat-first-run-4-T4", "Ended 21:05"),
     ] {
         let sample = samples::samples().into_iter().find(|sample| sample.name == name).expect("named sample");
@@ -425,5 +427,25 @@ fn times_read_against_each_mockup_worlds_fixed_now() {
                 .any(|node| node.text.iter().any(|run| String::from_utf8_lossy(&run.text).contains(expected))),
             "{name}: {expected}"
         );
+    }
+}
+
+#[test]
+fn gallery_chat_clocks_are_separate_leaves_under_the_speakers() {
+    for (name, clock) in [("chat-reference-T1", "06:56"), ("chat-solo-T10", "09:18")] {
+        let sample = samples::samples().into_iter().find(|sample| sample.name == name).expect("sample");
+        let view = view(&sample);
+        let tree = view.tree();
+        let who = tree
+            .nodes()
+            .iter()
+            .enumerate()
+            .find(|(_, node)| node.styles.as_slice().contains(&temper_client_view::look::WHO))
+            .expect("speaker")
+            .0;
+        assert_eq!(tree.nodes()[who + 1].name.as_deref(), Some(b"You".as_slice()));
+        let clock_at = who + 1 + usize::try_from(tree.nodes()[who + 1].size).expect("speaker size");
+        assert_eq!(tree.nodes()[clock_at].role, Role::Time);
+        assert_eq!(tree.nodes()[clock_at].name.as_deref(), Some(clock.as_bytes()));
     }
 }
