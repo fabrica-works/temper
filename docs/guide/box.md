@@ -55,7 +55,8 @@ No account or key goes in a file. Once the box runs, you sign in with
 ChatGPT from the client (step 8), or add an OpenAI API key there. The
 sign-in's callback is `127.0.0.1:1455` on the box's machine: if your
 browser is on another machine, connect to the box with
-`ssh -L 1455:127.0.0.1:1455 HOST` for that step.
+`ssh -L 1455:127.0.0.1:1455 -L 3000:127.0.0.1:3000 HOST`: the second
+port is Forgejo's web, for step 6.
 
 ## Step 5. Start the box and keep its terminal
 
@@ -104,7 +105,9 @@ never a stranger's pull request.
 ## Step 7. Adopt the repository in temper
 
 Open a second terminal in the same `temper-box` directory. Set `TEMPER`
-as in step 1, paste the printed link when prompted, and run the client:
+as in step 1, paste the printed link when prompted, and run the client.
+The link signs in once, within five minutes of its printing; past them
+the client is refused, and the box prints a fresh link in its terminal.
 
 ```sh
 TEMPER=/usr/local/bin/temper
@@ -122,7 +125,14 @@ the client.
 
 ## Step 8. Sign in with ChatGPT, then ask for work
 
-Reopen the client with the link. Open **Accounts** and, under **Add an
+Reopen the client on the sign-in it kept in `client`, by the box's
+address rather than the spent link:
+
+```sh
+"$TEMPER" open client http://127.0.0.1:7100/
+```
+
+Open **Accounts** and, under **Add an
 account**, choose **Continue with ChatGPT**. Open the address it shows
 in a browser on the box's machine, or in yours through the port
 forwarded in step 4, and approve temper there. Wait for `Signed in to
@@ -131,5 +141,5 @@ chat and ask for a change in `acme/widget`: the agent's work runs on
 your ChatGPT plan.
 
 Stop the box with Ctrl-C in its terminal. Start it again with the same
-command; use its new link to reopen the client. Your
+command, and reopen the client by its address as above. Your
 backups are yours: copy the forge directory and `state` with the box stopped.
