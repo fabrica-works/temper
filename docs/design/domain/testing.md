@@ -386,6 +386,22 @@ in the lower world that owns it, never here.
     `account=<login>` and `repositories=all`, or
     `repository_ids=<a>,<b>`; it answers `302` to the setup address
     with `installation_id`, `setup_action=install` and the state.
+  - **The harness,** the eight stories' own, in
+    `tests/real-loop/src/github.rs`: skein's forge peer with its GitHub
+    layer (skein's `fake-forge.md`, section 10) on the world's one fake
+    forge, the GitHub forge's configuration (its identity by the forge,
+    `login` and `author` null, the bot's), and the layer's record of its
+    git calls read for the story, which holds no token. A story that
+    starts connected has its App seeded before the service starts, by
+    `testing/temper-github-app`: the App on the layer's first fixed
+    test key, and its six records (`User`, `AppId`, `AppSlug`, `AppKey`,
+    `Accepted`, `Origin`: ../protocol/credentials.md, 2.1) kept in jig's
+    secrets' store in the scratch data directory, through jig's store
+    opened as temper's start opens it; the process tier seeds the same
+    (2.6). The worker's git in GitHub's stories is the hosted fake git
+    program over the layer's git route (`tests/real-loop/src/git.rs`,
+    the route's transport beside the typed one the other stories keep),
+    so each clone and push carries the token the route checks.
   - **The stories:**
     1. the meeting point (`../draft/github.md`, 16.1): jig's secrets'
        store seeded with an App's records before the start, its key one
@@ -398,15 +414,25 @@ in the lower world that owns it, never here.
        repaired;
     5. an approval rule waiting on a person, then the App on the bypass
        list;
-    6. git on GitHub's tokens: a chat's clone and push on a GitHub
-       repository, each authenticated by its installation's token
-       (`x-access-token`), which the layer's git route checks (skein's
-       `fake-forge.md`, section 10); the token renewed mid-run, git's
-       generation changing under it, and the next push authenticated
-       by the renewed token, as the layer's record of its git calls
-       shows; a repository of an account with no installation refused
-       as not installed, without a git call
-       (../protocol/credentials.md, section 4);
+    6. git on GitHub's tokens (`tests/real-loop/tests/github.rs`): a
+       chat's clone and push on a GitHub repository, each authenticated
+       by its installation's token (`x-access-token`), which the layer's
+       git route checks (skein's `fake-forge.md`, section 10). Two
+       accounts on the layer, `acme` with the App installed on all its
+       repositories and `umbra` with none, one repository each. The
+       person adopts `acme/app`; a chat delegates a change whose coder
+       reads, edits and finishes it, as `fuzzy_landing`'s scripts begin
+       (no review, no landing), and the story ends on the push. The
+       layer's record shows the clone and the push, each by a token
+       minted for `acme`'s installation, the push a write, and the
+       branch's head is the coder's commit. `umbra/tool`'s adoption is
+       refused as not installed (`temper ctl adopt` exits 2, `NoAccess`
+       on the client's wire until it names `NotInstalled`: forge.md,
+       4.3), with no git call and no
+       token minted for `umbra`. The token renewed mid-run is the
+       one-process world's story (2.5): its moment is GitHub's expiry,
+       in whole seconds at GitHub's hour, which a real clock can only
+       wait for;
     7. a repository granted on GitHub appearing in the picker;
     8. Forgejo connected, managed and owned from the client; its code
        waits for jig's request carrying a value and a jig
@@ -476,6 +502,13 @@ and 10).
     is prepared, committed and pushed on the fake forge through the fake
     git program;
   - a merge in progress is resolved and pushed with both parents;
+  - on GitHub's layer (skein's `fake-forge.md`, section 10), its App
+    seeded as the real loop's are (2.4): a goal's change cloned by its
+    installation's token, the token renewed `renew_before` ahead of
+    GitHub's hour on the simulator's clock while the run holds its
+    workspace, git's generation changing under it, and the push
+    authenticated by the renewed token, as the layer's record of its git
+    calls shows (../protocol/credentials.md, section 4);
   - a signal mid-run drains the engine, the worker ends, and the next
     start settles the worker's claims at once;
   - the service is killed, or the machine's power lost, at a drawn
@@ -676,6 +709,32 @@ and 10).
   the fake forge's API, once it joins: ../protocol/README.md, 15.5), and
   no process of the cluster outliving it. Without delegated cgroups the cluster's tests
   fail at their start, saying why (section 10).
+- **GitHub's git,** a test of its own (../protocol/credentials.md,
+  section 4), on temper's fakes as processes, never on github.com:
+  `temper fake forge` serving the fake's GitHub layer (4.2), the fake
+  LLM, an engine alone and one worker alone (../protocol/README.md,
+  15.1), by `crates/temper/tests/support/github.rs` on the cluster's
+  members: each started on its ready lines in a cgroup of its own, after
+  the one before, and stopped in reverse. Not from `lab/cluster/`'s
+  description: before the engine starts, the test seeds the App's
+  records into the engine's data directory with
+  `testing/temper-github-app`, as the real loop's GitHub stories do
+  (2.4), a step the lab's format has no place for (../protocol/README.md,
+  15.5). The engine's clients' listener is on a loopback port the test
+  reserved (2.4), and the worker's git is the `temper` binary under the
+  name `git`, `temper fake git` (4.3), over the layer's git route.
+  - **The story:** the person signs in, adds the test's key (2.4) and
+    adopts `acme/app`, the layer's one installed account's repository;
+    a chat delegates a change whose coder reads, edits and finishes it,
+    scripted as the real loop's story 6 is (2.4), on the worker; the
+    story waits, on a watch, until the change's production has
+    delivered, then stops the processes.
+  - **Its referee** is the tier's: the coder's task ended on the worker;
+    the forge's observations, which hold the layer's record of its git
+    calls and never a token, show the clone and the push, each by a
+    token minted for `acme`'s installation, the push a write, and the
+    branch's head the coder's commit; no process outlives the story.
+  - **It aims at 1 s,** as a world's story does (6.1).
 - **Outside the suites:** nextest profile `process`, run by
   `scripts/proof-one-process.sh`, which builds the binary and the fake
   `claude` first and sets `TEMPER_TEST_CLAUDE`. It aims at 3 minutes; if
@@ -892,6 +951,20 @@ loopback (section 5). temper's worlds add:
 - **GitHub's API** is served by the fake's GitHub layer, over the same
   domain, with the browser's pages as plain HTTP at its `web` origin
   (skein's `fake-forge.md`, section 10); its stories are 2.4's.
+- **GitHub's, as a process:** `temper fake forge --document FILE`
+  serves the GitHub layer when the document has a `github` member: the
+  App (`id`, `slug`, the bot's user id, and `key`, the index of one of
+  the layer's fixed test keys, as `testing/temper-github-app` names it),
+  the accounts (`login`, `id`, `kind`), each account's installation
+  (`all` its repositories, or the names of some) or none, and
+  `token_life_seconds`, GitHub's hour, 3600, unless the scenario says.
+  The repositories are the document's own, as for Forgejo, each with its
+  owner an account. Its `--observations` file holds, beside the forge's
+  observations, the layer's record of its git calls (skein's
+  `fake-forge.md`, 10.1): each call's repository, the installation and
+  mint of the token that authenticated it, whether it wrote, and its
+  status, never a token. Its ready line names its address, which the
+  engine's document gives as the forge's `api`, `git` and `web` (2.4).
 
 ### 4.3 The machine, and the fake git program
 
@@ -1353,7 +1426,8 @@ world of temper's on a scripted engine (../client/README.md, section 10).
 ```
 crates/*/src/tests.rs               step tests
 tests/codecs                        temper-codecs-world: the generated codecs and the foreign documents' decoders
-crates/temper/tests/process.rs      the process tier (2.6): the story, the terminal, the server's guards, the hinted story, `temper box`, the cluster's stories; nextest profile process
+crates/temper/tests/process.rs      the process tier (2.6): the story, the terminal, the server's guards, the hinted story, `temper box`, the cluster's stories, GitHub's git; nextest profile process
+crates/temper/tests/support/github.rs   GitHub's git as processes (2.6): the fake GitHub, the fake LLM, an engine alone and a worker alone, the App seeded
 crates/temper/tests/support/cluster.rs  the cluster's reader: `lab/cluster/` started, awaited and stopped on skein-world's `Binary` (../protocol/README.md, 15.5)
 lab/cluster                         the cluster's description, in the lab's format, which the process tier and skein's lab runner both run
 crates/temper/tests/live.rs         the live tier (2.7), nextest profile live
@@ -1361,6 +1435,7 @@ tests/client-browser                temper-client-browser-world: the browser tie
 crates/temper-client-shell-terminal/tests  the terminal's machine world (../client/README.md, section 10)
 crates/temper-fake-git              the fake git program's core: temper fake git (4.3)
 testing/temper-fake-git-hosted      the fake git program hosted by skein's world, with its fixtures (4.3)
+testing/temper-github-app           the App on the fake GitHub layer's first fixed key, its records, seeded in jig's secrets' store before a start (2.4, 2.6)
 tests/<component>/<child>           a child domain's world, temper-<component>-<child>-world
 tests/<component>/domain            a component's world: the engine's, the worker's
 tests/engine/forge                  the forge connector's world
