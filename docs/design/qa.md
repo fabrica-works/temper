@@ -177,20 +177,25 @@ serve  after  llm
 - **Files beneath a directory** (`config/`, `secrets/`, `setup/`) keep
   the configuration directory free of secrets
   (`protocol/configuration.md`, section 12) and the fake's setup
-  directory to its handover alone (`protocol/setup.md`, section 3); the
-  lab refuses only an absolute or climbing path (skein's `lab.md`, 4.7).
+  directory to its handover and, until temper-15, the credential files
+  its reconcile step writes (`protocol/setup.md`, section 3); the lab
+  refuses only an absolute or climbing path (skein's `lab.md`, 4.7).
 
 ### 4.3 Run credentials
 
 | Credential | Made from | Where | Read by |
 |---|---|---|---|
 | the fake model's key | the fake LLM from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.llm.dir}/llm.key`; exact output interface pending (11.1) | the fake LLM; the seed's `add-key` |
-| the fake forge's admin token | the fake forge from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.forge.dir}/setup/admin_token`; exact output interface pending | the fake forge before binding; serve's setup host, once, keeping its record before removal (`protocol/setup.md`, 6.5) |
+| the fake forge's admin token | the fake forge from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.forge.dir}/setup/admin_token`; exact output interface pending | the fake forge before binding; until temper-15, box reconcile and serve's start-time adoption; the file stays (`protocol/setup.md`, 8.4) |
 | the sign-in link | serve | its ready line | the seed's `sign-in`, which spends it (`client/README.md`, 6.7) |
 | the owner's client token | the sign-in | `{dir.client}` | the seed's acts; the driver's `ctl` |
-| the bot's tokens | serve's setup host, reconciling the fake | the fake forge's records in jig's secrets' store | serve |
+| the bot's tokens | until temper-15, `temper forge reconcile DIRS N`, once after the fake process and before serve | the fake forge's private `api_token` and `git_token` files | serve |
 | the worker's secret and digest | a fixed pair of the experiment's, as the process tier's | `{proc.serve.dir}/secrets/` | serve |
 
+- **The fake's file-backed start is transitional until temper-15:**
+  reconcile writes `user` and `webhook_secret` beside the tokens;
+  serve answers its start-time adoptions from the handover and secret
+  file, then connects with file-built access (`protocol/setup.md`, 8.4).
 - **No machine secret:** no file, argument or environment of the
   experiment names the home directory, `CODEX_HOME`, a real forge or a
   real provider. Each credential above opens only this run's loopback

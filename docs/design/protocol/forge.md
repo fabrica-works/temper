@@ -10,6 +10,7 @@ keys' markers written at the head of what the engine creates, the
 webhooks Forgejo sends back to a listener on loopback and the deliveries
 a GitHub App's log keeps, the client, the component, the setup and the
 fake forge. A forge's credentials are records in jig's secrets' store,
+except the fake's file-backed credentials until temper-15 (setup.md, 8.4),
 loaded at start and handed over at runtime (section 2; credentials.md,
 the forges' records). The overview is README.md (sections 5 and 6); the
 vocabulary carried is skein's (`forge.md`, section 3), and the forge
@@ -51,7 +52,8 @@ forge in section 13, and what is open in section 14.
   written into the forge.
 - **A forge starts connected or not, and stops alone.** Its access (an
   API token, or a GitHub App's id and key, and the user it must stand
-  for) is built from the forge's records at start (2.1), or handed over
+  for) is built from the forge's records at start (2.1), or the fake's
+  files until temper-15 (setup.md, 8.4), or handed over
   by `Request::Connect` once a setup's run has kept them (2.2). A forge
   with none answers each call `NotConnected`. A forge whose credential
   is refused is stopped and named to the root, and the engine and every
@@ -97,9 +99,9 @@ forge in section 13, and what is open in section 14.
 ```
 skein-forge-client                  the forge client: Read, Write, Answer, Error, Hint (skein-forge's vocabulary)
   ▲  the root: Request::Forge; Event::Forge (the client's Answered, the forge's Hint); each forge's connection (2.2 to 2.4)
-the routing (temper-service)        io ↔ components ↔ root; builds each forge's access from its records (2.1); runs the setup's plans (2.6)
+the routing (temper-service)        io ↔ components ↔ root; builds access from records, or the fake's transitional files (2.1); runs the setup's plans (2.6)
   ▲                    ▲
-  │                    skein-forge-setup's host     the setup's plans, one run per forge; its reads and writes are records
+  │                    skein-forge-setup's host     the setup's plans, one run per forge; its reads and writes are records, except the fake's transitional reads (2.1)
 skein-forge-connection              calls, connections, repositories' paths, users, each forge's start; GitHub's installations and tokens; the webhooks' listener and a GitHub App's log: verified deliveries as hints
   ▲  documents, call plans
 skein-forge                         Forgejo's and GitHub's requests and answers, both sides; deliveries' payloads; the markers; the setup's documents
@@ -215,7 +217,7 @@ skein-io socket
   forge's kind and `api` address the records were made for, written at
   each connect. They are decoded with skein's item decoders only where
   they build an access.
-- **The access** (skein's `forge-connection.md`, 3.5):
+- **The access from records** (skein's `forge-connection.md`, 3.5):
   - Forgejo: `Access { credential: Token(ApiToken), user: User,
     webhook_secret: WebhookSecret }`, the secret only when its row is
     there and `application.webhooks` is configured (section 5);
@@ -223,7 +225,8 @@ skein-io socket
     User, webhook_secret: None }`, since a GitHub forge has no secret
     (5.1), then `Request::Installations { forge, accepted }` from its
     `Accepted` row (2.4).
-- **Not connected, and named.** A forge starts with `access: None` when
+- **Not connected, and named.** A forge using records starts with
+  `access: None` when
   it has no rows; when its set is incomplete (a conversion a crash cut:
   an `AppId` kept and no `AppKey`, say); when a row is unreadable (a
   version temper does not know, bytes skein's decoder refuses, a value
@@ -238,11 +241,11 @@ skein-io socket
   (section 14). Carried rows, pasted values whose run a restart cut, are
   loaded from 2^63, where jig numbers them; the core decides their
   erase, which the routing carries out (2.6).
-- **A managed, owned or fake Forgejo starts connecting:** after the
+- **A managed or owned Forgejo starts connecting:** after the
   records' load and the root's restore, its access stays `None` until
   the setup host's `Reconcile { forge, adopted }` is done and its writes
   kept, then `Request::Connect` (2.2). `adopted` is the root's restored
-  repositories for the forge. For owned and fake, the engine first takes
+  repositories for the forge. For owned, the engine first takes
   the handover whenever its file is present, even with a kept
   `AdminToken`, removes the file after `TakeOver`'s `Done` and the
   record kept, and reconciles only after removal succeeds (setup.md,
@@ -250,6 +253,12 @@ skein-io socket
   failed removal leaves that forge not connected, named by the step,
   never a secret; every other forge runs on. A connected Forgejo and a
   GitHub forge start with their access.
+- **A fake Forgejo keeps file-backed access until temper-15.** Its
+  box runs `temper forge reconcile DIRS N` once after the fake process
+  and before serve. At start, the setup host runs `Adopt` for each
+  seeded repository, answered from the handover and `webhook_secret`
+  file, then connects with access built from files. It runs no
+  `TakeOver` or `Reconcile` on a fake (setup.md, 8.4).
 - **An owned forge set up from the client** (setup.md, 6.5) starts not
   set up: one whose setup says `"start": "asked"`, with neither the
   handover file nor an `AdminToken` record, has its access `None` and no
@@ -427,8 +436,8 @@ Run's start, and the page shows it as busy, try again (skein's
 | Plan | When | What it does |
 |---|---|---|
 | `Reconcile { forge, adopted }` | each start of a managed or owned Forgejo; a managed connect; the box's `started`, after its `TakeOver` (2.2) | converges the forge on what the deployment needs (setup.md, section 5), then the forge connects |
-| `TakeOver { forge, admin_token }` | an owned or fake forge's start, or the box's `started`, whenever the handover file is present, even with a kept `AdminToken` (setup.md, 6.5) | keeps the handover's admin token; only after its `Done` and the record kept is the file removed, before reconcile |
-| `Adopt { forge, repository }` | a managed or owned forge's adoption, before its reads | gives the bot access to the repository (`../domain/forge.md`, 4.2) |
+| `TakeOver { forge, admin_token }` | an owned forge's start, or the box's `started`, whenever the handover file is present, even with a kept `AdminToken` (setup.md, 6.5) | keeps the handover's admin token; only after its `Done` and the record kept is the file removed, before reconcile |
+| `Adopt { forge, repository }` | a managed or owned forge's adoption, before its reads; until temper-15, the fake's start-time adoption (setup.md, 8.4) | gives the bot access to the repository (`../domain/forge.md`, 4.2) |
 | `Check { forge }` | a connected Forgejo's pasted tokens, and their replacement | both tokens answer as one user, and as the kept user on a replacement |
 | `Manifest { forge, target }` | GitHub's Connect, for `Personal` or `Org(login)` | a fresh state and the manifest's page; it ends `Done(Manifest { state, page })` |
 | `Convert { forge, code, state }` | GitHub's redirect back | the code exchanged for the App's id, slug and key, the conversion's webhook secret and OAuth pair never kept; the bot user found; it writes `AppId`, `AppSlug`, `AppKey` and `User` |

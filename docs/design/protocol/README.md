@@ -216,8 +216,9 @@ default; the document is `temper.json` in the configuration directory
 - **The forge's setup** (setup.md), each command reading and checking
   the whole document as `temper serve` does (configuration.md, section
   8), FORGE a forge's `number`; reconcile is the engine setup host's
-  plan (forge.md, 2.6), except for managed and connected old forms'
-  transitional `temper forge reconcile` until temper-15 (setup.md, 6.5):
+  plan (forge.md, 2.6), except for the managed and connected old forms
+  and the fake's transitional `temper forge reconcile` until temper-15
+  (setup.md, 6.5):
   - `temper forge prepare`: an owned forge's preparation, before its
     Forgejo runs; it ends when done (setup.md, 6.3);
   - `temper forge run`: checks the binary and the preparation, takes
@@ -930,8 +931,10 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   `ready_seconds` and `stop_seconds` as that table gives them, the
   first bounding each process's ready lines from its start, the second
   each process's stop.
-- **The fake forge's setup** is `temper serve`'s handover and reconcile
-  at start, from records (setup.md, 6.5; `../qa.md`, 4.3). So
+- **The fake forge's setup** keeps a box reconcile once step after
+  the fake process and before serve until temper-15; serve adopts its
+  seeded repositories with the handover and `webhook_secret` file,
+  then connects with file-built access (setup.md, 8.4; `../qa.md`, 4.3). So
   `lab/cluster/` holds the fake LLM, the engine and the workers, the
   engine's one forge connected and unreached, as the process tier's
   other documents have theirs; its tasks are chats, and its stories'
@@ -940,8 +943,8 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   threshold or its time less its reserve, both of which the description
   sets past the story's deadline, so each chat takes a worker of its
   own, never by timing. The description starts the fake forge before
-  the engine, whose setup host takes its handover and reconciles at
-  start (setup.md, 6.5).
+  the engine, with `temper forge reconcile DIRS N` once between
+  them until temper-15 (setup.md, 8.4).
 - **Why a description,** not one program both call: the lab's runner is
   Python and the process tier is Rust; the lab's format is literal so
   that readers in any language agree (skein's `lab.md`, 4.3); and a
