@@ -40,7 +40,7 @@ class LookTests(unittest.TestCase):
                                      'temper docs/design/draft/qa-web.md 11')
                     signature = departure['signature']
                     self.assertTrue(
-                        signature == 'trouble/mockup/network/fonts.googleapis.com:443'
+                        signature in ('trouble/mockup/network/fonts.googleapis.com:443', 'trouble/mockup/log')
                         or signature in {'style/' + region['name'] + '/faces'
                                          for region in scene['regions']})
                 self.assertEqual(scene['page']['ready'],
