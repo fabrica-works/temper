@@ -176,3 +176,24 @@ fn cancelling_drops_the_pages_open_confirmation_without_sending() {
     assert!(f::sent(&mut f::act(&mut pages, Act::Cancel)).is_empty());
     assert_eq!(pages.confirmation(), None);
 }
+
+#[test]
+fn card_words_keep_the_send_bound_when_receiving_grows() {
+    let mut limits = fixtures::limits();
+    limits.client.domain.text = 2048;
+    let mut pages = f::pages(PROPOSAL, f::proposal(ActKind::Reject, Admission::Allowed));
+    let mut out = skein_lib::Queue::with_capacity(32);
+    let bound = usize::try_from(temper_client_protocol_wire::CUE_BYTES).unwrap();
+    let mut words = skein_lib::bytes::zeroed(bound);
+    words.fill(b'a');
+    let mut over = skein_lib::bytes::zeroed(bound.checked_add(1).unwrap());
+    over.fill(b'b');
+    acts::step(
+        &mut pages,
+        &fixtures::env(&limits),
+        Act::CardWords { object: PROPOSAL, words: words.clone() },
+        &mut out,
+    );
+    acts::step(&mut pages, &fixtures::env(&limits), Act::CardWords { object: PROPOSAL, words: over }, &mut out);
+    assert_eq!(pages.inbox().unwrap().cards.get(FIRST_CARD).unwrap().words.as_ref().unwrap().bytes(), &*words);
+}

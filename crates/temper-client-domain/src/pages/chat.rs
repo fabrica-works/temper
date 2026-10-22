@@ -4,6 +4,8 @@ use crate::{Limits, owner::Owner};
 use alloc::boxed::Box;
 use jig_client::{Client, Handle, Key, Latest, Readable, Readout, Told, Watchable, contract as c, thread::Thread};
 use skein_lib::{Env, List, Queue};
+/// A small conversation's retained window (client/README.md, 5.4).
+pub const LINES: u32 = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sending {
     Message,
@@ -20,6 +22,7 @@ pub struct Chat {
     pub run: Option<Handle>,
     pub next: u64,
     pub thread: Thread,
+    rows: u32,
     pub words: Box<[u8]>,
     pub pending: List<(Key, Sending)>,
     pub outcome: Option<jig_client::Outcome>,
@@ -48,6 +51,7 @@ impl Chat {
             run: None,
             next: first.checked_add(2).expect("chat handles fit"),
             thread,
+            rows: limits.client.domain.rows,
             words: Box::default(),
             pending: List::with_capacity(4),
             outcome: None,
@@ -86,6 +90,7 @@ impl Chat {
             Told::Changed { handle } if handle == self.document => {
                 if let Some(Latest::Jig(c::Delivery::Task(task))) = latest(client, handle) {
                     read(self.activity, self.thread.document(task), out);
+                    self.fill(out);
                     self.watch_run(task, out);
                     self.proposals(task, out);
                 }
@@ -98,6 +103,7 @@ impl Chat {
             Told::Page { handle, page } if handle == self.document => {
                 if let Some(task) = page_task(page, self.task) {
                     read(self.activity, self.thread.document(&task), out);
+                    self.fill(out);
                     self.watch_run(&task, out);
                     self.proposals(&task, out);
                     self.final_task = Some(task);
@@ -111,6 +117,7 @@ impl Chat {
             Told::Page { handle, page } if handle == self.activity => {
                 if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = page {
                     read(self.activity, self.thread.page(*page), out);
+                    self.fill(out);
                 } else {
                     self.thread.failed();
                 }
@@ -178,6 +185,22 @@ impl Chat {
         }
         self.delegations(client, out);
         true
+    }
+    fn room(&self) -> bool {
+        self.thread.lines.rows.len() <= LINES.saturating_sub(self.rows)
+    }
+    fn fill(&mut self, out: &mut Queue<Request>) {
+        if self.room() && self.thread.reading.is_none() {
+            read(self.activity, self.thread.older(), out);
+        }
+    }
+    /// Older activity is offered once another page cannot fit in the window.
+    #[must_use]
+    pub fn offers_older(&self) -> bool {
+        match self.thread.lines.edges.after {
+            jig_client::thread::window::Edge::More(_) => !self.room(),
+            jig_client::thread::window::Edge::End => false,
+        }
     }
     #[must_use]
     pub fn delegation<'a>(&'a self, client: &'a Client, task: u64) -> Option<&'a c::Task> {
@@ -448,7 +471,7 @@ impl Chat {
     ) {
         match act {
             Act::MessageWords { words } => {
-                if words.len() <= usize::try_from(env.limits.client.domain.text).expect("text bound fits") {
+                if words.len() <= usize::try_from(temper_client_protocol_wire::CUE_BYTES).expect("text bound fits") {
                     self.words = words;
                 }
             }
@@ -475,13 +498,14 @@ impl Chat {
             | Act::Go { .. } => unreachable!("only conversation acts routed here"),
         }
     }
-    fn send(&mut self, env: &Env<Limits>, client: &Client, kind: Sending, serial: &mut u64, out: &mut Queue<Request>) {
+    fn send(&mut self, _env: &Env<Limits>, client: &Client, kind: Sending, serial: &mut u64, out: &mut Queue<Request>) {
         let Some(task) = self.task(client) else { return };
         let ask = match kind {
             Sending::Message if !self.words.is_empty() && allowed(task, c::ActKind::Message) => c::Ask::Message {
                 project: task.project,
                 task: self.task,
-                words: c::Text::new(self.words.clone(), env.limits.client.domain.text).expect("composer bounded"),
+                words: c::Text::new(self.words.clone(), temper_client_protocol_wire::CUE_BYTES)
+                    .expect("composer bounded"),
             },
             Sending::Stop if allowed(task, c::ActKind::Stop) => c::Ask::Stop { project: task.project, task: self.task },
             Sending::Seen if self.thread.loaded > self.seen => {
@@ -520,7 +544,7 @@ impl Chat {
 #[must_use]
 pub fn thread_limits(limits: &Limits) -> jig_client::thread::Limits {
     jig_client::thread::Limits {
-        lines: limits.client.domain.rows,
+        lines: LINES,
         bytes: limits.client.domain.document_bytes,
         text: limits.client.domain.text,
     }
@@ -538,9 +562,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<delegation::Delegation>::worst_case(delegation::bound(limits))?.checked_mul(2)?)?
         .checked_add(u64::from(delegation::bound(limits)).checked_mul(limits.client.domain.document_bytes)?)?
         .checked_add(List::<u64>::worst_case(delegation::bound(limits))?.checked_mul(3)?)?
-        .checked_add(List::<jig_client::thread::Line<'_>>::worst_case(
-            limits.client.domain.rows.checked_mul(4)?.checked_add(1)?,
-        )?)?
+        .checked_add(List::<jig_client::thread::Line<'_>>::worst_case(LINES.checked_mul(4)?.checked_add(1)?)?)?
         // A received task's delegate list is bounded by its document bytes.
         .checked_add(List::<c::Operation>::worst_case(
             u32::try_from(limits.client.domain.document_bytes).ok()?.checked_add(1)?,

@@ -115,3 +115,47 @@ fn starting_a_chat_waits_for_the_first_words() {
 }
 #[test]
 fn a_started_chat_opens_its_conversation_activity() {}
+
+#[test]
+fn new_chats_and_cues_keep_the_send_bound_when_receiving_grows() {
+    let mut limits = fixtures::limits();
+    limits.client.domain.text = 2048;
+    let bound = usize::try_from(temper_client_protocol_wire::CUE_BYTES).unwrap();
+    let me = fixtures::chats::me();
+    for suggested in [false, true] {
+        for length in [bound, bound + 1] {
+            let mut words = skein_lib::bytes::zeroed(length);
+            words.fill(b'a');
+            let mut chats = Chats::new(FIRST);
+            let mut out = Queue::with_capacity(OUTPUTS);
+            let mut serial = SERIAL;
+            if suggested {
+                chats.suggest(
+                    &fixtures::env(&limits),
+                    Some(&me),
+                    Some(fixtures::PROJECT),
+                    &words,
+                    &crate::pages::choice::Draft::default(),
+                    &mut serial,
+                    &mut out,
+                );
+            } else {
+                chats.write(words.clone(), &limits);
+                chats.start(
+                    &fixtures::env(&limits),
+                    Some(&me),
+                    Some(fixtures::PROJECT),
+                    &crate::pages::choice::Draft::default(),
+                    &mut serial,
+                    &mut out,
+                );
+            }
+            let sent = fixtures::acts::sent(&mut out);
+            assert_eq!(sent.len(), usize::from(length == bound), "suggested={suggested}, length={length}");
+            if length == bound {
+                let words = Text::new(words, temper_client_protocol_wire::CUE_BYTES).unwrap();
+                assert_eq!(sent.as_ref(), [jig_client::shapes::chat(&me, fixtures::PROJECT, words).unwrap()]);
+            }
+        }
+    }
+}

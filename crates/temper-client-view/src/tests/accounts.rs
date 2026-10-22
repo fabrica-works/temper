@@ -446,6 +446,7 @@ mod memory_literal;
 // Plan rows add 32 x 574,364 B, phrases 2,368 B and a tool name 32 B,
 // less 8 B of root stack: +18,382,040 B, giving 4,979,325,463 B.
 // Lower-case phase words add 16 phrases' room, 2,368 B: 4,979,327,831 B.
+// Smaller receiving bounds and the full chat window price each turn's shared budget (client/README.md, 5.4).
 // Agent lineage, taskbar, brief, run and dependencies add 109 nodes x 574,364 B
 // = 62,605,676 B, giving 5,041,933,507 B; its six phrases fit the reserved book.
 // The context line adds one repository/forge text node; chat words use existing phrase room.

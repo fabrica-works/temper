@@ -24,12 +24,39 @@ impl Limits {
         // nodes plus the result's markdown, and one region for live delegates.
         let delegations = temper_client_domain::pages::delegation::bound(domain);
         let delegated = markdown.checked_add(14)?.checked_mul(delegations)?.checked_add(1)?;
-        // A transcript window, with a window of messages and blocks in each turn.
-        let turns = markdown
-            .checked_add(16)?
-            .checked_mul(receiving.rows)?
-            .checked_mul(receiving.rows)?
-            .checked_mul(receiving.rows)?;
+        // A decoded turn shares text across texts, names, inputs, outcomes and
+        // summaries (jig-protocol-transcript's Budget; client/README.md, 5.4).
+        // Splitting that text among rows squared blocks adds two markdown nodes
+        // per block; five structural nodes cover a call's slot and two paragraphs.
+        let blocks = receiving.rows.checked_mul(receiving.rows)?;
+        let turn = markdown
+            .checked_add(blocks.checked_mul(2_u32.checked_add(5)?)?)?
+            // Per message: message/who/says slots, Temper paragraph and text,
+            // fold slot, paragraph and text (client/README.md, 3.5).
+            .checked_add(receiving.rows.checked_mul(8)?)?
+            // One turn region and a two-node cut status.
+            .checked_add(3)?;
+        // Provisional/live text is capped by thread::live_turn at text bytes.
+        // Person/owner words have their own text cap, not Budget: a paragraph
+        // and text per line (at most text + 1 lines), plus eight shell/state nodes.
+        let plain = receiving.text.checked_add(1)?.checked_mul(2)?.checked_add(8)?;
+        // An activity result can have three independent markdown documents:
+        // cancellation reason, ending value and result value. No shared Budget;
+        // price each whole, as before, plus its heading/status/region structure.
+        let activity = markdown.checked_add(16)?.checked_mul(3)?;
+        let line = turn.max(markdown.checked_add(8)?).max(plain).max(activity);
+        let turns = line
+            .checked_mul(temper_client_domain::pages::chat::LINES)?
+            // Thread::lines retains LINES plus one Left status (two nodes).
+            .checked_add(2)?
+            // The conversation log.
+            .checked_add(1)?
+            // Request: paragraph and text per line, words at most text bytes;
+            // region, message/who/says slots and the requester's paragraph/text.
+            .checked_add(receiving.text.checked_add(1)?.checked_mul(2)?)?
+            .checked_add(6)?
+            // End line: one paragraph and its text, including the report's words.
+            .checked_add(2)?;
         let counts = domain.accounts;
         // Per account: six structural nodes, one per use, two per source and two omission words.
         // Own and deployment lists each have a heading, omission word, sign-in and last-end room.

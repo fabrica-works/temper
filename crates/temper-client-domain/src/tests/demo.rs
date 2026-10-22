@@ -209,13 +209,13 @@ fn opened(cue: &[u8]) -> (crate::Domain, skein_lib::Token) {
 }
 #[test]
 fn a_suggestion_starts_one_chat_with_its_cue_and_preserves_the_draft() {
-    assert_eq!(f::limits().client.domain.text, 32, "the bound rows below sit at the composer's bound");
-    let at_bound = [b'a'; 32];
-    let past_bound = [b'a'; 33];
+    let mut at_bound = skein_lib::bytes::zeroed(usize::try_from(wire::CUE_BYTES).unwrap());
+    at_bound.fill(b'a');
+    let above_receiving_fixture = [b'a'; 33];
     for (row, words, pending, project, model, cue, count) in [
         ("demo project", CUE, false, f::PROJECT, true, 0, 1),
         ("at the composer's bound", &at_bound, false, f::PROJECT, true, 0, 1),
-        ("past the composer's bound", &past_bound, false, f::PROJECT, true, 0, 0),
+        ("above the receiving fixture", &above_receiving_fixture, false, f::PROJECT, true, 0, 1),
         ("pending", CUE, true, f::PROJECT, true, 0, 0),
         ("other project", CUE, false, f::PROJECT + 1, true, 0, 0),
         ("no model half", CUE, false, f::PROJECT, false, 0, 0),
@@ -276,7 +276,12 @@ fn a_suggestion_starts_one_chat_with_its_cue_and_preserves_the_draft() {
         if count == 1 {
             assert_eq!(
                 sent.as_slice(),
-                [jig_client::shapes::chat(&f::chats::me(), f::PROJECT, f::acts::text(words)).unwrap()],
+                [jig_client::shapes::chat(
+                    &f::chats::me(),
+                    f::PROJECT,
+                    c::Text::new(words.into(), wire::CUE_BYTES).unwrap()
+                )
+                .unwrap()],
                 "{row}"
             );
         }

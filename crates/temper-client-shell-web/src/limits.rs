@@ -15,6 +15,8 @@ pub const EXCHANGES: u32 = 8;
 pub const BODY_BYTES: u32 = 33_554_432;
 /// Stream body chunk bytes.
 pub const PIECE: u32 = 4096;
+/// Fits the dark-theme and later CSV turns; CSV's first stays cut (client/README.md, 5.4).
+pub const CONVERSATION_TEXT: u32 = 512;
 /// The root's bounds: `temper-client-shell-terminal`'s `native().client`.
 #[must_use]
 pub fn client() -> client::Limits {
@@ -48,8 +50,8 @@ pub fn client() -> client::Limits {
             records: 16,
             kept: 16,
             projects: 2,
-            text: temper_client_protocol_wire::CUE_BYTES, // Admit a whole suggested request.
-            rows: 2,
+            text: CONVERSATION_TEXT,
+            rows: 3,
             fields: 16,
             segments: 9,
         },

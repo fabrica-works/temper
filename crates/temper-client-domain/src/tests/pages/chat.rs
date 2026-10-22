@@ -431,3 +431,91 @@ fn an_ended_delegation_reads_its_task_and_keeps_its_result() {
     assert_eq!(f.chat.delegation(&f.client, DELEGATED), Some(&task), "refresh keeps the final task");
     assert!(f.out.is_empty(), "no new requests for retained calls");
 }
+
+#[test]
+fn the_chat_composer_keeps_the_send_bound_when_receiving_grows() {
+    let mut limits = fixtures::limits();
+    limits.client.domain.text = 2048;
+    let mut f = f::opened();
+    let mut serial = SERIAL;
+    let bound = usize::try_from(temper_client_protocol_wire::CUE_BYTES).unwrap();
+    let mut words = skein_lib::bytes::zeroed(bound);
+    words.fill(b'a');
+    let mut over = skein_lib::bytes::zeroed(bound.checked_add(1).unwrap());
+    over.fill(b'b');
+    f.chat.act(&fixtures::env(&limits), &f.client, Act::MessageWords { words: words.clone() }, &mut serial, &mut f.out);
+    assert_eq!(f.chat.words, words);
+    f.chat.act(&fixtures::env(&limits), &f.client, Act::MessageWords { words: over }, &mut serial, &mut f.out);
+    assert_eq!(f.chat.words, words, "an oversized edit keeps the previous words");
+}
+
+fn window_page(chat: &mut Chat, client: &jig_client::Client, out: &mut Queue<Request>, page: u32, pages: u32) {
+    let mut rows = skein_lib::List::with_capacity(2);
+    for offset in 0..2 {
+        rows.push(c::ActivityLine {
+            position: u64::from(pages.checked_sub(page).unwrap().checked_mul(2).unwrap().checked_sub(offset).unwrap()),
+            at: skein_lib::Wall::EPOCH,
+            event: c::Activity::RunBegan {
+                attempt: 1,
+                how: c::RunBeginning::Resumed,
+                why: fixtures::acts::text(b"resume"),
+            },
+        })
+        .unwrap();
+    }
+    let cursor = c::Cursor::new(Box::from(*b"older"), 5).unwrap();
+    chat.told(
+        client,
+        Told::Page {
+            handle: chat.activity,
+            page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(c::ActivityPage {
+                rows,
+                before: if page.checked_add(1).unwrap() < pages { Some(cursor) } else { None },
+                after: None,
+                cut: false,
+            })))),
+        },
+        out,
+    );
+}
+#[test]
+fn a_chat_fills_its_window_to_the_start_without_offering_older() {
+    let limits = fixtures::limits();
+    let client = jig_client::Client::unlinked(&limits.client, fixtures::SEED).unwrap();
+    let mut out = Queue::with_capacity(OUTPUTS);
+    let mut chat = Chat::new(f::TASK, f::FIRST, &limits, &mut out);
+    while out.pop().is_some() {}
+    for page in 0..5 {
+        window_page(&mut chat, &client, &mut out, page, 5);
+        assert_eq!(!out.is_empty(), page < 4, "page {page}");
+        while out.pop().is_some() {}
+        assert!(!chat.offers_older());
+    }
+    assert_eq!(chat.thread.lines.rows.len(), 10);
+    assert!(chat.thread.reading.is_none());
+}
+#[test]
+fn a_full_chat_window_offers_older_and_reads_it_when_asked() {
+    let limits = fixtures::limits();
+    let client = jig_client::Client::unlinked(&limits.client, fixtures::SEED).unwrap();
+    let mut out = Queue::with_capacity(OUTPUTS);
+    let mut chat = Chat::new(f::TASK, f::FIRST, &limits, &mut out);
+    while out.pop().is_some() {}
+    for page in 0..8 {
+        window_page(&mut chat, &client, &mut out, page, 10);
+        assert_eq!(!out.is_empty(), page < 7, "page {page}");
+        while out.pop().is_some() {}
+    }
+    assert_eq!(chat.thread.lines.rows.len(), crate::pages::chat::LINES);
+    assert!(chat.offers_older());
+    let mut serial = SERIAL;
+    chat.act(&fixtures::env(&limits), &client, Act::Older, &mut serial, &mut out);
+    let Some(Request::Client(Event::Read { read: Readable::Jig(c::Read::Activity { before: Some(_), .. }), .. })) =
+        out.pop()
+    else {
+        panic!("Older reads the preceding page");
+    };
+    window_page(&mut chat, &client, &mut out, 8, 10);
+    assert!(out.is_empty());
+    assert!(chat.offers_older());
+}

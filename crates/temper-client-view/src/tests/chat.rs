@@ -183,10 +183,11 @@ fn enter_in_the_message_composer_sends() {
 #[test]
 fn a_line_break_counts_within_the_message_bound() {
     let mut root = messaging_root();
-    let mut over = [b'a'; 33];
+    let bound = usize::try_from(temper_client_protocol_wire::CUE_BYTES).expect("bound fits");
+    let mut over = skein_lib::bytes::zeroed(bound.checked_add(1).unwrap());
+    over.fill(b'a');
     over[3] = b'\n';
-    let words = &over[..32];
-    assert_eq!(words.len(), usize::try_from(TEXT).expect("bound fits"));
+    let words = &over[..bound];
     assert_eq!(&*fixtures::type_into(&mut root, b"Message", words), words);
     assert_eq!(&*fixtures::type_into(&mut root, b"Message", &over), words);
 }

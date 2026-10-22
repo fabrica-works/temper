@@ -91,8 +91,8 @@ impl Chats {
             self.read(Some(after.clone()), out);
         }
     }
-    pub(crate) fn write(&mut self, words: Box<[u8]>, limits: &Limits) {
-        if words.len() <= usize::try_from(limits.client.domain.text).expect("text bound fits") {
+    pub(crate) fn write(&mut self, words: Box<[u8]>, _limits: &Limits) {
+        if words.len() <= usize::try_from(temper_client_protocol_wire::CUE_BYTES).expect("text bound fits") {
             self.words = words;
         }
     }
@@ -129,7 +129,7 @@ impl Chats {
     )]
     fn send(
         &mut self,
-        env: &Env<Limits>,
+        _env: &Env<Limits>,
         me: Option<&Me>,
         project: Option<u32>,
         words: Box<[u8]>,
@@ -144,7 +144,7 @@ impl Chats {
         if !choice.valid(me) {
             return;
         }
-        let Ok(words) = Text::new(words, env.limits.client.domain.text) else { return };
+        let Ok(words) = Text::new(words, temper_client_protocol_wire::CUE_BYTES) else { return };
         match jig_client::shapes::chat(me, project, words) {
             Ok(mut ask) => {
                 if let c::Ask::Create { tasks, .. } = &mut ask
