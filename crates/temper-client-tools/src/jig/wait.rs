@@ -28,16 +28,13 @@ enum Stage {
     Finishing { read: Handle },
 }
 impl Wait {
+    #[expect(clippy::manual_map, reason = "the domain matches without closures")]
     fn answers(&self, digest: Digest, holds: Option<bool>) -> bool {
-        let differs = match self.since.or(self.first) {
-            Some(old) => old != digest,
-            None => false,
+        let verdict = match self.until {
+            Some(_) => Some(holds == Some(true)),
+            None => None,
         };
-        match (&self.until, self.since) {
-            (Some(_), Some(_)) => differs && holds == Some(true),
-            (Some(_), None) => holds == Some(true),
-            (None, _) => differs,
-        }
+        met(self.since, self.first, digest, verdict)
     }
 }
 pub(crate) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
@@ -461,4 +458,19 @@ fn accounts<'a>(wait: &Wait, client: &'a Client) -> render::document::accounts::
         }
     }
     value
+}
+
+/// A family owner supplies its document digest and its condition verdict. None
+/// means no condition; a condition awaiting facts supplies Some(false).
+#[must_use]
+pub fn met(since: Option<Digest>, first: Option<Digest>, digest: Digest, holds: Option<bool>) -> bool {
+    let differs = match since.or(first) {
+        Some(old) => old != digest,
+        None => false,
+    };
+    match (holds, since) {
+        (Some(holds), Some(_)) => differs && holds,
+        (Some(holds), None) => holds,
+        (None, _) => differs,
+    }
 }

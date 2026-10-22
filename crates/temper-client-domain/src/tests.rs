@@ -4,6 +4,7 @@ mod amend;
 mod demo;
 mod fixtures;
 mod forge_words;
+mod forges;
 mod form;
 mod pages;
 mod panel;

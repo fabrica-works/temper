@@ -229,10 +229,11 @@ fn decode_value(table: &[&Tool], doc: &Document, at: u32, spec: &Argument, limit
     }
     let kind = doc.token(at).ok_or(Usage::Json)?.kind;
     match spec.kind {
-        Kind::Number | Kind::Count | Kind::Duration => require(doc, at, JsonKind::Number)?,
+        Kind::Number | Kind::NumberRange { .. } | Kind::Count | Kind::Duration => require(doc, at, JsonKind::Number)?,
         Kind::Project if kind == JsonKind::Number => {}
         Kind::Word { .. }
         | Kind::Text
+        | Kind::NamedNumber { .. }
         | Kind::Literal
         | Kind::File
         | Kind::Proposal
@@ -428,6 +429,26 @@ fn encode_tool(tool: &Tool, out: &mut Encoder) {
                     }
                     out.array_end();
                 }
+                Kind::NumberRange { min, max } => {
+                    out.key(b"min");
+                    out.unsigned(min);
+                    out.key(b"max");
+                    out.unsigned(max);
+                }
+                Kind::NamedNumber { words, prefix, min, max } => {
+                    out.key(b"set");
+                    out.array_start();
+                    for word in words {
+                        out.string(word);
+                    }
+                    out.array_end();
+                    out.key(b"prefix");
+                    out.string(prefix);
+                    out.key(b"min");
+                    out.unsigned(min);
+                    out.key(b"max");
+                    out.unsigned(max);
+                }
                 Kind::Number
                 | Kind::Count
                 | Kind::Text
@@ -467,7 +488,7 @@ fn encode_tool(tool: &Tool, out: &mut Encoder) {
 }
 fn kind_word(kind: Kind) -> &'static [u8] {
     match kind {
-        Kind::Number => b"number",
+        Kind::Number | Kind::NumberRange { .. } => b"number",
         Kind::Count => b"count",
         Kind::Word { .. } => b"word",
         Kind::Text => b"text",
@@ -476,6 +497,7 @@ fn kind_word(kind: Kind) -> &'static [u8] {
         Kind::Duration => b"duration",
         Kind::Proposal => b"proposal",
         Kind::Digest => b"digest",
+        Kind::NamedNumber { .. } => b"string",
         Kind::Condition => b"condition",
         Kind::Subject => b"subject",
         Kind::Project => b"project",

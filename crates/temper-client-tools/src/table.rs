@@ -22,7 +22,7 @@ pub const TOOLS: &[&Tool] = &[
     &rows::RELEASE,
     &rows::STOP,
     &rows::CANCEL,
-    &rows::WAIT,
+    &crate::forges::WAIT,
     &crate::adopt::ROW,
     &rows::SIGN_IN,
     &rows::SIGN_OUT,
@@ -40,6 +40,8 @@ pub const TOOLS: &[&Tool] = &[
     &rows::AMEND,
     &rows::DECLARE,
     &rows::VERIFY,
+    &crate::forges::READ,
+    &crate::forges::SET_UP,
 ];
 pub fn parse(words: &[&[u8]]) -> Result<Parsed, Usage> {
     argv::parse(TOOLS, words, &crate::limits::tools())

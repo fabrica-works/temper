@@ -54,6 +54,18 @@ pub enum Keyed {
 pub enum Kind {
     Number,
     Count,
+    /// Inclusive numeric bounds, checked in argv and JSON.
+    NumberRange {
+        min: u64,
+        max: u64,
+    },
+    /// A closed word or a prefix followed by a bounded number.
+    NamedNumber {
+        words: &'static [&'static [u8]],
+        prefix: &'static [u8],
+        min: u64,
+        max: u64,
+    },
     Word {
         set: &'static [&'static [u8]],
     },
