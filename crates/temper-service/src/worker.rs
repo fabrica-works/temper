@@ -39,6 +39,8 @@ pub struct Worker {
     pub(crate) events: Queue<root::Event>,
     process_events: Queue<host::ProcessEvent>,
     processes: Map<Token, host::Process>,
+    // Read rights can outlive reaping while prefetched records still settle.
+    reading: Map<Token, ()>,
     owners: Map<Token, Token>,
     entities: Map<Token, Token>,
     retired: List<Token>,
@@ -127,6 +129,7 @@ impl Worker {
             events: Queue::with_capacity(room),
             process_events: Queue::with_capacity(room),
             processes: Map::with_capacity(slots),
+            reading: Map::with_capacity(slots),
             owners: Map::with_capacity(slots),
             entities: Map::with_capacity(slots.checked_mul(4).expect("process entities")),
             retired: List::with_capacity(slots),
@@ -200,6 +203,9 @@ impl Worker {
             return;
         }
         self.aborted = Some(());
+        while let Some((&owner, _)) = self.reading.first() {
+            self.reading.remove(&owner);
+        }
         self.stopping = true;
         self.git.component.abort(&mut self.git.out);
         self.git_drain();
@@ -527,7 +533,7 @@ impl Worker {
             smith::process::Request::Spawn { owner, deadline, .. } => self.process_spawn(owner, deadline),
             smith::process::Request::Send { owner, message, .. } => self.process_send(owner, message),
             smith::process::Request::Signal { owner, signal, .. } => self.process_signal(owner, signal),
-            smith::process::Request::Read { .. } => Self::process_read(),
+            smith::process::Request::Read { owner, .. } => self.process_read(owner),
             smith::process::Request::Wait { .. } => Self::process_wait(),
             smith::process::Request::Reap { .. } => Self::process_reap(),
         }
@@ -613,9 +619,41 @@ impl Worker {
         self.events.push(root::Event::Process(Box::new(smith::process::Event::Signalled { owner })));
     }
     // Smith's process adapter keeps reads, exit waits and reaping active.
-    fn process_read() {}
+    fn process_read(&mut self, owner: Token) {
+        assert_eq!(self.reading.insert(owner, ()).expect("one read per hosted agent"), None, "one pending host read");
+    }
     fn process_wait() {}
     fn process_reap() {}
+    fn process_work_pending(&self) -> bool {
+        self.process_events.iter().any(|event| {
+            self.aborted.is_some() || read_owner(event).is_none_or(|owner| self.reading.contains_key(&owner))
+        })
+    }
+    fn drain_process(&mut self) {
+        for _ in 0..self.process_events.len() {
+            let event = self.process_events.pop().expect("process events");
+            if self.aborted.is_none()
+                && let Some(owner) = read_owner(&event)
+                && self.reading.remove(&owner).is_none()
+            {
+                self.process_events.push(event);
+                continue;
+            }
+            match &event {
+                host::ProcessEvent::Unspawned { agent, .. } | host::ProcessEvent::Reaped { agent, .. } => {
+                    self.retired.push(*agent).expect("retired processes");
+                }
+                host::ProcessEvent::Spawned { .. }
+                | host::ProcessEvent::Exited { .. }
+                | host::ProcessEvent::Channel { .. } => {}
+            }
+            if self.aborted.is_none()
+                && let Some(event) = worker_route::process(event)
+            {
+                self.events.push(event);
+            }
+        }
+    }
     pub fn iterate(&mut self, now: Time, wall: Wall) {
         self.env.now = now;
         self.env.wall = wall;
@@ -643,22 +681,7 @@ impl Worker {
         for agent in &agents {
             self.processes.get_mut(agent).expect("owned process").fire(now, &mut self.process_events, &mut self.io);
         }
-        for _ in 0..self.process_events.len() {
-            let event = self.process_events.pop().expect("process events");
-            match &event {
-                host::ProcessEvent::Unspawned { agent, .. } | host::ProcessEvent::Reaped { agent, .. } => {
-                    self.retired.push(*agent).expect("retired processes");
-                }
-                host::ProcessEvent::Spawned { .. }
-                | host::ProcessEvent::Exited { .. }
-                | host::ProcessEvent::Channel { .. } => {}
-            }
-            if self.aborted.is_none()
-                && let Some(event) = worker_route::process(event)
-            {
-                self.events.push(event);
-            }
-        }
+        self.drain_process();
         if self.aborted.is_some() {
             for _ in 0..self.events.len() {
                 let _event = self.events.pop();
@@ -745,7 +768,7 @@ impl Worker {
         !self.started
             || !self.io.is_empty()
             || !self.events.is_empty()
-            || !self.process_events.is_empty()
+            || self.process_work_pending()
             || !self.submitted.is_empty()
             || (self.aborted.is_none() && self.root.is_ready())
             || match self.next_deadline() {
@@ -884,3 +907,39 @@ pub(crate) fn remote_worst_case(name: u32, room: u32) -> Option<u64> {
                 .checked_mul(u64::from(name).checked_add(u64::try_from(size_of::<core::net::SocketAddr>()).ok()?)?)?,
         )
 }
+
+// Only the records forwarded as smith read terminals spend host credit.
+// Writes and lifecycle events pass independently; ignored live pieces do not.
+fn read_owner(event: &host::ProcessEvent) -> Option<Token> {
+    use host::{OpenEvent, ProcessEvent};
+    match event {
+        ProcessEvent::Channel { agent, event } => match event.as_ref() {
+            OpenEvent::Hangup { .. }
+            | OpenEvent::Answer { .. }
+            | OpenEvent::Admitted
+            | OpenEvent::MessageRefused { .. }
+            | OpenEvent::Waiting { .. }
+            | OpenEvent::Long { .. }
+            | OpenEvent::LongDone
+            | OpenEvent::Turn { .. }
+            | OpenEvent::Fact { .. }
+            | OpenEvent::Unauthorized { .. }
+            | OpenEvent::Limited { .. }
+            | OpenEvent::Refused { .. }
+            | OpenEvent::Call { .. }
+            | OpenEvent::Withdraw { .. } => Some(*agent),
+            OpenEvent::Opened { .. }
+            | OpenEvent::Sent { .. }
+            | OpenEvent::Unsent { .. }
+            | OpenEvent::Live { .. }
+            | OpenEvent::WriteFailed => None,
+        },
+        ProcessEvent::Spawned { .. }
+        | ProcessEvent::Unspawned { .. }
+        | ProcessEvent::Exited { .. }
+        | ProcessEvent::Reaped { .. } => None,
+    }
+}
+
+#[cfg(test)]
+mod tests;

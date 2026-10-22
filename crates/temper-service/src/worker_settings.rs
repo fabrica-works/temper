@@ -216,6 +216,7 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
         .checked_add(Queue::<link::Request>::worst_case(link::MAX_OUT_DOWN)?)?
         .checked_add(Queue::<io::Request>::worst_case(prepared.lower)?)?
         .checked_add(Map::<Token, host::Process>::worst_case(jig.slots)?)?
+        .checked_add(Map::<Token, ()>::worst_case(jig.slots)?)?
         .checked_add(Map::<Token, Token>::worst_case(jig.slots.checked_mul(5)?)?)?
         .checked_add(List::<Token>::worst_case(jig.slots)?.checked_mul(6)?)?
         .checked_add(Queue::<io::kernel::Submit>::worst_case(1)?)?
