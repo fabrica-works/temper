@@ -104,7 +104,7 @@ a { color: inherit; text-decoration: none; }
 .temper-invitation > p { margin: 12px 0 0; color: var(--temper-muted); font-size: 12px; }
 .temper-invitation > ul { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; list-style: none; padding: 0; margin: 16px 0 0; border: 0; }
 .temper-invitation > ul > li { min-width: 0; max-width: 100%; padding: 0; border: 0; }
-.temper-invitation button { display: inline-flex; align-items: center; max-width: 100%; min-height: 30px; padding: 5px 10px; border: 1px solid #ddd6cb; border-radius: 5px; background: var(--temper-paper); color: #6a6258; font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.temper-invitation button { display: inline-flex; align-items: center; max-width: 100%; min-height: 30px; padding: 5px 10px; border: 1px solid #ddd6cb; border-radius: 5px; background: var(--temper-paper); color: #6a6258; font: 600 11px/1.35 var(--temper-mono); overflow-wrap: anywhere; }
 .temper-invitation button:hover { border-color: #ba9c89; color: var(--temper-accent-dark); }
 .temper-invitation button:disabled { opacity: .55; cursor: default; }
 .temper-invitation > p:last-child { margin-top: 14px; font-size: 12px; }
@@ -124,7 +124,7 @@ a { color: inherit; text-decoration: none; }
 .temper-accounts > a { display: inline-flex; align-items: center; min-height: 28px; max-width: 100%; background: var(--temper-paper); line-height: 1.35; overflow-wrap: anywhere; }
 .temper-accounts > a:hover { color: var(--temper-accent-dark); text-decoration: underline; }
 /* The Demo region is a section; the account-required notice is a separate slot. */
-section.temper-accounts button, section.temper-accounts > a { border: 0; background: transparent; padding-left: 0; }
+section.temper-accounts button, section.temper-accounts > a { display: inline-flex; align-items: center; min-height: 30px; line-height: 1.35; border: 0; background: transparent; padding-left: 0; }
 section.temper-accounts button:hover { text-decoration: underline; }
 /* .first-run-account-line: the account and model above the composer. */
 .temper-account-line { width: min(1040px, 100%); margin: 0 auto 6px; font-size: 10px; color: var(--temper-muted); }
@@ -615,18 +615,22 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 @media (max-width: 600px) {
   #app:has(> .temper-main:not(.temper-chat) > :is(h1, .temper-heading, .temper-accounts-page)) > section.temper-accounts { padding: 6px 16px; }
 }
-/* First run shares the chat frame, with its entry following the invitation in the column. */
+/* The demo start uses the Chats list column; its entry follows the invitation at the left edge. */
 .temper-main:not(.temper-chat):has(> .temper-chatbar) { width: 100%; margin: 0; padding: 0 0 58px; font-size: 13px; letter-spacing: -.018em; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: min(1040px, calc(100% - 64px)); margin-inline: auto; }
+.temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: min(1160px, calc(100% - 48px)); margin-inline: auto; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-accounts { margin-top: 22px; margin-bottom: 16px; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-context > p { margin: 0; }
-.temper-main:not(.temper-chat):has(> .temper-chatbar) > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 64px)); margin-left: max(32px, calc((100% - 1040px) / 2)); margin-right: auto; }
+.temper-main:not(.temper-chat):has(> .temper-chatbar) > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 48px)); margin-left: max(24px, calc((100% - 1160px) / 2)); margin-right: auto; }
 .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-entry { margin-bottom: 21px; }
 .temper-main:not(.temper-chat) > .temper-chatbar .temper-status-quiet { color: #4c8067; }
 .temper-main:not(.temper-chat) > .temper-chatbar [role=status]::before { content: none; }
+@media (max-width: 850px) {
+  .temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: calc(100% - 34px); }
+  .temper-main:not(.temper-chat):has(> .temper-chatbar) > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 34px)); margin-left: 17px; }
+}
 @media (max-width: 760px) {
-  .temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: calc(100% - 32px); }
-  .temper-main:not(.temper-chat):has(> .temper-chatbar) > :is(.temper-choice, .temper-entry) { margin-left: 16px; }
+  .temper-main:not(.temper-chat):has(> .temper-chatbar) > :not(.temper-chatbar) { width: calc(100% - 28px); }
+  .temper-main:not(.temper-chat):has(> .temper-chatbar) > :is(.temper-choice, .temper-entry) { width: min(760px, calc(100% - 28px)); margin-left: 14px; }
   .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-accounts { margin-top: 17px; }
 }
 @media (max-width: 430px) {
