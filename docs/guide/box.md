@@ -49,9 +49,13 @@ printf %s "$secret" | sha256sum | cut -d' ' -f1 > secrets/worker.digest
 unset secret
 ```
 
-## Step 4. LLM sign-in (off until JP13)
+## Step 4. The LLM account: nothing to prepare
 
-Off until JP13 (fallback D): the owned example's Codex adapter needs a signed-in account and refuses deployment API keys; configured account files are no longer read.
+No account or key goes in a file. Once the box runs, you sign in with
+ChatGPT from the client (step 8), or add an OpenAI API key there. The
+sign-in's callback is `127.0.0.1:1455` on the box's machine: if your
+browser is on another machine, connect to the box with
+`ssh -L 1455:127.0.0.1:1455 HOST` for that step.
 
 ## Step 5. Start the box and keep its terminal
 
@@ -116,9 +120,15 @@ to `1`. Keep **It runs CI** checked. Choose **Adopt** and wait for
 collaborator on the repository and adds its webhook. Type `q` to leave
 the client.
 
-## Step 8. Ask for work (off until JP13)
+## Step 8. Sign in with ChatGPT, then ask for work
 
-Off until JP13 (fallback D): live work needs the signed-in account deferred in step 4.
+Reopen the client with the link. Open **Accounts** and, under **Add an
+account**, choose **Continue with ChatGPT**. Open the address it shows
+in a browser on the box's machine, or in yours through the port
+forwarded in step 4, and approve temper there. Wait for `Signed in to
+ChatGPT`; your account then reads **Ready**. Start a
+chat and ask for a change in `acme/widget`: the agent's work runs on
+your ChatGPT plan.
 
 Stop the box with Ctrl-C in its terminal. Start it again with the same
 command; use its new link to reopen the client. Your
