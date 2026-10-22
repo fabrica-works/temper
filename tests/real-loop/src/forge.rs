@@ -148,6 +148,12 @@ impl State {
         let mut config = temper_fake_git_hosted::fixtures::CONFIG;
         // The HTTP peer admits four simultaneous calls, unlike the git-only fixture.
         config.limits.calls = protocol_limits().calls;
+        // A change opens its pull under the full specification, before coding's
+        // result supplies its final title; the case's brief exceeds 16 bytes.
+        config.limits.title_bytes = 512;
+        // The case's design pull body and title-plus-body commit message exceed
+        // the git-only fixture's 32-byte body and 50-byte message limits.
+        config.limits.body_bytes = 2048;
         // Forgejo timestamps are wall times; this peer runs on the real monotonic clock.
         let now = skein_shell::Clock::new().now();
         config.skew = domain::Skew::Ahead(Duration::from_nanos(
