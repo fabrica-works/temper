@@ -241,7 +241,7 @@ fn the_navigation_marks_only_the_current_page() {
         (Address::Chats, Some(b"Chats".as_slice())),
         (Address::Adopt { project: fixtures::PROJECT }, Some(b"Adopt a repository".as_slice())),
         (Address::Accounts, Some(b"Accounts".as_slice())),
-        (Address::Chat { task: 9 }, None),
+        (Address::Chat { task: 9 }, Some(b"Chats".as_slice())),
         (Address::Task { task: 9 }, None),
     ] {
         let root = fixtures::root_at(address, &fixtures::domain_limits()).0;
@@ -336,7 +336,31 @@ fn navigation_shows_the_inbox_count_only_when_nonzero() {
             },
         );
         let view = fixtures::page_view(&root);
-        assert!(fixtures::find(view.tree(), Role::Link, expected).is_some());
+        let id = fixtures::find(view.tree(), Role::Link, expected).expect("inbox link");
+        let nodes = view.tree().nodes();
+        let mut at = None;
+        for (index, node) in nodes.iter().enumerate() {
+            if node.id == id {
+                at = Some(index);
+                break;
+            }
+        }
+        let at = at.expect("inbox link position");
+        assert_eq!(nodes[at].id, id);
+        let end = at + usize::try_from(nodes[at].size).unwrap();
+        let mut counts = skein_lib::List::with_capacity(1);
+        for node in &nodes[at + 1..end] {
+            if node.styles.as_slice().contains(&skein_ui::Style { owner: crate::frame::owner(), token: 92 }) {
+                counts.push(node).expect("only one count node");
+            }
+        }
+        if count == 0 {
+            assert!(counts.is_empty());
+        } else {
+            let [node] = counts.as_slice() else { panic!("one count node") };
+            assert_eq!(node.role, Role::Text);
+            assert_eq!(node.text.get(0).unwrap().text.as_ref(), b"3");
+        }
     }
 }
 

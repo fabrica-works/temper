@@ -194,20 +194,35 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     builder.open(Role::Navigation);
     builder.name(&words.say(crate::words::Word::MainNavigation, &[]));
     builder.style(crate::look::NAVIGATION);
-    action(
+    crate::link(
         builder,
-        Role::Link,
         &name,
-        Act::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
-        inbox_current,
-        bindings,
+        bindings.insert(Act::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } }),
     );
+    if inbox_current {
+        builder.state(skein_ui::State::Current);
+    }
+    if count == 0 {
+        builder.text(Run::Plain, &name);
+    } else {
+        let number = skein_lib::Decimal::of(u64::from(count));
+        let prefix = name.len().checked_sub(number.as_bytes().len()).expect("count is the phrase suffix");
+        builder.text(Run::Plain, name.get(..prefix).expect("prefix fits"));
+        builder.open(Role::Text);
+        builder.style(crate::look::NAV_COUNT);
+        builder.run(Run::Plain, number.as_bytes());
+        builder.close();
+    }
+    builder.close();
     action(
         builder,
         Role::Link,
         &words.say(crate::words::Word::Chats, &[]),
         Act::Go { address: Address::Chats },
-        *root.pages().address() == Address::Chats,
+        match root.pages().address() {
+            Address::Chats | Address::Chat { .. } => true,
+            Address::Inbox { .. } | Address::Task { .. } | Address::Adopt { .. } | Address::Accounts => false,
+        },
         bindings,
     );
     if let Some(project) = root.pages().project() {

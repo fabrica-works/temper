@@ -735,3 +735,6 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
   .temper-chat .temper-turn > .temper-work, .temper-chat .temper-turn > .temper-task-card { margin-left: 0; }
   .temper-chat .temper-task-card > .temper-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* The inbox count keeps its own accent within the navigation link. */
+.temper-navigation .temper-nav-count { color: var(--temper-accent); }
