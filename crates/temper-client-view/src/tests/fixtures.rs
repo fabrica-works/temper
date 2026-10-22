@@ -572,6 +572,9 @@ pub mod chat {
     pub fn projected_tree(thread: &Thread) -> skein_ui::Tree {
         drawn_tree(thread, crate::pages::chat::Drawn::Chat { request: None, delegations: None })
     }
+    pub fn requested_tree(thread: &Thread, request: &c::SpecificationDocument) -> skein_ui::Tree {
+        drawn_tree(thread, crate::pages::chat::Drawn::Chat { request: Some(request), delegations: None })
+    }
     pub fn tree(thread: &Thread) -> skein_ui::Tree {
         drawn_tree(thread, crate::pages::chat::Drawn::Lines)
     }

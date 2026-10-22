@@ -226,7 +226,9 @@ fn conversation_speakers_use_you_temper_or_the_other_person() {
         ("another requester", Some(f::chat::PARTY + 1), false, b"Person", b"Pat"),
     ] {
         let mut b = skein_ui::Builder::new(&f::tree_limits());
-        let request = f::task::document().spec;
+        // A request with words opens the conversation under its speaker.
+        let mut request = f::task::document().spec;
+        request.specification.words = f::task::document_words(b"Rotate tokens safely.");
         let mut thread = super::chat::structured_thread();
         thread.lines.edges.after = jig_client::thread::window::Edge::End;
         crate::pages::chat::conversation(

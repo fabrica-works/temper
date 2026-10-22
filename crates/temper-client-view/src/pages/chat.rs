@@ -328,8 +328,10 @@ pub(crate) fn conversation(
     let mut shown = List::with_capacity(bound);
     b.open(Role::Log);
     b.name(&words.say_card(P::ConversationLog, &[]));
+    // A chat started with no words opens on its first words line (3.5).
     if thread.lines.edges.after == jig_client::thread::window::Edge::End
         && let Some(request) = request
+        && !request.specification.words.bytes().is_empty()
     {
         b.open(Role::Region);
         b.style(look::TURN);

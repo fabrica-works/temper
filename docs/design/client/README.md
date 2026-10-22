@@ -340,7 +340,8 @@ keeps (`../protocol/configuration.md`, section 2).
   - *its request,* first, under "You" (or the requester's name): the
     chat's specification's words (its document's `spec`), a paragraph
     for each of its lines, where the window holds the conversation's
-    start, its first line with no older page;
+    start, its first line with no older page; a chat whose spec is
+    empty has no such turn, and opens on its first words line;
   - *the agent's words,* each assistant message's text under "Temper",
     whole within the receiving bounds (5.4);
   - *its calls,* after its message's text: each delegation as its

@@ -68,6 +68,37 @@ fn provisional_text_is_marked_until_its_turn_commits() {
 
 #[test]
 fn an_owner_activity_message_is_shown_in_the_chat() {
+    let thread = owner_words_thread();
+    assert!(skein_lib::bytes::find(&fixtures::text(&tree(&thread)), b"An owner message").is_some());
+}
+
+// The chat gallery's T10: a chat started with no spec, its request a words line.
+#[test]
+fn a_chat_whose_spec_is_empty_draws_no_opening_turn() {
+    let thread = owner_words_thread();
+    let spec = |words: &[u8]| {
+        c::SpecificationDocument::complete(c::Specification {
+            words: c::Text::new(Box::from(words), TEXT).expect("spec words"),
+            parameters: List::with_capacity(0),
+            inputs: List::with_capacity(0),
+        })
+    };
+    let person_turns = |tree: &skein_ui::Tree| {
+        let mut count = 0_u32;
+        for node in tree.nodes() {
+            if node.styles.as_slice().contains(&crate::look::BY_PERSON) {
+                count = count.checked_add(1).expect("person turn count");
+            }
+        }
+        count
+    };
+    assert_eq!(person_turns(&fixtures::chat::requested_tree(&thread, &spec(b"A request"))), 2, "the request opens");
+    let tree = fixtures::chat::requested_tree(&thread, &spec(b""));
+    assert_eq!(person_turns(&tree), 1, "the words line alone");
+    assert!(skein_lib::bytes::find(&fixtures::text(&tree), b"An owner message").is_some());
+}
+
+fn owner_words_thread() -> Thread {
     let mut thread = Thread::new(TASK, &jig_client::thread::Limits { lines: LINES, bytes: BYTES, text: TEXT });
     thread.reading = Some(jig_client::thread::Reading::Latest { known: COMMITTED.into() });
     let mut rows = List::with_capacity(TURN);
@@ -91,7 +122,7 @@ fn an_owner_activity_message_is_shown_in_the_chat() {
     })
     .expect("line");
     thread.page(c::ActivityPage { rows, before: None, after: None, cut: false });
-    assert!(skein_lib::bytes::find(&fixtures::text(&tree(&thread)), b"An owner message").is_some());
+    thread
 }
 
 #[test]
