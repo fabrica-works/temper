@@ -1332,7 +1332,9 @@ The words for each offered source are:
   account (jig's `domain/accounts.md`, 4.3).
 - **A sign-in:** "Open this address in a browser on the engine's
   machine:" and the address, as an external link (6.5); then "Signed in
-  to ChatGPT as alice@example.com", or, for a subject the person
+  to ChatGPT as alice@example.com", or "Signed in to ChatGPT" while the
+  account has no display (jig carries none yet: its card's heading then
+  drops that part), or, for a subject the person
   already has, "That's alice@example.com again. To add another account,
   sign out of ChatGPT in your browser first, then Continue with
   ChatGPT."; or why it was refused.
