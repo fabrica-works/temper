@@ -199,8 +199,58 @@ in the lower world that owns it, never here.
   11.3); a repository adopted, a hooked repository's webhook delivered,
   and a chat's change cloned, pushed and landed on the fake git program
   (below); a chat adding a landing dependency to its live report delegate,
-  kept until the change lands and started after Met (`fuzzy_landing`); and GitHub's, one
+  kept until the change lands and started after Met (`fuzzy_landing`); the
+  first run's green light, a question answered in the person's inbox before
+  the change it holds (`fuzzy_green_light`, below); and GitHub's, one
   per feature of a GitHub forge (below).
+- **The first run's green light,** one story (`fuzzy_green_light`), on
+  the first run's cast (`../client/mockups/README.md`, "The first
+  run"): the person asks their chat T1 "Add CSV export to widget"; T1
+  delegates the work T2, an agent holding the change's authority; T2
+  asks T1 whether to go ahead before it delegates anything, and jig
+  puts the question in the inbox of T1's person (jig's
+  `domain/people.md`, section 6); the person answers it there with
+  `temper ctl answer`; T1, woken by the answer, relays it to T2
+  (`message`, its form an answer to the question's number); T2 then
+  delegates the change T3, whose coder edits widget's `src/main.rs`; it
+  lands with CI green at its head, T2 reports, and T1 says so.
+  - **The work that waits asks.** The change's own agents cannot reach
+    the person: a question reaches a person's inbox only when the task
+    asked is one the person requested, and a coder's requester is its
+    change (jig's `domain/tasks.md`, 8.1 and 8.5). The chat cannot ask
+    its own person (5.3, 4.4's row), so the question is T2's, asked of
+    the chat, as the case's A asks the director (5.3, 4.1's row).
+  - **Every judgement a script,** one call per response, each task's
+    wakes one cause at a time, so each turn follows the count of replies
+    said: T1 delegates T2, says so and waits; on the question, says it
+    waits in the person's inbox and waits; on the answer, relays it,
+    says so and waits; on T2's report, finishes with its own. T2 asks,
+    says so and waits; on the answer, delegates the change and waits; on
+    the change's result, reports. The coder reads, edits and finishes;
+    the reviewer approves. The numbers are a fresh deployment's, named
+    once: the tasks T1 to T5 and the question, message 1, which the
+    story checks against T2's tool output ("Message 1 sent") and the
+    inbox's entry, since a script cannot read a returned number.
+  - **The person's acts,** by `temper ctl`, waiting on watches, never on
+    repeated reads: sign in; start the chat and a watch on its end;
+    wait until the question waits in the inbox (`wait inbox --until
+    waiting`) and T1 is at rest; read T1's tree, which holds T2 alone;
+    adopt the repository then, while the question waits, so that no
+    forge poll runs through the question's wait (the first run's box
+    adopts widget at its start; here it is adopted before the answer that
+    the change waits for); read the question and answer it; join the
+    watch.
+  - **What it checks:** the question in the inbox, on T1 and message 1,
+    in T2's words, while T1's tree held no change; T1 told the person's
+    answer after the question, and T2 told it as T1's answer before it
+    delegated the change; the change merged with CI green at its head,
+    widget's edit on main; T2's report and T1's; no question left in
+    the inbox. The fake forge's one repository stands as widget, its
+    tree holding widget's source, and its CI follows the edit (4.2);
+    the story's fixture, scripts and checks are its own, in its test
+    file, on the tier's shared hosts. It is fuzzy, past the 1 s guide by
+    the change procedure's landing path, as `fuzzy_landing` is, and its
+    forge's records stay within the harness's bound.
 - **An account first,** with area 5's tools (../client/tools.md, 5.5):
   a story whose agents run adds a key the fake LLM peer accepts, from
   the client, before its first task, and waits for its account to be

@@ -333,9 +333,11 @@ keeps (`../protocol/configuration.md`, section 2).
   counts even if the chat's document still lists it. It says "waiting on
   your words" while it waits on news and its wake policy wakes it on
   words (its document's `wake`), from
-  the person signed in, who requested it; jig's word otherwise. A line
-  of the chats page has no wake policy, so it keeps jig's word for
-  news.
+  the person signed in, who requested it; jig's word otherwise. While
+  a question a delegate asked it waits in the person's inbox, jig's wait
+  is on the person, before its delegates, and it says "Waiting for
+  you". A line of the chats page has no wake policy, so it keeps jig's
+  word for news.
 - **A chat's conversation** is the chat's own, drawn from jig's thread
   (jig's `client/domain/objects.md`, section 10), never its runs'
   mechanics (`chat.html`, the mockups' first run):
@@ -356,6 +358,12 @@ keeps (`../protocol/configuration.md`, section 2).
     person sent (jig's `OwnerActivity::Words`, by a person), under
     "You" or the party's name, a paragraph for each line, with "Being
     sent" or "Sent" until the engine has it, and no word once read;
+    an answer the person gave in the inbox to a question on the chat
+    is among them;
+  - *a delegate's words,* each words line a task sent the chat (jig's
+    `OwnerActivity::Words`, by a task), a delegate's question among
+    them, under the task's name, "TN", on the agent's side, a paragraph
+    for each line;
   - *not drawn:* a run's beginning and end, the task's milestones, and
     every message a turn's person, tool or system speaks, which are
     the run's inputs: its opening, its calls' results, and what woke
@@ -388,6 +396,20 @@ keeps (`../protocol/configuration.md`, section 2).
   task's; on a chat's page too, a proposal's card says "waiting 12
   min". An update says when it came, "12 min ago" (5.12's ago): a
   result's time, a reply's last activity.
+- **A question** in the inbox is a delegate's, asked of a task the
+  person requested, their chat among them (jig's `domain/people.md`,
+  section 6). Its card, under "Needs you": "Question", its project, the
+  asked task's link, "Task N", whose conversation holds the question
+  (above), and the question's words as written. Its act is an answer in
+  words, "Answer words" and "Answer", one request (3.6): "Pending" while
+  it is sent, "Answered" once the engine has it. The answer goes to the
+  asked task, which relays it to its delegate as its own judgement. An
+  answered card keeps its outcome while the page stays open; the inbox
+  read again holds it no more, and the navigation's count no longer
+  counts it. A question carries words alone, so its answer is words
+  (choices, section 11), and temper has no hold of its own for one: the
+  person answers in words, or stops the asking task from its page,
+  which holds it until it is released (5.11).
 - **Seen** is how far the person has read: jig's read positions (jig's
   `client/domain/pages.md`, section 3), one over their results and one
   over each chat's turns. An update is seen when it is opened, and no
@@ -2492,6 +2514,13 @@ own tests:
   (`browser.md`, section 4).
 
 ## 11. Open questions
+
+- **The mockups' question card:** the asker's lineage and its link
+  ("Open T3 ↗"), and choices as buttons beside "Answer in words"
+  (`world-solo.js`). jig's question carries words alone, so choices
+  need its question form to carry them, an upstream change; the lineage
+  needs the asker's documents on the inbox page. Default: the asked
+  task's link and an answer in words (3.5).
 
 - **Pages the mockups do not show:** a project's page with its
   resources, findings, notes and settings (policy, people and roles,
