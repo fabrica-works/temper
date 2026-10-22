@@ -51,18 +51,32 @@ impl Running {
         let child = command.spawn().expect("valid fixture");
         let mut run = Self { child: Some(child), address: "127.0.0.1:0".parse().expect("valid fixture") };
         let mut bytes = Vec::new();
-        let stdout = run.child.as_mut().expect("running fake").stdout.as_mut().expect("stdout pipe");
         for _ in 0..128 {
             let mut byte = [0_u8; 1];
-            stdout.read_exact(&mut byte).expect("ready line");
+            let read =
+                run.child.as_mut().expect("running fake").stdout.as_mut().expect("stdout pipe").read_exact(&mut byte);
+            if let Err(why) = read {
+                let mut child = run.child.take().expect("running fake");
+                if why.kind() != std::io::ErrorKind::UnexpectedEof {
+                    child.kill().expect("stop fake after readiness failure");
+                }
+                let ended = child.wait_with_output().expect("reap fake after readiness failure");
+                panic!(
+                    "ready line: {why:?}; status {}; stderr {}; partial {:?}; command {command:?}",
+                    ended.status,
+                    String::from_utf8_lossy(&ended.stderr),
+                    String::from_utf8_lossy(&bytes)
+                );
+            }
             bytes.push(byte[0]);
             if byte[0] == b'\n' {
                 break;
             }
         }
         let line = String::from_utf8(bytes).expect("ready line is UTF-8");
-        assert!(line.starts_with("ready 127.0.0.1:"), "ready line: {line}");
+        assert!(line.starts_with("ready "), "ready line: {line}");
         run.address = line.strip_prefix("ready ").expect("valid fixture").trim_end().parse().expect("valid fixture");
+        assert!(run.address.ip().is_loopback());
         assert_ne!(run.address.port(), 0);
         run
     }
@@ -88,6 +102,18 @@ impl Drop for Running {
             let _ended = child.wait();
         }
     }
+}
+#[test]
+#[should_panic(expected = "status exit status: 7; stderr fixture refused")]
+fn readiness_eof_reports_child_status_and_stderr() {
+    let mut command = Command::new("/bin/sh");
+    command
+        .env_clear()
+        .args(["-c", "printf 'fixture refused' >&2; exit 7"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let _run = Running::command(command, None);
 }
 fn stream(address: SocketAddr) -> TcpStream {
     let stream = TcpStream::connect_timeout(&address, Duration::from_millis(300)).expect("valid fixture");
@@ -1161,32 +1187,28 @@ fn seed_demo(name: &str) -> (support::Scratch, Running, Running, SeedServe) {
     let scratch = support::Scratch::new(name);
     let dir = scratch.path();
     support::configuration(dir, &support::Forge::Unreached);
-    let [listen, forge_listen] = support::free_addresses::<2>(&[]);
+    // Distinct loopback addresses keep the configured listeners distinct while port 0
+    // lets each fake claim its port. Clients are configured from the ready lines.
+    let listen = "127.0.0.1:0".parse::<SocketAddr>().expect("LLM listen");
+    let forge_listen = "127.0.0.2:0".parse::<SocketAddr>().expect("forge listen");
     let mut config = support::configuration::demo_document(dir, &listen.to_string());
     // Adoption outgrows the channel fixture's tiny amendment; use the shipped bound.
     config["engine"]["limits"]["overrides"].as_object_mut().expect("engine overrides").remove("people.amendment_bytes");
+    config["application"]["clients"]["listener"] = json!({"socket":"127.0.0.3:0"});
     config["application"]["forges"][0]["api"] = json!({"socket":forge_listen.to_string()});
     config["application"]["forges"][0]["git"] = json!(format!("http://{forge_listen}"));
     config["application"]["setup"][0]["mode"]["fake"]["listen"] = json!({"socket":forge_listen.to_string()});
     document(&dir.join("temper.json"), &config);
-    let agent_path = dir.join("agent.json");
-    let mut agent: Value = serde_json::from_slice(&fs::read(&agent_path).expect("agent document")).expect("agent JSON");
-    let mut endpoint = agent["endpoints"][0].clone();
-    endpoint["name"] = "demo".into();
-    endpoint["number"] = 3.into();
-    endpoint["address"] = listen.to_string().into();
-    endpoint["transport"] = "plaintext".into();
-    endpoint.as_object_mut().expect("endpoint").remove("server_name");
-    endpoint.as_object_mut().expect("endpoint").remove("trust_der");
-    endpoint["models"][0]["name"] = "qa".into();
-    agent["endpoints"].as_array_mut().expect("agent endpoints").push(endpoint);
-    document(&agent_path, &agent);
     // Serve still reads Forgejo's private files before starting (temper-15).
     let prepared = support::owned::prepare(dir, 1);
     assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
     let mut command = deployment_command("forge", dir);
     command.arg("1");
     let forge = Running::command(command, None);
+    config["application"]["forges"][0]["api"] = json!({"socket":forge.address.to_string()});
+    config["application"]["forges"][0]["git"] = json!(format!("http://{}", forge.address));
+    config["application"]["setup"][0]["mode"]["fake"]["listen"] = json!({"socket":forge.address.to_string()});
+    document(&dir.join("temper.json"), &config);
     let reconciled = Command::new(env!("CARGO_BIN_EXE_temper"))
         .env_clear()
         .args(["forge", "reconcile"])
@@ -1200,7 +1222,29 @@ fn seed_demo(name: &str) -> (support::Scratch, Running, Running, SeedServe) {
         &dir.join("demo/llm.key"),
         b"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n",
     );
+    // Another listener may bind between writing the configuration and starting the fake.
+    let competing = std::net::TcpListener::bind(listen).expect("competing listener");
     let llm = Running::command(deployment_command("llm", dir), None);
+    assert_ne!(llm.address, competing.local_addr().expect("competing address"));
+    drop(competing);
+    config["application"]["demo"]["llm"]["listen"] = json!({"socket":llm.address.to_string()});
+    let endpoints = config["engine"]["llm"]["endpoints"].as_array_mut().expect("LLM endpoints");
+    let endpoint = endpoints.iter_mut().find(|entry| entry["name"] == "demo").expect("demo endpoint");
+    endpoint["address"] = json!({"socket":llm.address.to_string()});
+    config["application"]["clients"]["listener"] = json!({"socket":"127.0.0.1:0"});
+    document(&dir.join("temper.json"), &config);
+    let agent_path = dir.join("agent.json");
+    let mut agent: Value = serde_json::from_slice(&fs::read(&agent_path).expect("agent document")).expect("agent JSON");
+    let mut endpoint = agent["endpoints"][0].clone();
+    endpoint["name"] = "demo".into();
+    endpoint["number"] = 3.into();
+    endpoint["address"] = llm.address.to_string().into();
+    endpoint["transport"] = "plaintext".into();
+    endpoint.as_object_mut().expect("endpoint").remove("server_name");
+    endpoint.as_object_mut().expect("endpoint").remove("trust_der");
+    endpoint["models"][0]["name"] = "qa".into();
+    agent["endpoints"].as_array_mut().expect("agent endpoints").push(endpoint);
+    document(&agent_path, &agent);
     let serve = SeedServe::start(dir);
     (scratch, llm, forge, serve)
 }
