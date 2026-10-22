@@ -22,6 +22,20 @@ pub enum Read {
     BenchmarkWaiting,
     BenchmarkEnded,
     BEnded,
+    /// The retried director reports.
+    HangEnded,
+    /// The director commits its question read before stopping.
+    HangQuestionRead,
+    /// The director waits in its first attempt.
+    HangWaiting,
+    /// A's next phase reports.
+    PhaseEnded,
+    /// The newest director activity page.
+    HangActivity,
+    /// The middle director activity page.
+    HangActivityOlder,
+    /// The oldest director activity page.
+    HangActivityFirst,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -226,4 +240,52 @@ pub fn step_4_1_4_3() -> Vec<calls::Step> {
 pub fn reads_4_1_4_3() -> Vec<(Read, usize)> {
     let base = READS_4_1.iter().map(|(_, call)| call).max().expect("opener calls") + 1;
     READS_4_1.iter().copied().chain(READS_4_3.iter().map(|&(read, call)| (read, base + call))).collect()
+}
+
+const HANG_ENDED: usize = 2;
+const HANG_QUESTION_READ: usize = 3;
+const HANG_WAITING: usize = 4;
+const HANG_A_ENDED: usize = 5;
+const HANG_ACTIVITY: usize = 6;
+const HANG_ACTIVITY_OLDER: usize = 7;
+const HANG_ACTIVITY_FIRST: usize = 8;
+/// Documents within the standalone restart story, relative to its first call.
+pub const READS_4_6: &[(Read, usize)] = &[
+    (Read::HangEnded, HANG_ENDED),
+    (Read::HangQuestionRead, HANG_QUESTION_READ),
+    (Read::HangWaiting, HANG_WAITING),
+    (Read::PhaseEnded, HANG_A_ENDED),
+    (Read::HangActivity, HANG_ACTIVITY),
+    (Read::HangActivityOlder, HANG_ACTIVITY_OLDER),
+    (Read::HangActivityFirst, HANG_ACTIVITY_FIRST),
+];
+
+/// Sign in and run the restart story; `base` names its first recorded call.
+#[must_use]
+pub fn step_4_6(base: usize) -> Vec<calls::Step> {
+    use super::{HANG, HANG_PERSON, HANG_READ, PHASE};
+    vec![
+        sign_in(D1),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "hang", HANG_PERSON]),
+        start(D1, argv!["wait", "task", number(HANG), "--until", "ended", "--json"]),
+        calls::watching(base + HANG_ENDED),
+        // ctl's predicates distinguish phase/replied, but cannot select a
+        // committed turn or its text. Activity contains only committed turns;
+        // chat/run can also contain the live writing, so cannot be this barrier.
+        calls::until(D1, argv!["activity", number(HANG), "--json"], HANG_READ.as_bytes(), b"run_began"),
+        // Once the read is committed, await the following in-run wait.
+        // Its withheld turn is sealed when the worker stops, as A's parked waits are.
+        call(D1, argv!["wait", "task", number(HANG), "--until", "replied", "--json"]),
+        calls::stop_worker("ws"),
+        join(base + HANG_ENDED),
+        call(D1, argv!["task", number(PHASE), "--activity", "32", "--json"]),
+        call(D1, argv!["activity", number(HANG), "--json"]),
+        call(D1, argv!["activity", number(HANG), "--before", calls::activity_before(base + HANG_ACTIVITY), "--json"]),
+        call(
+            D1,
+            argv!["activity", number(HANG), "--before", calls::activity_before(base + HANG_ACTIVITY_OLDER), "--json"],
+        ),
+        // The ended chat is the cheapest event proving its retry cannot use ws.
+        calls::start_worker("ws"),
+    ]
 }
