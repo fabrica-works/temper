@@ -190,8 +190,10 @@ mod memory_literal;
 // across two plan rows and the brief: (2 * 2 + 2) * 2 = 12 nodes x 1,674,892 B.
 // Their five phrases add five entries' room, 740 B.
 // Naming navigation and cards adds two phrases (296 B).
+// The forge side's kept change panel (client/README.md 4.6): its handle, its box
+// and the panel's bounded heap add 4,976 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 262198984149;
+const WEB_BYTES: u64 = 262198989125;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

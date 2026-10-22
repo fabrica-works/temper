@@ -1,9 +1,10 @@
-//! The forge's adoption form, requests and receiving state.
+//! The forge's adoption form, demo read, panel watch and receiving state.
 use skein_lib::{Env, Queue, Time};
 pub mod demo;
 pub mod family;
 mod form;
 pub(crate) mod me;
+pub mod panel;
 mod vocabulary;
 pub mod words;
 pub use form::{Act, Broken, Check, Field, Form, Marks, Text, Typed, adoption, broken, form, write};
@@ -17,6 +18,8 @@ pub struct Limits {
 #[derive(Debug)]
 pub enum Event {
     Act { act: Act },
+    Panel { subject: Option<panel::Subject> },
+    Watched { handle: jig_client::Handle, watched: panel::Watched },
     Progress { request: skein_lib::Token, progress: skein_lib::RequestProgress },
     Answered { request: skein_lib::Token, answer: Answer },
     Went { address: Address },
@@ -32,6 +35,7 @@ pub enum Request {
 #[derive(Debug)]
 pub struct Side {
     demo: demo::State,
+    panel: Option<panel::Panel>,
     address: Option<Address>,
     served: Served,
     form: Option<Form>,
@@ -46,6 +50,7 @@ impl Side {
     pub fn new(_limits: &Limits, seed: u64) -> Side {
         Side {
             demo: demo::State::new(),
+            panel: None,
             address: None,
             served: Served::Unknown,
             form: None,
@@ -72,12 +77,18 @@ impl Side {
     pub const fn demo(&self) -> Option<&Demo> {
         self.demo.answer.as_ref()
     }
+    #[must_use]
+    pub const fn panel(&self) -> Option<&panel::Panel> {
+        self.panel.as_ref()
+    }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("forge shown count fits");
     }
 }
 pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Panel { subject } => panel::subject(side, env.limits, subject, out),
+        Event::Watched { handle, watched } => panel::watched(side, handle, watched, out),
         Event::Went { address } => {
             side.address = Some(address);
             let Address::Adopt { project } = address;
@@ -206,7 +217,7 @@ pub const fn shown(side: &Side) -> u64 {
 }
 #[must_use]
 pub const fn max_out(_limits: &Limits) -> u32 {
-    1
+    2
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
@@ -218,7 +229,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(6)?
         .checked_add(u64::from(limits.checks).checked_mul(4)?)?
         .checked_add(temper_client_protocol_wire::v1::DemoAnswer::worst_case_heap(&wire)?)?
-        .checked_add(u64::try_from(size_of::<jig_client::Handle>()).ok()?)
+        .checked_add(u64::try_from(size_of::<jig_client::Handle>()).ok()?)?
+        .checked_add(u64::try_from(size_of::<temper_client_protocol_wire::v1::ChangePanel>()).ok()?)?
+        .checked_add(temper_client_protocol_wire::v1::ChangePanel::worst_case_heap(&wire)?)
 }
 
 fn served(side: &mut Side, served: Served) {
@@ -247,6 +260,10 @@ pub fn wire_limits(limits: &Limits) -> Option<temper_client_protocol_wire::v1::L
 pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: jig_client::Told) -> Option<Event> {
     use jig_client::{Outcome, Told};
     match told {
+        Told::Changed { handle } => {
+            Some(Event::Watched { handle, watched: panel::decode(client, handle, limits.forge) })
+        }
+        Told::Ended { handle, why } => Some(Event::Watched { handle, watched: panel::Watched::Ended(why) }),
         Told::Pending { key } => {
             let pending = client.pending(key)?;
             let progress = match pending.progress {
@@ -271,13 +288,7 @@ pub(crate) fn told(client: &jig_client::Client, limits: &crate::Limits, told: ji
             };
             Some(Event::Answered { request, answer })
         }
-        Told::Kept { .. }
-        | Told::Dropped { .. }
-        | Told::Link { .. }
-        | Told::Changed { .. }
-        | Told::Text { .. }
-        | Told::Ended { .. }
-        | Told::Page { .. } => None,
+        Told::Kept { .. } | Told::Dropped { .. } | Told::Link { .. } | Told::Text { .. } | Told::Page { .. } => None,
     }
 }
 

@@ -6,6 +6,7 @@ mod fixtures;
 mod forge_words;
 mod form;
 mod pages;
+mod panel;
 use crate::{Address, Event, Fact, Request, forge};
 use jig_client::contract;
 use skein_lib::{List, Queue};

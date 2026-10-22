@@ -326,6 +326,20 @@ impl Task {
             Latest::Jig(_) | Latest::Family(_) => None,
         }
     }
+    /// A procedure's connector panel (jig's client/domain/pages.md, 5.2).
+    #[must_use]
+    pub fn panel(&self, client: &Client, forge: u16) -> Option<crate::forge::panel::Subject> {
+        let task = self.document(client)?;
+        match task.chip.executor {
+            c::Executor::Procedure { connector, .. } if connector == forge => {
+                Some(crate::forge::panel::Subject { task: task.chip.task, project: task.project })
+            }
+            c::Executor::Procedure { .. }
+            | c::Executor::Agent { .. }
+            | c::Executor::Party { .. }
+            | c::Executor::Role { .. } => None,
+        }
+    }
     pub(crate) fn act(
         &mut self,
         env: &Env<Limits>,

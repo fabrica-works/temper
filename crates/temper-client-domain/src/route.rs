@@ -57,6 +57,18 @@ pub(crate) fn pages(root: &mut Domain, env: &Env<Limits>, event: crate::pages::E
             crate::pages::Request::Show { address } => out.push(Request::Show { address, replace: false }),
         }
     }
+    let subject = match root.pages.task() {
+        Some(task) => task.panel(&root.client, root.forge_number()),
+        None => None,
+    };
+    #[expect(clippy::manual_map, reason = "the client's domain matches without a closure")]
+    let watched = match root.forge.panel() {
+        Some(panel) => Some(panel.subject),
+        None => None,
+    };
+    if watched != subject {
+        forge(root, env, forge::Event::Panel { subject }, out);
+    }
 }
 
 pub(crate) fn route_forge(
