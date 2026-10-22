@@ -1012,9 +1012,12 @@ loopback (section 5). temper's worlds add:
   The repositories are the document's own, as for Forgejo, each with its
   owner an account. Its `--observations` file holds, beside the forge's
   observations, the layer's record of its git calls (skein's
-  `fake-forge.md`, 10.1): each call's repository, the installation and
+  `fake-forge.md`, 10.1): the installation and
   mint of the token that authenticated it, whether it wrote, and its
-  status, never a token. Its ready line names its address, which the
+  status, never a token. Each new call is written as it appears; at the
+  layer's `limits.git_records` bound, the stream ends with a git-call
+  record-full observation and the fake exits non-zero before an eviction
+  can go unnoticed. Its ready line names its address, which the
   engine's document gives as the forge's `api`, `git` and `web` (2.4).
 
 ### 4.3 The machine, and the fake git program
