@@ -181,6 +181,7 @@ pub fn run(seed: u64, case: Case, facts: u32) -> Report {
             remote: b"forge/temper".as_slice().into(),
             start: Start::Merge { branch: b"topic".as_slice().into(), base: translate::commit(world.base) },
             identity: 0,
+            account: None,
             push: Some(b"topic".as_slice().into()),
             expected: Some(translate::commit(world.ours)),
         }]),

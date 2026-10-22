@@ -816,6 +816,22 @@ fn start_growth() -> u64 {
     held_forges_growth + u64::try_from(temper_service::clients::bundle::NO_BUNDLE_PAGE.len()).expect("fixed page size")
 }
 
+fn github_worker_pick_growth() -> u64 {
+    // Value grows 64 -> 80 B; each of three credential slots keeps two generations.
+    let identities = 3 * 2 * 16;
+    // Repository.account adds 16 B to both repository types. The checkout has
+    // two holds per workspace, three workspaces and two repositories per hold;
+    // the root stages items for its one run slot plus one refused assignment.
+    let repositories = (2 * 3 * 2 + (1 + 1) * 2) * 16;
+    // Op grows 144 -> 160 B, checkout::Request 160 -> 176 B. The root keeps
+    // two MAX_OUT (2) checkout requests; root::Request remains 224 B.
+    let checkout_requests = 2 * 2 * 16;
+    // Operation's inline Op grows 16 B in each of 2*(operations+1) slab slots.
+    // worker_git::worst_case counts the component and operations+1 carriers.
+    let git_operations = (1 + (3 + 1)) * (2 * (3 + 1)) * 16;
+    identities + repositories + checkout_requests + git_operations
+}
+
 #[test]
 #[expect(clippy::too_many_lines, reason = "keep the cause-by-cause census of the owned startup envelopes together")]
 fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
@@ -1050,7 +1066,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // transient list holds accounts + credentials = 4 + 3 grants (224 B).
     // Include v3's identity generations and assignment carriers; the original
     // admission cause stays separate.
-    let grant_wire_growth = 4 * 32 + (4 + 3) * 32 + github_worker_growth;
+    let grant_wire_growth = 4 * 32 + (4 + 3) * 32 + github_worker_growth + github_worker_pick_growth();
     assert_eq!(required.worker_bytes, 2_343_551_746_598_u64 + worker_growth + admission_growth + grant_wire_growth);
 
     support::owned::check_memory("../../docs/examples/owned.json", required);
@@ -1101,6 +1117,8 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // Worker-wire v3 adds the same channel/Items/Service growth as above, but
     // init holds two encoded identities: 3,637 + 2,177 = 5,814 B engine growth.
     // Its worker has the same three credential slots and grows 13,116 B.
+    // The decoded worker pick adds github_worker_pick_growth() = 1,056 B to
+    // both examples and the worker-alone figure; the engine does not grow.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);

@@ -192,7 +192,6 @@ pub fn workspace(items: Option<&v1::Items>) -> Assigned {
             }
             v1::Access::ReadOnly => worker::Access::ReadOnly,
         };
-        // The worker's GitHub pick (o/github-git-m2's worker task) uses Repository.account.
         repositories
             .push(worker::Repository {
                 tag: repository.tag(),
@@ -202,6 +201,7 @@ pub fn workspace(items: Option<&v1::Items>) -> Assigned {
                 start,
                 access,
                 identity: repository.identity(),
+                account: *repository.account(),
             })
             .expect("one result per decoded repository");
     }
@@ -326,21 +326,33 @@ pub fn preparation(preparation: &temper_worker_domain::wire::Preparation) -> Opt
     }
 }
 
-/// The git component's identity, once its login and author fields pass their rules.
+/// The worker's value, once its login and author fields pass their rules.
 #[must_use]
-pub fn value(identity: &v1::Identity) -> Option<temper_worker_protocol_git::Identity> {
+pub fn value(identity: &v1::Identity) -> Option<crate::identities::Value> {
+    use crate::identities::{Entry, Value};
     if !wire::valid(identity) {
         return None;
     }
-    let token = match identity.kind() {
-        v1::Kind::Forgejo(value) => value.token().clone(),
-        // The worker's GitHub pick (o/github-git-m2's worker task) decodes this kind.
-        v1::Kind::Github(_) => return None,
-    };
-    Some(temper_worker_protocol_git::Identity {
-        token,
-        login: identity.login().into(),
-        name: identity.name().into(),
-        email: identity.email().into(),
+    Some(match identity.kind() {
+        v1::Kind::Forgejo(value) => Value::Forgejo(temper_worker_protocol_git::Identity {
+            token: value.token().clone(),
+            login: identity.login().into(),
+            name: identity.name().into(),
+            email: identity.email().into(),
+        }),
+        v1::Kind::Github(value) => {
+            let mut entries = List::with_capacity(value.entries().len());
+            for entry in value.entries() {
+                entries
+                    .push(Entry { account: entry.account(), token: entry.token().clone() })
+                    .expect("one entry per decoded installation");
+            }
+            Value::GitHub {
+                login: identity.login().into(),
+                name: identity.name().into(),
+                email: identity.email().into(),
+                entries,
+            }
+        }
     })
 }

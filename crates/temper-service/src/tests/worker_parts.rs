@@ -176,7 +176,7 @@ fn an_identity_breaking_a_field_rule_is_dropped() {
         let value = worker_route::identity(&payload::identity(&record), &limits);
         assert_eq!(value.is_some(), expected, "{row}");
         if expected {
-            assert_eq!(value, Some(fixtures::identity(b"credential")), "{row}");
+            assert_eq!(value, Some(crate::identities::Value::Forgejo(fixtures::identity(b"credential"))), "{row}");
         }
     }
     assert_eq!(worker_route::identity(&Secret::new(Box::from([255, 0])), &limits), None, "malformed");
@@ -192,12 +192,20 @@ fn a_late_older_generation_leaves_the_newest_in_place() {
         (1, b"late-1", b"tok-3"),
         (3, b"again-3", b"again-3"),
     ] {
-        table.granted(1, generation, fixtures::identity(token)).unwrap();
-        assert_eq!(table.newest(1), Some(&fixtures::identity(newest)), "generation {generation}");
+        table.granted(1, generation, crate::identities::Value::Forgejo(fixtures::identity(token))).unwrap();
+        assert_eq!(
+            table.newest(1),
+            Some(&crate::identities::Value::Forgejo(fixtures::identity(newest))),
+            "generation {generation}"
+        );
     }
     assert_eq!(table.newest(2), None);
     for number in [0, 3] {
-        assert_eq!(table.granted(number, 1, fixtures::identity(b"bad")), Err(Unfit), "number {number}");
+        assert_eq!(
+            table.granted(number, 1, crate::identities::Value::Forgejo(fixtures::identity(b"bad"))),
+            Err(Unfit),
+            "number {number}"
+        );
     }
 }
 
@@ -249,7 +257,7 @@ fn program_resource_debug_exposes_only_counts() {
 }
 
 #[test]
-fn a_github_identity_is_dropped_and_counted_until_the_worker_pick_arrives() {
+fn an_empty_github_identity_is_decoded_and_kept() {
     let limits = fixtures::wire_limits();
     let record = v1::Identity::new(
         &limits,
@@ -265,7 +273,9 @@ fn a_github_identity_is_dropped_and_counted_until_the_worker_pick_arrives() {
     .unwrap();
     let secret = payload::identity(&record);
     assert!(payload::valid(&record));
-    assert_eq!(worker_route::identity(&secret, &limits), None);
+    let expected = worker_route::identity(&secret, &limits).expect("valid GitHub value");
+    let crate::identities::Value::GitHub { entries, .. } = &expected else { panic!("GitHub kind") };
+    assert!(entries.is_empty());
     let mut worker = fixtures::worker();
     worker.link(
         fixtures::NOW,
@@ -276,6 +286,6 @@ fn a_github_identity_is_dropped_and_counted_until_the_worker_pick_arrives() {
             value: jig_protocol_worker_link::GrantValue::Application { secret },
         },
     );
-    assert_eq!(worker.undecodable_values, 1);
-    assert_eq!(worker.identities.newest(1), None);
+    assert_eq!(worker.undecodable_values, 0);
+    assert_eq!(worker.identities.newest(1), Some(&expected));
 }

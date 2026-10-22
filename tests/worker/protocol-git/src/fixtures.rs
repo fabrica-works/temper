@@ -106,7 +106,7 @@ pub fn operations() -> Vec<(&'static str, Scenario)> {
         (
             "clone",
             scenario(
-                git::Op::Clone { at: at(), remote: remote(), identity: 1 },
+                git::Op::Clone { at: at(), remote: remote(), identity: 1, account: None },
                 &["clone"],
                 Expected::done(git::Done::Succeeded),
             ),
@@ -121,6 +121,7 @@ pub fn operations() -> Vec<(&'static str, Scenario)> {
                     branch: Box::from(&b"created"[..]),
                     commit: ONE,
                     identity: 1,
+                    account: None,
                 },
                 &["create-new-branch"],
                 Expected::done(git::Done::Succeeded),
@@ -155,7 +156,7 @@ pub fn operations() -> Vec<(&'static str, Scenario)> {
 #[must_use]
 pub fn fetch() -> Scenario {
     scenario(
-        git::Op::Fetch { at: at(), remote: remote(), want: git::Want::Default, identity: 1 },
+        git::Op::Fetch { at: at(), remote: remote(), want: git::Want::Default, identity: 1, account: None },
         &["fetch-default"],
         Expected::done(git::Done::Fetched { commit: TWO }),
     )
@@ -189,6 +190,7 @@ pub fn push(lease: bool) -> Scenario {
             branch: Box::from(&b"main"[..]),
             expected: lease.then_some(ONE),
             identity: 1,
+            account: None,
         },
         if lease { &["push-ancestor-yes", "push-fast-forward"] } else { &["push-fast-forward"] },
         Expected::done(git::Done::Succeeded),

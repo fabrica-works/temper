@@ -1,5 +1,6 @@
 //! Git's records at the worker layer, with identity values below the root.
 use crate::{limits, settings};
+use alloc::boxed::Box;
 use jig_protocol_config::{Path, Problems, Segment, What};
 use skein_io::{self as io, kernel};
 use skein_lib::{Queue, Writer};
@@ -85,6 +86,52 @@ pub(crate) fn identity(op: &git::Op) -> Option<u32> {
         | git::Op::Push { identity, .. } => Some(*identity),
         git::Op::Make { .. } | git::Op::CheckOut { .. } | git::Op::Merge { .. } => None,
     }
+}
+/// Select only this operation's credential below the root (protocol/channel.md, 6).
+#[expect(clippy::result_large_err, reason = "bounded git diagnostics stay inline")]
+pub(crate) fn pick(
+    value: Option<&crate::identities::Value>,
+    op: &git::Op,
+) -> Result<Option<component::Identity>, git::Done> {
+    use crate::identities::Value;
+    let Some(value) = value else { return Ok(None) };
+    let (login, name, email, entries) = match value {
+        Value::Forgejo(identity) => return Ok(Some(identity.clone())),
+        Value::GitHub { login, name, email, entries } => (login, name, email, entries),
+    };
+    let (at, account) = match op {
+        git::Op::Clone { at, account, .. }
+        | git::Op::Fetch { at, account, .. }
+        | git::Op::Create { at, account, .. }
+        | git::Op::Push { at, account, .. } => (at, account),
+        git::Op::Commit { .. } => {
+            return Ok(Some(component::Identity {
+                token: skein_lib::Secret::new(Box::default()),
+                login: login.clone(),
+                name: name.clone(),
+                email: email.clone(),
+            }));
+        }
+        git::Op::Make { .. } | git::Op::CheckOut { .. } | git::Op::Merge { .. } => return Ok(None),
+    };
+    for entry in entries {
+        if Some(entry.account) == *account {
+            return Ok(Some(component::Identity {
+                token: entry.token.clone(),
+                login: login.clone(),
+                name: name.clone(),
+                email: email.clone(),
+            }));
+        }
+    }
+    let prefix = b"temper's App is not installed on the account owning ";
+    let mut output = Writer::new(prefix.len().checked_add(at.repository.len()).expect("bounded repository name"));
+    output.put(prefix).expect("measured diagnostic");
+    output.put(&at.repository).expect("measured diagnostic");
+    Err(git::Done::FailedWithOutput {
+        fault: git::Fault::Refused,
+        diagnostic: git::PushDiagnostic::new(&output.finish(), 0),
+    })
 }
 #[must_use]
 pub(crate) fn worst_case(own: &limits::Limits) -> Option<u64> {

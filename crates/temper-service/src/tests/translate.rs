@@ -248,17 +248,20 @@ fn each_repository_item_carries_no_account_yet() {
 }
 
 #[test]
-fn a_repositorys_account_is_dropped_before_the_workers_domain() {
+fn a_repositorys_account_reaches_the_workers_domain() {
     let settings = fixtures::engine();
     let assignment = fixtures::assignment_with(fixtures::repository(7, b"acme", b"shop"));
     let limits = fixtures::wire_limits();
     let original = translate::items(&assignment, &settings.forges, &limits).unwrap().unwrap();
-    let (expected, save) = translate::workspace(Some(&original));
+    let (mut expected, save) = translate::workspace(Some(&original));
+    expected.repositories[0].account = Some(19);
     let mut repositories = List::with_capacity(1);
     let repository = original.repositories().get(0).unwrap().clone().into_parts();
     repositories
         .push(wire::Repository::new(&limits, wire::RepositoryParts { account: Some(19), ..repository }).unwrap())
         .unwrap();
     let items = wire::Items::new(&limits, wire::ItemsParts { repositories, save: original.save().clone() }).unwrap();
-    assert_eq!(translate::workspace(Some(&items)), (expected, save));
+    let bytes = temper_protocol_worker_wire::items(&items);
+    let decoded = wire::Items::decode(&limits, &mut skein_lib::Reader::new(&bytes)).unwrap();
+    assert_eq!(translate::workspace(Some(&decoded)), (expected, save));
 }

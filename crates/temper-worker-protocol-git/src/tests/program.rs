@@ -236,7 +236,7 @@ fn request(program: Option<&[u8]>, remote: bool) -> Request {
     Request::Io {
         owner: fixtures::OWNER,
         op: if remote {
-            git::Op::Clone { at, remote: Box::from(REMOTE), identity: 1 }
+            git::Op::Clone { at, remote: Box::from(REMOTE), identity: 1, account: None }
         } else {
             git::Op::CheckOut { at, commit: fixtures::COMMIT }
         },

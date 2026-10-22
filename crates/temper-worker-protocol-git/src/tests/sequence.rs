@@ -14,6 +14,7 @@ fn each_operation_s_next_invocation_is_git_md_s() {
         branch: Box::from(&b"main"[..]),
         commit: fixtures::COMMIT,
         identity: 1,
+        account: None,
     };
     let ran = Command::Create {
         remote: Box::from(fixtures::REMOTE),
@@ -45,6 +46,7 @@ fn standard_rows() {
         remote: Box::from(fixtures::REMOTE),
         want: git::Want::Default,
         identity: 1,
+        account: None,
     };
     let rows = [
         (&commit,Command::DiffIndex { parent:fixtures::PARENT },0,b"".as_slice(),Next::End(git::Done::Unchanged)),

@@ -466,6 +466,7 @@ impl World {
             name: Box::from(&b"app"[..]),
             remote: Box::from(&b"org/app"[..]),
             identity: 0,
+            account: None,
             start: if self.settings.merging {
                 wire::Start::Merge { branch: Box::from(&b"topic"[..]), base: BASE }
             } else {

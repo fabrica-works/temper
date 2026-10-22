@@ -797,7 +797,9 @@ pub use worker::{
     AGENT_JSON, NOW, TEMPER, application_value, assignment as worker_assignment, chat_assignment, identity,
     one_repository, repository_assignment, spawn, worker, worker_agent, worker_files, worker_limits, worker_settings,
 };
-pub use worker_git::{IDENTITY, WorkerStand, started_worker};
+pub use worker_git::{
+    IDENTITY, WorkerStand, git_place, github_assignment, github_push, github_record, github_value, started_worker,
+};
 pub fn clients() -> crate::clients::Clients {
     let engine = engine();
     crate::clients::Clients::new(&engine.jig, &engine.clients.listener, &seeds(), 64, &engine.limits.root.journal)

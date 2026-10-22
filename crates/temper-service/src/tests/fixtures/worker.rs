@@ -10,6 +10,7 @@ pub fn one_repository() -> wire::Workspace {
             start: wire::Start::Base { branch: b"main".as_slice().into() },
             access: wire::Access::Writable { push: b"temper/task-7".as_slice().into(), expected: None },
             identity: 1,
+            account: None,
         }]),
     }
 }

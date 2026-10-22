@@ -297,6 +297,7 @@ impl World {
             name: Box::from(&b"app"[..]),
             remote: Box::from(REMOTE),
             identity: 0,
+            account: None,
             start,
             access: wire::Access::Writable {
                 push: Box::from(&b"topic"[..]),

@@ -144,3 +144,179 @@ fn ended(worker: &mut Worker) -> Option<Ending> {
     }
     last
 }
+
+#[test]
+fn a_github_operation_takes_the_entry_of_its_items_account() {
+    let mut stand = fixtures::started_worker();
+    grant_github(&mut stand, 1, b"tok-second");
+    stand.worker.link(fixtures::NOW, fixtures::github_assignment(Some(22)));
+    let (owner, clone) = stand.answer_until_spawn(b"clone");
+    assert_header(&clone, b"tok-second");
+    assert_eq!(stand.finish_git(owner, clone, "clone"), git::Done::Succeeded);
+    stand.route_git(Token::new(92), fixtures::github_push());
+    let (owner, push) = stand.answer_until_spawn(b"push");
+    assert_header(&push, b"tok-second");
+    assert_eq!(stand.finish_git(owner, push, "push-fast-forward"), git::Done::Succeeded);
+}
+
+#[test]
+fn an_account_without_an_entry_is_refused_as_not_installed_without_git() {
+    for account in [Some(99), None] {
+        let mut stand = fixtures::started_worker();
+        grant_github(&mut stand, 1, b"tok-second");
+        let mut op = fixtures::github_push();
+        if let git::Op::Push { account: field, .. } = &mut op {
+            *field = account;
+        }
+        let owner = Token::new(92);
+        stand.route_git(owner, op);
+        let Some(root::Event::Done { owner: echoed, done: git::Done::FailedWithOutput { fault, diagnostic } }) =
+            stand.worker.events.pop()
+        else {
+            panic!("routing returns a git refusal to the root");
+        };
+        assert_eq!(echoed, owner);
+        assert_eq!(fault, git::Fault::Refused);
+        assert_eq!(diagnostic.output(), b"temper's App is not installed on the account owning app");
+        assert_eq!(diagnostic.cut(), 0);
+        stand.worker.link(fixtures::NOW, fixtures::github_assignment(account));
+        for _ in 0_u16..1000 {
+            if !stand.turn() {
+                break;
+            }
+        }
+        assert_eq!(stand.below.spawns, 1, "only the version check, {account:?}");
+        assert_eq!(ended(&mut stand.worker), Some(Ending::Failed { fault: git::Fault::Refused }));
+    }
+}
+
+#[test]
+fn an_undecodable_value_is_dropped_and_its_operation_fails_broken() {
+    use skein_lib::Secret;
+    let valid = temper_protocol_worker_wire::identity(&fixtures::github_record(b"x-access-token", b"tok-second"));
+    let truncated = Secret::new(valid.expose()[..valid.expose().len() - 1].into());
+    let invalid = temper_protocol_worker_wire::identity(&fixtures::github_record(b"bad:login", b"tok-second"));
+    for secret in [truncated, invalid] {
+        let mut stand = fixtures::started_worker();
+        stand.worker.link(fixtures::NOW, fixtures::github_value(1, secret));
+        assert_eq!(stand.worker.undecodable_values, 1);
+        assert_eq!(stand.worker.identities.newest(fixtures::IDENTITY), None);
+        stand.worker.link(fixtures::NOW, fixtures::github_assignment(Some(22)));
+        for _ in 0_u16..1000 {
+            if !stand.turn() {
+                break;
+            }
+        }
+        assert_eq!(stand.below.spawns, 1, "only the version check");
+        assert_eq!(ended(&mut stand.worker), Some(Ending::Failed { fault: git::Fault::Broken }));
+    }
+}
+
+#[test]
+fn a_push_in_flight_across_a_new_generation_ends_on_the_value_it_began_with() {
+    let mut stand = fixtures::started_worker();
+    grant_github(&mut stand, 1, b"tok-old");
+    let mut op = fixtures::github_push();
+    // The ancestry check is one invocation of this same push, before its network invocation.
+    if let git::Op::Push { expected, .. } = &mut op {
+        *expected = Some(git::Commit::new([1; 32]));
+    }
+    stand.route_git(Token::new(92), op);
+    let (owner, ancestry) = stand.answer_until_spawn(b"merge-base");
+    assert_header(&ancestry, b"tok-old");
+    grant_github(&mut stand, 2, b"tok-new");
+    stand.below.script.invocations.push_back(Invocation::captured("push-ancestor-yes"));
+    stand.below.out.io.push(io::Request::Spawn { owner, spawn: ancestry });
+    let (owner, push) = stand.answer_until_spawn(b"push");
+    assert_header(&push, b"tok-old");
+    assert_eq!(stand.finish_git(owner, push, "push-fast-forward"), git::Done::Succeeded);
+    stand.route_git(Token::new(93), fixtures::github_push());
+    let (owner, push) = stand.answer_until_spawn(b"push");
+    assert_header(&push, b"tok-new");
+    assert_eq!(stand.finish_git(owner, push, "push-fast-forward"), git::Done::Succeeded);
+}
+
+#[test]
+fn a_commit_on_github_takes_the_values_author() {
+    use temper_protocol_worker_wire::v1;
+    let mut stand = fixtures::started_worker();
+    // An empty entry list still supplies a commit's author.
+    let limits = fixtures::wire_limits();
+    let mut record = fixtures::github_record(b"x-access-token", b"tok-second").into_parts();
+    record.kind = v1::Kind::Github(
+        v1::Entries::new(&limits, v1::EntriesParts { entries: skein_lib::List::with_capacity(0) }).unwrap(),
+    );
+    let value = temper_protocol_worker_wire::identity(&v1::Identity::new(&limits, record).unwrap());
+    stand.worker.link(fixtures::NOW, fixtures::github_value(1, value));
+    stand.route_git(
+        Token::new(92),
+        git::Op::Commit {
+            at: fixtures::git_place(),
+            parent: git::Commit::new([1; 32]),
+            merging: None,
+            title: b"Change".as_slice().into(),
+            body: Box::default(),
+            identity: fixtures::IDENTITY,
+        },
+    );
+    for (command, transcript) in [
+        (b"add".as_slice(), "commit-add"),
+        (b"diff-index", "commit-changed"),
+        (b"write-tree", "commit-write-tree"),
+        (b"commit-tree", "commit-tree-one-parent"),
+    ] {
+        let (owner, spawn) = stand.answer_until_spawn(command);
+        assert!(spawn.env.contains(&Box::from(b"GIT_AUTHOR_NAME=Temper App".as_slice())));
+        assert!(spawn.env.contains(&Box::from(b"GIT_AUTHOR_EMAIL=app@example.test".as_slice())));
+        assert!(spawn.env.contains(&Box::from(b"GIT_COMMITTER_NAME=Temper App".as_slice())));
+        assert!(spawn.env.contains(&Box::from(b"GIT_COMMITTER_EMAIL=app@example.test".as_slice())));
+        for value in &spawn.env {
+            assert!(!value.starts_with(b"GIT_CONFIG_VALUE_0="));
+        }
+        if command == b"commit-tree" {
+            let git::Done::Committed { .. } = stand.finish_git(owner, spawn, transcript) else {
+                panic!("commit finishes")
+            };
+        } else {
+            stand.below.script.invocations.push_back(Invocation::captured(transcript));
+            stand.below.out.io.push(io::Request::Spawn { owner, spawn });
+        }
+    }
+}
+
+fn grant_github(stand: &mut fixtures::WorkerStand, generation: u64, token: &[u8]) {
+    let record = fixtures::github_record(b"x-access-token", token);
+    stand
+        .worker
+        .link(fixtures::NOW, fixtures::github_value(generation, temper_protocol_worker_wire::identity(&record)));
+}
+fn assert_header(spawn: &kernel::Spawn, token: &[u8]) {
+    use skein_lib::Writer;
+    let login = b"x-access-token:";
+    let mut raw = Writer::new(login.len().checked_add(token.len()).unwrap());
+    raw.put(login).unwrap();
+    raw.put(token).unwrap();
+    let raw = raw.finish();
+    let length =
+        skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, u32::try_from(raw.len()).unwrap())
+            .unwrap();
+    let mut encoded = Writer::new(usize::try_from(length).unwrap());
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Standard, &raw, &mut encoded).unwrap();
+    let prefix = b"GIT_CONFIG_VALUE_0=Authorization: Basic ";
+    let encoded = encoded.finish();
+    let mut expected = Writer::new(prefix.len().checked_add(encoded.len()).unwrap());
+    expected.put(prefix).unwrap();
+    expected.put(&encoded).unwrap();
+    let expected = expected.finish();
+    assert!(spawn.env.contains(&expected), "the selected entry supplies the Basic header");
+    let mut headers = 0_u32;
+    for value in &spawn.env {
+        if value.starts_with(b"GIT_CONFIG_VALUE_0=") {
+            headers = headers.checked_add(1).unwrap();
+        }
+    }
+    assert_eq!(headers, 1);
+    for argument in &spawn.args {
+        assert_eq!(skein_lib::bytes::find(argument, token), None, "no token in an argument");
+    }
+}

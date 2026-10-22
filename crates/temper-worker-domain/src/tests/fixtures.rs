@@ -129,6 +129,7 @@ pub fn items(names: &[&[u8]]) -> wire::Workspace {
             start: wire::Start::Base { branch: Box::from(&b"main"[..]) },
             access: wire::Access::ReadOnly,
             identity: 7,
+            account: None,
         };
         repositories.push(repository).expect("room for each name");
     }

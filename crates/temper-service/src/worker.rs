@@ -488,11 +488,19 @@ impl Worker {
                 );
             }
             root::Request::Io { owner, op, deadline } => {
-                let identity = match crate::worker_git::identity(&op) {
-                    Some(number) => self.identities.newest(number).cloned(),
+                let value = match crate::worker_git::identity(&op) {
+                    Some(number) => self.identities.newest(number),
                     None => None,
                 };
-                self.git_request(temper_worker_protocol_git::Request::Io { owner, op, deadline, identity });
+                match crate::worker_git::pick(value, &op) {
+                    Ok(identity) => {
+                        self.git_request(temper_worker_protocol_git::Request::Io { owner, op, deadline, identity });
+                    }
+                    Err(done) => {
+                        self.git.out.events.push(temper_worker_protocol_git::Event::Done { owner, done });
+                        self.git_drain();
+                    }
+                }
             }
             root::Request::CancelIo { owner } => {
                 self.git_request(temper_worker_protocol_git::Request::CancelIo { owner });

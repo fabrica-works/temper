@@ -40,6 +40,9 @@ pub struct Repository {
     /// credentials, granted with the assignment, which the protocol layer
     /// maps to credentials and an author.
     pub identity: u32,
+    /// The forge account whose entry of the identity's value authenticates git
+    /// on this repository (protocol/channel.md, section 4); copied, never read.
+    pub account: Option<u64>,
 }
 
 /// Where a repository's checkout starts.

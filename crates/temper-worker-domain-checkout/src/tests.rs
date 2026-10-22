@@ -181,6 +181,7 @@ fn repository(name: &[u8], writable: bool) -> Repository {
         remote: remote(name),
         start: Start::Branch { branch: bytes(b"main") },
         identity: 0,
+        account: None,
         push,
         expected: None,
     }
@@ -280,15 +281,17 @@ fn a_new_workspace_is_made_then_each_repository_cloned_fetched_and_checked_out()
     let (hold, op) = h.prepare(7, two(b"issue-1"));
     let Op::Make { workspace } = op else { panic!("a new workspace is made: {op:?}") };
     let identity = 0;
-    let clone_a = Op::Clone { at: place(workspace, b"a"), remote: remote(b"a"), identity };
+    let clone_a = Op::Clone { at: place(workspace, b"a"), remote: remote(b"a"), identity, account: None };
     assert_eq!(h.next(hold, Done::Succeeded), clone_a);
-    let clone_b = Op::Clone { at: place(workspace, b"b"), remote: remote(b"b"), identity };
+    let clone_b = Op::Clone { at: place(workspace, b"b"), remote: remote(b"b"), identity, account: None };
     assert_eq!(h.next(hold, Done::Succeeded), clone_b);
-    let fetch_a = Op::Fetch { at: place(workspace, b"a"), remote: remote(b"a"), want: want_main(), identity };
+    let fetch_a =
+        Op::Fetch { at: place(workspace, b"a"), remote: remote(b"a"), want: want_main(), identity, account: None };
     assert_eq!(h.next(hold, Done::Succeeded), fetch_a);
     let check_out_a = Op::CheckOut { at: place(workspace, b"a"), commit: commit(1) };
     assert_eq!(h.next(hold, Done::Fetched { commit: commit(1) }), check_out_a);
-    let fetch_b = Op::Fetch { at: place(workspace, b"b"), remote: remote(b"b"), want: want_main(), identity };
+    let fetch_b =
+        Op::Fetch { at: place(workspace, b"b"), remote: remote(b"b"), want: want_main(), identity, account: None };
     assert_eq!(h.next(hold, Done::Succeeded), fetch_b);
     let check_out_b = Op::CheckOut { at: place(workspace, b"b"), commit: commit(2) };
     assert_eq!(h.next(hold, Done::Fetched { commit: commit(2) }), check_out_b);
@@ -430,8 +433,14 @@ fn a_missing_base_branch_is_created_from_the_default_branch() {
     let default = h.next(hold, failed(Fault::Missing { missing: Missing::Branch }));
     let Op::Fetch { want: Want::Default, .. } = default else { panic!("then the default branch: {default:?}") };
     let create = h.next(hold, Done::Fetched { commit: commit(9) });
-    let expected =
-        Op::Create { at: at.clone(), remote: remote(b"a"), branch: bytes(b"temper/1"), commit: commit(9), identity: 0 };
+    let expected = Op::Create {
+        at: at.clone(),
+        remote: remote(b"a"),
+        branch: bytes(b"temper/1"),
+        commit: commit(9),
+        identity: 0,
+        account: None,
+    };
     assert_eq!(create, expected, "created at the default branch's tip");
     let check_out = h.next(hold, Done::Succeeded);
     assert_eq!(check_out, Op::CheckOut { at, commit: commit(9) });
@@ -542,8 +551,15 @@ fn a_push_commits_the_tree_on_its_start_and_pushes_it_to_the_push_branch() {
     assert_eq!((&*at.repository, parent), (&b"a"[..], commit(1)), "the writable one, on its start");
     assert_eq!((&*title, &*body, identity), (&b"Fix it"[..], &b"Because."[..], 0));
     let push = h.next(hold, Done::Committed { commit: commit(11) });
-    let expected =
-        Op::Push { at, remote: remote(b"a"), commit: commit(11), branch: bytes(b"main"), expected: None, identity: 0 };
+    let expected = Op::Push {
+        at,
+        remote: remote(b"a"),
+        commit: commit(11),
+        branch: bytes(b"main"),
+        expected: None,
+        identity: 0,
+        account: None,
+    };
     assert_eq!(push, expected);
     let end = h.one(Event::Done { owner: hold, done: Done::Succeeded });
     assert_eq!(
@@ -1119,4 +1135,42 @@ fn a_moved_head_refusal_preserves_the_original_condition_on_retry() {
         panic!("retry of unlanded commit")
     };
     assert_eq!((head, expected), (commit(9), Some(commit(1))));
+}
+
+#[test]
+fn each_git_op_carries_its_repositorys_account() {
+    for account in [Some(22), None] {
+        let mut h = Harness::new(LIMITS);
+        let repo = Repository { account, start: Start::Base { branch: bytes(b"topic") }, ..repository(b"a", true) };
+        let (hold, make) = h.prepare(1, spec(b"w", Box::new([repo])));
+        let Op::Make { .. } = make else { panic!("workspace made first") };
+        assert_account(h.next(hold, Done::Succeeded), account, Kind::Clone);
+        assert_account(h.next(hold, Done::Succeeded), account, Kind::Fetch);
+        assert_account(h.next(hold, failed(Fault::Missing { missing: Missing::Branch })), account, Kind::Fetch);
+        assert_account(h.next(hold, Done::Fetched { commit: commit(1) }), account, Kind::Create);
+        assert_account(h.next(hold, Done::Exists), account, Kind::Fetch);
+        let Op::CheckOut { .. } = h.next(hold, Done::Fetched { commit: commit(1) }) else {
+            panic!("checkout follows fetch")
+        };
+        let Request::Prepared { .. } = h.one(Event::Done { owner: hold, done: Done::Succeeded }) else {
+            panic!("prepared after checkout")
+        };
+        let op = io(h.one(Event::Push { hold, message: message() }), hold);
+        let Op::Commit { .. } = op else { panic!("commit precedes push") };
+        assert_account(h.next(hold, Done::Committed { commit: commit(2) }), account, Kind::Push);
+        assert_account(h.next(hold, failed(Fault::TimedOut)), account, Kind::Fetch);
+        h.one(Event::Done { owner: hold, done: Done::Fetched { commit: commit(2) } });
+    }
+}
+fn assert_account(op: Op, expected: Option<u64>, kind: Kind) {
+    assert_eq!(op.kind(), kind);
+    match op {
+        Op::Clone { account, .. }
+        | Op::Fetch { account, .. }
+        | Op::Create { account, .. }
+        | Op::Push { account, .. } => assert_eq!(account, expected),
+        Op::Make { .. } | Op::CheckOut { .. } | Op::Merge { .. } | Op::Commit { .. } => {
+            panic!("an operation that authenticates")
+        }
+    }
 }

@@ -88,14 +88,14 @@ pub fn perform(forge: &mut impl Remote, disk: &mut Checkout, op: Op) -> Done {
             disk.mkdir(&dir);
             Done::Succeeded
         }
-        Op::Clone { at, remote, identity: _ } => {
+        Op::Clone { at, remote, identity: _, account: _ } => {
             assert!(disk.exists(&dir(at.workspace)), "a repository is cloned into a workspace made");
             match git::clone_repository(forge, disk, &remote, &path(&at)) {
                 Ok(()) => Done::Succeeded,
                 Err(fault) => failed(fault),
             }
         }
-        Op::Fetch { at, remote, want, identity: _ } => {
+        Op::Fetch { at, remote, want, identity: _, account: _ } => {
             assert_cloned(disk, &at);
             let want = match &want {
                 Want::Branch { branch } => git::Want::Branch(branch),
@@ -107,7 +107,7 @@ pub fn perform(forge: &mut impl Remote, disk: &mut Checkout, op: Op) -> Done {
                 Err(fault) => failed(fault),
             }
         }
-        Op::Create { at, remote, branch, commit, identity: _ } => {
+        Op::Create { at, remote, branch, commit, identity: _, account: _ } => {
             assert_cloned(disk, &at);
             match git::create(forge, &remote, &branch, fake(commit)) {
                 Ok(Created::Created) => Done::Succeeded,
@@ -153,7 +153,7 @@ pub fn perform(forge: &mut impl Remote, disk: &mut Checkout, op: Op) -> Done {
                 Done::Conflicted { files: merged.conflicts.into_iter().map(Vec::into_boxed_slice).collect() }
             }
         }
-        Op::Push { at, remote, commit, branch, expected, identity: _ } => {
+        Op::Push { at, remote, commit, branch, expected, identity: _, account: _ } => {
             assert_cloned(disk, &at);
             let pushed = match expected {
                 Some(expected) => {

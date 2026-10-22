@@ -752,7 +752,8 @@ fn prepare_step(
             let repository = nth(holding, repository);
             let remote = copy_of(&repository.remote);
             let identity = repository.identity;
-            Op::Clone { at: place(workspace, repository), remote, identity }
+            let account = repository.account;
+            Op::Clone { at: place(workspace, repository), remote, identity, account }
         }
         PrepareStep::Fetch { repository } | PrepareStep::Refetch { repository } => {
             let repository = nth(holding, repository);
@@ -765,13 +766,15 @@ fn prepare_step(
             };
             let remote = copy_of(&repository.remote);
             let identity = repository.identity;
-            Op::Fetch { at: place(workspace, repository), remote, want, identity }
+            let account = repository.account;
+            Op::Fetch { at: place(workspace, repository), remote, want, identity, account }
         }
         PrepareStep::Default { repository } => {
             let repository = nth(holding, repository);
             let remote = copy_of(&repository.remote);
             let identity = repository.identity;
-            Op::Fetch { at: place(workspace, repository), remote, want: Want::Default, identity }
+            let account = repository.account;
+            Op::Fetch { at: place(workspace, repository), remote, want: Want::Default, identity, account }
         }
         PrepareStep::Create { repository, commit } => {
             let repository = nth(holding, repository);
@@ -783,7 +786,8 @@ fn prepare_step(
             };
             let remote = copy_of(&repository.remote);
             let identity = repository.identity;
-            Op::Create { at: place(workspace, repository), remote, branch, commit, identity }
+            let account = repository.account;
+            Op::Create { at: place(workspace, repository), remote, branch, commit, identity, account }
         }
         PrepareStep::CheckOut { repository, commit } => {
             Op::CheckOut { at: place(workspace, nth(holding, repository)), commit }
@@ -795,6 +799,7 @@ fn prepare_step(
                 remote: copy_of(&repository.remote),
                 want: Want::Commit { commit: base },
                 identity: repository.identity,
+                account: repository.account,
             }
         }
         PrepareStep::CheckOutMerge { repository, ours, .. } => {
@@ -950,11 +955,12 @@ fn push_commit(
     let at = place(holding.workspace.token(), spec);
     let remote = copy_of(&spec.remote);
     let identity = spec.identity;
+    let account = spec.account;
     let expected = match push.to {
         To::Branches => tips(holding, repository).expected,
         To::Saved { .. } => None,
     };
-    io(id, Op::Push { at, remote, commit, branch, expected, identity }, env, out);
+    io(id, Op::Push { at, remote, commit, branch, expected, identity, account }, env, out);
     State::Pushing { push, step: PushStep::Push { repository }, asked: Asked::Nothing }
 }
 
@@ -1005,7 +1011,8 @@ fn verify(
     let at = place(holding.workspace.token(), spec);
     let remote = copy_of(&spec.remote);
     let identity = spec.identity;
-    io(id, Op::Fetch { at, remote, want, identity }, env, out);
+    let account = spec.account;
+    io(id, Op::Fetch { at, remote, want, identity, account }, env, out);
     State::Pushing { push, step: PushStep::Verify { repository, failure }, asked }
 }
 

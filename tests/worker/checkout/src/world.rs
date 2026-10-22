@@ -546,6 +546,7 @@ impl World {
                 remote: remote.clone().into(),
                 start,
                 identity,
+                account: None,
                 push,
             };
             repositories.push(spec);
@@ -574,6 +575,7 @@ impl World {
                     remote: first,
                     start: Start::Branch { branch: b"main".as_slice().into() },
                     identity: IDENTITY,
+                    account: None,
                     push: None,
                 }),
                 way => repositories[0].name = names[usize::try_from(way - 2).expect("small")].into(),

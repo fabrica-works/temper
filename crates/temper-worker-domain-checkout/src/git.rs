@@ -64,15 +64,15 @@ pub enum Op {
     /// Clone the repository at `remote` on the forge into its directory, which
     /// does not exist yet, without checking a tree out. Fails `Missing` if the
     /// forge has no such repository.
-    Clone { at: Place, remote: Box<[u8]>, identity: u32 },
+    Clone { at: Place, remote: Box<[u8]>, identity: u32, account: Option<u64> },
     /// Fetch `want` from the repository at `remote` into the repository. Ends
     /// in `Fetched`, or fails `Missing` if the forge has no such branch or
     /// commit, or no default branch.
-    Fetch { at: Place, remote: Box<[u8]>, want: Want, identity: u32 },
+    Fetch { at: Place, remote: Box<[u8]>, want: Want, identity: u32, account: Option<u64> },
     /// Create `branch` on the forge at `commit`, only if it does not exist:
     /// a branch that does is left where it is, and the operation ends in
     /// `Exists`.
-    Create { at: Place, remote: Box<[u8]>, branch: Box<[u8]>, commit: Commit, identity: u32 },
+    Create { at: Place, remote: Box<[u8]>, branch: Box<[u8]>, commit: Commit, identity: u32, account: Option<u64> },
     /// Make the repository's working tree exactly `commit`'s tree: what is not
     /// in it is removed, including untracked nested repositories. HEAD is
     /// detached at commit, and the merge state is cleared.
@@ -91,7 +91,15 @@ pub enum Op {
     /// ancestor of `commit` is left where it is, and the operation ends in
     /// `Rejected`. A supplied `expected` is an additional exact old-head
     /// condition, including when ordinary ancestry would permit the push.
-    Push { at: Place, remote: Box<[u8]>, commit: Commit, branch: Box<[u8]>, expected: Option<Commit>, identity: u32 },
+    Push {
+        at: Place,
+        remote: Box<[u8]>,
+        commit: Commit,
+        branch: Box<[u8]>,
+        expected: Option<Commit>,
+        identity: u32,
+        account: Option<u64>,
+    },
 }
 
 /// What a fetch asks for.

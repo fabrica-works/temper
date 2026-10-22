@@ -51,7 +51,13 @@ pub fn at() -> git::Place {
 pub fn fetch(owner: skein_lib::Token, deadline: skein_lib::Time) -> crate::Request {
     crate::Request::Io {
         owner,
-        op: git::Op::Fetch { at: at(), remote: Box::from(REMOTE), want: git::Want::Default, identity: 1 },
+        op: git::Op::Fetch {
+            at: at(),
+            remote: Box::from(REMOTE),
+            want: git::Want::Default,
+            identity: 1,
+            account: None,
+        },
         deadline,
         identity: Some(identity()),
     }
@@ -74,6 +80,7 @@ pub fn push_op(expected: Option<git::Commit>) -> git::Op {
         branch: Box::from(&b"main"[..]),
         expected,
         identity: 1,
+        account: None,
     }
 }
 pub fn settings() -> crate::Settings {

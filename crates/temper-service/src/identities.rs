@@ -1,6 +1,20 @@
 //! The two newest git identity generations by grant number (protocol/credentials.md, 4).
-use skein_lib::List;
+use alloc::boxed::Box;
+use skein_lib::{List, Secret};
 use temper_worker_protocol_git::Identity;
+
+/// A git identity's decoded value (protocol/channel.md, section 6).
+#[derive(PartialEq, Eq, Debug)]
+pub enum Value {
+    Forgejo(Identity),
+    GitHub { login: Box<[u8]>, name: Box<[u8]>, email: Box<[u8]>, entries: List<Entry> },
+}
+/// One installation account's token; Debug reveals only its length.
+#[derive(PartialEq, Eq, Debug)]
+pub struct Entry {
+    pub account: u64,
+    pub token: Secret,
+}
 
 #[derive(Debug)]
 pub struct IdentityTable {
@@ -8,13 +22,13 @@ pub struct IdentityTable {
 }
 #[derive(Debug)]
 struct Generations {
-    newest: Option<Entry>,
-    older: Option<Entry>,
+    newest: Option<Generation>,
+    older: Option<Generation>,
 }
 #[derive(Debug)]
-struct Entry {
+struct Generation {
     generation: u64,
-    value: Identity,
+    value: Value,
 }
 /// A grant's number outside the configured table.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -31,10 +45,10 @@ impl IdentityTable {
         Self { identities: slots }
     }
     /// Keep the two newest generations, replacing a repeated generation.
-    pub fn granted(&mut self, number: u32, generation: u64, identity: Identity) -> Result<(), Unfit> {
+    pub fn granted(&mut self, number: u32, generation: u64, identity: Value) -> Result<(), Unfit> {
         let slot = number.checked_sub(1).ok_or(Unfit)?;
         let slots = self.identities.get_mut(slot).ok_or(Unfit)?;
-        let entry = Entry { generation, value: identity };
+        let entry = Generation { generation, value: identity };
         match &slots.newest {
             Some(newest) if generation < newest.generation => match &slots.older {
                 Some(older) if generation < older.generation => (),
@@ -50,7 +64,7 @@ impl IdentityTable {
     }
     /// The value handed to every operation naming this identity.
     #[must_use]
-    pub fn newest(&self, number: u32) -> Option<&Identity> {
+    pub fn newest(&self, number: u32) -> Option<&Value> {
         let slot = number.checked_sub(1)?;
         Some(&self.identities.get(slot)?.newest.as_ref()?.value)
     }

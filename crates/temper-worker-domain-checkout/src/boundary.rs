@@ -109,6 +109,9 @@ pub struct Repository {
     /// Who the worker is to the forge for this repository, and who commits to
     /// it: a name the protocol layer maps to credentials and an author.
     pub identity: u32,
+    /// The forge account whose entry of the identity's value authenticates git
+    /// on this repository (protocol/channel.md, section 4); copied, never read.
+    pub account: Option<u64>,
     /// The branch a change is pushed to, if the repository may be written.
     pub push: Option<Box<[u8]>>,
     /// Exact old head required for the push branch; None requests

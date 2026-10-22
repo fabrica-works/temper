@@ -72,6 +72,7 @@ fn full_spec(limits: &Limits, n: u32) -> Spec {
             remote: name(limits.name_bytes, place),
             start: Start::Base { branch: name(limits.name_bytes, place) },
             identity: 0,
+            account: None,
             push: Some(bytes(limits.name_bytes)),
         });
     }

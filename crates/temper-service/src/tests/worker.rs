@@ -158,7 +158,7 @@ fn a_git_identity_s_value_lands_in_the_identities_table_only() {
     let mut worker = fixtures::worker();
     worker.link(fixtures::NOW, fixtures::application_value(1, 2, b"tok-2"));
     worker.link(fixtures::NOW, fixtures::application_value(1, 1, b"tok-1"));
-    assert_eq!(worker.identities.newest(1), Some(&fixtures::identity(b"tok-2")));
+    assert_eq!(worker.identities.newest(1), Some(&crate::identities::Value::Forgejo(fixtures::identity(b"tok-2"))));
     assert_eq!(worker.values.value(1, 2, fixtures::NOW), None);
     assert!(worker.events.is_empty(), "values stay below the root");
     worker.link(
@@ -171,7 +171,7 @@ fn a_git_identity_s_value_lands_in_the_identities_table_only() {
         },
     );
     assert_eq!(worker.undecodable_values, 1);
-    assert_eq!(worker.identities.newest(1), Some(&fixtures::identity(b"tok-2")));
+    assert_eq!(worker.identities.newest(1), Some(&crate::identities::Value::Forgejo(fixtures::identity(b"tok-2"))));
 }
 
 #[test]

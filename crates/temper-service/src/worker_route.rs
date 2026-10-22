@@ -354,7 +354,7 @@ fn part(token: Token, parts: &[jig_protocol_worker_wire::Part]) -> Option<&[u8]>
 pub fn identity(
     value: &skein_lib::Secret,
     limits: &temper_protocol_worker_wire::v1::Limits,
-) -> Option<temper_worker_protocol_git::Identity> {
+) -> Option<crate::identities::Value> {
     let mut reader = Reader::new(value.expose());
     let identity = temper_protocol_worker_wire::v1::Identity::decode(limits, &mut reader).ok()?;
     if !reader.is_empty() {
