@@ -135,9 +135,9 @@ with a fault (qa-web.md, 5.4).
     browser by its templates, `--mockups
     {source}/docs/design/client/mockups`, `--page {dir.page}/gallery`,
     `--out {collect.dir}/capture` and every scene;
-  - the checks `look-structure` and `look-style`: `{runner}/look/check
-    structure|style --capture {collected.capture}/capture` and every
-    scene.
+  - the checks `look-structure`, `look-style` and `look-words`:
+    `{runner}/look/check structure|style|words --capture
+    {collected.capture}/capture` and every scene.
 - `stage`: extracts the subject's tar into the page directory and requires
   exactly one `bundle/*/temper.css` (the bundle directory is named by its
   16-digit hex digest), failing loudly if zero or several match. When the
@@ -153,6 +153,14 @@ with a fault (qa-web.md, 5.4).
   widths, so its signatures are new: `planted` lists
   `check/look-style/chat/<width>/style/<region>/<property>` and
   `check/look-structure/chat/<width>/order/composer` at each width.
+  A third fault is the words': on the task's page alone (a rule under
+  `:has(.temper-task-heading)`), the banner's connection line, "Live",
+  is hidden, a line that is neither a control's nor a heading's name,
+  so `look-structure` cannot see it and the healthy banner agrees with
+  the mockup there: `planted` lists
+  `check/look-words/task/desktop/words/banner/missing/Live` (at phone
+  the line is behind the Menu on both sides). It draws nothing on the
+  chat, so the blind judge's pictures, and its run, stand.
 
 ## The subject
 
@@ -203,6 +211,28 @@ ready by its `main`. The page is the gallery's state by its name
 - **Names** are the frame's and the controls' words (the navigation's
   links, Sign out, the composers' Send, a card's acts, the lists'
   headings), never content.
+- **Words** (skein's `lab-browser.md`, 4 and 5.4): the regions whose
+  every word is held to the mockup's, a `words` entry a region and
+  width. The gallery uses the mockups' words where temper's model can
+  hold them (qa-web.md, 3.2), so a word difference is a finding
+  (`world`), a departure citing the section that means the page's way,
+  or a question. They are the frame and the parts whose text the model
+  holds whole: the banner in each scene with a mockup, at both widths;
+  the first run's suggested requests; the account's heading. A region
+  whose part the tree leaves out (an ignored element the mockup's
+  selector finds, such as its chatbar) records no words, so it has
+  none. Content a run draws (the conversation, the lists' entries, the
+  proposal's fields) stays with the structure and the eye.
+- **The data rule:** a region's `data` lists its patterns for what a
+  run or the model draws rather than the design (a count, a time, a
+  title), declared in the scene and cut to `#` on both sides, never
+  inferred from what a page lacks; a datum's span never holds a space,
+  so a word beside it still signs, and a pattern that matches nothing
+  shows on the check's stderr. A region whose words the model holds as
+  the mockup's needs none.
+- **A disclosure's words** (the phone's Menu, the chat's model
+  chooser) are out of the tree while it is closed, and judged by eye
+  until the capture can press it open (skein's `lab-browser.md`, 5.4).
 - **Expectations and departures** are the judge's (below). Expectations
   are few, since the base is the mockup as captured; `adoption`, with
   no mockup, is held to them alone. Each departure cites the section of
@@ -418,8 +448,9 @@ key's bar again without a run.
 `lab/tests/unit/test_look.py`, in the gate, fast and with no browser:
 each scene canonical `look-scene/1` with the members above, its page a
 name of `tools/gallery/names.txt`, its mockup's file in
-`client/mockups/`; `experiment.json` naming every scene in its capture
-and both checks; and `look-planted/` byte for byte `look/` but for
+`client/mockups/`, its `words` entries naming its regions, none in a
+scene without a mockup; `experiment.json` naming every scene in its
+capture and the three checks; and `look-planted/` byte for byte `look/` but for
 `planted.css` and `experiment.json`'s `planted`. `test_look_pack.py` checks
 identical tar bytes and digests despite changed disk times and modes,
 fixed archive metadata, and refusal of links, special files and names
