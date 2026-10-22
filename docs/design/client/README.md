@@ -1318,6 +1318,17 @@ or difference of their amounts (jig's `client/domain/contract.md`,
   `ctl task N` prints when (`tools.md`, 6.1). A dependency the facts
   don't name, or one not added, has no mark; the line keeps its shape
   (section 11).
+- **Latest activity,** a region after "Plan": the latest page of the
+  goal's activity (`activity`), an item per line, its time, then what
+  happened. A result the goal heard begins with its task's "Task N"
+  link: a heard word of a result's kind from a task (jig's
+  `OwnerActivity::Heard`, its word's `kind` a `Result` and its `from`
+  a task), then its words; a result line (`Activity::Result`), then
+  its task's title. That is how a person reaches a delegate that has
+  ended, which leaves the plan (section 11): by its result while it is
+  in the latest page, and by its address after. The page reads no
+  older page of a goal's activity (section 11). The chat's page draws
+  its activity as before.
 - **Budget and authority,** a region after "Latest activity", as the
   mockup's side card: "S spent · L left of B", what the goal spent
   itself and what its budget has left of itself, both as supplied;
@@ -2119,14 +2130,16 @@ own tests:
   call's summaries and its heard result; a goal's page, 5.8: its
   parts in order, the result it gives of each kind, its result in each
   state and none before it ends, no row for the goal, a row's state,
-  own spend and dependency line, cut and not, and its budget's card
+  own spend and dependency line, cut and not, its budget's card
   with each funder, with a deadline and none, with and without models,
-  cut and not; an agent's task's page, 5.9: its parts in order, its
-  lineage bar with a parent's chip, a requester alone and neither, its
-  brief with dependencies and none, its run's heading in each phase
-  with a start and none, its conversation as a chat's, its result in
-  each state and none before it ends, and its plan only with a
-  delegate or a card; a task's page's acts, 5.11: each act by its
+  cut and not, and its latest activity's heard result and result line
+  with their task's link, a person's words with none, and the chat's
+  activity unchanged; an agent's task's page, 5.9: its parts in
+  order, its lineage bar with a parent's chip, a requester alone and
+  neither, its brief with dependencies and none, its run's heading in
+  each phase with a start and none, its conversation as a chat's, its
+  result in each state and none before it ends, and its plan only with
+  a delegate or a card; a task's page's acts, 5.11: each act by its
   admission (a button, proposable, refused, and not offered: not
   drawn), the goal's toolbar in order, the taskbar's acts, both gone
   while the confirmation is open, the composer with its note and a
@@ -2190,8 +2203,18 @@ own tests:
   delegates ended; a waiting delegate's Message refused, its page
   saying why and sending nothing; an amendment of a goal's
   specification from its page, and one refused as moved asking to look
-  again; a repository adopted from the
-  navigation's link, its outcome read and the engine holding it;
+  again; roadmap B2 whole, on fixtures shaped on the reference case
+  (`../draft/reference-case.md`, 6.1, 6.8 and 7.3): a goal's advisor
+  reports, the goal's latest activity names it by its link, and its
+  page, opened from there, shows its result and reaches the goal by
+  its lineage bar; the goal declares two delegates, the second
+  depending on the first in a later call: the second's row and its
+  page's state say "waiting on task M", and its dependency line names
+  the first with its state; the first reports, the line says
+  "Completed" and the second runs; the second reports, then the
+  goal, and its page shows its "Result" and its budget's card as
+  supplied, what its delegates spent among it; a repository adopted
+  from the navigation's link, its outcome read and the engine holding it;
   refused: not found, a second home, a field the form refuses; a part
   of the forge's saying "Shown on the forge."; the banner with no
   account, a key added on the accounts page and the banner gone, and
@@ -2409,8 +2432,11 @@ own tests:
   side does not read yet (4.2). Default: the link to the task's page.
 - **An ended delegate on a goal's plan** (5.8): the owner tree holds
   live tasks only, so a delegate leaves the plan as it ends, and is
-  read only in its dependants' lines ("Completed") and in its funder's
-  "Delegates spent"; the mockup's done rows, its "Live only" and its
+  read only in its dependants' lines ("Completed"), in its funder's
+  "Delegates spent", and in the latest activity's line for its result,
+  whose "Task N" link opens its page, until older lines push it out;
+  the goal's older activity pages, its history, are not read; the
+  mockup's done rows, its "Live only" and its
   counts ("3 running, 3 in queues, 7 ended") have no document to come
   from. Default: as supplied; they wait for a supplied source, such as
   a task query's phases.
