@@ -181,7 +181,7 @@ ready by its `main`. The page is the gallery's state by its name
 |---|---|---|---|
 | `chats` | `/chats.html?world=solo&bare` | `/chats-solo.html` | the chats' list, the composer |
 | `chat` | `/chat.html?world=solo&task=T10&bare` | `/chat-solo-T10.html` | the chatbar, the conversation, the proposal, the composer |
-| `inbox` | `/inbox.html?world=solo&bare` | `/inbox-solo.html` | the first entry's card, the updates |
+| `inbox` | `/inbox.html?world=solo&bare` | `/inbox-solo.html` | the first entry, the "Needs you" and "Updates" lists |
 | `task` | `/task.html?world=solo&task=T3&bare` | `/task-solo-T3.html` | the task's heading, the plan, the budget's card |
 | `accounts` | `/accounts.html?world=solo&bare` | `/accounts-solo.html` | the first account's card |
 | `first-run` | `/chats.html?world=first-run&step=1&bare` | `/chats-first-run-1.html` | the suggested requests, the composer |
@@ -189,11 +189,23 @@ ready by its `main`. The page is the gallery's state by its name
 
 - **Regions** are found on temper's side by role and name, as a person
   finds them, and on the mockup's by role and name or, where its part
-  has no role of its own, by selector.
+  has no role of its own, by selector. The view's names: the navigation
+  `navigation "Main navigation"`; the chats' list by its heading; the
+  chatbar `region "T10 · TITLE"`; the proposal `listitem "Proposal from
+  T10"` (an `article` of that name in the mockup); the inbox's entries
+  `listitem "KIND from TN"` and its lists by their headings. The
+  mockup's side keeps a selector where its part has no role or name of
+  its own (its chatbar, its inbox entries and sections), and for the
+  navigation, which the phone mockups hide. The account card and the
+  adoption form have no name yet: their regions stand on a named part
+  inside them (the account's heading, the form's field and button).
 - **Names** are the frame's and the controls' words (the navigation's
-  links, Sign out, the composers' Send, a card's acts), never content.
-- **Expectations** are empty until the first campaign's judge writes
-  them; `adoption`, with no mockup, is held to them alone.
+  links, Sign out, the composers' Send, a card's acts, the lists'
+  headings), never content.
+- **Expectations and departures** are the judge's (below). Expectations
+  are few, since the base is the mockup as captured; `adoption`, with
+  no mockup, is held to them alone. Each departure cites the section of
+  the design text that says the page's way is meant.
 - **Standing departures:** with the network closed, the mockups'
   Google Fonts stylesheet is refused and their families fall back to
   the lab's DejaVu, while temper draws its bundled faces; each such
@@ -201,6 +213,133 @@ ready by its `main`. The page is the gallery's state by its name
   request in their trouble, is a departure citing qa-web.md, 11, until
   the mockups' fonts sit beside them. Nothing in `client/mockups/`
   changes.
+
+## Judging
+
+The judge (qa-web.md, 5.2) is the lab owner's step of a campaign, by
+hand and outside the run: Claude reads each scene's three views at both
+widths beside the design text of its page (`client/README.md`, the
+page's section; `client/browser.md`, 2.5 and 7; `client/mockups/README.md`;
+the gap tables its owners give). A sub-agent may draft a scene's
+judgement; the judge checks it against the pictures and the text. Each
+difference gets a tag (`layout`, `navigation`, `content`, `naming`,
+`style`, `behaviour`) and a place:
+
+- **the mockup's way:** temper's page is wrong, a finding (qa-web.md,
+  9), classed `world` (words, order, a missing part or name) or `look`
+  (appearance);
+- **the page's way:** the mockup is behind. Departures at the
+  difference's width, by signature or by outline entry, each citing the
+  section that says the page's way is meant, and a note for the user.
+  Without such a section the difference is a finding or a question,
+  never a departure;
+- **the text silent:** a question for the user, with its options and a
+  recommendation. Its signatures go on failing, undecided.
+
+### When the judge writes an expectation
+
+The base is the mockup as captured, so a difference the mockup's way
+already fails, and needs none. The judge writes one only where the base
+is not the value meant:
+- **a scene without a mockup** (`adoption`): its first judged capture's
+  outline entries and the regions' values the judge holds right, so
+  that it is held to itself (qa-web.md, 3.1);
+- **a mockup's value not drawn as meant,** bound to its invented
+  content or its refused fonts, where the text gives the value meant:
+  the page is held to that rather than to the captured mockup;
+- **a defect the pictures show that no signature names:** a region's
+  value or an outline entry that fails on it, so that it signs.
+
+### The judgements
+
+`~/src/rust/tmp/lab/judgements/look/<scene>.json`, beside the lab's
+keys: one file a scene, written by the judge, replaced when the scene is
+judged again, and never read by the runner. `look-judgements/1`,
+canonical JSON (skein's `lab.md`, 2.2), shown spread out:
+
+```json
+{"format": "look-judgements/1",
+ "scene": "chat",
+ "widths": [{"name": "desktop", "pictures": ["sha256:…"]},
+            {"name": "phone", "pictures": ["sha256:…", "sha256:…"]}],
+ "differences": [
+   {"id": "composer-stack", "width": "desktop",
+    "signatures": ["style/composer/font-family"],
+    "tag": "style", "place": "mockup",
+    "cites": "client/mockups/README.md, Where each value comes from",
+    "seen": "temper's monospace stack adds Liberation Mono",
+    "finding": {"class": "look", "title": "…"}},
+   {"id": "fonts-phone", "width": "phone",
+    "signatures": ["style/banner/faces"],
+    "tag": "style", "place": "page", "cites": "qa-web.md, 11",
+    "seen": "…", "departures": ["google-fonts-banner-faces-phone"]},
+   {"id": "goal-deadline", "width": "desktop", "signatures": ["…"],
+    "tag": "content", "place": "silent",
+    "cites": "client/README.md, 11, A goal's page against its mockup",
+    "seen": "…",
+    "question": {"options": ["…", "…"], "recommendation": "…"}}]}
+```
+
+- **`pictures`:** the picture digests the width's judgement stands for.
+  A width's picture digest is `sha256:` and the hex of the canonical
+  JSON list of its shots' digests as the capture's record names them:
+  the mockup's viewport (null without a mockup), the page's, then each
+  region's mockup crop and page crop in the scene's order, null for one
+  not taken. A list, since a state may draw a few pixels apart from one
+  run to the next: the judge adds a digest once it has seen that
+  nothing in the pictures moved. A scene whose pictures moved is judged
+  again; one whose pictures stand is not (qa-web.md, 5.2).
+- **A difference:** `id`, a name unique in the file; `width`; its
+  `signatures`, the tails after `<scene>/<width>/` as the checks print
+  them, each in at most one difference of its width; `tag`; `place`,
+  `mockup`, `page` or `silent`; `cites`, the text it is judged by;
+  `seen`, what the pictures show, in a line. Then by place: `mockup`, a
+  `finding` (`class` and `title`) and the `expectations` written for it,
+  if any; `page`, its `departures` and `expectations`, the scene's ids,
+  at least one; `silent`, a `question`, at least two `options` and a
+  `recommendation`.
+- **Findings and questions are named** `<scene>/<id>`. The findings go
+  to the lab owner's parent as they are made, which routes them through
+  the director (qa-web.md, 9); the questions and the notes go to the
+  user in one batch. `python3 -I lab/look_bar.py batch` prints the three
+  lists from the files, each with its scene, width, signatures, the
+  pair's paths and its citation.
+
+### The bar
+
+`lab/look_bar.py`, beside `look_pack.py`, reads a key's records in the
+lab and the judgements, and prints the key's bar; `look-judge` prints it
+after each key's verdict.
+
+- **Each scene's verdict on each judged run:** `pass`, or `fail` and its
+  signatures' count, and whether the runs' signatures are the same.
+- **With `planted`** (the planted twin): each judged run's planted
+  signatures, those present of all. Its other failures are the healthy
+  key's or the fault's, and its pictures differ by design, so it has no
+  unjudged list: the blind judge (below) judges it.
+- **Without `planted`, the unjudged list.** A judged run's failing
+  signature is judged when it is a look check's, `<scene>/<width>/<tail>`,
+  its scene's judgements hold that width with the run's picture digest,
+  and a difference of that width names `<tail>` as a finding or a
+  question. Every other is listed once, with the runs it failed in and
+  why: `departure-gone`, always; `not a look check` (the runner's own);
+  `not judged` (no judgements for the scene or the width); `pictures
+  moved`; `no difference`; `still failing` (judged the page's way, its
+  departure or expectation not in the scene). Each check's `undecided`
+  line is listed too. `unjudged: none` when nothing is.
+
+### The planted chat's blind judge
+
+The judge must name both planted differences (qa-web.md, 5.4) without
+being told them. A fresh Claude session, whose working directory holds
+only copies of a planted run's chat pictures (the pair and the regions'
+pairs at both widths, named by width and region), is asked to compare
+each mockup with temper's page and to name every difference it sees. It
+sees neither `planted.css`, nor the experiment's name, nor the planted
+signatures, nor the healthy run's chat, and reads the copies alone,
+which its transcript shows. Its words and transcript are kept in
+`judgements/look/blind/`; the bar holds when they name the changed
+token and the composer's move.
 
 ## Running it
 
@@ -213,10 +352,12 @@ through `heavy` (release), prints and packs its output in temporary space
 removed after making the subject, and runs skein's `lab
 judge` on each experiment named (`lab/look`, `lab/look-planted`):
 three seeds a key (skein's `lab.md`, section 8), printing each key and
-verdict. More runs of a seed are `lab run --seed N`. The lab is
-`~/src/rust/tmp/lab`, whose `settings.json` names the browser and the
-`look` cost class. It runs on demand, never in the gate; its shots are
-evidence, never goldens.
+verdict, then the key's bar (above). More runs of a seed are `lab run
+--seed N`. The lab is `~/src/rust/tmp/lab`, whose `settings.json` names
+the browser and the `look` cost class. It runs on demand, never in the
+gate; its shots are evidence, never goldens. `python3 -I
+lab/look_bar.py bar --key KEY EXPERIMENT` prints a key's bar again
+without a run.
 
 ## Its tests
 
@@ -228,5 +369,10 @@ and both checks; and `look-planted/` byte for byte `look/` but for
 `planted.css` and `experiment.json`'s `planted`. `test_look_pack.py` checks
 identical tar bytes and digests despite changed disk times and modes,
 fixed archive metadata, and refusal of links, special files and names
-outside USTAR's limits. The checks' own decisions are skein's, tested
-there on capture fixtures.
+outside USTAR's limits. `test_look_bar.py` checks the bar on records and
+judgements written as fixtures: the picture digest; a signature judged
+by a finding and by a question; each reason of the unjudged list; a
+scene's verdicts the same on three runs and not; the planted signatures
+counted; a judgements file refused for each rule above; and the batch.
+The checks' own decisions are skein's, tested there on capture
+fixtures.
