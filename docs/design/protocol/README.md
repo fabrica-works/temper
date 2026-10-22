@@ -822,7 +822,13 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
 
   A refused opening or hello is a note on the worker's stderr with jig's
   reason, and the worker redials, as a worker between hosts would; it
-  never exits for one. The sign-in link stays on stdout (section 4).
+  never exits for one. The note reads `refused <worker> <address>
+  <reason>`, the address the engine's as `linked` gives it, the reason
+  the engine's refusal as jig's link names it (`unauthorized`,
+  `application`, `busy`, `replaced`, `not-admitted`, `stopping`), or
+  the worker's own (`terms`, `malformed`); the engine's text, which jig
+  does not keep, is not in it. The sign-in link stays on stdout
+  (section 4).
 - **Each line's address is its listener's bound one:** the clients'
   server keeps its own, as the sign-in link reads it; the workers'
   routing keeps the one io's `Listening` event gives; and the webhooks'
