@@ -141,13 +141,13 @@ class FilesTests(unittest.TestCase):
                 dict(name=phase, argv=['/bin/sh', '{experiment}/steps', phase] + browse, env=env),
                 dict(name='capture-' + scene[5:], env=env, argv=capture + [
                     '--mockups', '{source}/docs/design/client/mockups', '--live',
-                    '{proc.browser.ready.address}', '--live-out', '{dir.hand}', '--ready-seconds', '20',
+                    '{proc.browser.ready.address}', '--live-out', '{dir.hand}', '--ready-seconds', '40',
                     '--out', '{dir.look}/' + scene, '{experiment}/scenes/' + scene + '.json'])])
         self.assertEqual(exp['actions'][6:], expected)
         self.assertEqual(exp['collect'], [
             dict(name='look', env={}, scan=[], argv=['/bin/cp', '-R', '--', '{dir.look}/.', '{collect.dir}/.']),
             base['collect'][0], dict(name='gallery', env=env, scan=[], argv=capture + [
-                '--page', '{dir.page}/gallery', '--ready-seconds', '20', '--out', '{collect.dir}/capture',
+                '--page', '{dir.page}/gallery', '--ready-seconds', '40', '--out', '{collect.dir}/capture',
                 '{experiment}/gallery/chat.json', '{experiment}/gallery/chat-closing.json'])])
         captures = [a for scene in SCENES for a in ('--capture', '{collected.look}/' + scene)]
         scenes = ['{experiment}/scenes/' + scene + '.json' for scene in SCENES]

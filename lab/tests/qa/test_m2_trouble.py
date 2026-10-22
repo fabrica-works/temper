@@ -30,7 +30,7 @@ class TroubleQA(unittest.TestCase):
         if raw is not None:
             self.path.write_bytes(raw)
         result = subprocess.run(['/usr/bin/python3', '-I', '-B', '-S', str(CHECK), str(self.path)],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
         return result, [json.loads(row) for row in result.stdout.splitlines()]
 
     def test_empty_and_seed_only_logs_pass(self):

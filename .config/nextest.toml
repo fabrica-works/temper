@@ -1,14 +1,17 @@
+# Test-time caps doubled provisionally at the user's request, 10-22.
+# Slow periods are doubled; terminate-after counts stay fixed, so termination
+# deadlines double as well.
 # The two test suites (docs/development/workflow.md): the focused one, every
-# test but the fuzzy ones and the tiers' binaries below, within 15 seconds; and
+# test but the fuzzy ones and the tiers' binaries below, within 30 seconds; and
 # the fuzzy one, the test binaries named fuzzy_* beside each world's focused
-# tests, within 1 minute. A suite past its budget fails, naming the tests it
+# tests, within 2 minutes. A suite past its budget fails, naming the tests it
 # stopped; a test past its slow period is flagged SLOW as it runs. The process,
 # live, QA and browser tiers have profiles of their own, at the end.
 
 [profile.default]
 default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
-global-timeout = "15s"
-slow-timeout = { period = "3s" }
+global-timeout = "30s"
+slow-timeout = { period = "6s" }
 
 # The worlds' tests first, the longest, then the many short unit tests behind
 # them, so that the run ends close to its total over the threads.
@@ -18,8 +21,8 @@ priority = 10
 
 [profile.fuzzy]
 default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/)"
-global-timeout = "60s"
-slow-timeout = { period = "20s" }
+global-timeout = "120s"
+slow-timeout = { period = "40s" }
 
 # The walking story's eight shards first, the suite's longest tests.
 [[profile.fuzzy.overrides]]
@@ -30,22 +33,22 @@ priority = 20
 #   cargo nextest run --workspace --profile measure -j 1
 #   cargo nextest run --workspace --profile measure -j 1 --ignore-default-filter -E 'binary(/^fuzzy_/)'
 [profile.measure]
-global-timeout = "1h"
-slow-timeout = { period = "60s" }
+global-timeout = "2h"
+slow-timeout = { period = "120s" }
 
 [profile.process]
 # The process tier (docs/design/domain/testing.md, 2.6): crates/temper's
 # process binary alone, one test at a time, which scripts/proof-one-process.sh
 # runs.
 default-filter = "binary(=process)"
-global-timeout = "10m"
+global-timeout = "20m"
 test-threads = 1
 
 [profile.live]
 # The live tier (docs/design/domain/testing.md, 2.7): crates/temper's live binary
 # alone, one test at a time, which scripts/proof-live.sh runs.
 default-filter = "binary(=live)"
-global-timeout = "20m"
+global-timeout = "40m"
 test-threads = 1
 retries = 0
 
@@ -54,12 +57,12 @@ retries = 0
 # named qa_*, which the gate builds and does not run. One at a time: some start
 # the shipped binary.
 default-filter = "binary(/^qa_/)"
-global-timeout = "10m"
+global-timeout = "20m"
 test-threads = 1
 
 # Chromium against temper serve, one test at a time (client/browser.md, 4.3).
 [profile.browser]
 default-filter = "package(temper-client-browser-world) & binary(/^browser_/)"
-global-timeout = "60s"
-slow-timeout = { period = "20s", terminate-after = 3 }
+global-timeout = "120s"
+slow-timeout = { period = "40s", terminate-after = 3 }
 test-threads = 1

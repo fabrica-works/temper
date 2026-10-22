@@ -27,8 +27,8 @@ fn pem(root: &[u8]) -> Vec<u8> {
 fn serve(listener: TcpListener, response: &'static [u8]) -> thread::JoinHandle<Vec<u8>> {
     thread::spawn(move || {
         let (socket, _) = listener.accept().expect("fetch fixture");
-        socket.set_read_timeout(Some(Duration::from_secs(2))).expect("fetch fixture");
-        socket.set_write_timeout(Some(Duration::from_secs(2))).expect("fetch fixture");
+        socket.set_read_timeout(Some(Duration::from_secs(4))).expect("fetch fixture");
+        socket.set_write_timeout(Some(Duration::from_secs(4))).expect("fetch fixture");
         let mut tls = rustls::StreamOwned::new(
             rustls::ServerConnection::new(pki::Server::plain().config()).expect("fetch fixture"),
             socket,

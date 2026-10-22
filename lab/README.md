@@ -30,7 +30,7 @@ keeps the driver from writing this directory. Source: `crates/temper/src/ctl.rs`
 
 The story makes exactly one `chat --project 1 --key smoke-chat` with the
 exact request in qa.md, 3.3; extracts `done: task N, chat`; watches `wait
-task N --until ended --timeout 110`; then reads `task N --tree`. The runner
+task N --until ended --timeout 220`; then reads `task N --tree`. The runner
 must enforce the approved **240s (120s before the user's doubling of 10-22,
 provisional) total command budget**. There is no sleep, application polling
 or new deadline. The private Python text reader checks the actual task
@@ -468,8 +468,9 @@ experiments stand on, and it costs no model call.
   `temper ctl` directory; `hand`, the browser's `--out` (its
   `trouble.jsonl` and its shots); `spent`, the directory of the `ctl`
   that presents the spent link.
-- **`cost`:** `temper-m1-calibration`, `cluster/`'s (`qa.md`, 10.1): 60 s
-  to be ready, 120 s a command, 10 s to stop.
+- **`cost`:** `temper-m1-calibration`, `cluster/`'s (`qa.md`, 10.1): 120 s (60 s before the user's doubling of 10-22, provisional)
+  to be ready, 240 s (120 s before the user's doubling of 10-22, provisional) a command,
+  20 s (10 s before the user's doubling of 10-22, provisional) to stop.
 - **`relink`, `smoke` and `checks/trouble`,** below.
 
 ## The seed
@@ -480,10 +481,10 @@ Each `{artifact.temper} ctl` action is `qa.md`'s, 5.1. In order:
 |---|---|---|---|
 | `sign-in` | `{artifact.temper} ctl {dir.client} sign-in -` | `http://{proc.engine.ready.link}` | the owner signs in by serve's printed link, which spends it |
 | `add-key` | `{artifact.temper} ctl {dir.client} add-key 1 {proc.llm.dir}/llm.key --deployment --key cluster-web-llm` | | the fake model's key |
-| `usable` | `{artifact.temper} ctl {dir.client} wait accounts --until usable --timeout 100` | | the account usable |
+| `usable` | `{artifact.temper} ctl {dir.client} wait accounts --until usable --timeout 200` | | the account usable |
 | `relink` | `/bin/sh {experiment}/relink {artifact.temper} {dir.spent}` | the spent link again | serve refuses it and prints a fresh one, the action's awaited line: `{"process": "engine", "stream": "stdout", "prefix": "http://", "capture": "link"}` (skein's `lab.md`, 4.5) |
 | `browser-sign-in` | `{runner}/hand/sign-in {proc.browser.ready.address}` | `http://{action.relink.link}` | the browser opens the fresh link |
-| `signed-in` | `{runner}/hand/browse {proc.browser.ready.address} wait heading Chats --exact --timeout 60` | | the chats page, signed in |
+| `signed-in` | `{runner}/hand/browse {proc.browser.ready.address} wait heading Chats --exact --timeout 120` | | the chats page, signed in |
 | `smoke` | `/bin/sh {experiment}/smoke {runner}/hand/browse {proc.browser.ready.address}` | | the story (below) |
 
 - **Environments:** `browser-sign-in`, `signed-in` and `smoke` have
@@ -517,20 +518,21 @@ Each `{artifact.temper} ctl` action is `qa.md`'s, 5.1. In order:
 output printed, and the story ends at the first that does not exit 0,
 with its status, which fails the action (`action/smoke/exit:1`, skein's
 `lab.md`, 7.1). Each expectation is a `wait`, so a missed one exits 1
-(lab-browser.md, 8.8), 60 seconds at most but the first reply's, 90. The roles are the fake
+(lab-browser.md, 8.8), 120 seconds (60 seconds before the user's doubling of 10-22, provisional) at most
+but the first reply's, 180 seconds (90 seconds before the user's doubling of 10-22, provisional). The roles are the fake
 person's; the names are o/web-look's words for the pages:
 
 1. `type "text area" "Start a chat"`, its text `cluster-first-chat`,
    the fake model's cue (`cluster/llm.json`); `press button Start
    --exact`.
 2. `wait log Conversation`, the chat's page; `wait text "First worker
-   replied." --in log Conversation --timeout 90`: its reply, once its
+   replied." --in log Conversation --timeout 180`: its reply, once its
    turn commits. A run is shown by its activity, and its words as each
    turn commits (`docs/design/protocol/llm.md`, 7; an agent process
    gives no provisional text, `client/tools.md`). The cue's turn writes
    the reply, then calls `wait`, which ends at the charter's
    `waiting_ms`, 60 s (`cluster/engine.json`): the reply shows 60 s
-   after Start, most of a run's time, and the wait's 90 s leave it a
+   after Start, most of a run's time, and the wait's 180 s (90 s before the user's doubling of 10-22, provisional) leave it a
    margin. A shorter fixture or `waiting_ms` would only hide it.
 3. `address`: the chat's, `/chats/<task>` on the origin, kept.
 4. `go /chats`, `wait heading Chats --exact`; `go` the chat's path,
@@ -701,7 +703,7 @@ phase `/bin/sh {experiment}/steps PHASE {runner}/hand/browse
 
 A live capture is `{runner}/look/capture` with the settings' browser by
 its templates, `--mockups {source}/docs/design/client/mockups --live
-{proc.browser.ready.address} --live-out {dir.hand} --ready-seconds 20`.
+{proc.browser.ready.address} --live-out {dir.hand} --ready-seconds 40`.
 The three captures and their steps take about 30 s, inside the second
 turn's quiet five minutes.
 
@@ -806,3 +808,7 @@ demand, never in the gate.
 - **`lab/tests/process/test_look_live.py`,** on demand: `steps` under
   the real shell against a stand-in for `browse`: each phase's calls
   in order, and a missed wait ending it with 1.
+
+The provisional lab waits are 200 s (100 s before the user's doubling of 10-22, provisional) for an
+account, 120 s (60 s before the user's doubling of 10-22, provisional) for a page, and 40 s
+(20 s before the user's doubling of 10-22, provisional) for capture readiness.

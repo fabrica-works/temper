@@ -8,7 +8,7 @@ pub mod github;
 pub mod owned;
 pub mod terminal;
 pub mod webhooks;
-pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(30);
+pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(60);
 pub mod forgejo;
 pub mod live;
 pub mod person;
@@ -352,7 +352,7 @@ fn run_signal(
         sent: false,
         signal,
         deadline: clock.now().now.saturating_add(Duration::from_nanos(
-            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()),
+            deadline.as_nanos().saturating_sub(Duration::from_secs(10).as_nanos()),
         )),
         settled: false,
     });
@@ -511,8 +511,8 @@ pub fn run(
 ) -> Seen {
     run_story(directory, script, peer, deadline, None, Ending::Stop)
 }
-/// domain/testing.md 2.6 bounds each landing story at 180 seconds.
-pub const LANDING: Duration = Duration::from_secs(180);
+/// domain/testing.md 2.6 bounds each landing story at 360 seconds.
+pub const LANDING: Duration = Duration::from_secs(360);
 /// Past `LANDING`: poll, `poll_max`, slow and stall ship at 5, 30, 40 and 30 s (temper-service limits.rs).
 pub const RAISED_MS: u64 = 600_000;
 const _: () = assert!(Duration::from_millis(RAISED_MS).as_nanos() > LANDING.as_nanos());
@@ -571,7 +571,7 @@ fn run_story(
         poll: clock.now().now,
         merged: false,
         deadline: clock.now().now.saturating_add(Duration::from_nanos(
-            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()),
+            deadline.as_nanos().saturating_sub(Duration::from_secs(10).as_nanos()),
         )),
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));

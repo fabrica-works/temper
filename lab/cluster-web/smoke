@@ -22,10 +22,10 @@ read_address() {
 }
 printf 'cluster-first-chat\n' | call type 'text area' 'Start a chat'
 call press button Start --exact
-call wait log Conversation --timeout 60
+call wait log Conversation --timeout 120
 # The reply shows as its turn commits, which the cue's wait ends at the
-# charter's waiting_ms, 60 s (lab/README.md): 90 s leaves a margin.
-call wait text 'First worker replied.' --in log Conversation --timeout 90
+# charter's waiting_ms, 60 s (lab/README.md): 180 s leaves a margin.
+call wait text 'First worker replied.' --in log Conversation --timeout 180
 read_address
 case "$current" in
     http://*/chats/*) ;;
@@ -51,14 +51,14 @@ case "$port" in ''|*[!0-9]*) echo 'smoke: invalid chat port' >&2; exit 1 ;; esac
 task=${chat#/chats/}
 case "$task" in ''|*[!0-9]*) echo 'smoke: expected /chats/<digits>' >&2; exit 1 ;; esac
 call go /chats
-call wait heading Chats --exact --timeout 60
+call wait heading Chats --exact --timeout 120
 call go "$chat"
-call wait text 'First worker replied.' --in log Conversation --timeout 60
+call wait text 'First worker replied.' --in log Conversation --timeout 120
 call reload
-call wait text 'First worker replied.' --in log Conversation --timeout 60
+call wait text 'First worker replied.' --in log Conversation --timeout 120
 call shot
 call back
-call wait heading Chats --exact --timeout 60
+call wait heading Chats --exact --timeout 120
 read_address
 if [ "$current" != "$origin/chats" ]; then
     printf 'smoke: expected %s/chats after back; got %s\n' "$origin" "$current" >&2

@@ -79,7 +79,7 @@ pub fn run(directory: &Path) -> super::Ended {
     world.spawn_with_fds(binary.descriptors(), || super::Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || super::Process::Stdout(Box::new(super::StdoutReader::new(input, output))));
     // The process and every inherited pipe must close within five seconds.
-    let outcome = world.run(&skein_shell::Clock::new(), skein_lib::Duration::from_secs(5));
+    let outcome = world.run(&skein_shell::Clock::new(), skein_lib::Duration::from_secs(10));
     assert!(outcome.procs.iter().all(Host::is_empty), "all login io settles");
     let super::Process::Binary(binary) = &outcome.procs[0] else { panic!("login binary") };
     let super::Process::Stdout(stdout) = &outcome.procs[1] else { panic!("login stdout") };

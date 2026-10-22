@@ -349,7 +349,7 @@ impl Typist {
         world.spawn_with_fds(streams.descriptors(), || {
             Process::Pipes(Box::new(Pipes::new(&streams, std::mem::take(&mut self.actions))))
         });
-        let outcome = world.run(&clock, within.saturating_add(Duration::from_secs(5)));
+        let outcome = world.run(&clock, within.saturating_add(Duration::from_secs(10)));
         let Process::Binary(open) = &outcome.procs[2] else { panic!("terminal binary") };
         self.stderr = open.stderr().to_vec();
         let Process::Binary(serve) = &outcome.procs[0] else { panic!("service binary") };

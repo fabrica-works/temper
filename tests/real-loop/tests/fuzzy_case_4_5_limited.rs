@@ -1,5 +1,5 @@
 //! Reference case 4.5: an account's reset resumes A without the person's act.
-//! The provider's shortest reset is 1 s, putting this story past the 1 s guide.
+//! The provider's shortest reset is 1 s, the story is measured against the provisional 2 s guide.
 use temper_real_loop_world::{
     case::{
         self,

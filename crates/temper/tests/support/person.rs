@@ -43,9 +43,9 @@ impl Face for ReplyFace<'_> {
         TreeFace::new(self.tree).allows(node, act)
     }
 }
-const START_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(20);
+const START_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(40);
 // Measured 21 s from Start to landed + one missed slow poll of 40 s = 61 s.
-const DEMO_LANDS_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(61);
+const DEMO_LANDS_WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(122);
 const SIGN_IN_FIRST: skein_lib::Duration = skein_lib::Duration::from_millis(100);
 const SIGN_IN_MOST: skein_lib::Duration = skein_lib::Duration::from_secs(2);
 const PIPE: Token = Token::new(u64::MAX);

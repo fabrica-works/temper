@@ -9,7 +9,7 @@ fn a_real_model_answers_a_chat_and_pushes_a_small_change() {
     support::configuration(scratch.path(), &forgejo.forge());
     let peer = support::live::configure(scratch.path(), &forgejo);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        support::live::run(scratch.path(), &forgejo, peer, Duration::from_secs(840))
+        support::live::run(scratch.path(), &forgejo, peer, Duration::from_secs(1680))
     }));
     let completions = support::live::completions(scratch.path());
     eprintln!("live completions={completions}; state={}", scratch.path().display());

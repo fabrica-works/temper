@@ -63,14 +63,14 @@ class FilesTests(unittest.TestCase):
             dict(name='add-key', argv=ctl + ['add-key', '1', '{proc.llm.dir}/llm.key',
                  '--deployment', '--key', 'cluster-web-llm'], env={}),
             dict(name='usable', argv=ctl + ['wait', 'accounts', '--until', 'usable',
-                 '--timeout', '100'], env={}),
+                 '--timeout', '200'], env={}),
             dict(name='relink', argv=['/bin/sh', '{experiment}/relink', '{artifact.temper}',
                  '{dir.spent}'], env={}, stdin='http://{proc.engine.ready.link}\n',
                  **{'await': dict(process='engine', stream='stdout', prefix='http://', capture='link')}),
             dict(name='browser-sign-in', argv=['{runner}/hand/sign-in', '{proc.browser.ready.address}'],
                  env={'PATH': '/usr/bin:/bin'}, stdin='http://{action.relink.link}\n'),
             dict(name='signed-in', argv=['{runner}/hand/browse', '{proc.browser.ready.address}',
-                 'wait', 'heading', 'Chats', '--exact', '--timeout', '60'], env={'PATH': '/usr/bin:/bin'}),
+                 'wait', 'heading', 'Chats', '--exact', '--timeout', '120'], env={'PATH': '/usr/bin:/bin'}),
             dict(name='smoke', argv=['/bin/sh', '{experiment}/smoke', '{runner}/hand/browse',
                  '{proc.browser.ready.address}'], env={'PATH': '/usr/bin:/bin'})]
         self.assertEqual(exp['actions'], expected)

@@ -180,7 +180,7 @@ pub fn run_command(command: Command, forgejo: Option<SocketAddr>, plan: Plan, de
         next_probe: Time::ZERO,
         cleanup: false,
         deadline: clock.now().now.saturating_add(Duration::from_nanos(
-            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()).max(deadline.as_nanos() / 2),
+            deadline.as_nanos().saturating_sub(Duration::from_secs(10).as_nanos()).max(deadline.as_nanos() / 2),
         )),
         settled: false,
     });
@@ -316,7 +316,7 @@ pub fn run_story<T>(
         cleanup: false,
         settled: false,
         deadline: clock.now().now.saturating_add(Duration::from_nanos(
-            deadline.as_nanos().saturating_sub(Duration::from_secs(5).as_nanos()),
+            deadline.as_nanos().saturating_sub(Duration::from_secs(10).as_nanos()),
         )),
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));

@@ -17,8 +17,8 @@ use std::{
 };
 
 // qa.md, 10.1: temper-m1-calibration, the approved class the cluster runs under until it has its own.
-const READY_SECONDS: u64 = 60;
-const STOP_SECONDS: u64 = 10;
+const READY_SECONDS: u64 = 120;
+const STOP_SECONDS: u64 = 20;
 const STDERR_TAIL_LINES: usize = 20;
 // lab/cluster/engine.json's fleet.grace_ms: above each worker's stop bound, 2300 (jig-protocol-config worker.rs:38), which a hello must be under (jig-domain-fleet channel.rs:174); reached only on a lost link.
 pub(crate) const FLEET_GRACE_MS: u64 = 3000;
