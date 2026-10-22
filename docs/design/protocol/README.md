@@ -921,7 +921,8 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   other documents have theirs; its tasks are chats, and its stories'
   referee the tasks' ends on their named workers and no survivor. A
   chat's run holds its worker's one slot until its charter's idle
-  threshold, which the description sets past the story's deadline, so
+  threshold or its time less its reserve, both of which the
+  description sets past the story's deadline, so
   each chat takes a worker of its own, never by timing. The
   fake forge joins the description, after which the engine starts, once
   serve reconciles at its start: the change of serve's command line's
@@ -959,8 +960,10 @@ workers need no more; a worker of several slots is later (15.7).
   exiting 0, no survivor.
 - **A worker lost:** w1 killed mid-run; its task's run is placed on w2
   past the grace, and lands once. Its tree is killed whole, so the
-  engine sees its link close and no silence is waited on. The retried
-  run resumes from the chat's committed turns, so w1's reply is in
+  engine sees its link close and no silence is waited on. A waiting
+  run's turn is committed only when the run ends, so the killed
+  attempt's reply never reaches the engine; the retried run resumes
+  from the chat's committed turns and answers anew, the reply is in
   them once, and the lost attempt's run ends as lost in the task's
   activity. The killed process's end is the story's, not a failure.
 - **A worker hung:** w1 stopped past the grace, then continued; its run,
@@ -971,8 +974,9 @@ workers need no more; a worker of several slots is later (15.7).
   (never a length of time): once continued, w1 links again, its
   listing of the fenced attempt is cancelled and what it sends of it
   dropped, and w1 takes a new run on its one slot, which shows it
-  acted on the cancel; the fenced attempt's activity and turns are as
-  they were before the continue.
+  acted on the cancel, whose end sent the fenced attempt's held turn;
+  the fenced attempt's activity and the chat's turns are as they were
+  before the continue, and the reply is in them once.
 - **A worker started later:** w2 started once w1's slot is taken; the
   second task waits, claimed and unplaced, then runs on w2 once it
   links. A restarted worker links again at its position: w1, its run
