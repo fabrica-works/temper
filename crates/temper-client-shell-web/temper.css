@@ -188,8 +188,8 @@ section.temper-accounts button:hover { text-decoration: underline; }
 /* .first-run-context: a direct chat child shares the conversation column. */
 .temper-chat > .temper-context { flex: none; width: min(1040px, calc(100% - 64px)); margin-inline: auto; }
 /* The tail under the log, in the content column as the mockup's proposal. */
-.temper-chat .temper-thread > [role=log] ~ :not(.temper-cards) { padding-left: 109px; }
-.temper-chat .temper-thread > :last-child:not([role=log]):not(.temper-cards) { margin-bottom: 14px; }
+.temper-chat .temper-thread > [role=log] ~ :not(.temper-cards):not(.temper-ended) { padding-left: 109px; }
+.temper-chat .temper-thread > :last-child:not([role=log]):not(.temper-cards):not(.temper-ended) { margin-bottom: 14px; }
 .temper-chat .temper-thread > button { min-height: 28px; margin-block: 7px -2px; border: 0; background: transparent; padding: 3px 0; color: #756e65; font-size: 11px; text-align: left; }
 .temper-chat .temper-thread > button:last-child:not([role=log]):not(.temper-cards) { margin-bottom: 12px; }
 .temper-chat .temper-thread > button:hover { color: var(--temper-accent); text-decoration: underline; }
@@ -227,7 +227,7 @@ section.temper-accounts button:hover { text-decoration: underline; }
 .temper-chat .temper-marker { display: flex; align-items: center; gap: 13px; color: #aaa196; font-size: 10px; margin-bottom: 18px; }
 .temper-chat .temper-marker::after { content: ''; height: 1px; flex: 1; background: var(--temper-line); }
 .temper-chat .temper-marker > * { margin: 0; }
-.temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message), .temper-chat .temper-says > [role=status] { margin: 0 0 18px 131px; color: var(--temper-muted); font-size: 11px; }
+.temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message):not(.temper-work):not(.temper-task-card), .temper-chat .temper-says > [role=status] { margin: 0 0 18px 131px; color: var(--temper-muted); font-size: 11px; }
 .temper-chat .temper-says > [role=status] { margin: 0; }
 /* .terminal-proposal and .terminal-proposal-actions. */
 .temper-chat .temper-cards { flex: none; max-height: 50%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d9d1c5 transparent; width: 100%; margin: 0; padding: 0 max(32px, calc((100% - 1040px) / 2)); list-style: none; }
@@ -284,18 +284,18 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
   .temper-chat .temper-who { font-size: 10px; }
   .temper-chat .temper-says { font-size: 12px; }
   .temper-chat .temper-by-tool { margin-left: 70px; }
-  .temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message) { margin-left: 92px; }
+  .temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message):not(.temper-work):not(.temper-task-card) { margin-left: 92px; }
   .temper-chat .temper-cards { padding-inline: 16px; }
   .temper-chat .temper-cards > .temper-card { margin-left: 70px; padding: 12px; }
-  .temper-chat .temper-thread > [role=log] ~ :not(.temper-cards) { padding-left: 70px; }
+  .temper-chat .temper-thread > [role=log] ~ :not(.temper-cards):not(.temper-ended) { padding-left: 70px; }
   .temper-chat .temper-composer-area { padding: 8px 10px; }
 }
 /* .terminal-role and .terminal-proposal at 430px. */
 @media (max-width: 430px) {
   .temper-chat .temper-message { display: block; }
   .temper-chat .temper-who { display: flex; gap: 8px; margin-bottom: 4px; }
-  .temper-chat .temper-by-tool, .temper-chat .temper-cards > .temper-card, .temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message) { margin-left: 0; }
-  .temper-chat .temper-thread > [role=log] ~ :not(.temper-cards) { padding-left: 0; }
+  .temper-chat .temper-by-tool, .temper-chat .temper-cards > .temper-card, .temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message):not(.temper-work):not(.temper-task-card) { margin-left: 0; }
+  .temper-chat .temper-thread > [role=log] ~ :not(.temper-cards):not(.temper-ended) { padding-left: 0; }
   .temper-main .temper-chatbar > div:first-child { flex-wrap: wrap; }
   .temper-main .temper-chatbar > div:first-child > p { flex: 1; max-width: max-content; }
   .temper-main .temper-chatbar [role=status] { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
@@ -635,4 +635,63 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 }
 @media (max-width: 430px) {
   .temper-main:not(.temper-chat):has(> .temper-chatbar) > .temper-invitation { padding: 20px 0 24px; }
+}
+
+/* chat.html: the identity's three text nodes retain the whole accessible heading. */
+.temper-chat .temper-chatbar h1 { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 0 1 auto; color: var(--temper-ink); font-size: 12px; }
+.temper-chat .temper-chatbar h1 > span:first-child { flex: none; color: var(--temper-accent); }
+.temper-chat .temper-chatbar h1 > span:nth-child(2) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.temper-chat .temper-chatbar h1 > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.temper-chat .temper-chatbar .temper-status-waiting { color: #8b7957; }
+/* Folded calls and delegation cards belong to their turn, after its words. */
+.temper-chat .temper-turn > .temper-work { display: inline-flex; gap: 12px; margin: -1px 0 17px 109px; color: #7e786f; }
+.temper-chat .temper-turn > .temper-task-card { margin: 4px 0 22px 109px; border: 0; border-left: 2px solid var(--temper-accent); border-radius: 0; box-shadow: none; background: #f8f5f0; padding: 14px 18px 15px; }
+.temper-chat .temper-task-card > .temper-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 15px; border: 0; margin: 0; padding: 0; color: var(--temper-muted); font-size: 10px; }
+.temper-chat .temper-task-card > .temper-meta > p { margin: 0; color: #a55b43; font-size: 10px; font-weight: 700; letter-spacing: .09em; }
+.temper-chat .temper-task-card > .temper-meta > [role=status] { color: var(--temper-muted); font-size: 10px; font-weight: 400; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.temper-chat .temper-task-card > .temper-meta > [role=status]::before { content: none; }
+.temper-chat .temper-task-card > .temper-title { font-size: 14px; font-weight: 700; line-height: 1.3; margin: 6px 0; }
+.temper-chat .temper-task-card > .temper-details { display: block; border: 0; border-radius: 0; background: transparent; padding: 0; margin: 0 0 4px; color: #4f4a43; font-size: 11px; line-height: inherit; }
+.temper-chat .temper-task-card > .temper-details > * { margin: 0; color: inherit; font-size: inherit; }
+.temper-chat .temper-task-card > a { color: var(--temper-accent-dark); font-size: 11px; font-weight: 600; }
+.temper-chat .temper-task-card > .temper-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 0; }
+.temper-chat .temper-task-card > .temper-steps > .temper-step { border-color: #e8e3db; color: #a09c93; font-size: 10px; overflow-wrap: normal; word-break: normal; }
+.temper-chat .temper-task-card > .temper-steps > .temper-step-done { border-color: var(--temper-green); color: var(--temper-green); }
+/* Agent Markdown uses the mockup's block rhythm and inline-code treatment. */
+.temper-chat .temper-by-agent > .temper-says > * { margin: 0; }
+.temper-chat .temper-by-agent > .temper-says > * + * { margin-top: 8px; }
+.temper-chat .temper-by-agent > .temper-says :is(ul, ol) { padding-left: 18px; }
+.temper-chat .temper-by-agent > .temper-says :not(pre) > code { font-size: .92em; background: #f4f0ea; padding: 0 3px; border-radius: 3px; }
+/* The chat's end and Older control share the conversation's full column. */
+.temper-chat .temper-thread > .temper-ended { display: flex; align-items: center; gap: 13px; padding-left: 0; font-size: 10px; color: #8b8378; margin-bottom: 18px; }
+.temper-chat .temper-thread > .temper-ended::after, .temper-chat .temper-thread > button:first-child::after { content: ''; height: 1px; flex: 1; background: var(--temper-line); }
+.temper-chat .temper-thread > button:first-child { display: flex; align-items: center; gap: 13px; min-height: 0; border: 0; background: transparent; padding: 0; margin-block: 0 18px; color: var(--temper-accent-dark); font: inherit; font-size: 10px; }
+/* A provisional agent message is identified by its WHO status, as in the view. */
+.temper-chat .temper-by-agent:has(> .temper-who > [role=status]) > .temper-who > [role=status] { color: #4c8067; font-size: 10px; text-transform: none; letter-spacing: 0; }
+.temper-chat .temper-by-agent:has(> .temper-who > [role=status]) > .temper-says { color: #59534c; }
+.temper-chat .temper-by-agent:has(> .temper-who > [role=status]) > .temper-says > p:last-of-type::after { content: ''; display: inline-block; width: 5px; height: 12px; margin-left: 2px; background: #aa6a50; vertical-align: -2px; animation: agent-blink 1s steps(1) infinite; }
+@keyframes agent-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .temper-chat .temper-by-agent:has(> .temper-who > [role=status]) > .temper-says > p:last-of-type::after { animation: none; }
+}
+.temper-repository { font-weight: 700; }
+@media (max-width: 760px) {
+  .temper-chat .temper-chatbar h1 { gap: 9px; }
+  .temper-chat .temper-turn > .temper-work { margin-left: 70px; }
+  .temper-chat .temper-turn > .temper-task-card { margin-left: 70px; padding: 12px; }
+}
+@media (max-width: 430px) {
+  .temper-chat .temper-chatbar { flex-wrap: nowrap; gap: 9px; }
+  .temper-chat .temper-chatbar > div:first-child { flex-wrap: nowrap; width: auto; flex: 1 1 auto; }
+  .temper-chat .temper-chatbar > div:last-child { flex-wrap: nowrap; gap: 6px; white-space: nowrap; }
+  .temper-chat .temper-chatbar > div:last-child > * { flex: none; }
+  .temper-chat .temper-chatbar [role=status] { max-width: none; white-space: nowrap; overflow-wrap: normal; }
+  /* The status yields before the title; its text leaf clips while its dot stays visible. */
+  .temper-chat .temper-chatbar > div:first-child > [role=status] { display: flex; flex: 0 1000 auto; min-width: 5px; overflow: hidden; text-overflow: ellipsis; }
+  .temper-chat .temper-chatbar > div:first-child > [role=status]::before { display: block; margin-right: 0; }
+  .temper-chat .temper-chatbar > div:first-child > [role=status] > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* The mockup omits spend in its narrow bar; retain the status and every act. */
+  .temper-chat .temper-chatbar > div:last-child > p { display: none; }
+  .temper-chat .temper-turn > .temper-work, .temper-chat .temper-turn > .temper-task-card { margin-left: 0; }
+  .temper-chat .temper-task-card > .temper-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

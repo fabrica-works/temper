@@ -42,7 +42,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.name(&title);
         b.style(look::CHATBAR);
         b.open(Role::Slot);
-        text(b, Role::Heading { level: 1 }, &title);
+        heading(b, &title, task.chip.title.bytes());
         if let Some(me) = root.pages().me(root.client()) {
             super::chats::status(
                 b,
@@ -128,6 +128,25 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
 }
+fn heading(b: &mut Builder, title: &[u8], suffix: &[u8]) {
+    b.open(Role::Heading { level: 1 });
+    b.name(title);
+    let title_at = title.len().checked_sub(suffix.len()).expect("title hole is a suffix");
+    let prefix = title.get(..title_at).expect("title suffix is within the phrase");
+    let separator_at = skein_lib::bytes::find(prefix, b" ").expect("chat heading separates number and title");
+    for part in [
+        prefix.get(..separator_at).expect("number precedes the separator"),
+        prefix.get(separator_at..).expect("separator is within the prefix"),
+        title.get(title_at..).expect("title suffix is within the phrase"),
+    ] {
+        b.open(Role::Text);
+        b.name(part);
+        b.run(Run::Plain, part);
+        b.close();
+    }
+    b.close();
+}
+
 /// The signed-in person and whether they requested this chat.
 pub(crate) struct Speakers {
     pub(crate) person: Option<u64>,
@@ -205,10 +224,10 @@ fn owner_end(b: &mut Builder, ending: &c::OwnerChipEnding, words: &Words) {
     match ending {
         c::OwnerChipEnding::Done(value) => end_report(b, Some(value), words),
         c::OwnerChipEnding::Failed(reason) => {
-            text(b, Role::Paragraph, &words.say(Word::ChatFailed, &[crate::cards::name(reason.bytes())]));
+            end_line(b, &words.say(Word::ChatFailed, &[crate::cards::name(reason.bytes())]));
         }
         c::OwnerChipEnding::Cancelled { reason, .. } => {
-            text(b, Role::Paragraph, &words.say(Word::ChatCancelled, &[crate::cards::name(reason.bytes())]));
+            end_line(b, &words.say(Word::ChatCancelled, &[crate::cards::name(reason.bytes())]));
         }
     }
 }
@@ -217,7 +236,7 @@ fn end_reason(b: &mut Builder, word: Word, reason: Option<&c::Text>, words: &Wor
         Some(reason) => reason.bytes(),
         None => b"",
     };
-    text(b, Role::Paragraph, &words.say(word, &[crate::cards::name(reason)]));
+    end_line(b, &words.say(word, &[crate::cards::name(reason)]));
 }
 fn end_report(b: &mut Builder, value: Option<&c::ResultValue>, words: &Words) {
     let said = match value {
@@ -226,7 +245,14 @@ fn end_report(b: &mut Builder, value: Option<&c::ResultValue>, words: &Words) {
         }
         _ => words.say(Word::ChatEnded, &[]),
     };
-    text(b, Role::Paragraph, &said);
+    end_line(b, &said);
+}
+fn end_line(b: &mut Builder, value: &[u8]) {
+    b.open(Role::Paragraph);
+    b.style(look::ENDED);
+    b.name(value);
+    b.text(Run::Plain, value);
+    b.close();
 }
 fn spend(b: &mut Builder, task: &c::Task, words: &Words) {
     text(
@@ -247,6 +273,9 @@ fn composer(
     bindings: &mut Bindings,
     shown: u64,
 ) {
+    if task.result.is_some() {
+        return;
+    }
     if temper_client_domain::pages::chat::allowed(task, c::ActKind::Message) {
         b.open(Role::Slot);
         b.style(look::COMPOSER_AREA);

@@ -161,7 +161,7 @@ pub(super) fn status_rows() -> [(TaskLine, skein_ui::Style); 11] {
         (line(), look::STATUS_ACTIVE),
         (line(), look::STATUS_ACTIVE),
         (line(), look::STATUS_ACTIVE),
-        (line(), look::STATUS_QUIET),
+        (line(), look::STATUS_WAITING),
         (line(), look::STATUS_QUIET),
         (line(), look::STATUS_QUIET),
         (line(), look::STATUS_QUIET),
@@ -453,7 +453,7 @@ fn a_chats_line_counts_the_delegates_it_waits_on() {
     line.waits_on = WaitsOn::Delegates;
     let (tree, _) = tree(&line);
     assert!(fixtures::find(&tree, Role::Status, b"waiting on 3 delegates").is_some());
-    assert_eq!(fixtures::styles(&tree, Role::Status).as_ref(), [Box::from([crate::look::STATUS_QUIET])]);
+    assert_eq!(fixtures::styles(&tree, Role::Status).as_ref(), [Box::from([crate::look::STATUS_WAITING])]);
 }
 
 #[test]

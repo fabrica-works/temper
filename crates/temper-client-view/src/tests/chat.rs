@@ -13,6 +13,15 @@ fn the_chatbar_region_is_named_by_its_heading() {
 
     let root = fixtures::demo_root(temper_client_domain::Address::Chat { task: TASK }, fixtures::PROJECT, true);
     let view = fixtures::page_view(&root);
+    let heading =
+        named_position(view.tree().nodes(), Role::Heading { level: 1 }, Some("T9 · Ship the update".as_bytes()))
+            .expect("heading");
+    let children = subtree(view.tree(), heading);
+    assert_eq!(children.len(), 3);
+    for (child, name) in children.iter().zip([b"T9".as_slice(), " · ".as_bytes(), b"Ship the update"]) {
+        assert_eq!(child.role, Role::Text);
+        assert_eq!(child.name.as_deref(), Some(name));
+    }
     let id = fixtures::person_find(view.tree(), Role::Region, "T9 · Ship the update".as_bytes()).expect("chatbar");
     let mut face = skein_fake_person::TreeFace::subtree(view.tree(), id).expect("chatbar subtree");
     match face.find(&Find::exactly_named(Role::Heading { level: 1 }, "T9 · Ship the update".as_bytes())) {
@@ -643,7 +652,7 @@ fn the_chatbar_counts_the_delegates_it_waits_on() {
         let view =
             header_with_status(c::WaitsOn::Delegates, live, c::WakeRule::Never, c::OwnerRequester::Person(PARTY));
         let status = fixtures::find(view.tree(), Role::Status, expected).expect("delegate status");
-        assert_eq!(view.tree().find(status).unwrap().styles.as_slice(), [crate::look::STATUS_QUIET]);
+        assert_eq!(view.tree().find(status).unwrap().styles.as_slice(), [crate::look::STATUS_WAITING]);
     }
 }
 
@@ -658,7 +667,7 @@ fn the_chatbar_waits_on_the_requesting_persons_words() {
     {
         let view = header_with_status(c::WaitsOn::News, 0, rule, c::OwnerRequester::Person(requester));
         let status = fixtures::find(view.tree(), Role::Status, b"waiting on your words").expect("words status");
-        assert_eq!(view.tree().find(status).unwrap().styles.as_slice(), [crate::look::STATUS_QUIET]);
+        assert_eq!(view.tree().find(status).unwrap().styles.as_slice(), [crate::look::STATUS_WAITING]);
     }
 }
 
@@ -784,4 +793,94 @@ fn committed_text_exceeds_field_text_on_both_conversation_pages() {
         assert!(skein_lib::bytes::find(&fixtures::text(&drawn), &value).is_some(), "chat projection {projected}");
         assert!(fixtures::find(&drawn, Role::Status, b"Earlier text omitted").is_none());
     }
+}
+
+fn result_view(result: c::TaskResult) -> crate::View {
+    use temper_client_domain::{Address, Event};
+    let (mut root, _, watch) = fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
+    let live = messaging_root();
+    let mut task = live.pages().chat().expect("chat").task(live.client()).expect("task").clone();
+    // Keep Message offered: the same result which draws the end must suppress the whole foot.
+    task.result = Some(result);
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("task watch"),
+                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                },
+            },
+        },
+    );
+    fixtures::page_view(&root)
+}
+
+fn result_document(ending: c::Ending) -> c::TaskResult {
+    c::TaskResult::Document(Box::new(c::Result {
+        task: fixtures::task::document().chip,
+        ending,
+        value: None,
+        at: None,
+        details: None,
+        acts: List::with_capacity(0),
+    }))
+}
+
+#[test]
+fn every_chat_end_line_carries_ended_and_omits_the_whole_composer() {
+    use fixtures::first_run::text;
+    let report = c::ResultValue::Report(c::DocumentText::complete(text(b"A report")));
+    let cancelled = c::OwnerChipEnding::Cancelled {
+        reason: c::DocumentText::complete(text(b"No longer needed")),
+        result: None,
+        by: c::OwnerRequester::Person(PARTY),
+        at: Wall::EPOCH,
+    };
+    for (result, expected) in [
+        (c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Done(report.clone()))), "Ended · its report, “A report”"),
+        (
+            c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Failed(c::DocumentText::complete(text(
+                b"Checks failed",
+            ))))),
+            "Failed · Checks failed",
+        ),
+        (c::TaskResult::Ending(Box::new(cancelled.clone())), "Cancelled · No longer needed"),
+        (
+            result_document(c::Ending::Task(Box::new(c::OwnerChipEnding::Done(report)))),
+            "Ended · its report, “A report”",
+        ),
+        (result_document(c::Ending::Task(Box::new(cancelled))), "Cancelled · No longer needed"),
+        (result_document(c::Ending::Failed { reason: Some(text(b"Checks failed")) }), "Failed · Checks failed"),
+        (result_document(c::Ending::Failed { reason: None }), "Failed · "),
+        (
+            result_document(c::Ending::Cancelled {
+                reason: Some(text(b"No longer needed")),
+                by: c::Actor::Party(PARTY),
+                at: None,
+            }),
+            "Cancelled · No longer needed",
+        ),
+        (result_document(c::Ending::Withdrawn { reason: text(b"Withdrawn") }), "Cancelled · Withdrawn"),
+        (result_document(c::Ending::Done), "Ended"),
+        (result_document(c::Ending::Deleted), "Ended"),
+        (result_document(c::Ending::Decided { by: PARTY, party: None, how: None, at: Wall::EPOCH }), "Ended"),
+    ] {
+        let view = result_view(result);
+        let end = fixtures::find(view.tree(), Role::Paragraph, expected.as_bytes()).expect("end line");
+        assert_eq!(view.tree().find(end).expect("end").styles.as_slice(), [crate::look::ENDED]);
+        for token in [crate::look::CHOICE, crate::look::ACCOUNT_LINE, crate::look::COMPOSER_AREA, crate::look::COMPOSER]
+        {
+            assert!(style_position(view.tree().nodes(), token).is_none(), "ended foot: {token:?}");
+        }
+        assert!(fixtures::find(view.tree(), Role::TextArea, b"Message").is_none());
+    }
+}
+
+#[test]
+fn a_live_chat_keeps_its_choice_line_and_composer() {
+    let view = fixtures::page_view(&messaging_root());
+    assert!(style_position(view.tree().nodes(), crate::look::CHOICE).is_some());
+    assert!(style_position(view.tree().nodes(), crate::look::ACCOUNT_LINE).is_some());
+    assert!(fixtures::find(view.tree(), Role::TextArea, b"Message").is_some());
 }

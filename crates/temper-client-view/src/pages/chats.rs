@@ -260,7 +260,7 @@ pub(crate) fn status(
     };
     if let Some(name) = narrowed {
         b.open(Role::Status);
-        b.style(crate::look::STATUS_QUIET);
+        b.style(crate::look::STATUS_WAITING);
         b.name(&name);
         b.text(Run::Plain, &name);
         b.close();
@@ -288,8 +288,8 @@ pub(crate) fn status(
         | jig_client::facts::ChatStatus::Writing
         | jig_client::facts::ChatStatus::Tool { .. }
         | jig_client::facts::ChatStatus::Working { .. } => crate::look::STATUS_ACTIVE,
-        jig_client::facts::ChatStatus::WaitingFor(_)
-        | jig_client::facts::ChatStatus::Parked
+        jig_client::facts::ChatStatus::WaitingFor(_) => crate::look::STATUS_WAITING,
+        jig_client::facts::ChatStatus::Parked
         | jig_client::facts::ChatStatus::Closing
         | jig_client::facts::ChatStatus::Ended { .. } => crate::look::STATUS_QUIET,
     };

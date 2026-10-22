@@ -167,6 +167,8 @@ pub const AGENT_STEER: Style = Style { owner: owner(), token: 80 };
 pub const TASK_DANGER: Style = Style { owner: owner(), token: 81 };
 /// The task page's amendment editor (client/README.md, 5.11).
 pub const TASK_AMEND: Style = Style { owner: owner(), token: 82 };
+/// A chat's end line (client/README.md, 3.5).
+pub const ENDED: Style = Style { owner: owner(), token: 83 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -255,6 +257,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-agent-steer",
         b"temper-task-danger",
         b"temper-task-amend",
+        b"temper-ended",
     ],
     regions: &[b"temper-link"],
 };
