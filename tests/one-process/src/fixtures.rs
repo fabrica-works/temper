@@ -402,7 +402,7 @@ pub(crate) fn account_steps() -> Box<[skein_fake_person::Step<temper_client_doma
         Step::Go { address: temper_client_domain::Address::Accounts },
         Step::See { find: Find::named(Role::Button, b"Use deployment accounts"), within: PERSON_WAIT },
         Step::Press { find: Find::named(Role::Button, b"Use deployment accounts") },
-        Step::Type { find: Find::named(Role::TextField, b"Provider number"), words: b"1".as_slice().into() },
+        Step::Press { find: Find::named(Role::Button, b"Use an API key") },
         Step::Type { find: Find::named(Role::TextField, b"Key (pasted once)"), words: channel::KEY.into() },
         Step::Press { find: Find::named(Role::Button, b"Add key") },
         Step::See { find: Find::text(b"Key kept as source"), within: PERSON_WAIT },

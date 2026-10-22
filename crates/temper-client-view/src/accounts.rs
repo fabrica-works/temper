@@ -20,6 +20,7 @@ pub(crate) enum Meaning {
     Action(AccountAct),
     Field(Field, Selection),
     Key,
+    Program,
 }
 #[derive(Debug)]
 pub(crate) struct Bindings {
@@ -34,8 +35,8 @@ pub(crate) const fn owner() -> skein_ui::Owner {
     skein_ui::Owner { number: 65536 }
 }
 impl Bindings {
-    pub fn new(counts: temper_client_domain::limits::AccountLimits) -> Self {
-        let capacity = binding_capacity(&counts);
+    pub fn new(counts: temper_client_domain::limits::AccountLimits, providers: u32) -> Self {
+        let capacity = binding_capacity(&counts, providers);
         Self { entries: List::with_capacity(capacity), next: 0, invalid: 0, revision: 0, counts }
     }
     pub const fn counts(&self) -> temper_client_domain::limits::AccountLimits {
@@ -63,6 +64,7 @@ impl Bindings {
             }
             let action = match (meaning, act) {
                 (Meaning::Key, Act::Input { value }) => return Some(Event::AccountKey { value: Secret::new(value) }),
+                (Meaning::Program, Act::Input { value }) => AccountAct::ProgramName { value },
                 (Meaning::Field(field, selection), Act::Input { value }) => {
                     self.revision = self.revision.checked_add(1).expect("field edit revisions fit");
                     let bit = field.bit();
@@ -90,7 +92,8 @@ impl Bindings {
                 }
                 (Meaning::Action(action), Act::Press) => {
                     match action {
-                        AccountAct::Select { .. } | AccountAct::Cancel => self.invalid = 0,
+                        AccountAct::Select { .. } | AccountAct::Choose { .. } | AccountAct::Cancel => self.invalid = 0,
+                        AccountAct::ProgramName { .. } => {}
                         AccountAct::Submit { .. } | AccountAct::Confirm => {
                             if self.invalid != 0 {
                                 return None;
@@ -101,7 +104,7 @@ impl Bindings {
                 }
                 (_, Act::Submit | Act::Toggle | Act::Drawing { .. })
                 | (Meaning::Action(_), Act::Input { .. })
-                | (Meaning::Key | Meaning::Field(..), Act::Press) => return None,
+                | (Meaning::Key | Meaning::Program | Meaning::Field(..), Act::Press) => return None,
             };
             return Some(Event::Act { action: Action::Pages(pages::Act::Accounts(action)) });
         }
@@ -131,12 +134,13 @@ impl Field {
     }
 }
 
-/// Two holder controls, three number fields, a key field, seven operations, confirm and cancel;
-/// only one matched account/source can contribute the two rank directions apiece.
-pub(crate) fn binding_capacity(counts: &temper_client_domain::limits::AccountLimits) -> u32 {
+/// Two holders, three numbers, a key, six existing-account operations, confirm and cancel;
+/// at most three ways per provider and two controls for the chosen way. Only one
+/// matched account/source can contribute the two rank directions apiece.
+pub(crate) fn binding_capacity(counts: &temper_client_domain::limits::AccountLimits, providers: u32) -> u32 {
     let holders = 2;
     let fields = 4;
-    let operations = 7;
+    let operations = 6;
     let confirmation = 2;
     let account_moves = if counts.accounts > 0 { 2 } else { 0 };
     let source_moves = if counts.accounts > 0 && counts.sources > 0 { 2 } else { 0 };
@@ -150,4 +154,8 @@ pub(crate) fn binding_capacity(counts: &temper_client_domain::limits::AccountLim
         .expect("controls fit")
         .checked_add(source_moves)
         .expect("controls fit")
+        .checked_add(providers.checked_mul(3).expect("provider ways fit"))
+        .expect("controls fit")
+        .checked_add(2)
+        .expect("chosen way's field and submit fit")
 }

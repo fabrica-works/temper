@@ -219,12 +219,13 @@ fn adoption(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
     }
 }
 fn account(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
-    use temper_client_domain::pages::accounts::{Act as A, Operation, Selection};
+    use temper_client_domain::pages::accounts::{Act as A, Operation, Way};
     step(
         root,
         Event::Act {
-            action: Action::Pages(Act::Accounts(A::Select {
-                selection: Selection { provider: Some(18), ..Default::default() },
+            action: Action::Pages(Act::Accounts(A::Choose {
+                name: [97; 16],
+                way: if refused { Way::Key { provider: 18 } } else { Way::SignIn { provider: 18, plan: true } },
             })),
         },
         out,
@@ -236,16 +237,15 @@ fn account(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
             out,
         );
     }
-    step(
-        root,
-        Event::Act {
-            action: Action::Pages(Act::Accounts(A::Submit {
-                name: [97; 16],
-                operation: if refused { Operation::AddKey } else { Operation::SignIn },
-            })),
-        },
-        out,
-    );
+    if refused {
+        step(
+            root,
+            Event::Act {
+                action: Action::Pages(Act::Accounts(A::Submit { name: [97; 16], operation: Operation::AddAccountKey })),
+            },
+            out,
+        );
+    }
     step(root, Event::Client { event: jig_client::Event::Stored }, out);
     let attempt = sent_attempt(out);
     // The tool branch's carried-key refusal: its final answer was lost, so

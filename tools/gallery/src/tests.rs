@@ -96,8 +96,8 @@ const HOLDS: [Holds; samples::N] = [
         heading: "Accounts",
         parts: &[
             Part::Named { role: Role::Heading { level: 3 }, name: "Claude" },
-            Part::Named { role: Role::Item, name: "Source 1 · Order 1 · Program login claude-robin · Ready" },
-            Part::Named { role: Role::Item, name: "Source 2 · Order 2 · API key robin-key · Ready" },
+            Part::Named { role: Role::Item, name: "Claude Code login claude-robin · Ready" },
+            Part::Named { role: Role::Item, name: "API key · Ready" },
             Part::Named { role: Role::Paragraph, name: "laptop" },
         ],
     },

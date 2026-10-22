@@ -1,7 +1,7 @@
 use skein_lib::Secret;
 use temper_client_domain::{
     self as d,
-    pages::accounts::{Act, Operation, Selection, SignInState},
+    pages::accounts::{Act, Operation, SignInState, Way},
 };
 use temper_client_world::{fixtures, front::account_acts as accounts};
 const NAME: [u8; 16] = [113; 16];
@@ -9,14 +9,7 @@ fn act(act: Act) -> temper_client_world::app::Event {
     d::Event::Act { action: d::Action::Pages(d::pages::Act::Accounts(act)) }.into()
 }
 fn select() -> temper_client_world::app::Event {
-    act(Act::Select {
-        selection: Selection {
-            holder: jig_client::contract::AccountHolder::Own,
-            provider: Some(accounts::PROVIDER),
-            account: None,
-            source: None,
-        },
-    })
+    act(Act::Choose { name: NAME, way: Way::Key { provider: accounts::PROVIDER } })
 }
 #[test]
 fn a_lost_key_answer_replays_under_the_same_name_without_a_second_account() {
@@ -28,7 +21,7 @@ fn a_lost_key_answer_replays_under_the_same_name_without_a_second_account() {
         &mut root,
         d::Event::AccountKey { value: Secret::new(Box::from(b"test-private-key".as_slice())) }.into(),
     );
-    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME, operation: Operation::AddKey }));
+    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME, operation: Operation::AddAccountKey }));
     let source = accounts::kept(&mut front);
     accounts::settle(&mut front, &mut root);
     accounts::lost(&mut front, &mut root);
@@ -39,7 +32,7 @@ fn a_lost_key_answer_replays_under_the_same_name_without_a_second_account() {
         &mut root,
         d::Event::AccountKey { value: Secret::new(Box::from(b"test-private-key".as_slice())) }.into(),
     );
-    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME, operation: Operation::AddKey }));
+    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME, operation: Operation::AddAccountKey }));
     let root = root.person();
     assert_eq!(
         root.pages()
@@ -61,9 +54,22 @@ fn a_lost_key_answer_replays_under_the_same_name_without_a_second_account() {
 #[test]
 fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch() {
     use jig_domain_accounts as a;
-    let (mut front, mut root) = accounts::fixture(fixtures::SEED);
-    accounts::event(&mut front, &mut root, select());
-    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME, operation: Operation::SignIn }));
+    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    let limits = fixtures::domain_limits();
+    let words = fixtures::phrasebooks(&limits);
+    let bounds = fixtures::view_bounds(&limits, &words);
+    let mut view = temper_client_view::View::new(&bounds, &limits, words, fixtures::FORGE);
+    let mut patches = skein_lib::Queue::with_capacity(bounds.tree.patches);
+    temper_client_view::build(&mut view, root.person(), fixtures::NOW, &mut patches);
+    let button = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|node| node.role == skein_ui::Role::Button && node.name.as_deref() == Some(b"Continue with ChatGPT"))
+        .expect("plan sign-in way")
+        .id;
+    let press = temper_client_view::event(&mut view, button, skein_ui::Act::Press).expect("way press");
+    accounts::event(&mut front, &mut root, press.into());
     let source = accounts::signing(&front);
     front.engine.send(temper_engine_domain::Event::Account(a::Event::Visited {
         source,
@@ -73,6 +79,14 @@ fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch(
     assert_eq!(
         root.person().pages().accounts().expect("account fixture state").sign_in_state(root.person().client()),
         SignInState::Signing { source }
+    );
+    patches = skein_lib::Queue::with_capacity(bounds.tree.patches);
+    temper_client_view::build(&mut view, root.person(), fixtures::NOW, &mut patches);
+    assert!(
+        view.tree()
+            .nodes()
+            .iter()
+            .any(|node| node.role == skein_ui::Role::Link && node.external.as_deref() == Some(b"https://issuer/visit"))
     );
     front.engine.send(temper_engine_domain::Event::Account(a::Event::SignedIn {
         source,
@@ -102,7 +116,7 @@ fn a_client_shows_a_third_account_at_two_rows() {
             &mut root,
             d::Event::AccountKey { value: Secret::new(Box::from(b"test-private-key".as_slice())) }.into(),
         );
-        accounts::event(&mut front, &mut root, act(Act::Submit { name, operation: Operation::AddKey }));
+        accounts::event(&mut front, &mut root, act(Act::Submit { name, operation: Operation::AddAccountKey }));
         accounts::kept(&mut front);
         accounts::settle(&mut front, &mut root);
     }

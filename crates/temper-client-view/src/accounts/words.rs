@@ -128,6 +128,25 @@ pub(crate) enum Word {
     Exited,
     Unconfigured,
     ProgramsOmitted,
+    AddAccount,
+    AddKeyToAccount,
+    ProgramField,
+    Declare,
+    ProgramInvalid,
+    HeldDeployment,
+    Separator,
+    Continue,
+    SignInBrand,
+    SubscriptionWay,
+    KeyWay,
+    KeyWayOnly,
+    KeyWayAn,
+    Subscription,
+    ApiKeyBrand,
+    HeldBy,
+    PlanSignIn,
+    CodeLogin,
+    ProgramCommand,
 }
 const ROWS: &[(Word, &[u8])] = &[
     (Word::AccountsOmitted, b"Accounts left out: "),
@@ -145,7 +164,7 @@ const ROWS: &[(Word, &[u8])] = &[
         b"Account removed; revocation was not confirmed. Disconnect temper in the provider's settings.",
     ),
     (Word::Accounts, b"Accounts"),
-    (Word::Own, b"Your accounts"),
+    (Word::Own, b"Your LLM accounts"),
     (Word::Deployment, b"Deployment accounts"),
     (Word::Unknown, b"Waiting for current account facts."),
     (Word::Empty, b"No accounts shown."),
@@ -221,7 +240,7 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::Rank, b"Choose a positive position."),
     (Word::ValueAgain, b"Enter the key again for the same act, or Cancel."),
     (Word::ProviderField, b"Provider number"),
-    (Word::AccountField, b"Account number (empty for a new account)"),
+    (Word::AccountField, b"Account number"),
     (Word::SourceField, b"Source number"),
     (Word::KeyField, b"Key (pasted once)"),
     (Word::OwnChoice, b"Use your accounts"),
@@ -255,6 +274,46 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::Exited, b"Program exited"),
     (Word::Unconfigured, b"Program not configured"),
     (Word::ProgramsOmitted, b"Program observations left out: "),
+    (Word::AddAccount, b"Add an account"),
+    (Word::AddKeyToAccount, b"Add key to account"),
+    (Word::ProgramField, b"Program name"),
+    (Word::Declare, b"Declare"),
+    (Word::ProgramInvalid, b"Use 1 to 32 lowercase letters, digits or hyphens for the program name."),
+    (Word::HeldDeployment, b"held by the deployment"),
+    (Word::Separator, " · ".as_bytes()),
+    (Word::KeyWayOnly, b"Use an API key"),
+];
+// Both names are borrowed; no configured name is replaced by a guessed brand.
+pub(crate) fn provider_words(name: &[u8]) -> (&[u8], &[u8]) {
+    match name {
+        b"openai" => (b"OpenAI", b"ChatGPT"),
+        b"anthropic" => (b"Anthropic", b"Claude"),
+        name => (name, name),
+    }
+}
+pub(crate) fn join(parts: &[&[u8]]) -> Box<[u8]> {
+    let mut length = 0_usize;
+    for part in parts {
+        length = length.checked_add(part.len()).expect("admitted account words fit");
+    }
+    let mut out = skein_lib::Writer::new(length);
+    for part in parts {
+        out.put(part).expect("measured words fit");
+    }
+    out.finish()
+}
+const NAMED: &[(Word, &[u8], &[u8])] = &[
+    (Word::Continue, b"Continue with ", b""),
+    (Word::SignInBrand, b"Sign in to ", b""),
+    (Word::SubscriptionWay, b"Use your ", b" subscription"),
+    (Word::KeyWay, b"Use a ", b" API key"),
+    (Word::KeyWayAn, b"Use an ", b" API key"),
+    (Word::Subscription, b"", b" subscription"),
+    (Word::ApiKeyBrand, b"", b" API key"),
+    (Word::HeldBy, b"held by ", b""),
+    (Word::PlanSignIn, b"", b" sign-in"),
+    (Word::CodeLogin, b"Claude Code login ", b""),
+    (Word::ProgramCommand, b"On each host, run: temper program-login ", b""),
 ];
 fn id(number: u16) -> PhraseId {
     PhraseId { owner: super::owner(), number }
@@ -271,11 +330,21 @@ pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
     } else if word == Word::AddressLong {
         204
     } else {
-        literal_number(word)
+        let mut number = None;
+        for (index, (candidate, _, _)) in NAMED.iter().enumerate() {
+            if *candidate == word {
+                number =
+                    Some(205_u16.checked_add(u16::try_from(index).expect("named words fit")).expect("phrase IDs fit"));
+            }
+        }
+        match number {
+            Some(number) => number,
+            None => literal_number(word),
+        }
     };
     words.book.say(words.language, id(number), holes).expect("checked account phrase").text
 }
-pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>) {
+pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>, name_bytes: u32) {
     for (index, (_, literal)) in ROWS.iter().enumerate() {
         let id = id(u16::try_from(index).expect("account words fit"));
         shapes.push(PhraseShape { id, holes: Box::new([]), plural: None }).expect("account shapes fit");
@@ -288,6 +357,30 @@ pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>)
                 }]),
             })
             .expect("account phrases fit");
+    }
+    for (index, (_, prefix, suffix)) in NAMED.iter().enumerate() {
+        let id =
+            id(205_u16.checked_add(u16::try_from(index).expect("named account words fit")).expect("phrase IDs fit"));
+        shapes
+            .push(PhraseShape {
+                id,
+                holes: Box::new([HoleShape { kind: HoleKind::Name, bytes: name_bytes }]),
+                plural: None,
+            })
+            .expect("account shape fits");
+        phrases
+            .push(Phrase {
+                id,
+                forms: Box::new([Form {
+                    class: PluralClass::Other,
+                    segments: Box::new([
+                        Segment::Text(copy_of(prefix)),
+                        Segment::Hole { index: 0, kind: HoleKind::Name },
+                        Segment::Text(copy_of(suffix)),
+                    ]),
+                }]),
+            })
+            .expect("account phrase fits");
     }
     for (number, prefix, kind, suffix) in [
         (200, b"".as_slice(), HoleKind::Number, b"".as_slice()),
@@ -327,6 +420,9 @@ pub(crate) fn capacity(words: &Words) -> Option<u32> {
     }
     for number in [200, 201, 202, 203, 204] {
         most = most.max(words.book.capacity(id(number))?);
+    }
+    for index in 0..NAMED.len() {
+        most = most.max(words.book.capacity(id(205_u16.checked_add(u16::try_from(index).ok()?)?))?);
     }
     Some(most)
 }

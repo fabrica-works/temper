@@ -1,5 +1,5 @@
 //! Named operations and one-shot secret transport; jig owns admission and durability.
-use super::{Accounts, KEY_BYTES, Request, Selection};
+use super::{Accounts, KEY_BYTES, Request, Selection, Way};
 use crate::owner::Owner;
 use alloc::boxed::Box;
 use jig_client::{Client, Key, Told, contract as c};
@@ -10,6 +10,8 @@ pub enum Operation {
     SignIn,
     SignOut,
     AddKey,
+    AddAccountKey,
+    DeclareProgram,
     ReplaceKey,
     RemoveKey,
     RemoveAccount,
@@ -20,6 +22,8 @@ pub enum Operation {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
     Select { selection: Selection },
+    Choose { name: RequestKey, way: Way },
+    ProgramName { value: Box<[u8]> },
     Submit { name: RequestKey, operation: Operation },
     Confirm,
     Cancel,
@@ -40,6 +44,7 @@ pub enum Broken {
     Selection,
     Rank,
     ValueAgain,
+    ProgramName,
 }
 
 impl Accounts {
@@ -66,6 +71,45 @@ impl Accounts {
                 self.confirm = None;
                 self.selection = selection;
                 self.broken = None;
+                self.way = None;
+                self.program = Box::new([]);
+            }
+            Act::Choose { name, way } => {
+                if let Some(pending) = &self.pending
+                    && pending.outcome.is_none()
+                {
+                    return;
+                }
+                let Some(me) = super::current_me(client) else { return };
+                if !super::ways(&me.providers, None, self.selection.holder).as_slice().contains(&way) {
+                    return;
+                }
+                self.clear_key();
+                self.confirm = None;
+                self.broken = None;
+                self.selection =
+                    Selection { provider: Some(way.provider()), holder: self.selection.holder, ..Default::default() };
+                self.way = Some(way);
+                self.program =
+                    if let Way::Program { .. } = way { program_default(me.party.name.bytes()) } else { Box::new([]) };
+                if let Way::SignIn { .. } = way {
+                    self.submit(client, name, Operation::SignIn, serial, out);
+                }
+            }
+            Act::ProgramName { value } => {
+                if let Some(pending) = &self.pending
+                    && pending.outcome.is_none()
+                {
+                    return;
+                }
+                self.program = Box::new([]);
+                self.broken = Some(Broken::ProgramName);
+                if value.len() <= 32 {
+                    self.program = value;
+                    if c::valid_program_name(&self.program) {
+                        self.broken = None;
+                    }
+                }
             }
             Act::Cancel => {
                 self.confirm = None;
@@ -84,35 +128,45 @@ impl Accounts {
                 }
             }
             Act::Submit { name, operation } => {
-                if let Some(pending) = &self.pending
-                    && pending.outcome.is_none()
-                {
-                    return;
-                }
-                if operation.carries() && self.value.is_none() {
-                    if self.broken != Some(Broken::Empty) && self.broken != Some(Broken::TooLong) {
-                        self.broken = Some(Broken::ValueAgain);
-                    }
-                    return;
-                }
-                let Some(ask) = self.ask(client, operation) else {
-                    return;
-                };
-                if let Some(pending) = &self.pending
-                    && (pending.outcome == Some(jig_client::Outcome::Unsent)
-                        || pending.outcome == Some(jig_client::Outcome::Lost))
-                    && (pending.name != Some(name) || pending.ask != ask)
-                {
-                    self.clear_key();
-                    self.broken = Some(Broken::ValueAgain);
-                    return;
-                }
-                if operation.confirms() {
-                    self.confirm = Some((name, ask));
-                } else {
-                    self.send(name, ask, operation.carries(), serial, out);
-                }
+                self.submit(client, name, operation, serial, out);
             }
+        }
+    }
+    fn submit(
+        &mut self,
+        client: &Client,
+        name: RequestKey,
+        operation: Operation,
+        serial: &mut u64,
+        out: &mut Queue<Request>,
+    ) {
+        if let Some(pending) = &self.pending
+            && pending.outcome.is_none()
+        {
+            return;
+        }
+        if operation.carries() && self.value.is_none() {
+            if self.broken != Some(Broken::Empty) && self.broken != Some(Broken::TooLong) {
+                self.broken = Some(Broken::ValueAgain);
+            }
+            return;
+        }
+        let Some(ask) = self.ask(client, operation) else {
+            return;
+        };
+        if let Some(pending) = &self.pending
+            && (pending.outcome == Some(jig_client::Outcome::Unsent)
+                || pending.outcome == Some(jig_client::Outcome::Lost))
+            && (pending.name != Some(name) || pending.ask != ask)
+        {
+            self.clear_key();
+            self.broken = Some(Broken::ValueAgain);
+            return;
+        }
+        if operation.confirms() {
+            self.confirm = Some((name, ask));
+        } else {
+            self.send(name, ask, operation.carries(), serial, out);
         }
     }
     fn ask(&mut self, client: &Client, operation: Operation) -> Option<c::Ask> {
@@ -135,9 +189,21 @@ impl Accounts {
                 self.broken = None;
                 return Some(c::Ask::SignOut { holder, source });
             }
+            Operation::AddAccountKey => {
+                let Way::Key { provider } = self.way? else { return None };
+                c::AccountChange::AddKey { provider, join: None, digest: self.digest()? }
+            }
+            Operation::DeclareProgram => {
+                let Way::Program { provider } = self.way? else { return None };
+                if holder != c::AccountHolder::Own || !c::valid_program_name(&self.program) {
+                    self.broken = Some(Broken::ProgramName);
+                    return None;
+                }
+                c::AccountChange::DeclareProgram { provider, join: None, name: self.program.clone() }
+            }
             Operation::AddKey => c::AccountChange::AddKey {
                 provider: selection.provider?,
-                join: selection.account,
+                join: Some(selection.account?),
                 digest: self.digest()?,
             },
             Operation::ReplaceKey => c::AccountChange::ReplaceKey { source: selection.source?, digest: self.digest()? },
@@ -246,8 +312,9 @@ impl Accounts {
 impl Operation {
     const fn carries(self) -> bool {
         match self {
-            Self::AddKey | Self::ReplaceKey => true,
+            Self::AddKey | Self::AddAccountKey | Self::ReplaceKey => true,
             Self::SignIn
+            | Self::DeclareProgram
             | Self::SignOut
             | Self::RemoveKey
             | Self::RemoveAccount
@@ -261,10 +328,28 @@ impl Operation {
             Self::RemoveAccount | Self::RemoveKey | Self::SignOut => true,
             Self::SignIn
             | Self::AddKey
+            | Self::AddAccountKey
+            | Self::DeclareProgram
             | Self::ReplaceKey
             | Self::Resume
             | Self::MoveAccount { .. }
             | Self::MoveSource { .. } => false,
         }
     }
+}
+
+fn program_default(person: &[u8]) -> Box<[u8]> {
+    let mut length = 0;
+    for (index, byte) in person.iter().take(25).enumerate() {
+        if !byte.is_ascii_alphanumeric() && *byte != b'-' {
+            break;
+        }
+        length = index.checked_add(1).expect("program prefix fits");
+    }
+    let mut name = skein_lib::Writer::new(7_usize.checked_add(length).expect("program name fits"));
+    name.put(b"claude-").expect("measured prefix fits");
+    for byte in person.iter().take(length) {
+        name.put(&[byte.to_ascii_lowercase()]).expect("measured name fits");
+    }
+    name.finish()
 }

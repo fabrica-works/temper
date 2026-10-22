@@ -219,7 +219,7 @@ impl Person {
                 Step::Go { address: Address::Accounts },
                 Step::See { find: Find::named(Role::Button, b"Use deployment accounts"), within: START_WITHIN },
                 Step::Press { find: Find::named(Role::Button, b"Use deployment accounts") },
-                Step::Type { find: Find::named(Role::TextField, b"Provider number"), words: b"1".as_slice().into() },
+                Step::Press { find: Find::named(Role::Button, b"Use an API key") },
                 Step::Type {
                     find: Find::named(Role::TextField, b"Key (pasted once)"),
                     words: jig_channel_world::fixtures::KEY.into(),

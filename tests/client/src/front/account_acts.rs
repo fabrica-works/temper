@@ -15,17 +15,21 @@ pub const PROVIDER: u32 = 17;
 pub const SMALL_ROWS: u32 = 2;
 #[must_use]
 pub fn fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None)
+    fixture_root(seed, false, 2, None, false)
+}
+#[must_use]
+pub fn plan_fixture(seed: u64) -> (Joint, Root) {
+    fixture_root(seed, false, 2, None, true)
 }
 #[must_use]
 pub fn tools_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, true, 2, None)
+    fixture_root(seed, true, 2, None, false)
 }
 #[must_use]
 pub fn small_rows_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 3, Some(SMALL_ROWS))
+    fixture_root(seed, false, 3, Some(SMALL_ROWS), false)
 }
-fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>) -> (Joint, Root) {
+fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>, plan: bool) -> (Joint, Root) {
     let mut limits = if tools { temper_client_tools::limits::client() } else { fixtures::domain_limits() };
     if let Some(rows) = rows {
         limits.client.domain.rows = rows;
@@ -35,8 +39,8 @@ fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>) ->
         config.core.settings.llm_providers = a::Providers {
             providers: Box::new([a::Provider {
                 number: PROVIDER,
-                name: Box::from(b"Scripted".as_slice()),
-                signed_in_plan: false,
+                name: Box::from(if plan { b"openai".as_slice() } else { b"Scripted".as_slice() }),
+                signed_in_plan: plan,
                 manage_usage: None,
                 models: Box::new([Box::from(b"scripted".as_slice())]),
                 offers: a::Offers { sign_in: true, key: true, programs: Box::new([]) },

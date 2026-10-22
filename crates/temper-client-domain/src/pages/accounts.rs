@@ -1,10 +1,13 @@
 //! Borrowed account facts and one bounded form (client/README.md, 3.5–3.6).
 use super::Request;
 use crate::owner::Owner;
+use alloc::boxed::Box;
 use jig_client::{Client, Handle, Latest, State, contract as c};
 use skein_lib::{Queue, Secret};
 mod acts;
+mod ways;
 pub use acts::{Act, Broken, Operation, Pending};
+pub use ways::{Way, ways};
 /// The carried-value bound (client/README.md, 3.6); the engine catalogue is staged.
 pub const KEY_BYTES: usize = 4096;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,6 +55,8 @@ pub struct Accounts {
     pub pending: Option<Pending>,
     pub confirm: Option<(skein_lib::RequestKey, c::Ask)>,
     pub broken: Option<Broken>,
+    pub way: Option<Way>,
+    pub program: Box<[u8]>,
     value: Option<Secret>,
     written: u64,
 }
@@ -71,6 +76,8 @@ impl Accounts {
             pending: None,
             confirm: None,
             broken: None,
+            way: None,
+            program: Box::new([]),
             value: None,
             written: 0,
         }
@@ -83,6 +90,8 @@ impl Accounts {
             self.selection.provider = None;
             self.selection.account = None;
             self.selection.source = None;
+            self.way = None;
+            self.program = Box::new([]);
         }
         if owner && self.deployment.is_none() {
             let handle = Handle { asker: Owner::Pages.asker(), number: *next };
@@ -101,6 +110,8 @@ impl Accounts {
         self.clear_key();
         self.confirm = None;
         self.selection = Selection::default();
+        self.way = None;
+        self.program = Box::new([]);
         if let Some(handle) = self.deployment.take() {
             out.push(Request::Client(jig_client::Event::Unwatch { handle }));
         }
@@ -133,7 +144,9 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     u64::try_from(size_of::<Accounts>())
         .ok()?
         .checked_add(u64::try_from(KEY_BYTES).ok()?)?
-        .checked_add(limits.client.domain.document_bytes)
+        .checked_add(limits.client.domain.document_bytes)?
+        .checked_add(32)?
+        .checked_add(skein_lib::List::<Way>::worst_case(limits.client.domain.rows.checked_mul(3)?)?)
 }
 
 impl Accounts {

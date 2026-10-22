@@ -13,6 +13,8 @@ impl Limits {
             .max(receiving.text.checked_mul(2)?)
             .max(receiving.turn_text)
             .max(domain.forge.field_bytes.checked_add(64)?);
+        // An account heading joins the provider, plan/display and holder's words.
+        let text = text.max(receiving.text.checked_add(words.name_bytes.min(256).checked_mul(3)?)?.checked_add(64)?);
         let markdown = skein_ui::markdown::max_nodes(receiving.text)?;
         // Each grant and note scope has a bounded sequence of pattern segments.
         let pattern = receiving.segments.checked_add(2)?.checked_mul(2)?;
@@ -64,15 +66,16 @@ impl Limits {
             // End line: one paragraph and its text, including the report's words.
             .checked_add(2)?;
         let counts = domain.accounts;
-        // Per account: six structural nodes, one per use, two per source and two omission words.
+        // Per account: six structural nodes, one per use, three per source and two omission words.
         // Own and deployment lists each have a heading, omission word, sign-in and last-end room.
-        let account = counts.sources.checked_mul(2)?.checked_add(counts.uses)?.checked_add(10)?;
+        let account = counts.sources.checked_mul(3)?.checked_add(counts.uses)?.checked_add(10)?;
         let account_nodes = account
             .checked_mul(counts.accounts)?
             .checked_mul(2)?
             .checked_add(counts.sign_ins.checked_mul(2)?)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?
+            .checked_add(receiving.rows.checked_mul(3)?)?
             // Worker and program observations, omission rows and retained sign-out failures.
             .checked_add(counts.accounts.checked_mul(counts.sources.checked_add(2)?)?.checked_mul(2)?)?
             .checked_add(2)?
@@ -170,7 +173,15 @@ pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words:
         )?
         .checked_add(crate::forge::bindings::worst_case(limits.tree.bindings)?)?
         .checked_add(crate::frame::Bindings::worst_case(limits.tree.bindings)?)?
-        .checked_add(crate::accounts::Bindings::worst_case(crate::accounts::binding_capacity(&domain.accounts))?)?
+        .checked_add(crate::accounts::Bindings::worst_case(crate::accounts::binding_capacity(
+            &domain.accounts,
+            domain.client.domain.rows,
+        ))?)?
+        // Transient offered ways and account heading fragments, borrowed from admitted documents.
+        .checked_add(skein_lib::List::<temper_client_domain::pages::accounts::Way>::worst_case(
+            domain.client.domain.rows.checked_mul(3)?,
+        )?)?
+        .checked_add(u64::from(limits.tree.text_per_node).checked_mul(4)?)?
         .checked_add(skein_ui::phrases::worst_case(words.book.limits())?)?
         .checked_add(u64::from(words.capacity()?))
 }

@@ -20,10 +20,14 @@ fn an_account_act_is_answered_through_the_page() {
                 words: Box::from(b"17".as_slice()),
             },
             Step::Type {
+                find: Find::exactly_named(Role::TextField, b"Account number"),
+                words: Box::from(b"1".as_slice()),
+            },
+            Step::Type {
                 find: Find::exactly_named(Role::TextField, b"Key (pasted once)"),
                 words: Box::from(b"private-page-key".as_slice()),
             },
-            Step::Press { find: Find::exactly_named(Role::Button, b"Add key") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Add key to account") },
             Step::Pause { span: skein_lib::Duration::from_millis(50) },
         ],
     );

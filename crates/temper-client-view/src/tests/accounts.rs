@@ -15,6 +15,234 @@ use temper_client_domain::{
 const PROVIDER: u32 = 17;
 const SOURCE: u32 = 43;
 const ADDRESS: &[u8] = b"https://issuer.example/visit";
+fn offer(provider: u32, name: &[u8], sign_in: bool, program: bool) -> c::ProviderOffer {
+    let mut programs = List::with_capacity(1);
+    if program {
+        programs.push(c::Text::new(Box::from(b"claude_code".as_slice()), 32).unwrap()).unwrap();
+    }
+    c::ProviderOffer {
+        provider,
+        name: text(name),
+        key_bytes: 4096,
+        sign_in,
+        signed_in_plan: true,
+        key: true,
+        programs,
+        programs_cut: false,
+        none: false,
+        manage_usage: None,
+    }
+}
+fn text(value: &[u8]) -> c::DocumentText {
+    c::DocumentText::complete(c::Text::new(Box::from(value), 64).unwrap())
+}
+fn ways_root(offers: List<c::ProviderOffer>, demo: bool) -> d::Domain {
+    let limits = fixtures::limits();
+    let (mut root, watch, _) = fixtures::root_at(d::Address::Accounts, &limits);
+    let mut me = d::pages::accounts::current_me(root.client()).unwrap().clone();
+    me.providers = offers;
+    me.providers_cut = true;
+    me.deployment_role = Some(c::HeldRole::Owner);
+    if demo {
+        return fixtures::demo_frame_root(d::Address::Accounts, fixtures::PROJECT, true, None, Some(me));
+    }
+    fixtures::root_event(
+        &mut root,
+        d::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(me))) },
+            },
+        },
+    );
+    root
+}
+fn offered_root() -> d::Domain {
+    let mut providers = List::with_capacity(1);
+    providers.push(offer(PROVIDER, b"openai", true, false)).unwrap();
+    ways_root(providers, false)
+}
+fn button_names(root: &d::Domain) -> Vec<Vec<u8>> {
+    let mut view = fixtures::view();
+    fixtures::build(&mut view, root)
+        .nodes()
+        .iter()
+        .filter(|node| node.role == Role::Button)
+        .filter_map(|node| node.name.as_ref().map(|name| name.to_vec()))
+        .collect()
+}
+#[test]
+fn the_accounts_page_names_the_plan_sign_in_and_key_ways() {
+    let names = button_names(&offered_root());
+    assert!(names.contains(&b"Continue with ChatGPT".to_vec()));
+    assert!(names.contains(&b"Use an API key".to_vec()));
+}
+#[test]
+fn two_key_providers_name_each_key_way_by_its_brand() {
+    let mut providers = List::with_capacity(2);
+    providers.push(offer(PROVIDER, b"openai", false, false)).unwrap();
+    providers.push(offer(PROVIDER + 1, b"Scripted", false, false)).unwrap();
+    let names = button_names(&ways_root(providers, false));
+    assert!(names.contains(&b"Use an OpenAI API key".to_vec()));
+    assert!(names.contains(&b"Use a Scripted API key".to_vec()));
+    assert!(!names.contains(&b"Use an API key".to_vec()));
+}
+#[test]
+fn a_provider_without_a_plan_names_its_sign_in_by_its_brand() {
+    let mut providers = List::with_capacity(1);
+    let mut provider = offer(PROVIDER, b"anthropic", true, false);
+    provider.signed_in_plan = false;
+    providers.push(provider).unwrap();
+    assert!(button_names(&ways_root(providers, false)).contains(&b"Sign in to Anthropic".to_vec()));
+}
+#[test]
+fn the_demos_provider_offers_no_way() {
+    let mut providers = List::with_capacity(2);
+    providers.push(offer(PROVIDER, b"demo", true, true)).unwrap();
+    providers.push(offer(PROVIDER + 1, b"openai", true, false)).unwrap();
+    let names = button_names(&ways_root(providers, true));
+    assert!(names.contains(&b"Continue with ChatGPT".to_vec()));
+    assert!(names.contains(&b"Use an API key".to_vec()));
+    assert!(!names.iter().any(|name| name.windows(b"demo".len()).any(|part| part == b"demo")));
+}
+#[test]
+fn the_deployment_holder_offers_keys_only() {
+    let mut providers = List::with_capacity(2);
+    providers.push(offer(PROVIDER, b"openai", true, false)).unwrap();
+    providers.push(offer(PROVIDER + 1, b"anthropic", false, true)).unwrap();
+    let mut root = ways_root(providers, false);
+    action(
+        &mut root,
+        A::Select { selection: Selection { holder: c::AccountHolder::Deployment, ..Default::default() } },
+    );
+    let names = button_names(&root);
+    assert!(names.contains(&b"Use an OpenAI API key".to_vec()));
+    assert!(names.contains(&b"Use an Anthropic API key".to_vec()));
+    assert!(!names.contains(&b"Continue with ChatGPT".to_vec()));
+    assert!(!names.contains(&b"Use your Claude subscription".to_vec()));
+}
+#[test]
+fn a_program_way_shows_the_default_name_and_the_command_on_each_host() {
+    let mut providers = List::with_capacity(1);
+    providers.push(offer(PROVIDER, b"anthropic", false, true)).unwrap();
+    let mut root = ways_root(providers, false);
+    let mut view = fixtures::view();
+    press(&mut view, &mut root, Role::Button, b"Use your Claude subscription", Act::Press);
+    let tree = fixtures::build(&mut view, &root);
+    let field = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Program name")).unwrap();
+    assert_eq!(field.value.as_ref().unwrap().text.as_ref(), b"claude-pat");
+    assert!(fixtures::find(tree, Role::Button, b"Declare").is_some());
+    assert!(
+        String::from_utf8(fixtures::text(tree).into_vec())
+            .unwrap()
+            .contains("On each host, run: temper program-login claude-pat")
+    );
+}
+fn card_document(provider: &[u8], display: &[u8], kind: c::OwnerAccountKind) -> c::OwnerAccounts {
+    let mut doc = document(1);
+    let row = doc.accounts.get_mut(0).unwrap();
+    row.provider_name = Some(text(provider));
+    row.display = text(display);
+    row.plan = kind != c::OwnerAccountKind::Key;
+    let source = row.sources.get_mut(0).unwrap();
+    source.kind = kind;
+    if kind == c::OwnerAccountKind::Program {
+        source.name = Some(Box::from(display));
+    }
+    doc
+}
+fn card_heading(doc: c::OwnerAccounts) -> Vec<u8> {
+    let (mut root, watch) = fixtures::account_root();
+    deliver(&mut root, watch, doc);
+    let mut view = fixtures::view();
+    fixtures::build(&mut view, &root)
+        .nodes()
+        .iter()
+        .find(|node| node.role == Role::Heading { level: 3 })
+        .unwrap()
+        .name
+        .as_ref()
+        .unwrap()
+        .to_vec()
+}
+#[test]
+fn a_cards_region_is_named_by_its_heading() {
+    let (mut root, watch) = fixtures::account_root();
+    deliver(&mut root, watch, card_document(b"openai", b"alice@example.com", c::OwnerAccountKind::SignIn));
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    let heading = tree.nodes().iter().find(|node| node.role == Role::Heading { level: 3 }).unwrap();
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Region && node.name == heading.name));
+}
+#[test]
+fn a_plan_card_names_the_plan_display_brand_and_holder() {
+    assert_eq!(
+        card_heading(card_document(b"openai", b"alice@example.com", c::OwnerAccountKind::SignIn)),
+        "ChatGPT · alice@example.com · OpenAI · held by Pat".as_bytes()
+    );
+}
+#[test]
+fn a_key_only_card_names_the_brand_and_holder_once() {
+    assert_eq!(
+        card_heading(card_document(b"openai", b"", c::OwnerAccountKind::Key)),
+        "OpenAI API key · held by Pat".as_bytes()
+    );
+}
+#[test]
+fn a_program_card_names_the_subscription_and_login() {
+    let mut doc = card_document(b"anthropic", b"claude-alice", c::OwnerAccountKind::Program);
+    // A program declaration has no provider display; its portable name belongs to the source.
+    doc.accounts.get_mut(0).unwrap().display = text(b"");
+    assert_eq!(card_heading(doc), "Claude subscription · claude-alice · Anthropic · held by Pat".as_bytes());
+}
+#[test]
+fn a_deployment_card_names_its_holder_in_words() {
+    let mut doc = card_document(b"openai", b"", c::OwnerAccountKind::Key);
+    doc.accounts.get_mut(0).unwrap().holder = c::OwnerAccountHolder::Deployment;
+    assert_eq!(card_heading(doc), "OpenAI API key · held by the deployment".as_bytes());
+}
+#[test]
+fn an_empty_display_leaves_no_empty_heading_part() {
+    assert_eq!(
+        card_heading(card_document(b"openai", b"", c::OwnerAccountKind::SignIn)),
+        "ChatGPT · OpenAI · held by Pat".as_bytes()
+    );
+}
+#[test]
+fn sources_name_their_kinds_in_the_providers_words() {
+    for (provider, display, kind, expected) in [
+        (b"openai".as_slice(), b"alice@example.com".as_slice(), c::OwnerAccountKind::SignIn, "ChatGPT sign-in · Ready"),
+        (b"openai", b"", c::OwnerAccountKind::Key, "API key · Ready"),
+        (b"anthropic", b"claude-alice", c::OwnerAccountKind::Program, "Claude Code login claude-alice · Ready"),
+    ] {
+        assert!(shown(card_document(provider, display, kind)).contains(expected));
+    }
+}
+#[test]
+fn add_an_account_follows_both_account_lists() {
+    let (root, _) = owner_root();
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    let headings: Vec<_> = tree
+        .nodes()
+        .iter()
+        .filter(|node| node.role == Role::Heading { level: 2 })
+        .map(|node| node.name.as_ref().unwrap().to_vec())
+        .collect();
+    assert_eq!(headings, [b"Your LLM accounts".to_vec(), b"Deployment accounts".to_vec(), b"Add an account".to_vec()]);
+}
+#[test]
+fn a_cut_provider_name_keeps_the_numbered_card_fallback() {
+    let mut doc = card_document(b"openai", b"Pat", c::OwnerAccountKind::SignIn);
+    doc.accounts.get_mut(0).unwrap().provider_name.as_mut().unwrap().cut = true;
+    assert_eq!(card_heading(doc), "Account 1 · LLM provider 17 · Pat".as_bytes());
+}
+#[test]
+fn an_unknown_provider_keeps_its_configured_name() {
+    assert_eq!(
+        card_heading(card_document(b"Custom", b"Pat", c::OwnerAccountKind::SignIn)),
+        "Custom · Pat · Custom · held by Pat".as_bytes()
+    );
+}
 fn source(number: u32) -> c::OwnerAccountSource {
     c::OwnerAccountSource {
         name: None,
@@ -148,6 +376,7 @@ fn key_draft() -> (d::Domain, crate::View) {
     deliver(&mut root, watch, document(0));
     let mut view = fixtures::view();
     press(&mut view, &mut root, Role::TextField, b"Provider number", Act::Input { value: Box::from(b"17".as_slice()) });
+    press(&mut view, &mut root, Role::TextField, b"Account number", Act::Input { value: Box::from(b"1".as_slice()) });
     press(
         &mut view,
         &mut root,
@@ -180,7 +409,7 @@ fn a_held_key_has_an_empty_view_value() {
 fn sending_a_key_writes_an_empty_field() {
     let (mut root, mut view) = key_draft();
     let before = key_field(&view).value.as_ref().unwrap().written;
-    press(&mut view, &mut root, Role::Button, b"Add key", Act::Press);
+    press(&mut view, &mut root, Role::Button, b"Add key to account", Act::Press);
     fixtures::build(&mut view, &root);
     let value = key_field(&view).value.as_ref().unwrap();
     assert!(value.text.is_empty());
@@ -468,7 +697,7 @@ mod memory_literal;
 // skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
 // The page reserves its patch queue once, at four patches a node.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6978175079;
+const ACCOUNT_BYTES: u64 = 6978187051;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -548,15 +777,13 @@ fn an_owner_sees_deployment_accounts_after_their_own() {
     let mut view = fixtures::view();
     let text = fixtures::text(fixtures::build(&mut view, &root));
     assert!(
-        skein_lib::bytes::find(&text, b"Your accounts").unwrap()
+        skein_lib::bytes::find(&text, b"Your LLM accounts").unwrap()
             < skein_lib::bytes::find(&text, b"Deployment accounts").unwrap()
     );
     assert!(skein_lib::bytes::find(&text, b"Account 41").is_some());
 }
 fn invalid_number(view: &mut crate::View, root: &d::Domain) -> Option<d::Event> {
-    let node =
-        fixtures::find(fixtures::build(view, root), Role::TextField, b"Account number (empty for a new account)")
-            .unwrap();
+    let node = fixtures::find(fixtures::build(view, root), Role::TextField, b"Account number").unwrap();
     crate::event(view, node, Act::Input { value: Box::from(b"not-a-number".as_slice()) })
 }
 #[test]
@@ -576,7 +803,7 @@ fn invalid_number_input_preserves_a_key() {
 fn invalid_numbers_disable_submission() {
     let (root, mut view) = key_draft();
     invalid_number(&mut view, &root);
-    let node = fixtures::find(fixtures::build(&mut view, &root), Role::Button, b"Add key").unwrap();
+    let node = fixtures::find(fixtures::build(&mut view, &root), Role::Button, b"Add key to account").unwrap();
     let button = view.tree().nodes().iter().find(|n| n.id == node).unwrap();
     assert!(button.states.as_slice().contains(&skein_ui::State::Disabled));
     assert!(crate::event(&mut view, node, Act::Press).is_none());
@@ -665,6 +892,7 @@ fn the_current_holder_is_pressed() {
 fn an_account_without_a_provider_has_one_separator() {
     let mut doc = document(1);
     doc.accounts.get_mut(0).unwrap().provider = None;
+    doc.accounts.get_mut(0).unwrap().provider_name = None;
     assert!(shown(doc).contains("Account 1 · Pat"));
 }
 #[test]
@@ -734,8 +962,8 @@ fn duplicate_numbers_offer_one_rank_control() {
 #[test]
 fn bindings_at_capacity_refuse_another_control() {
     let counts = fixtures::limits().accounts;
-    let mut bindings = crate::accounts::Bindings::new(counts);
-    for _ in 0..crate::accounts::binding_capacity(&counts) {
+    let mut bindings = crate::accounts::Bindings::new(counts, fixtures::limits().client.domain.rows);
+    for _ in 0..crate::accounts::binding_capacity(&counts, fixtures::limits().client.domain.rows) {
         assert!(bindings.insert(crate::accounts::Meaning::Key).is_some());
     }
     assert!(bindings.insert(crate::accounts::Meaning::Key).is_none());
@@ -796,7 +1024,14 @@ fn deployment_accounts_past_the_count_are_named() {
     let mut view = bounded_view(counts);
     let tree = fixtures::build(&mut view, &root);
     let text = String::from_utf8(fixtures::text(tree).into_vec()).unwrap();
-    assert_eq!(text.matches("Account 41").count(), 2);
+    assert_eq!(
+        tree.nodes()
+            .iter()
+            .filter(|node| node.role == Role::Heading { level: 3 }
+                && node.name.as_ref().is_some_and(|name| name.starts_with(b"Account 41")))
+            .count(),
+        2
+    );
     assert!(text.contains("Accounts left out: 1"));
 }
 

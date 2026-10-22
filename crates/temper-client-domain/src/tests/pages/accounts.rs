@@ -3,7 +3,7 @@ use crate::{
     Action, Address, Event, Request,
     pages::{
         self,
-        accounts::{self, Act, Operation, Selection, SignInState},
+        accounts::{self, Act, Operation, Selection, SignInState, Way},
     },
 };
 use jig_client::{Down, contract as c};
@@ -12,6 +12,184 @@ const PROVIDER: u32 = 17;
 const ACCOUNT: u32 = 29;
 const SOURCE: u32 = 43;
 const NAME: [u8; 16] = [97; 16];
+fn offer(provider: u32) -> c::ProviderOffer {
+    let mut programs = List::with_capacity(1);
+    programs.push(c::Text::new(Box::from(b"claude_code".as_slice()), 32).unwrap()).unwrap();
+    c::ProviderOffer {
+        provider,
+        name: c::DocumentText::complete(c::Text::new(Box::from(b"openai".as_slice()), 32).unwrap()),
+        key_bytes: 4096,
+        sign_in: true,
+        signed_in_plan: true,
+        key: true,
+        programs,
+        programs_cut: false,
+        none: false,
+        manage_usage: None,
+    }
+}
+fn unordered_offers() -> List<c::ProviderOffer> {
+    let mut providers = List::with_capacity(3);
+    for provider in [PROVIDER + 2, PROVIDER, PROVIDER + 1] {
+        providers.push(offer(provider)).unwrap();
+    }
+    providers
+}
+#[test]
+fn account_ways_are_ordered_by_provider_then_sign_in_program_and_key() {
+    assert_eq!(
+        accounts::ways(&unordered_offers(), None, c::AccountHolder::Own).as_slice(),
+        &[
+            Way::SignIn { provider: PROVIDER, plan: true },
+            Way::Program { provider: PROVIDER },
+            Way::Key { provider: PROVIDER },
+            Way::SignIn { provider: PROVIDER + 1, plan: true },
+            Way::Program { provider: PROVIDER + 1 },
+            Way::Key { provider: PROVIDER + 1 },
+            Way::SignIn { provider: PROVIDER + 2, plan: true },
+            Way::Program { provider: PROVIDER + 2 },
+            Way::Key { provider: PROVIDER + 2 },
+        ]
+    );
+}
+#[test]
+fn account_ways_leave_out_the_demos_provider() {
+    let ways = accounts::ways(&unordered_offers(), Some(PROVIDER + 1), c::AccountHolder::Own);
+    for way in &ways {
+        assert_ne!(way.provider(), PROVIDER + 1);
+    }
+}
+#[test]
+fn deployment_account_ways_offer_keys_only() {
+    assert_eq!(
+        accounts::ways(&unordered_offers(), None, c::AccountHolder::Deployment).as_slice(),
+        &[Way::Key { provider: PROVIDER }, Way::Key { provider: PROVIDER + 1 }, Way::Key { provider: PROVIDER + 2 },]
+    );
+}
+#[test]
+fn a_provider_with_no_offered_sources_offers_no_way() {
+    let mut providers = List::with_capacity(1);
+    let mut provider = offer(PROVIDER);
+    provider.sign_in = false;
+    provider.key = false;
+    provider.programs.clear();
+    provider.programs_cut = true;
+    providers.push(provider).unwrap();
+    assert!(accounts::ways(&providers, None, c::AccountHolder::Own).is_empty());
+}
+#[test]
+fn a_sign_in_way_sends_one_own_sign_in_request() {
+    let (root, _, _) = opened(c::HeldRole::Member);
+    let mut page = accounts::Accounts::default();
+    let mut out = Queue::with_capacity(4);
+    let mut serial = 0;
+    let act = Act::Choose { name: NAME, way: Way::SignIn { provider: PROVIDER, plan: true } };
+    page.act(root.client(), act.clone(), &mut serial, &mut out);
+    assert_operation_send(&mut out, c::Ask::SignIn { holder: c::AccountHolder::Own, provider: PROVIDER });
+    page.act(root.client(), act, &mut serial, &mut out);
+    assert!(out.is_empty());
+}
+#[test]
+fn a_key_way_adds_a_new_account_with_the_value_privately_once() {
+    let (mut root, _, _) = opened(c::HeldRole::Owner);
+    select(&mut root, c::AccountHolder::Deployment);
+    act(&mut root, Act::Choose { name: NAME, way: Way::Key { provider: PROVIDER } });
+    key(&mut root, b"private-once");
+    let mut out = sends(submit(&mut root, Operation::AddAccountKey));
+    let (_, name, ask, value) = out.pop().expect("one carried key");
+    assert_eq!(name, NAME);
+    assert_eq!(
+        ask,
+        jig_client::Ask::Jig(Box::new(change(
+            c::AccountHolder::Deployment,
+            c::AccountChange::AddKey {
+                provider: PROVIDER,
+                join: None,
+                digest: skein_lib::sha256::digest(b"private-once")
+            }
+        )))
+    );
+    assert_eq!(value.unwrap().expose(), b"private-once");
+    assert!(out.is_empty());
+    assert!(sends(submit(&mut root, Operation::AddAccountKey)).is_empty());
+    assert!(!root.pages().accounts().unwrap().has_key());
+}
+#[test]
+fn adding_a_key_in_the_account_form_requires_an_account_number() {
+    let mut root = own_accounts();
+    act(&mut root, Act::Select { selection: Selection { provider: Some(PROVIDER), ..Default::default() } });
+    key(&mut root, b"private-once");
+    assert!(sends(submit(&mut root, Operation::AddKey)).is_empty());
+    assert_eq!(root.pages().accounts().unwrap().broken, Some(accounts::Broken::Selection));
+}
+#[test]
+fn a_program_way_declares_the_default_name_for_the_person() {
+    let (root, _, _) = opened(c::HeldRole::Member);
+    let mut page = accounts::Accounts::default();
+    let mut out = Queue::with_capacity(4);
+    let mut serial = 0;
+    page.act(
+        root.client(),
+        Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } },
+        &mut serial,
+        &mut out,
+    );
+    assert_eq!(page.program.as_ref(), b"claude-pat");
+    page.act(root.client(), Act::Submit { name: NAME, operation: Operation::DeclareProgram }, &mut serial, &mut out);
+    assert_operation_send(
+        &mut out,
+        change(
+            c::AccountHolder::Own,
+            c::AccountChange::DeclareProgram {
+                provider: PROVIDER,
+                join: None,
+                name: Box::from(b"claude-pat".as_slice()),
+            },
+        ),
+    );
+}
+#[test]
+fn an_invalid_or_overlong_program_name_is_never_declared() {
+    let (root, _, _) = opened(c::HeldRole::Member);
+    for value in [b"".as_slice(), b"Alice", b"bad name", &[b'a'; 33]] {
+        let mut page = accounts::Accounts::default();
+        let mut out = Queue::with_capacity(4);
+        page.act(root.client(), Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } }, &mut 0, &mut out);
+        page.act(root.client(), Act::ProgramName { value: Box::from(value) }, &mut 0, &mut out);
+        page.act(root.client(), Act::Submit { name: NAME, operation: Operation::DeclareProgram }, &mut 0, &mut out);
+        assert!(out.is_empty());
+    }
+}
+#[test]
+fn the_program_default_uses_the_lowercased_first_name_within_the_name_bound() {
+    for (person, expected) in [
+        (b"ALICE Example".as_slice(), b"claude-alice".as_slice()),
+        (b"abcdefghijklmnopqrstuvwxyz", b"claude-abcdefghijklmnopqrstuvwxy"),
+    ] {
+        let (mut root, watch, _) = opened(c::HeldRole::Member);
+        let c::WatchEvent::Delivered(c::Delivery::Me(mut me)) = frame(c::HeldRole::Member, fixtures::PARTY) else {
+            unreachable!()
+        };
+        me.party.name = c::DocumentText::complete(c::Text::new(Box::from(person), 32).unwrap());
+        deliver(&mut root, watch, c::WatchEvent::Delivered(c::Delivery::Me(me)));
+        act(&mut root, Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } });
+        assert_eq!(root.pages().accounts().unwrap().program.as_ref(), expected);
+    }
+}
+#[test]
+fn a_program_name_at_its_bound_is_declared() {
+    let (root, _, _) = opened(c::HeldRole::Member);
+    let mut page = accounts::Accounts::default();
+    let mut out = Queue::with_capacity(4);
+    let name = Box::new([b'a'; 32]);
+    page.act(root.client(), Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } }, &mut 0, &mut out);
+    page.act(root.client(), Act::ProgramName { value: name.clone() }, &mut 0, &mut out);
+    page.act(root.client(), Act::Submit { name: NAME, operation: Operation::DeclareProgram }, &mut 0, &mut out);
+    assert_operation_send(
+        &mut out,
+        change(c::AccountHolder::Own, c::AccountChange::DeclareProgram { provider: PROVIDER, join: None, name }),
+    );
+}
 fn event(root: &mut crate::Domain, event: Event) -> Queue<Request> {
     let limits = fixtures::limits();
     let mut out = Queue::with_capacity(crate::max_out(&limits));
@@ -25,6 +203,8 @@ fn act(root: &mut crate::Domain, act: Act) -> Queue<Request> {
 fn frame(role: c::HeldRole, party: u64) -> c::WatchEvent {
     let c::WatchEvent::Delivered(c::Delivery::Me(mut me)) = fixtures::frame(party) else { unreachable!() };
     me.deployment_role = Some(role);
+    me.providers = List::with_capacity(1);
+    me.providers.push(offer(PROVIDER)).unwrap();
     c::WatchEvent::Delivered(c::Delivery::Me(me))
 }
 fn opened(role: c::HeldRole) -> (crate::Domain, Token, Token) {
@@ -420,9 +600,9 @@ fn a_key_at_capacity_can_create_a_standalone_account() {
     let (root, _, _) = opened(c::HeldRole::Owner);
     let mut page = accounts::Accounts::default();
     let mut out = Queue::with_capacity(4);
-    page.selection.provider = Some(PROVIDER);
+    page.act(root.client(), Act::Choose { name: NAME, way: Way::Key { provider: PROVIDER } }, &mut 0, &mut out);
     page.key(Secret::new(Box::new([b'x'; 4096])));
-    page.act(root.client(), Act::Submit { name: NAME, operation: Operation::AddKey }, &mut 0, &mut out);
+    page.act(root.client(), Act::Submit { name: NAME, operation: Operation::AddAccountKey }, &mut 0, &mut out);
     let c::Ask::AccountChange { change: c::AccountChange::AddKey { join: None, .. }, .. } = page.pending.unwrap().ask
     else {
         panic!("key-only account");
