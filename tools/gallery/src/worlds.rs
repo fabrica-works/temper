@@ -170,7 +170,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                         &temper_client_domain::forge::wire_limits(&limits.forge).expect("wire limits"),
                     )
                     .expect("gallery change watch");
-                    let w::Watch::Change(subject) = watching.watch();
+                    let w::Watch::Change(subject) = watching.watch() else { panic!("gallery change watch") };
                     if let Some(panel) = change_panel(w, subject.task()) {
                         for up in [
                             jig_client::Up::Watched { watch, event: c::WatchEvent::Opened },

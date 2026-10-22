@@ -299,3 +299,22 @@ fn a_restored_adoption_with_a_drawn_engine_key_keeps_its_context() {
         &[Box::from(b"kept: adopt It is not known whether o/n was adopted.\n".as_slice())]
     );
 }
+
+#[test]
+fn a_saved_setup_request_is_not_restored_as_an_adoption() {
+    let mut records = fixtures::restored_adoption(fixtures::PARTY);
+    let held = records.get_mut(fixtures::EMPTY).expect("one saved request");
+    let client::Ask::Family { record, .. } = &mut held.request.request else { panic!("family request") };
+    let request = w::Requesting::new(
+        &w::CEILINGS,
+        w::RequestingParts {
+            request: w::Request::SetUp(w::SetUp::new(&w::CEILINGS, w::SetUpParts { forge: 3 }).expect("forge")),
+        },
+    )
+    .expect("setup request");
+    record.bytes = temper_client_protocol_wire::requesting(&request);
+    let mut root = fixtures::started(records);
+    root.deliver(c::Delivery::Me(Box::new(fixtures::me(fixtures::PARTY))));
+    root.adopt_outcome(fixtures::RESTORED_PREFIX, client::Outcome::Unknown);
+    assert!(root.kept_lines.is_empty(), "a setup request has no adoption outcome to print");
+}

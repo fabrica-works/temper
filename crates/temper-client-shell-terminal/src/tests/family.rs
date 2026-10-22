@@ -12,9 +12,15 @@ fn an_adoption_round_trips_through_the_family_record() {
         adoption.role = role;
         let record = family::request(&adoption, &limits).expect("fixture encodes");
         assert_eq!((record.family, record.version), (FORGE, CLIENT_VERSION), "{role:?}: owner");
-        let value = w::Adopt::decode(&limits, &mut skein_lib::Reader::new(&record.bytes))
+        let value = (match w::Requesting::decode(&limits, &mut skein_lib::Reader::new(&record.bytes))
             .expect("adoption decodes")
-            .into_parts();
+            .into_parts()
+            .request
+        {
+            w::Request::Adopt(adopt) => adopt,
+            w::Request::SetUp(_) => panic!("expected adoption"),
+        })
+        .into_parts();
         assert_eq!((value.project, value.home, value.forge), (adoption.project, adoption.home, adoption.forge));
         assert_eq!(
             (value.owner, value.name, value.prefix, value.landing),
@@ -68,7 +74,7 @@ fn protection_rule() -> w::Protection {
     )
 }
 fn answer(outcome: w::Outcome) -> jig_client::Family {
-    let record = w::AdoptAnswer::new(&fixtures::wire_limits(), w::AdoptAnswerParts { outcome }).expect("outcome fits");
+    let record = w::Answer::new(&fixtures::wire_limits(), w::AnswerParts { outcome }).expect("outcome fits");
     jig_client::Family { family: FORGE, version: CLIENT_VERSION, bytes: wire::answer(&record) }
 }
 fn refused(reason: w::ForgeReason) -> w::Outcome {
@@ -128,5 +134,18 @@ fn each_outcome_decodes_to_the_forge_sides_answer() {
     let link = fixtures::link_limits();
     for (name, outcome, expected) in outcome_rows() {
         assert_eq!(family::answer(&answer(outcome), &wire, &link), Some(expected), "{name}");
+    }
+}
+
+#[test]
+fn setup_outcomes_are_undecodable_for_an_adoption() {
+    let limits = fixtures::wire_limits();
+    for outcome in [
+        w::Outcome::SettingUp,
+        w::Outcome::SetUpRefused(
+            w::SetUpRefused::new(&limits, w::SetUpRefusedParts { why: w::SetUpRefusal::Busy }).expect("refusal"),
+        ),
+    ] {
+        assert_eq!(family::answer(&answer(outcome), &limits, &fixtures::link_limits()), None);
     }
 }

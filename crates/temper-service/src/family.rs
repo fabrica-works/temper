@@ -1,7 +1,7 @@
 //! The forge family's records at the clients' boundary (client/README.md, 8).
 use alloc::boxed::Box;
 use jig_protocol_engine_clients as kit;
-use skein_lib::{Decimal, List, Reader, Token, Writer};
+use skein_lib::{Decimal, List, Token, Writer};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 use temper_engine_domain as root;
 use temper_engine_domain_forge as forge;
@@ -27,19 +27,20 @@ pub fn to_root(
 ) -> Result<root::Event, Box<kit::Event>> {
     match exchange {
         kit::ToApplication::Request { reply_to, sign_in, key, family, version, record, digest, scope, carried } => {
-            let mut reader = Reader::new(&record);
             let request = match wire::owner(family) {
-                Some(wire::Owner::Forge) if version == wire::CLIENT_VERSION => {
-                    w::Adopt::decode(limits, &mut reader).ok()
-                }
+                Some(wire::Owner::Forge) if version == wire::CLIENT_VERSION => wire::decode_requesting(&record, limits),
                 Some(wire::Owner::Forge | wire::Owner::Pages | wire::Owner::Runner) | None => None,
             };
-            let Some(request) = request else {
+            // task E (forgejo-setup M3) wires SetUp and Watch::Forges; until then refuse them.
+            let request = match request {
+                Some(request) => request.into_parts().request,
+                None => {
+                    return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));
+                }
+            };
+            let w::Request::Adopt(request) = request else {
                 return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));
             };
-            if !reader.is_empty() {
-                return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));
-            }
             let a = request.into_parts();
             let mut host = Box::default();
             for forge in forges {
@@ -102,20 +103,19 @@ pub fn to_root(
             if family == wire::FORGE
                 && version == wire::CLIENT_VERSION
                 && let Some(watching) = wire::decode_watching(&record, limits)
+                && let w::Watch::Change(subject) = watching.into_parts().watch
+                && subject.task() > 0
             {
-                let w::Watch::Change(subject) = watching.into_parts().watch;
-                if subject.task() > 0 {
-                    return Ok(root::Event::Party(root::PartyInput::Watch {
-                        watcher,
-                        sign_in,
-                        subject: jig_domain_core::documents::Watched::Application {
-                            scope,
-                            connector: wire::FORGE,
-                            subject: Token::new(subject.task()),
-                        },
-                        window,
-                    }));
-                }
+                return Ok(root::Event::Party(root::PartyInput::Watch {
+                    watcher,
+                    sign_in,
+                    subject: jig_domain_core::documents::Watched::Application {
+                        scope,
+                        connector: wire::FORGE,
+                        subject: Token::new(subject.task()),
+                    },
+                    window,
+                }));
             }
             Err(Box::new(kit::Event::WatchRefused { watcher, why: jig_domain_core::WatchRefusal::Unknown }))
         }
@@ -384,7 +384,7 @@ pub fn answer(
         ),
         None => w::Outcome::Unknown,
     };
-    let answer = w::AdoptAnswer::new(limits, w::AdoptAnswerParts { outcome }).ok()?;
+    let answer = w::Answer::new(limits, w::AnswerParts { outcome }).ok()?;
     Some(wire::answer(&answer))
 }
 fn protection(value: forge::Protection, limits: &w::Limits) -> Option<w::Protection> {
