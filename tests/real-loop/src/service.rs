@@ -152,6 +152,8 @@ impl Host for ServiceHost {
                 }
             }
             temper_service::iterate(service, now, wall);
+            while service.listening().pop().is_some() {}
+            while service.notes().pop().is_some() {}
             while let Some(link) = service.links().pop() {
                 self.links += 1;
                 self.link.clear();
