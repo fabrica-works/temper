@@ -53,6 +53,23 @@ fn a_process_exit_keeps_its_owner_and_status() {
     );
 }
 
+#[test]
+fn a_live_piece_becomes_progress_for_its_owner() {
+    let owner = Token::new(9);
+    let live = smith_host_protocol::OpenEvent::Live {
+        turn: 1,
+        retry: 0,
+        kind: smith_channel::LiveKind::Text,
+        offset: 0,
+        bytes: b"live text".as_slice().into(),
+        call: None,
+    };
+    assert_eq!(
+        worker_route::process(smith_host_protocol::ProcessEvent::Channel { agent: owner, event: Box::new(live) }),
+        Some(temper_worker_domain::Event::Process(Box::new(agent::process::Event::Progress { owner }))),
+    );
+}
+
 use super::fixtures;
 use crate::identities::{IdentityTable, Unfit};
 use crate::translate;
