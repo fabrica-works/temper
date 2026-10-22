@@ -56,25 +56,11 @@ fn a_delegates_question_answered_in_the_inbox_reaches_its_chat() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     let tree = world.tree(person);
-    let (start, log) = tree
-        .nodes()
-        .iter()
-        .enumerate()
-        .find(|(_, node)| node.role == Role::Log && node.name.as_deref() == Some(b"Conversation"))
-        .expect("chat conversation");
-    let conversation = &tree.nodes()[start..start + usize::try_from(log.size).expect("log size")];
-    for (label, words) in [(format!("T{delegate}").into_bytes(), QUESTION), (b"You".to_vec(), ANSWER)] {
-        assert!(
-            conversation.iter().filter(|node| node.role == Role::Region).any(|turn| {
-                let mut face = TreeFace::subtree(tree, turn.id).expect("conversation turn");
-                matches!(face.find(&Find::exactly_named(Role::Paragraph, &label)), Found::Node(_))
-                    && matches!(face.find(&Find::exactly_named(Role::Paragraph, words)), Found::Node(_))
-            }),
-            "turn under {} holding {:?}: {conversation:?}",
-            String::from_utf8_lossy(&label),
-            String::from_utf8_lossy(words)
-        );
-    }
+    assert!(
+        turn_holds(tree, format!("T{delegate}").as_bytes(), QUESTION),
+        "delegate T{delegate}'s question turn missing"
+    );
+    assert!(turn_holds(tree, b"You", ANSWER), "person's answer turn under You missing");
 
     world.go(person, fixtures::inbox());
     world.person(
@@ -87,6 +73,23 @@ fn a_delegates_question_answered_in_the_inbox_reaches_its_chat() {
     );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+}
+
+fn turn_holds(tree: &skein_ui::Tree, label: &[u8], words: &[u8]) -> bool {
+    let Some((start, log)) = tree
+        .nodes()
+        .iter()
+        .enumerate()
+        .find(|(_, node)| node.role == Role::Log && node.name.as_deref() == Some(b"Conversation"))
+    else {
+        return false;
+    };
+    let conversation = &tree.nodes()[start..start + usize::try_from(log.size).expect("log size")];
+    conversation.iter().filter(|node| node.role == Role::Region).any(|turn| {
+        let mut face = TreeFace::subtree(tree, turn.id).expect("conversation turn");
+        matches!(face.find(&Find::exactly_named(Role::Paragraph, label)), Found::Node(_))
+            && matches!(face.find(&Find::exactly_named(Role::Paragraph, words)), Found::Node(_))
+    })
 }
 
 #[test]
