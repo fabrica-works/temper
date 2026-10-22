@@ -1578,13 +1578,12 @@ Its rules:
   "Look again" (below). Its outcome is the editor's: pending, then the
   answer in jig's words in the region, a refusal as moved with "Look
   again". A done amendment leaves the region holding its outcome alone,
-  where it was made, until "Amend" opens another draft.
-  Amend is drawn by its admission as every act is: proposable, the page
-  proposes nothing. The model choice for the
-  next runs stays the choice line's (3.5), its own amendment, not
-  repeated in the editor. Instructions, dependencies, the deadline,
-  wake and an addressee are `temper ctl amend`'s alone (`tools.md`,
-  5.5).
+  where it was made, until "Amend" opens another draft. Amend is drawn
+  by its admission as every act is: proposable, the page proposes
+  nothing. The model choice for the next runs stays the choice line's
+  (3.5), its own amendment, not repeated in the editor. Instructions,
+  dependencies, the deadline, wake and an addressee are `temper ctl
+  amend`'s alone (`tools.md`, 5.5).
 - **Their outcome.** One request per kind of act at a time; a double
   press joins the pending one (3.6). Pending, its progress as a card
   says it; answered, the outcome in jig's words, or the refusal in
