@@ -669,7 +669,7 @@ digest: task 7c1e09a2b44f0d13
   holds, a chip a line. The engine answers the tools' window within its
   own rows (jig's `client/domain/contract.md`, 7.2), so a tree larger
   than either folds the rest, and its text says so on one line after
-  the rows: `cut: 3 more not shown (2 Running, 1 Waiting); read on
+  the rows: `cut: 3 more not shown (1 Waiting, 2 Running); read on
   with: tasks --project 1 --parent 41`, the folded tasks' count, then
   each phase that has any, in a chip's words and jig's order of phases,
   then the call that lists the root's delegates, the project's number
