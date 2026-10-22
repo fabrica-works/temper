@@ -12,7 +12,7 @@ CHAT = 'http://127.0.0.1:9200/chats/42'
 REPLY = ['wait', 'text', 'First worker replied.', '--in', 'log', 'Conversation', '--timeout', '60']
 CALLS = [
     ['type', 'text area', 'Start a chat'], ['press', 'button', 'Start', '--exact'],
-    ['wait', 'log', 'Conversation', '--timeout', '60'], REPLY, ['address'],
+    ['wait', 'log', 'Conversation', '--timeout', '60'], REPLY[:-1] + ['90'], ['address'],
     ['go', '/chats'], ['wait', 'heading', 'Chats', '--exact', '--timeout', '60'],
     ['go', '/chats/42'], REPLY, ['reload'], REPLY, ['shot'], ['back'],
     ['wait', 'heading', 'Chats', '--exact', '--timeout', '60'], ['address']]

@@ -515,15 +515,22 @@ Each `{artifact.temper} ctl` action is `qa.md`'s, 5.1. In order:
 `smoke BROWSE ADDRESS`, POSIX sh: each step one `browse` call, its
 output printed, and the story ends at the first that does not exit 0,
 with its status, which fails the action (`action/smoke/exit:1`, skein's
-`lab.md`, 7.1). Each expectation is a `wait`, 60 seconds at most, so a
-missed one exits 1 (lab-browser.md, 8.8). The roles are the fake
+`lab.md`, 7.1). Each expectation is a `wait`, so a missed one exits 1
+(lab-browser.md, 8.8), 60 seconds at most but the first reply's, 90. The roles are the fake
 person's; the names are o/web-look's words for the pages:
 
 1. `type "text area" "Start a chat"`, its text `cluster-first-chat`,
    the fake model's cue (`cluster/llm.json`); `press button Start
    --exact`.
 2. `wait log Conversation`, the chat's page; `wait text "First worker
-   replied." --in log Conversation`: its reply, live.
+   replied." --in log Conversation --timeout 90`: its reply, once its
+   turn commits. A run is shown by its activity, and its words as each
+   turn commits (`docs/design/protocol/llm.md`, 7; an agent process
+   gives no provisional text, `client/tools.md`). The cue's turn writes
+   the reply, then calls `wait`, which ends at the charter's
+   `waiting_ms`, 60 s (`cluster/engine.json`): the reply shows 60 s
+   after Start, most of a run's time, and the wait's 90 s leave it a
+   margin. A shorter fixture or `waiting_ms` would only hide it.
 3. `address`: the chat's, `/chats/<task>` on the origin, kept.
 4. `go /chats`, `wait heading Chats --exact`; `go` the chat's path,
    `wait text "First worker replied." --in log Conversation`: its page

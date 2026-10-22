@@ -23,7 +23,9 @@ read_address() {
 printf 'cluster-first-chat\n' | call type 'text area' 'Start a chat'
 call press button Start --exact
 call wait log Conversation --timeout 60
-call wait text 'First worker replied.' --in log Conversation --timeout 60
+# The reply shows as its turn commits, which the cue's wait ends at the
+# charter's waiting_ms, 60 s (lab/README.md): 90 s leaves a margin.
+call wait text 'First worker replied.' --in log Conversation --timeout 90
 read_address
 case "$current" in
     http://*/chats/*) ;;
