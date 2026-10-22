@@ -234,3 +234,14 @@ fn a_refused_next_run_is_named_in_text_and_json() {
         assert!(skein_lib::bytes::find(&printed.stdout, expected).is_some());
     }
 }
+
+#[test]
+fn a_document_at_its_byte_bound_prints_worst_case_json_escapes() {
+    use crate::jig::render::document::{self, Document};
+    let task = fixtures::document_at_byte_bound();
+    let printed = document::print(Document::Task(&task, None), true, &crate::limits::tools(), &crate::root::Parts);
+
+    assert_eq!(printed.status, 0, "{:?}", printed.stderr);
+    assert!(u64::try_from(printed.stdout.len()).expect("output length fits") > crate::limits::DOCUMENT);
+    assert!(fixtures::occurrences(&printed.stdout, br"\u0000") > 0, "control text is JSON escaped");
+}

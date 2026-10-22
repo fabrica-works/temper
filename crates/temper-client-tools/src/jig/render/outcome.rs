@@ -138,7 +138,7 @@ fn bytes(
     if json {
         let bounds = skein_json::writer::Limits {
             depth: 32,
-            length: u32::try_from(limits.ask_bytes).expect("output bytes fit"),
+            length: u32::try_from(limits.result_bytes).expect("output bytes fit"),
         };
         let mut measure = Encoder::measure(&bounds);
         encode(operation, outcome, &mut measure, kept, me, limits);

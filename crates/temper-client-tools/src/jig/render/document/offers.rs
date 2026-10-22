@@ -115,9 +115,9 @@ pub(super) fn readiness_rows(limits: &Limits) -> u32 {
 pub(super) fn me_window(limits: &Limits) -> Window {
     // Contract: rows providers × (1 header + rows programs). Each JSON row
     // costs at most 256 structural bytes; escaped text costs 6 × text bytes.
-    // Reserve 1 KiB for the envelope; the ask-byte ceiling bounds this window.
+    // Reserve 1 KiB for the envelope; the result-byte ceiling bounds this window.
     let rows = limits.rows.saturating_mul(limits.rows.saturating_add(1));
-    let room = limits.ask_bytes.saturating_sub(1024).saturating_sub(u64::from(limits.text).saturating_mul(6));
+    let room = limits.result_bytes.saturating_sub(1024).saturating_sub(u64::from(limits.text).saturating_mul(6));
     Window { left: u32::try_from(u64::from(rows).min(room / 256)).expect("contract row bound"), cut: false }
 }
 pub(super) fn whole(bytes: &[u8], out: &mut Encoder, cut: &mut Cut, window: &mut Window) {

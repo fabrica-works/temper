@@ -6,7 +6,7 @@ use skein_json::writer::{Encoder, Limits as JsonLimits};
 
 #[must_use]
 pub(crate) fn part_bytes(part: &Part<'_>, limits: &Limits) -> Box<[u8]> {
-    let bounds = JsonLimits { depth: 32, length: u32::try_from(limits.ask_bytes).expect("output bound fits") };
+    let bounds = JsonLimits { depth: 32, length: u32::try_from(limits.result_bytes).expect("output bound fits") };
     let mut measure = Encoder::measure(&bounds);
     encode(part, limits, false, &mut measure);
     let mut out = Encoder::write(measure.measured().expect("bounded subject"), &bounds);

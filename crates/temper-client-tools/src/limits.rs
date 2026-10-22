@@ -8,6 +8,10 @@ pub const TEXT: u32 = 32_768;
 pub use crate::jig::call::{PROGRAM_ADAPTER, PROGRAM_NAME};
 pub const PART: u32 = 16_384;
 pub const DOCUMENT: u64 = 1_048_576;
+/// A document's bytes can each become six JSON bytes (`\u00XX` in skein's
+/// encoder). Reserve the same 1 KiB envelope as the me window for the printed
+/// object's digest, continuation and result framing, beyond the document.
+pub const RESULT_BYTES: u64 = DOCUMENT * 6 + 1024;
 pub const DEADLINE: Duration = Duration::from_secs(30);
 pub const LOCK: Duration = Duration::from_secs(60);
 pub const LOCK_TRY: Duration = Duration::from_millis(100);
@@ -74,6 +78,7 @@ pub fn tools() -> crate::jig::Limits {
         program_login: b"temper program-login",
         application: b"temper",
         ask_bytes: client.ask_bytes,
+        result_bytes: RESULT_BYTES,
         text: TEXT,
         part: PART,
         wait: WAIT,

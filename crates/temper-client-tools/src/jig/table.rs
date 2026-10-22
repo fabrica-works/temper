@@ -7,6 +7,7 @@ pub struct Limits {
     pub program_login: &'static [u8],
     pub application: &'static [u8],
     pub ask_bytes: u64,
+    pub result_bytes: u64,
     pub text: u32,
     pub part: u32,
     pub wait: Duration,

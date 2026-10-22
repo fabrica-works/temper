@@ -77,3 +77,35 @@ fn run_prints_the_hosts_provisional_text() {
     root.deliver_run(fixtures::provisional());
     assert_eq!(root.answer(call).expect("run answered").stdout, fixtures::golden("run_provisional"));
 }
+
+#[test]
+fn a_document_sized_turn_prints_escaped_tool_names_with_the_shipped_limits() {
+    use crate::limits;
+    use jig_client::contract as c;
+    use skein_lib::List;
+
+    // Leave 256 bytes per call for its source framing. Each retained tool
+    // name fits TEXT; together their six-byte NUL escapes pass ask_bytes.
+    let tool_bytes = limits::TEXT.checked_sub(256).expect("room for call framing");
+    let mut blocks = List::with_capacity(limits::ROWS);
+    for number in 0..limits::ROWS {
+        blocks
+            .push(c::Block::Call(c::Call {
+                number: u64::from(number),
+                tool: c::Text::new(fixtures::worst_case_json_text(tool_bytes), limits::TEXT)
+                    .expect("tool within shipped text bound"),
+                input: c::Text::new(Box::default(), limits::TEXT).expect("empty input"),
+                outcome: None,
+                failed: false,
+                objects: List::with_capacity(0),
+                parts: List::with_capacity(0),
+            }))
+            .expect("calls within shipped block bound");
+    }
+    let printed =
+        fixtures::read_answer(&["turn", fixtures::TASK_CALL[1], "3.7", "--json"], fixtures::turn_blocks(blocks));
+
+    assert_eq!(printed.status, 0, "{:?}", printed.stderr);
+    let escaped = tool_bytes.checked_mul(limits::ROWS).expect("bounded document");
+    assert_eq!(fixtures::occurrences(&printed.stdout, br"\u0000"), usize::try_from(escaped).expect("count fits"));
+}

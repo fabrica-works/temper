@@ -341,3 +341,68 @@ pub(crate) fn composite_tree() -> c::Tree {
         held_below: 0,
     }
 }
+
+/// NUL is valid UTF-8 and takes six bytes as a JSON Unicode escape.
+pub(crate) fn worst_case_json_text(size: u32) -> Box<[u8]> {
+    let mut out = skein_lib::Writer::new(usize::try_from(size).expect("fixture length"));
+    for _ in 0..size {
+        out.put(&[0]).expect("fixture length");
+    }
+    out.finish()
+}
+
+/// Four nine-segment paths can fill DOCUMENT while each segment stays at TEXT.
+const DOCUMENT_RESOURCES: u32 = 4;
+pub(crate) fn document_at_byte_bound() -> c::Task {
+    use jig_client_protocol_wire::v11 as w;
+    let client = crate::limits::client().client;
+    let link = jig_client_protocol_link::Limits::new(client.domain, client.exchanges).expect("shipped link limits");
+    let mut parts = jig_client_test_records::task_record().into_parts();
+    parts.instructions = Some(
+        w::DocumentText::new(
+            &link.wire,
+            w::DocumentTextParts { bytes: worst_case_json_text(client.domain.text), cut: false },
+        )
+        .expect("worst-case instructions at text bound"),
+    );
+    parts.resources = resource_pieces(&link, 0);
+    let empty = w::Task::new(&link.wire, parts).expect("task with empty paths");
+    let payload = u32::try_from(crate::limits::DOCUMENT)
+        .expect("document bound fits")
+        .checked_sub(empty.measure())
+        .expect("room after framing");
+    let mut parts = empty.into_parts();
+    parts.resources = resource_pieces(&link, payload);
+    let record = w::Task::new(&link.wire, parts).expect("task at document bound");
+    assert_eq!(u64::from(record.measure()), crate::limits::DOCUMENT, "whole encoded document at the bound");
+    jig_client_protocol_link::translate::documents::task(record, &link).expect("document admitted by shipped limits")
+}
+fn resource_pieces(link: &jig_client_protocol_link::Limits, payload: u32) -> Box<[u8]> {
+    use jig_client_protocol_wire::v11 as w;
+    let mut rows = List::with_capacity(DOCUMENT_RESOURCES);
+    let mut left = payload;
+    let mut size = 0_u32;
+    for _ in 0..DOCUMENT_RESOURCES {
+        let mut path = List::with_capacity(link.client.segments);
+        for _ in 0..link.client.segments {
+            let bytes = left.min(link.client.text);
+            path.push(worst_case_json_text(bytes)).expect("bounded path");
+            left = left.checked_sub(bytes).expect("within payload");
+        }
+        let part = w::Part::Resource(
+            w::PartResource::new(&link.wire, w::PartResourceParts { connector: 4, path }).expect("bounded resource"),
+        );
+        let row = w::TaskResource::Part(
+            w::TaskResourcePart::new(&link.wire, w::TaskResourcePartParts { value: part }).expect("resource row"),
+        );
+        size = size.checked_add(4).expect("piece prefix").checked_add(row.measure()).expect("bounded pieces");
+        rows.push(row).expect("bounded resources");
+    }
+    assert_eq!(left, 0, "paths contain the whole payload");
+    let mut out = skein_lib::Writer::new(usize::try_from(size).expect("pieces fit"));
+    for row in &rows {
+        out.put(&row.measure().to_be_bytes()).expect("piece prefix");
+        row.encode(&mut out).expect("measured row");
+    }
+    out.finish()
+}

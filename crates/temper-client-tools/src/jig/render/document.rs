@@ -39,7 +39,7 @@ pub(crate) fn print(
     let stdout = if json {
         let bounds = skein_json::writer::Limits {
             depth: 32,
-            length: if accounts { limits.text } else { u32::try_from(limits.ask_bytes).expect("output bound fits") },
+            length: if accounts { limits.text } else { u32::try_from(limits.result_bytes).expect("output bound fits") },
         };
         let mut measure = Encoder::measure(&bounds);
         encode(&document, limits, &mut measure);
