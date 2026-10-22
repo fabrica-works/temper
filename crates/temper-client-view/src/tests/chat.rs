@@ -610,12 +610,25 @@ fn older_is_not_offered_while_the_window_is_filling() {
 }
 fn answered_message(answer: c::Answer) -> temper_client_domain::Domain {
     use temper_client_domain::{Action, Event, Request, pages::Act};
-    let mut root = chat_with_history();
-    let mut out = skein_lib::Queue::with_capacity(temper_client_domain::max_out(&fixtures::domain_limits()));
+    let (mut root, mut out) = history();
+    let mut seen = None;
+    while let Some(request) = out.pop() {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Send { attempt, request: jig_client::Ask::Jig(ask), .. },
+                },
+        } = request
+            && let c::Ask::Seen { .. } = *ask
+        {
+            seen = Some(attempt);
+        }
+    }
+    let seen = seen.expect("history already emitted automatic Seen");
     for act in [Act::MessageWords { words: Box::from(*b"Hello") }, Act::Send] {
         chat_event(&mut root, Event::Act { action: Action::Pages(act) }, &mut out);
     }
-    assert_eq!(root.pages().chat().expect("chat").pending.len(), 1);
+    assert_eq!(root.pages().chat().expect("chat").pending.len(), 2);
     let pending = fixtures::page_view(&root);
     assert!(fixtures::find(pending.tree(), Role::Status, b"Being sent").is_some());
     let thread = styled(pending.tree(), crate::look::THREAD);
@@ -643,6 +656,20 @@ fn answered_message(answer: c::Answer) -> temper_client_domain::Domain {
                     attempt,
                     envelope: skein_lib::RequestEnvelope::Final,
                     answer: Some(jig_client::Answered::Jig(answer)),
+                    why: None,
+                },
+            },
+        },
+        &mut out,
+    );
+    chat_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt: seen,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Changed))),
                     why: None,
                 },
             },
@@ -1019,6 +1046,30 @@ fn a_chats_end_and_its_phase_keep_the_supplied_clock() {
     }
 }
 
+#[test]
+fn an_automatic_seen_draws_no_progress() {
+    let root = chat_with_history();
+    let chat = root.pages().chat().expect("chat");
+    let mut seeing = false;
+    for (key, kind) in &chat.pending {
+        if *kind == temper_client_domain::pages::chat::Sending::Seen {
+            assert!(root.client().pending(*key).is_some(), "request table has Seen progress");
+            seeing = true;
+        }
+    }
+    assert!(seeing, "automatic Seen pending");
+    let view = fixtures::page_view(&root);
+    let words = fixtures::words();
+    for phrase in
+        [crate::cards::P::InFlight, crate::cards::P::Retrying, crate::cards::P::Parked, crate::cards::P::Unknown]
+    {
+        let name = words.say_card(phrase, &[]);
+        assert!(fixtures::find(view.tree(), Role::Status, &name).is_none(), "automatic request progress: {name:?}");
+    }
+    assert!(fixtures::find(view.tree(), Role::Button, b"Mark seen").is_none());
+}
+
+// Thursday 22 October 2026, noon UTC, and its neighbouring days.
 const TURN_NOON: u64 = 1_792_670_400;
 const TURN_DAY: u64 = 86_400;
 const TURN_MIDNIGHT: u64 = TURN_NOON - TURN_DAY / 2;

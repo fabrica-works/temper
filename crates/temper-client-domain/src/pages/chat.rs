@@ -600,6 +600,23 @@ impl Chat {
             | Act::Go { .. } => unreachable!("only conversation acts routed here"),
         }
     }
+    pub(crate) fn see(&mut self, serial: &mut u64, out: &mut Queue<Request>) {
+        if self.thread.loaded <= self.seen || self.sending(Sending::Seen) {
+            return;
+        }
+        *serial = serial.checked_add(1).expect("chat keys fit");
+        let key = Key { asker: Owner::Pages.asker(), number: *serial };
+        self.seen_before = self.seen;
+        self.seen = self.thread.loaded;
+        self.pending.push((key, Sending::Seen)).expect("one seen fits");
+        out.push(Request::Client(jig_client::Event::Send {
+            key,
+            name: None,
+            request: jig_client::Ask::Jig(Box::new(c::Ask::Seen {
+                through: c::SeenThrough::Conversation { task: self.task, through: self.seen },
+            })),
+        }));
+    }
     fn send(&mut self, _env: &Env<Limits>, client: &Client, kind: Sending, serial: &mut u64, out: &mut Queue<Request>) {
         let Some(task) = self.task(client) else { return };
         let ask = match kind {

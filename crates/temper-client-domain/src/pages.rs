@@ -309,8 +309,8 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 task.amend(env, client, act, &mut pages.serial, out);
             }
         }
-        Event::Act { act: Act::OpenResult { task, .. } } => {
-            open_result(task, out);
+        Event::Act { act: Act::OpenResult { task, through } } => {
+            open_result(pages, task, through, out);
         }
         Event::Act {
             act:
@@ -469,9 +469,19 @@ fn seen_answered(outcome: &jig_client::Outcome) -> bool {
     }
 }
 
-// The automatic Seen is held (decision 515): jig's link keeps a Seen as a pending act, which arms the
-// page's warning on leaving, so following a result only shows it until the repin that ends that.
-fn open_result(task: u64, out: &mut Queue<Request>) {
+fn open_result(pages: &mut Pages, task: u64, through: u64, out: &mut Queue<Request>) {
+    if pages.inbox.is_some() && through > pages.seen && pages.seeing.is_none() {
+        pages.serial = pages.serial.checked_add(1).expect("pages keys fit");
+        let key = jig_client::Key { asker: Owner::Pages.asker(), number: pages.serial };
+        pages.seeing = Some((through, key));
+        out.push(Request::Client(jig_client::Event::Send {
+            key,
+            name: None,
+            request: jig_client::Ask::Jig(Box::new(jig_client::contract::Ask::Seen {
+                through: jig_client::contract::SeenThrough::Results { through },
+            })),
+        }));
+    }
     out.push(Request::Show { address: Address::Task { task } });
 }
 
@@ -488,8 +498,21 @@ fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Req
         return task.told(client, told, out);
     }
     if let Some(chat) = &mut pages.chat {
+        let moved = match &told {
+            Told::Answered { outcome, .. } => seen_answered(outcome),
+            Told::Changed { .. } | Told::Text { .. } | Told::Page { .. } => true,
+            Told::Link { .. }
+            | Told::Pending { .. }
+            | Told::Kept { .. }
+            | Told::Dropped { .. }
+            | Told::Ended { .. } => false,
+        };
         if !chat.told(client, told, out) {
             return false;
+        }
+        // Pages owns the shared key sequence, including automatic conversation reads.
+        if moved {
+            chat.see(&mut pages.serial, out);
         }
     } else if let Some(chats) = &mut pages.chats {
         if !chats.told(told, out) {
