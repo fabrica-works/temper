@@ -16,7 +16,7 @@ const QUESTION: &str =
     "The old parser accepts a trailing comma as an empty last field. RFC 4180 does not. Keep it, or drop it in 0.5?";
 fn person(w: World) -> &'static str {
     match w {
-        Reference | World::None => "Pat",
+        Reference | World::Bare => "Pat",
         Solo => "Robin",
         FirstRun { .. } => "Sam",
     }
@@ -25,7 +25,7 @@ fn project(w: World) -> &'static str {
     match w {
         Reference => "factory",
         Solo => "tally",
-        World::None => "gallery",
+        World::Bare => "gallery",
         FirstRun { .. } => "Default",
     }
 }
@@ -35,7 +35,7 @@ fn doc(s: &str) -> c::DocumentText {
 fn matches_demo(w: World) -> bool {
     match w {
         FirstRun { .. } => true,
-        Reference | Solo | World::None => false,
+        Reference | Solo | World::Bare => false,
     }
 }
 fn model(w: World) -> c::LlmChoice {
@@ -45,7 +45,7 @@ fn model(w: World) -> c::LlmChoice {
             model: text(if matches_demo(w) { "Demo model" } else { "Opus" }),
             effort: match w {
                 Reference => Some(text("xhigh")),
-                Solo | World::None => Some(text("high")),
+                Solo | World::Bare => Some(text("high")),
                 FirstRun { .. } => None,
             },
         },
@@ -58,7 +58,7 @@ fn frame(w: World) -> c::Me {
     let template = member.templates.get_mut(0).expect("chat template");
     template.llm = match w {
         FirstRun { .. } => None,
-        Reference | Solo | World::None => Some(model(w)),
+        Reference | Solo | World::Bare => Some(model(w)),
     };
     member.models = List::with_capacity(1);
     let choice = model(w);
@@ -90,7 +90,7 @@ fn providers(w: World) -> List<c::ProviderOffer> {
     let names: &[(u32, &str)] = match w {
         Reference => &[(17, "Anthropic"), (18, "OpenAI")],
         Solo => &[(17, "Anthropic")],
-        World::None => &[(18, "OpenAI")],
+        World::Bare => &[(18, "OpenAI")],
         FirstRun { .. } => &[(17, "Demo"), (18, "OpenAI")],
     };
     for (number, name) in names {
@@ -145,7 +145,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                         c::Subject::Task { task: number } => {
                             Some(c::Delivery::Task(Box::new(shown_task(w, number, then))))
                         }
-                        c::Subject::Tree { task, window } => Some(held_tree(w, task, window)),
+                        c::Subject::Tree { task, window } => Some(plan_tree(w, task, window, then)),
                         c::Subject::Deployment => Some(c::Delivery::OwnerDeployment(Box::new(deployment(w)))),
                         c::Subject::Chips { .. } | c::Subject::Run { .. } => None,
                     };
@@ -298,7 +298,7 @@ fn chat_rows(w: World, ended: bool) -> List<c::TaskLine> {
         (Reference, false) | (Solo, true) => &[1],
         (Reference, true) => &[3, 2],
         (Solo, false) => &[6, 10],
-        (FirstRun { .. } | World::None, _) => &[],
+        (FirstRun { .. } | World::Bare, _) => &[],
     };
     let mut rows = List::with_capacity(u32::try_from(numbers.len()).expect("small chats"));
     for number in numbers {
@@ -315,7 +315,7 @@ fn inbox_document(w: World) -> c::Inbox {
             (c::ObjectKey::Task(10), c::InboxGroup::Replies),
             (c::ObjectKey::Task(6), c::InboxGroup::Replies),
         ],
-        FirstRun { .. } | World::None => &[],
+        FirstRun { .. } | World::Bare => &[],
     };
     let mut entries = List::with_capacity(u32::try_from(keys.len()).expect("small inbox"));
     for (object, group) in keys {
@@ -535,7 +535,20 @@ fn chip(w: World, number: u64) -> c::Chip {
     } else {
         c::Executor::Agent { charter: f.charter }
     };
+    t.budget = budget(&f);
     finish_document(t).chip
+}
+fn budget(f: &TaskFacts) -> c::OwnerBudget {
+    let spent = round_mockup_spend(f.spent_tenths);
+    c::OwnerBudget {
+        numbers: c::OwnerNumbers { budget: f.budget, spent, spent_below: 0, reserved: 0 },
+        left: f.budget.saturating_sub(spent),
+        funder: match f.parent {
+            Some(parent) => c::Funder::Task(parent),
+            None => c::Funder::Pool { project: PROJECT, person: 73, period: 1 },
+        },
+        deadline: None,
+    }
 }
 #[expect(clippy::manual_map, reason = "fixture follows the step crates’ explicit Option matches")]
 fn document(w: World, number: u64) -> c::Task {
@@ -543,6 +556,11 @@ fn document(w: World, number: u64) -> c::Task {
     let mut t = base_task(number, f.title);
     t.chip = chip(w, number);
     t.priority = f.priority;
+    if f.priority.is_some() {
+        t.goal = Some(number);
+        t.flags.conversation = false;
+        t.flags.listed = true;
+    }
     t.kept_account = if matches_demo(w) || f.change { None } else { Some(f.account) };
     t.last_activity = Wall::from_nanos(f.activity_at);
     t.changed = t.last_activity;
@@ -553,9 +571,7 @@ fn document(w: World, number: u64) -> c::Task {
     t.spec.specification.words = doc(f.brief);
     // Mockup amounts have decimals; the view prints integer deployment units.
     // Round to the nearest unit, and keep the missing below-ledger at zero.
-    t.budget.numbers.spent = round_mockup_spend(f.spent_tenths);
-    t.budget.numbers.budget = f.budget;
-    t.budget.left = f.budget.saturating_sub(round_mockup_spend(f.spent_tenths));
+    t.budget = budget(&f);
     t.llm = if f.change || matches_demo(w) {
         None
     } else {
@@ -1519,7 +1535,7 @@ fn accounts(w: World) -> c::OwnerAccounts {
             })
             .expect("account");
         }
-        FirstRun { .. } | World::None => {
+        FirstRun { .. } | World::Bare => {
             let mut sources = List::with_capacity(2);
             sources
                 .push(c::OwnerAccountSource {
@@ -1933,30 +1949,51 @@ fn shown_task(w: World, task: u64, then: Then) -> c::Task {
     }
     t
 }
-fn held_tree(w: World, task: u64, window: u32) -> c::Delivery {
-    let root = shown_task(w, task, Then::Held).chip;
+fn plan_tree(w: World, task: u64, window: u32, then: Then) -> c::Delivery {
+    let root = shown_task(w, task, then).chip;
+    let mut descendants = Vec::new();
+    let mut pending = vec![(task, 0_u32)];
+    while let Some((parent, depth)) = pending.pop() {
+        for number in facts(w, parent).children {
+            let f = facts(w, *number);
+            // The owner tree contains live tasks; T5's retained result is
+            // not a plan row (client/README.md, 5.8).
+            if f.phase != c::Phase::Done && f.phase != c::Phase::Ended {
+                descendants.push((*number, parent, depth + 1));
+                pending.push((*number, depth + 1));
+            }
+        }
+    }
+    // The engine's live task view supplies number order, not mockup order.
+    descendants.sort_unstable_by_key(|(number, _, _)| *number);
     let mut rows = List::with_capacity(window);
-    for number in facts(w, task).children {
+    let mut phases = c::OwnerPhaseCounts::ZERO;
+    for (number, parent, depth) in descendants {
         if rows.len() < window {
             rows.push(c::OwnerTreeRow {
-                chip: chip(w, *number),
-                parent: task,
-                depth: 1,
+                chip: chip(w, number),
+                parent,
+                depth,
                 proposals: List::with_capacity(0),
-                spent: round_mockup_spend(facts(w, *number).spent_tenths),
+                spent: round_mockup_spend(facts(w, number).spent_tenths),
                 dependencies: List::with_capacity(0),
                 cut: false,
             })
             .expect("tree window");
+        } else {
+            // The solo goal's omitted live descendants are running.
+            assert_eq!(facts(w, number).phase, c::Phase::Running);
+            phases.running += 1;
         }
     }
-    c::Delivery::OwnerTree(Box::new(c::OwnerTree {
-        root,
-        rows,
-        folded: List::with_capacity(0),
-        held_below: 0,
-        next: None,
-    }))
+    let mut folded = List::with_capacity(1);
+    let next = if phases.running > 0 {
+        folded.push(c::OwnerTreeFold { parent: task, phases, held_below: 0 }).expect("root fold");
+        Some(c::Cursor::new(Box::from(b"next".as_slice()), limits().client.domain.text).expect("opaque cursor"))
+    } else {
+        None
+    };
+    c::Delivery::OwnerTree(Box::new(c::OwnerTree { root, rows, folded, held_below: 0, next }))
 }
 
 fn deployment(w: World) -> c::OwnerDeployment {

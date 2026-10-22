@@ -9,7 +9,7 @@ pub enum World {
     Reference,
     Solo,
     FirstRun { step: u8 },
-    None,
+    Bare,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Then {
@@ -32,17 +32,19 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 26;
+pub const N: usize = 28;
 #[must_use]
 pub fn samples() -> [Sample; N] {
     use Then::{
         AccountRefused, Closing, Filled, Held, OutOfDate, Refused, Rejecting, Releasing, Shown, SignedOut, SigningIn,
     };
-    use World::{FirstRun, None, Reference, Solo};
+    use World::{Bare, FirstRun, Reference, Solo};
     [
         Sample { name: "chats-solo", world: Solo, address: Address::Chats, then: Shown },
         Sample { name: "chat-solo-T10", world: Solo, address: Address::Chat { task: 10 }, then: Shown },
         Sample { name: "inbox-solo", world: Solo, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
+        Sample { name: "task-solo-T3", world: Solo, address: Address::Task { task: 3 }, then: Shown },
+        Sample { name: "accounts-solo", world: Solo, address: Address::Accounts, then: Shown },
         Sample { name: "chats-first-run-1", world: FirstRun { step: 1 }, address: Address::Chats, then: Shown },
         Sample { name: "adoption", world: Reference, address: Address::Adopt { project: 1 }, then: Shown },
         Sample { name: "adoption-filled", world: Reference, address: Address::Adopt { project: 1 }, then: Filled },
@@ -76,10 +78,10 @@ pub fn samples() -> [Sample; N] {
         },
         Sample { name: "accounts-reference", world: Reference, address: Address::Accounts, then: Shown },
         Sample { name: "accounts-first-run-1", world: FirstRun { step: 1 }, address: Address::Accounts, then: Shown },
-        Sample { name: "signed-out", world: None, address: Address::Chats, then: SignedOut },
-        Sample { name: "out-of-date", world: None, address: Address::Chats, then: OutOfDate },
-        Sample { name: "chats-empty", world: None, address: Address::Chats, then: Shown },
-        Sample { name: "inbox-empty", world: None, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
+        Sample { name: "signed-out", world: Bare, address: Address::Chats, then: SignedOut },
+        Sample { name: "out-of-date", world: Bare, address: Address::Chats, then: OutOfDate },
+        Sample { name: "chats-empty", world: Bare, address: Address::Chats, then: Shown },
+        Sample { name: "inbox-empty", world: Bare, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
         Sample { name: "chat-closing", world: Solo, address: Address::Chat { task: 6 }, then: Closing },
         Sample { name: "chat-rejecting", world: Solo, address: Address::Chat { task: 10 }, then: Rejecting },
         Sample { name: "task-held", world: Solo, address: Address::Task { task: 3 }, then: Held },
@@ -97,7 +99,7 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         World::Reference => "reference".to_owned(),
         World::Solo => "solo".to_owned(),
         World::FirstRun { step } => format!("first-run&step={step}"),
-        World::None => return None,
+        World::Bare => return None,
     };
     let (page, task) = match sample.address {
         Address::Chats => ("chats", None),

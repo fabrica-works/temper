@@ -19,6 +19,7 @@ const SOLO_LIVE: u32 = 2;
 const SOLO_CLOSED: u32 = 1;
 const REFERENCE_LIVE: u32 = 1;
 const REFERENCE_CLOSED: u32 = 2;
+const SOLO_PLAN_LIVE: u32 = 3;
 struct Holds {
     name: &'static str,
     heading: &'static str,
@@ -29,6 +30,7 @@ enum Part {
     Absent { role: Role, name: &'static str },
     Value { role: Role, name: &'static str, value: &'static str },
     Chats { live: u32, closed: u32 },
+    Plan { live: u32, title: &'static str },
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
@@ -55,6 +57,28 @@ const HOLDS: [Holds; samples::N] = [
             Part::Named { role: Role::Paragraph, name: "JSON output for tally report" },
             Part::Named { role: Role::Button, name: "Accept" },
             Part::Named { role: Role::Paragraph, name: "The old parser accepts" },
+        ],
+    },
+    Holds {
+        name: "task-solo-T3",
+        heading: "CSV import",
+        parts: &[
+            Part::Named { role: Role::Status, name: "waiting on an answer from you" },
+            Part::Plan { live: SOLO_PLAN_LIVE, title: "CSV import: the quoted-field parser" },
+            Part::Named { role: Role::Region, name: "Budget and authority" },
+            Part::Named { role: Role::Paragraph, name: "5 spent · 15 left of 20" },
+            Part::Named { role: Role::Term, name: "Funded by" },
+            Part::Named { role: Role::Description, name: "Your pool" },
+        ],
+    },
+    Holds {
+        name: "accounts-solo",
+        heading: "Accounts",
+        parts: &[
+            Part::Named { role: Role::Heading { level: 3 }, name: "Claude" },
+            Part::Named { role: Role::Item, name: "Source 1 · Order 1 · Program login claude-robin · Ready" },
+            Part::Named { role: Role::Item, name: "Source 2 · Order 2 · API key robin-key · Ready" },
+            Part::Named { role: Role::Paragraph, name: "laptop" },
         ],
     },
     Holds {
@@ -257,6 +281,24 @@ fn each_state_holds_what_its_name_says() {
                         count,
                         (*live).min(window) + (*closed).min(window),
                         "{}: windowed chat rows",
+                        sample.name
+                    );
+                }
+                Part::Plan { live, title } => {
+                    let plan = find(tree, Role::Tree, "Plan", sample.name);
+                    let row = Find::named(Role::Paragraph, title.as_bytes()).within(Box::new([
+                        skein_fake_person::Target::Role { role: Role::Tree, name: Box::from(b"Plan".as_slice()) },
+                    ]));
+                    assert!(matches!(main.find(&row), Found::Node(_)), "{}: delegate title", sample.name);
+                    let nodes = tree.nodes();
+                    let start = nodes.iter().position(|node| node.id == plan).expect("plan node");
+                    let end = start + usize::try_from(nodes[start].size).expect("plan subtree");
+                    let count = nodes[start..end].iter().filter(|node| node.role == Role::TreeItem).count();
+                    let window = driver::limits().client.domain.rows;
+                    assert_eq!(
+                        count,
+                        usize::try_from((*live).min(window)).expect("row count"),
+                        "{}: plan window",
                         sample.name
                     );
                 }

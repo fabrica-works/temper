@@ -14,4 +14,7 @@ fn main() {
         eprintln!("temper-gallery: {why:?}");
         process::exit(1);
     }
+    for sample in temper_gallery::samples::samples() {
+        println!("{}", sample.name);
+    }
 }

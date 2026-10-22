@@ -1,6 +1,8 @@
 chats-solo
 chat-solo-T10
 inbox-solo
+task-solo-T3
+accounts-solo
 chats-first-run-1
 adoption
 adoption-filled
