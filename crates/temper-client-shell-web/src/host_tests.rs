@@ -188,8 +188,9 @@ mod memory_literal;
 // Added dependency marks (client/README.md, 5.8): two nodes per dependency,
 // across two plan rows and the brief: (2 * 2 + 2) * 2 = 12 nodes x 1,674,892 B.
 // Their five phrases add five entries' room, 740 B.
+// Naming navigation and cards adds two phrases (296 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 247959888139;
+const WEB_BYTES: u64 = 247959888435;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

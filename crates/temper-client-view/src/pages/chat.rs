@@ -34,17 +34,15 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     if let Some(chat) = root.pages().chat()
         && let Some(task) = chat.task(root.client())
     {
-        b.open(Role::Slot);
+        let title = words.say(
+            Word::ChatTitle,
+            &[Hole::Number(chat.task), Hole::Name(skein_lib::bytes::copy_of(task.chip.title.bytes()))],
+        );
+        b.open(Role::Region);
+        b.name(&title);
         b.style(look::CHATBAR);
         b.open(Role::Slot);
-        text(
-            b,
-            Role::Heading { level: 1 },
-            &words.say(
-                Word::ChatTitle,
-                &[Hole::Number(chat.task), Hole::Name(skein_lib::bytes::copy_of(task.chip.title.bytes()))],
-            ),
-        );
+        text(b, Role::Heading { level: 1 }, &title);
         if let Some(me) = root.pages().me(root.client()) {
             super::chats::status(
                 b,
@@ -97,6 +95,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         }
         for card in &chat.cards {
             b.open(Role::Item);
+            b.name(&super::inbox::card_name(root, card.object, Word::Proposal, words));
             b.style(look::CARD);
             b.key(super::inbox::card_key(card.object));
             crate::confirm::card(b, root, card, words, bindings, rows);

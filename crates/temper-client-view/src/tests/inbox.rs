@@ -10,6 +10,45 @@ use temper_client_domain::{
 use skein_ui::{Act, Role};
 const GOAL: u64 = 7;
 #[test]
+fn entries_are_named_by_kind_and_source_task() {
+    let view = fixtures::page_view(&fixtures::inbox_root());
+    for name in [
+        b"Proposal from T9".as_slice(),
+        b"Question from T9",
+        b"Held from T9",
+        b"Person task from T9",
+        b"Updates from T9",
+        b"Reply from T10",
+    ] {
+        assert!(fixtures::person_find(view.tree(), Role::Item, name).is_some(), "{name:?}");
+    }
+}
+
+#[test]
+fn a_proposal_from_the_signed_in_party_names_them() {
+    let view = fixtures::page_view(&fixtures::inbox_from(c::Proposer::Party(fixtures::chat::PARTY)));
+    assert!(fixtures::person_find(view.tree(), Role::Item, b"Proposal from Pat").is_some());
+}
+
+#[test]
+fn another_partys_proposal_is_named_by_kind_alone() {
+    let view = fixtures::page_view(&fixtures::inbox_from(c::Proposer::Party(fixtures::OTHER_PARTY)));
+    assert!(fixtures::person_find(view.tree(), Role::Item, b"Proposal").is_some());
+}
+
+#[test]
+fn the_needs_list_is_named_by_its_heading() {
+    let view = fixtures::page_view(&fixtures::inbox_root());
+    assert!(fixtures::person_find(view.tree(), Role::List, b"Needs you").is_some());
+}
+
+#[test]
+fn the_updates_list_is_named_by_its_heading() {
+    let view = fixtures::page_view(&fixtures::inbox_root());
+    assert!(fixtures::person_find(view.tree(), Role::List, b"Updates").is_some());
+}
+
+#[test]
 fn entries_show_proposals_questions_held_and_person_tasks_then_updates() {
     let root = fixtures::inbox_root();
     let mut view = fixtures::view();
@@ -308,7 +347,6 @@ fn a_reply_card_names_its_task_after_the_task_ends() {
         cut: false,
     };
     task.chip.phase = c::Phase::Ended;
-    let name = Box::from(task.chip.title.bytes());
     let result = c::Result {
         task: task.chip.clone(),
         ending: c::Ending::Done,
@@ -331,8 +369,8 @@ fn a_reply_card_names_its_task_after_the_task_ends() {
     );
     let view = fixtures::page_view(&root);
     let mut face = TreeFace::new(view.tree());
-    let find =
-        Find::named(Role::Heading { level: 3 }, b"Reply").within(Box::new([Target::Role { role: Role::Item, name }]));
+    let find = Find::named(Role::Heading { level: 3 }, b"Reply")
+        .within(Box::new([Target::Role { role: Role::Item, name: Box::from(b"Reply from T10".as_slice()) }]));
     let found = match face.find(&find) {
         Found::Node(_) => true,
         Found::Absent | Found::Pending => false,

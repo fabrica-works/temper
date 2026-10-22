@@ -3,6 +3,12 @@ use skein_ui::{Act, Role};
 use temper_client_domain::{Action, pages};
 
 #[test]
+fn the_navigation_is_named_main_navigation() {
+    let view = fixtures::signed_in_with_project();
+    assert!(fixtures::person_find(view.tree(), Role::Navigation, b"Main navigation").is_some());
+}
+
+#[test]
 fn the_navigation_ends_with_accounts() {
     let view = fixtures::signed_in_with_project();
     assert_eq!(

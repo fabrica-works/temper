@@ -253,13 +253,16 @@ pub enum Word {
     DependencyAddedByTask,
     DependencyAddedByDeployment,
     DependencyKeeps,
+    MainNavigation,
+    KindFrom,
 }
 // Room for temper, jig, account, card and forge phrases.
 // Seven chat projection phrases, alongside the agent's original work-line words.
 // Eleven amendment editor phrases (client/README.md, 5.11), and five added
 // dependency mark phrases (5.8).
-const PHRASES: u32 = 599;
-const ALL: [Word; 237] = [
+// Two names for navigation and cards.
+const PHRASES: u32 = 601;
+const ALL: [Word; 239] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -497,6 +500,8 @@ const ALL: [Word; 237] = [
     Word::DependencyAddedByTask,
     Word::DependencyAddedByDeployment,
     Word::DependencyKeeps,
+    Word::MainNavigation,
+    Word::KindFrom,
 ];
 impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
@@ -744,6 +749,8 @@ impl Word {
             Self::DependencyAddedByTask => 1060,
             Self::DependencyAddedByDeployment => 1061,
             Self::DependencyKeeps => 1062,
+            Self::MainNavigation => 1063,
+            Self::KindFrom => 1064,
         };
         let owner =
             if number >= 100 { crate::frame::owner() } else { temper_client_domain::forge::words::owner(connector) };
@@ -1065,6 +1072,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Again => (&[b"Repeat the effect"], &[]),
         Word::DoNotRepeat => (&[b"Do not repeat the effect"], &[]),
         Word::Brand => (&[b"temper"], &[]),
+        Word::MainNavigation => (&[b"Main navigation"], &[]),
+        Word::KindFrom => (&[b"", b" from ", b""], &[Name, Name]),
         Word::InboxTitle => (&[b"Inbox"], &[]),
         Word::NeedsYou => (&[b"Needs you"], &[]),
         Word::InboxUpdates => (&[b"Updates"], &[]),

@@ -209,7 +209,7 @@ fn the_conversation_tokens_stay_on_their_roles() {
     ] {
         let role = match token {
             CHAT => Role::Main,
-            MARKER => Role::Region,
+            CHATBAR | MARKER => Role::Region,
             CARDS => Role::List,
             _ => Role::Slot,
         };

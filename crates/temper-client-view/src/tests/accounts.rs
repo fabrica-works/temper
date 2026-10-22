@@ -457,8 +457,9 @@ mod memory_literal;
 // Added dependency marks (client/README.md, 5.8): two nodes per dependency,
 // across two plan rows and the brief: (2 * 2 + 2) * 2 = 12 nodes x 574,364 B.
 // Their five phrases add five entries' room, 740 B.
+// Naming navigation and cards adds two phrases (296 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6989605235;
+const ACCOUNT_BYTES: u64 = 6989605531;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

@@ -171,6 +171,13 @@ pub fn find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<
     }
     None
 }
+pub fn person_find(tree: &skein_ui::Tree, role: skein_ui::Role, name: &[u8]) -> Option<skein_ui::NodeId> {
+    use skein_fake_person::{Face, Find, Found, TreeFace};
+    match TreeFace::new(tree).find(&Find::exactly_named(role, name)) {
+        Found::Node(id) => Some(id),
+        Found::Absent | Found::Pending => None,
+    }
+}
 pub fn root_in_project(project: Option<u32>) -> temper_client_domain::Domain {
     root_with_watch(project).0
 }
@@ -351,6 +358,7 @@ pub const INBOX_TASK: u64 = 9;
 pub const INBOX_REPLY_TASK: u64 = 10;
 pub const INBOX_QUESTION: u64 = 1;
 pub const INBOX_POSITION: u64 = 1;
+pub const OTHER_PARTY: u64 = 74;
 pub fn inbox_root() -> temper_client_domain::Domain {
     inbox_root_filtered(temper_client_domain::address::Filter::ALL)
 }
@@ -360,6 +368,16 @@ pub fn inbox_root_filtered(filter: temper_client_domain::address::Filter) -> tem
 pub fn inbox_with_document(
     filter: temper_client_domain::address::Filter,
     document: Option<(jig_client::contract::Read, jig_client::contract::ReadValue)>,
+) -> temper_client_domain::Domain {
+    inbox_with_proposer(filter, document, c::Proposer::Task(INBOX_TASK))
+}
+pub fn inbox_from(proposer: c::Proposer) -> temper_client_domain::Domain {
+    inbox_with_proposer(temper_client_domain::address::Filter::ALL, None, proposer)
+}
+fn inbox_with_proposer(
+    filter: temper_client_domain::address::Filter,
+    document: Option<(c::Read, c::ReadValue)>,
+    proposer: c::Proposer,
 ) -> temper_client_domain::Domain {
     use jig_client::contract::{self, InboxGroup as Group, ObjectKey as Object};
     let mut limits = domain_limits();
@@ -371,13 +389,7 @@ pub fn inbox_with_document(
     let mut entries = List::with_capacity(6);
     for (object, group) in [
         (Object::Question { task: INBOX_TASK, message: INBOX_QUESTION }, Group::Questions),
-        (
-            Object::Proposal(contract::ProposalKey {
-                proposer: contract::Proposer::Task(INBOX_TASK),
-                number: INBOX_QUESTION,
-            }),
-            Group::Proposals,
-        ),
+        (Object::Proposal(contract::ProposalKey { proposer, number: INBOX_QUESTION }), Group::Proposals),
         (Object::Escalation(INBOX_TASK), Group::Escalations),
         (Object::PersonTask(INBOX_TASK), Group::PersonTasks),
         (Object::Result(INBOX_TASK), Group::Results),

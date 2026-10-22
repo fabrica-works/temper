@@ -187,6 +187,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         words.say(crate::words::Word::Inbox, &[skein_ui::phrases::Hole::Number(u64::from(count))])
     };
     builder.open(Role::Navigation);
+    builder.name(&words.say(crate::words::Word::MainNavigation, &[]));
     builder.style(crate::look::NAVIGATION);
     action(
         builder,

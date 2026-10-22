@@ -4,6 +4,7 @@ use crate::{
     look,
     words::{Word, Words},
 };
+use alloc::boxed::Box;
 use jig_client::contract::{InboxGroup, ObjectKey, OwnerHistoricalValue, Proposer, ReadValue, ResultValue};
 use skein_lib::Decimal;
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
@@ -68,6 +69,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                 if card.group == group {
                     if !opened {
                         b.open(Role::List);
+                        b.name(&words.say(heading, &[]));
                         b.style(look::CARDS);
                         if heading == Word::InboxUpdates {
                             b.style(look::UPDATES);
@@ -174,6 +176,7 @@ fn entry(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &
         InboxGroup::Results => (Word::InboxUpdates, look::KIND_RESULT),
         InboxGroup::Replies => (Word::Reply, look::KIND_REPLY),
     };
+    b.name(&card_name(root, card.object, kind, words));
     b.style(style);
     b.open(Role::Slot);
     b.style(look::META);
@@ -192,19 +195,7 @@ fn entry(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &
         }
         text(b, Role::Paragraph, name);
     }
-    let task = match card.object {
-        ObjectKey::Task(task)
-        | ObjectKey::Escalation(task)
-        | ObjectKey::PersonTask(task)
-        | ObjectKey::Result(task)
-        | ObjectKey::Question { task, .. } => Some(task),
-        ObjectKey::Proposal(proposal) => match proposal.proposer {
-            Proposer::Task(task) => Some(task),
-            Proposer::Party(_) => None,
-        },
-        ObjectKey::Note { .. } => None,
-    };
-    if let Some(task) = task {
+    if let Some(task) = source_task(card.object) {
         control(
             b,
             bindings,
@@ -226,6 +217,42 @@ fn entry(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &
         crate::confirm::controls(b, root, card, words, bindings);
     }
     b.close();
+}
+fn source_task(object: ObjectKey) -> Option<u64> {
+    match object {
+        ObjectKey::Task(task)
+        | ObjectKey::Escalation(task)
+        | ObjectKey::PersonTask(task)
+        | ObjectKey::Result(task)
+        | ObjectKey::Question { task, .. } => Some(task),
+        ObjectKey::Proposal(proposal) => match proposal.proposer {
+            Proposer::Task(task) => Some(task),
+            Proposer::Party(_) => None,
+        },
+        ObjectKey::Note { .. } => None,
+    }
+}
+pub(crate) fn card_name(root: &Domain, object: ObjectKey, kind: Word, words: &Words) -> Box<[u8]> {
+    let kind = words.say(kind, &[]);
+    let source = if let Some(task) = source_task(object) {
+        let digits = Decimal::of(task);
+        let mut name = skein_lib::Writer::new(digits.as_bytes().len().checked_add(1).expect("task name fits"));
+        name.put(b"T").expect("task prefix fits");
+        name.put(digits.as_bytes()).expect("task digits fit");
+        Some(name.finish())
+    } else if let ObjectKey::Proposal(proposal) = object
+        && let Proposer::Party(party) = proposal.proposer
+        && let Some(me) = root.pages().me(root.client())
+        && me.party.number == party
+    {
+        Some(skein_lib::bytes::copy_of(me.party.name.bytes()))
+    } else {
+        None
+    };
+    match source {
+        Some(source) => words.say(Word::KindFrom, &[Hole::Name(kind), Hole::Name(source)]),
+        None => kind,
+    }
 }
 fn has_facts(page: &ReadValue) -> bool {
     let proposal = match page {

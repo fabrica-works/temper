@@ -8,6 +8,26 @@ use skein_lib::{List, Wall};
 use skein_ui::Role;
 
 #[test]
+fn the_chatbar_region_is_named_by_its_heading() {
+    use skein_fake_person::{Face, Find, Found};
+
+    let root = fixtures::demo_root(temper_client_domain::Address::Chat { task: TASK }, fixtures::PROJECT, true);
+    let view = fixtures::page_view(&root);
+    let id = fixtures::person_find(view.tree(), Role::Region, "T9 · Ship the update".as_bytes()).expect("chatbar");
+    let mut face = skein_fake_person::TreeFace::subtree(view.tree(), id).expect("chatbar subtree");
+    match face.find(&Find::exactly_named(Role::Heading { level: 1 }, "T9 · Ship the update".as_bytes())) {
+        Found::Node(_) => {}
+        Found::Absent | Found::Pending => panic!("chatbar heading"),
+    }
+}
+
+#[test]
+fn a_chat_proposal_is_named_from_its_source_task() {
+    let view = fixtures::page_view(&proposal_root());
+    assert!(fixtures::person_find(view.tree(), Role::Item, b"Proposal from T12").is_some());
+}
+
+#[test]
 fn a_chats_header_says_its_status_and_spend() {
     let tree = chat_header();
     assert!(fixtures::find(&tree, Role::Status, b"Parked").is_some());
@@ -265,7 +285,7 @@ fn the_chat_bar_contains_identity_spend_and_acts() {
     );
     let view = fixtures::page_view(&fresh);
     let bar = styled(view.tree(), crate::look::CHATBAR);
-    assert_eq!(view.tree().nodes()[bar].role, Role::Slot);
+    assert_eq!(view.tree().nodes()[bar].role, Role::Region);
     let nodes = subtree(view.tree(), bar);
     let heading = fixtures::words().say(
         crate::words::Word::ChatTitle,
