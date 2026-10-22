@@ -6,8 +6,11 @@ use skein_lib::Writer;
 const ETAG: Fields = &[(b"If-None-Match", b"\"0011223344556677\"")];
 type Fields = &'static [(&'static [u8], &'static [u8])];
 type Row = (bool, Method, &'static [u8], Fields, Answer);
-const ROUTES: [Row; 10] = [
-    (false, Method::Get, b"/", &[], Answer::NotFound),
+const ROUTES: [Row; 13] = [
+    (false, Method::Get, b"/", &[], Answer::NoBundle),
+    (false, Method::Get, b"/jig/v1/sign-in/link?secret=AAAA", &[], Answer::NoBundle),
+    (false, Method::Get, b"/bundle/x", &[], Answer::NotFound),
+    (false, Method::Get, b"/robots.txt", &[], Answer::NotFound),
     (false, Method::Post, b"/", &[], Answer::NotFound),
     (true, Method::Post, b"/bundle/0123456789abcdef/boot.js", &[], Answer::NotAllowed),
     (true, Method::Get, b"/bundle/0123456789abcdef/boot.js", &[], Answer::File),
@@ -107,4 +110,41 @@ fn the_printed_links_route_serves_the_page() {
     assert_eq!(status, 200);
     assert_eq!(fixtures::bundle::body(&peer), b"<!doctype html><title>t</title>");
     assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 0, "nothing reached the root");
+}
+
+#[test]
+#[expect(
+    clippy::disallowed_methods,
+    clippy::disallowed_macros,
+    reason = "ordinary tests format requests and inspect the fixed HTML answer as UTF-8 text"
+)]
+fn without_a_bundle_the_root_and_printed_link_serve_temper_with_the_page_policy() {
+    for target in ["/", "/jig/v1/sign-in/link?secret=AAAA"] {
+        let mut service = fixtures::started();
+        let request = format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nConnection: close\r\n\r\n");
+        let mut peer = fixtures::request(&mut service, request.as_bytes());
+        let (status, headers) = fixtures::answered(&mut service, &mut peer);
+        assert_eq!(status, 200);
+        assert_eq!(fixtures::header(&headers, b"content-type"), Some(b"text/html; charset=utf-8".as_slice()));
+        for (name, value) in fixtures::bundle::POLICY {
+            assert_eq!(fixtures::header(&headers, name), Some(value));
+        }
+        let body = core::str::from_utf8(fixtures::bundle::body(&peer)).unwrap();
+        assert!(body.starts_with("<!doctype html>"));
+        assert!(body.contains("lang=\"en\""));
+        assert!(body.contains("<title>temper</title>"));
+        assert!(body.contains("<h1>temper</h1>"));
+        for paragraph in [
+            "This temper serves no browser client: its configuration names no bundle (application.clients.bundle).",
+            "Open the link in a terminal with temper open DIRECTORY LINK.",
+            "To serve the browser, install temper with scripts/install.sh, or build a bundle with scripts/bundle.sh, name its directory in application.clients.bundle, and restart temper.",
+        ] {
+            assert!(body.contains(&format!("<p>{paragraph}</p>")));
+        }
+        assert_eq!(body.matches("<p>").count(), 3);
+        for tag in ["<script", "<style", "<img"] {
+            assert!(!body.contains(tag));
+        }
+        assert_eq!(service.engine.as_ref().unwrap().clients.early.len(), 0);
+    }
 }

@@ -409,7 +409,7 @@ fn robots_txt_is_the_bundles_root_file_revalidated_disallowing_every_path() {
 }
 
 #[test]
-fn with_no_bundle_every_path_outside_jig_is_not_found_with_the_policy() {
+fn with_no_bundle_gets_serve_temper_and_other_requests_stay_not_found() {
     let served = Served::start("no_bundle", false);
     let file = format!("/bundle/{DIGEST}/boot.js");
     let rows = [
@@ -426,7 +426,14 @@ fn with_no_bundle_every_path_outside_jig_is_not_found_with_the_policy() {
     ];
     for (method, path) in rows {
         let reply = served.send(method, path, &[]);
-        assert_eq!(reply.status, 404, "{method} {path}");
+        let page = method == "GET" && path != "/robots.txt" && !path.starts_with("/bundle/");
+        assert_eq!(reply.status, if page { 200 } else { 404 }, "{method} {path}");
+        if page {
+            assert_eq!(reply.header("content-type"), Some("text/html; charset=utf-8"));
+            assert!(reply.body.windows(b"<h1>temper</h1>".len()).any(|part| part == b"<h1>temper</h1>"));
+        } else {
+            assert!(reply.body.is_empty());
+        }
         reply.policy(&format!("{method} {path}"));
     }
     served.stop();

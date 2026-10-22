@@ -444,6 +444,7 @@ pub fn worst_case(
     journal: &root::JournalLimits,
 ) -> Option<u64> {
     kit::worst_case(limits)?
+        .checked_add(u64::try_from(bundle::NO_BUNDLE_PAGE.len()).ok()?)?
         // First-clock initialization briefly owns both validated component instances.
         .checked_add(kit::worst_case(limits)?)?
         .checked_add(http::worst_case(mapping)?)?

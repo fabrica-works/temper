@@ -808,7 +808,16 @@ fn github_identity_growth() -> (u64, u64) {
     (github_identity_growth, github_worker_growth)
 }
 
+fn start_growth() -> u64 {
+    // Held DNS names: 32 B inline map in Service and its 312 B node at four forge slots.
+    // This owned fixture uses socket addresses, so it retains no host-name bytes.
+    let held_forges_growth = 32 + 312;
+    // The fixed page served when no browser bundle is configured.
+    held_forges_growth + u64::try_from(temper_service::clients::bundle::NO_BUNDLE_PAGE.len()).expect("fixed page size")
+}
+
 #[test]
+#[expect(clippy::too_many_lines, reason = "keep the cause-by-cause census of the owned startup envelopes together")]
 fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let scratch = support::Scratch::startup("owned-memory-figures");
     let bounded = support::owned::bounded(scratch.path());
@@ -1023,6 +1032,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + open_questions_growth
             + settled_root_growth
             + github_identity_growth
+            + start_growth()
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.

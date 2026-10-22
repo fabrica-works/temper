@@ -39,18 +39,18 @@ fn refused(bytes: &[u8], expected: u16) {
     assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 0, "nothing reached the root");
 }
 #[test]
-fn a_path_outside_jig_is_answered_not_found() {
-    refused(b"GET /elsewhere HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n", 404);
+fn a_post_outside_jig_is_answered_not_found() {
+    refused(b"POST /elsewhere HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n", 404);
 }
 #[test]
-fn a_get_of_the_printed_links_route_is_not_found_with_no_referrer() {
+fn a_get_of_the_printed_links_route_serves_temper_with_no_referrer() {
     let mut service = fixtures::started();
     let mut call = fixtures::request(
         &mut service,
         b"GET /jig/v1/sign-in/link?secret=AAAA HTTP/1.1\r\nHost: 127.0.0.1:7100\r\n\r\n",
     );
     let (status, headers) = fixtures::answered(&mut service, &mut call);
-    assert_eq!(status, 404);
+    assert_eq!(status, 200);
     assert_eq!(fixtures::header(&headers, b"referrer-policy"), Some(b"no-referrer".as_slice()));
     assert_eq!(service.engine.as_ref().expect("engine").clients.early.len(), 0, "nothing reached the root");
 }

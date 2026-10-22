@@ -8,6 +8,10 @@ use skein_lib::{
     stream::{Down, Read, Up},
 };
 
+/// Temper's fixed explanation when configuration names no browser bundle (client/browser.md, 2.2).
+#[expect(clippy::disallowed_macros, reason = "a fixed page compiled in, not data read at run time")]
+pub const NO_BUNDLE_PAGE: &[u8] = include_bytes!("no-bundle.html");
+
 /// A bundle path's bound (jig's testing/jig-test/src/bundle.rs).
 pub const NAME_BYTES: u32 = 1024;
 /// The digest directory's name: sixteen lowercase hex digits.
@@ -73,6 +77,7 @@ pub fn worst_case(limits: &crate::limits::Clients) -> Option<u64> {
 pub(crate) enum Answer {
     File,
     Page,
+    NoBundle,
     NotModified,
     Root,
     NotFound,
@@ -115,6 +120,7 @@ impl Bundle {
         match reply.answer {
             Answer::File | Answer::Root => &self.file(&reply.path).expect("routed file").bytes,
             Answer::Page => &self.page,
+            Answer::NoBundle => NO_BUNDLE_PAGE,
             Answer::NotModified | Answer::NotFound | Answer::NotAllowed | Answer::Busy => b"",
         }
     }
@@ -147,7 +153,14 @@ fn revalidates(field: &[u8], etag: &[u8]) -> bool {
 }
 /// The answer to a call the mapping does not claim, in the design's order.
 pub(crate) fn route(bundle: Option<&Bundle>, head: &http::Call) -> Answer {
-    let Some(bundle) = bundle else { return Answer::NotFound };
+    let Some(bundle) = bundle else {
+        return if head.method == Method::Get && !target(head).starts_with(b"/bundle/") && target(head) != b"/robots.txt"
+        {
+            Answer::NoBundle
+        } else {
+            Answer::NotFound
+        };
+    };
     if head.method != Method::Get {
         return Answer::NotAllowed;
     }
@@ -181,12 +194,18 @@ impl Clients {
                 let kind = match answer {
                     Answer::File | Answer::Root => bundle.file(&reply.path).expect("routed file").kind,
                     Answer::Page => b"text/html; charset=utf-8",
+                    Answer::NoBundle => unreachable!("handled without a bundle"),
                     Answer::NotModified | Answer::NotFound | Answer::NotAllowed | Answer::Busy => {
                         unreachable!("content answer")
                     }
                 };
                 field(&mut headers, b"Content-Type", kind);
                 length = bundle.content(&reply).len();
+                200
+            }
+            Answer::NoBundle => {
+                field(&mut headers, b"Content-Type", b"text/html; charset=utf-8");
+                length = NO_BUNDLE_PAGE.len();
                 200
             }
             Answer::NotModified => 304,
@@ -200,6 +219,7 @@ impl Clients {
                 field(&mut headers, b"Cache-Control", b"no-cache");
                 field(&mut headers, b"ETag", &self.bundle.as_ref().expect("revalidated bundle").etag);
             }
+            Answer::NoBundle => field(&mut headers, b"Cache-Control", b"no-cache"),
             Answer::NotFound | Answer::NotAllowed | Answer::Busy => {}
         }
         let response = http::Response {
@@ -255,7 +275,16 @@ impl Clients {
     }
     fn chunk(&mut self, call: Token) {
         let reply = self.replies.get_mut(&call).expect("own reply");
-        let body = self.bundle.as_ref().expect("body's bundle").content(reply);
+        let body = match reply.answer {
+            Answer::NoBundle => NO_BUNDLE_PAGE,
+            Answer::File
+            | Answer::Page
+            | Answer::Root
+            | Answer::NotModified
+            | Answer::NotFound
+            | Answer::NotAllowed
+            | Answer::Busy => self.bundle.as_ref().expect("body's bundle").content(reply),
+        };
         let end = reply.offset.saturating_add(usize::try_from(self.send).expect("send fits")).min(body.len());
         let bytes = bytes::copy_of(body.get(reply.offset..end).expect("reply slice"));
         let left = body.len().checked_sub(end).expect("reply cursor");
