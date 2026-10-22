@@ -1,0 +1,96 @@
+{
+  "format": "lab-experiment/1",
+  "name": "cluster",
+  "cost": "temper-m1-calibration",
+  "dirs": [],
+  "processes": [
+    {
+      "name": "llm",
+      "argv": ["{artifact.temper}", "fake", "llm", "--document", "{proc.llm.dir}/llm.json", "--ready", "listening "],
+      "env": {},
+      "ready": [{"stream": "stdout", "prefix": "listening ", "capture": "address"}],
+      "files": [{"path": "llm.json", "from": "llm.json"}],
+      "memory_bytes": null
+    },
+    {
+      "name": "engine",
+      "after": ["llm"],
+      "argv": [
+        "{artifact.temper}",
+        "serve",
+        "--config",
+        "{proc.engine.dir}/config",
+        "--data",
+        "{proc.engine.dir}/data",
+        "--cache",
+        "{proc.engine.dir}/cache"
+      ],
+      "env": {},
+      "ready": [
+        {"stream": "stderr", "prefix": "listening clients ", "capture": "clients"},
+        {"stream": "stderr", "prefix": "listening workers ", "capture": "workers"},
+        {"stream": "stdout", "prefix": "http://", "capture": "link"}
+      ],
+      "files": [
+        {"path": "config/temper.json", "from": "engine.json"},
+        {"path": "config/charters/chat.txt", "from": "chat.txt"},
+        {"path": "data/secrets/w1.digest", "from": "w1.digest"},
+        {"path": "data/secrets/w2.digest", "from": "w2.digest"},
+        {"path": "data/secrets/forge-1.api-token", "from": "forge-1.api-token"},
+        {"path": "data/secrets/forge-1.user", "from": "forge-1.user"},
+        {"path": "data/secrets/forge-1.git-token", "from": "forge-1.git-token"}
+      ],
+      "memory_bytes": 1152921504606846976
+    },
+    {
+      "name": "w1",
+      "after": ["engine"],
+      "argv": [
+        "{artifact.temper}",
+        "serve",
+        "--config",
+        "{proc.w1.dir}/config",
+        "--data",
+        "{proc.w1.dir}/data",
+        "--cache",
+        "{proc.w1.dir}/cache"
+      ],
+      "env": {},
+      "ready": [{"stream": "stderr", "prefix": "linked w1 ", "capture": "engine"}],
+      "files": [
+        {"path": "config/temper.json", "from": "w1.json"},
+        {"path": "config/agent.json", "from": "agent.json"},
+        {"path": "data/secrets/w1.secret", "from": "w1.secret"}
+      ],
+      "memory_bytes": 1152921504606846976
+    },
+    {
+      "name": "w2",
+      "after": ["engine"],
+      "argv": [
+        "{artifact.temper}",
+        "serve",
+        "--config",
+        "{proc.w2.dir}/config",
+        "--data",
+        "{proc.w2.dir}/data",
+        "--cache",
+        "{proc.w2.dir}/cache"
+      ],
+      "env": {},
+      "ready": [{"stream": "stderr", "prefix": "linked w2 ", "capture": "engine"}],
+      "files": [
+        {"path": "config/temper.json", "from": "w2.json"},
+        {"path": "config/agent.json", "from": "agent.json"},
+        {"path": "data/secrets/w2.secret", "from": "w2.secret"}
+      ],
+      "memory_bytes": 1152921504606846976
+    }
+  ],
+  "actions": [],
+  "driver": null,
+  "faults": [],
+  "planted": [],
+  "collect": [],
+  "checks": []
+}

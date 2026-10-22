@@ -1,0 +1,49 @@
+{{
+  "workers": [
+    {{
+      "engine": {{"socket": "{proc.engine.ready.workers}"}},
+      "name": "w2",
+      "secret": "secrets/w2.secret",
+      "slots": 1,
+      "programs": {{"check_interval_ms": 60000}},
+      "graces": {{"grace_ms": 1000, "agent_stop_ms": 100, "delivery_ms": 100, "save_ms": 100}},
+      "agent": {{
+        "program": "{artifact.temper}",
+        "configuration": "{proc.w2.dir}/config/agent.json",
+        "arguments": ["agent", "{proc.w2.dir}/config/agent.json"]
+      }},
+      "limits": {{
+        "profile": "small",
+        "overrides": {{
+          "hub.slots": 1,
+          "hub.run_calls": 1,
+          "tasks.message_bytes": 512,
+          "people.words": 512,
+          "core.call_answer_bytes": 2048,
+          "hub.accounts": 4,
+          "hub.event_bytes": 598,
+          "hub.turns": 1,
+          "hub.held": 1,
+          "hub.program_sources": 0,
+          "link.ping_ms": 100,
+          "link.silence_ms": 1000
+        }}
+      }},
+      "memory_bytes": 1152921504606846976
+    }}
+  ],
+  "application": {{
+    "workers": [{{"root": "worker-root", "git": "/usr/bin/git"}}],
+    "limits": {{
+      "profile": "small",
+      "overrides": {{
+        "checkout.name_bytes": 256,
+        "checkout.repositories": 2,
+        "checkout.message_bytes": 4096,
+        "forge.name_bytes": 64,
+        "forge.resources_per_task": 2,
+        "git_component.stdout_bytes": 2048
+      }}
+    }}
+  }}
+}}

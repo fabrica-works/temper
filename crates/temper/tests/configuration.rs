@@ -90,3 +90,64 @@ fn assert_owned_limits(limits: &serde_json::Value) {
         }})
     );
 }
+
+#[test]
+fn the_clusters_documents_check_as_their_shapes() {
+    use temper_service::startup::{self, Shape};
+    let scratch = support::Scratch::startup("cluster-documents");
+    let cluster = support::cluster::Cluster::documents(
+        scratch.path(),
+        &[("llm", "address", "127.0.0.1:1"), ("engine", "workers", "127.0.0.1:2")],
+    );
+    let engine: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(cluster.dir("engine").join("config/temper.json")).expect("lab/cluster/engine.json"),
+    )
+    .expect("engine JSON");
+    let engine_limits = &engine["engine"]["limits"]["overrides"];
+    assert_eq!(
+        engine_limits["fleet.grace_ms"],
+        support::cluster::FLEET_GRACE_MS,
+        "lab/cluster/engine.json: engine.limits.overrides.fleet.grace_ms"
+    );
+    for (process, expected) in [("engine", Shape::EngineAlone), ("w1", Shape::WorkerAlone), ("w2", Shape::WorkerAlone)]
+    {
+        let root = cluster.dir(process);
+        let directories = temper_real_loop_world::cluster::directories_in([
+            &root.join("config"),
+            &root.join("data"),
+            &root.join("cache"),
+        ]);
+        let bytes = std::fs::read(root.join("config/temper.json")).expect("cluster document");
+        let shape = startup::shape(&bytes, &directories.jig())
+            .unwrap_or_else(|why| panic!("{process}: {}", String::from_utf8_lossy(&startup::lines(&why))));
+        assert_eq!(shape, expected, "{process}");
+        match shape {
+            Shape::EngineAlone => {
+                startup::named(&bytes, &directories.jig()).expect("checked engine alone");
+            }
+            Shape::WorkerAlone => {
+                let part = startup::worker_part(&bytes, &directories.jig()).expect("checked worker alone");
+                let worker = &part.worker.jig;
+                let stop = jig_protocol_config::stop_bound(
+                    &worker.graces,
+                    worker.limits.link.ping,
+                    worker.limits.link.silence,
+                )
+                .unwrap_or_else(|| panic!("lab/cluster/{process}.json: workers[0].graces stop_bound overflows"));
+                assert!(
+                    stop < skein_lib::Duration::from_millis(support::cluster::FLEET_GRACE_MS),
+                    "lab/cluster/{process}.json: workers[0].graces stop_bound must be below engine.json: engine.limits.overrides.fleet.grace_ms"
+                );
+                let value: serde_json::Value = serde_json::from_slice(&bytes).expect("worker JSON");
+                for key in ["link.ping_ms", "link.silence_ms"] {
+                    assert_eq!(
+                        value["workers"][0]["limits"]["overrides"][key], engine_limits[key],
+                        "lab/cluster/{process}.json: workers[0].limits.overrides.{key} must equal engine.json: engine.limits.overrides.{key}"
+                    );
+                }
+            }
+            Shape::Standalone => panic!("cluster members are separate"),
+        }
+    }
+    scratch.remove();
+}

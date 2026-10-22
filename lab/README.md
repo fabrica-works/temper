@@ -112,3 +112,4 @@ Memory verification used `home-free-src-rust-temper`, generation
 changed docs/rendering/startup paths, which were source-read. Skein's graph
 generation `2026-10-19T04:48:30Z` does not track those fake domain paths, so
 their source is the evidence. No index was written or deleted.
+The process cluster description and its templates live in [cluster/](cluster/).

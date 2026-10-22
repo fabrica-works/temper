@@ -1,0 +1,9 @@
+{{
+  "listen": {{"socket": "127.0.0.1:0"}},
+  "key": "{proc.llm.dir}/llm.key",
+  "tls": null,
+  "models": [{{"name": "fake", "window": 1048576, "output": 1024}}],
+  "cued": [],
+  "asked": [],
+  "otherwise": ["Hello."]
+}}

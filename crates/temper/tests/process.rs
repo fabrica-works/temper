@@ -736,3 +736,187 @@ fn demo_main(config: &std::path::Path, data: &std::path::Path, root: &std::path:
 fn fake_forge_commit_id(count: u64) -> String {
     format!("{count:016x}{}", "0".repeat(24))
 }
+
+// protocol/README.md, 15.6: the description's first process stories.
+struct ClusterJudge {
+    members: support::cluster::Members,
+    deadline: skein_lib::Time,
+    workers: bool,
+}
+impl skein_world::Referee<support::cluster::Member> for ClusterJudge {
+    fn act(&mut self, now: skein_lib::Time, hosts: &mut [support::cluster::Member]) {
+        if self.members.is_up() {
+            if self.workers {
+                for worker in ["w1", "w2"] {
+                    assert_eq!(
+                        self.members.capture(worker, "engine"),
+                        self.members.capture("engine", "workers"),
+                        "{worker} linked to this engine"
+                    );
+                }
+            }
+            self.members.stop();
+        }
+        self.members.act(now, hosts);
+    }
+    fn observe(&mut self, now: skein_lib::Time, hosts: &[support::cluster::Member]) {
+        self.members.observe(now, hosts);
+        if let Some(stopped) = self.members.stopped() {
+            if self.workers {
+                assert_eq!(stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["w2", "w1", "engine", "llm"]);
+            } else {
+                let [engine, llm] = stopped else { panic!("engine and llm stopped") };
+                assert_eq!(engine.name, "engine");
+                assert_eq!(llm.name, "llm");
+                engine_lines(engine);
+            }
+            for member in stopped {
+                clean_cluster_exit(member);
+            }
+        }
+    }
+    fn next_deadline(&self) -> Option<skein_lib::Time> {
+        Some(self.members.next_deadline().map_or(self.deadline, |at| at.min(self.deadline)))
+    }
+    fn overdue(&self, now: skein_lib::Time) -> Option<String> {
+        self.members.overdue(now).or_else(|| {
+            (now >= self.deadline && !self.members.passed()).then(|| "cluster did not settle within WITHIN".into())
+        })
+    }
+    fn passed(&self) -> bool {
+        self.members.passed()
+    }
+}
+fn cluster_story(scratch: &std::path::Path, workers: bool) {
+    let cluster = support::cluster::Cluster::read(scratch);
+    let (mut members, hosts) = cluster.members();
+    members.up(if workers { &["w1", "w2"] } else { &["engine"] });
+    let clock = skein_shell::Clock::new();
+    let mut world = skein_world::real::World::new(ClusterJudge {
+        members,
+        deadline: clock.now().now.saturating_add(support::WITHIN),
+        workers,
+    });
+    for host in hosts {
+        world.spawn(|| host);
+    }
+    let outcome = world.run(&clock, support::WITHIN);
+    assert!(outcome.procs.iter().all(skein_shell::Host::is_empty), "every cluster root settled");
+}
+fn clean_cluster_exit(stopped: &support::cluster::Stopped) {
+    assert_eq!(stopped.exit, Some(Exit::Code(0)), "{}: {}", stopped.name, String::from_utf8_lossy(&stopped.stderr));
+    assert!(!stopped.killed, "{} stopped before STOP_SECONDS", stopped.name);
+    assert!(stopped.survivors.is_empty(), "{} left no survivor", stopped.name);
+}
+#[test]
+fn an_engine_alone_prints_its_lines_and_drains_on_a_signal() {
+    let scratch = support::Scratch::new("cluster_engine_alone");
+    cluster_story(scratch.path(), false);
+    scratch.remove();
+}
+fn engine_lines(engine: &support::cluster::Stopped) {
+    let stderr = std::str::from_utf8(&engine.stderr).expect("engine lines");
+    let lines: Vec<_> = stderr.lines().collect();
+    let [_, _] = lines.as_slice() else { panic!("exactly the two listening lines: {stderr}") };
+    let clients: std::net::SocketAddr = lines
+        .iter()
+        .find_map(|line| line.strip_prefix("listening clients "))
+        .expect("clients line")
+        .parse()
+        .expect("clients address");
+    let workers: std::net::SocketAddr = lines
+        .iter()
+        .find_map(|line| line.strip_prefix("listening workers "))
+        .expect("workers line")
+        .parse()
+        .expect("workers address");
+    for address in [clients, workers] {
+        assert_eq!(address.ip(), std::net::Ipv4Addr::LOCALHOST);
+        assert_ne!(address.port(), 0, "a bound port");
+    }
+    assert_ne!(clients.port(), workers.port(), "distinct listeners");
+    let stdout = std::str::from_utf8(&engine.stdout).expect("link text");
+    let link = stdout.strip_suffix('\n').expect("terminated sign-in link");
+    assert!(!link.contains('\n'), "exactly one stdout line");
+    let secret = link
+        .strip_prefix(&format!("http://{clients}/jig/v1/sign-in/link?secret="))
+        .expect("sign-in link at the clients listener");
+    assert!(!secret.is_empty(), "a sign-in secret");
+}
+
+#[test]
+fn a_mixed_document_exits_1_naming_its_path() {
+    use skein_world::end_to_end::{Binary, Command, Expectation, Mode};
+    struct Refusal {
+        deadline: skein_lib::Time,
+        settled: bool,
+    }
+    impl skein_world::Referee<Binary> for Refusal {
+        fn act(&mut self, _now: skein_lib::Time, _hosts: &mut [Binary]) {}
+        fn observe(&mut self, _now: skein_lib::Time, hosts: &[Binary]) {
+            self.settled = hosts.iter().all(skein_shell::Host::is_empty);
+        }
+        fn next_deadline(&self) -> Option<skein_lib::Time> {
+            Some(self.deadline)
+        }
+        fn overdue(&self, now: skein_lib::Time) -> Option<String> {
+            (now >= self.deadline && !self.settled).then(|| "mixed document did not exit".into())
+        }
+        fn passed(&self) -> bool {
+            self.settled
+        }
+    }
+    let scratch = support::Scratch::new("cluster_mixed_document");
+    let cluster = support::cluster::Cluster::documents(
+        scratch.path(),
+        &[("llm", "address", "127.0.0.1:1"), ("engine", "workers", "127.0.0.1:2")],
+    );
+    let path = cluster.dir("engine").join("config/temper.json");
+    let mut engine: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).expect("engine document")).expect("engine JSON");
+    let worker: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(cluster.dir("w1").join("config/temper.json")).expect("worker document"))
+            .expect("worker JSON");
+    engine["workers"] = worker["workers"].clone();
+    std::fs::write(&path, serde_json::to_vec(&engine).expect("mixed JSON")).expect("mixed document");
+    let directory = cluster.dir("engine");
+    let binary = Binary::start_with_tree(
+        Command {
+            program: env!("CARGO_BIN_EXE_temper").into(),
+            arguments: vec![
+                "serve".into(),
+                "--config".into(),
+                directory.join("config").into(),
+                "--data".into(),
+                directory.join("data").into(),
+                "--cache".into(),
+                directory.join("cache").into(),
+            ],
+            environment: Vec::new(),
+            directory,
+        },
+        Mode::Pipes,
+        65_536,
+        Expectation::Supervise,
+        false,
+    )
+    .expect("mixed serve starts");
+    let clock = skein_shell::Clock::new();
+    let mut world = skein_world::real::World::new(Refusal {
+        deadline: clock.now().now.saturating_add(support::WITHIN),
+        settled: false,
+    });
+    world.spawn_with_fds(binary.descriptors(), || binary);
+    let outcome = world.run(&clock, support::WITHIN);
+    let [binary] = outcome.procs.as_slice() else { panic!("one serve") };
+    assert_eq!(binary.exit_status(), Some(Exit::Code(1)));
+    assert_eq!(binary.stderr(), b"temper serve: workers: an engine alone takes no local worker, one plaintext loopback listener and workers with distinct digest paths\n");
+    scratch.remove();
+}
+
+#[test]
+fn the_cluster_stops_in_reverse_each_exiting_0() {
+    let scratch = support::Scratch::new("cluster_reverse_stop");
+    cluster_story(scratch.path(), true);
+    scratch.remove();
+}
