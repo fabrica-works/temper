@@ -537,7 +537,7 @@ service's io.
 - **Under the box alone.** `temper serve --box` adopts fds 3 and 4
   (setup.md, 7.1), and the link writes its lines on fd 3 and holds one
   read on fd 4, a line at most `box.line_bytes` (configuration.md,
-  section 7) and its line feed. Without `--box` there is no pipe, and
+  section 7), its line feed included, as the box counts it. Without `--box` there is no pipe, and
   every ask is refused "not under the box".
 - **An ask** is the root's `SetUp { forge }` once the root has admitted
   it by the forge's connection (`../domain/forge.md`, 4.1). The link

@@ -1,4 +1,4 @@
-use crate::box_link::{Link, Out, Refused, Step};
+use crate::route::box_link::{Link, Out, Refused, Step};
 use alloc::boxed::Box;
 use skein_lib::Queue;
 
