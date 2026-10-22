@@ -1,0 +1,5 @@
+/* Change the banner's paired bottom-border token; confirm its healthy value
+   against the first gallery capture before calibrating these signatures. */
+:root { --temper-line: #ff00ff; }
+/* Move the chat composer before the conversation in its existing flex column. */
+.temper-chat > .temper-composer-area { order: -1; }

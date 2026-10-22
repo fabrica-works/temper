@@ -1,0 +1,21 @@
+#!/bin/sh
+# Print the subject's gallery, then apply the experiment's optional fault.
+set -eu
+if [ "$#" -ne 4 ]; then
+    echo 'usage: stage GALLERY SOURCE OUT EXPERIMENT' >&2
+    exit 2
+fi
+gallery=$1
+source=$2
+out=$3
+experiment=$4
+cd "$source"
+"$gallery" "$out"
+stylesheet=$out/bundle/temper.css
+if [ ! -f "$stylesheet" ]; then
+    echo "stage: missing stylesheet: $stylesheet" >&2
+    exit 1
+fi
+if [ -f "$experiment/planted.css" ]; then
+    cat "$experiment/planted.css" >> "$stylesheet"
+fi
