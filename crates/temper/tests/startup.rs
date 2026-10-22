@@ -1051,6 +1051,26 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // of its 8 changes' CI: two 568 B tree nodes. Each of 3,076 owned envelope copies
     // grows 5,290,096 B; the map's 32 B inline adds once through Engine in Service.
     let change_panel_growth = 3_076 * (80 * (576 + 65_536) + 2 * 568) + 32;
+    // Jig 73f049f8/edad055c: Source's State and Hold each retain one new Wall;
+    // Fact's State and spent_until do too. Isolate those two deadline fields
+    // at their unchanged alignment to price only the source map's slot growth.
+    // The fact queue and deployment scratch use the configured counts as well.
+    let value: serde_json::Value = serde_json::from_slice(&bounded.document).expect("deployment JSON");
+    let engine = jig_protocol_config::engine(
+        &configuration_document(&value["engine"]),
+        0,
+        &jig_protocol_config::Directories::working(),
+    )
+    .expect("engine configuration");
+    let accounts = &engine.limits.core.accounts;
+    let sources = accounts.accounts.checked_mul(accounts.sources).expect("bounded source count");
+    let source_slots = skein_lib::Map::<u32, [(skein_lib::Time, skein_lib::Wall); 2]>::worst_case(sources)
+        .expect("source deadline pairs")
+        - skein_lib::Map::<u32, [skein_lib::Time; 2]>::worst_case(sources).expect("old source deadlines");
+    let fact_queue = skein_lib::Queue::<[skein_lib::Wall; 2]>::worst_case(accounts.facts).expect("fact walls");
+    let deployment_scratch =
+        skein_lib::List::<[skein_lib::Wall; 2]>::worst_case(accounts.accounts).expect("deployment fact walls");
+    let source_deadline_growth = 3_076 * (source_slots + fact_queue + deployment_scratch);
     let (github_identity_growth, github_worker_growth) = github_identity_growth();
     assert_eq!(
         required.engine_bytes,
@@ -1079,6 +1099,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + finishing_growth
             - ending_release
             + change_panel_growth
+            + source_deadline_growth
             + github_identity_growth
             + start_growth()
             + GIT_GENERATIONS_GROWTH
