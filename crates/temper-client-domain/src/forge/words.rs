@@ -843,3 +843,125 @@ pub fn extend_change(connector: u16, shapes: &mut List<PhraseShape>, phrases: &m
         phrases.push(Phrase { id, forms }).expect("change phrases fit");
     }
 }
+
+/// The connection table's words (client/forge.md, 5.4), shared by every client.
+#[must_use]
+pub const fn forge_kind(kind: super::forges::Kind) -> &'static [u8] {
+    match kind {
+        super::forges::Kind::Forgejo => b"Forgejo",
+        super::forges::Kind::GitHub => b"GitHub",
+    }
+}
+#[must_use]
+pub const fn forge_mode(mode: super::forges::Mode) -> &'static [u8] {
+    use super::forges::Mode;
+    match mode {
+        Mode::Connected => b"connected",
+        Mode::Managed => b"managed",
+        Mode::Owned => b"owned",
+        Mode::Fake => b"fake",
+    }
+}
+#[must_use]
+pub const fn set_up_refusal(why: super::forges::SetUpRefusal) -> &'static [u8] {
+    use super::forges::SetUpRefusal;
+    match why {
+        SetUpRefusal::NotOffered => b"not offered",
+        SetUpRefusal::NotUnderTheBox => b"not under the box",
+        SetUpRefusal::Busy => b"busy",
+    }
+}
+#[must_use]
+pub const fn set_up_outcome(outcome: super::forges::SetUpOutcome) -> &'static [u8] {
+    use super::forges::SetUpOutcome;
+    match outcome {
+        SetUpOutcome::SettingUp => b"setting up",
+        SetUpOutcome::Refused(why) => set_up_refusal(why),
+        SetUpOutcome::Unknown => b"unknown",
+    }
+}
+/// The manual steps, also printed beside a set-up refusal without the box.
+#[must_use]
+pub fn set_up_commands(number: u16) -> Box<[u8]> {
+    let n = skein_lib::Decimal::of(u64::from(number));
+    let n = n.as_bytes();
+    let parts: &[&[u8]] = &[
+        b"run `temper forge fetch ",
+        n,
+        b"`, `temper forge prepare ",
+        n,
+        b"`, `temper forge run ",
+        n,
+        b" forgejo` and `temper forge run ",
+        n,
+        b" runner`, then restart `temper serve`",
+    ];
+    join_words(parts)
+}
+fn join_words(parts: &[&[u8]]) -> Box<[u8]> {
+    let mut size = 0usize;
+    for part in parts {
+        size = size.checked_add(part.len()).expect("bounded forge words");
+    }
+    let mut out = Writer::new(size);
+    for part in parts {
+        out.put(part).expect("measured words");
+    }
+    out.finish()
+}
+#[must_use]
+pub fn forge_connection(row: &super::forges::Row) -> Box<[u8]> {
+    use super::forges::{Connection as C, Offer, Step};
+    match &row.connection {
+        C::NotConnected => Box::from(b"Not connected".as_slice()),
+        C::NotSetUp => {
+            if row.offer == Offer::NotUnderTheBox {
+                join_words(&[b"Not set up: ", &set_up_commands(row.number)])
+            } else {
+                Box::from(b"Not set up".as_slice())
+            }
+        }
+        C::SettingUp { step } => Box::from(match step {
+            Some(Step::Fetch) => b"Setting up: fetching".as_slice(),
+            Some(Step::Prepare) => b"Setting up: preparing".as_slice(),
+            Some(Step::Run) => b"Setting up: starting".as_slice(),
+            None => b"Setting up".as_slice(),
+        }),
+        C::SetUpFailed { why } => join_words(&[b"Set up failed: ", &lossy(why)]),
+        C::Connecting => Box::from(b"Connecting".as_slice()),
+        C::Connected { id, login } => {
+            join_words(&[b"Connected as ", &lossy(login), b" (", skein_lib::Decimal::of(*id).as_bytes(), b")"])
+        }
+        C::Stopped { reason } => join_words(&[b"Stopped: ", &lossy(reason)]),
+    }
+}
+
+#[must_use]
+pub const fn forge_set_up_action(row: &super::forges::Row) -> Option<&'static [u8]> {
+    use super::forges::{Connection, Offer};
+    match (&row.connection, row.offer) {
+        (Connection::NotSetUp, Offer::Offered) => Some(b"Set up a Forgejo here"),
+        (Connection::SetUpFailed { .. }, Offer::Offered) => Some(b"Set up again"),
+        _ => None,
+    }
+}
+
+// Keep owned byte strings under the domain's subset while showing invalid UTF-8
+// with the same replacement character as the clients' text shells.
+fn lossy(bytes: &[u8]) -> Box<[u8]> {
+    let mut size = 0usize;
+    for chunk in bytes.utf8_chunks() {
+        size = size.checked_add(chunk.valid().len()).expect("bounded forge words");
+        if !chunk.invalid().is_empty() {
+            size = size.checked_add(3).expect("replacement fits");
+        }
+    }
+    let mut out = Writer::new(size);
+    for chunk in bytes.utf8_chunks() {
+        out.put(chunk.valid().as_bytes()).expect("measured words");
+        if !chunk.invalid().is_empty() {
+            out.put(b"\xef\xbf\xbd").expect("measured replacement");
+        }
+    }
+    out.finish()
+}

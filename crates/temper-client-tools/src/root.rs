@@ -15,6 +15,7 @@ pub struct Root {
     client: Client,
     runner: runner::Runner,
     adopter: crate::forge::Adopter,
+    forges: crate::forges::Forges,
     next: Option<u32>,
 }
 #[derive(Debug)]
@@ -44,7 +45,13 @@ impl Root {
     pub(crate) fn with_client(client: Client, seed: u64) -> Self {
         let mut runner = runner::Runner::new(RUNNER.asker(), crate::key::TOOLS, seed);
         runner.parts(&Parts);
-        Self { client, runner, adopter: crate::forge::Adopter::new(), next: Some(1) }
+        Self {
+            client,
+            runner,
+            adopter: crate::forge::Adopter::new(),
+            forges: crate::forges::Forges::new(),
+            next: Some(1),
+        }
     }
     #[must_use]
     pub fn client(&self) -> &Client {
@@ -57,6 +64,7 @@ impl Root {
     pub fn kept_json(&mut self, json: bool) {
         self.runner.kept_json(json);
         self.adopter.kept_json(json);
+        self.forges.kept_json(json);
     }
 }
 pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
@@ -70,12 +78,23 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             root.client.step(env.now, env.wall, event, &mut client);
         }
         Event::Call { number, call, json, value } => {
-            if let Some(call_number) = root.next {
+            let active = root
+                .runner
+                .calls()
+                .checked_add(root.adopter.calls())
+                .expect("bounded calls")
+                .checked_add(root.forges.calls())
+                .expect("bounded calls");
+            if active >= usize::try_from(env.limits.tools.rows).expect("rows fit") {
+                out.push(Request::Printed { number, printed: jig::render::failure(b"call limit", json, 1) });
+            } else if let Some(call_number) = root.next {
                 root.next = call_number.checked_add(1);
                 let forge = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name
                     == crate::adopt::ROW.name;
                 let called = runner::Called { number, call_number, call, json, value };
-                if forge {
+                if crate::forges::owns(&called.call) {
+                    crate::forges::call(&mut root.forges, &root.client, env, called, &mut child);
+                } else if forge {
                     crate::forge::call(&mut root.adopter, &root.client, &env.limits, called, &mut child);
                 } else {
                     runner::call(&mut root.runner, &root.client, &tools_env(env), called, &mut child);
@@ -181,12 +200,14 @@ fn route(root: &mut Root, env: &Env<Limits>, told: Told, child: &mut Queue<runne
                 | Told::Ended { .. }
                 | Told::Page { .. } => {}
             }
+            crate::forges::told(&mut root.forges, &root.client, env, &told, child);
             crate::forge::told(&mut root.adopter, &env.limits, told, child);
         }
         Some(Owner::Pages) | None => out.push(Request::Fact { fact: temper_client_domain::Fact::UnknownAsker }),
     }
     if me_changed {
         crate::forge::ready(&mut root.adopter, &root.client, &env.limits, child);
+        crate::forges::ready(&mut root.forges, &root.client, env, child);
     }
 }
 pub fn fire(root: &mut Root, env: &Env<Limits>, out: &mut Queue<Request>) {
@@ -195,12 +216,18 @@ pub fn fire(root: &mut Root, env: &Env<Limits>, out: &mut Queue<Request>) {
     root.client.fire(env.now, env.wall, &mut client);
     drain(root, env, &mut client, &mut child, out);
     jig::wait::fire(&mut root.runner, &root.client, &tools_env(env), &mut child);
+    crate::forges::fire(&mut root.forges, &root.client, env, &mut child);
     drain(root, env, &mut client, &mut child, out);
     root.client.reclaim();
 }
 #[must_use]
 pub fn next_deadline(root: &Root) -> Option<Time> {
-    root.client.next_deadline().into_iter().chain(jig::wait::next_deadline(&root.runner)).min()
+    root.client
+        .next_deadline()
+        .into_iter()
+        .chain(jig::wait::next_deadline(&root.runner))
+        .chain(root.forges.next_deadline())
+        .min()
 }
 
 #[cfg(test)]

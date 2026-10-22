@@ -35,6 +35,9 @@ impl Adopter {
     pub(crate) fn new() -> Self {
         Self { waiting: BTreeMap::new(), pending: BTreeMap::new(), json: false }
     }
+    pub(crate) fn calls(&self) -> usize {
+        self.waiting.len().checked_add(self.pending.len()).expect("bounded calls")
+    }
     pub(crate) fn kept_json(&mut self, json: bool) {
         self.json = json;
     }

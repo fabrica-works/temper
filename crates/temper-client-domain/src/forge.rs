@@ -3,6 +3,7 @@ use skein_lib::{Env, Queue, Time};
 pub mod change;
 pub mod demo;
 pub mod family;
+pub mod forges;
 mod form;
 pub(crate) mod me;
 pub mod panel;

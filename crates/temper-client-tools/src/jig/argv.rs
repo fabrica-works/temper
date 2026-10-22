@@ -66,9 +66,16 @@ pub fn parse(table: &[&Tool], words: &[&[u8]], limits: &Limits) -> Result<Parsed
         let tool = u8::try_from(tool).or(Err(Usage::Tool))?;
         for (form, arguments) in row.forms.iter().enumerate() {
             let form = u8::try_from(form).or(Err(Usage::Tool))?;
-            let parsed = if row.name == b"wait" {
-                let (subject, words) = watch(table, words, limits)?;
-                form_values(table, arguments, words.as_slice(), limits, row.keyed, json, Some(subject))
+            let parsed = if subject_form(arguments) {
+                match watch(table, words, limits) {
+                    Ok((subject, words)) => {
+                        form_values(table, arguments, words.as_slice(), limits, row.keyed, json, Some(subject))
+                    }
+                    Err(failed) => {
+                        error = failed;
+                        continue;
+                    }
+                }
             } else {
                 form_values(table, arguments, words, limits, row.keyed, json, None)
             };
@@ -324,7 +331,7 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
     if tool.name == b"inbox" {
         check_inbox(call)?;
     }
-    if tool.name == b"wait" {
+    if subject_form(args) {
         let Some(Some(Values::One(Value::Subject(subject)))) = call.values.first() else {
             return Err(Usage::Condition);
         };
@@ -670,4 +677,11 @@ pub fn deadline(text: &[u8]) -> Option<skein_lib::Wall> {
         .checked_add(hour.checked_mul(3600)?)?
         .checked_add(minute.checked_mul(60)?)?;
     Some(skein_lib::Wall::from_nanos(seconds.checked_mul(1_000_000_000)?))
+}
+
+fn subject_form(arguments: &[Argument]) -> bool {
+    match arguments.first() {
+        Some(arg) => arg.kind == Kind::Subject,
+        None => false,
+    }
 }
