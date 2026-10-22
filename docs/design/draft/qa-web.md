@@ -261,12 +261,19 @@ for byte.
 After `temper serve`, one more process, `browser`: a program over skein's
 browser kit and the person's browser face (skein's `browser.md`;
 `ui-web.md`, 14.2) that runs headless Chromium as its child, holds one
-person's page on serve's origin, and answers calls on a socket in its
-directory. It is ready by its line.
+person's page on serve's origin, and answers calls on a loopback
+listener its ready line names: skein's io has no Unix sockets, so not a
+socket in its directory (director decision 503; skein's
+`lab-browser.md`, section 8, designs it). It is ready by its line.
 
-- **It signs in:** a seed action gives it a printed sign-in link on its
-  stdin, which it opens. The link never reaches the driver, as no
-  credential reaches it through `ctl` (`qa.md`, 4.3).
+- **It signs in:** a seed action gives it a printed sign-in link from
+  the action's stdin, which it opens, and its query is redacted from
+  everything the browser answers or logs. The link never reaches the
+  driver, as no credential reaches it through `ctl` (`qa.md`, 4.3).
+  It is serve's second: once the seed's `ctl` has spent the first, a
+  spent link presented again is refused and serve prints a fresh one
+  (jig's `protocol/client.md`, section 8), which the runner awaits
+  after that action; no change of temper's (decision 503).
 - **One origin:** it goes only to paths on serve's origin, and a link to
   another host is not followed and says so. So the tool's endpoint is
   its own, as skein's `lab.md`, 6.2 asks of a tool.
@@ -279,11 +286,12 @@ directory. It is ready by its line.
 ### 6.2 The `browse` tool
 
 The tool's fixed arguments are the hand's call program and the browser's
-socket; the agent's arguments follow, a verb and its operands:
+listener; the agent's arguments follow, a verb and its operands, a role
+by the fake person's name for it (skein's `ui.md`, 17.1):
 
 | Verb | Does |
 |---|---|
-| `outline` | the page's outline as section 4's structure: what a screen reader meets, in order |
+| `outline` | the page's outline as section 4's structure, with every name, value and text: what a screen reader meets, in order |
 | `press ROLE NAME` | presses it, found by words in its name or exactly |
 | `type ROLE NAME` | types stdin's text into it, its value replaced |
 | `key KEY` | Enter, Shift+Enter, Escape or Tab, into what has focus |
@@ -432,7 +440,7 @@ No driver, so no paid driver run: W1's spend is the judge's.
 | the browser kit's reads for it: a found node's computed style and box, a clipped shot, viewport and media emulation. Reads no test may use, since a test sees what a person sees (skein's `browser.md`, section 1) | skein's browser kit | W1 |
 | `look`, a finding class (section 9) | skein's lab | W1's findings |
 | the hand: the browser's program and `browse`'s calls (section 6) | skein, over the browser kit and the face | W2 |
-| a sign-in for the browser beside the seed's `ctl`: a second printed link, or a link a signed-in client asks for | the client's owner | W2 |
+| a sign-in for the browser beside the seed's `ctl`: serve's fresh link after a spent one is presented, as the product has it (6.1; decision 503) | answered: no change | W2 |
 | a shot returned as an image in a tool's result, and kept in the transcript | skein's lab | the driver's shots |
 
 ## 12. Open questions
