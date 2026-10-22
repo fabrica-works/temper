@@ -6,12 +6,18 @@ use skein_lib::{List, Reader};
 
 #[test]
 fn an_adopt_of_another_version_is_refused() {
-    let mut bytes = crate::adopt(&fixtures::adopt());
+    let mut bytes = crate::requesting(
+        &v1::Requesting::new(
+            &fixtures::limits(),
+            v1::RequestingParts { request: v1::Request::Adopt(fixtures::adopt()) },
+        )
+        .expect("request"),
+    );
     *bytes.get_mut(1).expect("the record starts with a u16 version") =
         u8::try_from(crate::CLIENT_VERSION + 1).expect("test version fits");
     let problem =
-        v1::Adopt::decode(&fixtures::limits(), &mut Reader::new(&bytes)).expect_err("another version is refused");
-    assert_eq!(problem, v1::Problem { path: v1::Path::AdoptVersion, reason: skein_codec::Reason::Version });
+        v1::Requesting::decode(&fixtures::limits(), &mut Reader::new(&bytes)).expect_err("another version is refused");
+    assert_eq!(problem, v1::Problem { path: v1::Path::RequestingVersion, reason: skein_codec::Reason::Version });
 }
 
 #[test]
@@ -41,9 +47,9 @@ fn checks_one_past_their_count_are_refused() {
 fn each_outcome_round_trips_unchanged() {
     let limits = fixtures::limits();
     for (row, outcome) in fixtures::outcome_rows().into_iter().enumerate() {
-        let answer = v1::AdoptAnswer::new(&limits, v1::AdoptAnswerParts { outcome }).expect("an outcome");
+        let answer = v1::Answer::new(&limits, v1::AnswerParts { outcome }).expect("an outcome");
         let bytes = crate::answer(&answer);
-        let back = v1::AdoptAnswer::decode(&limits, &mut Reader::new(&bytes)).expect("decodes");
+        let back = v1::Answer::decode(&limits, &mut Reader::new(&bytes)).expect("decodes");
         assert_eq!(back, answer, "outcome row {row}");
     }
 }
@@ -53,6 +59,10 @@ fn limits_take_each_bound_from_its_source_field() {
     assert_eq!(
         fixtures::limits(),
         v1::Limits {
+            forges_forges: crate::FORGES,
+            set_up_failed_why: crate::SET_UP_WHY_BYTES,
+            connected_login: 16,
+            stopped_reason: 16,
             pull_address: crate::ADDRESS_BYTES,
             queued_ahead: crate::TASKS_AHEAD,
             change_panel_owner: 16,
@@ -226,6 +236,215 @@ fn change_panel_bounds_accept_at_and_refuse_one_past() {
                 assert_eq!(crate::decode_change_panel(&crate::change_panel(&panel), &limits), Some(panel), "{path:?}");
             } else {
                 assert_eq!(made.expect_err("past bound"), v1::Problem { path, reason: skein_codec::Reason::Bound });
+            }
+        }
+    }
+}
+
+#[test]
+fn requesting_round_trips_and_refuses_trailing_and_version_three_adopt_bytes() {
+    let limits = fixtures::limits();
+    for request in [
+        v1::Request::Adopt(fixtures::adopt()),
+        v1::Request::SetUp(v1::SetUp::new(&limits, v1::SetUpParts { forge: u16::MAX }).expect("forge number")),
+    ] {
+        let record = v1::Requesting::new(&limits, v1::RequestingParts { request }).expect("request");
+        let bytes = crate::requesting(&record);
+        assert_eq!(crate::decode_requesting(&bytes, &limits), Some(record));
+        assert_eq!(crate::decode_requesting(&fixtures::trailing(&bytes), &limits), None);
+    }
+    // Version 3's Adopt was versioned directly, without a request discriminator.
+    let adopt = fixtures::adopt();
+    let mut writer = skein_lib::Writer::new(usize::try_from(adopt.measure()).expect("length") + 2);
+    writer.put(&[0, 3]).expect("old version");
+    adopt.encode(&mut writer).expect("old adoption body");
+    assert_eq!(crate::decode_requesting(&writer.finish(), &limits), None);
+}
+
+#[test]
+fn forges_watch_round_trips_and_refuses_trailing_bytes() {
+    let limits = fixtures::limits();
+    let watch = v1::Watching::new(&limits, v1::WatchingParts { watch: v1::Watch::Forges }).expect("forges watch");
+    let bytes = crate::watching(&watch);
+    assert_eq!(crate::decode_watching(&bytes, &limits), Some(watch));
+    assert_eq!(crate::decode_watching(&fixtures::trailing(&bytes), &limits), None);
+}
+
+fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
+    let limits = fixtures::limits();
+    let mut forges = List::with_capacity(u32::try_from(numbers.len()).expect("small list"));
+    for number in numbers {
+        forges
+            .push(
+                v1::ForgeRow::new(
+                    &limits,
+                    v1::ForgeRowParts {
+                        number: *number,
+                        kind: v1::Kind::Forgejo,
+                        mode: v1::Mode::Owned,
+                        connection: connection.clone(),
+                    },
+                )
+                .expect("row"),
+            )
+            .expect("row capacity");
+    }
+    v1::Forges::new(&limits, v1::ForgesParts { forges }).expect("forges")
+}
+
+#[test]
+fn each_forge_connection_round_trips_at_its_bounds() {
+    let limits = fixtures::limits();
+    let failed =
+        v1::SetUpFailed::new(&limits, v1::SetUpFailedParts { why: fixtures::field_bytes(256) }).expect("why at bound");
+    let connected = v1::Connected::new(&limits, v1::ConnectedParts { id: u64::MAX, login: fixtures::field_bytes(16) })
+        .expect("login at bound");
+    let stopped =
+        v1::Stopped::new(&limits, v1::StoppedParts { reason: fixtures::field_bytes(16) }).expect("reason at bound");
+    for connection in [
+        v1::Connection::NotConnected,
+        v1::Connection::NotSetUp,
+        v1::Connection::SetUpFailed(failed),
+        v1::Connection::Connecting,
+        v1::Connection::Connected(connected),
+        v1::Connection::Stopped(stopped),
+    ] {
+        let record = forges_rows(&[u16::MAX], &connection);
+        let bytes = crate::forges(&record);
+        assert_eq!(crate::decode_forges(&bytes, &limits), Some(record));
+        assert_eq!(crate::decode_forges(&fixtures::trailing(&bytes), &limits), None);
+    }
+    for step in [None, Some(v1::SetUpStep::Fetch), Some(v1::SetUpStep::Prepare), Some(v1::SetUpStep::Run)] {
+        let connection =
+            v1::Connection::SettingUp(v1::SettingUp::new(&limits, v1::SettingUpParts { step }).expect("setup step"));
+        let record = forges_rows(&[1], &connection);
+        assert_eq!(crate::decode_forges(&crate::forges(&record), &limits), Some(record));
+    }
+}
+
+#[test]
+fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
+    let limits = fixtures::limits();
+    let mut writer = skein_lib::Writer::new(4 + 257);
+    writer.put(&257_u32.to_be_bytes()).expect("why length");
+    writer.put(&[b'w'; 257]).expect("why bytes");
+    assert_eq!(
+        v1::SetUpFailed::decode(&limits, &mut Reader::new(&writer.finish())).expect_err("why past ceiling"),
+        v1::Problem { path: v1::Path::SetUpFailedWhy, reason: skein_codec::Reason::Bound }
+    );
+    assert_eq!(
+        v1::SetUpFailed::new(&limits, v1::SetUpFailedParts { why: fixtures::field_bytes(257) })
+            .expect_err("past bound"),
+        v1::Problem { path: v1::Path::SetUpFailedWhy, reason: skein_codec::Reason::Bound }
+    );
+    assert_eq!(
+        v1::Connected::new(&limits, v1::ConnectedParts { id: 1, login: fixtures::field_bytes(17) })
+            .expect_err("past bound"),
+        v1::Problem { path: v1::Path::ConnectedLogin, reason: skein_codec::Reason::Bound }
+    );
+    assert_eq!(
+        v1::Stopped::new(&limits, v1::StoppedParts { reason: fixtures::field_bytes(17) }).expect_err("past bound"),
+        v1::Problem { path: v1::Path::StoppedReason, reason: skein_codec::Reason::Bound }
+    );
+    // A record legal at schema ceilings must still respect the receiving side's bounds.
+    for connection in [
+        v1::Connection::Connected(
+            v1::Connected::new(&v1::CEILINGS, v1::ConnectedParts { id: 1, login: fixtures::field_bytes(17) })
+                .expect("schema login"),
+        ),
+        v1::Connection::Stopped(
+            v1::Stopped::new(&v1::CEILINGS, v1::StoppedParts { reason: fixtures::field_bytes(17) })
+                .expect("schema reason"),
+        ),
+    ] {
+        let row = v1::ForgeRow::new(
+            &v1::CEILINGS,
+            v1::ForgeRowParts { number: 1, kind: v1::Kind::Github, mode: v1::Mode::Connected, connection },
+        )
+        .expect("schema row");
+        let mut forges = List::with_capacity(1);
+        forges.push(row).expect("one row");
+        let record = v1::Forges::new(&v1::CEILINGS, v1::ForgesParts { forges }).expect("schema forges");
+        assert_eq!(crate::decode_forges(&crate::forges(&record), &limits), None);
+    }
+}
+
+#[test]
+fn forges_refuse_seventeen_rows_unsorted_rows_and_duplicate_numbers() {
+    let limits = fixtures::limits();
+    let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    let at = forges_rows(&numbers, &v1::Connection::NotConnected);
+    assert_eq!(crate::decode_forges(&crate::forges(&at), &limits), Some(at.clone()));
+    let mut parts = at.into_parts();
+    let mut rows = List::with_capacity(17);
+    for row in parts.forges.into_boxed() {
+        rows.push(row).expect("room");
+    }
+    rows.push(
+        v1::ForgeRow::new(
+            &limits,
+            v1::ForgeRowParts {
+                number: 17,
+                kind: v1::Kind::Github,
+                mode: v1::Mode::Fake,
+                connection: v1::Connection::NotSetUp,
+            },
+        )
+        .expect("row"),
+    )
+    .expect("extra room");
+    parts.forges = rows;
+    assert_eq!(
+        v1::Forges::new(&limits, parts).expect_err("past bound"),
+        v1::Problem { path: v1::Path::ForgesForges, reason: skein_codec::Reason::Bound }
+    );
+    // A peer can send seventeen rows even though the constructor refuses them.
+    let at = forges_rows(&numbers, &v1::Connection::NotConnected);
+    let row = at.forges().get(0).expect("row");
+    let length = at.measure().checked_add(row.measure()).expect("seventeen rows fit");
+    let mut writer = skein_lib::Writer::new(usize::try_from(length).expect("length"));
+    writer.put(&4_u16.to_be_bytes()).expect("version");
+    writer.put(&17_u32.to_be_bytes()).expect("row count");
+    for row in at.forges() {
+        row.encode(&mut writer).expect("row bytes");
+    }
+    row.encode(&mut writer).expect("extra row bytes");
+    assert_eq!(crate::decode_forges(&writer.finish(), &limits), None);
+    for numbers in [&[2, 1][..], &[1, 1][..]] {
+        let record = forges_rows(numbers, &v1::Connection::NotSetUp);
+        assert_eq!(crate::decode_forges(&crate::forges(&record), &limits), None);
+    }
+}
+
+#[test]
+fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
+    let limits = v1::CEILINGS;
+    for count in [1024, 1025] {
+        let connected =
+            v1::Connected::new(&limits, v1::ConnectedParts { id: u64::MAX, login: fixtures::field_bytes(count) });
+        let stopped = v1::Stopped::new(&limits, v1::StoppedParts { reason: fixtures::field_bytes(count) });
+        if count == 1025 {
+            connected.expect_err("login past schema ceiling");
+            stopped.expect_err("reason past schema ceiling");
+            continue;
+        }
+        let connected = connected.expect("login ceiling");
+        let stopped = stopped.expect("reason ceiling");
+        for kind in [v1::Kind::Forgejo, v1::Kind::Github] {
+            for mode in [v1::Mode::Connected, v1::Mode::Managed, v1::Mode::Owned, v1::Mode::Fake] {
+                for connection in
+                    [v1::Connection::Connected(connected.clone()), v1::Connection::Stopped(stopped.clone())]
+                {
+                    let row = v1::ForgeRow::new(
+                        &limits,
+                        v1::ForgeRowParts { number: u16::MAX, kind: kind.clone(), mode: mode.clone(), connection },
+                    )
+                    .expect("forge row");
+                    let mut forges = List::with_capacity(1);
+                    forges.push(row).expect("one forge");
+                    let record = v1::Forges::new(&limits, v1::ForgesParts { forges }).expect("forges");
+                    assert_eq!(crate::decode_forges(&crate::forges(&record), &limits), Some(record));
+                }
             }
         }
     }

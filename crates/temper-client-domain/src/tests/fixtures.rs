@@ -285,8 +285,7 @@ pub fn adopted_bytes() -> jig_client::Family {
         },
     )
     .expect("adopted repository");
-    let answer =
-        w::AdoptAnswer::new(&limits, w::AdoptAnswerParts { outcome: w::Outcome::Adopted(adopted) }).expect("answer");
+    let answer = w::Answer::new(&limits, w::AnswerParts { outcome: w::Outcome::Adopted(adopted) }).expect("answer");
     jig_client::Family {
         family: wire::number(wire::Owner::Forge),
         version: wire::CLIENT_VERSION,

@@ -73,7 +73,7 @@ fn family_open(out: &mut Queue<Request>, task: u64) -> Option<Token> {
             assert_eq!((record.family, record.version), (wire::FORGE, wire::CLIENT_VERSION));
             let watching =
                 wire::decode_watching(&record.bytes, &forge::wire_limits(&f::limits().forge).unwrap()).unwrap();
-            let w::Watch::Change(subject) = watching.watch();
+            let w::Watch::Change(subject) = watching.watch() else { panic!("change watch") };
             assert_eq!(subject.task(), task);
             found = Some(watch);
         }

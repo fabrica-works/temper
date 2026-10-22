@@ -45,7 +45,7 @@ pub(crate) fn forge_refused(reason: w::ForgeReason) -> w::Outcome {
 }
 pub(crate) fn family_answer(outcome: w::Outcome) -> client::Answered {
     let limits = forge::wire_limits(&limits_root().domain.forge).expect("forge limits");
-    let answer = w::AdoptAnswer::new(&limits, w::AdoptAnswerParts { outcome }).expect("adoption answer");
+    let answer = w::Answer::new(&limits, w::AnswerParts { outcome }).expect("adoption answer");
     client::Answered::Family(client::Family {
         family: wire::FORGE,
         version: wire::CLIENT_VERSION,
@@ -74,7 +74,15 @@ impl Harness {
             panic!("forge ask")
         };
         let limits = forge::wire_limits(&self.limits.domain.forge).expect("forge limits");
-        w::Adopt::decode(&limits, &mut skein_lib::Reader::new(&record.bytes)).expect("valid adopt").into_parts()
+        (match w::Requesting::decode(&limits, &mut skein_lib::Reader::new(&record.bytes))
+            .expect("valid adopt")
+            .into_parts()
+            .request
+        {
+            w::Request::Adopt(adopt) => adopt,
+            w::Request::SetUp(_) => panic!("expected adoption"),
+        })
+        .into_parts()
     }
     pub(crate) fn adoption_bytes(&self, call: u32) -> &client::Ask {
         &self.sends.get(&call).expect("adopt sent").2

@@ -11,7 +11,7 @@ use crate::{
 use alloc::{boxed::Box, collections::BTreeMap};
 use jig_client::{Client, Key, Latest, Outcome, State, Told, contract as c};
 use skein_json::writer::Encoder;
-use skein_lib::{List, Queue, Reader};
+use skein_lib::{List, Queue};
 use skein_ui::phrases::Hole;
 use temper_client_domain::{
     forge::{
@@ -218,11 +218,9 @@ fn restored(ask: &jig_client::Ask, limits: forge::Limits) -> Option<forge::Adopt
     if record.family != wire::FORGE || record.version != wire::CLIENT_VERSION {
         return None;
     }
-    let mut reader = Reader::new(&record.bytes);
-    let a = w::Adopt::decode(&forge::wire_limits(&limits)?, &mut reader).ok()?.into_parts();
-    if !reader.is_empty() {
-        return None;
-    }
+    let requesting = wire::decode_requesting(&record.bytes, &forge::wire_limits(&limits)?)?;
+    let w::Request::Adopt(adopt) = requesting.into_parts().request else { return None };
+    let a = adopt.into_parts();
     Some(forge::Adoption {
         project: a.project,
         home: a.home,
