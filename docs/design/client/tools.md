@@ -157,7 +157,12 @@ temper                       the binary: `temper ctl` runs the host
   argv or from JSON and checked against the table before anything is
   sent. The runner takes a call and gives back its result; the host
   interprets neither.
-- **Projects by name or number;** a name is resolved through `me`.
+- **Projects by name or number;** a name is resolved through `me`. A
+  name is never decimal digits alone, and no two projects share one
+  (jig's `domain/core.md`, 6.1), so an argument is a number or a name,
+  never both, and names one project. Until jig gives projects names
+  (jig's `STATUS.md`, section 3), `me` gives none, and a project is
+  taken by its number.
 
 ### 5.2 Reads
 

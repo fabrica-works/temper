@@ -77,7 +77,12 @@ The mockup of what the person sees is `../client/mockups/first-run.html`.
   GitHub (managed, by the manifest flow, or connected, an App pasted),
   Set up a Forgejo here (owned, 3.8), or a Forgejo elsewhere (managed
   or connected, section 4). A forge connected, the person adopts a
-  repository into a new project, or into the default one.
+  repository into a new project, or into the default one. A new
+  project's form suggests the repository's name as the project's,
+  made unique ("tally 2" beside a "tally"), for the person to change;
+  the name is then the project's own, not the repository's (jig's
+  `domain/core.md`, 6.1). jig makes no project after a first start
+  yet.
 - **The demo** can be hidden; its forge and model stay in the document,
   so a demo is always there to show someone.
 

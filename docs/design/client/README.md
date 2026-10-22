@@ -1023,7 +1023,14 @@ of each (`../draft/first-run.md`, 3.6).
   it builds the page in one outline (skein's `ui.md`, section 14), in
   the mockups' order:
   - *a banner:* temper's name; the project the person is in, and the
-    others to choose from; the navigation (5.3) after the projects, as in
+    others to choose from, each by the name `me` gives it, which no
+    other project of the deployment shares (jig's `domain/core.md`,
+    6.1), its visible and accessible name the same words. Until jig
+    gives projects names (jig's `STATUS.md`, section 3, "A project's
+    name"), `me` gives none, and the banner says "Project N", N the
+    project's number: the name jig gives a project configuration
+    leaves unnamed, so nothing a person sees changes when names come;
+    the navigation (5.3) after the projects, as in
     the mockups; the link's state, one word for each of
     `jig-client`'s `Link` states ("Signed out", "Connecting" while
     starting, "Live", "Offline", "Out of date"), and "Behind" while a
