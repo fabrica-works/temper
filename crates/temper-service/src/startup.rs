@@ -398,6 +398,7 @@ fn checked_start(
         webhooks: resolved.webhooks,
         files: settings::Files { entries: files.entries.clone() },
         forges: resolved.forges,
+        demo: parsed.application.demo,
         identities: resolved.identities,
         landing: parsed.application.landing,
         charter: parsed.application.charter,

@@ -125,12 +125,8 @@ impl Service {
             .expect("client routing room");
         let clients =
             clients::Clients::new(&settings.jig, &settings.clients.listener, seeds, client_room, &limits.journal)?;
-        let setup = crate::setup::prepare(
-            &settings,
-            &forge_settings,
-            &seeds.crypto,
-            max.checked_add(SETUP_ROUTING_HEADROOM).expect("setup routing headroom"),
-        )?;
+        let setup_room = max.checked_add(SETUP_ROUTING_HEADROOM).expect("setup routing headroom");
+        let setup = crate::setup::prepare(&settings, &forge_settings, &seeds.crypto, setup_room)?;
         let forge = crate::forge::Layer::new(
             forge_settings,
             settings.limits.forge_component,
@@ -151,13 +147,15 @@ impl Service {
             forge_charter: settings.charter,
         };
         let store = store::Store::new(&limits, &store_limits, &config.core.settings.models, seeds.installation);
+        let demo = settings.demo;
+        let own = settings.limits;
         Ok(Self {
             worker,
             engine: engine::Engine::new(
                 config,
                 &limits,
                 store,
-                engine::Children { accounts, workers, clients, forge, setup, notes, limits: settings.limits },
+                engine::Children { accounts, workers, clients, demo, forge, setup, notes, limits: own },
                 values,
                 first_periods,
             )?,
@@ -668,6 +666,18 @@ fn memory(
         &root.journal,
     )?)?;
     bytes = bytes.checked_add(clients::bundle::worst_case(&settings.limits.clients)?)?;
+    if let Some(demo) = &settings.demo {
+        let mut retained = List::<Box<[u8]>>::worst_case(u32::try_from(demo.cues.len()).ok()?)?
+            .checked_add(u64::try_from(demo.owner.len()).ok()?)?
+            .checked_add(u64::try_from(demo.name.len()).ok()?)?;
+        for cue in &demo.cues {
+            retained = retained.checked_add(u64::try_from(cue.len()).ok()?)?;
+        }
+        // Configuration, plus one transient typed answer and its encoded record.
+        bytes = bytes.checked_add(retained.checked_mul(2)?)?.checked_add(
+            temper_client_protocol_wire::v1::DemoAnswer::worst_case_bytes(&temper_client_protocol_wire::v1::CEILINGS)?,
+        )?;
+    }
     let forges = skein_forge_connection::limits::Forges::of(forge.1)?;
     let batch = temper_engine_domain::max_out(root).checked_add(SETUP_ROUTING_HEADROOM)?;
     bytes = bytes

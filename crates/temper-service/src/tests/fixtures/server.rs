@@ -33,7 +33,7 @@ pub fn server_call(
 }
 const CONNECTION: skein_lib::Token = skein_lib::Token::new(1);
 pub fn listening(service: &mut Service) {
-    service.engine.clients.iterate(Time::ZERO, Wall::EPOCH, &mut service.engine.events, &[]);
+    service.engine.clients.iterate(Time::ZERO, Wall::EPOCH, &mut service.engine.events, &[], None);
     while let Some(request) = service.engine.clients.io.pop() {
         if let skein_io::Request::Listen { owner, addr } = request {
             assert!(service.engine.clients.up(skein_io::Event::Listening { owner, listener: LISTENER, addr }));

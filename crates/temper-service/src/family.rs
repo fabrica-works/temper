@@ -11,6 +11,7 @@ mod refusals;
 pub fn to_root(
     exchange: kit::ToApplication,
     forges: &[crate::settings::Forge],
+    demo: Option<&crate::settings::Demo>,
     limits: &w::Limits,
 ) -> Result<root::Event, Box<kit::Event>> {
     match exchange {
@@ -58,8 +59,33 @@ pub fn to_root(
                 carried,
             }))
         }
-        kit::ToApplication::Read { reply, family, .. } => {
-            Err(Box::new(kit::Event::Application(kit::FromApplication::Read { reply, family, record: None })))
+        kit::ToApplication::Read { reply, family, version, record, .. } => {
+            let mut answer = None;
+            if family == wire::FORGE
+                && version == wire::CLIENT_VERSION
+                && let Some(reading) = wire::decode_reading(&record, limits)
+                && *reading.read() == w::Read::Demo
+                && let Some(demo) = demo
+            {
+                let mut cues = List::with_capacity(u32::try_from(demo.cues.len()).expect("bounded demo cues"));
+                for cue in &demo.cues {
+                    cues.push(cue.clone()).expect("bounded demo cues");
+                }
+                let record = w::DemoAnswer::new(
+                    limits,
+                    w::DemoAnswerParts {
+                        project: demo.project,
+                        forge: demo.forge,
+                        provider: demo.provider,
+                        owner: demo.owner.clone(),
+                        name: demo.name.clone(),
+                        cues,
+                    },
+                )
+                .expect("demo checked at startup");
+                answer = Some(wire::demo_answer(&record));
+            }
+            Err(Box::new(kit::Event::Application(kit::FromApplication::Read { reply, family, record: answer })))
         }
         kit::ToApplication::Watch { watcher, .. } => {
             Err(Box::new(kit::Event::WatchRefused { watcher, why: jig_domain_core::WatchRefusal::Unknown }))

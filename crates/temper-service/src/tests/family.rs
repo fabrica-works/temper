@@ -51,9 +51,13 @@ fn exchange(family: u16, version: u32, record: Box<[u8]>) -> kit::ToApplication 
 #[test]
 fn an_adopt_reaches_the_root_with_its_forges_host() {
     let forges = configured(b"https://forge.example:3000/git");
-    let event =
-        family::to_root(exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt())), &forges, &w::CEILINGS)
-            .unwrap();
+    let event = family::to_root(
+        exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt())),
+        &forges,
+        None,
+        &w::CEILINGS,
+    )
+    .unwrap();
     let root::Event::Party(root::PartyInput::Application { reply_to, sign_in, key, digest, request, .. }) = event
     else {
         panic!("application request")
@@ -79,7 +83,8 @@ fn an_adopt_reaches_the_root_with_its_forges_host() {
 #[test]
 fn an_adopt_naming_no_configured_forge_reaches_the_root_with_no_host() {
     let event =
-        family::to_root(exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], &w::CEILINGS).unwrap();
+        family::to_root(exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], None, &w::CEILINGS)
+            .unwrap();
     let root::Event::Party(root::PartyInput::Application { request, .. }) = event else { panic!("adoption") };
     assert!(request.host.is_empty());
     assert_eq!(request.forge, 1);
@@ -92,7 +97,7 @@ fn an_adopt_of_another_version_is_answered_undecodable() {
         ("malformed", 1, wire::CLIENT_VERSION, Box::new([]), REPLY),
         ("trailing", 1, wire::CLIENT_VERSION, trailing_adopt(), REPLY),
     ] {
-        let Err(answer) = family::to_root(exchange(family, version, record), &[], &w::CEILINGS) else {
+        let Err(answer) = family::to_root(exchange(family, version, record), &[], None, &w::CEILINGS) else {
             panic!("{row}: undecodable")
         };
         let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *answer else {
@@ -109,7 +114,7 @@ fn trailing_adopt() -> Box<[u8]> {
     bytes.finish()
 }
 #[test]
-fn a_forge_family_read_is_unknown() {
+fn an_unconfigured_or_unknown_family_read_has_no_record() {
     for (row, family, version, record, scope, expected) in [
         (
             "forge",
@@ -121,7 +126,7 @@ fn a_forge_family_read_is_unknown() {
         ),
         ("other", 2, 3, Box::new([]), people::ApplicationScope::Project(7), (REPLY, 2, None)),
         (
-            "demo",
+            "demo, unconfigured",
             wire::FORGE,
             wire::CLIENT_VERSION,
             wire::reading(&w::Reading::new(&w::CEILINGS, w::ReadingParts { read: w::Read::Demo }).unwrap()),
@@ -138,11 +143,91 @@ fn a_forge_family_read_is_unknown() {
             scope,
             window: jig_domain_core::documents::Window { rows: 2, after: None },
         };
-        let Err(answer) = family::to_root(input, &[], &w::CEILINGS) else { panic!("{row}: unknown read") };
+        let Err(answer) = family::to_root(input, &[], None, &w::CEILINGS) else { panic!("{row}: unknown read") };
         let kit::Event::Application(kit::FromApplication::Read { reply, family, record }) = *answer else {
             panic!("{row}: read")
         };
         assert_eq!((reply, family, record), expected, "{row}");
+    }
+}
+fn demo_read(scope: people::ApplicationScope) -> kit::ToApplication {
+    kit::ToApplication::Read {
+        reply: REPLY,
+        sign_in: 3,
+        family: wire::FORGE,
+        version: wire::CLIENT_VERSION,
+        record: wire::reading(&w::Reading::new(&w::CEILINGS, w::ReadingParts { read: w::Read::Demo }).unwrap()),
+        scope,
+        window: jig_domain_core::documents::Window { rows: 2, after: None },
+    }
+}
+fn demo_record(input: kit::ToApplication, demo: &crate::settings::Demo) -> Box<[u8]> {
+    let Err(answer) = family::to_root(input, &[], Some(demo), &w::CEILINGS) else { panic!("demo read") };
+    let kit::Event::Application(kit::FromApplication::Read { reply, family, record }) = *answer else {
+        panic!("read answer")
+    };
+    assert_eq!((reply, family), (REPLY, wire::FORGE));
+    record.unwrap()
+}
+#[test]
+fn the_demo_read_answers_the_configured_demo() {
+    let demo = crate::settings::Demo {
+        project: 1,
+        forge: 2,
+        provider: 3,
+        owner: b"demo".as_slice().into(),
+        name: b"widget".as_slice().into(),
+        cues: Box::new([
+            b"Add CSV export to widget".as_slice().into(),
+            b"Add a dark theme to widget".as_slice().into(),
+        ]),
+    };
+    let mut cues = List::with_capacity(2);
+    cues.push(b"Add CSV export to widget".as_slice().into()).unwrap();
+    cues.push(b"Add a dark theme to widget".as_slice().into()).unwrap();
+    let expected = w::DemoAnswer::new(
+        &w::CEILINGS,
+        w::DemoAnswerParts {
+            project: 1,
+            forge: 2,
+            provider: 3,
+            owner: b"demo".as_slice().into(),
+            name: b"widget".as_slice().into(),
+            cues,
+        },
+    )
+    .unwrap();
+    for scope in [people::ApplicationScope::Deployment, people::ApplicationScope::Project(7)] {
+        let record = demo_record(demo_read(scope), &demo);
+        assert_eq!(wire::decode_demo_answer(&record, &w::CEILINGS), Some(expected.clone()), "{scope:?}");
+    }
+}
+#[test]
+fn the_demo_answer_carries_no_key_path_socket_or_placeholder() {
+    let service = fixtures::demo_service();
+    let record = demo_record(demo_read(people::ApplicationScope::Deployment), service.engine.demo.as_ref().unwrap());
+    // The answer's security rule: no key path, listen socket or placeholder.
+    for forbidden in [b"llm.key".as_slice(), b"demo/llm", b"$", b"socket"] {
+        assert_eq!(skein_lib::bytes::find(&record, forbidden), None, "{forbidden:?}");
+    }
+}
+#[test]
+fn a_configured_demo_does_not_answer_other_or_malformed_reads() {
+    let service = fixtures::demo_service();
+    for (row, family, version, record) in [
+        ("family", 2, wire::CLIENT_VERSION, Box::from([0, 2, 0].as_slice())),
+        ("version", wire::FORGE, wire::CLIENT_VERSION + 1, Box::from([0, 2, 0].as_slice())),
+        ("malformed", wire::FORGE, wire::CLIENT_VERSION, Box::from([0, 2, 1].as_slice())),
+        ("trailing", wire::FORGE, wire::CLIENT_VERSION, Box::from([0, 2, 0, 0].as_slice())),
+    ] {
+        let mut input = demo_read(people::ApplicationScope::Deployment);
+        let kit::ToApplication::Read { family: f, version: v, record: r, .. } = &mut input else { panic!("read") };
+        (*f, *v, *r) = (family, version, record);
+        let Err(answer) = family::to_root(input, &[], service.engine.demo.as_ref(), &w::CEILINGS) else {
+            panic!("{row}: read answer")
+        };
+        let kit::Event::Application(kit::FromApplication::Read { record, .. }) = *answer else { panic!("{row}: read") };
+        assert_eq!(record, None, "{row}");
     }
 }
 #[test]
@@ -160,7 +245,7 @@ fn a_forge_family_watch_is_refused_unknown() {
             scope: people::ApplicationScope::Project(7),
             window: jig_domain_core::documents::Window { rows: 2, after: None },
         };
-        let Err(answer) = family::to_root(input, &[], &w::CEILINGS) else { panic!("{row}: refused watch") };
+        let Err(answer) = family::to_root(input, &[], None, &w::CEILINGS) else { panic!("{row}: refused watch") };
         let kit::Event::WatchRefused { watcher, why } = *answer else { panic!("{row}: refusal") };
         assert_eq!((watcher, why), expected, "{row}");
     }
@@ -300,7 +385,7 @@ fn a_request_under_an_owner_without_records_is_answered_undecodable() {
     for owner in [wire::Owner::Pages, wire::Owner::Runner] {
         let number = wire::number(owner);
         let Err(answer) =
-            family::to_root(exchange(number, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], &w::CEILINGS)
+            family::to_root(exchange(number, wire::CLIENT_VERSION, wire::adopt(&adopt())), &[], None, &w::CEILINGS)
         else {
             panic!("owner is not served: {owner:?}")
         };
@@ -346,7 +431,7 @@ fn a_family_request_keeps_its_supplied_admission_scope() {
     let mut input = exchange(wire::FORGE, wire::CLIENT_VERSION, wire::adopt(&adopt()));
     let kit::ToApplication::Request { scope, .. } = &mut input else { panic!("request") };
     *scope = people::ApplicationScope::Deployment;
-    let event = family::to_root(input, &[], &w::CEILINGS).unwrap();
+    let event = family::to_root(input, &[], None, &w::CEILINGS).unwrap();
     let root::Event::Party(root::PartyInput::Application { scope, .. }) = event else { panic!("application") };
     assert_eq!(scope, people::ApplicationScope::Deployment);
 }

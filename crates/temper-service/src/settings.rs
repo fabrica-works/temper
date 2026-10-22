@@ -2,6 +2,17 @@
 use alloc::boxed::Box;
 use skein_lib::{List, Secret};
 
+/// The deployment's demo as the clients read it (client/README.md, 8; protocol/setup.md, 8.4).
+#[derive(Debug)]
+pub struct Demo {
+    pub project: u32,
+    pub forge: u16,
+    pub provider: u32,
+    pub owner: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub cues: Box<[Box<[u8]>]>,
+}
+
 /// A forge temper works on (protocol/configuration.md, section 3, `forges`).
 #[derive(Debug)]
 pub struct Forge {
@@ -83,6 +94,7 @@ pub struct Engine {
     pub webhooks: Option<skein_forge_connection::hooks::Webhooks>,
     pub files: Files,
     pub forges: Box<[Forge]>,
+    pub demo: Option<Demo>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
     pub charter: u32,

@@ -89,6 +89,7 @@ pub fn engine() -> settings::Engine {
         },
         files: settings::Files { entries: skein_lib::List::with_capacity(0) },
         forges: forges(),
+        demo: None,
         identities: Box::new([settings::Identity {
             number: 1,
             forge: 1,
@@ -796,7 +797,8 @@ pub fn clients() -> crate::clients::Clients {
 }
 mod startup;
 pub use startup::{
-    APPLICATION, document, files, parsed, startup_agent, webhook_document, with, without, worker_runtime,
+    APPLICATION, demo_application, demo_service, document, files, parsed, startup_agent, webhook_document, with,
+    without, worker_runtime,
 };
 pub fn forge_runtime() -> skein_lib::List<crate::ForgeRuntime> {
     let mut runtime = skein_lib::List::with_capacity(1);

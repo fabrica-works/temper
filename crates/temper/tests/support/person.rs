@@ -87,9 +87,9 @@ pub fn demo_change() -> Script {
         begin: Begin::Link,
         steps: Box::new([
             Step::Go { address: Address::Chats },
-            Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: START_WITHIN },
-            Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: b"Add CSV export to widget".as_slice().into() },
-            Step::Press { find: Find::named(Role::Button, b"Start") },
+            // client/README.md, 4.8: a suggested request starts and opens its chat.
+            Step::See { find: Find::named(Role::Button, b"Add CSV export to widget"), within: START_WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Add CSV export to widget") },
             Step::See {
                 find: Find::text("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes()).within(conversation()),
                 within: START_WITHIN,

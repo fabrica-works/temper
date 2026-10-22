@@ -9,6 +9,110 @@ use skein_lib::List;
 const REFUSED_TEMPLATE: u32 = 7;
 
 #[test]
+fn the_template_shaped_demo_reads_into_its_public_fields() {
+    let (members, problems) = application(&fixtures::demo_application(), &fixtures::engine().jig);
+    assert_eq!(&*lines(&problems), b"");
+    let demo = members.unwrap().demo.unwrap();
+    assert_eq!((demo.project, demo.forge, demo.provider), (1, 1, 3));
+    assert_eq!((demo.owner.as_ref(), demo.name.as_ref()), (b"demo".as_slice(), b"widget".as_slice()));
+    assert_eq!(
+        demo.cues.as_ref(),
+        &[
+            Box::from(b"Add CSV export to widget".as_slice()),
+            Box::from(b"Add a dark theme to widget".as_slice()),
+            Box::from(b"Fix widget's empty search state".as_slice()),
+            Box::from(b"Export widget's table as CSV".as_slice()),
+        ]
+    );
+}
+#[test]
+fn a_null_demo_reads_as_none() {
+    let (members, problems) = application(fixtures::APPLICATION, &fixtures::engine().jig);
+    assert_eq!(&*lines(&problems), b"");
+    assert!(members.unwrap().demo.is_none());
+}
+#[test]
+fn an_unanswerable_demo_is_refused_at_its_field() {
+    use temper_client_protocol_wire::v1::CEILINGS;
+    let input = fixtures::demo_application();
+    let input = core::str::from_utf8(&input).unwrap();
+    for (row, from, to, expected) in [
+        (
+            "missing forge",
+            "\"forge\":1,\"project\":1",
+            "\"forge\":2,\"project\":1".into(),
+            "application.demo.forge: unknown reference\n",
+        ),
+        (
+            "missing setup forge",
+            "\"setup\":[{\"forge\":1",
+            "\"setup\":[{\"forge\":2".into(),
+            "application.demo.forge: unknown reference\n",
+        ),
+        ("not fake", "\"fake\":{", "\"managed\":{".into(), "application.demo.forge: invalid form\n"),
+        (
+            "no repository",
+            "[{\"name\":\"widget\",\"landing\":\"main\"},{\"name\":\"other\",\"landing\":\"main\"}]",
+            "[]".into(),
+            "application.setup[0].mode.fake.repositories: invalid form\n",
+        ),
+        (
+            "cue count at bound",
+            "\"asked\":[",
+            ["\"asked\":[", &"{\"cue\":\"extra\",\"turns\":[\"x\"]},".repeat(4)].concat(),
+            "",
+        ),
+        (
+            "cue count past bound",
+            "\"asked\":[",
+            ["\"asked\":[", &"{\"cue\":\"extra\",\"turns\":[\"x\"]},".repeat(5)].concat(),
+            "application.demo.llm.asked: past its bound\n",
+        ),
+        (
+            "cue at bound",
+            "Add CSV export to widget",
+            "x".repeat(usize::try_from(CEILINGS.demo_answer_cues_item).unwrap()),
+            "",
+        ),
+        (
+            "cue past bound",
+            "Add CSV export to widget",
+            "x".repeat(usize::try_from(CEILINGS.demo_answer_cues_item + 1).unwrap()),
+            "application.demo.llm.asked[0].cue: past its bound\n",
+        ),
+        (
+            "owner at bound",
+            "\"owner\":\"demo\"",
+            ["\"owner\":\"", &"x".repeat(usize::try_from(CEILINGS.demo_answer_owner).unwrap()), "\""].concat(),
+            "",
+        ),
+        (
+            "owner past bound",
+            "\"owner\":\"demo\"",
+            ["\"owner\":\"", &"x".repeat(usize::try_from(CEILINGS.demo_answer_owner + 1).unwrap()), "\""].concat(),
+            "application.setup[0].mode.fake.owner: past its bound\n",
+        ),
+        (
+            "name at bound",
+            "\"name\":\"widget\"",
+            ["\"name\":\"", &"x".repeat(usize::try_from(CEILINGS.demo_answer_name).unwrap()), "\""].concat(),
+            "",
+        ),
+        (
+            "name past bound",
+            "\"name\":\"widget\"",
+            ["\"name\":\"", &"x".repeat(usize::try_from(CEILINGS.demo_answer_name + 1).unwrap()), "\""].concat(),
+            "application.setup[0].mode.fake.repositories[0].name: past its bound\n",
+        ),
+    ] {
+        let input = input.replace(from, &to);
+        let (members, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+        assert_eq!(members.is_some(), expected.is_empty(), "{row}");
+        assert_eq!(&*lines(&problems), expected.as_bytes(), "{row}");
+    }
+}
+
+#[test]
 fn the_clients_listener_is_read_from_the_application_member() {
     let jig = fixtures::engine().jig;
     let (members, problems) = application(fixtures::APPLICATION, &jig);

@@ -285,7 +285,12 @@ impl Clients {
             events.push(value);
         }
     }
-    pub fn advance(&mut self, events: &mut Queue<root::Event>, forges: &[crate::settings::Forge]) {
+    pub fn advance(
+        &mut self,
+        events: &mut Queue<root::Event>,
+        forges: &[crate::settings::Forge],
+        demo: Option<&crate::settings::Demo>,
+    ) {
         for _ in 0..self.out.len() {
             if self.io.room() == 0
                 || self.links.room() == 0
@@ -309,7 +314,7 @@ impl Clients {
                     Err(value) => self.down(*value),
                 },
                 kit::Request::Application(value) => {
-                    match crate::family::to_root(value, forges, &temper_client_protocol_wire::v1::CEILINGS) {
+                    match crate::family::to_root(value, forges, demo, &temper_client_protocol_wire::v1::CEILINGS) {
                         Ok(value) => self.root(value, events),
                         Err(value) => self.down(*value),
                     }
@@ -327,6 +332,7 @@ impl Clients {
         wall: Wall,
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
+        demo: Option<&crate::settings::Demo>,
     ) {
         self.env.now = now;
         self.env.wall = wall;
@@ -345,15 +351,15 @@ impl Clients {
         self.server.fire(&mut self.server_out);
         let server_pending = self.server.advance(&mut self.server_out);
         self.server_requests();
-        self.endings_step(events, forges);
-        self.advance(events, forges);
+        self.endings_step(events, forges, demo);
+        self.advance(events, forges, demo);
         if self.closed {
             return;
         }
         if !self.component_closed {
             self.component.fire(&self.env, &mut self.out);
         }
-        self.advance(events, forges);
+        self.advance(events, forges, demo);
         self.pending = server_pending || !self.server_out.is_empty();
         let mount_pending = self.mount.up(&self.mount_env, &mut self.mount_out);
         self.pending |= mount_pending;
@@ -372,7 +378,7 @@ impl Clients {
             self.pending |= self.component.up(&self.env, &mut self.out);
         }
 
-        self.advance(events, forges);
+        self.advance(events, forges, demo);
     }
 }
 #[must_use]
@@ -490,7 +496,12 @@ impl Clients {
         }
         false
     }
-    fn endings_step(&mut self, events: &mut Queue<root::Event>, forges: &[crate::settings::Forge]) {
+    fn endings_step(
+        &mut self,
+        events: &mut Queue<root::Event>,
+        forges: &[crate::settings::Forge],
+        demo: Option<&crate::settings::Demo>,
+    ) {
         for _ in 0..self.endings.len().checked_mul(self.writes).expect("bounded sign-in endings") {
             if !self.room(1) || events.room() < kit::MAX_OUT_DOWN {
                 break;
@@ -510,7 +521,7 @@ impl Clients {
                 self.endings.remove(&number);
             }
             self.down(kit::Event::SignInEnded { sign_in });
-            self.advance(events, forges);
+            self.advance(events, forges, demo);
         }
     }
 }

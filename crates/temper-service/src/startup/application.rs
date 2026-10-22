@@ -1,4 +1,5 @@
 //! Temper's members, read strictly with jig's readers (protocol/configuration.md, 3, 4, 10).
+mod demo;
 mod landing;
 mod read;
 use super::{Problems, What};
@@ -13,6 +14,7 @@ pub struct Members {
     pub clients: Clients,
     pub webhooks: Option<Webhooks>,
     pub forges: Box<[Forge]>,
+    pub demo: Option<settings::Demo>,
     pub identities: Box<[Identity]>,
     pub landing: temper_engine_domain::LandingPolicy,
     /// The landing's projects in the document's order, which names a refused one's path.
@@ -635,8 +637,8 @@ pub fn parse(
     let path = Path::root().member(b"application");
     let mut object = read::object(document, at, &path, problems)?;
     let mut overrides = List::with_capacity(document.len());
-    read::required(&mut object, document, b"setup", &path, problems);
-    read::required(&mut object, document, b"demo", &path, problems);
+    let setup_at = read::required(&mut object, document, b"setup", &path, problems);
+    let demo_at = read::required(&mut object, document, b"demo", &path, problems);
     let limit_at = read::required(&mut object, document, b"limits", &path, problems);
     let limits = match limit_at {
         Some(at) => configured_limits(document, at, &path.member(b"limits"), problems, &mut overrides),
@@ -703,6 +705,7 @@ pub fn parse(
         }
     }
     github_listener(&forges, clients.as_ref(), &path, problems);
+    let demo = demo::parse(document, demo_at, setup_at, &forges, problems);
     let workers = workers(document, workers_ats, jig.limits.core.fleet.workers, directories, &path, problems);
     if let Some(charter) = charter
         && forges.len() == forge_count
@@ -722,6 +725,7 @@ pub fn parse(
         clients: clients?,
         webhooks,
         forges: forges.into_boxed(),
+        demo,
         identities: identities.into_boxed(),
         workers: workers.into_boxed(),
         charter: charter?,

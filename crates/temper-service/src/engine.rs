@@ -11,6 +11,7 @@ pub(crate) struct Engine {
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
+    pub(crate) demo: Option<crate::settings::Demo>,
     pub(crate) setup: crate::setup::Layer,
     pub(crate) forge: crate::forge::Layer,
     pub(crate) forge_records: crate::forge::records::Loader,
@@ -35,6 +36,7 @@ pub(crate) struct Children {
     pub(crate) accounts: Option<crate::accounts::Accounts>,
     pub(crate) workers: crate::workers::Workers,
     pub(crate) clients: crate::clients::Clients,
+    pub(crate) demo: Option<crate::settings::Demo>,
     pub(crate) setup: crate::setup::Layer,
     pub(crate) forge: crate::forge::Layer,
     pub(crate) limits: crate::limits::Limits,
@@ -52,7 +54,7 @@ impl Engine {
         first_periods: List<(u32, u64)>,
     ) -> Result<Self, jig_protocol_config::Problems> {
         let forge_records = crate::forge::records::Loader::new(&children.limits, &children.workers.forges);
-        let Children { accounts, workers, clients, forge, setup, notes, limits: own } = children;
+        let Children { accounts, workers, clients, demo, forge, setup, notes, limits: own } = children;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let mut credentials = List::with_capacity(values.identities.len());
@@ -77,6 +79,7 @@ impl Engine {
             accounts,
             workers,
             clients,
+            demo,
             forge,
             setup,
             forge_records,
@@ -225,7 +228,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     engine.workers.iterate(now, &mut engine.events);
     let open = !engine.begin && engine.domain.ready() && engine.first_periods.is_empty();
     engine.clients.starting = if open { None } else { Some(()) };
-    engine.clients.iterate(now, wall, &mut engine.events, &engine.workers.forges);
+    engine.clients.iterate(now, wall, &mut engine.events, &engine.workers.forges, engine.demo.as_ref());
     clients_pass(engine);
     for _ in 0..engine.clients.early.len() {
         // A not-ready key returns its carried value before replying.
@@ -290,11 +293,11 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     clients_pass(engine);
 }
 fn clients_pass(engine: &mut Engine) {
-    engine.clients.advance(&mut engine.events, &engine.workers.forges);
+    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
     if engine.end.is_none() {
         engine.clients.secrets_step(&mut engine.store);
     }
-    engine.clients.advance(&mut engine.events, &engine.workers.forges);
+    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
 }
 fn release(engine: &mut Engine) {
     engine.ready = true;
