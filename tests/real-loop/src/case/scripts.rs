@@ -117,13 +117,26 @@ fn owner(spec: &str, survey: bool) -> Turn {
 
 #[must_use]
 pub fn step_4_5_refused(_forge: SocketAddr) -> Box<[Script]> {
-    use super::{REFUSED_A_SPEC, RESUMED_REPORT};
-    let mut resumed = report(RESUMED_REPORT);
-    let mut lines = vec![Line::Fail {
+    account_wait(Line::Fail {
         error: skein_fake_llm_domain::api::Error::Unauthorized,
         report: skein_fake_llm_domain::api::Report::none(),
         credentials: Box::new([0]),
-    }];
+    })
+}
+
+#[must_use]
+pub fn step_4_5_limited(_forge: SocketAddr) -> Box<[Script]> {
+    account_wait(Line::Fail {
+        error: skein_fake_llm_domain::api::Error::Exhausted { retry_after: Some(skein_lib::Duration::from_secs(1)) },
+        report: skein_fake_llm_domain::api::Report::none(),
+        credentials: Box::new([0]),
+    })
+}
+
+fn account_wait(failure: Line) -> Box<[Script]> {
+    use super::{REFUSED_A_SPEC, RESUMED_REPORT};
+    let mut resumed = report(RESUMED_REPORT);
+    let mut lines = vec![failure];
     lines.extend(resumed.lines);
     resumed.lines = lines.into();
     Box::new([

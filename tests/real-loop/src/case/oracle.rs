@@ -16,6 +16,8 @@ pub struct Observed {
     pub documents: BTreeMap<Read, Value>,
     /// Each LLM query in order, by its cue: its messages' texts and tool outputs.
     pub told: Vec<Told>,
+    /// Command verbs of the submitted ctl argv (reads and waits included).
+    pub commands: Vec<String>,
     /// kit's main at its last merged head.
     pub kit: Kit,
 }
@@ -71,6 +73,7 @@ impl Observed {
         }
         Self {
             documents,
+            commands: Vec::new(),
             told,
             kit: Kit { main: ran.forge().main().clone(), merged_green: ran.forge().merged_green() },
         }
@@ -405,6 +408,7 @@ mod tests {
         main.insert(DESIGN_DOC.as_bytes().to_vec(), DESIGN_WORDS.as_bytes().to_vec());
         Observed {
             documents,
+            commands: Vec::new(),
             told: vec![
                 Told {
                     agent: Agent::A,
@@ -482,12 +486,10 @@ fn task_document(observed: &Observed, read: Read) -> &Value {
 
 #[must_use]
 pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
-    use super::{FIRST_ACCOUNT, REFUSED_A_SPEC, RESUMED_REPORT};
+    use super::{FIRST_ACCOUNT, REFUSED_A_SPEC};
     let mut misses = Vec::new();
     let waiting = document(observed, Read::AWaiting);
     let accounts = document(observed, Read::Refused);
-    let a = &document(observed, Read::AEnded)["task"];
-    let director = task_document(observed, Read::DirectorEnded);
     for (met, promise, what) in [
         (
             number(waiting, "/chip/task") == Some(A)
@@ -505,6 +507,34 @@ pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
             ACCOUNT_WAIT,
             "the refused account must need sign_in_again",
         ),
+    ] {
+        step_check(&mut misses, "4.5", met, promise, what);
+    }
+    account_survives(&mut misses, observed);
+    let resumed = observed.told.iter().position(|told| told.agent == Agent::A && told.credential == Some(1));
+    step_check(
+        &mut misses,
+        "4.5",
+        resumed.is_some_and(|at| {
+            let told = &observed.told[at];
+            contains(&told.words, REFUSED_A_SPEC)
+                && observed.told[..at].iter().all(|told| told.credential == Some(0))
+                && observed.told[..at]
+                    .iter()
+                    .any(|told| told.agent == Agent::A && contains(&told.words, REFUSED_A_SPEC))
+        }),
+        SURVIVES,
+        "A's resumed query must retain its spec on credential 1, after queries on credential 0",
+    );
+    misses
+}
+
+fn account_survives(misses: &mut Vec<Miss>, observed: &Observed) {
+    use super::{FIRST_ACCOUNT, RESUMED_REPORT};
+    let waiting = document(observed, Read::AWaiting);
+    let a = &document(observed, Read::AEnded)["task"];
+    let director = task_document(observed, Read::DirectorEnded);
+    for (met, promise, what) in [
         (
             number(a, "/chip/task") == Some(A)
                 && number(a, "/spec_revision/value") == Some(0)
@@ -532,31 +562,100 @@ pub fn step_4_5_refused(observed: &Observed) -> Vec<Miss> {
             "no agent beyond the director and A may run",
         ),
     ] {
+        step_check(misses, "4.5", met, promise, what);
+    }
+}
+
+#[must_use]
+pub fn step_4_5_limited(observed: &Observed) -> Vec<Miss> {
+    use super::{FIRST_ACCOUNT, REFUSED_A_SPEC};
+    let mut misses = Vec::new();
+    let waiting = document(observed, Read::AWaiting);
+    let until = number(waiting, "/run_wait/account/why/limited/until");
+    for (met, promise, what) in [
+        (
+            number(waiting, "/chip/task") == Some(A)
+                && text(waiting, "/chip/phase") == "due"
+                && number(waiting, "/run_wait/account/account") == Some(FIRST_ACCOUNT)
+                && number(waiting, "/run_wait/account/source") == Some(0)
+                && until.is_some(),
+            ACCOUNT_WAIT,
+            "A's waiting task must name its account, source and limited until while due",
+        ),
+        (
+            until.is_some()
+                && document(observed, Read::Limited)
+                    .pointer("/accounts/deployment")
+                    .and_then(Value::as_array)
+                    .is_some_and(|rows| {
+                        rows.iter().any(|row| {
+                            number(row, "/number") == Some(FIRST_ACCOUNT)
+                                && later(row, until)
+                                && row["sources"].as_array().is_some_and(|sources| {
+                                    sources
+                                        .iter()
+                                        .any(|source| number(source, "/number") == Some(0) && later(source, until))
+                                })
+                        })
+                    }),
+            ACCOUNT_WAIT,
+            "the account and its source must be unusable and later until the same reset",
+        ),
+        (
+            until
+                .zip(number(task_document(observed, Read::AEnded), "/result/at"))
+                .is_some_and(|(reset, ended)| ended > reset),
+            SURVIVES,
+            "A's result timestamp must be past the reset",
+        ),
+        (
+            observed.commands.iter().position(|command| command == "chat").is_some_and(|chat| {
+                observed.commands[chat + 1..]
+                    .iter()
+                    .all(|command| matches!(command.as_str(), "wait" | "task" | "accounts"))
+            }),
+            ACCOUNT_WAIT,
+            "no person's act may follow the chat, including retry or replace-key",
+        ),
+    ] {
         step_check(&mut misses, "4.5", met, promise, what);
     }
-    let resumed = observed.told.iter().position(|told| told.agent == Agent::A && told.credential == Some(1));
+    account_survives(&mut misses, observed);
+    // The failed call committed no assistant turn: a fresh attempt must still
+    // receive the spec that was in the first query, on the original credential.
+    let mut queries = observed.told.iter().filter(|told| told.agent == Agent::A);
+    let first = queries.next();
+    let resumed = queries.last();
     step_check(
         &mut misses,
         "4.5",
-        resumed.is_some_and(|at| {
-            let told = &observed.told[at];
-            contains(&told.words, REFUSED_A_SPEC)
-                && observed.told[..at].iter().all(|told| told.credential == Some(0))
-                && observed.told[..at]
-                    .iter()
-                    .any(|told| told.agent == Agent::A && contains(&told.words, REFUSED_A_SPEC))
+        first.zip(resumed).is_some_and(|(first, resumed)| {
+            first.credential == Some(0)
+                && resumed.credential == Some(0)
+                && contains(&first.words, REFUSED_A_SPEC)
+                && contains(&resumed.words, REFUSED_A_SPEC)
         }),
         SURVIVES,
-        "A's resumed query must retain its spec on credential 1, after queries on credential 0",
+        "A's resumed query must retain its spec on credential 0 after its failed query",
     );
     misses
+}
+
+// Each document projects the engine's one monotonic deadline to wall time as
+// it is read (jig crates/jig-domain-core/src/documents/deployment.rs:163), so
+// two reads differ by their reads' gap. Allow 1 ms, in nanoseconds.
+const PROJECTION: u64 = 1_000_000;
+fn later(value: &Value, until: Option<u64>) -> bool {
+    text(value, "/state/kind") == "later"
+        && number(value, "/state/until").zip(until).is_some_and(|(state, until)| state.abs_diff(until) <= PROJECTION)
+        && value["usable"] == false
 }
 
 #[cfg(test)]
 mod account_tests {
     use super::{
-        ACCOUNT_WAIT, Agent, BTreeMap, DIRECTOR, Kit, Observed, Read, SURVIVES, Told, Value, assert_met,
-        step_4_5_refused,
+        ACCOUNT_WAIT, Agent, BTreeMap, DIRECTOR, Kit, Observed, PROJECTION, Read, SURVIVES, Told, Value, assert_met,
+        later, step_4_5_limited, step_4_5_refused,
     };
     use crate::case::{A, FIRST_ACCOUNT, REFUSED_A_SPEC, RESUMED_REPORT};
     use serde_json::json;
@@ -589,6 +688,7 @@ mod account_tests {
                     "result":{"ending":{"task":{"done":{}}},"value":{"report":{"bytes":RESUMED_REPORT}}}}}),
                 ),
             ]),
+            commands: Vec::new(),
             told: vec![told(Agent::A, REFUSED_A_SPEC, 0), told(Agent::A, REFUSED_A_SPEC, 1)],
             kit: Kit { main: BTreeMap::new(), merged_green: false },
         }
@@ -610,6 +710,83 @@ mod account_tests {
         assert!(misses.iter().any(|miss| miss.promise == ACCOUNT_WAIT && miss.what.contains("waiting task")));
         assert!(misses.iter().any(|miss| miss.promise == ACCOUNT_WAIT && miss.what.contains("sign_in_again")));
         assert!(misses.iter().any(|miss| miss.promise == SURVIVES && miss.what.contains("resumed query")));
+    }
+
+    const RESET: u64 = 10_000_000;
+    fn limited_met() -> Observed {
+        let mut observed = refused_met();
+        observed.documents.insert(
+            Read::AWaiting,
+            json!({"chip":{"task":A,"phase":"due"},
+                "run_wait":{"account":{"account":FIRST_ACCOUNT,"source":0,
+                    "why":{"limited":{"until":RESET}}}}}),
+        );
+        observed.documents.remove(&Read::Refused);
+        observed.documents.insert(
+            Read::Limited,
+            json!({"accounts":{"deployment":[{"number":FIRST_ACCOUNT,"usable":false,
+                "state":{"kind":"later","until":RESET},
+                "sources":[{"number":0,"usable":false,"state":{"kind":"later","until":RESET}}]}]}}),
+        );
+        observed.documents.get_mut(&Read::AEnded).expect("ended")["task"]["result"]["at"] = (RESET + 1).into();
+        observed.commands = ["chat", "wait", "wait", "task", "accounts", "task"].map(String::from).into();
+        observed.told = vec![told(Agent::A, REFUSED_A_SPEC, 0), told(Agent::A, REFUSED_A_SPEC, 0)];
+        observed
+    }
+    #[test]
+    fn limited_checkpoint_met() {
+        assert_met(&step_4_5_limited(&limited_met()));
+    }
+    #[test]
+    fn reset_projection_accepts_the_tolerance_in_both_directions() {
+        for until in [RESET - PROJECTION, RESET + PROJECTION] {
+            let row = json!({"usable":false,"state":{"kind":"later","until":until}});
+            assert!(later(&row, Some(RESET)));
+        }
+    }
+    #[test]
+    fn reset_projection_rejects_one_past_the_tolerance_in_both_directions() {
+        for until in [RESET - PROJECTION - 1, RESET + PROJECTION + 1] {
+            let row = json!({"usable":false,"state":{"kind":"later","until":until}});
+            assert!(!later(&row, Some(RESET)));
+        }
+    }
+    #[test]
+    fn limited_checkpoint_checks_both_account_and_source() {
+        for path in ["/state/until", "/sources/0/state/until", "/sources/0/number", "/usable", "/sources/0/usable"] {
+            let mut observed = limited_met();
+            *observed.documents.get_mut(&Read::Limited).expect("limited")["accounts"]["deployment"][0]
+                .pointer_mut(path)
+                .expect("account field") = Value::Null;
+            let misses = step_4_5_limited(&observed);
+            const MISSES: usize = 1;
+            assert_eq!(misses.len(), MISSES, "{path}");
+            assert!(misses.iter().all(|miss| miss.promise == ACCOUNT_WAIT && miss.what.contains("unusable")));
+        }
+    }
+    #[test]
+    fn limited_checkpoint_rejects_completion_at_the_reset() {
+        let mut observed = limited_met();
+        observed.documents.get_mut(&Read::AEnded).expect("ended")["task"]["result"]["at"] = RESET.into();
+        let misses = step_4_5_limited(&observed);
+        assert!(misses.iter().any(|miss| miss.promise == SURVIVES && miss.what.contains("timestamp")));
+    }
+    #[test]
+    fn limited_checkpoint_reports_independent_misses_together() {
+        const MISSES: usize = 6;
+        let mut observed = limited_met();
+        observed.documents.get_mut(&Read::AWaiting).expect("waiting")["chip"]["phase"] = "running".into();
+        observed.documents.remove(&Read::Limited);
+        observed.documents.get_mut(&Read::AEnded).expect("ended")["task"]["result"]["at"] = RESET.into();
+        observed.documents.get_mut(&Read::AEnded).expect("ended")["task"]["kept_account"] = Value::Null;
+        observed.commands.push("retry".into());
+        observed.told.last_mut().expect("resumed").words = Box::new([]);
+        let misses = step_4_5_limited(&observed);
+        assert_eq!(misses.len(), MISSES);
+        assert!(misses.iter().all(|miss| miss.step == "4.5"));
+        for what in ["waiting task", "unusable", "timestamp", "person's act", "original task", "resumed query"] {
+            assert!(misses.iter().any(|miss| miss.what.contains(what)), "{what}");
+        }
     }
 }
 
@@ -815,6 +992,7 @@ mod pace_tests {
                     "kept_account":SECOND_ACCOUNT,"result":{"value":{"report":{"bytes":SURVEY_REPORT}}}}}),
                 ),
             ]),
+            commands: Vec::new(),
             told: vec![
                 told(Agent::A, &format!("Message {PACE_QUESTION_MESSAGE} sent"), OWNER_MODEL, 0),
                 told(Agent::Director, PACE_QUESTION, DEFAULT_MODEL, 0),

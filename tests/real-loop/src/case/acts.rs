@@ -12,6 +12,7 @@ pub enum Read {
     DesignEnded,
     AWaiting,
     Refused,
+    Limited,
     PaceAsked,
     Ranked,
     SurveyEnded,
@@ -91,6 +92,31 @@ pub fn step_4_5_refused() -> Vec<calls::Step> {
     ]
 }
 
+// These reads occupy the same positions as the refused slice up to accounts.
+const LIMITED_DIRECTOR_ENDED: usize = 7;
+pub const READS_4_5_LIMITED: &[(Read, usize)] = &[
+    (Read::DirectorEnded, LIMITED_DIRECTOR_ENDED),
+    (Read::AWaiting, A_WAITING),
+    (Read::Limited, REFUSED),
+    (Read::AEnded, REFUSED_A_ENDED),
+];
+
+#[must_use]
+pub fn step_4_5_limited() -> Vec<calls::Step> {
+    vec![
+        sign_in(D1),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "limited", super::REFUSED_PERSON]),
+        call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "replied"]),
+        start(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(A), "--until", "phase:due"]),
+        call(D1, argv!["task", number(A), "--json"]),
+        call(D1, argv!["accounts", "--json"]),
+        // Only reads and waits follow the chat: the engine lifts the limit.
+        join(REFUSED_A_ENDED),
+        calls::until(D1, argv!["task", number(DIRECTOR), "--json"], b"\"phase\":\"ended\"", b"\"phase\":\"running\""),
+    ]
+}
+
 const PACE_DIRECTOR_ENDED: usize = 3;
 const PACE_ASKED: usize = 5;
 const RANKED: usize = 7;
@@ -122,4 +148,18 @@ pub fn step_4_4() -> Vec<calls::Step> {
         call(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
         join(PACE_DIRECTOR_ENDED),
     ]
+}
+
+/// Command verbs from the ctl argv submitted to the story, in order.
+#[must_use]
+pub fn commands(steps: &[calls::Step]) -> Vec<String> {
+    let mut commands = Vec::new();
+    for step in steps {
+        if let calls::Step::Call { argv, .. } | calls::Step::Start { argv, .. } | calls::Step::Until { argv, .. } = step
+            && let Some(calls::Arg::Lit(command)) = argv.0.first()
+        {
+            commands.push((*command).into());
+        }
+    }
+    commands
 }
