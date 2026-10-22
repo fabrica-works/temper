@@ -226,7 +226,7 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 - **The bundle's stylesheets:** skein's `skein-ui.css`, then
   `temper.css`, which takes its rules from the mockups' terminal sheets
   as they render (`terminal-chat.css` and `terminal-pages.css` over
-  `style.css`); the mockups are not shipped. These are the bundle's two
+  `style.css`); the mockups are not shipped. These are the bundle's three
   stylesheets; `jig.css` is not in it. `temper.css` holds the mockups'
   palette as variables under the prefix, their monospaced stack, compact
   top navigation and quiet borders. DM Sans, for the wordmark alone, is

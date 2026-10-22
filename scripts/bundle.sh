@@ -27,6 +27,7 @@ target/debug/skein-ui-bundle \
     --module "target/wasm32-unknown-unknown/$profile/temper_client_shell_web.wasm" \
     --name temper_client_shell_web --prefix /bundle/ \
     --stylesheet "$shell/temper.css" \
+    --stylesheet "$shell/task-pages.css" \
     --files "$shell/files" \
     --noscript 'temper needs WebAssembly and scripts.' \
     --out "$out" >&2
