@@ -1,6 +1,7 @@
 //! The standalone stack on one checked real loop (domain/testing.md, 2.4).
 #![forbid(unsafe_code)]
 
+pub mod case;
 pub mod fixtures;
 pub mod forge;
 pub mod git;
