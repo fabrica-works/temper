@@ -63,6 +63,8 @@ impl Limits {
             .checked_add(6)?
             .checked_add(2)?
             .checked_add(34)?
+            // A procedure's goal slot, paragraph and link, including text leaves.
+            .checked_add(5)?
             .checked_add(jig_client::contract::AUTHORITY_MODELS.checked_mul(2)?)?;
         // Each plan row adds a spend paragraph, dependency list and cut item
         // with a paragraph: six nodes including their text children. Each

@@ -74,13 +74,16 @@ pub fn root_with(mut document: c::Task) -> temper_client_domain::Domain {
     document.priority = Some(1);
     supplied_root(document, false)
 }
-fn supplied_root(document: c::Task, held: bool) -> temper_client_domain::Domain {
+pub fn supplied_root(document: c::Task, held: bool) -> temper_client_domain::Domain {
     use jig_client::{Event as E, Up};
     let limits = domain_limits();
     let (mut root, _, watch, tree_watch) =
-        root_at_with_tree(temper_client_domain::Address::Task { task: TASK }, &limits);
+        root_at_with_tree(temper_client_domain::Address::Task { task: document.chip.task }, &limits);
     let card = document.clone();
     let mut tree = tree();
+    if let c::Delivery::OwnerTree(value) = &mut tree {
+        value.root.task = document.chip.task;
+    }
     if held && let c::Delivery::OwnerTree(value) = &mut tree {
         value.root.phase = c::Phase::Held;
     }

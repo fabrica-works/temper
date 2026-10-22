@@ -47,7 +47,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         }
         text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
         b.close();
-        header(b, task, root.pages().me(root.client()), words);
+        header(b, task, root.pages().me(root.client()), words, bindings);
         crate::choice::composer(b, root, Some(task), words, bindings);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
@@ -56,7 +56,11 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
         {
-            plan(b, tree, root, words, bindings, rows);
+            let word = match task.chip.executor {
+                c::Executor::Procedure { .. } => Word::ItsTasks,
+                c::Executor::Agent { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => Word::Plan,
+            };
+            plan(b, tree, root, words, bindings, rows, word);
         }
         if page.shape == Shape::Tracked {
             latest(b, page.latest.as_deref(), words);
@@ -66,7 +70,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
 }
-pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words) {
+pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words, bindings: &mut Bindings) {
     region(b, Word::TaskHeader, words);
     b.style(look::TASK_HEADING);
     b.open(Role::Slot);
@@ -96,6 +100,15 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
         && let Some(part) = &details.procedure
     {
         crate::forge::owner_part(b, part, words);
+    }
+    if let c::Executor::Procedure { .. } = task.chip.executor
+        && let Some(goal) = task.goal
+        && goal != task.chip.task
+    {
+        b.open(Role::Slot);
+        text(b, Role::Paragraph, &words.say(Word::Goal, &[]));
+        task_link(b, goal, words, bindings);
+        b.close();
     }
     b.close();
     text(b, Role::Heading { level: 1 }, task.chip.title.bytes());
@@ -417,12 +430,13 @@ pub(crate) fn plan(
     words: &Words,
     bindings: &mut Bindings,
     rows: u32,
+    word: Word,
 ) {
-    region(b, Word::Plan, words);
+    region(b, word, words);
     b.style(look::TASK_CARD);
     b.open(Role::Tree);
     b.style(look::PLAN);
-    b.name(&words.say(Word::Plan, &[]));
+    b.name(&words.say(word, &[]));
     match tree {
         c::Delivery::OwnerTree(tree) => {
             let mut stack = List::with_capacity(tree.rows.len());

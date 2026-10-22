@@ -17,11 +17,11 @@ fn page(executor: c::Executor, priority: Option<u32>) -> crate::View {
     fixtures::build(&mut view, &root);
     view
 }
-fn assert_header_and_plan(executor: c::Executor) {
+fn assert_header_and_plan(executor: c::Executor, name: &[u8]) {
     let view = page(executor, None);
     let tree = view.tree();
     assert!(fixtures::find(tree, Role::Heading { level: 2 }, b"Task details").is_some());
-    assert!(fixtures::find(tree, Role::Heading { level: 2 }, b"Plan").is_some());
+    assert!(fixtures::find(tree, Role::Heading { level: 2 }, name).is_some());
     assert_eq!(fixtures::find(tree, Role::Heading { level: 2 }, b"What was asked"), None);
     assert_eq!(fixtures::find(tree, Role::Heading { level: 2 }, b"Latest activity"), None);
     assert_eq!(fixtures::find(tree, Role::Region, b"Result"), None);
@@ -29,11 +29,51 @@ fn assert_header_and_plan(executor: c::Executor) {
 }
 #[test]
 fn a_procedures_task_shows_its_header_and_plan_only() {
-    assert_header_and_plan(c::Executor::Procedure { connector: fixtures::FORGE, kind: PROCEDURE });
+    assert_header_and_plan(c::Executor::Procedure { connector: fixtures::FORGE, kind: PROCEDURE }, b"Its tasks");
 }
 #[test]
 fn a_person_tasks_page_shows_its_header_and_plan_only() {
-    assert_header_and_plan(c::Executor::Party { party: PARTY });
+    assert_header_and_plan(c::Executor::Party { party: PARTY }, b"Plan");
+}
+const PROCEDURE_TASK: u64 = 34;
+const SERVED_GOAL: u64 = 7;
+#[test]
+fn a_procedures_task_links_the_goal_it_serves() {
+    for browser in [false, true] {
+        for (goal, shown) in [(Some(SERVED_GOAL), true), (Some(PROCEDURE_TASK), false), (None, false)] {
+            let mut task = f::document();
+            task.chip.task = PROCEDURE_TASK;
+            task.chip.executor = c::Executor::Procedure { connector: fixtures::FORGE, kind: PROCEDURE };
+            task.goal = goal;
+            let root = f::supplied_root(task, false);
+            let mut view = fixtures::view_of(if browser { fixtures::browser_words() } else { fixtures::words() });
+            fixtures::build(&mut view, &root);
+            let tree = view.tree();
+            let details = subtree(tree, region_index(tree, b"Task details"));
+            assert_eq!(named(details, Role::Paragraph, b"Goal"), shown);
+            assert_eq!(named(details, Role::Link, b"Task 7"), shown);
+        }
+    }
+}
+#[test]
+fn a_procedures_plan_is_named_its_tasks() {
+    let view = page(c::Executor::Procedure { connector: fixtures::FORGE, kind: PROCEDURE }, None);
+    let tree = view.tree();
+    for role in [Role::Region, Role::Heading { level: 2 }, Role::Tree] {
+        assert!(fixtures::find(tree, role, b"Its tasks").is_some());
+    }
+    assert!(fixtures::find(tree, Role::Heading { level: 2 }, b"Plan").is_none());
+}
+#[test]
+fn a_goals_page_has_no_goal_slot_and_keeps_its_plan() {
+    let mut task = f::document();
+    task.goal = Some(TASK);
+    let view = goal(task);
+    let tree = view.tree();
+    assert!(!named(subtree(tree, region_index(tree, b"Task details")), Role::Paragraph, b"Goal"));
+    for role in [Role::Region, Role::Heading { level: 2 }, Role::Tree] {
+        assert!(fixtures::find(tree, role, b"Plan").is_some());
+    }
 }
 #[test]
 fn a_tracked_task_has_its_regions_in_order() {
@@ -65,6 +105,7 @@ fn a_plans_chip_links_to_its_tasks_page_by_number() {
         &fixtures::words(),
         &mut bindings,
         fixtures::domain_limits().client.domain.rows,
+        crate::words::Word::Plan,
     );
     let tree = builder.finish();
     let link = &tree.nodes()[index_of(&tree, Role::Link, b"Task 12")];
@@ -210,6 +251,7 @@ fn a_released_plans_item_keeps_its_decision_result_while_running() {
         &fixtures::words(),
         &mut crate::frame::Bindings::new(limits.bindings),
         fixtures::domain_limits().client.domain.rows,
+        crate::words::Word::Plan,
     );
     assert!(has_release_card(&builder.finish()));
 }
@@ -238,7 +280,13 @@ fn named(nodes: &[Node], role: Role, name: &[u8]) -> bool {
 }
 fn header(task: &c::Task, me: Option<&c::Me>) -> Tree {
     let mut builder = Builder::new(&fixtures::tree_limits());
-    crate::pages::task::header(&mut builder, task, me, &fixtures::words());
+    crate::pages::task::header(
+        &mut builder,
+        task,
+        me,
+        &fixtures::words(),
+        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+    );
     builder.finish()
 }
 fn titled() -> c::Task {
@@ -438,6 +486,7 @@ fn every_phase_has_the_same_status_token_in_the_header_and_its_plan_row() {
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
             fixtures::domain_limits().client.domain.rows,
+            crate::words::Word::Plan,
         );
         let tree = builder.finish();
         for (index, node) in tree.nodes().iter().enumerate() {
@@ -894,6 +943,7 @@ fn plan(delivery: &c::Delivery) -> Tree {
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         fixtures::domain_limits().client.domain.rows,
+        crate::words::Word::Plan,
     );
     builder.finish()
 }
@@ -1161,7 +1211,13 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
         for (waits_on, expected) in &cases {
             task.waits_on = waits_on.clone();
             let mut builder = Builder::new(&fixtures::tree_limits());
-            crate::pages::task::header(&mut builder, &task, Some(&me), &words);
+            crate::pages::task::header(
+                &mut builder,
+                &task,
+                Some(&me),
+                &words,
+                &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+            );
             let tree = builder.finish();
             assert_status(&tree, expected, look::STATUS_WAITING);
             assert!(fixtures::find(&tree, Role::Paragraph, "Goal · priority 1".as_bytes()).is_some());
@@ -1173,7 +1229,13 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
             let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() else { panic!("owner") };
             details.live_delegates = count;
             let mut builder = Builder::new(&fixtures::tree_limits());
-            crate::pages::task::header(&mut builder, &task, Some(&me), &words);
+            crate::pages::task::header(
+                &mut builder,
+                &task,
+                Some(&me),
+                &words,
+                &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+            );
             assert_status(&builder.finish(), expected, look::STATUS_WAITING);
         }
     }
@@ -1222,6 +1284,7 @@ fn both_plan_shapes_omit_the_goal_and_keep_its_hold_and_folds() {
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
             fixtures::domain_limits().client.domain.rows,
+            crate::words::Word::Plan,
         );
         let tree = builder.finish();
         assert!(fixtures::find(&tree, Role::TreeItem, b"Task 9").is_none());
@@ -1485,7 +1548,10 @@ fn an_agents_plan_shows_only_with_a_delegate_or_a_card() {
     ] {
         let root = f::agent_root(f::delegate(), delivery, true);
         let view = fixtures::page_view(&root);
-        assert_eq!(named(view.tree().nodes(), Role::Heading { level: 2 }, b"Plan"), plan);
+        for role in [Role::Region, Role::Heading { level: 2 }, Role::Tree] {
+            assert_eq!(named(view.tree().nodes(), role, b"Plan"), plan);
+        }
+        assert!(!named(view.tree().nodes(), Role::Heading { level: 2 }, b"Its tasks"));
     }
 }
 #[test]

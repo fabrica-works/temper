@@ -152,7 +152,7 @@ pub fn built() -> crate::View {
 pub fn view() -> crate::View {
     view_of(words())
 }
-fn view_of(words: crate::words::Words) -> crate::View {
+pub fn view_of(words: crate::words::Words) -> crate::View {
     let domain = domain_limits();
     let limits = crate::Limits { tree: tree_limits() };
     crate::View::new(&limits, &domain, words, FORGE)

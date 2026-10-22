@@ -1424,9 +1424,9 @@ does, and two things more, after `task.html`'s change:
   and gates are the forge's parts (`forge.md`, section 2). The header's
   procedure part says "Shown on the forge." for them (4.2); the page
   draws no stage bar, no gates and no "View on forge".
-- **Its words and look:** "Goal" and "Its tasks", two phrases; no new
-  token, since the slot sits in the header's META line and the link is
-  the plan's.
+- **Its words and look:** "Goal", the existing word, and "Its tasks",
+  a new phrase; no new token, since the slot sits in the header's META
+  line and the link is the plan's.
 
 ## 6. The terminal shell
 

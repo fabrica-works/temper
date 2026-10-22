@@ -266,7 +266,13 @@ fn the_task_tokens_stay_on_their_roles() {
     let mut builder = skein_ui::Builder::new(&fixtures::tree_limits());
     let mut task = fixtures::task::document();
     task.chip.phase = jig_client::contract::Phase::Done;
-    crate::pages::task::header(&mut builder, &task, None, &fixtures::words());
+    crate::pages::task::header(
+        &mut builder,
+        &task,
+        None,
+        &fixtures::words(),
+        &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+    );
     let done = builder.finish();
     let activity = super::task::activity_tree(true);
     let plan = super::task::dependency_plan();
