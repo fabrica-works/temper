@@ -77,7 +77,6 @@ pub(crate) fn main(
         if temper_client_domain::pages::chat::allowed(task, c::ActKind::Cancel) {
             control(b, bindings, Role::Button, &words.say(Word::Close, &[]), Act::Close);
         }
-        control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
         b.close();
         b.close();
         crate::frame::demo_banner(b, root, words, bindings);
@@ -156,10 +155,13 @@ fn heading(b: &mut Builder, title: &[u8], suffix: &[u8]) {
 
 fn act_status(b: &mut Builder, root: &Domain, chat: &Chat, words: &Words) {
     for (key, kind) in &chat.pending {
-        if *kind != temper_client_domain::pages::chat::Sending::Message
-            && let Some(pending) = root.client().pending(*key)
-        {
-            crate::confirm::progress_text(b, words, pending.progress);
+        match kind {
+            temper_client_domain::pages::chat::Sending::Message | temper_client_domain::pages::chat::Sending::Seen => {}
+            temper_client_domain::pages::chat::Sending::Stop | temper_client_domain::pages::chat::Sending::Close => {
+                if let Some(pending) = root.client().pending(*key) {
+                    crate::confirm::progress_text(b, words, pending.progress);
+                }
+            }
         }
     }
     if chat.outcome_kind != Some(temper_client_domain::pages::chat::Sending::Message)

@@ -148,7 +148,7 @@ pub(super) fn step(pages: &mut Pages, _env: &Env<Limits>, act: Act, out: &mut Qu
         | Act::Project { .. }
         | Act::SignOut
         | Act::Filter { .. }
-        | Act::Seen
+        | Act::OpenResult { .. }
         | Act::Amend
         | Act::AmendWords { .. }
         | Act::AmendTracked

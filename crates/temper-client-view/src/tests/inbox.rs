@@ -132,7 +132,7 @@ fn role_node(nodes: &[Node], role: Role) -> &Node {
     panic!("role {role:?}");
 }
 #[test]
-fn headings_hold_the_page_title_filters_and_mark_seen() {
+fn headings_hold_the_page_title_and_filters_without_mark_seen() {
     let view = fixtures::page_view(&fixtures::inbox_root());
     let tree = view.tree();
     let bar = subtree(tree, styled(tree, look::PAGEBAR));
@@ -145,9 +145,10 @@ fn headings_hold_the_page_title_filters_and_mark_seen() {
         assert_ne!(node.name.as_deref(), Some(b"Mark seen".as_slice()));
     }
     let updates = subtree(tree, heading(tree, b"Updates"));
-    assert_eq!(updates.len(), 4);
-    assert_eq!(updates[3].role, Role::Button);
-    assert_eq!(updates[3].name.as_deref(), Some(b"Mark seen".as_slice()));
+    assert_eq!(updates.len(), 3);
+    for node in tree.nodes() {
+        assert_ne!(node.name.as_deref(), Some(b"Mark seen".as_slice()));
+    }
 }
 #[test]
 fn filters_press_exactly_the_current_project_kind_and_all_goals() {
@@ -416,4 +417,27 @@ fn loaded_task_held_and_result_titles_keep_the_title_token() {
         assert_eq!(title.role, Role::Paragraph);
         assert_eq!(title.name.as_deref(), Some(task.chip.title.bytes()));
     }
+}
+
+#[test]
+fn a_result_entry_marks_seen_when_its_link_is_followed() {
+    let root = fixtures::inbox_root();
+    let mut view = fixtures::page_view(&root);
+    let tree = view.tree();
+    let mut item = None;
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if node.role == Role::Item && node.name.as_deref() == Some(b"Updates from T9") {
+            item = Some(index);
+            break;
+        }
+    }
+    let item = item.expect("result entry");
+    let link = role_node(subtree(tree, item), Role::Link).id;
+    assert_eq!(
+        crate::act(&mut view, link, Act::Press),
+        Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::OpenResult {
+            task: fixtures::INBOX_TASK,
+            through: fixtures::INBOX_POSITION
+        }))
+    );
 }

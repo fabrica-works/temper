@@ -66,8 +66,6 @@ pub(crate) fn main(
         text(b, Role::Heading { level: 2 }, &words.say(heading, &[]));
         if heading == Word::NeedsYou {
             filters(b, root, inbox.filter, words, bindings);
-        } else if inbox.results_through().is_some() {
-            control(b, bindings, Role::Button, &words.say(Word::MarkSeen, &[]), Act::Seen);
         }
         b.close();
         let mut opened = false;
@@ -216,7 +214,19 @@ fn entry(
             bindings,
             Role::Link,
             &words.say(Word::Task, &[Hole::Number(task)]),
-            Act::Go { address: Address::Task { task } },
+            match (card.object, card.position) {
+                (ObjectKey::Result(_), Some(through)) => Act::OpenResult { task, through },
+                (ObjectKey::Result(_), None)
+                | (
+                    ObjectKey::Task(_)
+                    | ObjectKey::Proposal(_)
+                    | ObjectKey::Escalation(_)
+                    | ObjectKey::Question { .. }
+                    | ObjectKey::PersonTask(_)
+                    | ObjectKey::Note { .. },
+                    _,
+                ) => Act::Go { address: Address::Task { task } },
+            },
         );
     }
     card_time(b, card, words, times);

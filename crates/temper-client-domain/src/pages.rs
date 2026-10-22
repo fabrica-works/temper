@@ -29,7 +29,8 @@ pub struct Pages {
     party: Option<u64>,
     next: u64,
     pub(crate) serial: u64,
-    seen: Option<(u64, jig_client::Key)>,
+    seen: u64,
+    seeing: Option<(u64, jig_client::Key)>,
     pub(crate) confirm: Option<crate::acts::Confirm>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -84,7 +85,10 @@ pub enum Act {
     Filter {
         filter: crate::address::Filter,
     },
-    Seen,
+    OpenResult {
+        task: u64,
+        through: u64,
+    },
     Decide {
         object: jig_client::contract::ObjectKey,
         revision: Option<jig_client::contract::Revision>,
@@ -141,7 +145,8 @@ impl Pages {
             party: None,
             next: 1,
             serial: 0,
-            seen: None,
+            seen: 0,
+            seeing: None,
             confirm: None,
         }
     }
@@ -304,12 +309,8 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 task.amend(env, client, act, &mut pages.serial, out);
             }
         }
-        Event::Act { act: Act::Seen } => {
-            if let Some(chat) = &mut pages.chat {
-                chat.act(env, client, Act::Seen, &mut pages.serial, out);
-            } else {
-                seen(pages, out);
-            }
+        Event::Act { act: Act::OpenResult { task, through } } => {
+            open_result(pages, task, through, out);
         }
         Event::Act {
             act:
@@ -327,12 +328,8 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         Event::Act { act: Act::Go { address } } => out.push(Request::Show { address }),
         Event::Told { told: Told::Changed { handle } } if handle == me_handle() => me_changed(pages, client, out),
         Event::Link { link } => link_changed(pages, link, out),
-        Event::Told { told } => {
-            if pages.choice.told(&told) || crate::acts::told(pages, &told) {
-                pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
-                return;
-            }
-            if !page_told(pages, client, told, out) {
+        Event::Told { told: event } => {
+            if !told(pages, client, event, out) {
                 return;
             }
         }
@@ -351,6 +348,24 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
     redirect_chat(pages, client, out);
     pages.shown = pages.shown.checked_add(1).expect("pages shown count fits");
 }
+fn told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
+    if let Told::Answered { key, outcome } = &told
+        && let Some((through, pending)) = pages.seeing
+        && *key == pending
+    {
+        if seen_answered(outcome) {
+            pages.seen = through;
+        }
+        pages.seeing = None;
+        return false;
+    }
+    if pages.choice.told(&told) || crate::acts::told(pages, &told) {
+        pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
+        return false;
+    }
+    page_told(pages, client, told, out)
+}
+
 fn started(pages: &mut Pages, out: &mut Queue<Request>) {
     pages.accounts.leave(out);
     pages.accounts_open = false;
@@ -433,23 +448,32 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
             pages.inbox = Some(inbox::Inbox::new(filter, pages.next, &env.limits, out));
         }
         pages.choice = choice::Draft::default();
-        pages.seen = None;
         pages.confirm = None;
     }
     pages.address = address;
 }
 
-fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
-    if let Some(through) = match &pages.inbox {
-        Some(inbox) => inbox.results_through(),
-        None => None,
-    } && match pages.seen {
-        Some((old, _)) => old < through,
-        None => true,
-    } {
+fn seen_answered(outcome: &jig_client::Outcome) -> bool {
+    match outcome {
+        jig_client::Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Done(_))) => true,
+        jig_client::Outcome::Answered(
+            jig_client::Answered::Jig(jig_client::contract::Answer::Refused { .. }) | jig_client::Answered::Family(_),
+        )
+        | jig_client::Outcome::NotKept
+        | jig_client::Outcome::Unknown
+        | jig_client::Outcome::Limit
+        | jig_client::Outcome::Unconfirmed
+        | jig_client::Outcome::Held
+        | jig_client::Outcome::Unsent
+        | jig_client::Outcome::Lost => false,
+    }
+}
+
+fn open_result(pages: &mut Pages, task: u64, through: u64, out: &mut Queue<Request>) {
+    if pages.inbox.is_some() && through > pages.seen && pages.seeing.is_none() {
         pages.serial = pages.serial.checked_add(1).expect("pages keys fit");
         let key = jig_client::Key { asker: Owner::Pages.asker(), number: pages.serial };
-        pages.seen = Some((through, key));
+        pages.seeing = Some((through, key));
         out.push(Request::Client(jig_client::Event::Send {
             key,
             name: None,
@@ -458,6 +482,7 @@ fn seen(pages: &mut Pages, out: &mut Queue<Request>) {
             })),
         }));
     }
+    out.push(Request::Show { address: Address::Task { task } });
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
@@ -473,8 +498,21 @@ fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Req
         return task.told(client, told, out);
     }
     if let Some(chat) = &mut pages.chat {
+        let moved = match &told {
+            Told::Answered { outcome, .. } => seen_answered(outcome),
+            Told::Changed { .. } | Told::Text { .. } | Told::Page { .. } => true,
+            Told::Link { .. }
+            | Told::Pending { .. }
+            | Told::Kept { .. }
+            | Told::Dropped { .. }
+            | Told::Ended { .. } => false,
+        };
         if !chat.told(client, told, out) {
             return false;
+        }
+        // Pages owns the shared key sequence, including automatic conversation reads.
+        if moved {
+            chat.see(&mut pages.serial, out);
         }
     } else if let Some(chats) = &mut pages.chats {
         if !chats.told(told, out) {
@@ -566,7 +604,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::ChatFilter { .. }
         | Act::ClosedChats
         | Act::Filter { .. }
-        | Act::Seen
+        | Act::OpenResult { .. }
         | Act::Go { .. } => unreachable!("only deciding acts routed here"),
     }
 }
@@ -629,6 +667,8 @@ fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
             }));
         }
         if pages.party != Some(me.party.number) {
+            pages.seen = 0;
+            pages.seeing = None;
             pages.choice = choice::Draft::default();
         }
         pages.party = Some(me.party.number);
@@ -655,6 +695,8 @@ fn link_changed(pages: &mut Pages, link: Link, out: &mut Queue<Request>) {
             pages.choice = choice::Draft::default();
             pages.party = None;
             pages.project = None;
+            pages.seen = 0;
+            pages.seeing = None;
         }
         Link::Starting | Link::Live | Link::Offline => {
             if !pages.watching {

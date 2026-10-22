@@ -28,6 +28,7 @@ pub struct Chat {
     pub outcome: Option<jig_client::Outcome>,
     pub outcome_kind: Option<Sending>,
     pub seen: u64,
+    seen_before: u64,
     pub cards: List<super::inbox::Card>,
     pub delegations: List<delegation::Delegation>,
     departures: List<c::ObjectKey>,
@@ -58,6 +59,7 @@ impl Chat {
             outcome: None,
             outcome_kind: None,
             seen: 0,
+            seen_before: 0,
             cards: List::with_capacity(limits.client.domain.reads),
             delegations: List::with_capacity(delegation::bound(limits)),
             departures: List::with_capacity(limits.client.domain.reads),
@@ -175,6 +177,19 @@ impl Chat {
         true
     }
     fn answered(&mut self, key: Key, outcome: jig_client::Outcome) {
+        if self.pending.as_slice().contains(&(key, Sending::Seen)) {
+            let mut kept = List::with_capacity(self.pending.capacity());
+            for row in &self.pending {
+                if row.0 != key {
+                    kept.push(*row).expect("remaining pending fits");
+                }
+            }
+            self.pending = kept;
+            if !super::seen_answered(&outcome) {
+                self.seen = self.seen_before;
+            }
+            return;
+        }
         if let jig_client::Outcome::Answered(jig_client::Answered::Jig(answer)) = &outcome {
             self.thread.answered(key, answer);
         } else {
@@ -557,7 +572,6 @@ impl Chat {
             Act::Older => read(self.activity, self.thread.older(), out),
             Act::Send => self.send(env, client, Sending::Message, serial, out),
             Act::Stop => self.send(env, client, Sending::Stop, serial, out),
-            Act::Seen => self.send(env, client, Sending::Seen, serial, out),
             Act::Choice(_)
             | Act::Accounts(_)
             | Act::Project { .. }
@@ -582,8 +596,26 @@ impl Chat {
             | Act::DiscardAmendment
             | Act::SendAmendment
             | Act::AmendAgain
+            | Act::OpenResult { .. }
             | Act::Go { .. } => unreachable!("only conversation acts routed here"),
         }
+    }
+    pub(crate) fn see(&mut self, serial: &mut u64, out: &mut Queue<Request>) {
+        if self.thread.loaded <= self.seen || self.sending(Sending::Seen) {
+            return;
+        }
+        *serial = serial.checked_add(1).expect("chat keys fit");
+        let key = Key { asker: Owner::Pages.asker(), number: *serial };
+        self.seen_before = self.seen;
+        self.seen = self.thread.loaded;
+        self.pending.push((key, Sending::Seen)).expect("one seen fits");
+        out.push(Request::Client(jig_client::Event::Send {
+            key,
+            name: None,
+            request: jig_client::Ask::Jig(Box::new(c::Ask::Seen {
+                through: c::SeenThrough::Conversation { task: self.task, through: self.seen },
+            })),
+        }));
     }
     fn send(&mut self, _env: &Env<Limits>, client: &Client, kind: Sending, serial: &mut u64, out: &mut Queue<Request>) {
         let Some(task) = self.task(client) else { return };
@@ -595,9 +627,6 @@ impl Chat {
                     .expect("composer bounded"),
             },
             Sending::Stop if allowed(task, c::ActKind::Stop) => c::Ask::Stop { project: task.project, task: self.task },
-            Sending::Seen if self.thread.loaded > self.seen => {
-                c::Ask::Seen { through: c::SeenThrough::Conversation { task: self.task, through: self.thread.loaded } }
-            }
             Sending::Message | Sending::Stop | Sending::Seen | Sending::Close => return,
         };
         for (_, pending) in &self.pending {
@@ -615,9 +644,6 @@ impl Chat {
                 return;
             }
             self.words = Box::default();
-        }
-        if kind == Sending::Seen {
-            self.seen = self.thread.loaded;
         }
         self.pending.push((key, kind)).expect("one request per chat act fits");
         self.outcome = None;

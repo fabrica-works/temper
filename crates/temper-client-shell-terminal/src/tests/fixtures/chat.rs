@@ -29,7 +29,6 @@ pub fn page() -> skein_ui::Tree {
         (Role::Button, b"Send"),
         (Role::Button, b"Stop"),
         (Role::Button, b"Close"),
-        (Role::Button, b"Mark seen"),
         (Role::Button, b"Older"),
     ] {
         b.open(role);

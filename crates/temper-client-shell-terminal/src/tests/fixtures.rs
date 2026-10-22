@@ -443,10 +443,6 @@ pub fn inbox_page() -> skein_ui::Tree {
             builder.close();
         }
     }
-    builder.open(Role::Button);
-    builder.name(b"Mark seen");
-    builder.bind(binding());
-    builder.close();
     builder.close();
     builder.close();
     visible(builder.finish())

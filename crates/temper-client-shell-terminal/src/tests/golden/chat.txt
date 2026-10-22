@@ -19,5 +19,4 @@ Conversation:
 [7] Send
 [8] Stop
 [9] Close
-[10] Mark seen
-[11] Older
+[10] Older

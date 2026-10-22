@@ -12,10 +12,9 @@ T1 · Add CSV export to widget:
   * waiting on your words
   Demo model
   Spent 0; delegates spent 0
-  [7] Mark seen
 Demo:
   This is a demo, running on a demo model and a demo forge.
-  [8] Connect a model
+  [7] Connect a model
   [-] Connect a forge (disabled)
 demo · demo/widget on Demo forge
 Signed in as the deployment’s owner
@@ -34,7 +33,7 @@ Conversation:
       - Pull request opened
       - CI passed
       - Landed
-    [9] Task 2 ↗
+    [8] Task 2 ↗
   1 tool call
   wait
   Temper
@@ -42,6 +41,6 @@ Conversation:
   1 tool call
   wait
 Using Demo model · Default
-[10] Message: (empty) (enter sends)
+[9] Message: (empty) (enter sends)
 Enter to send · Shift+Enter for newline
-[11] Send
+[10] Send

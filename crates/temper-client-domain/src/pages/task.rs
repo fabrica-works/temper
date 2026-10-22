@@ -383,7 +383,7 @@ impl Task {
             | Act::ClosedChats
             | Act::ChatFilter { .. }
             | Act::Filter { .. }
-            | Act::Seen
+            | Act::OpenResult { .. }
             | Act::Decide { .. }
             | Act::CardWords { .. }
             | Act::Again { .. }
@@ -477,7 +477,7 @@ impl Task {
             | Act::ClosedChats
             | Act::ChatFilter { .. }
             | Act::Filter { .. }
-            | Act::Seen
+            | Act::OpenResult { .. }
             | Act::Decide { .. }
             | Act::CardWords { .. }
             | Act::Again { .. }

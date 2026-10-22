@@ -301,3 +301,23 @@ fn accepting_the_goal_with_chat_and_inbox_watches_settles_the_engine() {
     }
     assert!(probes[0].0.person().pages().chat().expect("chat").cards.is_empty());
 }
+
+#[test]
+fn opening_a_chat_clears_its_reply_from_the_engines_inbox() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let task = fixtures::replied_chat(world.front(), b"Hello");
+    let person = world.client(fixtures::PARTY, fixtures::inbox());
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Heading { level: 3 }, b"Reply"), within: fixtures::WITHIN },
+            Step::Go { address: fixtures::chat_page(task) },
+            Step::See { find: Find::named(Role::TextArea, b"Message"), within: fixtures::WITHIN },
+            Step::Press { find: Find::exactly_named(Role::Link, b"Inbox") },
+            Step::See { find: Find::named(Role::Heading { level: 1 }, b"Inbox"), within: fixtures::WITHIN },
+            Step::Gone { find: Find::named(Role::Heading { level: 3 }, b"Reply"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+}

@@ -239,7 +239,6 @@ pub enum Word {
     Question,
     Held,
     PersonTask,
-    MarkSeen,
     Task,
     Project,
     Reply,
@@ -325,7 +324,7 @@ pub enum Word {
 // A task's name over its words in a chat (client/README.md, 3.5).
 // Forty-seven time form, calendar and placement phrases (5.12).
 const PHRASES: u32 = 657;
-const ALL: [Word; 295] = [
+const ALL: [Word; 294] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -550,7 +549,6 @@ const ALL: [Word; 295] = [
     Word::Question,
     Word::Held,
     Word::PersonTask,
-    Word::MarkSeen,
     Word::Task,
     Word::Project,
     Word::Reply,
@@ -854,7 +852,6 @@ impl Word {
             Self::Question => 118,
             Self::Held => 119,
             Self::PersonTask => 120,
-            Self::MarkSeen => 121,
             Self::Task => 122,
             Self::Project => 123,
             Self::Reply => 124,
@@ -1333,7 +1330,6 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Question => (&[b"Question"], &[]),
         Word::Held => (&[b"Held"], &[]),
         Word::PersonTask => (&[b"Person task"], &[]),
-        Word::MarkSeen => (&[b"Mark seen"], &[]),
         Word::Task => (&[b"Task ", b""], &[Number]),
         Word::Project => (&[b"Project ", b""], &[Number]),
         Word::Reply => (&[b"Reply"], &[]),

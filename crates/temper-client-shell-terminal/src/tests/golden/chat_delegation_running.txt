@@ -11,7 +11,6 @@ Main navigation:
 T1 · Add CSV export to widget:
   * waiting on 1 delegate
   Spent 0; delegates spent 0
-  [7] Mark seen
 Conversation:
   You
   Add CSV export to widget
@@ -26,10 +25,10 @@ Conversation:
       - Pull request opened
       - CI passed
       - Landed
-    [8] Task 2 ↗
+    [7] Task 2 ↗
   1 tool call
   wait
 Using the default model
-[9] Message: (empty) (enter sends)
+[8] Message: (empty) (enter sends)
 Enter to send · Shift+Enter for newline
-[10] Send
+[9] Send
