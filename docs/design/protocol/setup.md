@@ -1504,10 +1504,12 @@ them as it does any Forgejo.
   - *The dark theme, the empty search, and `otherwise`,* one turn each:
     its text line, answering what it would change and why, then
     `{"call": "finish", "arguments": {"form": "report", "text": "The demo
-    changes nothing.", "fields": {}}}`, finishing `tool_calls`, since a
-    text-only stop is nudged once and a second fails the run (smith's
-    `domain/run.md`, 7.2); the report is short, within the chat's 32
-    bytes, and the answer is the text. `finish`'s arguments are the
+    changes nothing.", "fields": {}}}`, finishing `tool_calls`. The
+    chat is ended by its requester (`../domain/agent.md`, 4.6), so the
+    `finish` ends only the run's turn: its report is discarded, no try
+    is spent, and the chat waits for the person's next words, its
+    composer with it, as the CSV's does with `wait`; the answer is the
+    text, committed with the turn. `finish`'s arguments are the
     contract's, as smith's schema for the tool has them (its
     `smith-protocol-llm`'s `contract.rs`): a `form`, the report's `text`
     and its `fields`, none for a chat.

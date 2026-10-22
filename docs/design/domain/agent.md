@@ -1,6 +1,6 @@
 # The agent
 
-Provisional, 2026-10-05, revised 2026-10-19. temper's agent is smith's:
+Provisional, 2026-10-05, revised 2026-10-22. temper's agent is smith's:
 the standard agent built from smith, the kit for LLM agents, on skein
 like temper. smith's design is its own (smith's `domain/run.md`,
 `domain/session.md`, `domain/tools.md`, `domain/host.md`), and how a
@@ -122,7 +122,8 @@ a chat that names none, runs with no workspace (worker.md, 4.1).
   charter's `inspect`, `modify`, `shell` and `agents` say; `wait`, always;
   `deliver`, for a change's contract, and mid-run for a run with a
   repository it may write, as a chat delivers a small fix (jig's
-  `domain/hosts.md`, section 8; smith's `domain/run.md`, 8.4).
+  `domain/hosts.md`, section 8; smith's `domain/run.md`, 8.4), but
+  never in an Open run (4.6).
 - **Every host tool below,** declared in every charter, each with the
   charter's call timeout. The task's authority decides each call by its
   family (jig's `domain/authority.md`, sections 3 and 8.5): a call beyond
@@ -236,6 +237,16 @@ Checks at `.temper/pre-pr`, guides at `AGENTS.md` (smith's
   coordinator's is zero. A chat resumes its transcript, and a
   coordinator starts fresh from its brief (jig's `domain/engine.md`,
   7.4).
+- **Its mode is its task's ending** (jig's `domain/tasks.md`, 5.8;
+  `domain/hosts.md`, 8.1), the assignment's `ended_by`, whatever the
+  charter: a task its result ends runs smith's `Finite` mode, and one
+  its requester ends runs `Open`, granted the wait and never
+  `deliver`. temper's chats are Open (`../protocol/configuration.md`,
+  section 2): a chat's run that answers and rests, by a text alone or
+  by `finish`, ends its turn with its reply committed, and the chat
+  waits for its person's next words, its finish's result discarded and
+  no try spent; only the person's Close, or a cancel, ends it. Goals
+  and every delegate run Finite and end by their results.
 
 ## 5. Messages
 
