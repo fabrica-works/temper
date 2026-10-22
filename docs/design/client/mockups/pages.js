@@ -72,14 +72,15 @@
   function plural(n, one, many) { return `${n} ${n === 1 ? one : (many || `${one}s`)}`; }
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
-  // A link within the mockups keeps the world and the step.
-  function u(target) {
+  // A link within the mockups keeps the world and the step, or names a
+  // later step, where an act's outcome is drawn.
+  function u(target, at = stepId) {
     if (/^(https?:|#)/.test(target)) return target;
     const [path, hash] = target.split('#');
     const [file, query] = path.split('?');
     const p = new URLSearchParams(query || '');
     p.set('world', worldKey);
-    p.set('step', stepId);
+    p.set('step', at);
     if (bare) p.set('bare', '');
     return `${file}?${p}${hash ? `#${hash}` : ''}`;
   }
@@ -253,21 +254,54 @@
   // (client README, 5.5).
   const account = name => world.accounts.find(a => a.name === name);
   function accountName(a) {
+    if (a.display) return a.display;
     const program = a.sources.find(s => s.kind === 'program');
     const signIn = a.sources.find(s => s.kind === 'sign-in');
     if (program) return `${a.plan} · ${program.name}`;
     if (signIn) return `${a.name} · ${signIn.name}`;
     return `${a.provider} API key`;
   }
-  function usingLine(id) {
-    const t = T(id);
-    const a = account(t.account);
+  function usingWords(a, modelName) {
     const first = a.sources[0];
-    const words = first.kind === 'program' ? `Using your ${a.plan}, through ${first.program} · ${t.model}`
-      : first.kind === 'sign-in' ? `Using ${a.plan} · ${t.model} · Manage usage`
-      : `Using your ${a.provider} API key · ${t.model}`;
-    return fact(`jig: the account and model ${id}'s next run takes; the account's first source, in temper's words`, esc(words));
+    return first.kind === 'program' ? `Using your ${a.plan}, through ${first.program} · ${modelName}`
+      : first.kind === 'sign-in' ? `Using ${a.plan} · ${modelName} · Manage usage`
+      : `Using your ${a.provider} API key · ${modelName}`;
   }
+  // While the demo's model holds, its line names it, and "Default" for
+  // the model while none is requested (5.6).
+  const DEMO_LINE = () => fact('temper: the demo’s model half holds, and no model is requested (client README, 5.6)', 'Using Demo model · Default');
+  function usingLine(id) {
+    if (modelHalf()) return DEMO_LINE();
+    const t = T(id);
+    return fact(`jig: the account and model ${id}'s next run takes; the account's first source, in temper's words`, esc(usingWords(account(t.account), t.model)));
+  }
+  function newChatLine() {
+    if (modelHalf()) return DEMO_LINE();
+    const n = world.config.next;
+    return n ? fact('jig: the account and model a new chat’s first run takes: its charter’s first model with a usable account', esc(usingWords(account(n.account), n.model))) : '';
+  }
+
+  // The demo (client README, 4.8): its model's half holds while no
+  // account of another provider is, and its forge's while no forge but
+  // its own is connected. Its words are 5.6's.
+  const demo = world.demo;
+  const modelHalf = () => !!demo && !world.accounts.some(a => a.provider !== demo.provider);
+  const forgeHalf = () => !!demo && !world.forges.some(f => f.n !== demo.forge && f.state === 'connected');
+  function demoBanner() {
+    const m = modelHalf(), f = forgeHalf();
+    if (!m && !f) return '';
+    const words = m && f ? 'This is a demo, running on a demo model and a demo forge.' : m ? 'This is a demo, running on a demo model.' : 'This is a demo, running on a demo forge.';
+    return `<aside class="first-run-banner" aria-label="Demo"><p>${fact('temper: the demo, as the forge’s side reads it, and which of its halves hold (client README, 4.8)', words)}</p><div class="terminal-proposal-actions">${m ? `<a href="${u('accounts.html')}">Connect a model</a>` : ''}${f ? `<a href="${u('forges.html')}">Connect a forge</a>` : ''}</div></aside>`;
+  }
+  function demoContext() {
+    if (!demo) return '';
+    return `<div class="compact-context first-run-context"><span>${project()} · ${fact('temper: the demo’s repository, and its forge', `<strong>${esc(world.repos[demo.repo].name)}</strong> on Demo forge`)}</span><span>${fact('jig: your role on the deployment', 'Signed in as the deployment’s owner')}</span></div>`;
+  }
+
+  // The forges the configuration names (client forge.md, 5.4); the demo's
+  // in the phrasebook's name (client README, 5.6).
+  const forgeOf = n => world.forges.find(f => f.n === n);
+  const forgeName = f => f.name || f.kind;
 
   const title = id => said(T(id).by, esc(T(id).title));
   const spent = id => fact(`jig: spent by ${id} itself`, esc(T(id).spend ?? ''));
@@ -407,8 +441,8 @@
   // ---- The product's chrome -------------------------------------------
 
   // In client README 5.3's order. Tasks and Workers are jig's pages
-  // (pages.md, 6.3 and 7), not temper's yet; Adopt and Forges have no
-  // mockup (client README, 4.4; forge.md, 5.4).
+  // (pages.md, 6.3 and 7), not temper's yet; Adopt has no mockup (client
+  // README, 4.4).
   const NAV = [
     ['inbox', 'inbox.html', 'Inbox'],
     ['chats', 'chats.html', 'Chats'],
@@ -416,7 +450,7 @@
     ['changes', 'changes.html', 'Changes'],
     ['tasks', 'tasks.html', 'Tasks'],
     ['adopt', '', 'Adopt a repository', 'No mockup: the adoption form is client README 4.4.'],
-    ['forges', '', 'Forges', 'No mockup: the forges’ page is forge.md 5.4.'],
+    ['forges', 'forges.html', 'Forges'],
     ['workers', 'workers.html', 'Workers'],
     ['accounts', 'accounts.html', 'Accounts'],
   ];
@@ -436,11 +470,15 @@
     </header>`;
   }
 
-  function listPage(active, crumbs, body, actions = '') {
-    const trail = crumbs.map((c, i) => i === crumbs.length - 1 ? `<strong>${c[0]}</strong>` : `<a href="${u(c[1])}">${c[0]}</a><span class="sep">/</span>`).join('');
+  // The frame draws the demo's banner under the navigation, on every page
+  // but the accounts and the forges pages (client README, 5.1); a page
+  // that draws it itself gives its own head, and no crumbs.
+  function listPage(active, crumbs, body, actions = '', head = null) {
+    const trail = (crumbs || []).map((c, i) => i === crumbs.length - 1 ? `<strong>${c[0]}</strong>` : `<a href="${u(c[1])}">${c[0]}</a><span class="sep">/</span>`).join('');
+    const banner = ['accounts', 'forges'].includes(active) ? '' : demoBanner();
     document.body.classList.add('terminal-pages');
-    return `${topbar(active)}<div class="app"><main class="main">
-      <header class="topbar"><div class="breadcrumbs">${trail}</div><div class="top-actions">${actions}<button class="icon-button" aria-label="More" title="Visual mockup"></button></div></header>
+    return `${topbar(active)}${head ?? (banner ? `<div class="demo-strip">${banner}</div>` : '')}<div class="app"><main class="main">
+      ${crumbs ? `<header class="topbar"><div class="breadcrumbs">${trail}</div><div class="top-actions">${actions}<button class="icon-button" aria-label="More" title="Visual mockup"></button></div></header>` : ''}
       <div class="page">${body}</div>
     </main></div>`;
   }
@@ -626,7 +664,7 @@
     const worlds = Object.entries(C.worlds).map(([key, w]) => key === worldKey
       ? `<li><b>${esc(w.name)}</b> · ${esc(w.about)}</li>`
       : `<li><a href="index.html?world=${key}">${esc(w.name)}</a> · ${esc(w.about)}</li>`).join('');
-    const pagesList = [['inbox.html', 'Inbox'], ['chats.html', 'Chats'], ['board.html', 'Board'], ['changes.html', 'Changes'], ['tasks.html', 'Tasks'], ['workers.html', 'Workers'], ['accounts.html', 'Accounts']]
+    const pagesList = [['inbox.html', 'Inbox'], ['chats.html', 'Chats'], ['board.html', 'Board'], ['changes.html', 'Changes'], ['tasks.html', 'Tasks'], ['forges.html', 'Forges'], ['workers.html', 'Workers'], ['accounts.html', 'Accounts']]
       .map(([h, label]) => `<a href="${u(h)}">${label}</a>`).join(' · ');
     return `<div class="mock-index">
       <h1>temper's client, in mockups</h1>
@@ -637,7 +675,7 @@
       <p>${esc(step.summary)}</p>
       <ol>${look}</ol>
       <h2>Pages</h2>
-      <p>${pagesList}; a chat, a task and a change open from them. <a href="first-run.html">first-run.html</a> is the owner's first chat after <code>temper box</code>, its own story on the demo's fake forge and scripted model.</p>
+      <p>${pagesList}; a chat, a task and a change open from them. <a href="first-run.html">first-run.html</a> opens the first run at its first step: the link <code>temper box</code> prints.</p>
       <h2>Marks</h2>
       <p>Slate marks are annotations, not the product: the reference case's names (<i class="case-ref">B</i>, <i class="case-ref">f1</i>) and the gaps temper lacks for what a page draws (<i class="gap">gap 6.5</i>). <b>Sources</b>, in View, underlines each value by where it comes from: <span class="legend-engine">an engine fact</span>, <span class="legend-config">a name from the configuration</span>, <span class="legend-written">words as a person or an agent wrote them</span>, or <span class="legend-ops">an ops application</span>. Unmarked text is the UI's own words, and names no workflow.</p>
     </div>`;
@@ -698,10 +736,39 @@
       const activity = Math.max(...lines.filter(x => x.at != null).map(x => x.at), t.made);
       return `<a class="card chat-preview${fresh(t)}" href="${href(id)}"><div><div class="meta-row"><span class="tag ${stateClass(id) === 'running' ? 'green' : 'amber'}">${phase(id, true)}</span><span>${project()} · ${id}</span>${ref(t.ref)}</div><h3>${title(id)}</h3>${last ? `<p>${said(id, esc(firstLine(last.text)), last.at)}</p>` : ''}</div><div class="meta-row"><span>${spent(id)} spent${kids(id).length ? ` · ${fact('jig: its delegates, live or ended', liveKids(id).length ? plural(liveKids(id).length, 'delegate') : `${plural(kids(id).length, 'delegate')}, ended`)}` : ''}</span><span>${fact('jig: its last activity', ago(activity))}</span></div></a>`;
     });
+    // A chat that ended itself, by its agent's finish, is still drawn;
+    // one closed before these mockups' time is a summary.
+    const finished = Object.keys(world.tasks).filter(k => isChat(T(k)) && requesterOf(T(k)) === world.person && !isLive(k)).map(id => {
+      const t = T(id);
+      const replies = (world.transcripts[id] || []).filter(x => x.who === 'agent');
+      const last = replies[replies.length - 1];
+      return `<a class="card chat-preview${fresh(t)}" href="${href(id)}"><div><div class="meta-row"><span class="tag">${fact(`jig: ${id}'s phase`, 'Ended')}</span><span>${project()} · ${id}</span></div><h3>${title(id)}</h3>${last ? `<p>${said(id, esc(firstLine(last.text)), last.at)}</p>` : ''}</div><div class="meta-row"><span>${spent(id)} spent</span><span>${fact('jig: when it ended', ago(t.ended))}</span></div></a>`;
+    });
     const ended = world.ended.filter(e => e.by === world.person).map(e => `<a class="card chat-preview" href="#"><div><div class="meta-row"><span class="tag">Closed</span><span>${project()} · ${e.task}</span></div><h3>${said(e.by, esc(e.title))}</h3><p>${fact('jig: its retention class, kept', 'Closed. Its transcript is kept.')}</p></div><div class="meta-row"><span>${fact('jig: what it spent', esc(e.spend))} spent</span><span>${fact('jig: when it ended', ago(e.ended))}</span></div></a>`);
-    return listPage('chats', [['Chats']], `<div class="welcome"><div class="section-heading" style="margin-top:0"><h2>Start a chat</h2></div><div class="terminal-entry-composer"><span class="entry-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Start a new chat" placeholder="Ask temper anything…"></textarea><span class="entry-hint">temper · Enter to start · Shift+Enter for newline</span><button class="send-button" aria-label="Start chat" data-later>↑</button></div></div>
-      <div class="section-heading"><h2>Your chats</h2><div class="filter-row"><button class="filter active">All</button><button class="filter">Live</button><button class="filter">Closed</button></div></div><div class="chat-list">${[...rows, ...ended].join('')}</div>`);
+    const all = [...rows, ...finished, ...ended];
+    const line = newChatLine();
+    const composer = `${line ? `<div class="composer-line">${line}</div>` : ''}<div class="terminal-entry-composer"><span class="entry-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Start a new chat"></textarea><span class="entry-hint">temper · Enter to start · Shift+Enter for newline</span><button class="send-button" aria-label="Start chat" data-later>↑</button></div>`;
+    const list = `<div class="section-heading"><h2>Your chats</h2><div class="filter-row"><button class="filter active">All</button><button class="filter">Live</button><button class="filter">Closed</button></div></div>${all.length ? `<div class="chat-list">${all.join('')}</div>` : '<div class="empty-state">No chats yet.</div>'}`;
+    if (!modelHalf()) return listPage('chats', [['Chats']], `<div class="welcome"><div class="section-heading" style="margin-top:0"><h2>Start a chat</h2></div>${composer}</div>${list}`);
+    // The demo's start, in place of the page's heading (client README,
+    // 5.6): a chat starts with its first message, so no task, no number.
+    const chatbar = `<div class="terminal-chatbar"><div class="terminal-chat-identity"><strong class="terminal-title">New chat</strong><span class="terminal-phase" role="status">Ready</span></div><div class="terminal-chat-meta"><span>${fact('temper: the demo’s model half holds', 'Demo model')}</span></div></div>`;
+    const start = `<section class="first-run-empty" aria-labelledby="demo-start"><h1 id="demo-start">What shall we change?</h1>
+      <p>Try a request in ${fact('temper: the demo’s repository', esc(world.repos[demo.repo].name))}. Follow the task from its branch to a landed change.</p>
+      <ul class="suggestions" aria-label="Suggested requests">${demo.cues.map(suggestion).join('')}</ul>
+      <p class="first-run-hint">The demo model plays these requests from a script.</p></section>`;
+    return listPage('chats', null, `${demoBanner()}${demoContext()}${start}<div class="welcome">${composer}</div>${list}`, '', chatbar);
   };
+
+  // A suggested request: the cue's words, copied in from the demo's
+  // configuration. Where a later step draws what it starts, it leads there.
+  function suggestion(cue) {
+    const play = demo.plays[cue];
+    const words = conf('a cue of the demo’s scripts, copied in (setup.md, 8.4)', esc(cue));
+    if (play && ids.indexOf(play[0]) > stepIndex) return `<li><a class="suggestion" href="${u(`chat.html?task=${play[1]}`, play[0])}">${words}</a></li>`;
+    const why = play ? 'Mockup: asking again is not drawn.' : 'Mockup: not drawn. Its script is the dark theme’s: one answer in words, then the chat ends.';
+    return `<li><button type="button" class="suggestion" data-later="${esc(why)}">${words}</button></li>`;
+  }
 
   pages.board = () => {
     const goals = Object.keys(world.tasks).filter(k => T(k).tracked && isLive(k)).sort((a, b) => T(a).priority - T(b).priority);
@@ -797,6 +864,12 @@
       </aside></div>`);
   }
 
+  // A repository's page on its forge, or a pull request's.
+  function forgeLink(repo, pr) {
+    const f = forgeOf(repo.forge);
+    return `${f.web}/${repo.name}${pr ? `/${f.kind === 'GitHub' ? 'pull' : 'pulls'}/${pr}` : ''}`;
+  }
+
   function changePage(id, t) {
     const repo = world.repos[t.repo];
     const pos = repo.queue.indexOf(id);
@@ -810,7 +883,7 @@
     const gates = repo.gates || [];
     return listPage('changes', [[project(), 'board.html'], ['Changes', 'changes.html'], [id]], `
       <div class="page-header"><div class="task-heading"><div class="meta-row"><span class="tag accent">${fact('temper: a change', `Change · ${id}`)}</span>${ref(t.ref)}<span>Goal ${chip(goal)}</span></div><h1>${title(id)}</h1><p class="intro">${fact('temper: its pull request, branch and landing branch', `${t.pr ? `PR #${t.pr}` : 'No pull request yet'} · ${esc(repo.name)} · temper/${id.slice(1)}/${esc(t.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'))} → ${esc(repo.branch)}`)}</p></div>
-      <div class="task-toolbar"><a class="button" href="https://github.com/" target="_blank" rel="noreferrer">View on forge ↗</a></div></div>
+      <div class="task-toolbar"><a class="button" href="${esc(forgeLink(repo, t.pr))}" target="_blank" rel="noreferrer">View on forge ↗</a></div></div>
       <section class="card card-pad">${fact(`temper: ${id}'s stage (forge.md, section 8)`, `<div class="steps">${steps}</div>`)}
         ${fixes ? `<div class="notice"><span>◇</span><div><strong>Fixes finding ${esc(fixes.id)}.</strong> ${esc(fixes.title)}: ${esc(fixes.rate)}. ${gap('6.5', 'an open finding at the landing tip')}</div></div>` : ''}
         <div class="section-heading"><h3>Its tasks</h3><span class="muted tiny">made by the change procedure: producing, repairs, reviews, resolving</span></div>
@@ -834,7 +907,7 @@
       <div class="agent-lineage"><a href="${href(t.parent)}">← ${t.parent} ${esc(parent.title)}</a><span>/</span><span class="agent-lineage-current">${id} ${esc(t.title)}</span></div>
       <div class="terminal-chatbar agent-taskbar"><div class="terminal-chat-identity"><h1 class="chatbar-heading"><span class="terminal-number">${id}</span><span class="visually-hidden"> · </span><strong class="terminal-title">${title(id)}</strong></h1>${ref(t.ref)}<span class="terminal-phase${stateClass(id) === 'waiting' ? ' waiting' : stateClass(id) === 'done' ? ' closed' : ''}"><i class="pill-dot"></i> ${phase(id, true)}</span></div>
         <div class="terminal-chat-meta"><span class="agent-charter">${kind(id)} · ${model(id)}</span><span class="agent-spend">${spent(id)} spent</span>${isLive(id) ? '<button type="button" data-later>Amend</button><button type="button" data-later>Stop</button>' : ''}</div></div>
-      <main class="terminal-thread" aria-label="Agent task"><div class="terminal-thread-inner">
+      <main class="terminal-thread" aria-label="Agent task"><div class="terminal-thread-inner">${demoBanner()}
         <div class="agent-brief"><span class="agent-kicker">TASK BRIEF</span><div class="agent-brief-text">${said(t.briefBy || t.by, md(t.brief), t.made)}</div><div class="agent-brief-meta">Asked by ${esc(t.parent)}${t.briefBy && t.briefBy !== t.parent ? `, from ${esc(t.briefBy)}’s spec` : ''} · ${fact('jig: the account its runs use', esc(t.account))} · ${model(id)}${t.pool ? ` · ${fact(`jig: a slot of ${t.parent}'s pool`, `holds a slot of ${t.parent}’s pool`)}` : ''}</div></div>
         ${body}
       </div></main>
@@ -845,6 +918,7 @@
   pages.chat = () => {
     const id = params.get('task') || Object.keys(world.tasks).find(k => isChat(T(k)));
     const t = T(id);
+    if (!t) return listPage('chats', [['Chats', 'chats.html'], [esc(id || 'A chat')]], `<div class="empty-state">${id ? `${esc(id)} does not exist at this step.` : 'No chat at this step.'}</div>`);
     document.body.classList.add('terminal-variant');
     const shown = new Set();
     const lines = conversation(id, shown);
@@ -853,11 +927,15 @@
     const after = liveKids(id).filter(k => !shown.has(k)).map(taskCard).join('');
     const notes = world.notes.filter(n => n.by === id);
     const scopes = [...new Set(notes.map(n => n.scope))];
+    const live = isLive(id);
+    // A chat its agent finished has ended, with its report; it takes no
+    // more words, so its page has no composer.
+    const end = live ? '' : `<div class="terminal-day terminal-ended">${fact(`jig: ${id}'s run ended, and its result`, `Ended ${clock(t.ended)}`)}${t.result ? ` · ${said(id, `its report, “${esc(t.result)}”`, t.ended)}` : ''}</div>`;
     return `<div class="terminal-shell">${topbar('chats')}
-      <div class="terminal-chatbar"><div class="terminal-chat-identity"><h1 class="chatbar-heading"><span class="terminal-number">${id}</span><span class="visually-hidden"> · </span><strong class="terminal-title">${title(id)}</strong></h1>${ref(t.ref)}<span class="terminal-phase waiting"><i class="pill-dot"></i> ${phase(id)}</span></div>
-        <div class="terminal-chat-meta"><span>${kind(id)} · ${model(id)} · ${conf('its charter’s host kind', esc(t.hostKind))}</span><span>${fact('jig: what it spent, and its budget', `${t.spend} spent · ${t.budget ? `of ${t.budget}` : 'as allowed'}`)}</span>${notes.length ? '<button type="button" data-notes aria-expanded="false">Notes</button>' : ''}${kids(id).length ? `<a href="${u('tasks.html')}" class="chatbar-link">${fact('jig: its delegates, live or ended', liveKids(id).length ? plural(liveKids(id).length, 'delegate') : `${plural(kids(id).length, 'delegate')}, ended`)}</a>` : ''}<button type="button" data-later>Stop</button><button type="button" data-later>Close</button></div></div>
-      <main class="terminal-thread" aria-label="Conversation"><div class="terminal-thread-inner">${lines}${after}</div></main>
-      <footer class="terminal-composer-area"><div class="composer-line">${usingLine(id)}</div><div class="terminal-composer"><span class="terminal-input-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Message ${id}" placeholder="Message ${esc(id)}…"></textarea><span class="terminal-input-hint">Enter to send · Shift+Enter for newline</span><button type="button" class="terminal-send" aria-label="Send message" data-later>↑</button></div></footer>
+      <div class="terminal-chatbar"><div class="terminal-chat-identity"><h1 class="chatbar-heading"><span class="terminal-number">${id}</span><span class="visually-hidden"> · </span><strong class="terminal-title">${title(id)}</strong></h1>${ref(t.ref)}<span class="terminal-phase ${live ? 'waiting' : 'closed'}"><i class="pill-dot"></i> ${phase(id)}</span></div>
+        <div class="terminal-chat-meta"><span>${kind(id)} · ${model(id)} · ${conf('its charter’s host kind', esc(t.hostKind))}</span><span>${fact('jig: what it spent, and its budget', `${t.spend} spent · ${t.budget ? `of ${t.budget}` : 'as allowed'}`)}</span>${notes.length ? '<button type="button" data-notes aria-expanded="false">Notes</button>' : ''}${kids(id).length ? `<a href="${u('tasks.html')}" class="chatbar-link">${fact('jig: its delegates, live or ended', liveKids(id).length ? plural(liveKids(id).length, 'delegate') : `${plural(kids(id).length, 'delegate')}, ended`)}</a>` : ''}${live ? '<button type="button" data-later>Stop</button><button type="button" data-later>Close</button>' : ''}</div></div>
+      <main class="terminal-thread" aria-label="Conversation"><div class="terminal-thread-inner">${demoBanner()}${demoContext()}${lines}${after}${end}</div></main>
+      ${live ? `<footer class="terminal-composer-area"><div class="composer-line">${usingLine(id)}</div><div class="terminal-composer"><span class="terminal-input-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Message ${id}" placeholder="Message ${esc(id)}…"></textarea><span class="terminal-input-hint">Enter to send · Shift+Enter for newline</span><button type="button" class="terminal-send" aria-label="Send message" data-later>↑</button></div></footer>` : ''}
     </div>
     ${notes.length ? `<aside class="drawer" id="notes" hidden aria-label="Notes ${id} wrote">
       <div class="drawer-head"><h2>${id} · the notes it wrote</h2><button type="button" data-notes-close>Close ✕</button></div>
@@ -885,7 +963,7 @@
     const landings = world.landings.map(l => `<a href="${href(l.task)}">${fact('temper: a landing', `${l.task} ${esc(T(l.task) ? T(l.task).title : l.title)}`)}<small>${fact('temper: where and when it landed', `${esc(world.repos[l.repo].name)} · ${clock(l.at)}${T(l.task) && T(l.task).parent ? ` · goal ${T(l.task).parent}` : ''}`)}</small></a>`).join('');
     const open = world.findings.filter(f => f.state === 'open');
     return listPage('changes', [[project(), 'board.html'], ['Changes']], `
-      <div class="compact-context"><span>${fact('temper: the forge and the adopted repositories', `Forge · GitHub · ${repos.map(([, r]) => esc(r.name)).join(', ')}`)}</span></div>
+      <div class="compact-context"><span>${fact('temper: the forges and the repositories adopted on each', world.forges.filter(f => repos.some(([, r]) => r.forge === f.n)).map(f => `Forge · ${esc(forgeName(f))} · ${repos.filter(([, r]) => r.forge === f.n).map(([, r]) => esc(r.name)).join(', ')}`).join(' · '))}</span></div>
       <div class="repo-grid${repos.length === 1 ? ' one' : ''}">${cards}</div>
       <div class="section-heading"><h2>Landing queues</h2></div>
       <div class="repo-grid${repos.length === 1 ? ' one' : ''}">${queues}</div>
@@ -916,7 +994,7 @@
         <div class="worker-runs">${runRows}</div>
         ${idle.length ? `<p class="muted tiny" style="margin:8px 0 0">Of host kind ${esc(w.kind)}, with no run now: ${idle.map(k => `<a class="text-link" href="${href(k)}">${fact(`${k}: its number and title`, `${k} ${esc(T(k).title)}`)}</a>`).join(', ')}.</p>` : ''}
         <div class="rule"></div>
-        <div class="worker-logins"><span>Programs’ logins on it</span>${w.logins.map(([n, s]) => `<span>${fact('temper: a login the worker declares, and its last check', `<b>${esc(n)}</b> · <span class="ok">${esc(s)}</span>`)}</span>`).join('')}</div>
+        <div class="worker-logins"><span>Programs’ logins on it</span>${w.logins.map(([n, s]) => `<span>${fact('temper: a login the worker declares, and its last check', `<b>${esc(n)}</b> · <span class="ok">${esc(s)}</span>`)}</span>`).join('') || `<span>${fact('temper: the logins the worker declares', 'none')}</span>`}</div>
         ${world.config.ops && h ? src('ops', 'the ops application: a later application feeding temper, not temper’s facts', `<div class="ops-strip"><div class="ops-strip-head"><span>From the ops application · not temper’s facts</span>${gap('6.4', 'worker health')}</div>
           <dl><div><dt>Load per core</dt><dd>${esc(h.load)}</dd></div><div><dt>Builds queued</dt><dd>${esc(h.builds)}</dd></div><div><dt>Disk free · floor</dt><dd>${esc(h.disk)} · ${esc(h.floor)}</dd></div><div><dt>Memory</dt><dd>${esc(h.memory)}</dd></div></dl></div>`) : ''}
       </section>`;
@@ -943,7 +1021,7 @@
     const cards = world.accounts.map(a => {
       const users = Object.keys(world.tasks).filter(k => T(k).account === a.name && isLive(k) && T(k).kind !== 'change').sort((x, y) => x.slice(1) - y.slice(1));
       const windows = a.sources.some(s => s.usage);
-      return `<section class="card card-pad"><div class="card-top"><div><h2>${fact('jig: the account’s provider and display name, in temper’s words', esc(accountName(a)))} <span class="muted" style="font-weight:400;font-size:11px">· ${fact('jig: its LLM provider, and the party holding it', `${esc(a.provider)} · held by ${esc(a.holder)}`)}</span></h2><p class="muted tiny" style="margin:5px 0 0">Its sources in order: a run takes the first usable one on its worker.</p></div><div class="filter-row">${windows ? gap('6.3', 'plan usage') : ''}<span class="tag green">${fact('jig: whether it is usable now', 'Ready')}</span></div></div>
+      return `<section class="card card-pad${fresh(a)}"><div class="card-top"><div><h2>${fact('jig: the account’s provider and display name, in temper’s words', esc(accountName(a)))} <span class="muted" style="font-weight:400;font-size:11px">· ${fact('jig: its LLM provider, and the party holding it', `${esc(a.provider)} · held by ${esc(a.holder)}`)}</span></h2><p class="muted tiny" style="margin:5px 0 0">Its sources in order: a run takes the first usable one on its worker.</p></div><div class="filter-row">${windows ? gap('6.3', 'plan usage') : ''}<span class="tag green">${fact('jig: whether it is usable now', 'Ready')}</span></div></div>
         <div style="margin-top:8px">${a.sources.map(sourceRow).join('')}</div>
         <div class="rule"></div>
         <div class="kv"><span>Used by</span><strong>${users.length ? `${fact('jig: the live tasks whose runs use it', users.map(k => `<a class="text-link" href="${href(k)}">${k}</a>`).join(', '))} · ${fact('jig: their runs now', `${users.filter(k => T(k).phase === 'running').length} running`)}` : 'none'}</strong></div>
@@ -951,11 +1029,90 @@
       </section>`;
     }).join('');
     const providers = new Set(world.accounts.map(a => a.provider));
-    const ways = [providers.has('OpenAI') ? 'Continue with ChatGPT' : '', providers.has('Anthropic') ? 'Use your Claude subscription' : '', 'Use an API key'].filter(Boolean);
+    const ways = world.config.ways || [providers.has('OpenAI') ? 'Continue with ChatGPT' : '', providers.has('Anthropic') ? 'Use your Claude subscription' : '', 'Use an API key'].filter(Boolean);
     return listPage('accounts', [['Accounts']], `
       <div class="section-heading" style="margin-top:0"><div><h2>Your LLM accounts</h2><p class="muted tiny" style="margin:5px 0 0">Each plan’s windows, read as the account’s facts. The mark on a week is its pace: where usage would be if the week were spent evenly.</p></div></div>
       <div class="stack">${cards}</div>
       <div class="section-heading"><h2>Add an account</h2><div class="filter-row">${ways.map(w => `<button class="button" data-later>${w}</button>`).join('')}</div></div>`);
+  };
+
+  // The forges' part of the deployment's connectors, in temper's words
+  // (client forge.md, 5.4): a row for each forge the configuration names,
+  // with its connection, its mode, temper's App on GitHub and its load,
+  // and the acts its kind, mode and state offer.
+  function forgeConnection(f) {
+    if (f.state === 'connected') return `Connected as ${f.login} (${f.id})`;
+    return cap(f.state);
+  }
+  const PASTED = '<p class="muted tiny" style="margin:0">A pasted value is sent once and shown nowhere, then or after.</p>';
+  function forgeActs(f) {
+    if (f.kind === 'GitHub' && f.state === 'not connected') {
+      return `<div class="rule"></div><div class="forge-acts">
+        <div class="forge-act"><h3>Connect GitHub</h3><p>Create an App and install it on your account or organization. Choose selected repositories.</p>
+          <label class="forge-field"><span>An organization, or none for your account</span><input type="text"></label>
+          <button class="button primary" data-later="Mockup: the answer is a link to create the App on GitHub, shown as text for you to open.">Connect GitHub</button></div>
+        <div class="forge-act"><h3>Connect an App of your own</h3><p>Its id, and its private key as GitHub gives it.</p>
+          <label class="forge-field"><span>App id</span><input type="text"></label>
+          <label class="forge-field"><span>Private key</span><textarea rows="2"></textarea></label>
+          <button class="button" data-later>Connect an App of your own</button></div>
+      </div>${PASTED}`;
+    }
+    if (f.kind === 'GitHub') return `<div class="rule"></div><div class="button-row"><button class="button" data-later="Mockup: a new App key, pasted; the old is erased once the new is kept.">Replace</button><button class="button" data-later="Mockup: a fresh link to install temper’s App, shown as text.">Install on another account</button></div>`;
+    if (f.mode === 'owned' && f.state === 'not set up' && f.box) {
+      return `<div class="rule"></div><div class="forge-act"><button class="button primary" data-later="Mockup: the box fetches Forgejo and its runner, prepares them and starts them.">Set up a Forgejo here</button><p style="margin-top:8px">temper downloads Forgejo and its runner, then starts them. No restart needed. You sign in to it with your login on this machine, and the password its preparation writes.</p></div>`;
+    }
+    return '';
+  }
+  function forgeLoad(f) {
+    const l = f.load;
+    if (!l) return '';
+    return `<div class="kv"><span>Requests</span><strong>${fact('temper: the forge’s request budget, the configuration’s rate per window (domain forge.md, 5.4)', esc(`${l.used.toLocaleString('en')} of ${l.rate.toLocaleString('en')} this ${l.window} · ${l.reserve} kept for keeping up and the slow pass`))}</strong></div>
+      <div class="kv"><span>Used by</span><strong>${fact('temper: what used the budget, by queue', esc(l.uses.map(([q, n]) => `${q} ${n.toLocaleString('en')}`).join(' · ')))}</strong></div>
+      <div class="kv"><span>Pause for its rate</span><strong>${fact('temper: a pause the forge asked for', 'none')}</strong></div>
+      <div class="kv"><span>Outbox</span><strong>${fact('temper: the effects waiting, and those uncertain, being looked for', esc(`${plural(l.outbox.waiting, 'effect')} waiting · ${l.outbox.uncertain ? `${l.outbox.uncertain} uncertain` : 'none uncertain'}`))}</strong></div>
+      <div class="kv"><span>Webhooks last heard</span><strong>${fact('temper: when each repository’s webhooks were last heard', esc(l.hooks.map(([r, at]) => `${r} ${ago(at)}`).join(' · ')))}</strong></div>`;
+  }
+  function forgeCard(f) {
+    const ok = f.state === 'connected';
+    const mode = f.mode === 'connected' ? 'Connected' : ok ? `${cap(f.mode)} · admin’s token kept` : cap(f.mode);
+    const app = f.app ? `<div class="kv"><span>temper’s App</span><strong>${fact('temper: the App, and its installations', `${esc(f.app.slug)} · ${f.app.installs.map(i => `<a class="text-link" href="#" data-later="Mockup: the installation’s page, on GitHub.">${esc(i.account)}, ${esc(i.repos)} ↗</a>`).join(', ')}`)}</strong></div>` : '';
+    return `<section class="card card-pad forge-card"><div class="card-top"><h2>${conf('the forge, by its number, kind and web address, in the configuration', `${esc(forgeName(f))} <small>forge ${f.n} · ${esc(f.kind)} · ${esc(f.web)}</small>`)}</h2><span class="tag ${ok ? 'green' : 'amber'}">${fact('temper: the forge’s connection', esc(forgeConnection(f)))}</span></div>
+      <div class="repo-lines">${ok || f.mode !== 'connected' ? `<div class="kv"><span>Mode</span><strong>${fact('temper: the forge’s mode: owned, where the setup owns it; managed, where temper keeps a site admin’s token; connected otherwise', esc(mode))}</strong></div>` : ''}
+        ${app}${forgeLoad(f)}</div>
+      ${forgeActs(f)}</section>`;
+  }
+
+  pages.forges = () => {
+    const next = Math.max(...world.forges.map(f => f.n)) + 1;
+    const intro = demo ? `<p class="muted tiny" style="margin:5px 0 0">Connect a forge, then adopt a repository into a new project or into ${project()}. ${esc(world.repos[demo.repo].name)} stays on Demo forge.</p>` : '<p class="muted tiny" style="margin:5px 0 0">Each forge the configuration names, by its number.</p>';
+    return listPage('forges', [['Forges']], `
+      <div class="section-heading" style="margin-top:0"><div><h2>The deployment’s forges <span class="subtle-count">${world.forges.length}</span></h2>${intro}</div></div>
+      <div class="stack">${world.forges.map(forgeCard).join('')}</div>
+      <div class="section-heading"><h2>A Forgejo elsewhere</h2><span class="muted tiny">Restart needed</span></div>
+      <section class="card card-pad forge-elsewhere"><p>Add its address to the configuration and restart temper, then connect as its admin or with its bot’s tokens.</p>
+        <details><summary>What to add</summary>
+          <p>For a forge at forge.example, add this entry to application.forges in ~/.config/temper/temper.json. Replace the example host with yours; use an unused forge number.</p>
+          <pre><code>{
+  "number": ${next},
+  "kind": "forgejo",
+  "api": {"host": "forge.example", "port": 443},
+  "transport": {"tls": {
+    "server_name": "forge.example", "trust": null
+  }},
+  "git": "https://forge.example",
+  "web": null,
+  "log_origins": null
+}</code></pre>
+          <p>Add its git identity to application.identities, using an unused identity number and the same forge number:</p>
+          <pre><code>{
+  "number": ${next}, "forge": ${next}, "login": null,
+  "author": {
+    "name": "temper",
+    "email": "temper-bot@forge.example"
+  }
+}</code></pre>
+          <p>Stop and start ${esc(world.config.restart)}. Return to Forges to connect with the bot’s API and git tokens, or choose “Connect as its admin”. Keep credentials out of the configuration.</p>
+        </details></section>`);
   };
 
   // ---- Mount ----------------------------------------------------------

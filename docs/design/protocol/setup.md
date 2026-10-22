@@ -1370,8 +1370,9 @@ them as it does any Forgejo.
        available from widget’s table. The change landed on Demo forge.
        This was a scripted demo change.", then the same `wait`.
 
-    The two texts are the mockup's (`../client/mockups/first-run.js`),
-    its typographic apostrophes kept, less the task's number. The first
+    The two texts are the mockups' first run's
+    (`../client/mockups/world-first-run.js`), with their typographic
+    apostrophes. The first
     goes with the `delegate` it announces, since the chat's page shows a
     message's text beside its calls (`temper-client-view`'s chat page).
 

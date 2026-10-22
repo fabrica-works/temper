@@ -23,18 +23,19 @@ Each file also opens directly in a browser, with no build step; serving it keeps
 | Every task, as one tree | `tasks.html` | none: jig's `client/domain/pages.md`, 6.3 |
 | A task: a goal's plan, an agent's transcript, a change's stages (`?task=T12`) | `task.html` | `Task { task }` |
 | The changes of each repository, with their queues and the open findings | `changes.html` | `Changes { project }` |
+| The deployment's forges: each one's connection, mode and load, and its acts | `forges.html` | `Forges` |
 | The workers, their slots and health | `workers.html` | none: jig's `client/domain/pages.md`, 7 |
 | The LLM accounts, their sources and plans' windows | `accounts.html` | `Accounts` |
-| The owner's first chat after `temper box` | `first-run.html` | `Chats`, `Chat { task }` |
+| The first run, at its first step: the link `temper box` prints | `first-run.html` | opens `chats.html` in the first run |
 
-"Adopt a repository" and "Forges" are in the navigation, in the order of the client README's 5.3, but have no mockup (4.4; `forge.md`, 5.4).
+"Adopt a repository" is in the navigation, in the order of the client README's 5.3, but has no mockup (4.4).
 
 ## A world, at a step
 
-- **The worlds.** `world-reference.js` holds the reference case (`../../draft/reference-case.md`): a director, owners on two machines, pools, findings, an ops application, at hour 0, with the steps that move it on. `world-solo.js` holds a workflow unlike it: one developer, one repository, one laptop, chats and a goal set by hand, no coordinator, timers, pools or ops application. A page that reads wrong in one world assumed the other's workflow.
+- **The worlds.** `world-reference.js` holds the reference case (`../../draft/reference-case.md`): a director, owners on two machines, pools, findings, an ops application, at hour 0, with the steps that move it on. `world-solo.js` holds a workflow unlike it: one developer, one repository, one laptop, chats and a goal set by hand, no coordinator, timers, pools or ops application. `world-first-run.js` holds a person's first run after `temper box`, on the demo's model and forge (below). A page that reads wrong in one world assumed another's workflow.
 - **The step.** `pages.js` draws every page from the world at the step in the address (`?world=`, `?step=`), so the pages agree at each step. The dark bar above each page is the mockups' own: ‹ and › move the step, **Steps** lists the whole case, the step's title opens what it shows and where to look, and **View** switches the world and what is marked.
-- **What is drawn:** the reference case's hour 0, and the solo world's one step. The case's later steps are listed, and are added one act at a time.
-- **Acts:** a button or link for an act shows a note instead of acting. Nothing is sent anywhere.
+- **What is drawn:** the reference case's hour 0, the solo world's one step, and the first run's five. The case's later steps are listed, and are added one act at a time.
+- **Acts:** a button or link for an act shows a note instead of acting, unless a later step draws what it does: then it leads to that step (the first run's suggested requests). Nothing is sent anywhere.
 - **For a capture:** `?bare` draws the page alone, without the bar and the marks, and every link keeps it (`chat.html?world=solo&task=T10&bare`). A page's state is its address: the world, the step and the task.
 
 ## Where each value comes from
@@ -67,12 +68,29 @@ Two pages follow jig's pages, which temper's client leaves out (the client READM
 
 Not drawn: two ideas that would change temper's engine, not only its pages. A charter or template would name the pages where its tasks lead, so the board could open with the director's line; an agent would set a short status line on its task with a tool, shown as written beside its phase. They wait for a design of their own.
 
-## first-run.html
+## The first run
 
-[first-run.html](first-run.html) and `first-run.js` are the owner's first chat after opening the link from `temper box`, a story of their own rather than a world: the demo's start with its suggested requests, the demo's banner, a delegation's card with its steps, on sample model and forge connections. The client README cites it for the demo (4.8, 5.6) and for what the view leaves out (section 11). It loads no external assets, and **Reset demo** or reloading clears its local state.
+`world-first-run.js` is the deployment `temper init` writes (`../../protocol/setup.md`, 8.2 and 8.3): the project Default, the charters `chat` and `coding`, one worker in temper's process, three forges (the demo's fake, GitHub not connected, a Forgejo here not set up), and the demo model's key as the one account. Every word an agent says is the demo's script (8.4). [first-run.html](first-run.html), the address the documents cite, opens it at its first step. Its steps:
+
+1. **The link opened:** the chats page is the demo's start (client README, 5.6): a chatbar with no task and no number, the banner, the context line, the three suggested requests.
+2. **A request sent:** "Add CSV export to widget" starts the chat T1; its agent delegates the change T2, whose agent T3 edits `src/main.rs`. T2's card says Running with no step ticked (5.7).
+3. **The change landed:** T2's card says Landed, every step ticked, "CI passed. Landed · merge commit e3b8d41"; T1 says so in its script's third turn.
+4. **A text-only request:** "Add a dark theme to widget", the chat T4, answered in words; then its script's `finish` ends it, so its page has no composer.
+5. **A model connected:** an OpenAI API key added. The model's half of the demo ends (4.8): the banner says a demo forge alone, the chats page has no demo's start, and the composers' line names the new key.
+
+Where the documents disagree, or leave a word open, the mockup takes one side and says so here:
+
+- **A text-only answer ends its chat** (step 4). setup.md 8.4 scripts the dark theme, the empty search and the fallback as one turn: words, then `finish` with the report "The demo changes nothing.", since a text-only stop is nudged and then fails the run. Finishing ends the chat, so the person cannot reply, and the page they are on loses its composer just after they asked. This is likely a flaw: a chat at rest should wait for the person's words, as the CSV's does with `wait`. The mockup draws the script as written.
+- **The demo project's next run takes the new account** (step 5). The draft says the demo model "stays the demo project's" (`../../draft/first-run.md`, 2.2). setup.md 8.3 says a task with no model chosen takes the first of its charter's models that has a usable account, and the demo model is last in both charters. The mockup follows setup.md: T1's next run, and a new chat's first, take gpt-6-luna on the new key.
+- **The coding agent's title is the change's** (T3, "Export widget's table as CSV"): setup.md 8.4 makes the change's title its agent's brief, and a chip is the spec's first line. The other worlds title that agent "Produce TN's branch", a stand-in for a title temper's procedure does not word yet.
+- **The dark theme's words** are a stand-in. Their content is the demo's follow-up (`../../draft/first-run.md`, section 8). The empty search and the fallback are not drawn: they take step 4's shape.
+- **"Connect a forge" is a link,** to `forges.html`. The client has no forges page yet, so until it does the button is disabled (client README, 5.6).
+- **The forges page** draws `forge.md` 5.4 in every world. Its "A Forgejo elsewhere" says what to add and that temper restarts (`../../draft/first-run.md`, section 4); the earlier first-run mockup's forges dialog gave its words. Its load's numbers are illustrative.
+
+The earlier first-run mockup, a story of its own, also drew "Reset demo", a turn's "Just now", the composer's placeholder, "Landed into main" and the pull request's link on the card. The client leaves each out (client README, section 11), and so does this world.
 
 ## The files
 
 - `style.css`, `terminal-chat.css` and `terminal-pages.css`: the product's look, from which `temper.css` takes its rules (`../browser.md`, 2.5).
 - `mockup.css`: the mockups' own marks and bar, never the product.
-- `pages.js`, `world-reference.js` and `world-solo.js`: every page but first-run, and its worlds; each HTML file is a shell that loads them.
+- `pages.js`, `world-reference.js`, `world-solo.js` and `world-first-run.js`: every page and its worlds; each HTML file is a shell that loads them, and `first-run.html` opens the first run.

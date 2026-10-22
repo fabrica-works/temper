@@ -19,17 +19,25 @@
         period: 'month',
         allotment: 50,
         ops: false,
+        next: { account: 'Claude', model: 'Opus · high' },
+        restart: 'temper serve',
       },
 
       repos: {
         tally: {
-          name: 'robin/tally', branch: 'main',
+          name: 'robin/tally', forge: 1, branch: 'main',
           tip: 'a81f03',
           ci: { state: 'passing', at: -40 },
           after: null,
           queue: [],
         },
       },
+
+      forges: [
+        { n: 1, kind: 'GitHub', web: 'https://github.com', mode: 'connected', state: 'connected', login: 'temper-robin[bot]', id: 190311402,
+          app: { slug: 'temper-robin', installs: [{ account: 'robin', repos: 'selected repositories' }] },
+          load: { used: 210, rate: 5000, window: 'hour', reserve: 500, uses: [['fresh reads', 96], ['writes', 12], ['keeping up', 88], ['the slow pass', 14]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['robin/tally', -3]] } },
+      ],
 
       landings: [
         // T2, a change the chat T1 handed its branch to, a small fix.

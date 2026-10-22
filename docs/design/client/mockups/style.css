@@ -186,32 +186,45 @@ h3 { font-size: 14px; line-height: 1.35; letter-spacing: -.015em; margin-bottom:
 .empty-state { padding: 22px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); font-size: 12px; text-align: center; }
 .button:disabled, .send-button:disabled { opacity: .55; cursor: default; }
 
-/* First run: the existing terminal conversation, with local demo connections. */
+/* The demo (client README, 4.8 and 5.6): its banner, its context line and
+   its start on the chats page. On a list page the banner sits under the
+   navigation; on a chat's page, after its chatbar. */
 .first-run-banner { padding: 12px 16px; border: 1px solid var(--term-line); background: #f8f5f0; margin-bottom: 16px; }
 .first-run-banner p { margin: 0; font-size: 11px; }
 .first-run-banner .terminal-proposal-actions { margin-top: 8px; }
+.first-run-banner .terminal-proposal-actions a { padding-left: 0; }
+.demo-strip { border-bottom: 1px solid var(--term-line); background: #f8f5f0; }
+.demo-strip .first-run-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin: 0; padding: 4px 25px; border: 0; background: none; }
+.demo-strip .terminal-proposal-actions { margin: 0; }
 .first-run-context { flex-wrap: wrap; }
-.first-run-empty { padding: 42px 0; }
-.first-run-empty h1 { font: 700 18px/1.4 ui-monospace, monospace; letter-spacing: -.025em; }
+.first-run-empty { padding: 30px 0 34px; }
+.first-run-empty h1 { font: 700 18px/1.4 ui-monospace, monospace; letter-spacing: -.025em; margin: 0 0 8px; }
 .first-run-empty p { font-size: 12px; color: var(--term-muted); }
-.first-run .first-run-hint { margin: 14px 0 0; color: var(--term-muted); font-size: 10px; }
-.first-run-account-line { width: min(1040px, 100%); margin: 0 auto 6px; font-size: 10px; color: var(--term-muted); }
-.first-run-task .steps, .task-card .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 14px 0; gap: 10px; }
-.first-run-task .step, .task-card .step { font-size: 10px; }
-.first-run-panel { max-height: calc(100dvh - 40px); overflow-y: auto; }
-.first-run-panel h3 { font-size: 12px; }
-.first-run-panel .stack p { margin: 6px 0 0; }
-.first-run-panel .kv { flex-wrap: wrap; }
-.first-run-panel .kv span { color: var(--term-ink); }
-.first-run-panel .kv strong { font-size: 10px; color: var(--green); text-align: left; }
-.first-run-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; background: #f8f5f0; padding: 12px; border: 1px solid var(--term-line); }
-.first-run-panel #elsewhere { border-top: 1px solid var(--term-line); margin-top: 16px; padding-top: 16px; }
-.first-run-panel .first-run-result { margin: 12px 0 0; color: var(--green); }
-.first-run button:disabled { opacity: .55; cursor: default; }
+.first-run-hint { margin: 14px 0 0; color: var(--term-muted); font-size: 10px; }
+.suggestions { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.suggestion { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px; border: 1px solid #ddd6cb; border-radius: 5px; background: #fffefd; color: #6a6258; font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-decoration: none; cursor: pointer; }
+.suggestion:hover { border-color: #ba9c89; color: #9d5139; }
+.task-card .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 14px 0; gap: 10px; }
+.task-card .step { font-size: 10px; }
+.terminal-ended { color: #8b8378; }
+
+/* The deployment's forges (client forge.md, 5.4). */
+.forge-card h2 small { font-weight: 400; color: var(--muted); font-size: 11px; margin-left: 6px; }
+.forge-card .repo-lines { margin-top: 10px; }
+.forge-acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; margin-top: 4px; }
+.forge-act h3 { font-size: 12px; margin: 0 0 4px; }
+.forge-act p { margin: 0 0 10px; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.forge-act .button { margin-top: 2px; }
+.forge-field { display: grid; gap: 4px; margin: 0 0 10px; font-size: 10px; color: var(--muted); }
+.forge-field input, .forge-field textarea { width: 100%; box-sizing: border-box; border: 1px solid #dcd4c9; border-radius: 5px; padding: 6px 8px; background: #fffefd; color: var(--term-ink); font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; }
+.forge-elsewhere p { font-size: 11px; line-height: 1.6; margin: 0 0 10px; }
+.forge-elsewhere summary { cursor: pointer; font-size: 11px; font-weight: 700; margin: 4px 0 10px; }
+.forge-elsewhere pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; background: #f8f5f0; padding: 12px; border: 1px solid var(--term-line); margin: 0 0 10px; }
+@media (max-width: 760px) { .forge-acts { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .demo-strip .first-run-banner { padding: 6px 16px; } }
 @media (max-width: 430px) {
-  .first-run-task .steps, .task-card .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .first-run .terminal-chat-identity { max-width: none; }
-  .first-run-empty { padding: 20px 0; }
+  .task-card .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .first-run-empty { padding: 20px 0 24px; }
 }
 
 @media (max-width: 1140px) {   .two-col { grid-template-columns: minmax(0,1fr) 245px; } }

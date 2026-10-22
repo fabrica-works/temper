@@ -24,24 +24,34 @@
         allotment: 240,
         // An ops application reports workers' health (gap 6.4).
         ops: true,
+        // What a new chat's first run takes.
+        next: { account: 'Claude', model: 'Opus · xhigh' },
+        restart: 'temper serve',
       },
 
       repos: {
         kit: {
-          name: 'acme/kit', branch: 'main',
+          name: 'acme/kit', forge: 1, branch: 'main',
           tip: '4e1a9c',
           ci: { state: 'passing', at: -29 },
           after: { name: 'slow tier', state: 'passing', head: '4e1a9c', at: -21 },
           queue: ['T26', 'T28', 'T31'],
         },
         app: {
-          name: 'acme/app', branch: 'main',
+          name: 'acme/app', forge: 1, branch: 'main',
           tip: '91c07e',
           ci: { state: 'passing', at: -655 },
           after: { name: 'slow tier', state: 'passing', head: '91c07e', at: -630 },
           queue: [],
         },
       },
+
+      // One forge, GitHub, through temper's App (client forge.md, 5.4).
+      forges: [
+        { n: 1, kind: 'GitHub', web: 'https://github.com', mode: 'connected', state: 'connected', login: 'temper-acme[bot]', id: 190244117,
+          app: { slug: 'temper-acme', installs: [{ account: 'acme', repos: 'selected repositories' }] },
+          load: { used: 1840, rate: 5000, window: 'hour', reserve: 500, uses: [['fresh reads', 920], ['writes', 140], ['keeping up', 610], ['the slow pass', 170]], outbox: { waiting: 2, uncertain: 0 }, hooks: [['acme/kit', -1], ['acme/app', -6]] } },
+      ],
 
       landings: [
         { task: 'T24', repo: 'kit', at: -72 },

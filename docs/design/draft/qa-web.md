@@ -81,9 +81,8 @@ A file in the look experiment's `scenes/`, one per page state:
 
 - **its mockup:** a page of `client/mockups/` at the address that names
   its state, its world, step and task, drawn bare, without the mockups'
-  bar and marks (`client/mockups/README.md`); for `first-run.html`, a
-  story, the acts that reach its state, by role and name, or by a
-  selector where the mockup gives a part no role;
+  bar and marks (`client/mockups/README.md`), the first run's among
+  them;
 - **temper's state:** a gallery state by its name (3.2), or, for a live
   scene, the seed actions that make it (3.3); and the page's address;
 - **its widths:** 1440×900 and 390×844, both for every scene, as
@@ -95,9 +94,10 @@ A file in the look experiment's `scenes/`, one per page state:
   controls', never content;
 - **its expectations and departures** (5.3).
 
-A page no mockup draws as a page (the adoption form, whose look comes
-from `first-run.html`'s dialogs) is a scene with no mockup: its first judged capture is its expectations, so it is held
-to itself from then on.
+A page no mockup draws (the adoption form, whose look follows the
+forges page's forms, `forges.html`) is a scene with no mockup: its first
+judged capture is its expectations, so it is held to itself from then
+on.
 
 ### 3.2 The gallery
 
@@ -317,10 +317,10 @@ signed in and on temper's first page, and nothing of the pages' paths.
   with no driver, the free smoke. On one subject, H at both levels
   compares the ctl level's verdict with the browser's: what one sees and
   the other misses is a finding of the level that misses it.
-- **Then the demo,** `client/mockups/first-run.html`, once o/first-run's
-  demo lands its one request end to end (director decision 342). It is
-  the one mockup that is a story, so its states are live scenes as the
-  story passes them.
+- **Then the demo,** the mockups' first run (`client/mockups/first-run.html`
+  opens it), once o/first-run's demo lands its one request end to end
+  (director decision 342). Its steps are the states a story passes, so
+  its scenes are live ones, each at its step's address.
 - **Then as the ctl level climbs,** neither level far ahead of the other
   (director decision 344).
 
