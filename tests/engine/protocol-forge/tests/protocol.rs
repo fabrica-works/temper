@@ -356,11 +356,11 @@ fn land_change(world: &mut Protocol) -> bool {
                     panic!("unexpected delegate")
                 }
                 top::Request::SetUp { .. }
-                | top::Request::SetUpRefused { .. }
                 | top::Request::ChangeDecision { .. }
                 | top::Request::Resource { .. }
                 | top::Request::Adopted { .. }
                 | top::Request::Save { .. }
+                | top::Request::MarkedForges
                 | top::Request::Marked { .. }
                 | top::Request::Erase { .. }
                 | top::Request::Taken { .. }

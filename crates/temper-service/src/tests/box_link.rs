@@ -1,6 +1,8 @@
 use crate::route::box_link::{Link, Out, Refused, Step};
 use alloc::boxed::Box;
-use skein_lib::Queue;
+use skein_lib::{Queue, Token};
+const REQUEST: Token = Token::new(91);
+const OTHER_REQUEST: Token = Token::new(92);
 
 const LINE_BYTES: u32 = 32;
 const FORGE: u16 = 7;
@@ -11,7 +13,7 @@ const OUTPUTS: u32 = 32;
 fn asked() -> (Link, Queue<Out>) {
     let mut link = Link::new(LINE_BYTES, true);
     let mut out = Queue::with_capacity(OUTPUTS);
-    link.ask(FORGE, &mut out);
+    link.ask(FORGE, REQUEST, &mut out);
     discard(&mut out);
     (link, out)
 }
@@ -27,7 +29,7 @@ fn accepted() -> [Out; 3] {
     [
         Out::Write(Box::from(b"start 7\n".as_slice())),
         Out::SettingUp { forge: FORGE, step: None },
-        Out::Answered { forge: FORGE, answer: Ok(()) },
+        Out::Answered { forge: FORGE, request: REQUEST, answer: Ok(()) },
     ]
 }
 fn tells(out: &mut Queue<Out>, expected: &[Out]) {
@@ -40,40 +42,56 @@ fn tells(out: &mut Queue<Out>, expected: &[Out]) {
 fn an_ask_writes_start_and_sets_up_with_no_step() {
     let mut link = Link::new(LINE_BYTES, true);
     let mut out = Queue::with_capacity(OUTPUTS);
-    link.ask(FORGE, &mut out);
+    link.ask(FORGE, REQUEST, &mut out);
     tells(&mut out, &accepted());
 }
 #[test]
 fn another_ask_is_refused_busy_until_started_or_failed() {
     for ending in [b"started 7\n".as_slice(), b"failed 7 prepare exited 1\n"] {
         let (mut link, mut out) = asked();
-        link.ask(FORGE, &mut out);
-        link.ask(OTHER, &mut out);
+        link.ask(FORGE, REQUEST, &mut out);
+        link.ask(OTHER, OTHER_REQUEST, &mut out);
         tells(
             &mut out,
             &[
-                Out::Answered { forge: FORGE, answer: Err(Refused::Busy) },
-                Out::Answered { forge: OTHER, answer: Err(Refused::Busy) },
+                named(b"box link: fault: a setup ask while busy or closed"),
+                Out::Answered { forge: FORGE, request: REQUEST, answer: Err(Refused::Busy) },
+                named(b"box link: fault: a setup ask while busy or closed"),
+                Out::Answered { forge: OTHER, request: OTHER_REQUEST, answer: Err(Refused::Busy) },
             ],
         );
         link.read(ending, &mut out);
         discard(&mut out);
-        link.ask(FORGE, &mut out);
+        link.ask(FORGE, REQUEST, &mut out);
         tells(&mut out, &accepted());
     }
 }
 #[test]
-fn every_ask_is_refused_not_under_the_box_without_a_pipe() {
-    let mut link = Link::new(LINE_BYTES, false);
+fn a_fault_ask_needs_only_one_forges_diagnostic_slot() {
+    let mut service = super::fixtures::ready();
+    let engine = service.engine.as_mut().unwrap();
+    assert_eq!(engine.notes.room(), 1);
     let mut out = Queue::with_capacity(OUTPUTS);
-    for forge in [FORGE, OTHER, FORGE] {
-        link.ask(forge, &mut out);
-        assert_eq!(out.pop(), Some(Out::Answered { forge, answer: Err(Refused::NotUnderTheBox) }));
-        assert_eq!(out.pop(), None);
-    }
-    link.read(b"started 7\n", &mut out);
-    link.closed(&mut out);
-    tells(&mut out, &[]);
+    engine.box_link.ask(1, REQUEST, &mut out);
+    crate::route::box_link::drain(engine, &mut out);
+    engine.box_link.ask(1, OTHER_REQUEST, &mut out);
+    crate::route::box_link::drain(engine, &mut out);
+    assert_eq!(
+        engine.notes.pop(),
+        Some(crate::Note::BoxLink { line: b"box link: fault: a setup ask while busy or closed".as_slice().into() })
+    );
+    assert!(engine.notes.is_empty());
+    let Some(temper_engine_domain::Event::Forge(event)) = engine.events.iter().last() else {
+        panic!("the fault ask is answered")
+    };
+    assert_eq!(
+        **event,
+        temper_engine_domain_forge::Event::SetUpAnswered {
+            forge: 1,
+            request: OTHER_REQUEST,
+            answer: temper_engine_domain_forge::SetUpAnswer::Refused(temper_engine_domain_forge::SetUpRefusal::Busy),
+        }
+    );
 }
 #[test]
 fn each_line_for_the_asked_forge_is_told() {
@@ -106,7 +124,7 @@ fn a_line_for_another_forge_or_with_none_asked_is_named_and_dropped() {
             let mut link = Link::new(LINE_BYTES, true);
             let mut out = Queue::with_capacity(OUTPUTS);
             if ask {
-                link.ask(FORGE, &mut out);
+                link.ask(FORGE, REQUEST, &mut out);
                 discard(&mut out);
             }
             link.read(line, &mut out);
@@ -165,7 +183,7 @@ fn a_line_at_the_bound_is_read_and_one_byte_past_it_is_skipped_to_its_line_feed(
         tells(&mut out, &[]);
         link.read(lf, &mut out);
         tells(&mut out, &[event]);
-        link.ask(FORGE, &mut out);
+        link.ask(FORGE, REQUEST, &mut out);
         discard(&mut out);
         link.read(b"step 7 run\n", &mut out);
         tells(&mut out, &[Out::SettingUp { forge: FORGE, step: Some(Step::Run) }]);
@@ -197,24 +215,14 @@ fn lines_split_and_joined_across_reads_are_read_alike() {
     tells(&mut chunks_out, &expected);
 }
 #[test]
-fn the_pipe_closed_fails_the_ask_and_refuses_every_later_one() {
+fn the_pipe_close_is_carried_once_to_the_root() {
     let (mut link, mut out) = asked();
     link.read(b"step 7 pre", &mut out);
     link.closed(&mut out);
-    tells(
-        &mut out,
-        &[
-            named(b"box link: the box closed the pipe"),
-            Out::Failed { forge: FORGE, why: Box::from(b"the box closed the pipe".as_slice()) },
-        ],
-    );
+    tells(&mut out, &[named(b"box link: the box closed the pipe"), Out::Closed]);
     link.read(b"pare\nstarted 7\n", &mut out);
     link.closed(&mut out);
     tells(&mut out, &[]);
-    for _ in [FORGE, FORGE] {
-        link.ask(FORGE, &mut out);
-        tells(&mut out, &[Out::Answered { forge: FORGE, answer: Err(Refused::NotUnderTheBox) }]);
-    }
 }
 #[test]
 fn an_idle_pipe_closes_once_without_failing_a_forge() {
@@ -222,14 +230,14 @@ fn an_idle_pipe_closes_once_without_failing_a_forge() {
     let mut out = Queue::with_capacity(OUTPUTS);
     link.closed(&mut out);
     link.closed(&mut out);
-    tells(&mut out, &[named(b"box link: the box closed the pipe")]);
+    tells(&mut out, &[named(b"box link: the box closed the pipe"), Out::Closed]);
 }
 #[test]
 fn forge_numbers_at_both_u16_bounds_are_read() {
     for (forge, line) in [(0, b"started 0\n".as_slice()), (u16::MAX, b"started 65535\n")] {
         let mut link = Link::new(LINE_BYTES, true);
         let mut out = Queue::with_capacity(OUTPUTS);
-        link.ask(forge, &mut out);
+        link.ask(forge, REQUEST, &mut out);
         discard(&mut out);
         link.read(line, &mut out);
         tells(&mut out, &[Out::Started { forge }]);

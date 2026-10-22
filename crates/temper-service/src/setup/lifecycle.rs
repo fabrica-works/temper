@@ -89,8 +89,18 @@ fn connected_in_root(root: &root::Domain, forge: u16) -> bool {
         | domain::Connection::Stopped { .. } => false,
     }
 }
-pub(crate) fn set_up_refused(engine: &mut crate::engine::Engine, forge: u16, why: domain::SetUpRefusal) {
-    engine.notes.push(crate::Note::SetUpRefused { number: forge, why });
+pub(crate) fn set_up_refused(
+    engine: &mut crate::engine::Engine,
+    forge: u16,
+    request: Token,
+    why: domain::SetUpRefusal,
+) {
+    // The link already named this fault. Ordinary refusals stay in the connector.
+    engine.events.push(temper_engine_domain::Event::Forge(Box::new(domain::Event::SetUpAnswered {
+        forge,
+        request,
+        answer: domain::SetUpAnswer::Refused(why),
+    })));
 }
 pub(crate) fn stopped_connection(engine: &mut crate::engine::Engine, forge: u16) {
     engine.setup.lifecycle.reconcile.remove(&forge);

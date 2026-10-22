@@ -167,11 +167,7 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
         }
         core::Held::Drained => emit(decision, &env.limits, Delivery::Drained),
         core::Held::Applied { to, token, .. } => {
-            emit(
-                decision,
-                &env.limits,
-                Delivery::Application { to, outcome: domain.forge.application_outcome(token).cloned() },
-            );
+            emit(decision, &env.limits, Delivery::Application { to, outcome: domain.forge.application_answer(token) });
         }
         core::Held::ApplicationDelivery { .. } => {
             unreachable!("application delivery is taken where it is made (panels.rs)")

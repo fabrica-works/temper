@@ -19,6 +19,7 @@ const _: () = {
 };
 
 /// Decode the keyed request, preserving its admission envelope and supplied digest.
+#[expect(clippy::too_many_lines, reason = "one exhaustive match translates the family's typed requests")]
 pub fn to_root(
     exchange: kit::ToApplication,
     forges: &[crate::settings::Forge],
@@ -31,15 +32,25 @@ pub fn to_root(
                 Some(wire::Owner::Forge) if version == wire::CLIENT_VERSION => wire::decode_requesting(&record, limits),
                 Some(wire::Owner::Forge | wire::Owner::Pages | wire::Owner::Runner) | None => None,
             };
-            // task E (forgejo-setup M3) wires SetUp and Watch::Forges; until then refuse them.
             let request = match request {
                 Some(request) => request.into_parts().request,
                 None => {
                     return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));
                 }
             };
-            let w::Request::Adopt(request) = request else {
-                return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));
+            let request = match request {
+                w::Request::SetUp(value) => {
+                    return Ok(root::Event::Party(root::PartyInput::Application {
+                        scope,
+                        reply_to,
+                        sign_in,
+                        key,
+                        digest,
+                        carried,
+                        request: forge::Ask::SetUp { forge: value.forge() },
+                    }));
+                }
+                w::Request::Adopt(value) => value,
             };
             let a = request.into_parts();
             let mut host = Box::default();
@@ -55,7 +66,7 @@ pub fn to_root(
                 sign_in,
                 key,
                 digest,
-                request: forge::Adoption {
+                request: forge::Ask::Adopt(forge::Adoption {
                     project: a.project,
                     home: a.home,
                     forge: a.forge,
@@ -67,7 +78,7 @@ pub fn to_root(
                     landing: a.landing,
                     ci: a.ci,
                     checks: a.checks.into_boxed(),
-                },
+                }),
                 carried,
             }))
         }
@@ -103,19 +114,28 @@ pub fn to_root(
             if family == wire::FORGE
                 && version == wire::CLIENT_VERSION
                 && let Some(watching) = wire::decode_watching(&record, limits)
-                && let w::Watch::Change(subject) = watching.into_parts().watch
-                && subject.task() > 0
             {
-                return Ok(root::Event::Party(root::PartyInput::Watch {
-                    watcher,
-                    sign_in,
-                    subject: jig_domain_core::documents::Watched::Application {
-                        scope,
+                let subject = match watching.into_parts().watch {
+                    w::Watch::Forges => jig_domain_core::documents::Watched::Application {
+                        scope: jig_domain_people::ApplicationScope::Deployment,
                         connector: wire::FORGE,
-                        subject: Token::new(subject.task()),
+                        subject: Token::new(0),
                     },
-                    window,
-                }));
+                    w::Watch::Change(subject) if subject.task() > 0 => {
+                        jig_domain_core::documents::Watched::Application {
+                            scope,
+                            connector: wire::FORGE,
+                            subject: Token::new(subject.task()),
+                        }
+                    }
+                    w::Watch::Change(_) => {
+                        return Err(Box::new(kit::Event::WatchRefused {
+                            watcher,
+                            why: jig_domain_core::WatchRefusal::Unknown,
+                        }));
+                    }
+                };
+                return Ok(root::Event::Party(root::PartyInput::Watch { watcher, sign_in, subject, window }));
             }
             Err(Box::new(kit::Event::WatchRefused { watcher, why: jig_domain_core::WatchRefusal::Unknown }))
         }
@@ -318,12 +338,12 @@ fn encoded_role(role: forge::Role) -> w::Role {
 /// Encode one durable terminal, or the unknown terminal past its retention.
 #[must_use]
 pub fn answer(
-    outcome: Option<forge::ApplicationOutcome>,
+    outcome: Option<forge::Answered>,
     limits: &w::Limits,
     jig: &jig_client_protocol_wire::v11::Limits,
 ) -> Option<Box<[u8]>> {
     let outcome = match outcome {
-        Some(forge::ApplicationOutcome::Adopted(a)) => w::Outcome::Adopted(
+        Some(forge::Answered::Adopt(forge::ApplicationOutcome::Adopted(a))) => w::Outcome::Adopted(
             w::Adopted::new(
                 limits,
                 w::AdoptedParts {
@@ -355,13 +375,13 @@ pub fn answer(
             )
             .ok()?,
         ),
-        Some(forge::ApplicationOutcome::CoreRefused(value)) => {
+        Some(forge::Answered::Adopt(forge::ApplicationOutcome::CoreRefused(value))) => {
             let value = refusals::refusal(value, jig).ok()?;
             let mut bytes = Writer::new(usize::try_from(value.measure()).ok()?);
             value.encode(&mut bytes).ok()?;
             w::Outcome::CoreRefused(w::CoreRefused::new(limits, w::CoreRefusedParts { refusal: bytes.finish() }).ok()?)
         }
-        Some(forge::ApplicationOutcome::ForgeRefused(reason)) => w::Outcome::ForgeRefused(
+        Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(reason))) => w::Outcome::ForgeRefused(
             w::ForgeRefused::new(
                 limits,
                 w::ForgeRefusedParts {
@@ -377,6 +397,20 @@ pub fn answer(
                         forge::AdoptionRefusal::TooLarge => w::ForgeReason::TooLarge,
                         forge::AdoptionRefusal::Unreachable => w::ForgeReason::Unreachable,
                         forge::AdoptionRefusal::InvalidAnswer => w::ForgeReason::InvalidAnswer,
+                    },
+                },
+            )
+            .ok()?,
+        ),
+        Some(forge::Answered::SetUp(forge::SetUpAnswer::SettingUp)) => w::Outcome::SettingUp,
+        Some(forge::Answered::SetUp(forge::SetUpAnswer::Refused(why))) => w::Outcome::SetUpRefused(
+            w::SetUpRefused::new(
+                limits,
+                w::SetUpRefusedParts {
+                    why: match why {
+                        forge::SetUpRefusal::NotOffered => w::SetUpRefusal::NotOffered,
+                        forge::SetUpRefusal::NotUnderTheBox => w::SetUpRefusal::NotUnderTheBox,
+                        forge::SetUpRefusal::Busy => w::SetUpRefusal::Busy,
                     },
                 },
             )
@@ -408,6 +442,72 @@ fn protection(value: forge::Protection, limits: &w::Limits) -> Option<w::Protect
                 )
                 .ok()?,
             )
+        }
+    })
+}
+
+/// Encode the connector's whole document without adding policy from settings.
+#[must_use]
+pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
+    let mut forges = List::with_capacity(limits.forges_forges);
+    for row in value.rows {
+        forges
+            .push(
+                w::ForgeRow::new(
+                    limits,
+                    w::ForgeRowParts {
+                        number: row.number,
+                        kind: match row.kind {
+                            forge::Kind::Forgejo => w::Kind::Forgejo,
+                            forge::Kind::GitHub => w::Kind::Github,
+                        },
+                        mode: match row.mode {
+                            forge::Mode::Connected => w::Mode::Connected,
+                            forge::Mode::Managed => w::Mode::Managed,
+                            forge::Mode::Owned => w::Mode::Owned,
+                            forge::Mode::Fake => w::Mode::Fake,
+                        },
+                        connection: connection(row.connection, limits)?,
+                        offer: match row.offer {
+                            forge::Offer::NotOffered => w::Offer::NotOffered,
+                            forge::Offer::NotUnderTheBox => w::Offer::NotUnderTheBox,
+                            forge::Offer::Offered => w::Offer::Offered,
+                        },
+                    },
+                )
+                .ok()?,
+            )
+            .ok()?;
+    }
+    Some(wire::forges(&w::Forges::new(limits, w::ForgesParts { forges }).ok()?))
+}
+fn connection(value: forge::Connection, limits: &w::Limits) -> Option<w::Connection> {
+    Some(match value {
+        forge::Connection::NotConnected => w::Connection::NotConnected,
+        forge::Connection::NotSetUp => w::Connection::NotSetUp,
+        forge::Connection::SettingUp { step } => w::Connection::SettingUp(
+            w::SettingUp::new(
+                limits,
+                w::SettingUpParts {
+                    step: match step {
+                        None => None,
+                        Some(forge::SetUpStep::Fetch) => Some(w::SetUpStep::Fetch),
+                        Some(forge::SetUpStep::Prepare) => Some(w::SetUpStep::Prepare),
+                        Some(forge::SetUpStep::Run) => Some(w::SetUpStep::Run),
+                    },
+                },
+            )
+            .ok()?,
+        ),
+        forge::Connection::SetUpFailed { why } => {
+            w::Connection::SetUpFailed(w::SetUpFailed::new(limits, w::SetUpFailedParts { why }).ok()?)
+        }
+        forge::Connection::Connecting => w::Connection::Connecting,
+        forge::Connection::Connected { id, login } => {
+            w::Connection::Connected(w::Connected::new(limits, w::ConnectedParts { id, login }).ok()?)
+        }
+        forge::Connection::Stopped { reason } => {
+            w::Connection::Stopped(w::Stopped::new(limits, w::StoppedParts { reason }).ok()?)
         }
     })
 }

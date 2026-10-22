@@ -1,7 +1,7 @@
 //! The routing's box link: serve's side of the box's pipe (protocol/forge.md, 2.8).
 
 use alloc::boxed::Box;
-use skein_lib::{Decimal, List, Queue, Writer, bytes};
+use skein_lib::{Decimal, List, Queue, Token, Writer, bytes};
 
 /// The box's word for the step it runs (protocol/setup.md, 7.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -13,7 +13,6 @@ pub(crate) enum Step {
 /// Why the link refuses an ask (protocol/forge.md, 2.8).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Refused {
-    NotUnderTheBox,
     Busy,
 }
 /// One outcome of a link input.
@@ -22,53 +21,56 @@ pub(crate) enum Out {
     /// A line for fd 3, its line feed included.
     Write(Box<[u8]>),
     /// The ask's one answer: setting up, or its refusal.
-    Answered { forge: u16, answer: Result<(), Refused> },
+    Answered { forge: u16, request: Token, answer: Result<(), Refused> },
     /// The forge setting up: `None` at the ask, then each `step` line's step.
     SettingUp { forge: u16, step: Option<Step> },
     /// `started FORGE`: the ask ended, the group started.
     Started { forge: u16 },
-    /// `failed FORGE WHY`, or the pipe closed during the ask.
+    /// `failed FORGE WHY`.
     Failed { forge: u16, why: Box<[u8]> },
     /// One log line naming what the link dropped, or the pipe's end.
     Named(Box<[u8]>),
+    /// The pipe ended; the root decides what it means for the forges.
+    Closed,
 }
 
 pub(crate) struct Link {
     pub(crate) write: Option<Box<[u8]>>,
-    piped: bool,
+    ended: bool,
     asked: Option<u16>,
     line_bytes: u32,
     partial: List<u8>,
     skipping: bool,
 }
 impl Link {
-    /// With no pipe, every ask is refused `NotUnderTheBox`.
-    pub(crate) fn new(line_bytes: u32, piped: bool) -> Link {
-        Link { write: None, piped, asked: None, line_bytes, partial: List::with_capacity(line_bytes), skipping: false }
+    /// The routing only sends asks admitted by the domain.
+    pub(crate) fn new(line_bytes: u32, _piped: bool) -> Link {
+        Link {
+            write: None,
+            ended: false,
+            asked: None,
+            line_bytes,
+            partial: List::with_capacity(line_bytes),
+            skipping: false,
+        }
     }
     /// The caller reserves three output slots before asking.
-    pub(crate) fn ask(&mut self, forge: u16, out: &mut Queue<Out>) {
-        let refusal = if !self.piped {
-            Some(Refused::NotUnderTheBox)
-        } else if self.asked.is_some() || self.write.is_some() {
-            Some(Refused::Busy)
-        } else {
-            None
-        };
-        if let Some(reason) = refusal {
-            out.push(Out::Answered { forge, answer: Err(reason) });
+    pub(crate) fn ask(&mut self, forge: u16, request: Token, out: &mut Queue<Out>) {
+        if self.asked.is_some() || self.write.is_some() || self.ended {
+            out.push(Out::Named(Box::from(b"box link: fault: a setup ask while busy or closed".as_slice())));
+            out.push(Out::Answered { forge, request, answer: Err(Refused::Busy) });
             return;
         }
         self.asked = Some(forge);
         out.push(Out::Write(joined(&[b"start ", Decimal::of(u64::from(forge)).as_bytes(), b"\n"])));
         out.push(Out::SettingUp { forge, step: None });
-        out.push(Out::Answered { forge, answer: Ok(()) });
+        out.push(Out::Answered { forge, request, answer: Ok(()) });
     }
     /// Any chunking is accepted. The caller reserves one output slot per LF in
     /// this chunk (including an LF completing a previous partial line).
     /// No output is emitted before LF, so a bounded read bounds its outputs.
     pub(crate) fn read(&mut self, input: &[u8], out: &mut Queue<Out>) {
-        if !self.piped {
+        if self.ended {
             return;
         }
         for byte in input {
@@ -98,17 +100,16 @@ impl Link {
     }
     /// fd 4 ended, or a read/write failed. The caller reserves two output slots.
     pub(crate) fn closed(&mut self, out: &mut Queue<Out>) {
-        if !self.piped {
+        if self.ended {
             return;
         }
-        self.piped = false;
+        self.ended = true;
         self.write = None;
         self.partial.clear();
         self.skipping = false;
         out.push(Out::Named(Box::from(b"box link: the box closed the pipe".as_slice())));
-        if let Some(forge) = self.asked.take() {
-            out.push(Out::Failed { forge, why: Box::from(b"the box closed the pipe".as_slice()) });
-        }
+        self.asked = None;
+        out.push(Out::Closed);
     }
 }
 
@@ -128,7 +129,7 @@ fn line(asked: &mut Option<u16>, line: &[u8], out: &mut Queue<Out>) {
             match &event {
                 Out::Started { .. } | Out::Failed { .. } => *asked = None,
                 Out::SettingUp { .. } => {}
-                Out::Write(_) | Out::Answered { .. } | Out::Named(_) => unreachable!("decoded box line"),
+                Out::Write(_) | Out::Answered { .. } | Out::Named(_) | Out::Closed => unreachable!("decoded box line"),
             }
             out.push(event);
         }
@@ -219,16 +220,24 @@ pub(crate) fn drain(engine: &mut crate::engine::Engine, out: &mut Queue<Out>) {
                 // Transitional: M4 (o/forgejo-setup) reads the forge's files and sends Request::Connect here (protocol/forge.md, 2.2).
                 state(engine, forge, Connection::NotConnected);
             }
-            Out::Answered { forge, answer } => match answer {
-                Ok(()) => {}
+            Out::Answered { forge, request, answer } => match answer {
+                Ok(()) => engine.events.push(temper_engine_domain::Event::Forge(Box::new(
+                    temper_engine_domain_forge::Event::SetUpAnswered {
+                        forge,
+                        request,
+                        answer: temper_engine_domain_forge::SetUpAnswer::SettingUp,
+                    },
+                ))),
                 Err(refused) => {
                     let why = match refused {
-                        Refused::NotUnderTheBox => SetUpRefusal::NotUnderTheBox,
                         Refused::Busy => SetUpRefusal::Busy,
                     };
-                    set_up_refused(engine, forge, why);
+                    set_up_refused(engine, forge, request, why);
                 }
             },
+            Out::Closed => engine
+                .events
+                .push(temper_engine_domain::Event::Forge(Box::new(temper_engine_domain_forge::Event::BoxClosed))),
             Out::Named(line) => engine.notes.push(crate::Note::BoxLink { line }),
         }
     }

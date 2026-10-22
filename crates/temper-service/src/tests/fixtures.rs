@@ -335,6 +335,8 @@ pub fn root() -> (temper_engine_domain::Domain, skein_lib::Env<temper_engine_dom
         },
         identities: Box::new([temper_engine_domain_forge::GitIdentity { forge: 1, credential: 1 }]),
         forge_charter: settings.charter,
+        forges: Box::new([]),
+        under_box: false,
     };
     (
         root::Domain::new(config, &limits).expect("valid engine configuration"),
@@ -355,7 +357,7 @@ pub fn fill_files(settings: &mut settings::Engine) {
     }
 }
 pub fn started_with_two_forges() -> crate::Service {
-    start_with_worker(&[(1, 100)], None, None, 0, true)
+    start_with_worker(&[(1, 100)], None, None, 0, true, false)
 }
 pub fn started() -> crate::Service {
     started_with_projects(&[(1, 100)])
@@ -364,7 +366,7 @@ pub fn started_with_projects(projects: &[(u32, u64)]) -> crate::Service {
     start_with_store(projects, None)
 }
 pub fn start_with_store(projects: &[(u32, u64)], stored: Option<crate::store::Store>) -> crate::Service {
-    start_with_worker(projects, stored, None, 0, false)
+    start_with_worker(projects, stored, None, 0, false, false)
 }
 fn start_with_worker(
     projects: &[(u32, u64)],
@@ -372,6 +374,7 @@ fn start_with_worker(
     worker: Option<crate::Worker>,
     worker_bytes: u64,
     two_forges: bool,
+    under_box: bool,
 ) -> crate::Service {
     let mut settings = engine();
     let mut runtime = forge_runtime();
@@ -395,6 +398,9 @@ fn start_with_worker(
         runtime = skein_lib::List::with_capacity(2);
         runtime.push(first).unwrap();
         runtime.push(second).unwrap();
+    }
+    if under_box {
+        settings.setup = Box::new([owned_setup(1), owned_setup(2)]);
     }
     settings.jig.limits.core.people.operations = 2;
     settings.jig.limits.core.tasks.tasks = 2;
@@ -452,7 +458,19 @@ fn start_with_worker(
     };
     let worker_io = if worker.is_some() { Some(worker_settings().jig.limits.io) } else { None };
     let io = crate::startup::checks::process_io(&settings.jig.limits.io, worker_io.as_ref()).unwrap();
-    let mut service = crate::Service::new(settings, &seeds(), None, runtime, worker, worker_bytes, io).unwrap();
+    let (endpoints, roots) = crate::forge::prepare(&settings, runtime).unwrap();
+    let owned = skein_forge_connection::settings::owned_bytes(&endpoints).unwrap();
+    let mut service = crate::Service::prepared(
+        settings,
+        &seeds(),
+        None,
+        (endpoints, roots, owned),
+        worker,
+        worker_bytes,
+        io,
+        under_box,
+    )
+    .unwrap();
 
     service.engine.as_mut().expect("engine").store = store;
     service
@@ -654,7 +672,6 @@ pub fn settle_root(
                 }
                 root::Request::Setup { .. }
                 | root::Request::SetUp { .. }
-                | root::Request::SetUpRefused { .. }
                 | root::Request::Forge { .. }
                 | root::Request::Busy(_)
                 | root::Request::Drained
@@ -898,4 +915,27 @@ pub fn chat(project: u32, words: &[u8]) -> jig_domain_people::Ask {
     member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
     member.label = 1;
     people::Ask::Create { project, batch: Box::new([member]) }
+}
+
+// Public setup configuration only; the transport story never runs these binaries.
+pub fn owned_setup(forge: u16) -> settings::Setup {
+    use temper_forge_setup::setup::{Account, Entry, Fetch, Mode, Owned};
+    settings::Setup {
+        entry: Entry {
+            forge,
+            directory: b"/data/forge".as_slice().into(),
+            bot: Account { login: b"temper".as_slice().into(), email: b"temper@example.test".as_slice().into() },
+            orgs: Box::new([]),
+            asked: true,
+            mode: Mode::Owned(Owned {
+                orgs: Box::new([]),
+                fetch: Fetch { forgejo: false, runner: false, mirror: None },
+                forgejo: b"/bin/forgejo".as_slice().into(),
+                runner: None,
+                listen: ([127, 0, 0, 1], 9).into(),
+                person: Account { login: b"owner".as_slice().into(), email: b"owner@example.test".as_slice().into() },
+            }),
+        },
+        handover: None,
+    }
 }
