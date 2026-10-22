@@ -18,6 +18,8 @@ const PREFIX: u64 = crate::tokens::CLIENTS;
 
 #[derive(Debug)]
 pub struct Clients {
+    /// Bound address awaiting the system's note routing.
+    pub(crate) listening: Option<::core::net::SocketAddr>,
     component: kit::Component,
     initial: Option<kit::Settings>,
     server: crate::server::Server,
@@ -134,6 +136,7 @@ impl Clients {
         let mut out = Queue::with_capacity(room);
         let component = kit::Component::new(settings.clone(), &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
+            listening: None,
             component,
             initial: Some(settings),
             server: crate::server::Server::new(*listener, &crate::limits::server(&config.limits)),
@@ -247,7 +250,11 @@ impl Clients {
             hosts.push(printed::address_text(address).expect("bound listener address")).expect("one listener host");
             self.mount.down(&self.mount_env, http::Event::Listening { hosts }, &mut self.mount_out);
         }
+        let previous = self.server.listening();
         self.server.up(event, &mut self.server_out);
+        if self.server.listening() != previous {
+            self.listening = self.server.listening();
+        }
         self.print_link();
         self.pending = true;
         true

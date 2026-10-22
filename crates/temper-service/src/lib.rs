@@ -66,9 +66,39 @@ use jig_protocol_config::Problems;
 /// Operator diagnostics taken by the shell (protocol/forge.md, 2.3).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Note {
-    ForgeLacking { number: u16, names: Box<[u8]> },
-    ForgeStopped { number: u16, why: skein_forge_connection::Stopped },
-    ForgeNotConnected { number: u16, why: NotConnected },
-    ForgeUnconfigured { number: u16 },
-    ForgeUnkept { number: u16, installation: u64 },
+    /// A listener bound its address (protocol/README.md, 15.3).
+    Listening {
+        listener: Listening,
+        addr: core::net::SocketAddr,
+    },
+    ForgeLacking {
+        number: u16,
+        names: Box<[u8]>,
+    },
+    ForgeStopped {
+        number: u16,
+        why: skein_forge_connection::Stopped,
+    },
+    ForgeNotConnected {
+        number: u16,
+        why: NotConnected,
+    },
+    ForgeUnconfigured {
+        number: u16,
+    },
+    ForgeUnkept {
+        number: u16,
+        installation: u64,
+    },
+}
+
+/// The engine's listeners (protocol/README.md, 15.3).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Listening {
+    /// The clients' HTTP server.
+    Clients,
+    /// The workers' socket listener.
+    Workers,
+    /// The forge webhooks listener.
+    Webhooks,
 }

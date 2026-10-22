@@ -19,6 +19,8 @@ const LISTENERS: u64 = crate::tokens::WORKER_LISTENERS;
 const CONNECTIONS: u64 = crate::tokens::WORKER_CONNECTIONS;
 #[derive(Debug)]
 pub struct Workers {
+    /// Bound address awaiting the system's note routing.
+    pub(crate) listening: Option<core::net::SocketAddr>,
     pub(crate) component: kit::Component,
     out: Queue<kit::Request>,
     pub(crate) io: Queue<io::Request>,
@@ -73,6 +75,7 @@ impl Workers {
             listeners.push((owner, None)).expect("listener count");
         }
         Ok(Self {
+            listening: None,
             component,
             out: Queue::with_capacity(kit::MAX_OUT_DOWN),
             io,
@@ -173,7 +176,8 @@ impl Workers {
             return false;
         };
         match event {
-            io::Event::Listening { listener, .. } => {
+            io::Event::Listening { listener, addr, .. } => {
+                self.listening = addr.socket();
                 for index in 0..self.listeners.len() {
                     let (name, slot) = self.listeners.get_mut(index).expect("listener index");
                     if *name == owner {

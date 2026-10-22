@@ -252,6 +252,10 @@ impl Service {
     pub const fn links(&mut self) -> &mut Queue<Box<[u8]>> {
         &mut self.links
     }
+    /// Bound listeners, taken by the binary before other diagnostics.
+    pub const fn listening(&mut self) -> &mut Queue<crate::Note> {
+        &mut self.engine.listening
+    }
     /// Operator diagnostics, taken by the binary.
     pub const fn notes(&mut self) -> &mut Queue<crate::Note> {
         &mut self.engine.notes
@@ -579,6 +583,18 @@ fn route_events(service: &mut Service) {
         } else if !service.engine.workers.up(service.io_env.now, event, &mut service.engine.events) {
             service.engine.end = Some(End::Stopped(Stop::Listener));
         }
+        for (listener, addr) in [
+            (crate::Listening::Clients, service.engine.clients.listening.take()),
+            (crate::Listening::Workers, service.engine.workers.listening.take()),
+        ] {
+            if let Some(addr) = addr {
+                service
+                    .engine
+                    .listening
+                    .try_push(crate::Note::Listening { listener, addr })
+                    .expect("one note per listener bind");
+            }
+        }
     }
 }
 
@@ -650,6 +666,7 @@ fn memory(
         .checked_add(Queue::<io::Event>::worst_case(queue)?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
         .checked_add(Queue::<crate::Note>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?
+        .checked_add(Queue::<crate::Note>::worst_case(3)?)?
         .checked_add(u64::try_from(settings.forges.len()).ok()?.checked_mul(crate::setup::diagnostics::worst_case()?)?)?
         .checked_add(u64::from(queue).checked_mul(u64::from(io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?

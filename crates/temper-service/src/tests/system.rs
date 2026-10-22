@@ -92,3 +92,68 @@ fn an_unusable_git_stops_the_service_naming_its_program() {
     );
     assert!(stand.service.is_empty());
 }
+
+#[test]
+fn a_socket_workers_bind_announces_its_bound_address_once() {
+    let mut service = fixtures::started();
+    service.notes().push(crate::Note::ForgeUnconfigured { number: 1 });
+    assert_eq!(service.notes().room(), 0, "forge diagnostics occupy their whole queue");
+    let addr = ([127, 0, 0, 1], 41733).into();
+    service.told.push(skein_io::Event::Listening {
+        owner: Token::new(crate::tokens::WORKER_LISTENERS),
+        listener: Token::new(77),
+        addr: skein_io::Addr::Ip(addr),
+    });
+    crate::iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert_eq!(service.listening().pop(), Some(crate::Note::Listening { listener: crate::Listening::Workers, addr }));
+    assert!(service.listening().is_empty());
+    crate::iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert!(service.listening().is_empty());
+    assert_eq!(service.notes().pop(), Some(crate::Note::ForgeUnconfigured { number: 1 }));
+}
+
+#[test]
+fn an_in_process_workers_bind_has_no_listening_note() {
+    let mut service = fixtures::started();
+    service.told.push(skein_io::Event::Listening {
+        owner: Token::new(crate::tokens::WORKER_LISTENERS),
+        listener: Token::new(77),
+        addr: skein_io::Addr::InProcess(skein_io::Name::new(b"workers").unwrap()),
+    });
+    crate::iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert!(service.listening().is_empty());
+    crate::iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert!(service.listening().is_empty());
+}
+
+#[test]
+fn a_clients_bind_announces_the_servers_bound_address_once() {
+    let mut service = fixtures::started();
+    let addr = ([127, 0, 0, 1], 41734).into();
+    service.told.push(skein_io::Event::Listening {
+        owner: Token::new(crate::tokens::SERVER),
+        listener: Token::new(77),
+        addr: skein_io::Addr::Ip(addr),
+    });
+    crate::iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert_eq!(service.listening().pop(), Some(crate::Note::Listening { listener: crate::Listening::Clients, addr }));
+    assert!(service.listening().is_empty());
+    crate::iterate(&mut service, Time::ZERO, Wall::EPOCH);
+    assert!(service.listening().is_empty());
+}
+
+#[test]
+fn standalone_announces_clients_without_announcing_in_process_workers() {
+    let mut stand = fixtures::one_process();
+    fixtures::until_hosting(&mut stand);
+    let addr = fixtures::engine().clients.listener;
+    let jig_protocol_config::Address::Addr(addr) = addr else { panic!("clients socket") };
+    let addr = addr.socket().unwrap();
+    assert_eq!(
+        stand.service.listening().pop(),
+        Some(crate::Note::Listening { listener: crate::Listening::Clients, addr })
+    );
+    assert!(stand.service.listening().is_empty());
+    stand.turn();
+    assert!(stand.service.listening().is_empty());
+}

@@ -901,6 +901,10 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let forge_body_intake_growth = 2 * 8_256;
     // The public demo option adds 64 B inline; this deployment has no demo heap.
     let demo_growth = 64;
+    // Listener notes: a separate 40 B queue holds three 40 B Note slots;
+    // the existing forge slot grows 32 -> 40 B. Two pending bound addresses
+    // add 32 B inline each, for 232 B total engine growth.
+    let listening_growth = 40 + 3 * 40 + (40 - 32) + 2 * 32;
     assert_eq!(
         required.engine_bytes,
         79_659_997_210_050_u64
@@ -918,6 +922,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + procedure_refusal_growth
             + forge_body_intake_growth
             + demo_growth
+            + listening_growth
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -980,6 +985,8 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     let scratch = support::Scratch::startup("init-memory-figures");
     let bounded = support::owned::bounded_template(scratch.path());
     let required = bounded.requirements();
+    // The same listener growth is 240 B here: init has two existing forge
+    // Note slots growing 32 -> 40 B, rather than the owned example's one.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);

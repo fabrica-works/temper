@@ -57,6 +57,10 @@ impl skein_shell::Host for Host {
         Some(Exit::Code(code))
     }
     fn drain(&mut self) {
+        while let Some(note) = self.service.listening().pop() {
+            let lines = note_line(note);
+            eprint!("{lines}");
+        }
         while let Some(note) = self.service.notes().pop() {
             let lines = note_line(note);
             eprint!("{lines}");
@@ -127,6 +131,14 @@ fn ending(end: Option<&End>, output_failed: bool, directories: &Directories, sto
 
 fn note_line(note: temper_service::Note) -> String {
     match note {
+        temper_service::Note::Listening { listener, addr } => {
+            let name = match listener {
+                temper_service::Listening::Clients => "clients",
+                temper_service::Listening::Workers => "workers",
+                temper_service::Listening::Webhooks => "webhooks",
+            };
+            format!("listening {name} {addr}\n")
+        }
         temper_service::Note::ForgeLacking { number, names } => {
             format!("temper serve: forge {number}: App lacks {}\n", String::from_utf8_lossy(&names))
         }
@@ -277,5 +289,20 @@ fn other_endings_keep_their_exit_behavior() {
             (expected.into(), code),
             "{end:?}, output failed {output_failed}"
         );
+    }
+}
+
+#[test]
+fn listening_notes_print_each_listener_and_socket_address_exactly() {
+    use temper_service::{Listening, Note};
+    for (listener, name) in
+        [(Listening::Clients, "clients"), (Listening::Workers, "workers"), (Listening::Webhooks, "webhooks")]
+    {
+        for (addr, printed) in [
+            (([127, 0, 0, 1], 41733).into(), "127.0.0.1:41733"),
+            (([0, 0, 0, 0, 0, 0, 0, 1], 41733).into(), "[::1]:41733"),
+        ] {
+            assert_eq!(note_line(Note::Listening { listener, addr }), format!("listening {name} {printed}\n"));
+        }
     }
 }
