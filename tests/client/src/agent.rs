@@ -92,7 +92,7 @@ pub fn new(seed: u64) -> (Root, View) {
             release_tasks: BTreeSet::new(),
             shown_revision: 0,
         })),
-        View::Agent { render: skein_ui::View::new(&tree_limits), limits: tree_limits },
+        View::Agent { render: Box::new(skein_ui::View::new(&tree_limits)), limits: tree_limits },
     )
 }
 fn environment(env: &Env<domain::Limits>) -> Env<root::Limits> {

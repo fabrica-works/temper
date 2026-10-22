@@ -465,8 +465,9 @@ mod memory_literal;
 // The change panel adds 86 forge phrases (12,728 B); its full address and
 // combined pull/bounds texts fit the existing maximum text envelope.
 // The procedure's ended page and its three phrases move the checked envelope.
+// skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6995945699;
+const ACCOUNT_BYTES: u64 = 6978564839;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

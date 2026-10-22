@@ -18,7 +18,7 @@ Demo:
   [-] Connect a forge (disabled)
 demo · demo/widget on Demo forge
 Signed in as the deployment’s owner
-What shall we change?:
+What shall we change?
   Try a request in demo/widget. Follow the task from its branch to a landed change.
   Suggested requests:
     - [8] Add CSV export to widget

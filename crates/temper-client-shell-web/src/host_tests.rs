@@ -199,8 +199,9 @@ mod memory_literal;
 // combined pull/bounds texts fit the existing maximum text envelope.
 // The procedure's ended page and its three phrases move the checked envelope.
 // Parent-based plan ordering adds 56 B per bounded tree row: 3 rows, 168 B.
+// skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274683721057;
+const WEB_BYTES: u64 = 274394142801;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

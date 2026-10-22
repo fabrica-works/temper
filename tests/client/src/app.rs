@@ -37,7 +37,7 @@ impl Root {
 }
 pub enum View {
     Person(Box<view::View>),
-    Agent { render: skein_ui::View, limits: skein_ui::Limits },
+    Agent { render: Box<skein_ui::View>, limits: skein_ui::Limits },
 }
 /// The shell world's Start carries its unlinked client's own typed records.
 #[derive(Debug)]
