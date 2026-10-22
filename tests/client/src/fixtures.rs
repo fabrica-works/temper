@@ -402,6 +402,7 @@ const DELEGATE_POSITION: u32 = 1;
 const RETRY_AT: Time = Time::from_nanos(2_000_000_000);
 const NO_SPEND: u64 = 0;
 const DELEGATE_SPEND: u64 = 3;
+const DELEGATE_PROGRESS: &[u8] = b"Findings in progress";
 const DEPENDENT_DELEGATES: u32 = 2;
 pub struct Dependents {
     pub goal: u64,
@@ -410,6 +411,7 @@ pub struct Dependents {
 }
 /// A tracked goal with two report delegates; the first has spent, the second waits for it.
 pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
+    use smith_domain_session::llm;
     use temper_engine_domain_world::fixtures::report_delegate;
     *front = Joint::with_delegates(SEED, &domain_limits());
     let goal = make_goal_with_delegation(front, false, Some(DEPENDENT_DELEGATES));
@@ -441,6 +443,19 @@ pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
     driver.settle();
     let first = driver.last_assignment();
     assert_eq!(first.task, dependents.first, "first delegate runs before its dependant");
+    let mut turn = temper_worker_domain_world::protocol::session_turn(
+        FIRST_REPLY_TURN,
+        DELEGATE_SPEND,
+        DELEGATE_PROGRESS.len(),
+        true,
+    );
+    turn.messages[0].content = Box::new([llm::Block::Text { text: DELEGATE_PROGRESS.into(), replay: None }]);
+    let body = smith_protocol_channel::encode_turn(
+        &turn,
+        &smith_transcript::CEILINGS,
+        &temper_worker_domain_world::protocol::endpoints(),
+    )
+    .expect("delegate turn encodes");
     driver.send(temper_engine_domain_world::protocol::turn(
         QUESTION_WORKER,
         first.task,
@@ -448,7 +463,7 @@ pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
         FIRST_REPLY_TURN,
         DELEGATE_SPEND,
         None,
-        b"Findings in progress",
+        &body,
     ));
     driver.settle();
     dependents
@@ -456,13 +471,26 @@ pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
 /// The same goal after its first delegate's report unblocks the second.
 pub fn goal_with_a_finished_dependency(front: &mut Joint) -> Dependents {
     let dependents = goal_with_dependent_delegates(front);
+    report_first_delegate(front, dependents.first);
+    assert!(
+        front.engine.delivered.iter().any(|delivery| matches!(delivery,
+            engine::Delivery::Assigned { assignment, .. } if assignment.task == dependents.second
+        )),
+        "dependant runs after the report"
+    );
+    dependents
+}
+/// Finish the running first delegate with its report and settle its spend.
+pub fn report_first_delegate(front: &mut Joint, task: u64) {
     let driver = &mut front.engine;
-    let first = driver.last_assignment();
+    let first = driver.task(task).expect("running first delegate");
+    let attempt = first.attempt;
+    let spent = first.run_spent;
     driver.answer(
         QUESTION_WORKER,
-        first.task,
-        first.attempt,
-        driver.task(first.task).expect("running first delegate").run_spent,
+        task,
+        attempt,
+        spent,
         tasks::End::Finished {
             result: tasks::TaskResult::Report { words: b"The change is feasible".as_slice().into() },
             cancel_delegates: false,
@@ -470,13 +498,6 @@ pub fn goal_with_a_finished_dependency(front: &mut Joint) -> Dependents {
         engine::Parts::none(),
     );
     driver.settle();
-    assert!(
-        driver.delivered.iter().any(|delivery| matches!(delivery,
-            engine::Delivery::Assigned { assignment, .. } if assignment.task == dependents.second
-        )),
-        "dependant runs after the report"
-    );
-    dependents
 }
 const BUDGET_WATCH: Token = Token::new(1204);
 /// A tracked goal whose worker finished with a report retained by the engine.
