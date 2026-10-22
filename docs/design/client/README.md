@@ -1555,17 +1555,32 @@ Its rules:
   grace and the reason "Cancelled from its page"; its delegates end
   with it.
 - **Amend** opens the amendment's editor, laid out after the goal's
-  toolbar or the agent's taskbar: a region "Amend task N" holding the
-  specification's words as a text area, "Specification", then on a
-  goal "Tracked", a check, and "Priority", a number; then "Send
-  amendment" and "Discard". Its draft, its base revision, the moved
-  check and the delta to jig's `Amendment` are the domain's `amend`
-  module's, which `temper ctl amend` shares (o/controls'); the page
-  holds no editor of its own. A refusal as moved keeps the draft and
-  asks the person to look again. The model choice for the next runs
-  is the choice line's (3.5), an amendment too, and not repeated in
-  the editor. Instructions, dependencies, wake, authority and an
-  addressee are `temper ctl amend`'s alone.
+  toolbar or the agent's taskbar: a region "Amend task N". The draft
+  is the amendment editor's (3.7), `amend::Draft::of` the task's
+  document as read when it opens, and the page lays out two of its
+  edits, no other:
+  - "Specification", a text area holding the spec's words, its edit
+    `words`; where the read cut the spec (`Cut::Spec`), the words read
+    only and "This task's specification is too long to edit here: use
+    `temper ctl amend`";
+  - on a goal, "Tracked", a check, and "Priority", a number, its edit
+    `track`: `Tracked { priority }` or, unchecked, `Untracked`.
+
+  Then "Send amendment" and "Discard". "Discard" closes the editor and
+  drops its draft. "Send amendment" with no change (`amendment()` is
+  none) sends nothing and says "No change". While a document read since
+  has another spec revision (`Draft::moved`), the editor says "This task
+  changed since the editor opened" and draws no "Send amendment": the
+  person discards and opens it again on the new document. Otherwise it
+  sends `Ask::Amend` with the drafted change, the drafted revision
+  (none for a tracked task's priority alone, 3.7) and the reason
+  "Amended from its page"; a refusal as moved in between says so with
+  "Look again" (below). Amend is drawn by its admission as every act
+  is: proposable, the page proposes nothing. The model choice for the
+  next runs stays the choice line's (3.5), its own amendment, not
+  repeated in the editor. Instructions, dependencies, the deadline,
+  wake and an addressee are `temper ctl amend`'s alone (`tools.md`,
+  5.5).
 - **Their outcome.** One request per kind of act at a time; a double
   press joins the pending one (3.6). Pending, its progress as a card
   says it; answered, the outcome in jig's words, or the refusal in
@@ -2114,8 +2129,10 @@ own tests:
   while the confirmation is open, the composer with its note and a
   refused Message in its place, the Stop dialog's words, the Cancel
   dialog's from each count of the effect, its own held card where 5.11
-  puts it, and each outcome: pending, done, refused, moved; a
-  procedure's task's
+  puts it, and each outcome: pending, done, refused, moved; the
+  amendment's editor on a goal and on an agent's task, a cut spec read
+  only, "No change", a moved draft with no "Send amendment", and its
+  request's revision named or not as 3.7 says; a procedure's task's
   page, 5.10: its goal's link when it serves another task and none
   when it serves itself or none, and "Its tasks" over its plan where a
   person task's says "Plan"; the forge's words for every
@@ -2432,6 +2449,8 @@ own tests:
   - the amendment's editor on the pages: the specification's words
     and, on a goal, its tracking and priority, the model choice being
     the choice line's; the rest of an amendment is `temper ctl
-    amend`'s;
+    amend`'s. A draft whose task moved is discarded and opened again,
+    not carried onto the new revision: the person rereads what
+    changed;
   - a goal's page has no composer, as the mockup, though the engine
     offers Message on a goal.
