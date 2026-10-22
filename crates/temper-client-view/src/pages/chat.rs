@@ -109,8 +109,7 @@ pub(crate) fn main(
             if let Some(page) = &card.page
                 && let Some(since) = super::inbox::waiting_since(page)
             {
-                let span = times.say(words, TimeForm::Span, since);
-                text(b, Role::Paragraph, &words.say(Word::TimeWaitingChat, &[Hole::Name(span)]));
+                proposal_wait(b, words, times, since);
             }
             crate::confirm::card(b, root, card, words, bindings, rows);
             b.close();
@@ -227,6 +226,15 @@ pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Word
     b.close();
 }
 
+// A proposal's wait, muted beside its first line as the inbox's.
+fn proposal_wait(b: &mut Builder, words: &Words, times: &mut Times, since: skein_lib::Wall) {
+    let said = words.say(Word::TimeWaitingChat, &[Hole::Name(times.say(words, TimeForm::Span, since))]);
+    b.open(Role::Paragraph);
+    b.name(&said);
+    b.style(look::META);
+    b.text(Run::Plain, &said);
+    b.close();
+}
 #[expect(clippy::manual_map, reason = "step code spells out the supplied end clock")]
 fn end_clock(task: &c::Task, result: &c::TaskResult, words: &Words, times: &mut Times) -> Option<Box<[u8]>> {
     let at = match task.chip.details.as_ref() {

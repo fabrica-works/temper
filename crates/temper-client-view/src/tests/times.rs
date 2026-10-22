@@ -118,7 +118,8 @@ fn at_twelve_minutes(root: &temper_client_domain::Domain) -> crate::View {
 #[test]
 fn the_chat_proposal_says_its_wait_only_on_the_chat_page() {
     let view = at_twelve_minutes(&fixtures::chat::proposal_root());
-    assert!(skein_lib::bytes::find(&fixtures::text(view.tree()), b"waiting 12 min").is_some());
+    let meta = super::inbox::styled(view.tree(), crate::look::META);
+    assert_eq!(view.tree().nodes()[meta].name.as_deref(), Some(b"waiting 12 min".as_slice()));
     assert_eq!(view.next_change(), Some(wall(13 * MINUTE)));
 }
 #[test]
