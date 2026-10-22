@@ -2370,6 +2370,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "temper-client-gallery"
+version = "0.0.0"
+dependencies = [
+ "jig-client",
+ "skein-fake-person",
+ "skein-lib",
+ "skein-scratch",
+ "skein-ui",
+ "skein-ui-bundle",
+ "skein-ui-web",
+ "temper-client-domain",
+ "temper-client-protocol-wire",
+ "temper-client-shell-terminal",
+ "temper-client-view",
+]
+
+[[package]]
 name = "temper-client-protocol-wire"
 version = "0.0.0"
 dependencies = [
@@ -2816,23 +2833,6 @@ dependencies = [
  "skein-tls-world",
  "temper-forge-setup",
  "temper-service",
-]
-
-[[package]]
-name = "temper-gallery"
-version = "0.0.0"
-dependencies = [
- "jig-client",
- "skein-fake-person",
- "skein-lib",
- "skein-scratch",
- "skein-ui",
- "skein-ui-bundle",
- "skein-ui-web",
- "temper-client-domain",
- "temper-client-protocol-wire",
- "temper-client-shell-terminal",
- "temper-client-view",
 ]
 
 [[package]]

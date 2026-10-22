@@ -446,17 +446,18 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
 
 ## 7. The gallery
 
-`temper-gallery` (`tools/gallery`), a program of temper's workspace,
-prints the browser's pages in named states into a directory, as static
-documents, for screenshots beside the mockups (`../draft/qa-web.md`,
-3.2) and a person's eye. It is a tool, not a test of the pages: what
+`temper-client-gallery` (`tools/gallery`), a program of temper's
+workspace, prints the browser's pages in named states into a
+directory, as static documents, for screenshots beside the mockups
+(`../draft/qa-web.md`, 3.2) and a person's eye. It is a tool, not a test of the pages: what
 the pages do is the worlds' (section 4), and the gallery draws what the
 view draws, never changing a view to suit a sample.
 
 ### 7.1 What it prints
 
-- **One command:** `cargo run -p temper-gallery -- OUT`. It reads no
-  configuration, environment, clock or network, and starts no server.
+- **One command:** `cargo run -p temper-client-gallery -- OUT`. It
+  reads no configuration, environment, clock or network, and starts no
+  server.
   `OUT` is replaced whole when it holds the gallery's `index.html`,
   made when it is missing, and refused otherwise.
 - **Each state's page** as `OUT/NAME.html`: the view's tree for the

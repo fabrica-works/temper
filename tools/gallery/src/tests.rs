@@ -308,7 +308,7 @@ fn each_state_holds_what_its_name_says() {
 }
 #[test]
 fn print_writes_every_page_and_the_bundle() {
-    let scratch = Scratch::new("temper-gallery-print");
+    let scratch = Scratch::new("temper-client-gallery-print");
     let out = scratch.path().join("gallery");
     print(&out).expect("print gallery");
     let index = fs::read_to_string(out.join("index.html")).expect("index");
@@ -370,7 +370,7 @@ fn print_writes_every_page_and_the_bundle() {
 }
 #[test]
 fn print_refuses_a_directory_not_its_own() {
-    let scratch = Scratch::new("temper-gallery-refusal");
+    let scratch = Scratch::new("temper-client-gallery-refusal");
     let file = scratch.path().join("precious");
     fs::write(&file, b"keep me").expect("foreign file");
     match print(scratch.path()) {
