@@ -30,5 +30,6 @@ mod system;
 
 mod forge;
 
+mod box_link;
 mod bundle;
 mod server;
