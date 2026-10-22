@@ -84,7 +84,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             plan(b, tree, root, words, bindings, rows, word);
         }
         if page.shape == Shape::Tracked {
-            latest(b, page.latest.as_deref(), words);
+            latest(b, page.latest.as_deref(), words, bindings);
             budget(b, task, root.pages().me(root.client()), words, bindings);
         }
     }
@@ -770,7 +770,7 @@ fn counts(b: &mut Builder, f: c::PhaseCounts, held: u32, words: &Words) {
         words,
     );
 }
-pub(crate) fn latest(b: &mut Builder, page: Option<&c::ActivityPage>, words: &Words) {
+pub(crate) fn latest(b: &mut Builder, page: Option<&c::ActivityPage>, words: &Words, bindings: &mut Bindings) {
     region(b, Word::Latest, words);
     b.style(look::TASK_CARD);
     if let Some(page) = page
@@ -782,7 +782,7 @@ pub(crate) fn latest(b: &mut Builder, page: Option<&c::ActivityPage>, words: &Wo
             b.open(Role::Item);
             text(b, Role::Paragraph, &words.say(Word::ActivityAt, &[Hole::Wall(row.at)]));
             b.open(Role::Slot);
-            activity(b, &row.event, words);
+            activity(b, &row.event, words, bindings);
             b.close();
             b.close();
         }
@@ -790,7 +790,7 @@ pub(crate) fn latest(b: &mut Builder, page: Option<&c::ActivityPage>, words: &Wo
     }
     b.close();
 }
-fn activity(b: &mut Builder, event: &c::Activity, words: &Words) {
+fn activity(b: &mut Builder, event: &c::Activity, words: &Words, bindings: &mut Bindings) {
     if let Some((_, text)) = event.word_message() {
         text_node(b, text.bytes());
         return;
@@ -822,14 +822,27 @@ fn activity(b: &mut Builder, event: &c::Activity, words: &Words) {
         c::Activity::RunEnded { attempt, .. } => {
             text(b, Role::Paragraph, &words.say(Word::RunEnded, &[Hole::Number(*attempt)]));
         }
-        c::Activity::Owner { source, .. } => owner_activity(b, &source.line, words),
+        c::Activity::Owner { source, .. } => {
+            if let c::OwnerActivity::Heard(c::OwnerWord {
+                from: c::OwnerRequester::Task(task),
+                kind: c::OwnerMessageKind::Result(_),
+                ..
+            }) = &source.line
+            {
+                task_link(b, *task, words, bindings);
+            }
+            owner_activity(b, &source.line, words);
+        }
         c::Activity::News { summary, part, .. } => {
             text_node(b, summary.bytes());
             if let Some(part) = part {
                 crate::forge::drawn(b, part, words);
             }
         }
-        c::Activity::Result { result } => text_node(b, result.task.title.bytes()),
+        c::Activity::Result { result } => {
+            task_link(b, result.task.task, words, bindings);
+            text_node(b, result.task.title.bytes());
+        }
         c::Activity::Decision { .. } => words.text(b, Word::DecisionMade, &[]),
         c::Activity::Turn { .. } => words.text(b, Word::UnreadTurn, &[]),
         c::Activity::Words { .. } => {}

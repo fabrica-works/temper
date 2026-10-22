@@ -278,7 +278,7 @@ fn the_task_tokens_stay_on_their_roles() {
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
     );
     let done = builder.finish();
-    let activity = super::task::activity_tree(true);
+    let activity = super::task::activity_tree(&[super::task::activity_news()]);
     let plan = super::task::dependency_plan();
     for (token, role) in [
         (TASK_HEADING, Role::Region),

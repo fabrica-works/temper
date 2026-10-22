@@ -520,28 +520,30 @@ fn the_goals_held_card_keeps_its_key_without_a_goal_row() {
     assert!(hold < plan);
     assert!(fixtures::find(tree, Role::TreeItem, b"Task 9").is_none());
 }
-pub(super) fn activity_tree(rows: bool) -> Tree {
-    let mut page = c::ActivityPage { rows: List::with_capacity(1), after: None, before: None, cut: false };
-    if rows {
-        page.rows
-            .push(c::ActivityLine {
-                position: 1,
-                at: skein_lib::Wall::EPOCH,
-                event: c::Activity::News {
-                    topic: 1,
-                    summary: c::Text::new(Box::from(*b"Ready for review"), 32).expect("news"),
-                    part: None,
-                },
-            })
-            .expect("row");
+pub(super) fn activity_news() -> c::Activity {
+    c::Activity::News { topic: 1, summary: result_words(b"Ready for review"), part: None }
+}
+pub(super) fn activity_tree(events: &[c::Activity]) -> Tree {
+    draw_activity(events).0
+}
+fn draw_activity(events: &[c::Activity]) -> (Tree, crate::frame::Bindings) {
+    let mut page = c::ActivityPage {
+        rows: List::with_capacity(u32::try_from(events.len()).expect("activity rows fit")),
+        after: None,
+        before: None,
+        cut: false,
+    };
+    for event in events {
+        page.rows.push(c::ActivityLine { position: 1, at: skein_lib::Wall::EPOCH, event: event.clone() }).expect("row");
     }
     let mut builder = Builder::new(&fixtures::tree_limits());
-    crate::pages::task::latest(&mut builder, Some(&page), &fixtures::words());
-    builder.finish()
+    let mut bindings = crate::frame::Bindings::new(fixtures::tree_limits().bindings);
+    crate::pages::task::latest(&mut builder, Some(&page), &fixtures::words(), &mut bindings);
+    (builder.finish(), bindings)
 }
 #[test]
 fn activity_rows_have_the_time_first_and_words_in_a_slot_and_no_empty_list() {
-    let tree = activity_tree(true);
+    let tree = activity_tree(&[activity_news()]);
     let events = styled(&tree, look::EVENTS);
     assert_eq!(tree.nodes()[events].role, Role::List);
     for item in children(&tree, events).as_slice() {
@@ -556,10 +558,109 @@ fn activity_rows_have_the_time_first_and_words_in_a_slot_and_no_empty_list() {
                 || skein_lib::bytes::find(&fixtures::text(&tree), b"Ready for review").is_some()
         );
     }
-    for node in activity_tree(false).nodes() {
+    for node in activity_tree(&[]).nodes() {
         assert!(!node.styles.as_slice().contains(&look::EVENTS));
     }
 }
+const RESULT_TASK: u64 = 7;
+const HEARD_WORDS: &[u8] = b"Two crates hold the export";
+fn heard_word(from: c::OwnerRequester, kind: c::OwnerMessageKind) -> c::OwnerWord {
+    c::OwnerWord {
+        number: 1,
+        from,
+        kind,
+        words: result_words(HEARD_WORDS),
+        at: skein_lib::Wall::EPOCH,
+        hits: 1,
+        eligible: true,
+    }
+}
+fn heard_activity(word: c::OwnerWord) -> c::Activity {
+    c::Activity::Owner {
+        source: Box::new(c::OwnerActivityLine {
+            task: TASK,
+            position: 1,
+            at: skein_lib::Wall::EPOCH,
+            line: c::OwnerActivity::Heard(word),
+        }),
+        decoded: None,
+    }
+}
+fn assert_activity_link(event: c::Activity, words: &[u8]) {
+    let (tree, bindings) = draw_activity(&[event]);
+    let events = styled(&tree, look::EVENTS);
+    let items = children(&tree, events);
+    let parts = children(&tree, items.as_slice()[0]);
+    let slot = parts.as_slice()[1];
+    assert_eq!(tree.nodes()[slot].role, Role::Slot);
+    let content = children(&tree, slot);
+    let link = &tree.nodes()[content.as_slice()[0]];
+    assert_eq!(link.role, Role::Link);
+    assert_eq!(link.name.as_deref(), Some(b"Task 7".as_slice()));
+    assert_eq!(
+        bindings.decode(link.binding.expect("bound link").token, skein_ui::Act::Press),
+        Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task: RESULT_TASK } }))
+    );
+    assert_eq!(fixtures::node_text(&tree, content.as_slice()[1]).as_ref(), words);
+}
+#[test]
+fn a_heard_result_begins_with_its_tasks_link() {
+    assert_activity_link(
+        heard_activity(heard_word(
+            c::OwnerRequester::Task(RESULT_TASK),
+            c::OwnerMessageKind::Result(c::OwnerWordResult::Report),
+        )),
+        HEARD_WORDS,
+    );
+}
+#[test]
+fn a_result_line_begins_with_its_tasks_link() {
+    let mut chip = f::document().chip;
+    chip.task = RESULT_TASK;
+    chip.title = document_words(b"Survey the export's crates");
+    assert_activity_link(
+        c::Activity::Result {
+            result: c::Result {
+                task: chip,
+                ending: c::Ending::Done,
+                value: None,
+                at: None,
+                details: None,
+                acts: List::with_capacity(0),
+            },
+        },
+        b"Survey the export's crates",
+    );
+}
+fn assert_no_activity_link(tree: &Tree) {
+    for node in tree.nodes() {
+        assert_ne!(node.role, Role::Link);
+    }
+}
+#[test]
+fn a_persons_words_have_no_link() {
+    for kind in [c::OwnerMessageKind::Words, c::OwnerMessageKind::Result(c::OwnerWordResult::Report)] {
+        let tree = activity_tree(&[heard_activity(heard_word(c::OwnerRequester::Person(PARTY), kind))]);
+        assert_no_activity_link(&tree);
+        assert!(skein_lib::bytes::find(&fixtures::text(&tree), HEARD_WORDS).is_some());
+    }
+}
+#[test]
+fn the_chats_owner_activity_draws_no_link() {
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    crate::pages::task::owner_activity(
+        &mut builder,
+        &c::OwnerActivity::Heard(heard_word(
+            c::OwnerRequester::Task(RESULT_TASK),
+            c::OwnerMessageKind::Result(c::OwnerWordResult::Report),
+        )),
+        &fixtures::words(),
+    );
+    let tree = builder.finish();
+    assert_no_activity_link(&tree);
+    assert_eq!(fixtures::text(&tree).as_ref(), HEARD_WORDS);
+}
+
 #[test]
 fn asked_resources_have_a_meta_row_only_when_there_are_parts() {
     let tree = asked(c::Part::Panel { connector: fixtures::FORGE, task: TASK });
