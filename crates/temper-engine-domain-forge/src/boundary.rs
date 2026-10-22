@@ -769,6 +769,10 @@ pub enum Event {
 /// The connector's output to the root, including child API calls.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Changed panel subjects, bounded by `MARKED` (domain/root.md, 10).
+    Marked {
+        tasks: Box<[u64]>,
+    },
     ApplicationPart {
         request: Token,
         adoption: Adoption,

@@ -2,6 +2,7 @@ use crate::*;
 mod adoption;
 mod change;
 mod fixtures;
+mod panel;
 mod purpose;
 use alloc::boxed::Box;
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
@@ -262,6 +263,7 @@ fn adoption_reads_permission_before_committing_its_role() {
     let (call, op) = match &sent[0] {
         Request::Call { call, op, .. } => (*call, op.clone()),
         Request::Resource { .. }
+        | Request::Marked { .. }
         | Request::Adopted { .. }
         | Request::Save { .. }
         | Request::Erase { .. }
@@ -311,6 +313,7 @@ fn adoption_reads_permission_before_committing_its_role() {
     let branches = match &next[0] {
         Request::Call { call, op: skein_forge::api::Op::Read(skein_forge::api::Read::Branches), .. } => *call,
         Request::Call { .. }
+        | Request::Marked { .. }
         | Request::Resource { .. }
         | Request::Adopted { .. }
         | Request::Save { .. }
@@ -361,6 +364,7 @@ fn adoption_reads_permission_before_committing_its_role() {
     match &next[0] {
         Request::Call { op: skein_forge::api::Op::Read(skein_forge::api::Read::Settings), .. } => {}
         Request::Call { .. }
+        | Request::Marked { .. }
         | Request::Resource { .. }
         | Request::Adopted { .. }
         | Request::Save { .. }

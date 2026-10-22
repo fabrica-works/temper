@@ -56,6 +56,8 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         || l.entries == 0
         || l.resources_per_task == 0
         || l.name_bytes == 0
+        || l.name_bytes > crate::PANEL_NAME_BYTES
+        || l.change_policy.gates > crate::PANEL_GATES
         || l.queue_window == skein_lib::Duration::ZERO
         || l.output == 0
         || l.adoptions == 0
@@ -81,6 +83,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     {
         return None;
     }
+    l.output.checked_mul(2)?;
     let names =
         u64::from(l.tasks).checked_mul(u64::from(l.resources_per_task))?.checked_mul(u64::from(l.name_bytes))?;
     let goal_tasks = u64::from(l.subscriptions).checked_mul(u64::from(l.issue_policy.plan_items))?.checked_mul(8)?;
@@ -132,6 +135,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(Map::<skein_lib::Token, crate::domain::PendingLanding>::worst_case(l.landings)?)?
         .checked_add(Map::<skein_lib::Token, crate::domain::PendingLost>::worst_case(l.holds)?)?
         .checked_add(Map::<u64, crate::ChangeRow>::worst_case(l.changes)?)?
+        .checked_add(Map::<u64, temper_engine_domain_forge_change::Ci>::worst_case(l.changes)?)?
         .checked_add(skein_lib::List::<(Box<[u8]>, crate::DriftChange)>::worst_case(l.changes)?)?
         .checked_add(u64::from(l.changes).checked_mul(u64::from(l.name_bytes).checked_mul(3)?)?)?
         .checked_add(Map::<u64, crate::topics::Files>::worst_case(l.changes)?)?

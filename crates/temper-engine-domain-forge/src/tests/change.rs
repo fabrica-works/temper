@@ -230,9 +230,12 @@ fn an_overtaking_open_outcome_restarts_the_fresh_chain() {
             Op::Read(Read::PullFor { head: Box::from(b"temper/51".as_slice()), base: Box::from(b"main".as_slice()) }),
         ]
     );
-    let [Request::Save { .. }, Request::ChangeDecision { task, decision, entry, evidence }] = finished.as_ref() else {
+    let [Request::Save { .. }, Request::Marked { tasks }, Request::ChangeDecision { task, decision, entry, evidence }] =
+        finished.as_ref()
+    else {
         panic!("one saved decision")
     };
+    assert_eq!(tasks.as_ref(), &[fixtures::CHANGE]);
     assert_eq!((*task, decision, entry, evidence), (fixtures::CHANGE, &change::Decision::Ready, &None, &None));
     assert_eq!(ready(&mut d).as_ref(), &[]);
 }
@@ -242,7 +245,10 @@ fn an_unwoken_chain_finishes_with_its_single_decision() {
     use temper_engine_domain_forge_change as change;
     let mut d = fixtures::opened_during_chain();
     let finished = fixtures::finish_missing(&mut d);
-    let [Request::Save { .. }, decision] = finished.as_ref() else { panic!("one saved decision") };
+    let [Request::Save { .. }, Request::Marked { tasks }, decision] = finished.as_ref() else {
+        panic!("one saved decision")
+    };
+    assert_eq!(tasks.as_ref(), &[fixtures::CHANGE]);
     assert_eq!(
         decision,
         &Request::ChangeDecision {

@@ -1040,6 +1040,12 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     // payload envelopes counted above; only Service owns Core's inline bytes.
     let finishing_growth = 3_076 * (expiry_index + reconciliation_growth) + 40;
     let ending_release = 3_076 * ending_release;
+    // A change's panel (domain/forge.md 8.8): forge::max_out doubles 80 -> 160 so one
+    // panel mark may accompany each bounded output, and the route bound's 80 more
+    // writes each reserve 576 B Work + 65,536 B row envelope. The forge keeps each
+    // of its 8 changes' CI: two 568 B tree nodes. Each of 3,076 owned envelope copies
+    // grows 5,290,096 B; the map's 32 B inline adds once through Engine in Service.
+    let change_panel_growth = 3_076 * (80 * (576 + 65_536) + 2 * 568) + 32;
     let (github_identity_growth, github_worker_growth) = github_identity_growth();
     assert_eq!(
         required.engine_bytes,
@@ -1067,6 +1073,7 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             + settled_root_growth
             + finishing_growth
             - ending_release
+            + change_panel_growth
             + github_identity_growth
             + start_growth()
             + GIT_GENERATIONS_GROWTH

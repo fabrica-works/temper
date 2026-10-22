@@ -560,6 +560,7 @@ impl World {
                         self.stored.insert(key(&record), record).expect("world store capacity");
                     }
                 }
+                top::Request::Marked { .. } => {}
                 top::Request::Save { record, .. } => {
                     if matches!(record, top::Stored::Writer(_)) {
                         self.writer_saves += 1;

@@ -777,6 +777,7 @@ fn a_change_produced_opened_checked_queued_and_landed() {
                 | top::Request::Resource { .. }
                 | top::Request::Adopted { .. }
                 | top::Request::Save { .. }
+                | top::Request::Marked { .. }
                 | top::Request::Erase { .. }
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }

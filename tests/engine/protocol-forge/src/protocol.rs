@@ -434,6 +434,7 @@ impl Protocol {
                         self.stored.insert(key(&record), record).expect("world store capacity");
                     }
                 }
+                top::Request::Marked { .. } => {}
                 top::Request::Save { record, .. } => {
                     let key = key(&record);
                     self.stored.insert(key, record).expect("world store capacity");

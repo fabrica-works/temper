@@ -39,3 +39,11 @@ fn before(a: &Ready, b: &Ready, window: Duration, now: Wall) -> bool {
     }
     a.task < b.task
 }
+
+impl Ready {
+    /// Compare queue candidates with the same order `first` uses (domain/forge.md, 9).
+    #[must_use]
+    pub fn before(a: &Ready, b: &Ready, window: Duration, now: Wall) -> bool {
+        before(a, b, window, now)
+    }
+}

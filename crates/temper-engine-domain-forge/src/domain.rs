@@ -117,6 +117,7 @@ pub struct Domain {
     pub(crate) sequence: u64,
     pub(crate) changes: Map<u64, ChangeRow>,
     steps: Map<Token, PendingStep>,
+    pub(crate) panel_ci: Map<u64, change::Ci>,
     pub(crate) issues: Map<u64, IssueRow>,
     releases: Map<u64, ReleaseRow>,
     namespace: Box<[u8]>,
@@ -348,6 +349,7 @@ impl Domain {
             sequence: 0,
             changes: Map::with_capacity(l.changes),
             steps: Map::with_capacity(l.changes),
+            panel_ci: Map::with_capacity(l.changes),
             issues: Map::with_capacity(l.issues),
             releases: Map::with_capacity(l.tasks),
             namespace: config.namespace.clone(),
@@ -715,6 +717,18 @@ impl Domain {
         self.issues.get(&goal)
     }
 
+    /// Save a changed goal priority and invalidate the affected queue panels (domain/forge.md, 9).
+    pub fn priority(&mut self, env: &Env<Limits>, task: u64, priority: i32, out: &mut Queue<Request>) {
+        let Some(row) = self.changes.get_mut(&task) else { return };
+        if row.priority == priority {
+            return;
+        }
+        let before = crate::panel::ready(row);
+        row.priority = priority;
+        let saved = row.clone();
+        save_queue_change(self, env, before, saved, out);
+    }
+
     /// Live change procedures in one repository, bounded by the connector's change table.
     #[must_use]
     pub fn changes_for(&self, repository: skein_forge::api::Repository, limit: u32) -> Box<[u64]> {
@@ -731,7 +745,9 @@ impl Domain {
 /// Maximum requests from one top step, including one child burst.
 #[must_use]
 pub const fn max_out(l: &Limits) -> u32 {
-    l.output
+    // At most one panel mark accompanies each previously bounded output:
+    // a saved change, or a read completion whose CI verdict changed.
+    l.output.saturating_mul(2)
 }
 
 /// Decide one parent event and collect its durable records and outputs.
@@ -848,11 +864,11 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             {
                 row.queue_repair = Some(repair);
                 row.queue_repairs = row.queue_repairs.saturating_add(1);
-                emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+                save_change(out, row.clone());
             }
         }
         Event::Delegated { task, child, kind } => delegated(d, task, child, kind, out),
-        Event::DelegateRefused { task, child } => delegate_refused(d, task, child, out),
+        Event::DelegateRefused { task, child } => delegate_refused(d, env, task, child, out),
         Event::DelegateResult { task, child, status, words } => {
             delegate_result(d, env, task, child, status, &words, out);
         }
@@ -867,7 +883,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::Committed { entry } => committed(d, env, entry, out),
         Event::Resolve { entry, again } => resolve(d, env, entry, again, out),
         Event::Withdraw { entry } => withdraw(d, env, entry, out),
-        Event::VetoChange { task, entry, prior } => veto_change(d, task, entry, prior, out),
+        Event::VetoChange { task, entry, prior } => veto_change(d, env, task, entry, prior, out),
         Event::Subscribe { subscription } => subscribe(d, env, subscription, out),
         Event::Unsubscribe { task, topic } => unsubscribe(d, task, topic, out),
         Event::Hint { hint } => {
@@ -1690,7 +1706,7 @@ fn register_change(d: &mut Domain, env: &Env<Limits>, row: ChangeRow, out: &mut 
         return;
     }
     d.changes.insert(task, row.clone()).expect("change capacity checked");
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row) });
+    save_queue_change(d, env, None, row, out);
 }
 
 fn delegated(d: &mut Domain, task: u64, child: u64, kind: change::Delegate, out: &mut Queue<Request>) {
@@ -1700,11 +1716,12 @@ fn delegated(d: &mut Domain, task: u64, child: u64, kind: change::Delegate, out:
     };
     row.delegate = Some((child, kind));
     row.delegate_status = change::Status::Unknown;
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+    save_change(out, row.clone());
 }
 
-fn delegate_refused(d: &mut Domain, task: u64, child: u64, out: &mut Queue<Request>) {
+fn delegate_refused(d: &mut Domain, env: &Env<Limits>, task: u64, child: u64, out: &mut Queue<Request>) {
     let Some(row) = d.changes.get_mut(&task) else { return };
+    let before = crate::panel::ready(row);
     let Some((expected, kind)) = row.delegate else { return };
     if expected != child {
         return;
@@ -1733,7 +1750,8 @@ fn delegate_refused(d: &mut Domain, task: u64, child: u64, out: &mut Queue<Reque
         _ => row.change.state.clone(),
     };
     row.change.state = change::State::Held { was: Box::new(state), why: change::Hold::Failed };
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+    let saved = row.clone();
+    save_queue_change(d, env, before, saved, out);
 }
 
 fn delegate_result(
@@ -1784,7 +1802,7 @@ fn delegate_result(
         }
         change::Delegate::Produce | change::Delegate::Repair(_) | change::Delegate::Resolve { .. } => {}
     }
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+    save_change(out, row.clone());
 }
 
 fn step_change(d: &mut Domain, env: &Env<Limits>, input: StepInput, out: &mut Queue<Request>) {
@@ -1949,6 +1967,9 @@ fn step_read(
                 Ok(skein_forge::api::Answer::Statuses { ci, .. }) => pending.ci = status(ci),
                 Ok(_) | Err(_) => pending.ci = change::Status::Unknown,
             }
+            if let Some(head) = pending.branch {
+                keep_panel_ci(d, pending.task, change::Ci { head, status: pending.ci }, out);
+            }
             pending.stage = StepStage::BaseCi;
             let Some(base_tip) = pending.base_tip else { unreachable!("base read") };
             skein_forge::api::Read::Statuses { commit: base_tip, page: 1 }
@@ -2028,22 +2049,16 @@ fn step_read(
     child(d, env, skein_forge_client::Event::Read { owner, repository, read: next }, out);
 }
 
-#[expect(
-    clippy::match_like_matches_macro,
-    clippy::wildcard_enum_match_arm,
-    reason = "the queue tests its currently known ready states without the disallowed matches macro"
-)]
-fn queue_first(d: &Domain, row: &ChangeRow, now: skein_lib::Wall, l: &Limits) -> bool {
+pub(crate) fn queue_ready(d: &Domain, row: &ChangeRow, l: &Limits) -> (List<change::Ready>, Option<u64>) {
+    let mut base_repair = None;
     for (_, repair) in &d.changes {
         if repair.repository == row.repository
             && repair.base == row.base
             && repair.base_repair
-            && match repair.change.state {
-                change::State::Queued { .. } | change::State::First { .. } => true,
-                _ => false,
-            }
+            && crate::panel::ready(repair).is_some()
         {
-            return row.task == repair.task;
+            base_repair = Some(repair.task);
+            break;
         }
     }
     let mut ready = List::with_capacity(l.changes);
@@ -2072,7 +2087,15 @@ fn queue_first(d: &Domain, row: &ChangeRow, now: skein_lib::Wall, l: &Limits) ->
                 .expect("changes bound ready");
         }
     }
-    change::first(ready.as_slice(), l.queue_window, now) == Some(row.task)
+    (ready, base_repair)
+}
+
+fn queue_first(d: &Domain, row: &ChangeRow, now: skein_lib::Wall, l: &Limits) -> bool {
+    let (ready, repair) = queue_ready(d, row, l);
+    match repair {
+        Some(task) => row.task == task,
+        None => change::first(ready.as_slice(), l.queue_window, now) == Some(row.task),
+    }
 }
 
 fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mut Queue<Request>) {
@@ -2097,6 +2120,7 @@ fn finish_step(d: &mut Domain, env: &Env<Limits>, pending: PendingStep, out: &mu
 
 fn decide_step(d: &mut Domain, env: &Env<Limits>, pending: &PendingStep, out: &mut Queue<Request>) {
     let Some(mut row) = d.changes.get(&pending.task).cloned() else { return };
+    let before = crate::panel::ready(&row);
     let prior = row.change.clone();
     let Some(base_tip) = pending.base_tip else {
         emit(out, Request::Refused { task: pending.task });
@@ -2159,7 +2183,7 @@ fn decide_step(d: &mut Domain, env: &Env<Limits>, pending: &PendingStep, out: &m
                 if in_queue(&prior.state) && !in_queue(&row.change.state) {
                     wake_queue(d, &row);
                 }
-                emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+                save_queue_change(d, env, before, row.clone(), out);
                 topics::head_changed(d, row.task, out);
                 topics::refresh(d, env, row.task, out);
                 emit(
@@ -2325,8 +2349,12 @@ fn emit_change_effect(
     };
     row.pending = Some(pending.entry);
     row.effect = change::EffectResult::Pending;
+    let before = match d.changes.get(&row.task) {
+        Some(row) => crate::panel::ready(row),
+        None => None,
+    };
     d.changes.insert(row.task, row.clone()).expect("replaces change");
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+    save_queue_change(d, env, before, row.clone(), out);
     keep_entry(d, entry, None, out);
     emit(
         out,
@@ -2415,7 +2443,7 @@ fn change_outcome(
         row.drift = Some(change::Hold::PullClosed);
     }
     let saved = row.clone();
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(saved.clone()) });
+    save_change(out, saved.clone());
     if pull_closed {
         let branch = skein_forge_client::Resource {
             repository: saved.repository,
@@ -2473,7 +2501,7 @@ fn release_change(d: &mut Domain, task: u64, out: &mut Queue<Request>) {
     };
     row.drift = None;
     let saved = row.clone();
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(saved) });
+    save_change(out, saved);
     let mut affected = List::with_capacity(d.holds.len());
     for (name, hold) in &d.holds {
         if hold.task == task && hold.drift.is_some() {
@@ -3095,15 +3123,24 @@ fn withdraw(d: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Requ
     }
 }
 
-fn veto_change(d: &mut Domain, task: u64, entry: u64, prior: change::Change, out: &mut Queue<Request>) {
+fn veto_change(
+    d: &mut Domain,
+    env: &Env<Limits>,
+    task: u64,
+    entry: u64,
+    prior: change::Change,
+    out: &mut Queue<Request>,
+) {
     let Some(row) = d.changes.get_mut(&task) else { return };
     if row.pending != Some(entry) || !d.entries.contains_key(&entry) {
         return;
     }
+    let before = crate::panel::ready(row);
     row.change = prior;
     row.pending = None;
     row.effect = change::EffectResult::None;
-    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+    let saved = row.clone();
+    save_queue_change(d, env, before, saved, out);
     d.entries.remove(&entry);
     emit(out, Request::Erase { key: Key::Entry(entry) });
 }
@@ -3579,7 +3616,7 @@ fn drift(
                 crate::DriftChange::PullClosed { .. } => change::Hold::PullClosed,
                 crate::DriftChange::Retargeted { .. } => change::Hold::Retargeted,
             });
-            emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row.clone()) });
+            save_change(out, row.clone());
         }
     }
 }
@@ -3780,5 +3817,79 @@ fn settled_projection(d: &Domain, goal: u64, out: &mut Queue<Request>) {
     };
     if settled {
         emit(out, Request::ProjectionSettled { goal });
+    }
+}
+
+/// Every saved record invalidates its own panel (domain/forge.md, 8.8).
+fn save_change(out: &mut Queue<Request>, row: ChangeRow) {
+    let task = row.task;
+    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row) });
+    emit(out, Request::Marked { tasks: Box::new([task]) });
+}
+
+/// Include the nearest affected followers when a saved row changes its queue order.
+fn save_queue_change(
+    d: &Domain,
+    env: &Env<Limits>,
+    before: Option<change::Ready>,
+    row: ChangeRow,
+    out: &mut Queue<Request>,
+) {
+    let after = crate::panel::ready(&row);
+    if before == after {
+        save_change(out, row);
+        return;
+    }
+    let (ready, repair) = queue_ready(d, &row, &env.limits);
+    let old_repair = if row.base_repair && before.is_some() { Some(row.task) } else { repair };
+    let mut followers = List::with_capacity(env.limits.changes);
+    for candidate in &ready {
+        if candidate.task == row.task {
+            continue;
+        }
+        let was_behind = match before {
+            Some(old) => crate::panel::queue_before(&old, candidate, old_repair, &env.limits, env.wall),
+            None => false,
+        };
+        let now_behind = match after {
+            Some(new) => crate::panel::queue_before(&new, candidate, repair, &env.limits, env.wall),
+            None => false,
+        };
+        if was_behind || now_behind {
+            followers.push(*candidate).expect("queue bounds followers");
+        }
+    }
+    let mut tasks = List::with_capacity(crate::MARKED);
+    tasks.push(row.task).expect("own subject");
+    let mut previous = None;
+    while tasks.room() > 0 {
+        let mut next = None;
+        for candidate in &followers {
+            if let Some(previous) = previous
+                && !crate::panel::queue_before(&previous, candidate, repair, &env.limits, env.wall)
+            {
+                continue;
+            }
+            next = match next {
+                Some(current) if crate::panel::queue_before(&current, candidate, repair, &env.limits, env.wall) => {
+                    Some(current)
+                }
+                Some(_) | None => Some(*candidate),
+            };
+        }
+        let Some(next) = next else { break };
+        tasks.push(next.task).expect("nearest follower room");
+        previous = Some(next);
+    }
+    emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Change(row) });
+    emit(out, Request::Marked { tasks: tasks.into_boxed() });
+}
+
+/// A read at a different head or with a different verdict changes the whole panel.
+pub(crate) fn keep_panel_ci(d: &mut Domain, task: u64, read: change::Ci, out: &mut Queue<Request>) {
+    assert!(d.changes.contains_key(&task), "CI belongs to a held change");
+    if d.panel_ci.get(&task) != Some(&read) {
+        d.panel_ci.insert(task, read).expect("one CI verdict per held change");
+        emit(out, Request::Marked { tasks: Box::new([task]) });
     }
 }
