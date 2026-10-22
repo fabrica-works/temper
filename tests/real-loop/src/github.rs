@@ -197,10 +197,6 @@ impl State {
         // do not inherit the checkout sweep's 256 files of 64 KiB each.
         config.limits.files = 4;
         config.limits.content_bytes = 1024;
-        // domain/testing.md, 2.4: the scenario sets mergeability's settling
-        // short, at the same 10--50 ms scale as the forge client's polls.
-        config.settle_min = Duration::from_millis(10);
-        config.settle_max = Duration::from_millis(50);
         config.limits.calls = protocol_limits().calls;
         config.limits.title_bytes = 512;
         config.limits.body_bytes = 2048;
