@@ -16,6 +16,12 @@ pub enum Read {
     PaceAsked,
     Ranked,
     SurveyEnded,
+    CheckEnded,
+    DirectorActivity,
+    DirectorTimer,
+    BenchmarkWaiting,
+    BenchmarkEnded,
+    BEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -157,4 +163,67 @@ pub fn step_4_4() -> Vec<calls::Step> {
         call(D1, argv!["task", number(SURVEY), "--json"]),
         call(D1, argv!["task", number(A), "--json"]),
     ]
+}
+
+// Call positions within the signed-in check suffix; non-call steps consume none.
+const CHECK_DIRECTOR_ENDED: usize = 1;
+const CHECK_BENCHMARK_WAITING: usize = 4;
+const CHECK_BENCHMARK_ENDED: usize = 5;
+const CHECK_B_ENDED: usize = 6;
+const CHECK_DIRECTOR_ACTIVITY: usize = 7;
+const CHECK_DIRECTOR_TIMER: usize = 8;
+pub const READS_4_3: &[(Read, usize)] = &[
+    (Read::CheckEnded, CHECK_DIRECTOR_ENDED),
+    (Read::BenchmarkWaiting, CHECK_BENCHMARK_WAITING),
+    (Read::BenchmarkEnded, CHECK_BENCHMARK_ENDED),
+    (Read::BEnded, CHECK_B_ENDED),
+    (Read::DirectorActivity, CHECK_DIRECTOR_ACTIVITY),
+    (Read::DirectorTimer, CHECK_DIRECTOR_TIMER),
+];
+
+/// The check follows the opener's sign-in; `base` is its first recorded call.
+#[must_use]
+pub fn step_4_3(base: usize) -> Vec<calls::Step> {
+    use super::{B, BENCHMARK, CHECK, CHECK_PERSON};
+    vec![
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "check", CHECK_PERSON]),
+        start(D1, argv!["wait", "task", number(CHECK), "--until", "ended", "--json"]),
+        calls::watching(base + CHECK_DIRECTOR_ENDED),
+        // Each replied wait follows a completed delegation, admitting the
+        // next task's watch without racing a not-yet-created task number.
+        call(D1, argv!["wait", "task", number(CHECK), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(B), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(BENCHMARK), "--until", "phase:due", "--json"]),
+        calls::add_worker("s2"),
+        join(base + CHECK_DIRECTOR_ENDED),
+        call(D1, argv!["task", number(BENCHMARK), "--activity", "32", "--json"]),
+        call(D1, argv!["task", number(B), "--activity", "32", "--json"]),
+        call(D1, argv!["task", number(CHECK), "--activity", "32", "--json"]),
+        // The latest page starts after the timer: follow its supplied cursor.
+        call(
+            D1,
+            argv![
+                "activity",
+                number(CHECK),
+                "--before",
+                calls::activity_before(base + CHECK_DIRECTOR_ACTIVITY),
+                "--json"
+            ],
+        ),
+    ]
+}
+
+/// Preserve every opener act, then run the check in the signed-in directory.
+#[must_use]
+pub fn step_4_1_4_3() -> Vec<calls::Step> {
+    let mut steps = step_4_1();
+    let base = READS_4_1.iter().map(|(_, call)| call).max().expect("opener calls") + 1;
+    steps.extend(step_4_3(base));
+    steps
+}
+
+#[must_use]
+pub fn reads_4_1_4_3() -> Vec<(Read, usize)> {
+    let base = READS_4_1.iter().map(|(_, call)| call).max().expect("opener calls") + 1;
+    READS_4_1.iter().copied().chain(READS_4_3.iter().map(|&(read, call)| (read, base + call))).collect()
 }

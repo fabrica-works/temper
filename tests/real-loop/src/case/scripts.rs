@@ -233,3 +233,69 @@ pub fn step_4_4(_forge: SocketAddr) -> Box<[Script]> {
         Script { cue: Agent::Survey.cue().into(), turns: Box::new([report(SURVEY_REPORT)]) },
     ])
 }
+
+#[must_use]
+pub fn step_4_3(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{B_REPORT, B_SPEC, BENCHMARK, BENCHMARK_RUNNING, BENCHMARK_SPEC, CHECK, CHECK_REASON, CHECK_REPORT};
+    use skein_fake_llm_domain::api::Piece;
+    let delegate = |spec, tools, tasks, depth, spend| {
+        call(
+            b"delegate",
+            &json!({"batch":[{
+                "executor":{"kind":"agent","charter":2},
+                "spec":{"words":spec,"parameters":[]},"contract":{"kind":"report","words":128},
+                "authority":{"tools":tools,"grants":[],
+                    "delegation":{"kinds":[{"kind":"agent","number":2}],"tasks":tasks,"depth":depth},
+                    "budget":{"spend":spend},"notes":0}
+            }]}),
+        )
+    };
+    let mut arm = call(b"subscribe", &json!({"kind":"timer","at":0}));
+    let mut lines = vec![Line::Pieces {
+        pieces: Box::new([Piece {
+            text: b"All workers placed; arm the two-hour check.".as_slice().into(),
+            hold: Some(crate::cluster::PLACED.into()),
+        }]),
+    }];
+    lines.extend(arm.lines);
+    arm.lines = lines.into_boxed_slice();
+    Box::new([
+        Script {
+            cue: Agent::Check.cue().into(),
+            turns: Box::new([
+                delegate(B_SPEC, 3, 1, 1, 20),
+                wait("B scheduled; awaiting the benchmark on s2."),
+                arm,
+                wait("The two-hour check is armed."),
+                call(b"cancel", &json!({"target":BENCHMARK,"reason":CHECK_REASON})),
+                wait("The benchmark's cancellation was requested."),
+                report(CHECK_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::B.cue().into(),
+            turns: Box::new([
+                delegate(BENCHMARK_SPEC, 2, 0, 0, 5),
+                // A grandchild needs an introduction to message the director.
+                call(b"introduce", &json!({"left":CHECK,"right":BENCHMARK})),
+                wait("B's benchmark is delegated."),
+                report(B_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::Benchmark.cue().into(),
+            turns: Box::new([then_wait(
+                call(b"message", &json!({"target":CHECK,"form":"words","words":BENCHMARK_RUNNING})),
+                BENCHMARK_RUNNING,
+            )]),
+        },
+    ])
+}
+
+/// The opener and the check share a forge, with a script for each distinct cue.
+#[must_use]
+pub fn step_4_1_4_3(forge: SocketAddr) -> Box<[Script]> {
+    let mut scripts = step_4_1(forge).into_vec();
+    scripts.extend(step_4_3(forge));
+    scripts.into_boxed_slice()
+}

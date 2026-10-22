@@ -97,7 +97,16 @@ impl Observed {
 fn cued(system: &[u8]) -> Option<Agent> {
     let mut first_at = usize::MAX;
     let mut first = None;
-    for agent in [Agent::Director, Agent::A, Agent::Design, Agent::Review, Agent::Survey] {
+    for agent in [
+        Agent::Director,
+        Agent::A,
+        Agent::Design,
+        Agent::Review,
+        Agent::Survey,
+        Agent::Check,
+        Agent::B,
+        Agent::Benchmark,
+    ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
                 if at < first_at {
@@ -1040,4 +1049,122 @@ mod pace_tests {
             assert!(misses.iter().any(|miss| miss.promise == promise));
         }
     }
+}
+
+// ctl wraps the source journal lines in its decoded activity rows.
+fn check_activity(observed: &Observed, read: Read) -> Vec<&Value> {
+    let document = document(observed, read);
+    document
+        .get("activity")
+        .filter(|value| value.is_object())
+        .unwrap_or(document)
+        .pointer("/rows")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|row| row.pointer("/event/owner/source"))
+        .collect()
+}
+
+/// Reference case 4.3's supported timer, cancel and empty-worker checkpoint.
+#[must_use]
+pub fn step_4_3(observed: &Observed) -> Vec<Miss> {
+    use super::{B, B_REPORT, BENCHMARK, CHECK, CHECK_REASON, CHECK_REPORT};
+    const TIMER: Promise = Promise::Must("a timer (exact)");
+    const CANCEL: Promise = Promise::Must("cancel (exact)");
+    const EMPTY: Promise = Promise::Add("a moved owner leaves nothing running behind");
+    let mut misses = Vec::new();
+    let director = task_document(observed, Read::CheckEnded);
+    let benchmark = task_document(observed, Read::BenchmarkEnded);
+    let b = task_document(observed, Read::BEnded);
+    let director_activity = check_activity(observed, Read::DirectorTimer);
+    let timer = director_activity
+        .iter()
+        .find_map(|line| number(line, "/line/heard/kind/timer/subscription").zip(number(line, "/line/heard/number")));
+    step_check(
+        &mut misses,
+        "4.3",
+        timer.is_some(),
+        TIMER,
+        "the director's activity must record the timer's subscription and wake",
+    );
+    let queries: Vec<_> = observed.told.iter().filter(|told| told.agent == Agent::Check).collect();
+    step_check(
+        &mut misses,
+        "4.3",
+        timer.is_some_and(|(subscription, _message)| {
+            let result = format!("Subscription {subscription} added");
+            let wake = format!("\n{CHECK}: \n");
+            queries.iter().position(|told| contains(&told.words, &result)).is_some_and(|at| {
+                !contains(&queries[at].words, &wake)
+                    && queries[at + 1..].iter().any(|told| {
+                        contains(&told.words, &wake)
+                            && contains(&told.words, "Messages arrived. Read them before continuing.")
+                    })
+            })
+        }),
+        TIMER,
+        "after the subscription result, a later director query must contain the timer's empty wake and live wait result",
+    );
+    step_check(
+        &mut misses,
+        "4.3",
+        number(benchmark, "/chip/task") == Some(BENCHMARK)
+            && text(benchmark, "/chip/phase") == "ended"
+            && number(benchmark, "/result/ending/task/cancelled/by/task") == Some(CHECK)
+            && text(benchmark, "/result/ending/task/cancelled/reason/bytes") == CHECK_REASON,
+        CANCEL,
+        "the ended benchmark must record cancellation by the director with its reason",
+    );
+    let activity = check_activity(observed, Read::BenchmarkEnded);
+    let attempt = number(benchmark, "/chip/details/owner/details/attempt");
+    let cancelled = activity.iter().any(|line| {
+        text(line, "/line/run_ended/end") == "cancelled"
+            && number(line, "/line/run_ended/attempt").zip(attempt).is_some_and(|(ended, current)| ended == current)
+    });
+    step_check(&mut misses, "4.3", cancelled, CANCEL, "the benchmark's activity must record a cancelled run ending");
+    let began: BTreeSet<_> = activity.iter().filter_map(|line| number(line, "/line/run_began/attempt")).collect();
+    let ended: BTreeSet<_> = activity.iter().filter_map(|line| number(line, "/line/run_ended/attempt")).collect();
+    step_check(
+        &mut misses,
+        "4.3",
+        !began.is_empty()
+            && began.is_subset(&ended)
+            && document(observed, Read::BenchmarkEnded).pointer("/activity/cut") == Some(&Value::Bool(false))
+            && document(observed, Read::BenchmarkEnded).pointer("/activity/before") == Some(&Value::Null)
+            && document(observed, Read::BenchmarkEnded).pointer("/activity/after") == Some(&Value::Null)
+            && number(benchmark, "/chip/details/owner/details/ended_at").is_some(),
+        EMPTY,
+        "the benchmark's complete activity must end every begun run, with the task ended",
+    );
+    let heard_cancel = check_activity(observed, Read::BEnded).iter().any(|line| {
+        text(line, "/line/heard/kind/result") == "cancelled"
+            && number(line, "/line/heard/from/task") == Some(BENCHMARK)
+            && text(line, "/line/heard/words") == CHECK_REASON
+            && number(line, "/at").zip(number(b, "/result/at")).is_some_and(|(heard, reported)| heard <= reported)
+    });
+    step_check(
+        &mut misses,
+        "4.3",
+        number(b, "/chip/task") == Some(B)
+            && text(b, "/result/value/report/bytes") == B_REPORT
+            && heard_cancel
+            && observed.told.iter().any(|told| {
+                told.agent == Agent::B
+                    && contains(&told.words, CHECK_REASON)
+                    && contains(&told.words, "Messages arrived. Read them before continuing.")
+            }),
+        EMPTY,
+        "B must hear its delegate's cancelled ending before reporting",
+    );
+    step_check(
+        &mut misses,
+        "4.3",
+        number(director, "/chip/task") == Some(CHECK)
+            && text(director, "/result/value/report/bytes") == CHECK_REPORT
+            && observed.told.iter().any(|told| told.agent == Agent::Check && contains(&told.words, B_REPORT)),
+        EMPTY,
+        "the check director must hear B's result and end with its check report",
+    );
+    misses
 }

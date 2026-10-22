@@ -14,6 +14,21 @@ pub const DIRECTOR: u64 = 1;
 pub const A: u64 = 2;
 pub const DESIGN: u64 = 3;
 pub const QUESTION: u64 = 6;
+// After step_4_1's chat and A's delegation create tasks 1..=5,
+// step_4_3's chat creates CHECK; its delegate creates B, which delegates BENCHMARK.
+pub const CHECK: u64 = 6;
+pub const B: u64 = 7;
+pub const BENCHMARK: u64 = 8;
+// The change procedure in step_4_1 creates its coder, then its reviewer.
+pub const CODER: u64 = 4;
+pub const REVIEW: u64 = 5;
+pub const CHECK_PERSON: &str = "@case_check Schedule B's benchmark and run the two-hour check.";
+pub const B_SPEC: &str = "@case_b Own the benchmark; delegate it and report its ending.";
+pub const BENCHMARK_SPEC: &str = "@case_benchmark Run the benchmark and wait in place.";
+pub const BENCHMARK_RUNNING: &str = "The benchmark is running.";
+pub const CHECK_REASON: &str = "The two-hour check found the benchmark stalled; cancel it.";
+pub const B_REPORT: &str = "The benchmark was cancelled; B has nothing left running.";
+pub const CHECK_REPORT: &str = "The two-hour check cancelled the stalled benchmark and B reported.";
 pub const FIRST_ACCOUNT: u64 = 1;
 pub const SECOND_ACCOUNT: u64 = 3;
 pub const SECOND_KEY_FILE: &str = "second.key";
@@ -74,11 +89,17 @@ pub enum Agent {
     Design,
     Review,
     Survey,
+    Check,
+    B,
+    Benchmark,
 }
 impl Agent {
     #[must_use]
     pub fn cue(self) -> &'static [u8] {
         match self {
+            Self::Check => b"@case_check",
+            Self::B => b"@case_b ",
+            Self::Benchmark => b"@case_benchmark",
             Self::Director => b"@case_director",
             Self::A => b"@case_a ",
             Self::Design => b"@case_design",
@@ -169,6 +190,35 @@ pub fn fixture() -> forge::Fixture {
     }
 }
 
+/// Keep only the director on its worker; delegates retain the usual parking waits.
+#[must_use]
+pub fn fixture_placed() -> forge::Fixture {
+    forge::Fixture {
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            // The chat and A both use charter 1 in the base fixture. A waiting
+            // run keeps its one slot until a message resumes it, so give only
+            // the director a charter whose wait exceeds PATIENCE (10 s).
+            let mut director = value["engine"]["charters"][0].clone();
+            director["number"] = 2.into();
+            director["waiting_ms"] = 60000.into();
+            value["engine"]["charters"].as_array_mut().expect("charters").push(director);
+            value["engine"]["limits"]["overrides"]["tasks.charters"] = 2.into();
+            value["engine"]["templates"][0]["executor"]["charter"] = 2.into();
+            // The person must also be offered the new executor for that chat.
+            let mut kinds = value["engine"]["rules"]["ceiling"]["delegation"]["kinds"].clone();
+            kinds.as_array_mut().expect("executor kinds").push(json!({"kind":"charter","number":2}));
+            value["engine"]["rules"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+                project["policy"]["roles"][0]["authority"]["delegation"]["kinds"] = kinds.clone();
+            }
+            landing::admit(value);
+        },
+        ..fixture()
+    }
+}
+
 #[must_use]
 pub fn fixture_4_4() -> forge::Fixture {
     forge::Fixture {
@@ -180,5 +230,31 @@ pub fn fixture_4_4() -> forge::Fixture {
             value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
         },
         ..fixture()
+    }
+}
+
+/// The check keeps all three runs in place, with timer and cancellation authority.
+#[must_use]
+pub fn fixture_check() -> forge::Fixture {
+    forge::Fixture {
+        configure: |value, agent, forge| {
+            (fixture_placed().configure)(value, agent, forge);
+            // Subscribe is family 32; cancel shares control (4), already in 391.
+            let tools = 0x0187 | 0x0020;
+            value["engine"]["rules"]["ceiling"]["tools"] = tools.into();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["tools"] = tools.into();
+                project["policy"]["roles"][0]["authority"]["tools"] = tools.into();
+            }
+            // Announce placement and wait in one completion, with serial tools.
+            agent["profile"]["declared"]["calls_per_response"] = 2.into();
+            agent["profile"]["policy"]["parallel_tools"] = 1.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
+            // The opener's checkout needs an LLM grant and an application git
+            // grant. One refuses its coder; two fit the three-worker ring.
+            value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
+            landing::admit(value);
+        },
+        ..fixture_placed()
     }
 }
