@@ -20,35 +20,6 @@ pub fn one_process() -> SystemStand {
     one_process_under_box(false)
 }
 pub fn one_process_under_box(under_box: bool) -> SystemStand {
-    let stored = if under_box {
-        use temper_engine_domain::{Record, StoreRequest, Write};
-        let mut bootstrap = super::ready();
-        let engine = bootstrap.engine.as_mut().unwrap();
-        let mut header = engine.domain.deployment();
-        header.commits = header.commits.checked_add(1).unwrap();
-        // jig's configured owners hold no deployment role yet (jig-protocol-config
-        // owners spans engine.projects only); temper's design gives the standalone
-        // owner the deployment's connectors (client/README.md, 1).
-        assert!(engine.store.down(StoreRequest::Commit {
-            number: header.commits,
-            writes: Box::new([
-                Write::Save(Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(
-                    header
-                ),))),
-                Write::Save(Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Roles {
-                    project: 0,
-                    holdings: Box::new([jig_domain_people::Holding {
-                        person: 1,
-                        role: jig_domain_people::Role::Owner
-                    }]),
-                }))),
-            ]),
-        }));
-        while engine.store.above.pop().is_some() {}
-        Some(bootstrap.engine.unwrap().store)
-    } else {
-        None
-    };
     let mut settings = super::worker_settings();
     settings.jig.limits.core.tasks.run_inbox = 2;
     let agent = super::worker_agent();
@@ -64,7 +35,7 @@ pub fn one_process_under_box(under_box: bool) -> SystemStand {
     )
     .unwrap();
     SystemStand {
-        service: super::start_with_worker(&[(1, 100)], stored, Some(worker), bytes, under_box, under_box),
+        service: super::start_with_worker(&[(1, 100)], None, Some(worker), bytes, under_box, under_box),
         kernel: Kernel::new(),
     }
 }

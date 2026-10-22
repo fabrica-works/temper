@@ -60,21 +60,11 @@ impl World {
         limits.forge.client.repositories = 4;
         // The forge client's output cohort counts two outputs per configured forge.
         limits.forge.output += extra * 2;
-        // The transitional deployment role adds a cohort beside project one.
-        limits.people.projects += 1;
         // Frame project allocations fit the tools preset, as the shared front requires.
         limits.documents.lines = tools::limits::client().client.domain.projects;
         limits.journal.writes = walking::writes(&limits);
         assert!(engine::worst_case(&limits).is_some(), "the story profile covers the larger cohort");
-        let mut store = temper_engine_domain_world::fixtures::restored_over(Store::new(), config(under_box), &limits);
-        // until jig 68a43842 (the deployment's roles) is built and repinned
-        store.seed(
-            Box::new([engine::Record::Core(jig_domain_core::Record::People(people::Stored::Roles {
-                project: 0,
-                holdings: Box::new([people::Holding { person: fixtures::PARTY, role: people::Role::Owner }]),
-            }))]),
-            Box::new([]),
-        );
+        let store = temper_engine_domain_world::fixtures::restored_over(Store::new(), config(under_box), &limits);
         let configuration = config(under_box);
         let mut transport = Transport::new(c::VersionRange {
             first: jig_client_protocol_wire::VERSION,
