@@ -144,7 +144,8 @@ reload. They are few, since each costs a cluster.
   scenes in turn.
 - **Their focus is held:** a live scene names the part that holds the
   focus, which `look-structure` checks; the caret is where the focus
-  is, and the shot does not draw it (3.4).
+  is, and the shot draws it steady, never in its blink's phase
+  (skein's `browser.md`, 5.1).
 - **The frame's regions:** a live page's content carries the clock (a
   turn's time, the day), so its regions are the frame's, and its
   judgement stands for their crops alone (`lab/README.md`, "The live
