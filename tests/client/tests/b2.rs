@@ -79,6 +79,7 @@ fn follow_the_plan_and_each_delegates_lineage(planned: &b2::Planned, attempt: u6
     ];
     steps.extend(return_to_goal(planned.goal));
     steps.extend([
+        see(plan_link(planned.first)),
         Step::Press { find: plan_link(planned.first) },
         see(task_heading(planned.first, b2::FIRST_BRIEF)),
         see(Find::exactly_named(Role::Heading { level: 2 }, format!("Run {attempt} · live now").as_bytes())),
