@@ -235,10 +235,15 @@ impl State {
             blob_records: 16,
             git_records: GIT_RECORDS,
         };
+        let mut hosted = forge::peer_limits();
+        // The four call connections share this peer with the component's
+        // reserved App/delivery connection, setup's client and hosted git.
+        // A call racing a delivery poll must not be refused by the fixture.
+        hosted.connections = wire.calls + 3;
         let mut peer = Peer::github(
             ([127, 0, 0, 1], 0).into(),
             ([127, 0, 0, 1], 0).into(),
-            forge::peer_limits(),
+            hosted,
             (fixture.config)(),
             limits,
             handle.clone(),
