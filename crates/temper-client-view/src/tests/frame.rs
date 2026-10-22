@@ -71,6 +71,15 @@ fn choosing_another_project_changes_the_navigations_project() {
     );
     let mut view = fixtures::view();
     fixtures::build(&mut view, &root);
+    assert_menu(
+        &view,
+        &[
+            (Role::Button, Some(b"Second")),
+            (Role::Button, Some(b"Shop")),
+            (Role::Navigation, Some(b"Main navigation")),
+            (Role::Slot, None),
+        ],
+    );
     let link = fixtures::find(view.tree(), Role::Link, b"Adopt a repository").expect("selected project's adoption");
     assert_eq!(
         crate::act(&mut view, link, Act::Press),
@@ -88,6 +97,15 @@ fn a_sign_out_that_did_not_reach_the_engine_is_offered_again() {
     let tree = fixtures::build(&mut view, &root);
     assert!(fixtures::find(tree, Role::Alert, b"Sign out did not reach the engine.").is_some());
     assert!(fixtures::find(tree, Role::Button, b"Sign out").is_some());
+    assert_menu(
+        &view,
+        &[
+            (Role::Button, Some(b"Shop")),
+            (Role::Button, Some(b"Second")),
+            (Role::Navigation, Some(b"Main navigation")),
+            (Role::Slot, None),
+        ],
+    );
 }
 #[test]
 fn a_page_behind_says_behind_after_the_links_state() {
@@ -320,4 +338,113 @@ fn navigation_shows_the_inbox_count_only_when_nonzero() {
         let view = fixtures::page_view(&root);
         assert!(fixtures::find(view.tree(), Role::Link, expected).is_some());
     }
+}
+
+#[test]
+fn the_banner_menu_holds_projects_navigation_and_corner_in_order() {
+    let view = fixtures::signed_in_with_project();
+    assert_menu(
+        &view,
+        &[
+            (Role::Button, Some(b"Shop")),
+            (Role::Button, Some(b"Second")),
+            (Role::Navigation, Some(b"Main navigation")),
+            (Role::Slot, None),
+        ],
+    );
+}
+
+#[test]
+fn the_banner_menu_keeps_navigation_and_corner_while_connecting() {
+    assert_menu(&fixtures::built(), &[(Role::Navigation, Some(b"Main navigation")), (Role::Slot, None)]);
+}
+
+#[test]
+fn the_unavailable_banner_menu_holds_its_corner_alone() {
+    for root in [fixtures::signed_out(), fixtures::out_of_date()] {
+        assert_menu(&fixtures::page_view(&root), &[(Role::Slot, None)]);
+    }
+}
+
+#[test]
+fn the_offline_banner_menu_keeps_its_choices() {
+    let (mut root, watch) = fixtures::root_with_watch(None);
+    fixtures::root_event(
+        &mut root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::WatchEnded { watch, end: jig_client::contract::WatchEnd::Dropped },
+            },
+        },
+    );
+    assert_menu(
+        &fixtures::page_view(&root),
+        &[
+            (Role::Button, Some(b"Shop")),
+            (Role::Button, Some(b"Second")),
+            (Role::Navigation, Some(b"Main navigation")),
+            (Role::Slot, None),
+        ],
+    );
+}
+
+#[test]
+fn the_qa_controls_keep_their_accessible_names_with_the_menu_closed() {
+    for (root, controls) in [
+        (
+            fixtures::chats_root(),
+            &[
+                (Role::Button, b"Sign out".as_slice()),
+                (Role::Link, b"Chats"),
+                (Role::TextArea, b"Start a chat"),
+                (Role::Button, b"Start"),
+            ][..],
+        ),
+        (
+            fixtures::chat::messaging_root(),
+            &[
+                (Role::Button, b"Sign out".as_slice()),
+                (Role::Link, b"Chats"),
+                (Role::TextArea, b"Message"),
+                (Role::Button, b"Send"),
+                (Role::Log, b"Conversation"),
+            ][..],
+        ),
+    ] {
+        let view = fixtures::page_view(&root);
+        for (role, name) in controls {
+            assert!(fixtures::person_find(view.tree(), *role, name).is_some(), "{role:?}: {name:?}");
+        }
+    }
+}
+
+fn assert_menu(view: &crate::View, children: &[(Role, Option<&[u8]>)]) {
+    let nodes = view.tree().nodes();
+    let mut banner = None;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == Role::Banner {
+            assert!(banner.is_none(), "one banner");
+            banner = Some(index);
+        }
+    }
+    let banner = banner.expect("banner");
+    let end = banner.checked_add(usize::try_from(nodes[banner].size).expect("banner size")).expect("banner end");
+    let brand = banner.checked_add(1).expect("brand index");
+    assert_eq!(nodes[brand].role, Role::Paragraph);
+    assert_eq!(nodes[brand].name.as_deref(), Some(b"temper".as_slice()));
+    let menu = brand.checked_add(usize::try_from(nodes[brand].size).expect("brand size")).expect("menu index");
+    assert_eq!(nodes[menu].role, Role::Disclosure);
+    assert_eq!(nodes[menu].name.as_deref(), Some(b"Menu".as_slice()));
+    assert_eq!(nodes[menu].styles.as_slice(), [crate::look::MENU]);
+    assert!(!nodes[menu].states.as_slice().contains(&skein_ui::State::Expanded));
+    let menu_end = menu.checked_add(usize::try_from(nodes[menu].size).expect("menu size")).expect("menu end");
+    assert_eq!(menu_end, end, "menu finishes banner");
+    assert_eq!(fixtures::person_find(view.tree(), Role::Disclosure, b"Menu"), Some(nodes[menu].id));
+    let mut index = menu.checked_add(1).expect("first child");
+    for (role, name) in children {
+        assert_eq!(nodes[index].role, *role);
+        assert_eq!(nodes[index].name.as_deref(), *name);
+        index = index.checked_add(usize::try_from(nodes[index].size).expect("child size")).expect("next child");
+    }
+    assert_eq!(index, end, "all banner contents follow the brand inside Menu");
 }

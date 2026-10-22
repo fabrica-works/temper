@@ -347,6 +347,7 @@ fn print_writes_every_page_and_the_bundle() {
         }
     }
     let digest = digest.expect("digest directory");
+    assert!(bundle.join(&digest).join("files/menu.svg").is_file(), "bundled menu mask");
     for file in ["skein-ui.css", "temper.css", "task-pages.css"] {
         assert!(bundle.join(&digest).join(file).is_file(), "bundled {file}");
     }
@@ -358,6 +359,8 @@ fn print_writes_every_page_and_the_bundle() {
         assert!(at >= position, "table order");
         position = at + link.len();
         let page = fs::read_to_string(out.join(format!("{}.html", sample.name))).expect("sample page");
+        assert!(page.contains("class=\"temper-menu\""), "{}: menu disclosure", sample.name);
+        assert!(page.contains("<summary>Menu</summary>"), "{}: menu name", sample.name);
         let mut position = 0;
         for file in ["skein-ui.css", "temper.css", "task-pages.css"] {
             let link = format!("href=\"bundle/{digest}/{file}\"");
