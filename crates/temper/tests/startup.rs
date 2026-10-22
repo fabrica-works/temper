@@ -171,16 +171,16 @@ fn refused_box(scratch: &support::Scratch, value: &serde_json::Value) -> String 
         .expect_err("box refused")
 }
 #[test]
-fn temper_box_runs_a_fake_entry_to_serves_link() {
-    let scratch = support::Scratch::startup("box-fake-entry");
-    let mut value = managed(scratch.path(), true);
-    let address = support::free_addresses::<1>(&[])[0];
-    support::configuration::fake_entry(&mut value["application"]["setup"][0], &address.to_string());
-    value["application"]["forges"][0]["api"] = serde_json::json!({"socket": address.to_string()});
-    value["application"]["forges"][0]["git"] = format!("http://{address}").into();
-    fs::set_permissions(scratch.path().join("forge-1"), fs::Permissions::from_mode(0o700))
-        .expect("private forge directory");
-    support::write_private(&scratch.path().join("temper.json"), &serde_json::to_vec(&value).expect("JSON"));
+fn a_box_on_a_fresh_init_reaches_serves_link_with_forge_3_dormant() {
+    let scratch = support::Scratch::startup("box-fresh-init");
+    let init = std::process::Command::new(env!("CARGO_BIN_EXE_temper"))
+        .arg("init")
+        .args(support::configuration::flags(scratch.path()))
+        .output()
+        .expect("init command");
+    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
+    // init's ports are fixed when free; tests run side by side, so each listener moves to a drawn one.
+    move_listeners(scratch.path());
     let ended =
         support::boxed::run(scratch.path(), None, support::boxed::Plan::Stop, skein_lib::Duration::from_secs(3));
     let diagnostic = String::from_utf8_lossy(&ended.stderr);
@@ -189,7 +189,55 @@ fn temper_box_runs_a_fake_entry_to_serves_link() {
     assert!(!diagnostic.contains("application.setup"), "{diagnostic}");
     assert_eq!(ended.exit, Some(skein_io::kernel::Exit::Code(0)), "{diagnostic}");
     assert_eq!(ended.left, Some(Vec::new()), "no process outlived the box: {diagnostic}");
+    // Forge 3 is asked: its group never ran, so it has no directory and nothing was fetched.
+    for absent in ["forge-3", "forgejo", "forgejo-runner"] {
+        assert!(!scratch.path().join(absent).exists(), "{absent}: {diagnostic}");
+    }
     scratch.remove();
+}
+/// Move each listener a fresh init names to a drawn loopback port, in both of its documents.
+fn move_listeners(directory: &std::path::Path) {
+    let read = |name: &str| -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(directory.join(name)).expect("init's document")).expect("JSON")
+    };
+    let mut deployment = read("temper.json");
+    let application = &deployment["application"];
+    let named = [
+        &application["clients"]["listener"]["socket"],
+        &application["forges"][0]["api"]["socket"],
+        &application["forges"][2]["api"]["socket"],
+        &application["demo"]["llm"]["listen"]["socket"],
+        &application["webhooks"]["listener"]["socket"],
+    ]
+    .map(|socket| socket.as_str().expect("init's socket").to_owned());
+    let drawn = support::free_addresses::<5>(&[]);
+    let moves: Vec<_> = named.into_iter().zip(drawn.map(|address| address.to_string())).collect();
+    let mut agent = read("agent.json");
+    for (name, value) in [("temper.json", &mut deployment), ("agent.json", &mut agent)] {
+        replace_sockets(value, &moves);
+        support::write_private(&directory.join(name), &serde_json::to_vec(value).expect("JSON"));
+    }
+}
+
+/// Each string naming a moved socket, alone or as an `http://` URL, names its new one.
+fn replace_sockets(value: &mut serde_json::Value, moves: &[(String, String)]) {
+    match value {
+        serde_json::Value::String(text) => {
+            for (before, after) in moves {
+                if text == before {
+                    text.clone_from(after);
+                } else if text.strip_prefix("http://") == Some(before.as_str()) {
+                    *text = format!("http://{after}");
+                } else {
+                    continue;
+                }
+                break;
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(|item| replace_sockets(item, moves)),
+        serde_json::Value::Object(items) => items.values_mut().for_each(|item| replace_sockets(item, moves)),
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+    }
 }
 #[test]
 fn a_fake_entrys_handover_is_read_privately_and_checked_before_serve_starts() {
