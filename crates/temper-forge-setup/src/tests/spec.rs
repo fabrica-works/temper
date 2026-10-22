@@ -151,7 +151,7 @@ fn the_runner_uses_only_its_home_and_configured_path() {
     assert_eq!(spec.output, 65_536);
 }
 #[test]
-fn the_admin_token_asks_for_three_scopes_under_a_suffixed_name() {
+fn the_admin_token_asks_for_four_scopes_under_a_suffixed_name() {
     let spec = spec::admin_token(&fixtures::owned(), &fixtures::place(), b"temper-admin-0123456789abcdef");
     let expected = [
         b"--work-path".as_slice(),
@@ -167,7 +167,7 @@ fn the_admin_token_asks_for_three_scopes_under_a_suffixed_name() {
         b"temper-admin-0123456789abcdef",
         b"--raw",
         b"--scopes",
-        b"write:admin,write:organization,write:user",
+        b"write:admin,read:user,write:organization,write:repository",
     ];
     assert_eq!(spec.arguments.len(), expected.len());
     for (arg, expected) in spec.arguments.iter().zip(expected) {

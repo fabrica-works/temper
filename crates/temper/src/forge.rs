@@ -271,6 +271,10 @@ pub fn reconcile_settings(
         return Err("its transport is TLS, and reconcile speaks plaintext to loopback alone".into());
     }
     let entry = checked.setup.entry(number).ok_or("the setup has no entry for it")?;
+    if forge.records_only && matches!(entry.mode, Mode::Owned(_) | Mode::Fake(_)) {
+        return Err(format!("forge {number} starts from its records: `temper serve` takes its handover"));
+    }
+    // temper-15 removes the legacy command's file-backed entries.
     let directory = super::path(&entry.directory).to_path_buf();
     if !directory.exists() {
         fs::DirBuilder::new().recursive(true).mode(0o700).create(&directory).map_err(|why| why.to_string())?;

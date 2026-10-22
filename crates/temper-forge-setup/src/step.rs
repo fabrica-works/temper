@@ -106,8 +106,8 @@ fn forge(action: &[u8], flags: &[Box<[u8]>], number: u16, run: Option<&[u8]>) ->
     Step::new(name, args.into_boxed(), if run.is_some() { Kind::Long } else { Kind::Once })
 }
 /// Carries the box's absolute directory flags after each command's words.
-/// Commands in setup order: owned processes, unasked reconciles, then serve;
-/// an asked forge's processes and final reconcile apart, in a group placed in that order.
+/// Commands in setup order: owned processes, legacy reconciles, then serve;
+/// an asked forge's processes apart, in a group placed in that order.
 #[must_use]
 pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     let count = u32::try_from(setup.entries.len()).expect("bounded entries");
@@ -117,7 +117,6 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     let mut asked = List::with_capacity(count);
     for e in &setup.entries {
         match &e.mode {
-            // Fake processes and their preparation come later; keep their reconcile below.
             Mode::Managed { .. } | Mode::Fake(_) => {}
             Mode::Owned(o) => {
                 let mut group = List::with_capacity(5);
@@ -132,7 +131,6 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
                     group.push((Stage::Run, forge(b"run", flags, e.forge, Some(b"runner")))).expect("runner");
                 }
                 if e.asked {
-                    group.push((Stage::Run, forge(b"reconcile", flags, e.forge, None))).expect("reconcile");
                     asked
                         .push(Group { forge: e.forge, before: out.len(), steps: group.into_boxed() })
                         .expect("entry capacity");
@@ -145,7 +143,12 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
         }
     }
     for e in &setup.entries {
-        if !e.asked {
+        // temper-15: the fake starts from records once its start-time adoption reads them.
+        let reconcile = match &e.mode {
+            Mode::Owned(_) => false,
+            Mode::Managed { .. } | Mode::Fake(_) => true,
+        };
+        if !e.asked && reconcile {
             out.push(forge(b"reconcile", flags, e.forge, None)).expect("step capacity");
         }
     }

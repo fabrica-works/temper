@@ -142,8 +142,7 @@ fn the_default_is_the_owned_example_so_edited() {
                      "api_token": "demo/forge/api_token", "user": {"file": "demo/forge/user"}, "webhook_secret": "demo/forge/webhook_secret"},
                     {"number": 2_u16, "kind": "github", "api": null, "transport": null, "git": null, "web": null},
                     {"number": 3_u16, "kind": "forgejo", "api": {"socket": format!("127.0.0.1:{}", facts.ports.owned)},
-                     "transport": "plaintext", "git": format!("http://127.0.0.1:{}", facts.ports.owned), "web": null,
-                     "api_token": "forge-3/api_token", "user": {"file": "forge-3/user"}, "webhook_secret": "forge-3/webhook_secret"}
+                     "transport": "plaintext", "git": format!("http://127.0.0.1:{}", facts.ports.owned), "web": null}
                 ]),
             ),
             (
@@ -152,7 +151,7 @@ fn the_default_is_the_owned_example_so_edited() {
                     {"number": 1_u32, "forge": 2_u16, "login": null, "author": null},
                     {"number": 2_u32, "forge": 1_u16, "token": "demo/forge/git_token", "login": "temper",
                      "author": {"name": "Temper", "email": "temper@localhost"}},
-                    {"number": 3_u32, "forge": 3_u16, "token": "forge-3/git_token", "login": "temper",
+                    {"number": 3_u32, "forge": 3_u16, "login": "temper",
                      "author": {"name": "Temper", "email": "temper@localhost"}}
                 ]),
             ),

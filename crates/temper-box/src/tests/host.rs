@@ -11,8 +11,8 @@ fn the_steps_start_in_order_and_a_stop_leaves_no_child() {
         once(b"prepare", &[b"exit", b"0"]),
         long(b"forgejo", &[b"never"]),
         long(b"runner", &[b"never"]),
-        once(b"reconcile-1", &[b"exit", b"0"]),
-        once(b"reconcile-2", &[b"exit", b"0"]),
+        once(b"once-1", &[b"exit", b"0"]),
+        once(b"once-2", &[b"exit", b"0"]),
         long(b"serve", &[b"never"]),
     ];
     let mut harness = Harness::new(&steps);
@@ -25,8 +25,8 @@ fn the_steps_start_in_order_and_a_stop_leaves_no_child() {
         bytes::copy_of(b"prepare"),
         bytes::copy_of(b"forgejo"),
         bytes::copy_of(b"runner"),
-        bytes::copy_of(b"reconcile-1"),
-        bytes::copy_of(b"reconcile-2"),
+        bytes::copy_of(b"once-1"),
+        bytes::copy_of(b"once-2"),
         bytes::copy_of(b"serve"),
     ]);
     assert_eq!(names.as_slice(), expected.as_ref(), "the setup's step order");

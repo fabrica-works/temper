@@ -22,14 +22,13 @@ pub fn document(value: &mut serde_json::Value, names: &Names<'_>) {
     owned.forgejo = ([127, 0, 0, 1], names.port).into();
     owned.forgejo_binary = names.forgejo.into();
     let mut members = application(&owned);
-    members["forges"][0]["webhook_secret"] = serde_json::Value::Null;
     members["webhooks"] = serde_json::Value::Null;
     members["identities"][0]["login"] = names.bot.into();
     let setup = &mut members["setup"][0];
     setup["bot"] = serde_json::json!({"login":names.bot,"email":format!("{}@example.invalid", names.bot)});
-    setup["orgs"] = serde_json::json!(names.orgs);
     let mode = &mut setup["mode"]["owned"];
-    mode["person"] = serde_json::json!({"login":names.person,"email":format!("{}@example.invalid", names.person)});
+    mode["person"] =
+        serde_json::json!({"login":names.person,"email":format!("{}@example.invalid", names.person),"orgs":names.orgs});
     if let Some(binary) = names.runner {
         mode["runner"]["binary"] = serde_json::json!(binary);
     } else {
@@ -40,11 +39,27 @@ pub fn document(value: &mut serde_json::Value, names: &Names<'_>) {
     }
 }
 
+// temper-15 removes this old form and temper-01a's Adopt stand-in.
+pub fn old_form(application: &mut serde_json::Value) {
+    let webhooks = !application["webhooks"].is_null();
+    let forge = &mut application["forges"][0];
+    forge["identity"] = 1.into();
+    forge["api_token"] = "forge-1/api_token".into();
+    forge["user"] = serde_json::json!({"file":"forge-1/user"});
+    forge["webhook_secret"] = if webhooks { "forge-1/webhook_secret".into() } else { serde_json::Value::Null };
+    application["identities"][0].as_object_mut().expect("identity").remove("forge");
+    application["identities"][0]["token"] = "forge-1/git_token".into();
+    let entry = &mut application["setup"][0];
+    let orgs = entry["mode"]["owned"]["person"].as_object_mut().expect("owned person").remove("orgs");
+    entry["orgs"] = orgs.expect("owned orgs");
+}
+
 pub fn configuration(directory: &Path, names: &Names<'_>) {
     super::configuration(directory, &super::Forge::Unreached);
     let path = directory.join("temper.json");
     let mut value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     document(&mut value, names);
+    old_form(&mut value["application"]);
     super::write_private(&path, &serde_json::to_vec(&value).expect("JSON"));
 }
 #[must_use]
@@ -757,7 +772,7 @@ pub fn bounded(directory: &Path) -> Bounded {
     )
 }
 
-/// The same admitted inputs with file-free owned access and nested orgs.
+/// The shipped owned form has file-free access and nested orgs.
 #[must_use]
 pub fn bounded_records(directory: &Path) -> Bounded {
     let owned =
@@ -765,17 +780,6 @@ pub fn bounded_records(directory: &Path) -> Bounded {
     lay(directory, &owned);
     let mut value: serde_json::Value =
         serde_json::from_slice(&example_document(directory, &owned)).expect("bounded records fixture");
-    let forge = value["application"]["forges"][0].as_object_mut().expect("bounded records fixture");
-    for name in ["api_token", "user", "webhook_secret"] {
-        forge.remove(name);
-    }
-    value["application"]["identities"][0].as_object_mut().expect("bounded records fixture").remove("token");
-    let orgs = value["application"]["setup"][0]
-        .as_object_mut()
-        .expect("bounded records fixture")
-        .remove("orgs")
-        .expect("bounded records fixture");
-    value["application"]["setup"][0]["mode"]["owned"]["person"]["orgs"] = orgs;
     // The records-only certificate also admits the longest configured directory
     // and a full records.value_bytes handover, without real filesystem reads.
     value["application"]["setup"][0]["directory"] = format!("/{}", "p".repeat(4095)).into();
@@ -1023,7 +1027,7 @@ pub fn check_memory(relative: &str, required: temper_service::startup::Requireme
     assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
     assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
 }
-/// Stands for skein's Adopt (forge-setup.md, 4.5 and 4.8); temper-14 removes it.
+/// temper-01a's Adopt stand-in (forge-setup.md, 4.5 and 4.8); temper-15 removes it.
 /// Uses the kept webhook secret, drawing one only when absent.
 /// Uses the person's token because preparation's admin token carries no write:repository; temper-14 settles Adopt's scopes.
 pub fn adopt(

@@ -9,8 +9,8 @@ use temper_forge_setup::{Kind, Step};
 pub const PREPARE: usize = 0;
 pub const FORGEJO: usize = 1;
 pub const RUNNER: usize = 2;
-pub const RECONCILE_1: usize = 3;
-pub const RECONCILE_2: usize = 4;
+pub const ONCE_1: usize = 3;
+pub const ONCE_2: usize = 4;
 pub const SERVE: usize = 5;
 pub fn step(name: &[u8], kind: Kind) -> Step {
     command(name, &[], kind)
@@ -20,8 +20,8 @@ pub fn owned_steps() -> Box<[Step]> {
         step(b"prepare", Kind::Once),
         step(b"forgejo", Kind::Long),
         step(b"runner", Kind::Long),
-        step(b"reconcile-1", Kind::Once),
-        step(b"reconcile-2", Kind::Once),
+        step(b"once-1", Kind::Once),
+        step(b"once-2", Kind::Once),
         step(b"serve", Kind::Long),
     ])
 }
@@ -48,8 +48,8 @@ impl Rig {
         rig.completed(PREPARE);
         rig.started(FORGEJO);
         rig.started(RUNNER);
-        rig.completed(RECONCILE_1);
-        rig.completed(RECONCILE_2);
+        rig.completed(ONCE_1);
+        rig.completed(ONCE_2);
         rig.started(SERVE);
         rig.orders();
         rig

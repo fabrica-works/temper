@@ -418,51 +418,24 @@ fn owned_example(case: &str) -> support::Scratch {
     scratch
 }
 #[test]
-fn the_owned_example_asks_for_reconciles_files() {
-    let scratch = owned_example("owned-example-refused");
-    assert_eq!(
-        temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("start refused"),
-        "temper serve: application.forges[0].api_token: forge-1/api_token: absent\n\
-         temper serve: application.forges[0].user.file: forge-1/user: absent\n\
-         temper serve: application.forges[0].webhook_secret: forge-1/webhook_secret: absent\n\
-         temper serve: application.identities[0].token: forge-1/git_token: absent\n"
-            .replace(": forge-1/", &format!(": {}/forge-1/", scratch.path().display()))
-    );
+fn the_owned_example_starts_without_credential_files() {
+    let scratch = owned_example("owned-example-records");
+    let prepared = temper::prepare_in(&support::configuration::directories(scratch.path()));
+    assert!(prepared.is_ok(), "{}", prepared.err().unwrap_or_default());
+    assert!(!scratch.path().join("forge-1").exists(), "startup writes no forge files");
     scratch.remove();
 }
-fn owned_example_with_forge_files(case: &str) -> support::Scratch {
-    const TOKEN_BYTES: usize = 512;
-    const BOT_USER: &[u8] = b"42";
-    let scratch = support::Scratch::startup(case);
-    let owned = support::owned::Owned::example();
-    support::owned::lay(scratch.path(), &owned);
-    support::write_private(
-        &scratch.path().join("temper.json"),
-        &support::owned::example_document(scratch.path(), &owned),
-    );
-    let forge = scratch.path().join("forge-1");
-    fs::create_dir(&forge).expect("forge directory");
-    fs::set_permissions(&forge, fs::Permissions::from_mode(0o700)).expect("private forge");
-    for (name, bytes) in [
-        ("api_token", [b't'; TOKEN_BYTES].as_slice()),
-        ("user", BOT_USER),
-        ("webhook_secret", b"webhook-secret"),
-        ("git_token", b"git-token"),
-    ] {
-        support::write_private(&forge.join(name), bytes);
-    }
-    scratch
-}
+
 #[test]
 fn serve_prepares_once_on_the_owned_example() {
-    let scratch = owned_example_with_forge_files("owned-example-prepared");
+    let scratch = owned_example("owned-example-prepared");
     let prepared = temper::prepare_in(&support::configuration::directories(scratch.path()));
     assert!(prepared.is_ok(), "{}", prepared.err().unwrap_or_default());
     scratch.remove();
 }
 #[test]
 fn serve_checks_the_owned_agents_admission_at_each_bound() {
-    let scratch = owned_example_with_forge_files("owned-admission-bounds");
+    let scratch = owned_example("owned-admission-bounds");
     let path = scratch.path().join("owned/agent.json");
     let original: serde_json::Value =
         serde_json::from_slice(&fs::read(&path).expect("agent fixture")).expect("agent JSON");
@@ -640,8 +613,8 @@ fn the_owned_example_is_named_without_a_problem() {
     for path in [b"forge-1/api_token".as_slice(), b"forge-1/user", b"forge-1/webhook_secret", b"forge-1/git_token"] {
         assert_eq!(
             named.files.iter().find(|file| file.path.as_ref() == path).map(|file| file.private),
-            Some(true),
-            "{path:?}"
+            None,
+            "records-only owned input names no file: {path:?}"
         );
     }
 }
@@ -1221,6 +1194,12 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // iii: handover/file-correlation state, Note layout and the one-time
             // restored guard. File/Secret payloads are certified separately below.
             + 624
+            // The owned example in its records-only form, beside ii's local
+            // start state, releases 388 B of legacy credential reads, and
+            // prices iii's handover diagnostics for its records-only forge:
+            // 256-B reasons in retained connections and handoffs, and its path in Notes.
+            - 388
+            + 387_647
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1326,6 +1305,8 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // Grant validity adds GIT_VALIDITY_GROWTH = 48 B to each worker figure.
     // Forge 3 and its repository/output room add 1,023,147,519 B to the engine;
     // the worker's credential slots already cover its identity, so it does not grow.
+    // Records-only forge 3 adds 4 B of checked admission; its asked legacy
+    // files were already absent, so there is no credential release here.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);
@@ -1625,12 +1606,14 @@ fn serve_box_refuses_closed_or_non_pipe_descriptors_before_starting() {
 }
 
 #[test]
-fn an_asked_owned_forges_absent_files_are_left_out_but_existing_files_stay_private() {
+fn a_legacy_asked_owned_forges_absent_files_are_left_out_but_existing_files_stay_private() {
     for public in [false, true] {
         let scratch = owned_example(if public { "asked-public-file" } else { "asked-absent-files" });
         let config = scratch.path().join("temper.json");
         let mut value: serde_json::Value =
             serde_json::from_slice(&fs::read(&config).expect("configuration file")).expect("configuration JSON");
+        // temper-15 removes the old-form file checks; the shipped form names none.
+        support::owned::old_form(&mut value["application"]);
         value["application"]["setup"][0]["start"] = "asked".into();
         support::write_private(&config, &serde_json::to_vec(&value).expect("configuration JSON"));
         if public {
@@ -1655,26 +1638,11 @@ fn an_asked_owned_forges_absent_files_are_left_out_but_existing_files_stay_priva
     }
 }
 
-fn records_owned(directory: &std::path::Path) {
-    let config = directory.join("temper.json");
-    let mut value: serde_json::Value =
-        serde_json::from_slice(&fs::read(&config).expect("configuration")).expect("JSON");
-    let forge = value["application"]["forges"][0].as_object_mut().expect("forge");
-    for member in ["api_token", "user", "webhook_secret"] {
-        forge.remove(member);
-    }
-    value["application"]["identities"][0].as_object_mut().expect("identity").remove("token");
-    let orgs =
-        value["application"]["setup"][0].as_object_mut().expect("setup").remove("orgs").expect("handover fixture");
-    value["application"]["setup"][0]["mode"]["owned"]["person"]["orgs"] = orgs;
-    support::write_private(&config, &serde_json::to_vec(&value).expect("configuration"));
-}
 #[test]
 fn records_only_handover_reads_are_private_optional_bounded_and_only_read_admin_token() {
     for row in ["absent", "exact", "over", "newline", "public", "link", "parent-link", "directory", "unreadable"] {
         let scratch = owned_example(&format!("handover-{row}"));
         let directory = scratch.path();
-        records_owned(directory);
         let forge = directory.join("forge-1");
         fs::create_dir(&forge).expect("forge directory");
         fs::set_permissions(&forge, fs::Permissions::from_mode(0o700)).expect("handover fixture");
@@ -1728,6 +1696,7 @@ fn old_form_owned_does_not_read_a_handover() {
     let config = scratch.path().join("temper.json");
     let mut value: serde_json::Value =
         serde_json::from_slice(&fs::read(&config).expect("handover fixture")).expect("handover fixture");
+    support::owned::old_form(&mut value["application"]);
     value["application"]["setup"][0]["start"] = "asked".into();
     support::write_private(&config, &serde_json::to_vec(&value).expect("handover fixture"));
     assert!(temper::prepare_in(&support::configuration::directories(scratch.path())).is_ok());
@@ -1737,7 +1706,6 @@ fn old_form_owned_does_not_read_a_handover() {
 #[test]
 fn tls_is_refused_before_reading_the_handover() {
     let scratch = owned_example("tls-before-handover");
-    records_owned(scratch.path());
     fs::create_dir(scratch.path().join("forge-1")).expect("handover fixture");
     fs::create_dir(scratch.path().join("forge-1/admin_token")).expect("handover fixture");
     let config = scratch.path().join("temper.json");

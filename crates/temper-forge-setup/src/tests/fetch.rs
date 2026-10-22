@@ -498,7 +498,6 @@ fn groups_fetch_before_preparation() {
                     cmd("prepare", 3, None),
                     cmd("run", 3, Some("forgejo")),
                     cmd("run", 3, Some("runner")),
-                    cmd("reconcile", 3, None),
                     serve(),
                 ]
                 .into_boxed_slice(),
@@ -515,7 +514,6 @@ fn groups_fetch_before_preparation() {
                     cmd("prepare", 1, None),
                     cmd("run", 1, Some("forgejo")),
                     cmd("run", 1, Some("runner")),
-                    cmd("reconcile", 1, None),
                     serve(),
                 ]
                 .into_boxed_slice(),
@@ -527,7 +525,6 @@ fn groups_fetch_before_preparation() {
                         (Stage::Prepare, cmd("prepare", 3, None)),
                         (Stage::Run, cmd("run", 3, Some("forgejo"))),
                         (Stage::Run, cmd("run", 3, Some("runner"))),
-                        (Stage::Run, cmd("reconcile", 3, None)),
                     ]),
                 }]),
             },
@@ -543,7 +540,6 @@ fn groups_fetch_before_preparation() {
                     cmd("prepare", 3, None),
                     cmd("run", 3, Some("forgejo")),
                     cmd("run", 3, Some("runner")),
-                    cmd("reconcile", 3, None),
                     serve(),
                 ]
                 .into_boxed_slice(),
@@ -560,7 +556,6 @@ fn groups_fetch_before_preparation() {
                     cmd("prepare", 3, None),
                     cmd("run", 3, Some("forgejo")),
                     cmd("run", 3, Some("runner")),
-                    cmd("reconcile", 3, None),
                     serve(),
                 ]
                 .into_boxed_slice(),

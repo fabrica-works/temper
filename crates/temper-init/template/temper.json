@@ -240,7 +240,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85584103877463,
+    "memory_bytes": 85584104265958,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -872,12 +872,7 @@
         },
         "transport": "plaintext",
         "git": "$owned_git",
-        "web": null,
-        "api_token": "forge-3/api_token",
-        "user": {
-          "file": "forge-3/user"
-        },
-        "webhook_secret": "forge-3/webhook_secret"
+        "web": null
       }
     ],
     "identities": [
@@ -900,7 +895,6 @@
       {
         "number": 3,
         "forge": 3,
-        "token": "forge-3/git_token",
         "login": "temper",
         "author": {
           "name": "Temper",

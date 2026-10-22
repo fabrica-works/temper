@@ -1,4 +1,4 @@
-use super::fixtures::{FORGEJO, PREPARE, RECONCILE_1, RECONCILE_2, RUNNER, Rig, SERVE};
+use super::fixtures::{FORGEJO, ONCE_1, ONCE_2, PREPARE, RUNNER, Rig, SERVE};
 use crate::{
     limits,
     machine::{Input, Order, Outcome},
@@ -43,11 +43,11 @@ fn a_long_step_that_exits_runs_every_once_step_just_before_it_again() {
     let mut rig = Rig::running();
     rig.failed_long(SERVE);
     rig.advance(Duration::from_millis(500));
-    assert_eq!(&*rig.orders(), &[Order::Spawn { step: RECONCILE_1 }]);
-    rig.completed(RECONCILE_1);
-    assert_eq!(&*rig.orders(), &[Order::Close { step: RECONCILE_1 }, Order::Spawn { step: RECONCILE_2 }]);
-    rig.completed(RECONCILE_2);
-    assert_eq!(&*rig.orders(), &[Order::Close { step: RECONCILE_2 }, Order::Spawn { step: SERVE }]);
+    assert_eq!(&*rig.orders(), &[Order::Spawn { step: ONCE_1 }]);
+    rig.completed(ONCE_1);
+    assert_eq!(&*rig.orders(), &[Order::Close { step: ONCE_1 }, Order::Spawn { step: ONCE_2 }]);
+    rig.completed(ONCE_2);
+    assert_eq!(&*rig.orders(), &[Order::Close { step: ONCE_2 }, Order::Spawn { step: SERVE }]);
 }
 #[test]
 fn a_long_step_after_a_long_step_restarts_alone() {
@@ -110,21 +110,21 @@ fn a_once_step_that_fails_gives_up_and_stops_what_runs() {
         rig.advance(Duration::from_millis(500));
         rig.orders();
         if not_started {
-            rig.input(Input::NotStarted { step: RECONCILE_1 });
+            rig.input(Input::NotStarted { step: ONCE_1 });
         } else {
-            rig.started(RECONCILE_1);
-            rig.exited(RECONCILE_1, Exit::Code(1));
-            rig.closed(RECONCILE_1);
+            rig.started(ONCE_1);
+            rig.exited(ONCE_1, Exit::Code(1));
+            rig.closed(ONCE_1);
         }
         assert_eq!(
             rig.machine.outcome(),
-            Some(Outcome::GaveUp { step: RECONCILE_1, restarts: 0 }),
+            Some(Outcome::GaveUp { step: ONCE_1, restarts: 0 }),
             "not started {not_started}"
         );
         let expected: &[Order] = if not_started {
             &[Order::Signal { step: RUNNER }]
         } else {
-            &[Order::Close { step: RECONCILE_1 }, Order::Signal { step: RUNNER }]
+            &[Order::Close { step: ONCE_1 }, Order::Signal { step: RUNNER }]
         };
         assert_eq!(&*rig.orders(), expected, "not started {not_started}");
     }
@@ -729,7 +729,7 @@ fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask(
             steps: Box::new([
                 (Stage::Run, step(b"forgejo 3", Kind::Long)),
                 (Stage::Run, step(b"runner 3", Kind::Long)),
-                (Stage::Run, step(b"reconcile 3", Kind::Once)),
+                (Stage::Run, step(b"once 3", Kind::Once)),
             ]),
         }]),
     });
@@ -743,7 +743,7 @@ fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask(
             assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step } }));
             machine.input(Time::ZERO, Input::Started { step }, &mut out);
         }
-        assert!(out.is_empty(), "reconcile must exit before started");
+        assert!(out.is_empty(), "the once step must exit before started");
         machine.input(Time::ZERO, Input::Exited { step: 2, exit: Exit::Code(code) }, &mut out);
         if code == 0 {
             assert_eq!(out.pop(), Some(Order::Close { step: 2 }));
@@ -785,7 +785,7 @@ fn an_owned_version_gates_the_runner_and_record_on_ask_and_restart() {
             steps: Box::new([
                 (Stage::Run, step(b"forgejo 3", Kind::Long).with_ready(([127, 0, 0, 1], 3000).into())),
                 (Stage::Run, step(b"runner 3", Kind::Long)),
-                (Stage::Run, step(b"reconcile 3", Kind::Once)),
+                (Stage::Run, step(b"once 3", Kind::Once)),
             ]),
         }]),
     });
@@ -815,7 +815,7 @@ fn an_owned_version_gates_the_runner_and_record_on_ask_and_restart() {
                         assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step: 1 } }));
                     }
                     machine.input(now, Input::Ready { step: 0 }, &mut out);
-                    assert!(out.is_empty(), "a stale ready cannot skip reconcile");
+                    assert!(out.is_empty(), "a stale ready cannot skip the once step");
                     machine.input(now, Input::Started { step: 1 }, &mut out);
                     assert_eq!(out.pop(), Some(Order::Spawn { step: 2 }));
                     if !recorded {

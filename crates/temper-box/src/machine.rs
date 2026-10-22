@@ -511,7 +511,7 @@ impl Machine {
     }
     fn advance_group(&mut self, index: usize, next: Option<usize>, orders: &mut Queue<Order>) {
         // The record means the whole group stands (setup.md, 6.6/7.1):
-        // Forgejo answered, the runner started, and reconcile exited zero.
+        // Forgejo answered and the remaining group steps completed.
         if let Some(step) = next {
             self.spawn(step, self.successor(step), orders);
         } else {

@@ -32,3 +32,40 @@ fn reconcile_adopts_no_repositories() {
     }
     fs::remove_dir_all(directory).expect("settings scratch removed");
 }
+
+#[test]
+fn reconcile_refuses_records_only_owned_and_fake_without_writing_files() {
+    let directory = std::env::temp_dir().join(format!("temper-records-reconcile-{}", std::process::id()));
+    fs::create_dir(&directory).expect("settings scratch");
+    let directories = jig_protocol_config::Directories::given(
+        directory.as_os_str().as_bytes(),
+        directory.as_os_str().as_bytes(),
+        directory.as_os_str().as_bytes(),
+    )
+    .expect("fixture directories");
+    for owned in [false, true] {
+        let mut value = configuration::check_document(&directory);
+        value["application"]["webhooks"] = serde_json::Value::Null;
+        let forge = value["application"]["forges"][0].as_object_mut().expect("forge");
+        for name in ["api_token", "user", "webhook_secret", "identity"] {
+            forge.remove(name);
+        }
+        let identity = &mut value["application"]["identities"][0];
+        identity.as_object_mut().expect("identity").remove("token");
+        identity["forge"] = 1.into();
+        if owned {
+            value["application"]["setup"][0]["mode"] = serde_json::json!({"owned":{
+                "forgejo":"/fixture/forgejo", "runner":null, "listen":{"socket":"127.0.0.1:9"},
+                "person":{"login":"ada","email":"ada@example.test","orgs":["acme"]}
+            }});
+        }
+        let deployment = crate::setup::check(&serde_json::to_vec(&value).expect("fixture JSON"), &directories)
+            .expect("checked deployment");
+        assert_eq!(
+            reconcile_settings(&deployment.named, &deployment.checked, 1).err(),
+            Some("forge 1 starts from its records: `temper serve` takes its handover".into())
+        );
+        assert!(!directory.join("forge-1").exists(), "refusal creates no directory or credential file");
+    }
+    fs::remove_dir_all(directory).expect("settings scratch removed");
+}

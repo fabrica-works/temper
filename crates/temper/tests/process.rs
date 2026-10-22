@@ -435,7 +435,7 @@ fn assert_box_streams(ended: &support::boxed::Outcome) {
     assert!(skein_lib::bytes::find(link, b"/jig/v1/sign-in/link?secret=").is_some(), "the sign-in link");
     let alone = |line: &[u8]| line.is_empty() || line.starts_with(b"http://127.0.0.1:");
     assert!(ended.stdout.split(|byte| *byte == b'\n').all(alone), "stdout holds links alone");
-    let steps: [&[u8]; 6] = [b"prepare 1: ", b"forgejo 1: ", b"runner 1: ", b"reconcile 1: ", b"serve: ", b"box: "];
+    let steps: [&[u8]; 5] = [b"prepare 1: ", b"forgejo 1: ", b"runner 1: ", b"serve: ", b"box: "];
     let lines = || ended.stderr.split(|byte| *byte == b'\n').filter(|line| !line.is_empty());
     assert!(lines().all(|line| steps.iter().any(|step| line.starts_with(step))), "each stderr line names its step");
     assert!(lines().any(|line| line.starts_with(b"runner 1: ")), "the runner's lines arrive prefixed");
@@ -602,6 +602,7 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         fs::set_permissions(target, fs::Permissions::from_mode(0o700)).expect("private executable");
     }
     let before = cached.each_ref().map(|path| cached_binary_fingerprint(path));
+    let mut bot = None;
     for run in ["first", "second"] {
         let client_root = scratch.path().join(run);
         fs::create_dir(&client_root).expect("fresh client root");
@@ -650,7 +651,7 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         let stderr = String::from_utf8_lossy(&ended.stderr);
         assert_eq!(ended.exit, Some(Exit::Code(0)), "{run}: {stderr}");
         assert_eq!(ended.left, Some(Vec::new()), "{run}: no process outlived the box: {stderr}");
-        assert_forgejo_setup_rows(run, &ended.calls, &stderr);
+        bot = Some(assert_forgejo_setup(run, &ended.calls, &stderr, bot, &paths[1]));
         let (address, version) = ended.checked.expect("the live forge check ran");
         let version = version.unwrap_or_else(|why| panic!("{run}: live Forgejo version: {why:?}; box: {stderr}"));
         assert_eq!(version["version"].as_str().expect("version").split('+').next(), Some(VERSION));
@@ -672,7 +673,13 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
     scratch.remove();
 }
 
-fn assert_forgejo_setup_rows(run: &str, calls: &[support::Ended], stderr: &str) {
+fn assert_forgejo_setup(
+    run: &str,
+    calls: &[support::Ended],
+    stderr: &str,
+    previous: Option<u64>,
+    data: &std::path::Path,
+) -> u64 {
     for call in calls {
         assert_eq!(
             call.exit,
@@ -699,7 +706,7 @@ fn assert_forgejo_setup_rows(run: &str, calls: &[support::Ended], stderr: &str) 
         assert_eq!(forge["offer"], "offered");
         assert_eq!(forge["state"], "not_set_up");
         assert!(calls[3].stdout.starts_with(b"setting up\n"));
-        // Preparation and reconcile are silent on success; Forgejo's startup
+        // Preparation is silent on success; Forgejo's startup
         // and the runner's lines reach the box with their step prefixes.
         for step in ["forgejo 3: ", "runner 3: "] {
             assert!(stderr.lines().any(|line| line.starts_with(step)), "group step {step}: {stderr}");
@@ -710,18 +717,19 @@ fn assert_forgejo_setup_rows(run: &str, calls: &[support::Ended], stderr: &str) 
             "the restarted group fetches nothing: {stderr}"
         );
     }
-    // M4 connects the forge at `started`; M3 leaves the first run NotConnected.
-    // The next box connects at startup from the group's reconciled files.
-    let expected = if run == "first" {
-        "forge 3 · Forgejo · owned · Not connected"
-    } else {
-        "forge 3 · Forgejo · owned · Connected as temper (3)"
-    };
-    assert!(
-        String::from_utf8_lossy(&calls.last().expect("forges read").stdout).lines().any(|line| line == expected),
-        "{run}: forges row: {}; box: {stderr}",
-        String::from_utf8_lossy(&calls.last().expect("forges read").stdout)
-    );
+    let stdout = String::from_utf8_lossy(&calls.last().expect("forges read").stdout);
+    let user = stdout.lines().find_map(|line| {
+        line.strip_prefix("forge 3 · Forgejo · owned · Connected as temper (")?.strip_suffix(')')?.parse::<u64>().ok()
+    });
+    assert!(user.is_some_and(|user| user != 0), "{run}: forges row: {stdout}; box: {stderr}");
+    let user = user.expect("connected bot's ID");
+    if let Some(previous) = previous {
+        assert_eq!(user, previous, "the second box connects as the same bot");
+    }
+    for name in ["admin_token", "api_token", "git_token", "user", "webhook_secret"] {
+        assert!(!data.join("forge-3").join(name).exists(), "{run}: no forge-3/{name}");
+    }
+    user
 }
 
 fn cached_binary_fingerprint(path: &std::path::Path) -> (u64, [u8; 32]) {
