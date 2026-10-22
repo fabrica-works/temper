@@ -257,9 +257,12 @@ temper-engine-domain-forge              the connector's top: resources and holds
 ### 4.1 Connected or not
 
 - **The root knows each forge's connection** from the routing's events
-  (`../protocol/forge.md`, 8.1): not connected; connecting, while a
-  setup's run that connects it holds it; connected, as its user, by id
-  and login; or stopped, and why. The connector keeps it as the root
+  (`../protocol/forge.md`, 8.1): not connected; not set up, an owned
+  forge the box starts when asked, whose files are absent; setting up,
+  while the box runs its group, at the step it last named, if any; set
+  up failed, and why; connecting, while a setup's run that connects it
+  holds it; connected, as its user, by id and login; or stopped, and
+  why. The connector keeps it as the root
   tells it, in memory: nothing of it is stored, and each start rebuilds
   it from the routing's events, every forge not connected until its
   `Connected`.
@@ -275,6 +278,16 @@ temper-engine-domain-forge              the connector's top: resources and holds
   entry failed `NotConnected` is committed again once the forge
   connects, since it reached no forge. The client shows why on the
   forge's row (`../client/forge.md`, the deployment's page).
+- **Setting up a forge,** `SetUp { forge }` (`../client/README.md`,
+  section 8): the root gives it to the connector, which admits it by
+  the forge's connection alone, not set up or set up failed, the
+  states only an owned forge whose setup says `"start": "asked"`
+  enters (`../protocol/forge.md`, 8.1). Any other connection, or a
+  forge not configured, refuses it "not offered". Admitted or refused,
+  it goes out to the routing's box link, which asks the box or refuses
+  it, "not under the box" or "busy", and answers it
+  (`../protocol/forge.md`, 2.8). The connector changes no state at the
+  ask: the routing tells it each, as it does the others.
 - **An adoption on a forge not connected** is refused as such, before
   any read, and the client offers Connect; the picker offers none of
   that forge's repositories (4.3).
@@ -1363,7 +1376,11 @@ cost.
 Its stories of access and of GitHub's ways, the root and routing
 scripted: a forge connected while temper runs, an adoption refused as
 not connected before it and made after it, the writer given then and
-restored at the next start; a forge stopped while a change waits on it,
+restored at the next start; an owned forge set up from the client,
+`SetUp` admitted when not set up and when set up failed, refused "not
+offered" while setting up, connecting, connected, stopped or not
+configured, each state the routing tells kept as told and none
+restored; a forge stopped while a change waits on it,
 nothing narrowed, its entry committed again once it connects; a managed
 Forgejo's adoption whose access is refused, refused and named, and one
 given, then read; the picker's listing on each kind of forge, a managed

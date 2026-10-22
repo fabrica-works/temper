@@ -216,6 +216,12 @@ to the forge; a timer to the child that armed it. What temper adds:
   parts translated (7.4).
 - **An adoption,** an application request, goes to the core to admit by
   key, then to the forge (5.4).
+- **A forge's set up,** `SetUp { forge }` (`../client/README.md`,
+  section 8), goes to the forge, which admits it by the forge's
+  connection (forge.md, 4.1), then out to the protocol layer's box link,
+  admitted or refused, which asks the box or refuses it, and answers it
+  (`../protocol/forge.md`, 2.8). Nothing of it is committed: the states
+  it moves are in memory, as every connection's is.
 - **A hint that comes before decisions open** is dropped, since the
   restart reads afresh (9.1).
 - **A watch of the forge's subject,** a change's panel

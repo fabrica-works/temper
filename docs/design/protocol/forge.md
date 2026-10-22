@@ -283,16 +283,17 @@ skein-io socket
   `forge-client.md`, 7.1; `../domain/forge.md`, 4.1). A GitHub forge's
   `Reconcile { forge }` runs next, once the forge's writing run is free
   (2.6); it ends in no connect.
-- **The box's pipe** (setup.md, 7.1), under the box alone: at
-  `SetUp { forge }` (client/README.md, section 8) the routing writes
-  `start FORGE`, one ask at a time, and refuses it "not under the box"
-  with no pipe; it tells the root each `step` line, the forge setting
-  up and at which step; at `started FORGE`, the forge's `TakeOver`,
-  then its `Reconcile`, then `Request::Connect` (until temper-15, the
-  group's reconcile has done the first two into the forge's files, and
-  the routing reads them, builds the access from them as at start and
-  sends `Request::Connect`: setup.md, 6.5); at `failed FORGE WHY`,
-  the forge set up failed, with `WHY`. An answer for a forge it did not
+- **The box's pipe** (setup.md, 7.1), under the box alone, through
+  the routing's box link (2.8): at `SetUp { forge }` (client/README.md,
+  section 8), admitted by the root, the link writes `start FORGE`, one
+  ask at a time, and refuses it "not under the box" with no pipe; it
+  tells the root each `step` line, the forge setting up and at which
+  step; at `started FORGE`, the forge's `TakeOver`, then its
+  `Reconcile`, then `Request::Connect` (until temper-15, the group's
+  reconcile has done the first two into the forge's files, and the
+  routing reads them, builds the access from them as at start and
+  sends `Request::Connect`: setup.md, 6.5); at `failed FORGE WHY`, the
+  forge set up failed, with `WHY`. An answer for a forge it did not
   ask for is named in the log and dropped.
 - **Until then** each call on the forge is answered `NotConnected` at
   once, at cost 0 (2.7). The root shows the forge connecting while a run
@@ -525,6 +526,49 @@ routing carries it to the root, and the domain reads it
   `free`, which no rate counts and the budget charges nothing for. The
   delivery log's polls take one (5.1).
 - **A forge no one configured:** `Unavailable`, at once.
+
+### 2.8 The box's link
+
+`temper serve`'s side of the box's pipe (setup.md, 7.1): a step machine
+of the routing in `temper-service`, its lines and the root's asks in,
+its lines, the root's states and its answers out, hosted on the
+service's io.
+
+- **Under the box alone.** `temper serve --box` adopts fds 3 and 4
+  (setup.md, 7.1), and the link writes its lines on fd 3 and holds one
+  read on fd 4, a line at most `box.line_bytes` (configuration.md,
+  section 7) and its line feed. Without `--box` there is no pipe, and
+  every ask is refused "not under the box".
+- **An ask** is the root's `SetUp { forge }` once the root has admitted
+  it by the forge's connection (`../domain/forge.md`, 4.1). The link
+  writes `start FORGE` and tells the root the forge setting up, with no
+  step yet. One ask at a time: from its `start` until `started` or
+  `failed` answers it, every other ask is refused "busy". The link
+  answers each ask once: setting up, or its refusal, which is named in
+  the log and changes no state. The root's own refusal, a forge whose
+  connection does not offer it, reaches the link to be answered the
+  same way.
+- **The box's lines,** for the forge asked:
+  - `step FORGE STEP`, `STEP` one of `fetch`, `prepare` and `run`: the
+    forge setting up, at that step;
+  - `started FORGE`: the ask ends, and the forge connects as 2.2 says;
+  - `failed FORGE WHY`: the ask ends, and the forge's set up failed,
+    with `WHY` as the box wrote it, which holds no secret (setup.md,
+    7.1).
+- **Named and dropped,** each in one line of the log and changing no
+  state: a line for a forge other than the one asked, or while none is;
+  a line whose word, forge number or step the link does not know; and a
+  line past `box.line_bytes`, named by its bound, skipped to its line
+  feed.
+- **The pipe closed:** fd 4 at its end, or a read or a write on the
+  pipe failing, ends the link, named in the log once. An ask in flight
+  ends with its forge's set up failed, "the box closed the pipe", and
+  every later ask is refused "not under the box". serve's own end is
+  the box's to make (setup.md, 7.2).
+- **Nothing kept.** The link's ask and the states it tells are in
+  memory alone (8.1): a restart makes a pipe and a link afresh, with no
+  ask, and a group the box still runs answers the next ask by its own
+  lines (setup.md, 7.1).
 
 ## 3. Forgejo's API as temper uses it
 
@@ -770,6 +814,8 @@ its `limits` member (configuration.md, section 7), set in
 - **The setup's host:** `setup.states`, `setup.state_life_ms` (1 h) and
   `setup.runs` (2.6); its `Reachable` plan's `reachable` is the
   picker's `picker.page`.
+- **The box's link** (2.8): `box.line_bytes`, its one line read and
+  its one line written, and one ask.
 - **Beside this layer,** the clients' listener's `routes.query_bytes`
   and the picker's `picker.page` (100, GitHub's page), which bound the
   GitHub routes and the picker's reads (client/README.md, the routes and
@@ -789,12 +835,19 @@ Held by skein's `forge-connection.md`, section 8: a forge connection
 | State | Entered on | Its calls |
 |---|---|---|
 | not connected | start with no access, an incomplete, unreadable or mismatched set (2.1); a setup run's `Stop` on a forge with none | `NotConnected` |
+| not set up | start, an owned forge whose setup says `"start": "asked"` with any of its files absent (setup.md, 6.5) | `NotConnected` |
+| setting up | the box's link's `start` written, then each `step` line, with its step (2.8) | `NotConnected` |
+| set up failed | the box's `failed`, or its pipe closed during the ask (2.8) | `NotConnected` |
 | connecting | a run that connects begins (2.6) | `NotConnected` |
 | connected | `Event::Connected` (2.2) | served |
 | stopped | `Event::Stopped` (2.3) | `NotConnected` |
 
 A connecting forge goes back to what it was when its run stops; a
 stopped one is connected again by its next `Connected`, after a Replace.
+A setting up forge, at the box's `started`, connects as 2.2 says; set up
+failed, it is asked again from the client, as not set up is. Only an
+owned forge whose setup says `"start": "asked"` is ever not set up,
+setting up or set up failed.
 The state is the routing's and the root's, in memory, and is rebuilt at
 each start from the records and the events (`../domain/forge.md`,
 4.1).
@@ -866,6 +919,16 @@ The tiers, the fakes and the layout are `../domain/testing.md`'s (sections 2,
   - **pasted values:** a digest that differs refuses the run, "the
     pasted value changed"; the carried row erased when its run ends,
     done or failed, its items kept first on `Done`;
+  - **the box's link** (2.8): its machine's step tests, lines in and
+    out: an ask written, another refused "busy" until `started` or
+    `failed`, and every ask refused "not under the box" with no pipe;
+    each line for the forge asked; a line for another forge, an
+    unknown word, step or number, each named and dropped; a line at
+    `box.line_bytes` read and one byte past it named and skipped; the
+    pipe closed during an ask. Then the routing with a scripted box on
+    a pipe pair: an ask, `start 3`, `step 3 prepare`, `failed 3 prepare
+    3 exited 1`, the ask again and `start 3` again, a third refused
+    "busy", a stray `started 9` dropped, and the root told each state;
   - **GitHub's three routes** on the clients' listener (the manifest
     page, the redirect and the setup address; `../client/forge.md`,
     9.1): requests through `fixtures::http::Peer` to the service's

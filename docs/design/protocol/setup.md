@@ -817,7 +817,9 @@ temper box
   finds the handover at its start (6.5). Each line is at most
   `box.line_bytes` (configuration.md, section 7), which both sides
   read within; another line, or a longer one, is named on its reader's
-  stderr and ignored.
+  stderr and ignored. serve's side, its asks, its reads and the states
+  they tell the engine's root, is the routing's box link (forge.md,
+  2.8).
 - **A group's failure** before `started` answers `failed`, and the group
   is dormant again, to be asked again; the box runs on. Once started,
   its long steps are restarted, and given up on, as 7.2 says.
