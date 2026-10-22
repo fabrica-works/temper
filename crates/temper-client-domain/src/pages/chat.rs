@@ -486,6 +486,7 @@ impl Chat {
             | Act::ChatWords { .. }
             | Act::StartChat
             | Act::Suggest { .. }
+            | Act::ChatFilter { .. }
             | Act::ClosedChats
             | Act::Filter { .. }
             | Act::Decide { .. }

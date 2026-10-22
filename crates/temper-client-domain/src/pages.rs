@@ -78,6 +78,9 @@ pub enum Act {
     },
     Older,
     ClosedChats,
+    ChatFilter {
+        filter: chats::Filter,
+    },
     Filter {
         filter: crate::address::Filter,
     },
@@ -275,11 +278,8 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         }
         Event::Act { act: Act::StartChat } => start_chat(pages, env, client, out),
         Event::Act { act: Act::Suggest { .. } } => unreachable!("suggestions are resolved by the root"),
-        Event::Act { act: Act::ClosedChats } => {
-            if let Some(chats) = &pages.chats {
-                chats.older(out);
-            }
-        }
+        Event::Act { act: Act::ClosedChats } => closed_chats(pages, out),
+        Event::Act { act: Act::ChatFilter { filter } } => chat_filter(pages, filter),
         Event::Act { act: Act::Filter { filter } } => out.push(Request::Show { address: Address::Inbox { filter } }),
         Event::Act { act: act @ (Act::MessageWords { .. } | Act::Send | Act::Older) } => {
             if let Some(chat) = &mut pages.chat {
@@ -376,6 +376,17 @@ pub const fn next_deadline(_pages: &Pages) -> Option<Time> {
 #[must_use]
 pub const fn shown(pages: &Pages) -> u64 {
     pages.shown
+}
+
+fn closed_chats(pages: &mut Pages, out: &mut Queue<Request>) {
+    if let Some(chats) = &mut pages.chats {
+        chats.older(out);
+    }
+}
+fn chat_filter(pages: &mut Pages, filter: chats::Filter) {
+    if let Some(chats) = &mut pages.chats {
+        chats.filter = filter;
+    }
 }
 
 fn contains(me: &Me, project: Option<u32>) -> bool {
@@ -552,6 +563,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::MessageWords { .. }
         | Act::Send
         | Act::Older
+        | Act::ChatFilter { .. }
         | Act::ClosedChats
         | Act::Filter { .. }
         | Act::Seen

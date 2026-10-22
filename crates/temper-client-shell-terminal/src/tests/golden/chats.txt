@@ -8,15 +8,16 @@ temper
 [5] Sign out
 [6] Start a chat: (empty)
 [7] Start
-## Live chats
-- [8] Chat 9
+## Your chats
+[8] All (pressed)
+[9] Live
+[10] Closed
+- [11] T9
   Hello
   * Writing
   Spent 7; delegates spent 2
-  Live delegates 1
-## Closed
-- [9] Chat 8
+  1 delegate
+- [12] T8
   Earlier
   * Ended
   Spent 4; delegates spent 0
-  Live delegates 0

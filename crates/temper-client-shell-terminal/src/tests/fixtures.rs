@@ -754,34 +754,47 @@ pub fn chats_page() -> skein_ui::Tree {
     b.name(b"Start");
     b.bind(binding());
     b.close();
-    for (heading, number, title, status, spend, delegates) in [
+    b.open(Role::Heading { level: 2 });
+    b.text(Run::Plain, b"Your chats");
+    b.close();
+    for label in [b"All".as_slice(), b"Live", b"Closed"] {
+        b.open(Role::Button);
+        b.name(label);
+        if label == b"All" {
+            b.state(skein_ui::State::Pressed);
+        }
+        b.bind(binding());
+        b.close();
+    }
+    b.open(Role::List);
+    for (number, title, status, spend, delegates) in [
         (
-            b"Live chats".as_slice(),
-            b"Chat 9".as_slice(),
+            b"T9".as_slice(),
             b"Hello".as_slice(),
             b"Writing".as_slice(),
             b"Spent 7; delegates spent 2".as_slice(),
-            b"Live delegates 1".as_slice(),
+            Some(b"1 delegate".as_slice()),
         ),
-        (b"Closed", b"Chat 8", b"Earlier", b"Ended", b"Spent 4; delegates spent 0", b"Live delegates 0"),
+        (b"T8".as_slice(), b"Earlier".as_slice(), b"Ended".as_slice(), b"Spent 4; delegates spent 0".as_slice(), None),
     ] {
-        b.open(Role::Heading { level: 2 });
-        b.text(Run::Plain, heading);
-        b.close();
         b.open(Role::Item);
         b.open(Role::Link);
         b.name(number);
         b.bind(binding());
         b.close();
-        for (role, value) in
-            [(Role::Paragraph, title), (Role::Status, status), (Role::Paragraph, spend), (Role::Paragraph, delegates)]
-        {
+        for (role, value) in [(Role::Paragraph, title), (Role::Status, status), (Role::Paragraph, spend)] {
             b.open(role);
             b.text(Run::Plain, value);
             b.close();
         }
+        if let Some(delegates) = delegates {
+            b.open(Role::Paragraph);
+            b.text(Run::Plain, delegates);
+            b.close();
+        }
         b.close();
     }
+    b.close();
     b.close();
     b.close();
     b.finish()

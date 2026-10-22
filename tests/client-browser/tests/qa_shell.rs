@@ -241,7 +241,7 @@ fn enter_starts_one_chat_and_empty_or_shift_enter_none() {
             go(b"/chats"),
             see(composer()),
             see(Find::text(FIRST_CHAT)),
-            gone(Find::text(b"Chat 2")),
+            gone(Find::text(b"T2")),
         ],
     );
 }

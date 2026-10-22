@@ -181,6 +181,7 @@ mod memory_literal;
 // Agent page: 557 added nodes x 574,364 B + 16,782,488 B for the bounded thread
 // and borrowed view lines = 336,703,236 B, giving 124,061,806,040 B.
 // The context line adds one repository/forge text node; chat words use existing phrase room.
+// Your chats adds filter/empty nodes and five phrases to the checked envelope.
 // Procedure goal slot: five added nodes including its paragraph and link text.
 // The chat projection adds seven phrases while retaining the agent's work-line words.
 // Amendment editor: sixteen nodes and eleven phrases; the web root also retains

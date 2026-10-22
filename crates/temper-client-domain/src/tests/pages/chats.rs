@@ -159,3 +159,271 @@ fn new_chats_and_cues_keep_the_send_bound_when_receiving_grows() {
         }
     }
 }
+
+#[test]
+fn chats_open_with_all_selected() {
+    assert_eq!(Chats::new(FIRST).filter, crate::pages::chats::Filter::All);
+}
+
+#[test]
+fn chat_filters_change_only_the_selection_and_emit_nothing() {
+    use crate::pages::{self, Act, Event, Pages, chats::Filter};
+    let limits = fixtures::limits();
+    let root = crate::unlinked(&limits, fixtures::SEED);
+    let mut pages = Pages::new();
+    let mut out = Queue::with_capacity(OUTPUTS);
+    pages::step(
+        &mut pages,
+        &fixtures::env(&limits),
+        root.client(),
+        Event::Went { address: crate::Address::Chats },
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    pages::step(
+        &mut pages,
+        &fixtures::env(&limits),
+        root.client(),
+        Event::Act { act: Act::ChatWords { words: Box::from(*b"draft") } },
+        &mut out,
+    );
+    assert!(out.is_empty());
+    let handles = {
+        let chats = pages.chats().expect("chats");
+        (chats.live, chats.closed)
+    };
+    for filter in [Filter::Live, Filter::Closed, Filter::All] {
+        for _ in 0_u32..2 {
+            pages::step(
+                &mut pages,
+                &fixtures::env(&limits),
+                root.client(),
+                Event::Act { act: Act::ChatFilter { filter } },
+                &mut out,
+            );
+            let chats = pages.chats().expect("chats");
+            assert_eq!(chats.filter, filter);
+            assert_eq!(&*chats.words, b"draft");
+            assert_eq!((chats.live, chats.closed), handles);
+            assert!(out.is_empty(), "a filter neither reads, watches, sends nor navigates");
+        }
+    }
+}
+
+#[test]
+fn chat_filters_outside_chats_are_ignored_and_reopening_resets_them() {
+    use crate::pages::{self, Act, Event, Pages, chats::Filter};
+    let limits = fixtures::limits();
+    let root = crate::unlinked(&limits, fixtures::SEED);
+    let mut pages = Pages::new();
+    let mut out = Queue::with_capacity(OUTPUTS);
+    pages::step(
+        &mut pages,
+        &fixtures::env(&limits),
+        root.client(),
+        Event::Act { act: Act::ChatFilter { filter: Filter::Closed } },
+        &mut out,
+    );
+    assert!(pages.chats().is_none());
+    assert!(out.is_empty());
+    for address in [crate::Address::Chats, crate::Address::Accounts, crate::Address::Chats] {
+        pages::step(&mut pages, &fixtures::env(&limits), root.client(), Event::Went { address }, &mut out);
+        while out.pop().is_some() {}
+        if let Some(chats) = pages.chats() {
+            assert_eq!(chats.filter, Filter::All);
+        }
+        pages::step(
+            &mut pages,
+            &fixtures::env(&limits),
+            root.client(),
+            Event::Act { act: Act::ChatFilter { filter: Filter::Live } },
+            &mut out,
+        );
+        assert!(out.is_empty());
+    }
+}
+
+#[test]
+fn live_updates_do_not_replace_an_older_closed_page() {
+    let limits = fixtures::limits();
+    let mut chats = Chats::new(FIRST);
+    let mut out = Queue::with_capacity(OUTPUTS);
+    chats.configure(Some(&fixtures::chats::me()), Some(fixtures::PROJECT), &limits, &mut out);
+    while out.pop().is_some() {}
+    chats.page = Some(TaskPage {
+        live: List::with_capacity(0),
+        live_after: None,
+        ended: EndedGroup::Rows {
+            rows: List::with_capacity(0),
+            after: Some(Cursor::new(Box::from(*b"next"), CURSOR_BYTES).expect("cursor")),
+            cut: false,
+        },
+    });
+    chats.older(&mut out);
+    out.pop();
+    chats.told(Told::Changed { handle: chats.live }, &mut out);
+    assert!(out.is_empty(), "an older page stays put");
+}
+
+fn chat_line() -> TaskLine {
+    let task = fixtures::chat::task();
+    let ChipPhase::Owner { details, .. } = task.chip.details.as_ref() else { panic!("owner") };
+    let budget = details.budget.clone();
+    TaskLine {
+        chip: task.chip,
+        project: fixtures::PROJECT,
+        requester: OwnerRequester::Person(fixtures::PARTY),
+        tracked: None,
+        label: fixtures::chat::LABEL,
+        flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+        changed: skein_lib::Wall::EPOCH,
+        last_activity: skein_lib::Wall::EPOCH,
+        ended_at: None,
+        budget,
+        waits_on: WaitsOn::Nothing,
+        phases: OwnerPhaseCounts::ZERO,
+        held_below: 0,
+        conversation: None,
+    }
+}
+
+fn opened_chats() -> (crate::Domain, skein_lib::Token, skein_lib::Token) {
+    use crate::{Address, Place};
+    let limits = fixtures::limits();
+    let env = fixtures::env(&limits);
+    let mut root = crate::unlinked(&limits, fixtures::SEED);
+    let me = fixtures::start(&mut root, List::with_capacity(0));
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    crate::step(
+        &mut root,
+        &env,
+        crate::Event::Client {
+            event: Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: me,
+                    event: WatchEvent::Delivered(Delivery::Me(Box::new(fixtures::chats::me()))),
+                },
+            },
+        },
+        &mut out,
+    );
+    crate::step(&mut root, &env, crate::Event::Went { place: Place::Address(Address::Chats) }, &mut out);
+    let mut watch = None;
+    let mut read = None;
+    while let Some(request) = out.pop() {
+        if let crate::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Open { watch: token, subject: Watchable::Jig(Subject::Tasks { .. }) },
+                },
+        } = request
+        {
+            watch = Some(token);
+        } else if let crate::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Read { read: token, what: Readable::Jig(Read::Tasks { .. }) },
+                },
+        } = request
+        {
+            read = Some(token);
+        }
+    }
+    (root, watch.expect("live watch"), read.expect("first closed page"))
+}
+
+#[test]
+fn an_ending_chat_refreshes_the_first_closed_page_and_remains_listed() {
+    use crate::{Action, pages::Act};
+    let limits = fixtures::limits();
+    let env = fixtures::env(&limits);
+    let (mut root, watch, first_read) = opened_chats();
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    crate::step(
+        &mut root,
+        &env,
+        crate::Event::Client {
+            event: Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read: first_read,
+                    result: Readout::Jig(ReadResult::Value(ReadValue::Tasks(Box::new(TaskPage {
+                        live: List::with_capacity(0),
+                        live_after: None,
+                        ended: EndedGroup::Rows { rows: List::with_capacity(0), after: None, cut: false },
+                    })))),
+                },
+            },
+        },
+        &mut out,
+    );
+    let mut rows = List::with_capacity(1);
+    rows.push(chat_line()).expect("one live chat");
+    for rows in [rows, List::with_capacity(0)] {
+        crate::step(
+            &mut root,
+            &env,
+            crate::Event::Client {
+                event: Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch,
+                        event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: false }))),
+                    },
+                },
+            },
+            &mut out,
+        );
+        if !root.pages().chats().expect("chats").live(root.client()).expect("live group").rows.is_empty() {
+            while out.pop().is_some() {}
+        }
+    }
+    assert!(root.pages().chats().expect("chats").live(root.client()).expect("live group").rows.is_empty());
+    let mut refreshed = None;
+    while let Some(request) = out.pop() {
+        if let crate::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Read { read, what: Readable::Jig(Read::Tasks { query, live, ended }) },
+                },
+        } = request
+        {
+            assert_eq!(
+                (query.phase, query.order, live, ended),
+                (Some(PhaseClass::Ended), QueryOrder::Ended, None, None)
+            );
+            refreshed = Some(read);
+        }
+    }
+    let mut ended = chat_line();
+    ended.ended_at = Some(skein_lib::Wall::EPOCH);
+    let mut rows = List::with_capacity(1);
+    rows.push(ended).expect("ended chat");
+    crate::step(
+        &mut root,
+        &env,
+        crate::Event::Client {
+            event: Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read: refreshed.expect("ending re-reads first page"),
+                    result: Readout::Jig(ReadResult::Value(ReadValue::Tasks(Box::new(TaskPage {
+                        live: List::with_capacity(0),
+                        live_after: None,
+                        ended: EndedGroup::Rows { rows, after: None, cut: false },
+                    })))),
+                },
+            },
+        },
+        &mut out,
+    );
+    let EndedGroup::Rows { rows, .. } = &root.pages().chats().expect("chats").page.as_ref().expect("page").ended else {
+        panic!("ended rows")
+    };
+    assert_eq!(rows.get(0).expect("ended chat").chip.task, fixtures::chat::TASK);
+    // Selection is independent of the retained page and its cursors.
+    crate::step(
+        &mut root,
+        &env,
+        crate::Event::Act { action: Action::Pages(Act::ChatFilter { filter: crate::pages::chats::Filter::Closed }) },
+        &mut out,
+    );
+    assert!(out.is_empty());
+}

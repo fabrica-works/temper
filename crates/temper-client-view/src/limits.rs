@@ -118,7 +118,10 @@ impl Limits {
             // The context line splits the repository from its forge suffix.
             .checked_add(1)?
             // Task amendment region, fields, buttons and explanatory text leaves (5.11).
-            .checked_add(16)?;
+            .checked_add(16)?
+            // Your chats replaces two headings with a heading, filters and empty words.
+            // The merge retains only scalar keys and borrowed lines on the stack.
+            .checked_add(4)?;
         let tree = skein_ui::Limits {
             nodes,
             depth: receiving.rows.checked_add(34)?,

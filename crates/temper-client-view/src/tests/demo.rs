@@ -57,6 +57,7 @@ fn suggestions_show_only_in_the_demo_project_with_the_model_half() {
             "{row}"
         );
         assert_eq!(f::find(view.tree(), Role::List, b"Suggested requests").is_some(), shown, "{row}");
+        assert!(f::find(view.tree(), Role::Heading { level: 2 }, b"Your chats").is_some(), "{row}");
         if shown {
             assert!(
                 f::find(

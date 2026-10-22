@@ -141,6 +141,7 @@ pub(super) fn step(pages: &mut Pages, _env: &Env<Limits>, act: Act, out: &mut Qu
         | Act::ChatWords { .. }
         | Act::StartChat
         | Act::Suggest { .. }
+        | Act::ChatFilter { .. }
         | Act::ClosedChats => unreachable!("chat acts routed to chats"),
         Act::Choice(_)
         | Act::Accounts(_)

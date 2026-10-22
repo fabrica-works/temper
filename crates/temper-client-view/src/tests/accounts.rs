@@ -450,6 +450,7 @@ mod memory_literal;
 // Agent lineage, taskbar, brief, run and dependencies add 109 nodes x 574,364 B
 // = 62,605,676 B, giving 5,041,933,507 B; its six phrases fit the reserved book.
 // The context line adds one repository/forge text node; chat words use existing phrase room.
+// Your chats adds filter/empty nodes and five phrases to the checked envelope.
 // Procedure goal slot: five added nodes including its paragraph and link text.
 // The chat projection adds seven phrases while retaining the agent's work-line words.
 // Amendment editor: sixteen nodes and eleven phrases; the web root also retains

@@ -53,7 +53,7 @@ fn enter_starts_one_chat_keeping_a_shift_enter_break() {
         Step::Address(Box::from(FIRST_CHAT_ADDRESS)),
         chats(),
         see(Find::exactly_named(Role::Link, FIRST_CHAT)),
-        Step::Person(PersonStep::Gone { find: Find::exactly_named(Role::Link, b"Chat 2"), within: ABSENT }),
+        Step::Person(PersonStep::Gone { find: Find::exactly_named(Role::Link, b"T2"), within: ABSENT }),
     ]));
     assert_eq!(Harness::new(tier.setup()).run(&mut [&mut script]), Outcome::Done);
 }

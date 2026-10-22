@@ -47,6 +47,8 @@ fn the_start_draws_its_chatbar_banner_context_and_invitation_before_the_composer
         (Role::Paragraph, b"The demo model plays these requests from a script."),
         (Role::Paragraph, "Using Demo model · Default".as_bytes()),
         (Role::TextArea, b"Start a chat"),
+        (Role::Heading { level: 2 }, b"Your chats"),
+        (Role::Paragraph, b"No chats yet."),
     ] {
         let mut found = None;
         for (index, node) in nodes.iter().enumerate() {

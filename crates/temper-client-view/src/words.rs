@@ -86,6 +86,11 @@ pub enum Word {
     Older,
     StartChat,
     Start,
+    YourChats,
+    AllChats,
+    NoChats,
+    NoLiveChats,
+    NoClosedChats,
     LiveChats,
     ClosedChats,
     MoreClosedChats,
@@ -261,8 +266,9 @@ pub enum Word {
 // Eleven amendment editor phrases (client/README.md, 5.11), and five added
 // dependency mark phrases (5.8).
 // Two names for navigation and cards.
-const PHRASES: u32 = 601;
-const ALL: [Word; 239] = [
+// Five chats heading, filter and empty phrases (client/README.md, 3.5).
+const PHRASES: u32 = 606;
+const ALL: [Word; 244] = [
     Word::WaitRefused,
     Word::DependencyParked,
     Word::WaitInvalid,
@@ -338,6 +344,11 @@ const ALL: [Word; 239] = [
     Word::Older,
     Word::StartChat,
     Word::Start,
+    Word::YourChats,
+    Word::AllChats,
+    Word::NoChats,
+    Word::NoLiveChats,
+    Word::NoClosedChats,
     Word::LiveChats,
     Word::ClosedChats,
     Word::MoreClosedChats,
@@ -587,6 +598,11 @@ impl Word {
             Self::Older => 149,
             Self::StartChat => 138,
             Self::Start => 139,
+            Self::YourChats => 347,
+            Self::AllChats => 348,
+            Self::NoChats => 349,
+            Self::NoLiveChats => 350,
+            Self::NoClosedChats => 351,
             Self::LiveChats => 140,
             Self::ClosedChats => 141,
             Self::MoreClosedChats => 142,
@@ -810,15 +826,15 @@ impl Words {
                 }
             }
             let id = word.id(connector);
-            let plural = if word == Word::WaitingForDelegates || word == Word::ToolCalls { Some(0) } else { None };
+            let plural = if word == Word::WaitingForDelegates || (word == Word::ToolCalls || word == Word::ChatDelegates) { Some(0) } else { None };
             shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural }).expect("closed shapes fit");
             let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
-            let forms: Box<[Form]> = if word == Word::WaitingForDelegates || word == Word::ToolCalls {
+            let forms: Box<[Form]> = if word == Word::WaitingForDelegates || (word == Word::ToolCalls || word == Word::ChatDelegates) {
                 Box::new([
                     Form {
                         class: PluralClass::One,
                         segments: Box::new([
-                            Segment::Text(copy_of(if word == Word::ToolCalls { b"" } else { b"waiting on " })),
+                            Segment::Text(copy_of(if (word == Word::ToolCalls || word == Word::ChatDelegates) { b"" } else { b"waiting on " })),
                             Segment::Hole { index: 0, kind: HoleKind::Number },
                             Segment::Text(copy_of(if word == Word::ToolCalls { b" tool call" } else { b" delegate" })),
                         ]),
@@ -945,7 +961,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::DelegateBounds => (&[b"Up to ", b" tasks, ", b" deep"], &[Number, Number]),
         Word::DelegateOne => (&[b"Up to 1 task, ", b" deep"], &[Number]),
         Word::Models => (&[b"Models"], &[]),
-        Word::AllModels => (&[b"All"], &[]),
+        Word::AllModels | Word::AllChats => (&[b"All"], &[]),
         Word::NoModels | Word::NoDeadline => (&[b"None"], &[]),
         Word::AuthorityCut => (&[b"Some of its authority is not shown."], &[]),
         Word::Amount => (&[b"", b""], &[Number]),
@@ -1026,12 +1042,16 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Older => (&[b"Older"], &[]),
         Word::StartChat => (&[b"Start a chat"], &[]),
         Word::Start => (&[b"Start"], &[]),
-        Word::LiveChats => (&[b"Live chats"], &[]),
-        Word::ClosedChats => (&[b"Closed chats"], &[]),
+        Word::YourChats => (&[b"Your chats"], &[]),
+        Word::NoChats => (&[b"No chats yet."], &[]),
+        Word::NoLiveChats => (&[b"No live chats."], &[]),
+        Word::NoClosedChats => (&[b"No closed chats."], &[]),
+        Word::LiveChats | Word::Live => (&[b"Live"], &[]),
+        Word::ClosedChats => (&[b"Closed"], &[]),
         Word::MoreClosedChats => (&[b"More closed chats"], &[]),
-        Word::Chat => (&[b"Chat ", b""], &[Number]),
+        Word::Chat => (&[b"T", b""], &[Number]),
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
-        Word::ChatDelegates => (&[b"Live delegates ", b""], &[Number]),
+        Word::ChatDelegates => (&[b"", b" delegates"], &[Number]),
         Word::ChoiceProvider | Word::ChatTime => (&[b"", b""], &[Name]),
         Word::ChatSendHint => (&[b"Enter to send \xc2\xb7 Shift+Enter for a new line"], &[]),
         Word::DemoBoth => (&[b"This is a demo, running on a demo model and a demo forge."], &[]),
@@ -1093,7 +1113,6 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Inbox => (&[b"Inbox ", b""], &[Number]),
         Word::Chats => (&[b"Chats"], &[]),
         Word::Adoption => (&[b"Adopt a repository"], &[]),
-        Word::Live => (&[b"Live"], &[]),
         Word::Offline => (&[b"Offline"], &[]),
         Word::SignedOut => (&[b"Signed out"], &[]),
         Word::OutOfDate => (&[b"Out of date"], &[]),

@@ -69,7 +69,7 @@ fn prepared_chat_answer_reaches_the_pages_task_watch() {
 }
 const PAST_CLOSE_GRACE: skein_lib::Duration = skein_lib::Duration::from_secs(6);
 #[test]
-fn a_closed_chat_shows_under_closed_in_the_chats() {
+fn a_closed_chat_shows_in_your_chats() {
     let mut world = fixtures::world(fixtures::SEED);
     let task = fixtures::chat(world.front(), b"A chat to close");
     let person = world.client(fixtures::PARTY, fixtures::chat_page(task));
@@ -82,7 +82,7 @@ fn a_closed_chat_shows_under_closed_in_the_chats() {
             Step::Press { find: Find::named(Role::Button, b"Confirm") },
             Step::Pause { span: PAST_CLOSE_GRACE },
             Step::Press { find: Find::exactly_named(Role::Link, b"Chats") },
-            Step::See { find: Find::named(Role::Heading { level: 2 }, b"Closed"), within: fixtures::WITHIN },
+            Step::See { find: Find::named(Role::Heading { level: 2 }, b"Your chats"), within: fixtures::WITHIN },
             Step::See { find: Find::text(b"A chat to close"), within: fixtures::WITHIN },
         ],
     );

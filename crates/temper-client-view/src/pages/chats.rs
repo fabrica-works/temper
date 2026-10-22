@@ -1,4 +1,4 @@
-//! The person's chats: a composer, live lines, then one page of closed lines.
+//! The person's chats: a composer and one filtered list of live and closed lines.
 use crate::{
     frame::Bindings,
     words::{Word, Words},
@@ -6,7 +6,10 @@ use crate::{
 use alloc::boxed::Box;
 use jig_client::contract::{EndedGroup, TaskLine};
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
-use temper_client_domain::{Address, Domain, pages::Act};
+use temper_client_domain::{
+    Address, Domain,
+    pages::{Act, chats::Filter},
+};
 fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.open(role);
     b.name(value);
@@ -68,54 +71,84 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if let Some(outcome) = &chats.outcome {
             outcome_text(b, words, outcome, text_limit);
         }
-        let live = chats.live(root.client());
-        let has_live = match live {
-            Some(live) => !live.rows.is_empty(),
-            None => false,
-        };
-        if demo.is_none() || has_live {
-            text(b, Role::Heading { level: 2 }, &words.say(Word::LiveChats, &[]));
-        }
-        if let Some(live) = live
-            && !live.rows.is_empty()
-        {
-            b.open(Role::List);
-            b.style(crate::look::ROWS);
-            for line in &live.rows {
-                row(b, root, line, words, bindings);
-            }
-            b.close();
-        }
-        let closed = if let Some(page) = &chats.page
-            && let EndedGroup::Rows { rows, after, .. } = &page.ended
-        {
-            Some((rows, after))
-        } else {
-            None
-        };
-        let has_closed = match closed {
-            Some((rows, after)) => !rows.is_empty() || after.is_some(),
-            None => false,
-        };
-        if demo.is_none() || has_closed {
-            text(b, Role::Heading { level: 2 }, &words.say(Word::ClosedChats, &[]));
-        }
-        if let Some((rows, after)) = closed {
-            if !rows.is_empty() {
-                b.open(Role::List);
-                b.style(crate::look::ROWS);
-                for line in rows {
-                    row(b, root, line, words, bindings);
-                }
-                b.close();
-            }
-            if after.is_some() {
-                control(b, bindings, Role::Button, &words.say(Word::MoreClosedChats, &[]), Act::ClosedChats);
-            }
-        }
+        list(b, root, words, bindings);
     }
     b.close();
 }
+fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings) {
+    let Some(chats) = root.pages().chats() else { return };
+    text(b, Role::Heading { level: 2 }, &words.say(Word::YourChats, &[]));
+    b.open(Role::Slot);
+    b.style(crate::look::FILTERS);
+    for (filter, word) in
+        [(Filter::All, Word::AllChats), (Filter::Live, Word::LiveChats), (Filter::Closed, Word::ClosedChats)]
+    {
+        b.open(Role::Button);
+        b.name(&words.say(word, &[]));
+        if chats.filter == filter {
+            b.state(State::Pressed);
+        }
+        b.bind(bindings.insert(Act::ChatFilter { filter }));
+        b.close();
+    }
+    b.close();
+    let live = match chats.live(root.client()) {
+        Some(live) if chats.filter != Filter::Closed => live.rows.as_slice(),
+        _ => &[],
+    };
+    let (closed, more) = match &chats.page {
+        Some(page) if chats.filter != Filter::Live => match &page.ended {
+            EndedGroup::Rows { rows, after, .. } => (rows.as_slice(), after.is_some()),
+            EndedGroup::None => (&[][..], false),
+        },
+        _ => (&[][..], false),
+    };
+    if live.is_empty() && closed.is_empty() {
+        let word = match chats.filter {
+            Filter::All => Word::NoChats,
+            Filter::Live => Word::NoLiveChats,
+            Filter::Closed => Word::NoClosedChats,
+        };
+        text(b, Role::Paragraph, &words.say(word, &[]));
+    } else {
+        b.open(Role::List);
+        b.style(crate::look::ROWS);
+        // Select from the two bounded windows without allocating scratch or
+        // cloning documents. Only the previous key survives each selection.
+        let mut previous = None;
+        for _ in 0..live.len().checked_add(closed.len()).expect("two bounded windows fit") {
+            let mut next: Option<&TaskLine> = None;
+            for rows in [live, closed] {
+                for line in rows {
+                    let key = (line.ended_at.unwrap_or(line.last_activity), line.chip.task);
+                    if let Some(previous) = previous
+                        && !before(previous, key)
+                    {
+                        continue;
+                    }
+                    if let Some(chosen) = next
+                        && !before(key, (chosen.ended_at.unwrap_or(chosen.last_activity), chosen.chip.task))
+                    {
+                        continue;
+                    }
+                    next = Some(line);
+                }
+            }
+            let Some(chosen) = next else { break };
+            row(b, root, chosen, words, bindings);
+            previous = Some((chosen.ended_at.unwrap_or(chosen.last_activity), chosen.chip.task));
+        }
+        b.close();
+    }
+    if more {
+        control(b, bindings, Role::Button, &words.say(Word::MoreClosedChats, &[]), Act::ClosedChats);
+    }
+}
+
+fn before(a: (skein_lib::Wall, u64), b: (skein_lib::Wall, u64)) -> bool {
+    a.0 > b.0 || (a.0 == b.0 && a.1 < b.1)
+}
+
 fn start(
     b: &mut Builder,
     root: &Domain,
@@ -168,7 +201,9 @@ pub(crate) fn row(b: &mut Builder, root: &Domain, line: &TaskLine, words: &Words
             &[Hole::Number(line.budget.numbers.spent), Hole::Number(line.budget.numbers.spent_below)],
         ),
     );
-    if let jig_client::contract::ChipPhase::Owner { details, .. } = line.chip.details.as_ref() {
+    if let jig_client::contract::ChipPhase::Owner { details, .. } = line.chip.details.as_ref()
+        && details.live_delegates > 0
+    {
         text(b, Role::Paragraph, &words.say(Word::ChatDelegates, &[Hole::Number(u64::from(details.live_delegates))]));
     }
     b.open(Role::Paragraph);

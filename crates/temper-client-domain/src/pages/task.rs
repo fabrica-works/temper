@@ -367,6 +367,7 @@ impl Task {
             | Act::Close
             | Act::DelegateFate { .. }
             | Act::ClosedChats
+            | Act::ChatFilter { .. }
             | Act::Filter { .. }
             | Act::Seen
             | Act::Decide { .. }
@@ -460,6 +461,7 @@ impl Task {
             | Act::DelegateFate { .. }
             | Act::Older
             | Act::ClosedChats
+            | Act::ChatFilter { .. }
             | Act::Filter { .. }
             | Act::Seen
             | Act::Decide { .. }
