@@ -1,5 +1,8 @@
 //! Reference case 4.1 hosts a director, owner, coder and reviewer through git
 //! and landing, well past the real-loop story's 1 s guide; hence a fuzzy binary.
+//! Its time is the change procedure's landing path, about 2.7 s of CPU; it moves
+//! to the default suite once that path's cost is cut (the engine's empty Resume,
+//! jig's empty completions).
 use temper_real_loop_world::{
     case::{
         self,

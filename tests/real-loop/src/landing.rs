@@ -129,7 +129,7 @@ pub fn configure(value: &mut Value, agent: &mut Value, forge: SocketAddr) {
     admit(value);
 }
 
-fn admit(value: &Value) {
+pub(crate) fn admit(value: &Value) {
     let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
     let document = jig_protocol_config::document(
         &bytes,

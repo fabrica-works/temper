@@ -46,7 +46,7 @@ pub fn step_4_1() -> Vec<calls::Step> {
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", "schedule", PERSON]),
         // Arm the director's watch while it is live, then watch each delegate
         // before its requester ends: small's historical join budget cannot
-        // hydrate the design through two ended ancestors.
+        // hydrate the design through two ended ancestors (M1's finding).
         start(D1, argv!["wait", "task", number(DIRECTOR), "--until", "ended", "--json"]),
         call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "replied"]),
         call(D1, argv!["wait", "task", number(A), "--until", "replied"]),

@@ -1,6 +1,6 @@
 //! The reference case's cast and first kit tree (domain/testing.md, 5.3).
 use crate::{fixtures, forge, landing};
-use serde_json::{Value, json};
+use serde_json::json;
 use skein_fake_forge_domain::{self as domain, api};
 
 pub mod acts;
@@ -129,33 +129,7 @@ pub fn fixture() -> forge::Fixture {
             value["engine"]["templates"][0]["contract"]["report"]["words"] = 128.into();
             // The brief includes the full draft commit and its instructions.
             value["engine"]["limits"]["overrides"]["documents.text_bytes"] = 512.into();
-            admit(value);
+            landing::admit(value);
         },
     }
-}
-
-// Admit the final values as landing's configure does for its intermediate fixture.
-fn admit(value: &Value) {
-    let bytes = serde_json::to_vec(&value["engine"]).expect("engine JSON");
-    let document = jig_protocol_config::document(
-        &bytes,
-        &jig_protocol_config::DocumentLimits { bytes: 1_048_576, tokens: 65_536, depth: 32 },
-    )
-    .expect("engine document");
-    let jig = jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
-        .expect("engine configuration");
-    let mut own = temper_service::limits::profile(temper_service::limits::Profile::Small);
-    for (name, number) in value["application"]["limits"]["overrides"].as_object().expect("own overrides") {
-        temper_service::limits::apply(&mut own, name.as_bytes(), number.as_u64().expect("limit number"))
-            .expect("application override");
-    }
-    let root = temper_service::limits::engine(&jig.limits, &own).expect("engine root admits the case");
-    jig_protocol_store::sizes::check(
-        &jig.limits.core,
-        &temper_protocol_store::application(&root.forge).expect("application sizes"),
-        &temper_engine_domain::journal_limits(&root.journal),
-        &jig.limits.store.store,
-        jig.limits.store.orphan_erases,
-    )
-    .expect("store admits the case");
 }
