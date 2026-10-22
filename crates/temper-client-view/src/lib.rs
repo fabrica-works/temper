@@ -14,6 +14,6 @@ pub mod pages;
 mod root;
 pub mod words;
 pub use limits::{Limits, worst_case};
-pub use root::{View, act, build, event};
+pub use root::{View, act, build, event, href};
 #[cfg(test)]
 mod tests;

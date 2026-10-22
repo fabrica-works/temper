@@ -6,9 +6,8 @@ use skein_lib::{Env, List, Queue, Secret, Time, Token, Wall};
 use skein_ui::{Act, NodeId, Patch};
 use std::collections::BTreeMap;
 use temper_client_domain::{
-    self as root, Action, Address, Event, Place, Request,
+    self as root, Address, Event, Place, Request,
     address::{Filter, parse, print},
-    forge, pages,
 };
 use temper_client_view as view;
 
@@ -77,20 +76,7 @@ impl Host {
         self.event(Event::Went { place: Place::Address(self.address.clone()) });
     }
     pub fn href(&mut self, node: NodeId) -> Option<Box<[u8]>> {
-        for shown in self.view.tree().nodes() {
-            if shown.id == node
-                && let Some(address) = &shown.external
-            {
-                return Some(address.clone());
-            }
-        }
-        match view::act(&mut self.view, node, Act::Press)? {
-            Action::Pages(pages::Act::Go { address }) => Some(print(&address)),
-            Action::Forge(forge::Act::Go { address: forge::Address::Adopt { project } }) => {
-                Some(print(&Address::Adopt { project }))
-            }
-            Action::Pages(_) | Action::Forge(_) => None,
-        }
+        view::href(&mut self.view, node)
     }
     pub fn clocks(&mut self, now: Time, wall: Wall) {
         self.env.now = now;

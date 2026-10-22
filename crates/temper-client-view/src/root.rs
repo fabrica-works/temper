@@ -3,6 +3,7 @@ use crate::{
     Limits, forge,
     words::{Word, Words},
 };
+use alloc::boxed::Box;
 use skein_lib::Queue;
 use skein_ui::{Act, Builder, NodeId, Patch, Role, Tree};
 use temper_client_domain::{Action, Domain};
@@ -124,6 +125,27 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
 #[must_use]
 pub fn act(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     if let temper_client_domain::Event::Act { action } = event(view, node, act)? { Some(action) } else { None }
+}
+/// The address a link node opens, which the browser shell gives as its href
+/// (client/browser.md, 2.3 and 7.1): its external address, or the page its press goes to.
+#[must_use]
+pub fn href(view: &mut View, node: NodeId) -> Option<Box<[u8]>> {
+    for shown in view.tree().nodes() {
+        if shown.id == node
+            && let Some(address) = &shown.external
+        {
+            return Some(address.clone());
+        }
+    }
+    match act(view, node, Act::Press)? {
+        Action::Pages(temper_client_domain::pages::Act::Go { address }) => {
+            Some(temper_client_domain::address::print(&address))
+        }
+        Action::Forge(temper_client_domain::forge::Act::Go {
+            address: temper_client_domain::forge::Address::Adopt { project },
+        }) => Some(temper_client_domain::address::print(&temper_client_domain::Address::Adopt { project })),
+        Action::Pages(_) | Action::Forge(_) => None,
+    }
 }
 /// Shell inputs can move a secret directly to the domain without a clonable action.
 #[must_use]
