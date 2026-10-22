@@ -1,6 +1,6 @@
 # The forge's protocol layer
 
-Provisional, 2026-10-03, revised 2026-10-20. How the engine reaches a
+Provisional, 2026-10-03, revised 2026-10-22. How the engine reaches a
 forge, on skein's forge kit: what temper's forge component, its setup's
 host and its forge connector do with it, and what the kit leaves to
 temper. The kit is skein's (`forge.md`, `forge-connection.md`,
@@ -544,10 +544,13 @@ service's io.
   writes `start FORGE` and tells the root the forge setting up, with no
   step yet. One ask at a time: from its `start` until `started` or
   `failed` answers it, every other ask is refused "busy". The link
-  answers each ask once: setting up, or its refusal, which is named in
-  the log and changes no state. The root's own refusal, a forge whose
-  connection does not offer it, reaches the link to be answered the
-  same way.
+  answers each ask once, by the request's token the root gave it:
+  setting up, or its refusal, which is named in the log and changes no
+  state. The root's own refusal, "not offered", a forge whose connection
+  does not offer it, reaches the link to be answered the same way. The
+  answer goes back to the root, whose forge connector keeps it as the
+  `SetUp` request's outcome, in memory alone, and the asking client
+  reads it (`../client/README.md`, section 8).
 - **The box's lines,** for the forge asked:
   - `step FORGE STEP`, `STEP` one of `fetch`, `prepare` and `run`: the
     forge setting up, at that step;

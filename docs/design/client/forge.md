@@ -599,9 +599,12 @@ project or the deployment (jig's `client/domain/contract.md`, 7.5; jig's
 `client/domain/root.md`, section 7), their records in
 `temper-client-protocol-wire` beside `Adopt` (`README.md`, 4.6).
 The first read served is the demo's (`README.md`, 4.6 and 4.8), from
-the configuration alone; the first watch, a change's panel (9.2); the
-deployment's part, its forges (5.4), and a change's result and its hold
-(2.5) follow.
+the configuration alone; the first watch, a change's panel (9.2); then
+the deployment's part, its forges (5.4), as the subject `forges`, whose
+rows carry each forge's number, kind, mode and connection (`README.md`,
+4.6); the rest of a forge's row (its `web` address, its last connect's
+end, its installations, its load and its actions) and a change's result
+and its hold (2.5) follow.
 
 | The client | jig's part and slot | The domain |
 |---|---|---|

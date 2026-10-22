@@ -696,6 +696,14 @@ and 10).
   (../protocol/setup.md, 13.4): `temper box` on the owned example prints the
   sign-in link on its stdout; Forgejo killed is restarted by the box, with
   the engine still serving; a stop leaves no process the box started.
+- **A Forgejo set up from the client,** a test of its own
+  (../protocol/setup.md, 13.4, "A first run set up for real"): `temper
+  box` on three empty scratch directories, forge 3's binaries placed
+  where its fetch looks, then `temper ctl DIRECTORY forge-setup 3` and
+  `wait forges --until settled`, the box's group run on the real
+  Forgejo and runner; a second box on the same directories starts the
+  group by its record. Plaintext throughout: no TLS and no call off the
+  machine.
 - **A first run,** a test of its own (../protocol/setup.md, 13.4):
   `temper box` on three empty scratch directories writes the
   configuration (../protocol/setup.md, 8.2), says so on stderr, and
