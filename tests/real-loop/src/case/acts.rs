@@ -50,9 +50,10 @@ pub fn step_4_1() -> Vec<calls::Step> {
             ],
         ),
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", "schedule", PERSON]),
-        // Arm the director's watch while it is live, then watch each delegate
-        // before its requester ends: small's historical join budget cannot
-        // hydrate the design through two ended ancestors (M1's finding).
+        // Keep these watches live: a fresh wait on an ended delegate exits
+        // unknown. jig's crates/jig-domain-core/src/routing/views.rs:304 maps
+        // documents/small.rs:23-28's missing/ended live row to that refusal.
+        // 2071ea76 fixes historical reads only; it cannot admit these watches.
         start(D1, argv!["wait", "task", number(DIRECTOR), "--until", "ended", "--json"]),
         call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "replied"]),
         call(D1, argv!["wait", "task", number(A), "--until", "replied"]),
@@ -98,8 +99,9 @@ fn held(key: &'static str, act: Option<calls::Step>) -> Vec<calls::Step> {
         sign_in(D1),
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", key, super::HELD_PERSON]),
         call(D1, argv!["wait", "task", number(DIRECTOR), "--until", "replied"]),
-        // Arm A before the act: after its result the requester can end
-        // before a new watch has hydrated A through that historical parent.
+        // A fresh wait after the requester ends exits unknown: jig's
+        // routing/views.rs admission and documents/small.rs require live rows.
+        // Keep A's watch across the act until jig supports historical waits.
         start(D1, argv!["wait", "task", number(A), "--until", "ended", "--json"]),
         call(D1, argv!["wait", "task", number(A), "--until", "phase:due"]),
         call(D1, argv!["task", number(A), "--json"]),
@@ -107,6 +109,7 @@ fn held(key: &'static str, act: Option<calls::Step>) -> Vec<calls::Step> {
     ];
     steps.extend(act);
     steps.push(join(HELD_A_ENDED));
+    // The director can already be ended too: a fresh wait exits unknown.
     steps.push(calls::until(
         D1,
         argv!["task", number(DIRECTOR), "--json"],
@@ -146,8 +149,9 @@ pub fn step_4_4() -> Vec<calls::Step> {
         call(D1, argv!["rank", number(SECOND_ACCOUNT), "1"]),
         call(D1, argv!["accounts", "--json"]),
         call(D1, argv!["answer", number(DIRECTOR), number(PACE_QUESTION_MESSAGE), PACE_ANSWER, "--key", "pace-answer"]),
-        // Read after delegation; ended parents can outpace a new live watch.
-        // Use historical reads, as the held stories do for the director.
+        // Wait for delegation by condition. Keep the ended-phase reads below:
+        // fresh waits exit unknown once their task's live row is gone (jig's
+        // routing/views.rs admission and documents/small.rs visible()).
         calls::until(
             D1,
             argv!["task", number(A), "--json"],

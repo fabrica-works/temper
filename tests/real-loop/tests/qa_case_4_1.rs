@@ -18,8 +18,6 @@ use temper_real_loop_world::{
 // One delegate call per director/owner script, and one record per tool turn.
 const ONE_EDIT: usize = 1;
 const FIRST_DELEGATE: usize = 0;
-// The case's act positions equal call positions until the final Join.
-const DESIGN_READ: usize = 6;
 // The fresh case has at most eight tasks; this number names none of them.
 const ABSENT_TASK: u64 = 999;
 const PAST_CALLS: usize = usize::MAX;
@@ -166,12 +164,16 @@ fn a_changed_draft_reports_the_markdown_must() {
 
 #[test]
 fn a_failed_document_act_cannot_silently_pass() {
+    let design_read = acts::READS_4_1
+        .iter()
+        .find_map(|&(read, call)| (read == acts::Read::DesignEnded).then_some(call))
+        .expect("design read position");
     let ran = temper_real_loop_world::run_forge(case::fixture(), case::scripts::step_4_1, || {
         let mut steps = acts::step_4_1();
-        steps[DESIGN_READ] = calls::call(D1, argv!["task", calls::number(ABSENT_TASK), "--json"]);
+        steps[design_read] = calls::call(D1, argv!["task", calls::number(ABSENT_TASK), "--json"]);
         steps
     });
-    let failed = &ran.calls()[DESIGN_READ];
+    let failed = &ran.calls()[design_read];
     println!(
         "document act: exit {:?}, stdout {}, stderr {}",
         failed.exit,
