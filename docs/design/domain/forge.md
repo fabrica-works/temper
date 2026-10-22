@@ -284,12 +284,16 @@ temper-engine-domain-forge              the connector's top: resources and holds
   serve runs under the box (`--box`, `../protocol/setup.md`, 7.1). One
   function gives a forge's offer from those, the box and the forge's
   connection: *offered* for an owned forge whose setup says `"start":
-  "asked"`, under the box with its pipe open, its connection not set
-  up, setting up or set up failed (setting up so that its row keeps
-  showing the set up under way); *not under the box* for such a forge,
-  in such a state, without the box or once its pipe closed; *not
-  offered* otherwise, and for a forge not configured. The row and the
-  answer read the same function, so they never disagree.
+  "asked"`, under the box with its pipe open, its connection not set up,
+  setting up or set up failed (setting up so that its row keeps showing
+  the set up under way); *not under the box* for such a forge, in such a
+  state, without the box or once its pipe closed; *not offered*
+  otherwise, and for a forge not configured. The row and the answer read
+  the same function, so they never disagree. The same function gives
+  each action's offer from the forge's kind, mode, setup and connection:
+  the engine domain decides every action a row offers, including
+  "Connect as its admin", which needs a managed setup entry
+  (`../protocol/setup.md`, 5.5).
 - **Setting up a forge,** `SetUp { forge }` (`../client/README.md`,
   section 8): the root gives it to the connector, which refuses it by
   the forge's offer when not offered, "not offered" or "not under the
@@ -297,19 +301,18 @@ temper-engine-domain-forge              the connector's top: resources and holds
   otherwise asks the routing's box link to ask the box
   (`../protocol/forge.md`, 2.8). The link decides nothing: it carries
   the ask out and the box's lines in, which the routing tells the
-  connector as connections, and the box's answer back. The pipe's
-  close comes to the connector as the root's `BoxClosed`: each offer
-  becomes not under the box, and a forge setting up becomes set up
-  failed, "the box closed the pipe". The connector changes no state at
-  the ask: the routing tells it each, as it does the others: at the
-  box's `started`, connecting, then connected, or set up failed when the
-  forge's access cannot be read (`../protocol/forge.md`, 2.8), offered
-  again. `SetUp` is a
-  keyed request, admitted by the core first (`../client/README.md`,
+  connector as connections, and the box's answer back. The pipe's close
+  comes to the connector as the root's `BoxClosed`: each offer becomes
+  not under the box, and a forge setting up becomes set up failed, "the
+  box closed the pipe". The connector changes no state at the ask: the
+  routing tells it each, as it does the others: at the box's `started`,
+  connecting, then connected, or set up failed with the engine's step
+  that stopped (`../protocol/forge.md`, 2.8), offered again. `SetUp` is
+  a keyed request, admitted by the core first (`../client/README.md`,
   section 8): the connector keeps its answer as its outcome, in memory
   alone, the latest per configured forge under its request's token and
-  one more for any forge not configured, and answers unknown for a
-  token it no longer holds.
+  one more for any forge not configured, and answers unknown for a token
+  it no longer holds.
 - **The deployment's forges,** the subject `forges`
   (`../client/forge.md`, 5.4): the connector makes its document, one
   row per configured forge in number order, each its number, kind,

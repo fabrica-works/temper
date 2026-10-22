@@ -467,22 +467,27 @@ have one, an engine alone none. Each:
 
 | File | Named by | Holds | Read by |
 |---|---|---|---|
-| an owned or fake forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at the start that finds it (setup.md, the setup host in the engine); a fake forge, at its start (setup.md, 8.4) |
+| an owned or fake forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at start or the box's `started` (setup.md, 6.5); a fake forge, before binding (setup.md, 8.4) |
 | a worker's secret, its digest | jig's parts, data paths: `worker.secret` and `worker.digest` in the data directory as `temper init` writes them (setup.md, 8.2) | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
 | the demo model's key | `application.demo.llm.key`, a data path: `demo/llm.key` as `temper init` writes it (setup.md, 8.2) | the key's bytes | the fake LLM, at its start, and the seed (setup.md, 8.4); never `temper serve` |
 
 - **A secret file holds its bytes and nothing else** but a final
   newline, which is not part of the secret (jig's
   `protocol/configuration.md`, section 10).
-- **Read at start,** each within its bound, with skein's
+- **Private reads,** each within its bound, with skein's
   `read_private_file` (skein's `shell.md`, 6.1): a file readable by
-  anyone but the process's user, or reached through a link, refuses the
-  start, naming it. The handover's bound is `records.value_bytes`
-  (section 7).
-- **The handover is taken once.** The setup host keeps the token as the
-  forge's `AdminToken` record in jig's secrets' store, runs the takeover,
-  and removes the file once that run is done (credentials.md, 2.1). A
-  start that finds no file reads none.
+  anyone but the process's user, or reached through a link, is refused,
+  naming it. For the handover, the forge stays not connected, or set up
+  failed at the box's `started`; the engine and other forges run on
+  (setup.md, 6.5). Its bound is `records.value_bytes` (section 7).
+- **A present handover is always taken over.** At start or the box's
+  `started`, the setup host reads it once, even with a kept
+  `AdminToken`, runs `TakeOver`, and removes the file only after its
+  `Done` and the record kept in jig's secrets' store (setup.md, 6.5).
+  Removal must succeed before reconcile; its failure leaves the file
+  for the next start or ask to take over again. With no file, the host
+  reconciles from the kept record; with neither, the forge is not set
+  up.
 - **A set-up forge's directory** (`application.setup[].directory`) and
   its other files are setup.md, section 3's, made by the setup's
   commands; `temper serve` reads none of them but the handover.

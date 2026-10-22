@@ -215,8 +215,9 @@ default; the document is `temper.json` in the configuration directory
   3). The engine need not run.
 - **The forge's setup** (setup.md), each command reading and checking
   the whole document as `temper serve` does (configuration.md, section
-  8), FORGE a forge's `number`; reconcile is no command, but a plan the
-  engine's setup host runs (forge.md, 2.6):
+  8), FORGE a forge's `number`; reconcile is the engine setup host's
+  plan (forge.md, 2.6), except for managed and connected old forms'
+  transitional `temper forge reconcile` until temper-15 (setup.md, 6.5):
   - `temper forge prepare`: an owned forge's preparation, before its
     Forgejo runs; it ends when done (setup.md, 6.3);
   - `temper forge run`: checks the binary and the preparation, takes
@@ -929,21 +930,18 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   `ready_seconds` and `stop_seconds` as that table gives them, the
   first bounding each process's ready lines from its start, the second
   each process's stop.
-- **The fake forge waits** on `temper serve` reconciling a fake forge at
-  its start (setup.md, 5.1). Until then an engine on a fake forge needs
-  `temper forge reconcile` run once before it, a step the lab's format
-  has no place for, as `../qa.md` (4.3 and section 11) waits on the same.
-  So `lab/cluster/` holds the fake LLM, the engine and the workers, the
+- **The fake forge's setup** is `temper serve`'s handover and reconcile
+  at start, from records (setup.md, 6.5; `../qa.md`, 4.3). So
+  `lab/cluster/` holds the fake LLM, the engine and the workers, the
   engine's one forge connected and unreached, as the process tier's
   other documents have theirs; its tasks are chats, and its stories'
   referee the tasks' ends on their named workers and no survivor. A
   chat's run holds its worker's one slot until its charter's idle
-  threshold or its time less its reserve, both of which the
-  description sets past the story's deadline, so
-  each chat takes a worker of its own, never by timing. The
-  fake forge joins the description, after which the engine starts, once
-  serve reconciles at its start: the change of serve's command line's
-  owner.
+  threshold or its time less its reserve, both of which the description
+  sets past the story's deadline, so each chat takes a worker of its
+  own, never by timing. The description starts the fake forge before
+  the engine, whose setup host takes its handover and reconciles at
+  start (setup.md, 6.5).
 - **Why a description,** not one program both call: the lab's runner is
   Python and the process tier is Rust; the lab's format is literal so
   that readers in any language agree (skein's `lab.md`, 4.3); and a

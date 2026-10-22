@@ -238,22 +238,24 @@ skein-io socket
   (section 14). Carried rows, pasted values whose run a restart cut, are
   loaded from 2^63, where jig numbers them; the core decides their
   erase, which the routing carries out (2.6).
-- **A managed or owned Forgejo starts connecting:** its access is `None`
-  until the setup host's `Reconcile { forge, adopted }` is done, then
-  `Request::Connect` (2.2). An owned forge runs `TakeOver { forge,
-  admin_token }` first when the handover file `admin_token` exists; the
-  file is removed after that run's `Done`. `adopted` is the repositories
-  the root holds for the forge, which a root effect names after the
-  root's restore. A connected Forgejo, and a GitHub forge, start with
-  their access.
+- **A managed, owned or fake Forgejo starts connecting:** after the
+  records' load and the root's restore, its access stays `None` until
+  the setup host's `Reconcile { forge, adopted }` is done and its writes
+  kept, then `Request::Connect` (2.2). `adopted` is the root's restored
+  repositories for the forge. For owned and fake, the engine first takes
+  the handover whenever its file is present, even with a kept
+  `AdminToken`, removes the file after `TakeOver`'s `Done` and the
+  record kept, and reconciles only after removal succeeds (setup.md,
+  6.5). With no file it reconciles from the kept record. A stop or
+  failed removal leaves that forge not connected, named by the step,
+  never a secret; every other forge runs on. A connected Forgejo and a
+  GitHub forge start with their access.
 - **An owned forge set up from the client** (setup.md, 6.5) starts not
   set up: one whose setup says `"start": "asked"`, with neither the
-  handover file nor an `AdminToken` row, has its access `None` and no
-  run until the box answers `started` on its pipe (2.2); then its
-  `TakeOver`, its `Reconcile` and its `Connect`, as at a start. Until
-  temper-15 the box's reconcile step takes the handover into the forge's
-  files, and such a forge is the one whose files are absent (setup.md,
-  6.5).
+  handover file nor an `AdminToken` record, has its access `None` and no
+  run until the box answers `started` on its pipe (2.2). Then the engine
+  runs the same handover, removal, reconcile and connect sequence as at
+  a start, with access and git value from records.
 - **The mode is no record** (setup.md, the modes): owned is the
   configuration's (a `setup` entry owning the forge), managed is an
   `AdminToken` row on a forge not owned, and connected is neither.
@@ -283,18 +285,17 @@ skein-io socket
   `forge-client.md`, 7.1; `../domain/forge.md`, 4.1). A GitHub forge's
   `Reconcile { forge }` runs next, once the forge's writing run is free
   (2.6); it ends in no connect.
-- **The box's pipe** (setup.md, 7.1), under the box alone, through
-  the routing's box link (2.8): at `SetUp { forge }` (client/README.md,
+- **The box's pipe** (setup.md, 7.1), under the box alone, through the
+  routing's box link (2.8): at `SetUp { forge }` (client/README.md,
   section 8), admitted by the root, the link writes `start FORGE`, one
   ask at a time, and refuses it "not under the box" with no pipe; it
   tells the root each `step` line, the forge setting up and at which
-  step; at `started FORGE`, the forge's `TakeOver`, then its
-  `Reconcile`, then `Request::Connect` (until temper-15, the group's
-  reconcile has done the first two into the forge's files, and the
-  routing reads them, builds the access from them as at start and
-  sends `Request::Connect`: setup.md, 6.5); at `failed FORGE WHY`, the
-  forge set up failed, with `WHY`. An answer for a forge it did not
-  ask for is named in the log and dropped.
+  step; at `started FORGE`, the forge's `TakeOver` when the handover
+  file is present, then its `Reconcile`, then `Request::Connect`, with
+  the handover removed before reconcile and access built from records
+  (setup.md, 6.5); at `failed FORGE WHY`, the forge set up failed, with
+  `WHY`. An answer for a forge it did not ask for is named in the log
+  and dropped.
 - **Until then** each call on the forge is answered `NotConnected` at
   once, at cost 0 (2.7). The root shows the forge connecting while a run
   holds it, setting up while the box runs its group, and not connected
@@ -364,11 +365,10 @@ skein-io socket
 One git identity per forge (credentials.md, git identities): its number
 and author are the configuration's, its value the forge's.
 
-- **Forgejo's value** is the `GitToken` row, its login the bot's (the
-  `User` row's): generation 1 at start, and a new generation when the
-  row is replaced. An owned forge set up from the client has none at
-  start: its value is put at the connect after the box's `started`, the
-  next generation of its number (1 when none), before its
+- **Forgejo's value** is the `GitToken` record's, its login the bot's
+  (`User`): generation 1 at start, or at the first connect after the
+  box's `started` when the start had none. Each later value takes the
+  next generation of its number. The value is put before its
   `Event::Credential` and before `Request::Connect` (2.2, 2.8).
 - **GitHub's value** is a list of `(account id, account login, token,
   expires)`, one per accepted installation, built from `Event::GitToken
@@ -427,12 +427,12 @@ Run's start, and the page shows it as busy, try again (skein's
 | Plan | When | What it does |
 |---|---|---|
 | `Reconcile { forge, adopted }` | each start of a managed or owned Forgejo; a managed connect; the box's `started`, after its `TakeOver` (2.2) | converges the forge on what the deployment needs (setup.md, section 5), then the forge connects |
-| `TakeOver { forge, admin_token }` | an owned forge's start, when the handover file `admin_token` exists; the box's `started`, for an owned forge set up from the client (2.2) | keeps the admin's token the box handed over; the file is removed after its `Done` |
+| `TakeOver { forge, admin_token }` | an owned or fake forge's start, or the box's `started`, whenever the handover file is present, even with a kept `AdminToken` (setup.md, 6.5) | keeps the handover's admin token; only after its `Done` and the record kept is the file removed, before reconcile |
 | `Adopt { forge, repository }` | a managed or owned forge's adoption, before its reads | gives the bot access to the repository (`../domain/forge.md`, 4.2) |
 | `Check { forge }` | a connected Forgejo's pasted tokens, and their replacement | both tokens answer as one user, and as the kept user on a replacement |
 | `Manifest { forge, target }` | GitHub's Connect, for `Personal` or `Org(login)` | a fresh state and the manifest's page; it ends `Done(Manifest { state, page })` |
 | `Convert { forge, code, state }` | GitHub's redirect back | the code exchanged for the App's id, slug and key, the conversion's webhook secret and OAuth pair never kept; the bot user found; it writes `AppId`, `AppSlug`, `AppKey` and `User` |
-| `Install { forge }` | Install on another account | a fresh state, and the install link (`Link`) |
+| `Install { forge }` | Install the App, or Install on another account | a fresh state, and the install link (`Link`) |
 | `Accept { forge, installation, state }` | the setup URL's visit | the installation checked, and added to `Accepted` |
 | `Paste { forge, app }` | a pasted App's Connect; Replace on GitHub, with the kept id | the pasted key (skein's `Pasted`, read once, never written) decoded to DER, `GET /app` matching the id, the bot user found, the App's hook set to `https://<slug>.invalid/`, the permissions and events checked as reconcile checks them; it writes `AppId`, `AppSlug`, `AppKey` and `User` |
 | `Reconcile { forge }` | after each GitHub `Connected` | the App's permissions, events, installations and key checked; it repairs only its hook's address (5.1) |
@@ -558,14 +558,17 @@ service's io.
 - **The box's lines,** for the forge asked:
   - `step FORGE STEP`, `STEP` one of `fetch`, `prepare` and `run`: the
     forge setting up, at that step;
-  - `started FORGE`: the ask ends, and the forge connects as 2.2 says:
-    until temper-15, the link tells the setup host, whose io reads the
-    forge's files (setup.md, 6.5) while the root shows it connecting;
-    once all are read, their values become the forge's git identity's
-    (2.5) and its access, as at start, and `Request::Connect` follows;
-    a file absent or unreadable sets the forge up failed, naming the
-    file, and a later ask, which the box answers `started` at once,
-    reads them again;
+  - **`started FORGE`:** the ask ends and the forge goes connecting. The
+    setup host takes the handover with `TakeOver` whenever the file is
+    present, even with a kept `AdminToken`, removes it after `Done` and
+    the record kept, then runs `Reconcile` with the root's restored
+    repositories and `Request::Connect` from records (2.1, 2.2;
+    setup.md, 6.5). With no file it reconciles from the kept record. Its
+    git value is the `GitToken` record's, put at its next generation
+    before `Event::Credential` and `Request::Connect` (2.5). A stop or
+    failed removal sets the forge up failed with the step named, never a
+    secret; a `TakeOver` stop leaves the file. The other forges run on.
+    The next ask, answered `started` at once, runs the sequence again;
   - `failed FORGE WHY`: the ask ends, and the forge's set up failed,
     with `WHY` as the box wrote it, which holds no secret (setup.md,
     7.1).
@@ -937,20 +940,22 @@ The tiers, the fakes and the layout are `../domain/testing.md`'s (sections 2,
   - **the box's link** (2.8): its machine's step tests, lines in and
     out: an ask written, another refused "busy" until `started` or
     `failed`, and every ask refused "not under the box" with no pipe;
-    each line for the forge asked; a line for another forge, an
-    unknown word, step or number, each named and dropped; a line at
+    each line for the forge asked; a line for another forge, an unknown
+    word, step or number, each named and dropped; a line at
     `box.line_bytes` read and one byte past it named and skipped; the
-    pipe closed during an ask. Then the routing with a scripted box on
-    a pipe pair: an ask, `start 3`, `step 3 prepare`, `failed 3 prepare
-    3 exited 1`, the ask again and `start 3` again, a third refused
+    pipe closed during an ask. Then the routing with a scripted box on a
+    pipe pair: an ask, `start 3`, `step 3 prepare`, `failed 3 prepare 3
+    exited 1`, the ask again and `start 3` again, a third refused
     "busy", a stray `started 9` dropped, and the root told each state;
-    and, until temper-15, the connect at `started` (2.8; setup.md,
-    6.5) in the service's one-process world: the forge's files written
-    by the test, `started 3` making it connecting, then
-    `Request::Connect` with the access they give and its git identity's
-    value put at generation 1 and announced; each file absent, or not
-    private, setting it up failed with the file named, and the next
-    ask, answered `started 3`, connecting it;
+    and the service's step world (setup.md, 6.5): at `started 3`, the
+    forge connecting, the handover read and `TakeOver` run, its record
+    kept before the file's removal, `Reconcile` with the root's restored
+    list, then `Request::Connect` from records and the git value put at
+    its generation before `Event::Credential` and `Request::Connect`; a
+    `TakeOver` stop leaving the file and the forge set up failed; a
+    failed removal blocking `Reconcile`; and the next ask, answered
+    `started 3`, taking the handover over again, removing it and
+    connecting;
   - **GitHub's three routes** on the clients' listener (the manifest
     page, the redirect and the setup address; `../client/forge.md`,
     9.1): requests through `fixtures::http::Peer` to the service's

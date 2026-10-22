@@ -397,44 +397,55 @@ configured forge, by its number, its kind and its `web` address, says:
   | not connected | "Not connected", with Connect; where its records say why, "Not connected: its records are unreadable" or "Not connected: its records were made for KIND at ADDRESS", and connecting again overwrites them (`../protocol/forge.md`, at start) |
   | not set up | an owned forge not prepared yet (`../protocol/setup.md`, 6.5): under the box, "Not set up", with "Set up a Forgejo here"; without it, "Not set up: run `temper forge fetch N`, `temper forge prepare N`, `temper forge run N forgejo` and `temper forge run N runner`, then restart `temper serve`", N its number, with no action |
   | setting up | the box runs its steps, asked: "Setting up: fetching", "Setting up: preparing" or "Setting up: starting", by the box's last word of the step it runs, else "Setting up" (`../protocol/setup.md`, 7.1); then "Connecting", as its handover is taken and reconciled (`../protocol/setup.md`, 5.1) |
-  | set up failed | "Set up failed: WHY", the box's reason in words (a step that exited, a digest that differs, a version refused, its port taken), or, after the box's `started`, the forge's file that could not be read and why ("forge 3's api_token is absent"; `../protocol/setup.md`, 6.5), with "Set up again"; the engine and every other forge run on |
+  | set up failed | "Set up failed: STEP", naming the box's step, or, after the box's `started`, the engine's step that stopped (taking the handover, reconciling, removing the handover file; `../protocol/setup.md`, 6.5), with `temper box`'s output for the rest until its `failed` line carries a reason; with "Set up again"; the engine and every other forge run on |
   | connecting | "Connecting": a run holds the forge, and what it waits for: a managed or owned Forgejo's reconcile, the forge's answers to a check, or the person's browser on GitHub until the link's state ends (`setup.state_life_ms`) |
-  | connected | "Connected as LOGIN (ID)", the user the records hold: the bot's on Forgejo, the App's on GitHub |
-  | stopped | "Stopped: WHY", the component's reason in words (its key or token refused, a user other than its own, an access it finds invalid, a refusal that asking again would not mend), with Replace; the engine and every other forge run on |
+  | connected | "Connected as LOGIN", the user the records hold: the bot's on Forgejo, the App's on GitHub; its id on an Account line |
+  | stopped | "Stopped: WHY", the component's reason in words (its key or token refused, a user other than its own, an access it finds invalid, a refusal that asking again would not mend), with Replace where offered; an owned forge says "Restart temper box: its preparation mends it"; the engine and every other forge run on |
 
   A connect that ends otherwise is said on the row until the next one:
   refused (the person's role, the forge's kind or mode, "busy": the
   forge's one writing run is taken, or `setup.runs` runs are running),
-  "the pasted value changed", "the API token
-  and the git token answer as LOGIN and LOGIN", "LOGIN is not temper's
-  bot: add `temper:bot` to its full name on Forgejo" (5.5), the forge
-  unreachable, a `Manifest` or an `Install` that
-  stopped, its failure said here and never in its answer (`README.md`,
-  section 8), or "interrupted; paste again" after a restart. A GitHub
-  App lacking what temper needs connects all the same (the setup's
-  host's `Lacking` is done): the row says it beside "Connected as LOGIN
-  (ID)", each permission and event named (5.5), until the forge's next
-  check of the App ends: a paste's (a connect or a Replace) or the
-  reconcile after each connect, the one at each start among them
+  "the pasted value changed", "the API token and the git token answer as
+  LOGIN and LOGIN", "LOGIN is not temper's bot: add `temper:bot` to its
+  full name on Forgejo" (5.5), the forge unreachable, a `Manifest` or an
+  `Install` that stopped, its failure said here and never in its answer
+  (`README.md`, section 8), or "interrupted; paste again" after a
+  restart. A GitHub App lacking what temper needs connects all the same
+  (the setup's host's `Lacking` is done): the row says it beside
+  "Connected as LOGIN", each permission and event named (5.5), until the
+  forge's next check of the App ends: a paste's (a connect or a Replace)
+  or the reconcile after each connect, the one at each start among them
   (`../protocol/setup.md`, 17.5), which clears the line or names what
-  the App still lacks. The line is kept in memory alone: a restart
-  drops it, and the start's reconcile names it again while the App
-  still lacks it. A forge other than a fake, connected while a worker's
-  `git` is null (`../protocol/configuration.md`, section 4), says beside
-  "Connected as LOGIN (ID)": "No git on this machine: install git 2.41
-  or later and set workers[].git, then restart"; its repositories'
-  commands fail on that worker, naming the forge's host, until it has
-  one (`../protocol/git.md`, section 3).
+  the App still lacks. The line is kept in memory alone: a restart drops
+  it, and the start's reconcile names it again while the App still lacks
+  it. A forge other than a fake, connected while a worker's `git` is
+  null (`../protocol/configuration.md`, section 4), says beside
+  "Connected as LOGIN": "No git on this machine: install git 2.41 or
+  later and set workers[].git, then restart"; its repositories' commands
+  fail on that worker, naming the forge's host, until it has one
+  (`../protocol/git.md`, section 3).
 - **Its mode** (`../protocol/setup.md`, the modes): owned, where the
   configuration's setup owns the forge; managed, where temper keeps a
-  site admin's token for it; connected otherwise. Owned and managed say
-  "admin's token kept": the setup's host alone reads it, never the
-  forge's component.
+  site admin's token for it; connected otherwise.
+- **Its Access line,** on Forgejo: "Site admin, with temper's own token"
+  for owned; "Site admin, with a token you gave" for managed; "Its bot's
+  tokens, which you gave" for connected. The setup host alone reads an
+  admin's token, never the forge component.
+- **Owned's Runs line:** Forgejo and its runner on this machine, their
+  versions, and CI jobs on this machine as the person. Before set up,
+  the card says CI jobs run here unisolated, Forgejo stops with `temper
+  box`, and it is kept in temper's data directory. Until signing in
+  through temper, the card names the `person_password` file's path,
+  never the password (`../protocol/setup.md`, 6.5).
 - **On GitHub, temper's App:** its slug, and its installations, each
   with its account's login, "all repositories" or "selected
   repositories" (linked to the installation's page, 5.5), "suspended"
   while GitHub suspends it, and a stray, an installation never accepted
-  through temper's link, "uninstalled at the next reconcile".
+  through temper's link, "uninstalled at the next reconcile". When
+  connected, it shows the setup URL the person must set on GitHub:
+  `http://<listener>/forges/<n>/github/setup`, with redirect on update,
+  no callback URL and no user's authorization at install
+  (`../protocol/setup.md`, 17.3).
 - **A job's log on an origin temper does not read:** "A job's log is on
   ORIGIN, which temper does not read: add it to this forge's
   `log_origins` and restart." (`../protocol/configuration.md`, the
@@ -449,18 +460,23 @@ configured forge, by its number, its kind and its `web` address, says:
   and those uncertain, being looked for; and when each repository's
   webhooks were last heard.
 
-Its actions, each a request of the forge's family (`README.md`,
-section 8), offered by kind, mode and state:
+Its actions, each a request of the forge's family (`README.md`, section
+8), offered by kind, mode, setup and state. The engine domain decides
+every offer; the client reads it (`../domain/forge.md`, 4.1). "A Forgejo
+elsewhere" names the managed setup entry needed for "Connect as its
+admin", with its forge number and bot (`../protocol/setup.md`, section
+8); an address alone offers connected's token paste:
 
 | Action | Offered | What it does |
 |---|---|---|
 | Connect | GitHub, not connected or stopped | "Connect GitHub", for the person's account or an organization they name: the answer is a link to the manifest's page on the clients' listener (9.1), shown as text for the person to open; on GitHub they create the App, then install it on an account, and come back to temper. Or "Connect an App of your own": its id, and its private key pasted as GitHub gives it; no webhook secret is asked, since temper points the App's hook at `https://SLUG.invalid/` and hears changes from its delivery log |
 | Connect | Forgejo not owned, not connected; a Forgejo of the connected mode, stopped | its bot's API token, its git token and, where the person made hooks to temper's listener, their secret, pasted together; both tokens must answer as one user |
-| Connect | Forgejo not owned, not connecting | "Connect as its admin": a site admin's token pasted; temper makes its bot (or takes over the connected one, 5.5) and the forge becomes managed |
+| Connect | Forgejo not owned, not connecting, with a managed setup entry | "Connect as its admin": a site admin's token pasted; temper makes its bot (or takes over the connected one, 5.5) and the forge becomes managed |
 | Replace | GitHub, connected or stopped; a Forgejo of the connected mode, connected or stopped | a new App key, or a new API token, git token or both, pasted, which must answer as the forge's user (on GitHub, the same App); the old is erased once the new is kept |
-| Install on another account | GitHub, connected | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
+| Install the App; Install on another account | GitHub, connected: "Install the App" before any accepted installation, "Install on another account" after one | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
+| New repository | Forgejo owned or managed, connected | the set up's same fields: organization (default `work`), repository (default `hello`) and an existing project; the general form of the first repository (`../protocol/setup.md`, section 15) |
 | Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
-| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled; the person signs in to it as their login, with the password its preparation wrote (`person_password`, `../protocol/setup.md`, section 9) |
+| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
 | Set up again | the row's offer offered, set up failed | the same ask again: what the last one left is kept, a fetched binary hashed and not fetched again |
 
 A pasted value is a field of its own (`README.md`, 3.6 and section 8),

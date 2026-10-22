@@ -175,11 +175,12 @@ experience; good defaults for a person's real work are open (section 8).
   fake forge`, a long step of the box, its address and its script or
   seed from the document. The setup's `mode` gains `fake` beside
   `managed` and `owned`: a forge the box runs from temper's own binary,
-  which writes a handover at its start as an owned forge's preparation
-  does. The box's reconcile makes the bot and its tokens; the engine's
-  setup host runs start-time adoption, then connects the fake with
-  those files (setup.md, 8.4). Adoption grants the bot write access and
-  hooks each repository to the configured webhooks' listener.
+  whose preparation writes a handover before it starts. The engine's
+  setup host takes the handover, reconciles into records, runs
+  start-time adoption, then connects the fake from those records
+  (`../protocol/setup.md`, 6.5 and 8.4). Adoption grants the bot write
+  access and hooks each repository to the configured webhooks'
+  listener.
 - **The demo model's script** is the document's: suggested requests
   each with its scripted turns, and an answer for anything else, which
   says it is the demo model and offers to connect a real one.

@@ -747,13 +747,10 @@ is cited by its probe's number across this document.
   section 4) with it, as its host, and keeps what reconcile makes, the
   bot's two tokens, its id and the hooks' secret, in the store. The
   forge then connects as 12.1's would.
-- **Reconcile's host moves into the engine:** temper's setup shell,
-  run today by `temper forge reconcile` (setup.md, sections 5 and 11),
-  becomes a part of the engine's protocol layer, which runs a reconcile
-  at each start, and when the person connects, before the component
-  opens the forge; its items (skein's `forge-setup.md`, 4.1) are the
-  store's records. The forge waits, "connecting", meanwhile; the engine
-  serves.
+- **Reconcile's host is in the engine:** its protocol layer runs it at
+  each start, and when the person connects, before the component opens
+  the forge; its items (skein's `forge-setup.md`, 4.1) are the store's
+  records. The forge waits, "connecting", meanwhile; the engine serves.
 - **Access per repository, at adoption,** in place of setup's `orgs`:
   adopting a repository on a managed forge first grants the bot write on
   it, as a collaborator (`PUT /api/v1/repos/{o}/{r}/collaborators/{bot}`),

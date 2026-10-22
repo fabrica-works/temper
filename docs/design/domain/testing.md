@@ -705,13 +705,14 @@ and 10).
   (../protocol/setup.md, 13.4, "A first run set up for real"): `temper
   box` on three empty scratch directories, forge 3's binaries placed
   where its fetch looks, then `temper ctl DIRECTORY forge-setup 3` and
-  `wait forges --until settled`, the box's group run on the real
-  Forgejo and runner, and forge 3 connected as temper's user with no
-  restart; the person's repository, made in the person's org as the
-  person, adopted through the client and cloned as a worker runs git
-  (../protocol/setup.md, 13.4); a second box on the same directories
-  starts the group by its record. Plaintext throughout: no TLS and no call off the
-  machine.
+  `wait forges --until settled`, the box's group run on the real Forgejo
+  and runner; forge 3's row goes through "Setting up" and "Connecting"
+  to "Connected as temper", with no restart. The handover file is gone,
+  and forge 3's directory holds no `api_token`, `git_token`, `user` or
+  `webhook_secret` file. A second box on the same directories starts the
+  group by its record; preparation makes a new handover, and serve takes
+  it over and connects forge 3 from its records. Plaintext throughout:
+  no TLS and no call off the machine.
 - **A first run,** a test of its own (../protocol/setup.md, 13.4):
   `temper box` on three empty scratch directories writes the
   configuration (../protocol/setup.md, 8.2), says so on stderr, and

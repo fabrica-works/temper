@@ -185,10 +185,10 @@ serve  after  llm
 | Credential | Made from | Where | Read by |
 |---|---|---|---|
 | the fake model's key | the fake LLM from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.llm.dir}/llm.key`; exact output interface pending (11.1) | the fake LLM; the seed's `add-key` |
-| the fake forge's admin token | the fake forge from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.forge.dir}/setup/admin_token`; exact output interface pending | the fake forge; serve's setup host at each start, leaving it for later starts (`protocol/setup.md`, 8.4) |
+| the fake forge's admin token | the fake forge from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.forge.dir}/setup/admin_token`; exact output interface pending | the fake forge before binding; serve's setup host, once, keeping its record before removal (`protocol/setup.md`, 6.5) |
 | the sign-in link | serve | its ready line | the seed's `sign-in`, which spends it (`client/README.md`, 6.7) |
 | the owner's client token | the sign-in | `{dir.client}` | the seed's acts; the driver's `ctl` |
-| the bot's tokens | `temper forge reconcile` on the fake, before serve | the fake entry's files in `{dir.data}` | serve |
+| the bot's tokens | serve's setup host, reconciling the fake | the fake forge's records in jig's secrets' store | serve |
 | the worker's secret and digest | a fixed pair of the experiment's, as the process tier's | `{proc.serve.dir}/secrets/` | serve |
 
 - **No machine secret:** no file, argument or environment of the
