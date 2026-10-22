@@ -50,6 +50,7 @@ enum Part {
     Value { role: Role, name: &'static str, value: &'static str },
     Chats { live: u32, closed: u32 },
     Plan { live: u32, title: &'static str },
+    PlanWithEnded { live: u32, ended: u32, before: &'static str, after: &'static str },
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
@@ -263,6 +264,21 @@ const HOLDS: [Holds; samples::N] = [
             Part::Absent { role: Role::Paragraph, name: "More of its ended tasks are not shown." },
         ],
     },
+    Holds {
+        name: "task-reference-T12",
+        heading: "Harness",
+        parts: &[
+            Part::Named { role: Role::Paragraph, name: "Its delegates: 6 live, 3 ended." },
+            Part::Named { role: Role::Button, name: "All" },
+            Part::Named { role: Role::Button, name: "Live only" },
+            Part::PlanWithEnded {
+                live: 6,
+                ended: 3,
+                before: "Advise: the fake server's API",
+                after: "Fake server: typed errors",
+            },
+        ],
+    },
 ];
 fn in_main(role: Role, name: &str) -> Find {
     Find::named(role, name.as_bytes())
@@ -274,6 +290,30 @@ fn find(tree: &skein_ui::Tree, role: Role, name: &str, sample: &str) -> skein_ui
         Found::Node(node) => node,
         Found::Absent | Found::Pending => panic!("{sample}: missing {role:?} {name:?}"),
     }
+}
+fn plan_with_ended(tree: &skein_ui::Tree, live: u32, ended: u32, before: &str, after: &str, sample: &str) {
+    let plan = find(tree, Role::Tree, "Plan", sample);
+    let nodes = tree.nodes();
+    let start = nodes.iter().position(|node| node.id == plan).expect("plan node");
+    let end = start + usize::try_from(nodes[start].size).expect("plan subtree");
+    let rows: Vec<_> = (start..end).filter(|index| nodes[*index].role == Role::TreeItem).collect();
+    let window = driver::limits().client.domain.rows;
+    assert_eq!(
+        rows.len(),
+        usize::try_from(live.min(window) + ended.min(window)).expect("row count"),
+        "{sample}: live and ended plan rows"
+    );
+    let [before, after] = [before, after].map(|title| {
+        rows.iter()
+            .position(|start| {
+                let end = *start + usize::try_from(nodes[*start].size).expect("row subtree");
+                nodes[*start..end]
+                    .iter()
+                    .any(|node| node.role == Role::Paragraph && node.name.as_deref() == Some(title.as_bytes()))
+            })
+            .unwrap_or_else(|| panic!("{sample}: missing plan row {title:?}"))
+    });
+    assert!(before < after, "{sample}: lower-numbered ended row before live row");
 }
 #[test]
 fn each_state_holds_what_its_name_says() {
@@ -341,6 +381,9 @@ fn each_state_holds_what_its_name_says() {
                         }
                     }
                     assert_eq!(count, available, "{}: windowed chat rows", sample.name);
+                }
+                Part::PlanWithEnded { live, ended, before, after } => {
+                    plan_with_ended(tree, *live, *ended, before, after, sample.name);
                 }
                 Part::Plan { live, title } => {
                     let plan = find(tree, Role::Tree, "Plan", sample.name);
