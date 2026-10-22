@@ -199,6 +199,7 @@ pub(crate) fn route_takes(domain: &Domain, limits: &Limits) -> bool {
 }
 
 pub(crate) fn route_decision(domain: &mut Domain, limits: &Limits) -> Option<Decision> {
+    domain.settled = None;
     Decision::reserve_room(&mut domain.journal, &limits.journal, route_room(limits))
 }
 

@@ -223,6 +223,10 @@ pub struct Decision {
 pub type Journal = SkeinJournal<Write, crate::Output>;
 
 impl Decision {
+    pub(crate) fn empty(&self) -> bool {
+        !self.overrun && self.writes.is_empty() && self.deliveries.is_empty()
+    }
+
     /// Test the unused slots while exercising journal admission bounds.
     #[cfg(test)]
     pub(crate) fn room_for(&self, writes: u32, deliveries: u32) -> bool {

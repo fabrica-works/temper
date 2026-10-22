@@ -7,6 +7,8 @@ use crate::{Deployment, Family, Key, Record, TurnRecord, Write};
 use alloc::boxed::Box;
 use skein_lib::{JournalRoom, List, Queue, Token, Wall};
 mod result;
+mod resume;
+mod resume_fixture;
 
 const LIMITS: Limits =
     Limits { commits: 2, held: 8, writes: 4, deliveries: 4, transcript_bytes: 64, result_bytes: 32, run_bytes: 1 };

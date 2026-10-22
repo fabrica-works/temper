@@ -19,7 +19,7 @@ use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_domain_views as views;
-use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Slab, Token};
+use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Slab, Time, Token, Wall};
 use temper_engine_domain_forge as forge;
 use temper_engine_domain_forge_change as forge_change;
 
@@ -29,6 +29,11 @@ use temper_engine_domain_forge_change as forge_change;
 /// (jig's domain/root.md, sections 2–4).
 #[derive(Debug)]
 pub struct Domain {
+    /// A completed empty fleet/finish pass, valid only until continuation state
+    /// or either injected clock changes. Journal release remains independent.
+    pub(crate) settled: Option<(Time, Wall)>,
+    #[cfg(test)]
+    pub(crate) empty_resumes: u32,
     pub(crate) limits: Limits,
     pub(crate) config: RootConfig,
     pub(crate) core: Core,
@@ -71,6 +76,7 @@ pub struct Domain {
 impl Domain {
     /// Routing capacities are fixed before the first input and priced by the service.
     pub fn connection_limits(&mut self, forges: u32, installations: u32) {
+        self.settled = None;
         self.forge.connection_limits(forges, installations);
     }
     /// The routing's latest connection information; no connection state is restored.
@@ -211,7 +217,7 @@ impl Domain {
         assert!(forge.gate_policy(gate_policy, &limits.forge), "forge owns bounded landing templates");
         let root_config = RootConfig { forge_connector, forge_charter: config.forge_charter };
         let mut core = Core::new(config.core, &core_limits(limits))?;
-        let core_env = Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: core_limits(limits) };
+        let core_env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: core_limits(limits) };
         let configured = jig_domain_core::step(
             &mut core,
             &core_env,
@@ -245,6 +251,9 @@ impl Domain {
             }
         }
         Ok(Domain {
+            settled: None,
+            #[cfg(test)]
+            empty_resumes: 0,
             journal: Journal::new(&root_journal_limits(limits)),
             stop_pending: false,
             door_pass: false,
@@ -343,6 +352,7 @@ impl Domain {
     /// pass. Bounded child/slab bookkeeping releases only retired entries; issued loads still
     /// awaiting a terminal remain owned. Emits no request or terminal.
     pub fn reclaim(&mut self) {
+        self.settled = None;
         self.core.reclaim();
         self.brief_connectors.reclaim();
         self.forge.reclaim();
@@ -412,16 +422,25 @@ pub(crate) fn admits(domain: &Domain, limits: &Limits) -> bool {
         })
 }
 
-pub(crate) fn close(domain: &mut Domain, env: &Env<Limits>, mut decision: Decision, out: &mut Queue<Request>) {
+// Whether this close was empty, including the automatic deployment header.
+// Only the fleet Resume branch may use it to mark the instant settled.
+pub(crate) fn close(domain: &mut Domain, env: &Env<Limits>, mut decision: Decision, out: &mut Queue<Request>) -> bool {
     if domain.core.restart_failure().is_some() {
         out.push(Request::Stop);
-        return;
+        return false;
     }
     let requests = jig_domain_core::finish_decision(&mut domain.core, &environment_core(env));
+    let finished = only_decided(&requests);
     route_core_requests(domain, env, &mut decision, requests);
     route_into(domain, env, &mut decision);
     let persist_header =
         domain.core_header_loaded && domain.core.restart_step() != Some(jig_domain_core::RestartStep::LoadCore);
+    let empty = finished
+        && decision.empty()
+        && !(persist_header && domain.core.counters.dirty())
+        && domain.work.is_empty()
+        && domain.store_answers.is_empty()
+        && out.is_empty();
     crate::decision::accept_routed(
         &mut domain.journal,
         &mut domain.core.counters,
@@ -436,6 +455,41 @@ pub(crate) fn close(domain: &mut Domain, env: &Env<Limits>, mut decision: Decisi
     }
     if domain.journal.stopped() {
         out.push(Request::Stop);
+        return false;
+    }
+    empty
+}
+
+fn only_decided(requests: &jig_domain_core::Requests) -> bool {
+    let jig_domain_core::Requests::Out(output) = requests;
+    if output.len() != 1 {
+        return false;
+    }
+    for request in output {
+        match request {
+            jig_domain_core::Request::Decided => {}
+            jig_domain_core::Request::Write(_)
+            | jig_domain_core::Request::Ask { .. }
+            | jig_domain_core::Request::Held(_)
+            | jig_domain_core::Request::Now(_) => return false,
+        }
+    }
+    true
+}
+
+pub(crate) fn invalidate_input(domain: &mut Domain, event: &Event) {
+    match event {
+        Event::Resume => {}
+        Event::Setup { .. }
+        | Event::Released(_)
+        | Event::Forge(_)
+        | Event::Stop
+        | Event::Credential { .. }
+        | Event::Account(_)
+        | Event::Party(_)
+        | Event::Store(_)
+        | Event::Restart
+        | Event::Worker(_) => domain.settled = None,
     }
 }
 
@@ -569,11 +623,24 @@ pub(crate) fn resume_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Qu
             close(domain, env, decision, out);
             return;
         }
+        if domain.settled == Some((env.now, env.wall)) && !domain.core.fleet.is_ready() {
+            return;
+        }
         let mut decision = route_decision(domain, &env.limits).expect("journal room checked before fleet continuation");
         let routed = jig_domain_core::resume_fleet(&mut domain.core, &environment_core(env));
+        let fleet_empty = only_decided(&routed);
         route_core_requests(domain, env, &mut decision, routed);
         route_into(domain, env, &mut decision);
-        close(domain, env, decision, out);
+        if close(domain, env, decision, out) && fleet_empty {
+            // finish_decision ran its watch/retained-run maintenance. Quiet
+            // changes are idempotent at this instant; fleet readiness is still
+            // checked on reuse. Committed inputs always invalidate this mark.
+            domain.settled = Some((env.now, env.wall));
+            #[cfg(test)]
+            {
+                domain.empty_resumes = domain.empty_resumes.checked_add(1).expect("test decision count");
+            }
+        }
     }
 }
 
@@ -588,6 +655,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>) {
 }
 
 pub(crate) fn fire_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    domain.settled = None;
     if domain.journal.stopped() || domain.core.restart_failure().is_some() {
         return;
     }
@@ -641,6 +709,7 @@ pub(crate) fn forge_release_ending(ending: tasks::Ending) -> forge::ReleaseEndin
 /// A released continuation is one newly admitted step, just like an input.
 /// When the route is full the journal returns it to iterate without changing a child.
 pub(crate) fn step_released(domain: &mut Domain, env: &Env<Limits>, released: Released, out: &mut Queue<Request>) {
+    domain.settled = None;
     // A committed forge entry is not made while the engine stops; it stays
     // durable and the next start's outbox settlement makes it.
     if let Delivery::ForgeCommitted { .. } = released.0

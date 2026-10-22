@@ -50,6 +50,7 @@ pub(crate) use tools::relay_payload;
     reason = "one exhaustive input match keeps every input before a single decision close"
 )]
 pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
+    crate::domain::invalidate_input(domain, &event);
     assert!(domain.application.is_none(), "application value cleared in its admission step");
     assert!(domain.limits == env.limits, "root uses configured limits");
     assert!(out.room() >= max_out(&env.limits), "root output room reserved");
