@@ -94,9 +94,13 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     let judges = Map::<u32, Box<[Criterion]>>::worst_case(l.judge_projects)?
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
     crate::adoption::worst_case(l)?
+        .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
+        .checked_add(Map::<u16, crate::Configured>::worst_case(l.client.repositories)?)?
         .checked_add(skein_forge_client::worst_case(&l.client)?)?
         .checked_add(Map::<skein_forge::api::Repository, Repository>::worst_case(l.repositories)?)?
-        .checked_add(Map::<u16, crate::Connection>::worst_case(l.client.repositories)?)?
+        .checked_add(Map::<u16, (crate::Connection, Option<(skein_lib::Token, crate::SetUpAnswer)>)>::worst_case(
+            l.client.repositories,
+        )?)?
         .checked_add(u64::from(l.client.repositories).checked_mul(
             u64::from(l.name_bytes).checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?.max(STOPPED_TEXT_BYTES),
         )?)?
@@ -207,7 +211,7 @@ fn issue_payload(l: &Limits) -> Option<u64> {
 #[must_use]
 pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -> Option<u64> {
     let count = forges.checked_mul(installations)?;
-    Map::<u16, crate::Connection>::worst_case(forges)?
+    Map::<u16, (crate::Connection, Option<(skein_lib::Token, crate::SetUpAnswer)>)>::worst_case(forges)?
         .checked_add(u64::from(forges).checked_mul(
             u64::from(name_bytes).checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?.max(STOPPED_TEXT_BYTES),
         )?)?

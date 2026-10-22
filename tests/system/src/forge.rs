@@ -386,13 +386,13 @@ impl World {
                         self.answers.push(answer.clone());
                     }
                     Delivery::Application { outcome, .. } => {
-                        self.adopted.push(outcome.expect("retained application"));
+                        let Some(forge_top::Answered::Adopt(outcome)) = outcome else { panic!("retained adoption") };
+                        self.adopted.push(outcome);
                     }
                     _ => {}
                 },
                 engine::Request::Account(_)
                 | engine::Request::SetUp { .. }
-                | engine::Request::SetUpRefused { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Party(_)
                 | engine::Request::Store(_)
@@ -501,7 +501,7 @@ impl World {
             key: [91; 16],
             digest: [5; 32],
             carried: None,
-            request: forge_top::Adoption {
+            request: forge_top::Ask::Adopt(forge_top::Adoption {
                 project: 1,
                 home: true,
                 forge: forge_world::REPO.forge,
@@ -513,7 +513,7 @@ impl World {
                 landing: Box::from(&b"main"[..]),
                 ci: true,
                 checks: Box::new([]),
-            },
+            }),
         }));
         self.until(Until::Adopted);
         assert!(matches!(self.adopted.as_slice(), [forge_top::ApplicationOutcome::Adopted(_)]));

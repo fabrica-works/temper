@@ -88,6 +88,8 @@ fn domain() -> Domain {
             writers: Box::new([skein_forge_client::Writer { forge: 1, author: 7 }]),
         },
         &[GitIdentity { forge: 1, credential: 1 }],
+        &[],
+        false,
     )
     .expect("valid connector")
 }
@@ -294,8 +296,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationPart { .. }
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
+        | Request::MarkedForges
         | Request::SetUp { .. }
-        | Request::SetUpRefused { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
     };
     assert_eq!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Permission { user: 7 }));
@@ -347,8 +349,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationPart { .. }
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
+        | Request::MarkedForges
         | Request::SetUp { .. }
-        | Request::SetUpRefused { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
     };
     assert!(
@@ -400,8 +402,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationPart { .. }
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
+        | Request::MarkedForges
         | Request::SetUp { .. }
-        | Request::SetUpRefused { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),
     }
 }
@@ -923,6 +925,8 @@ fn routing_domain() -> Domain {
         4,
         skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
         &[GitIdentity { forge: 1, credential: 1 }],
+        &[],
+        false,
     )
     .unwrap()
 }
@@ -932,21 +936,31 @@ fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() 
     let mut d = routing_domain();
     assert_eq!(d.connection(1), Connection::NotConnected);
     for state in [Connection::Connecting, Connection::Stopped { reason: Box::from(b"key refused".as_slice()) }] {
-        assert!(outputs(&mut d, Event::Connection { forge: 1, state: state.clone() }).is_empty());
+        assert_eq!(
+            outputs(&mut d, Event::Connection { forge: 1, state: state.clone() }).as_ref(),
+            [Request::MarkedForges]
+        );
         assert_eq!(d.connection(1), state);
     }
     let state = Connection::Connected { id: 7, login: Box::from(b"writer".as_slice()) };
     let first = outputs(&mut d, Event::Connection { forge: 1, state: state.clone() });
     assert_eq!(
         first.as_ref(),
-        [Request::Save {
-            record: Stored::Writer(skein_forge_client::Writer { forge: 1, author: 7 }),
-            release: None,
-            read_afresh: None
-        }]
+        [
+            Request::Save {
+                record: Stored::Writer(skein_forge_client::Writer { forge: 1, author: 7 }),
+                release: None,
+                read_afresh: None
+            },
+            Request::MarkedForges
+        ]
     );
     assert_eq!(d.connection(1), state);
-    assert!(outputs(&mut d, Event::Connection { forge: 1, state }).is_empty(), "writer given twice saves once");
+    assert_eq!(
+        outputs(&mut d, Event::Connection { forge: 1, state }).as_ref(),
+        [Request::MarkedForges],
+        "writer given twice saves once"
+    );
     let mut restarted = domain();
     outputs(
         &mut restarted,
@@ -954,40 +968,141 @@ fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() 
     );
     assert_eq!(restarted.connection(1), Connection::NotConnected, "restored writer is no connection claim");
 }
+const CONFIGURED: [Configured; 2] = [
+    Configured { number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true },
+    Configured { number: 2, kind: Kind::GitHub, mode: Mode::Owned, asked: true },
+];
+fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
+    Domain::new(
+        &LIMITS,
+        4,
+        skein_forge_client::Config {
+            namespace: Box::from(b"test".as_slice()),
+            writers: Box::new([skein_forge_client::Writer { forge: 1, author: 7 }]),
+        },
+        &[],
+        forges,
+        under_box,
+    )
+    .unwrap()
+}
+fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
+    Row { number, kind, mode: Mode::Owned, connection, offer }
+}
 #[test]
-fn set_up_is_admitted_when_not_set_up_and_when_set_up_failed() {
-    let mut d = domain();
-    let forge = 1;
-    for state in [Connection::NotSetUp, Connection::SetUpFailed { why: Box::from(b"fetch failed".as_slice()) }] {
-        outputs(&mut d, Event::Connection { forge, state: state.clone() });
-        assert_eq!(outputs(&mut d, Event::SetUp { forge }).as_ref(), [Request::SetUp { forge }]);
-        assert_eq!(d.connection(forge), state, "asking leaves the connection unchanged");
+fn setup_rows_and_answers_agree_in_every_connection_state() {
+    let not_offered = (Offer::NotOffered, Some(SetUpRefusal::NotOffered));
+    let offered = (Offer::Offered, None);
+    let busy = (Offer::Offered, Some(SetUpRefusal::Busy));
+    let no_box = (Offer::NotUnderTheBox, Some(SetUpRefusal::NotUnderTheBox));
+    let rows = [
+        (Connection::NotConnected, [not_offered, not_offered]),
+        (Connection::NotSetUp, [offered, no_box]),
+        (Connection::SetUpFailed { why: b"failed".as_slice().into() }, [offered, no_box]),
+        (Connection::SettingUp { step: None }, [busy, no_box]),
+        (Connection::SettingUp { step: Some(SetUpStep::Fetch) }, [busy, no_box]),
+        (Connection::SettingUp { step: Some(SetUpStep::Prepare) }, [busy, no_box]),
+        (Connection::SettingUp { step: Some(SetUpStep::Run) }, [busy, no_box]),
+        (Connection::Connecting, [not_offered, not_offered]),
+        (Connection::Connected { id: 7, login: b"writer".as_slice().into() }, [not_offered, not_offered]),
+        (Connection::Stopped { reason: b"stopped".as_slice().into() }, [not_offered, not_offered]),
+    ];
+    for (state, expected) in rows {
+        for (under_box, (offer, refusal)) in [true, false].into_iter().zip(expected) {
+            let mut d = setup_domain(&CONFIGURED[..1], under_box);
+            outputs(&mut d, Event::Connection { forge: 1, state: state.clone() });
+            assert_eq!(d.forges().rows.as_ref(), [setup_row(1, Kind::Forgejo, state.clone(), offer)]);
+            let request = Token::new(91);
+            let token = Token::new(92);
+            let emitted = outputs(&mut d, setup_application(1, request, token));
+            match refusal {
+                None => {
+                    assert_eq!(emitted.as_ref(), [Request::SetUp { forge: 1, request }]);
+                    outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer: SetUpAnswer::SettingUp });
+                    assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::SettingUp)));
+                }
+                Some(why) => {
+                    assert_eq!(emitted.as_ref(), [Request::ApplicationDone { request, token }]);
+                    assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::Refused(why))));
+                }
+            }
+        }
     }
 }
-
 #[test]
-fn set_up_is_refused_not_offered_in_every_other_state() {
-    let mut d = domain();
-    let configured = 1;
-    let unconfigured = 2;
-    for (forge, state) in [
-        (configured, Some(Connection::NotConnected)),
-        (unconfigured, None),
-        (configured, Some(Connection::SettingUp { step: None })),
-        (configured, Some(Connection::SettingUp { step: Some(SetUpStep::Prepare) })),
-        (configured, Some(Connection::Connecting)),
-        (configured, Some(Connection::Connected { id: 7, login: Box::from(b"writer".as_slice()) })),
-        (configured, Some(Connection::Stopped { reason: Box::from(b"key refused".as_slice()) })),
-    ] {
-        if let Some(state) = &state {
-            outputs(&mut d, Event::Connection { forge, state: state.clone() });
-        }
+fn setup_is_not_offered_without_owned_asked_configuration() {
+    let rows: [Box<[Configured]>; 5] = [
+        Box::new([Configured { mode: Mode::Connected, ..CONFIGURED[0] }]),
+        Box::new([Configured { mode: Mode::Managed, ..CONFIGURED[0] }]),
+        Box::new([Configured { mode: Mode::Fake, ..CONFIGURED[0] }]),
+        Box::new([Configured { asked: false, ..CONFIGURED[0] }]),
+        Box::new([]),
+    ];
+    for forges in rows {
+        let mut d = setup_domain(&forges, true);
+        outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
+        let token = Token::new(91);
+        assert_eq!(d.offer(1), Offer::NotOffered);
         assert_eq!(
-            outputs(&mut d, Event::SetUp { forge }).as_ref(),
-            [Request::SetUpRefused { forge, why: SetUpRefusal::NotOffered }],
-            "forge {forge}, connection {state:?}",
+            outputs(&mut d, setup_application(1, token, token)).as_ref(),
+            [Request::ApplicationDone { request: token, token }]
         );
+        assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::NotOffered))));
     }
+}
+#[test]
+fn a_setup_on_another_forge_keeps_the_offer_but_answers_busy() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::SettingUp { step: Some(SetUpStep::Run) } });
+    outputs(&mut d, Event::Connection { forge: 2, state: Connection::NotSetUp });
+    let token = Token::new(91);
+    assert_eq!(d.offer(2), Offer::Offered);
+    assert_eq!(
+        outputs(&mut d, setup_application(2, token, token)).as_ref(),
+        [Request::ApplicationDone { request: token, token }]
+    );
+    assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::Busy))));
+}
+#[test]
+fn closing_the_box_fails_setup_and_marks_every_offer_unavailable() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::SettingUp { step: Some(SetUpStep::Run) } });
+    outputs(&mut d, Event::Connection { forge: 2, state: Connection::NotSetUp });
+    assert_eq!(outputs(&mut d, Event::BoxClosed).as_ref(), [Request::MarkedForges]);
+    assert_eq!(
+        d.forges().rows.as_ref(),
+        [
+            setup_row(
+                1,
+                Kind::Forgejo,
+                Connection::SetUpFailed { why: b"the box closed the pipe".as_slice().into() },
+                Offer::NotUnderTheBox
+            ),
+            setup_row(2, Kind::GitHub, Connection::NotSetUp, Offer::NotUnderTheBox),
+        ]
+    );
+    let token = Token::new(91);
+    assert_eq!(
+        outputs(&mut d, setup_application(1, token, token)).as_ref(),
+        [Request::ApplicationDone { request: token, token }]
+    );
+    assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::NotUnderTheBox))));
+}
+#[test]
+fn configured_forges_are_bounded_at_construction() {
+    fn config() -> skein_forge_client::Config {
+        skein_forge_client::Config { namespace: b"test".as_slice().into(), writers: Box::new([]) }
+    }
+    let count = usize::try_from(LIMITS.client.repositories).unwrap();
+    let mut forges = skein_lib::List::with_capacity(LIMITS.client.repositories.checked_add(1).unwrap());
+    for number in 0..=count {
+        forges.push(Configured { number: u16::try_from(number).unwrap(), ..CONFIGURED[0] }).unwrap();
+    }
+    Domain::new(&LIMITS, 4, config(), &[], &forges.as_slice()[..count], false).unwrap();
+    assert_eq!(
+        Domain::new(&LIMITS, 4, config(), &[], forges.as_slice(), false).unwrap_err(),
+        skein_forge::api::Error::TooLarge
+    );
 }
 
 #[test]
@@ -999,7 +1114,10 @@ fn set_up_states_are_kept_as_told_and_give_no_writer() {
         Connection::SettingUp { step: Some(SetUpStep::Prepare) },
         Connection::SetUpFailed { why: Box::from(b"the box closed the pipe".as_slice()) },
     ] {
-        assert!(outputs(&mut d, Event::Connection { forge: 1, state: state.clone() }).is_empty());
+        assert_eq!(
+            outputs(&mut d, Event::Connection { forge: 1, state: state.clone() }).as_ref(),
+            [Request::MarkedForges]
+        );
         assert_eq!(d.connection(1), state);
     }
 }
@@ -1031,4 +1149,141 @@ fn routing_tables_take_every_installation_with_the_connection_components_bounds(
     assert!(d.installation(2, 8).unwrap().stray);
     assert!(connection_worst_case(2, 8, LIMITS.name_bytes).is_some());
     assert_eq!(connection_worst_case(u32::MAX, u32::MAX, LIMITS.name_bytes), None);
+}
+
+fn setup_application(forge: u16, request: Token, token: Token) -> Event {
+    Event::Application { request, token, retention: Duration::from_secs(60), ask: Ask::SetUp { forge } }
+}
+
+#[test]
+fn a_setup_answer_finishes_its_application_without_a_durable_record() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    let request = Token::new(91);
+    let token = Token::new(92);
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
+    outputs(&mut d, setup_application(1, request, token));
+    assert_eq!(d.application_answer(token), None);
+    let answer = SetUpAnswer::SettingUp;
+    assert_eq!(
+        outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer }).as_ref(),
+        [Request::ApplicationDone { request, token }]
+    );
+    assert_eq!(d.application_answer(token), Some(Answered::SetUp(answer)));
+    assert_eq!(d.connection(1), Connection::NotSetUp);
+    assert_eq!(domain().application_answer(token), None, "restart keeps no setup outcome");
+}
+
+#[test]
+fn a_connection_change_keeps_the_latest_setup_answer() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    let request = Token::new(91);
+    let token = Token::new(92);
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
+    outputs(&mut d, setup_application(1, request, token));
+    outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer: SetUpAnswer::SettingUp });
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::SettingUp { step: Some(SetUpStep::Fetch) } });
+    assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::SettingUp)));
+}
+
+#[test]
+fn setup_flights_refuse_busy_at_the_bound_and_an_answer_frees_room() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
+    for number in 1..=u64::from(LIMITS.applications) {
+        let request = Token::new(number);
+        outputs(&mut d, setup_application(1, request, request));
+    }
+    let request = Token::new(99);
+    assert_eq!(
+        outputs(&mut d, setup_application(1, request, request)).as_ref(),
+        [Request::ApplicationAgain { request, why: jig_domain_people::Again::Busy }]
+    );
+    outputs(
+        &mut d,
+        Event::SetUpAnswered {
+            forge: 1,
+            request: Token::new(1),
+            answer: SetUpAnswer::Refused(SetUpRefusal::NotOffered),
+        },
+    );
+    assert_eq!(
+        outputs(&mut d, setup_application(1, request, request)).as_ref(),
+        [Request::SetUp { forge: 1, request }]
+    );
+}
+
+#[test]
+fn a_later_setup_answer_replaces_only_that_forges_previous_token() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    d.connection_limits(2, 1);
+    for forge in [1, 2] {
+        outputs(&mut d, Event::Connection { forge, state: Connection::NotSetUp });
+        let token = Token::new(u64::from(forge));
+        outputs(&mut d, setup_application(forge, token, token));
+        outputs(&mut d, Event::SetUpAnswered { forge, request: token, answer: SetUpAnswer::SettingUp });
+    }
+    let request = Token::new(3);
+    outputs(&mut d, setup_application(1, request, request));
+    assert_eq!(
+        d.application_answer(Token::new(1)),
+        Some(Answered::SetUp(SetUpAnswer::SettingUp)),
+        "kept until answered"
+    );
+    let answer = SetUpAnswer::Refused(SetUpRefusal::Busy);
+    outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer });
+    assert_eq!(d.application_answer(Token::new(1)), None);
+    assert_eq!(d.application_answer(request), Some(Answered::SetUp(answer)));
+    assert_eq!(d.application_answer(Token::new(2)), Some(Answered::SetUp(SetUpAnswer::SettingUp)));
+}
+
+#[test]
+fn unconfigured_forges_share_one_latest_refusal_beside_the_configured_forges() {
+    let mut d = setup_domain(&CONFIGURED[..1], true);
+    d.connection_limits(1, 1);
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
+    for forge in [1, 2, 3] {
+        let request = Token::new(u64::from(forge));
+        outputs(&mut d, setup_application(forge, request, request));
+        outputs(
+            &mut d,
+            Event::SetUpAnswered {
+                forge,
+                request,
+                answer: if forge == 1 {
+                    SetUpAnswer::SettingUp
+                } else {
+                    SetUpAnswer::Refused(SetUpRefusal::NotOffered)
+                },
+            },
+        );
+    }
+    assert_eq!(d.application_answer(Token::new(1)), Some(Answered::SetUp(SetUpAnswer::SettingUp)));
+    assert_eq!(d.application_answer(Token::new(2)), None);
+    assert_eq!(
+        d.application_answer(Token::new(3)),
+        Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::NotOffered)))
+    );
+    assert_eq!(d.forges().rows.len(), 1);
+}
+
+#[test]
+fn the_forges_document_orders_connections_and_every_connection_marks_it() {
+    let mut d = setup_domain(&[CONFIGURED[1], CONFIGURED[0]], true);
+    d.connection_limits(2, 1);
+    for (forge, state) in [(2, Connection::NotSetUp), (1, Connection::Connecting), (2, Connection::NotSetUp)] {
+        assert_eq!(outputs(&mut d, Event::Connection { forge, state }).as_ref(), [Request::MarkedForges]);
+    }
+    assert_eq!(
+        d.forges().rows.as_ref(),
+        [
+            setup_row(1, Kind::Forgejo, Connection::Connecting, Offer::NotOffered),
+            setup_row(2, Kind::GitHub, Connection::NotSetUp, Offer::Offered)
+        ]
+    );
+}
+
+#[test]
+fn a_configured_forge_without_routing_input_reads_not_connected() {
+    let d = setup_domain(&CONFIGURED[..1], true);
+    assert_eq!(d.forges().rows.as_ref(), [setup_row(1, Kind::Forgejo, Connection::NotConnected, Offer::NotOffered)]);
 }

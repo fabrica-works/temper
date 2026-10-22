@@ -234,6 +234,7 @@ fn the_checked_fake_git_program_reaches_the_services_forge_settings() {
         Some(fixtures::worker_runtime()),
         fixtures::forge_runtime(),
         Some(&checked),
+        false,
     )
     .unwrap();
     let forge = &service.engine.as_ref().expect("engine").workers.forges[0];
@@ -1187,6 +1188,7 @@ fn an_engine_alone_prepares_without_a_worker_or_its_files_and_agent() {
         None,
         fixtures::forge_runtime(),
         None,
+        false,
     )
     .unwrap();
     assert!(service.worker.is_none());
@@ -1222,6 +1224,7 @@ fn an_engine_alone_admits_its_own_worst_case_and_names_an_insufficient_memory_de
             None,
             fixtures::forge_runtime(),
             None,
+            false,
         );
         if accepted {
             assert!(result.is_ok(), "at the calculated worst case");
@@ -1354,6 +1357,7 @@ fn fake_start(
         Some(fixtures::worker_runtime()),
         fixtures::forge_runtime(),
         Some(checked),
+        false,
     )
 }
 
@@ -1508,5 +1512,24 @@ fn an_asked_file_present_past_its_bound_still_refuses_startup() {
     assert_eq!(
         lines(&start_owned(true, &files).err().unwrap()).as_ref(),
         b"application.forges[0].api_token: past its bound\n"
+    );
+}
+
+#[test]
+fn forge_configuration_keeps_kind_mode_and_asked_start() {
+    use temper_engine_domain_forge::{Configured, Kind, Mode};
+    let mut settings = fixtures::engine();
+    for (source, kind) in [(settings::Kind::Forgejo, Kind::Forgejo), (settings::Kind::GitHub, Kind::GitHub)] {
+        settings.forges[0].kind = source;
+        assert_eq!(
+            application::configured(&settings).as_ref(),
+            [Configured { number: 1, kind, mode: Mode::Connected, asked: false }]
+        );
+    }
+    settings.forges[0].kind = settings::Kind::Forgejo;
+    settings.setup = Box::new([fixtures::owned_setup(1)]);
+    assert_eq!(
+        application::configured(&settings).as_ref(),
+        [Configured { number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true }]
     );
 }

@@ -324,12 +324,13 @@ fn prepare_with_store(
     bytes: &[u8],
     owned: &mut Vec<Fd>,
 ) -> Result<(service::Service, Box<[u8]>), String> {
-    prepare_with_limits(directories, bytes, owned).map(|(service, store, _)| (service, store))
+    prepare_with_limits(directories, bytes, owned, false).map(|(service, store, _)| (service, store))
 }
 fn prepare_with_limits(
     directories: &Directories,
     bytes: &[u8],
     owned: &mut Vec<Fd>,
+    under_box: bool,
 ) -> Result<(service::Service, Box<[u8]>, u32), String> {
     if service::startup::shape(bytes, &directories.jig())
         .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?
@@ -384,6 +385,7 @@ fn prepare_with_limits(
         runtime,
         forges,
         Some(&checked),
+        under_box,
     )
     .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
     if let Some(agent) = &agent
@@ -440,7 +442,7 @@ fn serve(directories: &Directories, boxed: bool) -> Result<Exit, String> {
     }
     let bytes = directories.read()?;
     let mut owned = Vec::new();
-    let prepared = prepare_with_limits(directories, &bytes, &mut owned);
+    let prepared = prepare_with_limits(directories, &bytes, &mut owned, boxed);
     let (mut service, store, line_bytes) = match prepared {
         Ok(prepared) => prepared,
         Err(why) => {

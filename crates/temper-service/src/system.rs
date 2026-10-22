@@ -84,8 +84,10 @@ impl Service {
         let (forges, roots) = crate::forge::prepare(&settings, forges)?;
         let owned = skein_forge_connection::settings::owned_bytes(&forges)
             .ok_or(start_problem(b"memory_bytes", What::Bound))?;
-        Self::prepared(settings, seeds, accounts, (forges, roots, owned), worker, worker_bytes, io_limits)
+        Self::prepared(settings, seeds, accounts, (forges, roots, owned), worker, worker_bytes, io_limits, false)
     }
+    #[expect(clippy::too_many_arguments, reason = "startup supplies runtime facts before the domain is built")]
+    #[expect(clippy::too_many_lines, reason = "one startup constructs the service after its worst case is checked")]
     pub(crate) fn prepared(
         mut settings: settings::Engine,
         seeds: &settings::Seeds,
@@ -94,6 +96,7 @@ impl Service {
         worker: Option<Worker>,
         worker_bytes: u64,
         io_limits: io::Limits,
+        under_box: bool,
     ) -> Result<Self, Problems> {
         let limits =
             limits::engine(&settings.jig.limits, &settings.limits).ok_or(start_problem(b"limits", What::Bound))?;
@@ -159,6 +162,7 @@ impl Service {
         .expect("checked forge limits");
         forget_handover(&mut settings);
         let notes = Queue::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
+        let configured = crate::startup::application::configured(&settings);
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;
         let config = temper_engine_domain::Config {
             core: jig_protocol_config::core(&settings.jig, seeds.deployment, seeds.seed),
@@ -166,6 +170,8 @@ impl Service {
             forge: forge_config,
             identities,
             forge_charter: settings.charter,
+            forges: configured,
+            under_box,
         };
         let store = store::Store::new(&limits, &store_limits, &config.core.settings.models, seeds.installation);
         let demo = settings.demo;

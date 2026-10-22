@@ -12,7 +12,10 @@ fn an_adoption_of_a_repository_the_forge_lacks_is_refused_as_not_found() {
     let mut request = fixtures::adoption(1);
     request.name = Box::from(&b"none"[..]);
     adopt(&mut driver, request, 95);
-    assert_eq!(outcomes(&driver), [&Some(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NotFound))]);
+    assert_eq!(
+        outcomes(&driver),
+        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NotFound)))]
+    );
     assert_eq!(driver.forge.as_ref().expect("forge stand").calls, 1);
 }
 
@@ -120,11 +123,11 @@ fn adopt(driver: &mut Driver, request: forge::Adoption, reply: u64) {
         key: [95; 16],
         digest: [5; 32],
         carried: None,
-        request,
+        request: forge::Ask::Adopt(request),
     }));
     driver.settle();
 }
-fn outcomes(driver: &Driver) -> Vec<&Option<forge::ApplicationOutcome>> {
+fn outcomes(driver: &Driver) -> Vec<&Option<forge::Answered>> {
     driver
         .delivered
         .iter()
@@ -138,7 +141,7 @@ fn an_adoption_naming_a_forge_not_configured_is_refused_as_no_such_forge() {
     adopt(&mut driver, fixtures::adoption(2), 95);
     assert_eq!(
         outcomes(&driver),
-        [&Some(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoSuchForge))]
+        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoSuchForge)))]
     );
     assert_eq!(driver.forge.as_ref().expect("a forge stand").calls, 0);
 }
@@ -149,7 +152,7 @@ fn an_adoption_on_a_configured_forge_is_adopted_with_what_temper_may_do() {
     adopt(&mut driver, fixtures::adoption(1), 95);
     assert_eq!(
         outcomes(&driver),
-        [&Some(forge::ApplicationOutcome::Adopted(forge::AdoptedRepository {
+        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::Adopted(forge::AdoptedRepository {
             repository: skein_forge::api::Repository { forge: 1, repository: 2 },
             owner: Box::from(&b"org"[..]),
             name: Box::from(&b"repo"[..]),
@@ -167,7 +170,7 @@ fn an_adoption_on_a_configured_forge_is_adopted_with_what_temper_may_do() {
                 branch: true
             },
             protection: forge::Protection::Absent,
-        }))]
+        })))]
     );
 }
 
@@ -188,7 +191,10 @@ fn an_adoption_the_forge_user_may_not_read_is_refused_as_no_access() {
     let mut request = fixtures::adoption(1);
     request.name = b"private".as_slice().into();
     adopt(&mut driver, request, 95);
-    assert_eq!(outcomes(&driver), [&Some(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoAccess))]);
+    assert_eq!(
+        outcomes(&driver),
+        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoAccess)))]
+    );
 }
 
 #[test]
