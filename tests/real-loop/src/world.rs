@@ -323,18 +323,7 @@ impl Referee<Proc> for Judge {
             }
         }
         if let Some(state) = &self.github {
-            let Proc::Forge(forge) = &mut children[0] else { panic!("GitHub root") };
-            service.forge_address = forge.address();
-            if let Some(address) = forge.address()
-                && let Some(scripts) = peer.scripts.take()
-            {
-                peer.peer = llm::peer(llm::scripted(scripts(address))).expect("bound GitHub scripts");
-            }
-            service.github_seen.checkpoint(forge, &caller.calls);
-            if service.is_empty() {
-                service.github_seen.collect(forge, &state.handle);
-                forge.shutdown();
-            }
+            github_cues(state, peer, service, caller, children);
         }
         service.address = peer.address();
         if service.links() != 0
@@ -441,6 +430,27 @@ impl Referee<Proc> for Judge {
     }
     fn passed(&self) -> bool {
         self.finished
+    }
+}
+
+fn github_cues(
+    state: &crate::github::State,
+    peer: &mut Llm,
+    service: &mut ServiceHost,
+    caller: &Caller,
+    children: &mut [Proc],
+) {
+    let Proc::Forge(forge) = &mut children[0] else { panic!("GitHub root") };
+    service.forge_address = forge.address();
+    if let Some(address) = forge.address()
+        && let Some(scripts) = peer.scripts.take()
+    {
+        peer.peer = llm::peer(llm::scripted(scripts(address))).expect("bound GitHub scripts");
+    }
+    service.github_seen.checkpoint(forge, &caller.calls);
+    if service.is_empty() {
+        service.github_seen.collect(forge, &state.handle);
+        forge.shutdown();
     }
 }
 
