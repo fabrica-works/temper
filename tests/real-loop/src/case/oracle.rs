@@ -1137,12 +1137,17 @@ pub fn step_4_3(observed: &Observed) -> Vec<Miss> {
         EMPTY,
         "the benchmark's complete activity must end every begun run, with the task ended",
     );
-    let heard_cancel = check_activity(observed, Read::BEnded).iter().any(|line| {
+    // B's journal orders its lines, newest first (../client/tools.md, 11.3): the
+    // cancel heard is older than the run that finished with B's report. The
+    // journal's order, not two wall times, so a clock step can't reorder them.
+    let b_activity = check_activity(observed, Read::BEnded);
+    let reported = b_activity.iter().position(|line| text(line, "/line/run_ended/end") == "finished");
+    let heard = b_activity.iter().position(|line| {
         text(line, "/line/heard/kind/result") == "cancelled"
             && number(line, "/line/heard/from/task") == Some(BENCHMARK)
             && text(line, "/line/heard/words") == CHECK_REASON
-            && number(line, "/at").zip(number(b, "/result/at")).is_some_and(|(heard, reported)| heard <= reported)
     });
+    let heard_cancel = reported.zip(heard).is_some_and(|(reported, heard)| reported < heard);
     step_check(
         &mut misses,
         "4.3",
