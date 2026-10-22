@@ -910,8 +910,13 @@ fn a_held_pin_stays_pinned_while_fresh_selection_passes_to_the_next_account() {
     ] {
         let mut held = account(3, c::OwnerAccountKind::SignIn, None);
         held.sources.get_mut(1).unwrap().state = state;
-        // Even contradictory usable evidence cannot override a held deciding source.
-        assert!(held.sources.get(1).unwrap().usable);
+        if let c::OwnerAccountState::Later { .. } = state {
+            // An unusable Later source waits in both possible underlying states.
+            held.sources.get_mut(1).unwrap().usable = false;
+        } else {
+            // Even contradictory usable evidence cannot override a held deciding source.
+            assert!(held.sources.get(1).unwrap().usable);
+        }
         let rows = accounts(&[held, account(7, c::OwnerAccountKind::Key, None)]);
         for (pin, expected) in
             [(Some(3), "chosen · needs an account"), (None, "Using your Supplied Provider API key · chosen")]
@@ -999,5 +1004,60 @@ fn mixed_or_cut_program_offers_do_not_guess_a_models_endpoint() {
         offer.programs_cut = cut;
         delivered(&mut root, me_watch, c::Delivery::Me(Box::new(me)));
         assert_eq!(using_text(&root), "Using chosen");
+    }
+}
+
+#[test]
+fn a_usable_later_source_names_no_account() {
+    for (ready, pin) in [
+        (c::Readiness::Usable, None),
+        (c::Readiness::Unavailable, None),
+        (c::Readiness::Usable, Some(3)),
+        (c::Readiness::Unavailable, Some(3)),
+    ] {
+        let mut first = account(3, c::OwnerAccountKind::Key, None);
+        first.sources.get_mut(1).unwrap().state = c::OwnerAccountState::Later { until: None };
+        let rows = accounts(&[first, account(7, c::OwnerAccountKind::SignIn, None)]);
+        let (mut root, me_watch, _, _) = line_fixture(Some(readiness(ready)), rows, pin, None, None, true);
+        let mut me = d::pages::accounts::current_me(root.client()).unwrap().clone();
+        me.providers.get_mut(0).unwrap().name =
+            c::DocumentText::complete(c::Text::new(Box::from(b"openai".as_slice()), 32).unwrap());
+        delivered(&mut root, me_watch, c::Delivery::Me(Box::new(me)));
+        assert_eq!(
+            using_text(&root),
+            if ready == c::Readiness::Unavailable { "chosen · needs an account" } else { "Using chosen" }
+        );
+    }
+}
+#[test]
+fn an_unusable_later_program_source_names_no_account_when_a_program_source_after_it_would_be_chosen() {
+    for (ready, pin, after_usable) in [
+        (c::Readiness::Usable, None, true),
+        (c::Readiness::Unavailable, None, true),
+        (c::Readiness::Usable, Some(3), true),
+        (c::Readiness::Unavailable, Some(3), true),
+        (c::Readiness::Usable, None, false),
+    ] {
+        // jig's Later goes on to the account's next program source; its Limited waits.
+        let mut first = account(3, c::OwnerAccountKind::Program, None);
+        first.sources.get_mut(0).unwrap().state = c::OwnerAccountState::Later { until: None };
+        first.sources.get_mut(1).unwrap().usable = after_usable;
+        let rows = accounts(&[first, account(7, c::OwnerAccountKind::Program, None)]);
+        let (mut root, me_watch, _, _) = line_fixture(Some(readiness(ready)), rows, pin, None, None, true);
+        let mut me = d::pages::accounts::current_me(root.client()).unwrap().clone();
+        let offer = me.providers.get_mut(0).unwrap();
+        offer.name = c::DocumentText::complete(c::Text::new(Box::from(b"Claude".as_slice()), 32).unwrap());
+        offer.key = false;
+        offer.sign_in = false;
+        offer.programs = List::with_capacity(1);
+        offer.programs.push(c::Text::new(Box::from(b"claude_code".as_slice()), 32).unwrap()).unwrap();
+        delivered(&mut root, me_watch, c::Delivery::Me(Box::new(me)));
+        let expected = match (after_usable, ready) {
+            (true, c::Readiness::Unavailable) => "chosen · needs an account",
+            (true, _) => "Using chosen",
+            // Both of jig's states wait on this account, so the next one is chosen.
+            (false, _) => "Using your Claude subscription, through Claude Code · chosen",
+        };
+        assert_eq!(using_text(&root), expected, "ready {ready:?}, pin {pin:?}");
     }
 }

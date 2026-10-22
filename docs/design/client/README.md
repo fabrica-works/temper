@@ -1156,10 +1156,13 @@ against the real issuer (JP13). The words for each offered source are:
     absent uses serve the holder. A plan serves its holder. Program
     endpoints skip direct sources, and direct endpoints skip program
     sources; a held deciding source stops that account, and a waiting
-    direct source does too. A program source without usable evidence
-    may pass to the next program source. Mixed provider offers do not
-    establish a model's endpoint kind, so name no account. Another
-    payer's work, or a cut document or account, names no account.
+    direct source does too. A "later" source names no account where
+    jig's Later and Limited would choose differently: a usable one, and
+    an unusable program source before one that would be chosen. A
+    program source without usable evidence may pass to the next program
+    source. Mixed provider offers do not establish a model's endpoint
+    kind, so name no account. Another payer's work, or a cut document or
+    account, names no account.
     The source words the line, with the configured provider name from
     `me`: "Using your OpenAI API key · MODEL" for a key; "Using ChatGPT
     plan · MODEL · Manage usage" for a signed-in plan, the last an

@@ -227,20 +227,29 @@ fn program_endpoint(me: &c::Me, provider: Option<u32>) -> Option<bool> {
     }
     None
 }
-fn held(state: c::OwnerAccountState) -> bool {
+fn held(state: c::OwnerAccountState) -> Option<bool> {
     match state {
-        c::OwnerAccountState::Asking | c::OwnerAccountState::Granted => false,
+        c::OwnerAccountState::Asking | c::OwnerAccountState::Granted => Some(false),
         // The public Later state also carries jig's Limited state.
-        c::OwnerAccountState::Later { .. }
-        | c::OwnerAccountState::SignInAgain
+        c::OwnerAccountState::Later { .. } => None,
+        c::OwnerAccountState::SignInAgain
         | c::OwnerAccountState::Misconfigured
         | c::OwnerAccountState::Unloaded { .. }
         | c::OwnerAccountState::Cancelled
-        | c::OwnerAccountState::Closing => true,
+        | c::OwnerAccountState::Closing => Some(true),
     }
 }
-fn chosen_source(row: &c::OwnerAccountLine, program: bool) -> Option<&c::OwnerAccountSource> {
-    for source in &row.sources {
+enum SourceChoice {
+    Chosen(u32),
+    Wait,
+    Undecidable,
+}
+fn chosen_source(row: &c::OwnerAccountLine, program: bool) -> SourceChoice {
+    // An unusable "later" program source is jig's Later, which goes on to the
+    // account's next program source, or its Limited, which waits: a source
+    // chosen after it is undecidable.
+    let mut later = false;
+    for (source, index) in row.sources.iter().zip(0u32..) {
         let fits = match source.kind {
             c::OwnerAccountKind::Program => program,
             c::OwnerAccountKind::Key | c::OwnerAccountKind::SignIn | c::OwnerAccountKind::None => !program,
@@ -248,19 +257,29 @@ fn chosen_source(row: &c::OwnerAccountLine, program: bool) -> Option<&c::OwnerAc
         if !fits {
             continue;
         }
-        if held(source.state) {
-            return None;
+        match held(source.state) {
+            Some(true) => return SourceChoice::Wait,
+            None => {
+                if source.usable {
+                    return SourceChoice::Undecidable;
+                }
+                if !program {
+                    return SourceChoice::Wait;
+                }
+                later = true;
+                continue;
+            }
+            Some(false) => {}
         }
         if source.usable {
-            return Some(source);
+            return if later { SourceChoice::Undecidable } else { SourceChoice::Chosen(index) };
         }
         if !program {
-            return None;
+            return SourceChoice::Wait;
         }
     }
-    None
+    SourceChoice::Wait
 }
-#[expect(clippy::manual_find, reason = "the programming model uses bounded loops, not closures")]
 fn selected_account(
     doc: &c::OwnerAccounts,
     viewer: u64,
@@ -268,8 +287,16 @@ fn selected_account(
     program: bool,
 ) -> Option<&c::OwnerAccountLine> {
     for row in &doc.accounts {
-        if eligible(row, viewer, provider) && (row.cut || chosen_source(row, program).is_some()) {
+        if !eligible(row, viewer, provider) {
+            continue;
+        }
+        if row.cut {
             return Some(row);
+        }
+        match chosen_source(row, program) {
+            SourceChoice::Chosen(_) => return Some(row),
+            SourceChoice::Wait => {}
+            SourceChoice::Undecidable => return None,
         }
     }
     None
@@ -392,12 +419,25 @@ fn using_line(
         None
     };
     if let Some(account) = account {
-        if account.cut || ready != c::Readiness::Usable {
+        let source = chosen_source(account, program.expect("selected with a known endpoint"));
+        let undecidable = match source {
+            SourceChoice::Undecidable => true,
+            SourceChoice::Chosen(_) | SourceChoice::Wait => false,
+        };
+        if account.cut || (ready != c::Readiness::Usable && !undecidable) {
             line(b, w, W::UsingModel, &[Hole::Name(name)]);
-        } else if let Some(source) = chosen_source(account, program.expect("selected with a known endpoint")) {
-            using_account(b, root, account, source, name, w);
         } else {
-            line(b, w, W::ModelNeedsAccount, &[Hole::Name(name)]);
+            match source {
+                SourceChoice::Chosen(index) => {
+                    let source = account.sources.get(index).expect("chosen source exists");
+                    using_account(b, root, account, source, name, w);
+                }
+                SourceChoice::Wait => line(b, w, W::ModelNeedsAccount, &[Hole::Name(name)]),
+                SourceChoice::Undecidable => {
+                    let word = if ready == c::Readiness::Unavailable { W::ModelNeedsAccount } else { W::UsingModel };
+                    line(b, w, word, &[Hole::Name(name)]);
+                }
+            }
         }
     } else {
         let word = if ready == c::Readiness::Unavailable { W::ModelNeedsAccount } else { W::UsingModel };
