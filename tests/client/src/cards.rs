@@ -33,8 +33,13 @@ pub fn enclosing(tree: &Tree, node: NodeId) -> Option<CardKey> {
 }
 pub fn seen(tree: &Tree) -> Vec<Seen> {
     let mut seen = Vec::new();
+    // A dependency line's items are links keyed by their task, not cards (client/README.md, 5.8).
+    let mut links_end = 0;
     for (index, node) in tree.nodes().iter().enumerate() {
-        if node.role != Role::Item {
+        if node.styles.as_slice().contains(&temper_client_view::look::DEPENDENCIES) {
+            links_end = index.checked_add(usize::try_from(node.size).expect("link subtree fits")).expect("tree fits");
+        }
+        if node.role != Role::Item || index < links_end {
             continue;
         }
         let Some(key) = node.key.and_then(identity) else {
