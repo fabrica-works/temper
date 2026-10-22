@@ -4,6 +4,15 @@ pub mod support;
 use skein_world::end_to_end::{Binary, Command, Mode};
 use support::{Scratch, WITHIN, configuration, terminal};
 
+// The demo forge creates the seeded widget commit (1), then the CSV change
+// commit (2), before merging task 2's change (3).
+const DEMO_MERGE_COUNT: u64 = 3;
+
+fn demo_merge_short_id() -> String {
+    let id = temper_fake_git::id::id(DEMO_MERGE_COUNT);
+    std::str::from_utf8(&id[..7]).expect("fake commit ids are ASCII hex").to_owned()
+}
+
 #[test]
 fn running_card_names_the_change_and_exposes_its_steps() {
     // Choose the demo explicitly so this check is independent of the default
@@ -73,9 +82,10 @@ fn result_anchor_preserves_the_landed_words_and_task_link() {
     person.type_on(b"Start", b"");
     person.wait_for("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes(), WITHIN);
     // This contiguous block checks the title and the first seven characters
-    // of the result, and keeps the four stand-in steps in their design order.
+    // of the result's merge commit, and keeps the four stand-in steps in
+    // their design order.
     person.wait_for(
-        "Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit 0000000\n    Steps:\n      - Branch pushed\n      - Pull request opened\n      - CI passed\n      - Landed\n".as_bytes(),
+        format!("Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit {merge}\n    Steps:\n      - Branch pushed\n      - Pull request opened\n      - CI passed\n      - Landed\n", merge = demo_merge_short_id()).as_bytes(),
         WITHIN,
     );
     person.type_on(b"Task 2", b"");
@@ -115,7 +125,7 @@ fn original_delegate_call_uses_the_ended_task_document() {
     // within the committed turn's own text budget: the original delegate call
     // carries the card, from the ended task's own document (5.7).
     person.wait_for(
-        "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.\n  Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit 0000000\n".as_bytes(),
+        format!("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.\n  Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit {merge}\n", merge = demo_merge_short_id()).as_bytes(),
         WITHIN,
     );
     person.type_on(b"Task 2", b"");
