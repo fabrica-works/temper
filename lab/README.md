@@ -463,9 +463,10 @@ experiments stand on, and it costs no model call.
   on its stdout, captured as `address`. At a desktop width: at 760 px
   and under, the banner's "Sign out" and the navigation sit in a closed
   disclosure, "Menu".
-- **`dirs`:** `client`, the seed's `temper ctl` directory; `spent`, the
-  directory of the `ctl` that presents the spent link; `hand`, the
-  browser's `--out` (its `trouble.jsonl` and its shots).
+- **`dirs`:** sorted as `client`, `hand`, `spent`: `client`, the seed's
+  `temper ctl` directory; `hand`, the browser's `--out` (its
+  `trouble.jsonl` and its shots); `spent`, the directory of the `ctl`
+  that presents the spent link.
 - **`cost`:** `temper-m1-calibration`, `cluster/`'s (`qa.md`, 10.1): 60 s
   to be ready, 120 s a command, 10 s to stop.
 - **`relink`, `smoke` and `checks/trouble`,** below.
@@ -484,6 +485,9 @@ Each `{artifact.temper} ctl` action is `qa.md`'s, 5.1. In order:
 | `signed-in` | `{runner}/hand/browse {proc.browser.ready.address} wait heading Chats --exact --timeout 60` | | the chats page, signed in |
 | `smoke` | `/bin/sh {experiment}/smoke {runner}/hand/browse {proc.browser.ready.address}` | | the story (below) |
 
+- **Environments:** `browser-sign-in`, `signed-in` and `smoke` have
+  `PATH=/usr/bin:/bin` for the hand launchers' `python3` shebangs; all
+  other actions have empty environments.
 - **A second `ctl` presents the spent link,** not the browser. The
   browser then signs in once, by the fresh link, so its trouble holds
   nothing the seed caused but its `sign-in` call's, which the entries'
