@@ -386,11 +386,18 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 .temper-kind-held > .temper-meta .temper-inbox-tag { background: var(--temper-red-pale); color: var(--temper-red); }
 .temper-kind-person-task > .temper-meta .temper-inbox-tag { background: var(--temper-green-pale); color: var(--temper-green); }
 .temper-page .temper-meta .temper-wait { margin-left: auto; }
-.temper-kind-menu { position: relative; flex: none; }
+.temper-kind-menu { flex: none; }
 .temper-kind-menu > summary { list-style: none; cursor: pointer; border: 1px solid var(--temper-line); background: #f7f5f0; border-radius: 4px; padding: 5px 9px; color: var(--temper-muted); font: 600 11px/1.35 var(--temper-mono); }
 .temper-kind-menu > summary::-webkit-details-marker { display: none; }
 .temper-kind-menu > summary::after { content: "⌄" / ""; margin-left: 8px; }
-.temper-kind-menu > div { position: absolute; z-index: 10; top: calc(100% + 5px); right: 0; min-width: max-content; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; border: 1px solid var(--temper-line); border-radius: 6px; background: var(--temper-paper); box-shadow: 0 8px 24px #30291f18; }
+/* The open Kind menu stays in the flow: its kinds take a row under the filters and push the list down, and the heading keeps its place. */
+.temper-kind-menu[open] { display: contents; }
+.temper-kind-menu[open]::details-content { display: contents; }
+.temper-kind-menu > div { order: 1; flex: 0 0 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
+@media (min-width: 601px) {
+  .temper-page .temper-heading:has(> .temper-filters > .temper-kind-menu[open]) { align-items: flex-start; }
+  .temper-heading:has(> .temper-filters > .temper-kind-menu[open]) > :is(h2, .temper-subtle-count) { margin-top: calc((28px - 1lh) / 2); }
+}
 /* .inbox-card h3 and .proposal-items: the title and supplied facts. */
 .temper-page .temper-card .temper-title { font-size: 13px; font-weight: 700; line-height: 1.35; letter-spacing: -.025em; color: var(--temper-ink); margin: 6px 0; }
 .temper-page .temper-meta + p:not(.temper-title) { margin-top: 6px; }
@@ -439,6 +446,7 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 @media (max-width: 600px) {
   .temper-page .temper-heading, .temper-main:has(> .temper-chatbar) > .temper-heading { flex-wrap: wrap; row-gap: 0; }
   .temper-heading .temper-filters { flex: 0 0 100%; margin-top: 8px; justify-content: flex-start; }
+  .temper-kind-menu > div { justify-content: flex-start; }
   .temper-page .temper-card textarea { width: 100%; }
 }
 
