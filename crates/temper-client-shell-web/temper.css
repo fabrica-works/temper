@@ -329,6 +329,8 @@ dialog button:nth-last-child(2) { margin-left: auto; background: var(--temper-ac
 @media (max-width: 430px) {
   .temper-chat .temper-message { display: block; }
   .temper-chat .temper-who { display: flex; gap: 8px; margin-bottom: 4px; }
+  .temper-chat .temper-who:has(> time) { display: flex; }
+  .temper-chat .temper-who time { display: inline; }
   .temper-chat .temper-by-tool, .temper-chat .temper-cards > .temper-card, .temper-chat .temper-turn:not(.temper-marker) > :not(.temper-message):not(.temper-work):not(.temper-task-card) { margin-left: 0; }
   .temper-chat .temper-thread > [role=log] ~ :not(.temper-cards):not(.temper-ended) { padding-left: 0; }
   .temper-main .temper-chatbar > div:first-child { flex-wrap: wrap; }
