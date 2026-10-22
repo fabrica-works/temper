@@ -492,8 +492,9 @@ in the lower world that owns it, never here.
     root, a fact, a store record but the secrets' store's, a request or
     an answer (../protocol/credentials.md, section 7); and no carried
     value left once its run has ended (../protocol/forge.md, 2.6).
-  - **Each at most 0.5 s,** half the tier's 1 s story guide, and the
-    tier's sum within its 6 s ceiling (6.1). Their cases are tested below:
+  - **Each at most 0.5 s,** half the tier's 1 s story guide, or 1.5 s
+    for one that runs a whole chat (its agents, git and `ctl`), and the
+    tier's sum within its 6.5 s ceiling (6.1). Their cases are tested below:
     the records' and the identity's codecs in step tests, the routing
     and GitHub's routes on the clients' listener in `temper-service`'s
     own tests (../protocol/forge.md, section 10; ../client/forge.md,
@@ -1385,7 +1386,7 @@ by the commands in `docs/development/workflow.md`. In temper:
     machine, client, one-process and reconcile worlds) together at most
     4 s of the default suite;
   - the real-loop world's tests, its stories included, together at
-    most 6 s of the default suite: a standing ceiling, the
+    most 6.5 s of the default suite: a standing ceiling, the
     same for each plan, sized to the smoke
     that 2.4 keeps the real loop to ("one end-to-end path per feature,
     and each behaviour and corner case tested in the lower world that
@@ -1395,13 +1396,16 @@ by the commands in `docs/development/workflow.md`. In temper:
     most 40 s of the fuzzy suite;
   - a focused protocol-world test at most 0.5 s, and a one-process or
     real-loop story at most 1 s;
-  - a GitHub story of the real loop (2.4) at most 0.5 s, so that its
-    eight stay within the real loop's 6 s with the rest.
+  - a GitHub story of the real loop (2.4) at most 0.5 s, and one that
+    runs a whole chat (its agents, git and `ctl`) at most 1.5 s, so that
+    its eight stay within the real loop's ceiling with the rest; a
+    whole-chat GitHub story that would pass the ceiling goes to the user
+    with its numbers.
 
   A test that misses its guide is made cheaper or moved to the fuzzy
   suite, never merged with another and never named as an exception: a
   real-loop story with CI and webhooks (2.4) is held to the 1 s as any
-  other. If GitHub's stories would push the real loop's sum past 6 s,
+  other. If GitHub's stories would push the real loop's sum past 6.5 s,
   the ceiling goes to the user, as below, and no real-loop story moves to
   the fuzzy suite to make room for them unless the user so decides.
 - **The worlds' sums are measured as the suites' rules are:** each test's
@@ -1411,13 +1415,13 @@ by the commands in `docs/development/workflow.md`. In temper:
 - **The sums are the worlds' guides, never a landing's.** A test within
   its own guide lands. A plan that adds to these worlds gives both
   default-suite sums at its base and at its end: the other worlds'
-  against 4 s, the real loop's against 6 s. When the other worlds
-  together pass 4 s, or the real-loop world 6 s, their slowest tests
+  against 4 s, the real loop's against 6.5 s. When the other worlds
+  together pass 4 s, or the real-loop world 6.5 s, their slowest tests
   are profiled, then made cheaper at the cause the profile shows or moved
   to the fuzzy suite, by steps a plan names. A plan whose end finds the
-  real loop's sum at 6 s or past it puts the ceiling to the user, as
+  real loop's sum at 6.5 s or past it puts the ceiling to the user, as
   skein's `development.md`, 10.4, "What goes to the user", says; until
-  the user moves it, the 6 s stands.
+  the user moves it, the 6.5 s stands.
 - **Outside both suites:** the process tier's binary `process` and the
   live tier's binary `live`, which both suites' filters leave out, run
   under the nextest profiles `process` and `live` by
