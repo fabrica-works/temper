@@ -1,5 +1,8 @@
 //! Adversarial stories for domain/testing.md, 5.3 and draft/reference-case.md, 4.1.
-//! Only scripts, fixture inputs and the person's reads are changed.
+//! Only scripts, fixture inputs and the person's reads are changed. A story whose
+//! mutation stalls it (A untracked, authority beyond the director's, the answer before
+//! the question or none, CI red) fails before the oracle, on the settle deadline or the
+//! forge's record cap: loud, but not the oracle's to report, so none is kept here.
 use serde_json::{Value, json};
 use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
 use std::net::SocketAddr;
@@ -10,23 +13,17 @@ use temper_real_loop_world::{
         self, Agent, acts,
         oracle::{self, Observed, Promise},
     },
-    forge,
 };
 
 // One delegate call per director/owner script, and one record per tool turn.
 const ONE_EDIT: usize = 1;
 const FIRST_DELEGATE: usize = 0;
-// The director's script is delegate, wait, answer, wait, finish.
-const DIRECTOR_WAIT: usize = 1;
-const DIRECTOR_ANSWER: usize = 2;
 // The case's act positions equal call positions until the final Join.
 const DESIGN_READ: usize = 6;
 // The fresh case has at most eight tasks; this number names none of them.
 const ABSENT_TASK: u64 = 999;
 const PAST_CALLS: usize = usize::MAX;
 const OTHER_PRIORITY: u8 = 2;
-// The case director receives spend 40 from its project role.
-const EXCESS_SPEND: u8 = 41;
 // Keep the case's scripted per-turn token charge when adding a tool turn.
 const TOKENS_PER_CALL: u64 = 20;
 const NON_MARKDOWN: &str = "export.rs";
@@ -102,13 +99,6 @@ const AUTHORITY: Promise = Promise::Add("authority bounds A's subtree");
 const MARKDOWN: Promise = Promise::Must("the fast path for Markdown alone (exact)");
 
 #[test]
-fn the_unmutated_story_meets_every_checkpoint() {
-    let ran = story(case::scripts::step_4_1);
-    let misses = oracle::step_4_1(&Observed::from_ran(&ran, acts::READS_4_1));
-    oracle::assert_met(&misses);
-}
-
-#[test]
 fn another_priority_reports_the_delegation_must() {
     let ran = story(|forge| {
         let mut scripts = case::scripts::step_4_1(forge);
@@ -118,18 +108,6 @@ fn another_priority_reports_the_delegation_must() {
         scripts
     });
     misses(&ran, &[(DELEGATION, "priority")]);
-}
-
-#[test]
-#[should_panic(expected = "the real loop settles within 10000 ms")]
-fn a_untracked_stops_before_the_oracle() {
-    let _ran = story(|forge| {
-        let mut scripts = case::scripts::step_4_1(forge);
-        edit_call(&mut scripts, Agent::Director, b"delegate", |call| {
-            call["batch"][FIRST_DELEGATE].as_object_mut().expect("delegate").remove("tracked");
-        });
-        scripts
-    });
 }
 
 #[test]
@@ -155,41 +133,6 @@ fn a_brief_without_the_commit_reports_the_delegation_must() {
         scripts
     });
     misses(&ran, &[(DELEGATION, "commit")]);
-}
-
-#[test]
-#[should_panic(expected = "the real loop settles within 10000 ms")]
-fn excess_spend_stops_before_the_oracle() {
-    let _ran = story(|forge| {
-        let mut scripts = case::scripts::step_4_1(forge);
-        edit_call(&mut scripts, Agent::Director, b"delegate", |call| {
-            call["batch"][FIRST_DELEGATE]["authority"]["budget"]["spend"] = EXCESS_SPEND.into();
-        });
-        scripts
-    });
-}
-
-#[test]
-#[should_panic(expected = "frozen record count fits")]
-fn an_early_answer_stops_before_the_oracle() {
-    let _ran = story(|forge| {
-        let mut scripts = case::scripts::step_4_1(forge);
-        script(&mut scripts, Agent::Director).turns.swap(DIRECTOR_WAIT, DIRECTOR_ANSWER);
-        scripts
-    });
-}
-
-#[test]
-#[should_panic(expected = "frozen record count fits")]
-fn no_answer_stops_before_the_oracle() {
-    let _ran = story(|forge| {
-        let mut scripts = case::scripts::step_4_1(forge);
-        let director = script(&mut scripts, Agent::Director);
-        let mut turns = director.turns.to_vec();
-        turns.remove(DIRECTOR_ANSWER);
-        director.turns = turns.into();
-        scripts
-    });
 }
 
 #[test]
@@ -219,26 +162,6 @@ fn a_changed_draft_reports_the_markdown_must() {
         "the draft mutation must actually land"
     );
     misses(&ran, &[(MARKDOWN, "draft")]);
-}
-
-fn red_fixture() -> forge::Fixture {
-    forge::Fixture {
-        setup: || {
-            let mut setup = (case::fixture().setup)();
-            setup.checks.cue = Some(skein_fake_forge_domain::api::Cue::File {
-                path: case::DESIGN_DOC.as_bytes().into(),
-                green: b"impossible green cue".as_slice().into(),
-            });
-            setup
-        },
-        configure: case::fixture().configure,
-    }
-}
-
-#[test]
-#[should_panic(expected = "frozen record count fits")]
-fn red_ci_stops_before_the_oracle() {
-    let _ran = temper_real_loop_world::run_forge(red_fixture(), case::scripts::step_4_1, acts::step_4_1);
 }
 
 #[test]
