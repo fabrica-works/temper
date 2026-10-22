@@ -36,10 +36,10 @@ pub(crate) fn card(b: &mut Builder, root: &Domain, card: &Card, words: &Words, b
     controls(b, root, card, words, bindings);
 }
 pub(crate) fn facts(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32) {
-    facts_at(b, page, words, rows, 2);
+    facts_at(b, page, words, rows, crate::cards::Place::Chat);
 }
-pub(crate) fn facts_at(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32, level: u8) {
-    crate::cards::proposal_facts(b, page, words, rows, level);
+pub(crate) fn facts_at(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32, place: crate::cards::Place) {
+    crate::cards::proposal_facts(b, page, words, rows, place);
     if !crate::cards::proposal_has_rows(page) {
         crate::cards::decision(b, words, Some(page), ActKind::Accept);
     }

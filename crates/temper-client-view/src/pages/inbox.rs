@@ -299,7 +299,7 @@ fn entry(
                 b.open(Role::Slot);
                 b.style(look::DETAILS);
             }
-            crate::confirm::facts_at(b, page, words, rows, 3);
+            crate::confirm::facts_at(b, page, words, rows, crate::cards::Place::Inbox);
             if !proposal {
                 b.close();
             }

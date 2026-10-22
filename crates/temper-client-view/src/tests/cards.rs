@@ -251,10 +251,11 @@ fn proposal_titles_head_the_cards_and_funding_is_said_once_in_both_pages() {
 
 #[test]
 fn a_proposal_kicker_precedes_the_title_in_a_chat_but_not_in_the_inbox() {
+    use crate::cards::Place;
     use skein_ui::Role;
     let page = batch_proposal();
-    for (root, kicked) in [
-        (fixtures::chat::proposal_root_with_document(None, Some(page.clone())), true),
+    for (root, place) in [
+        (fixtures::chat::proposal_root_with_document(None, Some(page.clone())), Place::Chat),
         (
             fixtures::inbox_with_document(
                 temper_client_domain::address::Filter::ALL,
@@ -268,12 +269,12 @@ fn a_proposal_kicker_precedes_the_title_in_a_chat_but_not_in_the_inbox() {
                     page,
                 )),
             ),
-            false,
+            Place::Inbox,
         ),
     ] {
         let view = fixtures::page_view(&root);
         let tree = view.tree();
-        let level = if kicked { 2 } else { 3 };
+        let level = if place == Place::Chat { 2 } else { 3 };
         let title = super::chat::named_position(tree.nodes(), Role::Heading { level }, Some(b"Ship update")).unwrap();
         let mut kickers = 0_u32;
         let mut first = None;
@@ -283,7 +284,7 @@ fn a_proposal_kicker_precedes_the_title_in_a_chat_but_not_in_the_inbox() {
                 first = first.or(Some(at));
             }
         }
-        if kicked {
+        if place == Place::Chat {
             assert_eq!(kickers, 1, "one Proposal kicker in a chat");
             let kicker = first.expect("Proposal kicker");
             assert_eq!(fixtures::node_text(tree, kicker).as_ref(), b"Proposal");

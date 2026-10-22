@@ -51,10 +51,10 @@ pub(super) fn reason(b: &mut Builder, page: &c::ReadValue) {
         why(b, page);
     }
 }
-/// The heading level is the caller's, and the kicker with it: a chat's card (h2)
-/// says its kind above its title; an inbox card (h3) has a tag that says it already.
-fn title(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &Words, level: u8) {
-    if level == 2 {
+/// The place is the caller's: it sets the title's level and whether a kicker says the kind.
+fn title(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &Words, place: super::Place) {
+    let level = place.level();
+    if place.kicker() {
         b.open(Role::Paragraph);
         b.style(crate::look::PROPOSAL_KICKER);
         let kicker = words.say(Word::Proposal, &[]);
@@ -105,9 +105,9 @@ fn why(b: &mut Builder, page: &c::ReadValue) {
         | c::ReadValue::OwnerDeployment(_) => {}
     }
 }
-pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, level: u8) {
+pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, place: super::Place) {
     if let Some(tasks) = batch(page) {
-        title(b, tasks, words, level);
+        title(b, tasks, words, place);
         batch_facts(b, page, tasks, words, rows);
         return;
     }

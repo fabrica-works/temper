@@ -270,20 +270,42 @@ impl Words {
         ending(b, value, self);
     }
 }
+/// Where a proposal card is drawn. A chat's card heads its title at level 2 and
+/// says its kind above it; an inbox card heads it at level 3 under a tag that
+/// says the kind already.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Place {
+    Chat,
+    Inbox,
+}
+impl Place {
+    pub(crate) const fn level(self) -> u8 {
+        match self {
+            Self::Chat => 2,
+            Self::Inbox => 3,
+        }
+    }
+    pub(crate) const fn kicker(self) -> bool {
+        match self {
+            Self::Chat => true,
+            Self::Inbox => false,
+        }
+    }
+}
 pub fn proposal(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
-    proposal_at(b, page, words, rows, 2);
+    proposal_at(b, page, words, rows, Place::Chat);
 }
 
-/// Project the same proposal at its caller's heading level.
-pub fn proposal_at(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, level: u8) {
+/// Project the same proposal where its caller draws it.
+pub fn proposal_at(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, place: Place) {
     proposal::reason(b, page);
-    proposal::facts(b, page, words, rows, level);
+    proposal::facts(b, page, words, rows, place);
 }
 pub(crate) fn proposal_reason(b: &mut Builder, page: &c::ReadValue) {
     proposal::reason(b, page);
 }
-pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, level: u8) {
-    proposal::facts(b, page, words, rows, level);
+pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32, place: Place) {
+    proposal::facts(b, page, words, rows, place);
 }
 
 pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {
