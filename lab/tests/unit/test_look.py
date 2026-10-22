@@ -12,6 +12,17 @@ WIDTHS = [dict(name='desktop', width=1440, height=900, mobile=False),
           dict(name='phone', width=390, height=844, mobile=True)]
 
 
+# Copied from skein scripts/lab/look/style.py: the capture's 5.3 properties.
+# Skein is a separate repository, unavailable as an import under python3 -I.
+PROPERTIES = ["font-family", "font-size", "font-weight", "line-height", "letter-spacing",
+              "color", "background-color"] + [
+    f"border-{side}-{part}" for side in ("top", "right", "bottom", "left")
+    for part in ("width", "style", "color")
+] + [f"border-{corner}-radius" for corner in ("top-left", "top-right", "bottom-right", "bottom-left")] + [
+    "box-shadow", "padding-top", "padding-right", "padding-bottom", "padding-left", "row-gap", "column-gap"]
+STYLE_PROPERTIES = PROPERTIES + ["faces", "x", "y", "width", "height", "shown"]
+
+
 def canonical(value):
     return (json.dumps(value, sort_keys=True, separators=(',', ':'),
                        ensure_ascii=False) + '\n').encode('utf-8')
@@ -32,17 +43,55 @@ class LookTests(unittest.TestCase):
                 self.assertEqual(scene['name'], path.stem)
                 self.assertEqual(scene['widths'], WIDTHS)
                 self.assertRegex(scene['page']['path'], r'^/[A-Za-z0-9-]+\.html$')
-                self.assertEqual(scene['expectations'], [])
-                for departure in scene['departures']:
-                    self.assertEqual(set(departure), {'id', 'width', 'signature', 'cites'})
-                    self.assertIn(departure['width'], ('desktop', 'phone'))
-                    self.assertEqual(departure['cites'],
-                                     'temper docs/design/draft/qa-web.md 11')
-                    signature = departure['signature']
-                    self.assertTrue(
-                        signature in ('trouble/mockup/network/fonts.googleapis.com:443', 'trouble/mockup/log')
-                        or signature in {'style/' + region['name'] + '/faces'
-                                         for region in scene['regions']})
+                widths = {width['name'] for width in scene['widths']}
+                regions = {region['name'] for region in scene['regions']}
+                ids = set()
+                for kind in ('expectations', 'departures'):
+                    self.assertIsInstance(scene[kind], list)
+                    for item in scene[kind]:
+                        with self.subTest(kind=kind, id=item.get('id')):
+                            self.assertIsInstance(item['id'], str)
+                            self.assertRegex(item['id'], r'^[a-z][a-z0-9-]*\Z')
+                            self.assertNotIn(item['id'], ids)
+                            ids.add(item['id'])
+                            self.assertIn(item['width'], widths)
+                            self.assertIsInstance(item['cites'], str)
+                            self.assertTrue(item['cites'])
+                            common = {'id', 'width', 'cites'}
+                            if kind == 'expectations':
+                                if 'region' in item:
+                                    self.assertEqual(set(item), common | {
+                                        'region', 'property', 'value'})
+                                    self.assertIn(item['region'], regions)
+                                    self.assertIn(item['property'], STYLE_PROPERTIES)
+                                    self.assertIsInstance(item['value'], str)
+                                    self.assertTrue(item['value'])
+                                else:
+                                    self.assertEqual(set(item), common | {'entry', 'count'})
+                                    self.assertIs(type(item['count']), int)
+                                    self.assertGreaterEqual(item['count'], 0)
+                            elif 'signature' in item:
+                                self.assertEqual(set(item), common | {'signature'})
+                                signature = item['signature']
+                                self.assertIsInstance(signature, str)
+                                self.assertTrue(signature)
+                                self.assertFalse(any(char.isspace() for char in signature))
+                                self.assertFalse(signature.startswith('/'))
+                                self.assertFalse(signature.startswith(name + '/'))
+                            else:
+                                self.assertEqual(set(item), common | {'entry'})
+                            if 'entry' in item:
+                                self.assertIsInstance(item['entry'], str)
+                                self.assertTrue(item['entry'])
+                if scene['mockup'] is not None:
+                    # Both standing qa-web 11 trouble signatures in the original scenes.
+                    for width in widths:
+                        for signature in ('trouble/mockup/network/fonts.googleapis.com:443',
+                                          'trouble/mockup/log'):
+                            self.assertTrue(any(
+                                departure['width'] == width
+                                and departure.get('signature') == signature
+                                for departure in scene['departures']))
                 self.assertEqual(scene['page']['ready'],
                                  dict(role='main', name='', match='words'))
                 for region in scene['regions']:
