@@ -1310,6 +1310,8 @@ them as it does any Forgejo.
             "key": "demo/llm.key",
             "asked": [{"cue": "Add CSV export to widget",
                        "turns": ["..."]}],
+            "cued": [{"cue": "Export widget's table as CSV",
+                      "turns": ["..."]}],
             "otherwise": ["..."]},
     "forge": 1, "project": 1, "client": "demo/client"}
   ```
@@ -1319,13 +1321,14 @@ them as it does any Forgejo.
   | `llm.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned and fake forges |
   | `llm.provider` | u32 | the number of one of `engine.llm`'s providers (configuration.md, section 2), whose endpoints are each at `llm.listen`, plaintext, OpenAI's dialect on its public route, and whose source is a key alone |
   | `llm.key` | a data path (configuration.md, section 12) | a secret's file, 0o600 (section 9): the key is its bytes less a final newline |
-  | `llm.asked` | a list of `{"cue", "turns"}` | at most 8; each `cue` non-empty text of at most 256 bytes, unique, the words of a request the client suggests (`../client/README.md`, 4.8); `turns` 1 to 8 turns (below) |
+  | `llm.asked` | a list of `{"cue", "turns"}` | at most 8 with `cued`'s; each `cue` non-empty text of at most 256 bytes, unique across `asked` and `cued`, the words of a request the client suggests (`../client/README.md`, 4.8 and 5.6); `turns` 1 to 8 turns (below) |
+  | `llm.cued` | a list of `{"cue", "turns"}`, optional, none when absent | as `asked`'s; the scripts the fake plays and the client never suggests, an agent's, cued by its brief |
   | `llm.otherwise` | a list of turns | 1 to 8 |
   | `forge` | u16 | the `forge` of one fake `setup` entry (section 8) |
   | `project` | u32 | the number of one of `engine.projects` (configuration.md, section 2) |
   | `client` | a data path | a private directory (section 3), unique among the document's directories |
 
-  The scripts, `asked` and `otherwise` together, fit skein's fake LLM's
+  The scripts, `asked`, `cued` and `otherwise` together, fit skein's fake LLM's
   `script_bytes` (skein's `fake-llm.md`), which `temper-fake` sets.
 - **A turn** is skein's `Turn` (skein's `fake-llm.md`, section 2), in
   either of two spellings:
@@ -1345,7 +1348,8 @@ them as it does any Forgejo.
   for each request the client suggests in the demo project
   (`../client/mockups/first-run.html`), "Add CSV export to widget", "Add
   a dark theme to widget" and "Fix widget's empty search state"; one
-  for the coding agent of the change the first delegates; and an
+  `cued` script, for the coding agent of the change the first
+  delegates; and an
   `otherwise` that says it is the demo model, which answers only the
   suggested requests, and how to connect a real one from the client's
   accounts page. Each turn is an object, its tokens its lines' bytes
@@ -1418,8 +1422,8 @@ them as it does any Forgejo.
   no story there.
 - **`temper fake llm DIRS`,** a long step: skein's fake LLM peer, run
   `without_records` as a peer serving a person is (skein's
-  `fake-llm.md`), its domain `Domain::played` with `asked` as its
-  cued scripts and `otherwise` as its fallback, no asked script and no
+  `fake-llm.md`), its domain `Domain::played` with `asked` then `cued`
+  as its cued scripts and `otherwise` as its fallback, no asked script and no
   menu. A chat's opening words are its run's brief, which smith puts in
   the system text, and the one user message is smith's own opening, so
   a request's cue is in the system, where skein's cued scripts look and

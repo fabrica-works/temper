@@ -293,8 +293,8 @@ keeps (`../protocol/configuration.md`, section 2).
 | Address | Mockup | Shows | Watches and reads | Acts |
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back; seen |
-| `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats, live or closed, newest activity first, each with its status, spend and delegates | `tasks{query}`: requester the person, the chat label, by last activity; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request |
-| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation: committed turns, the person's words, work summaries, provisional text; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
+| `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
+| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the demo's banner while either half holds, in any project (5.1, 5.6), and the context line only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place; seen |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree with each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel; an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), its composer, Amend and Stop later | `task`, `tree`, `activity` a page at a time; `run` while one is live | amend, stop, cancel, release a held task of the plan; an agent's task's later (5.9) |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -319,6 +319,57 @@ keeps (`../protocol/configuration.md`, section 2).
   conversation. A chip's executor keeps jig's "Agent". The mockups'
   time beside each turn is not drawn: the view keeps no clock (section
   11).
+- **A chat's status,** in its chatbar and on its line of the chats
+  page, is jig's, narrowed as the mockups' "Where each value comes
+  from" says: "waiting on 1 delegate", "waiting on N delegates" while
+  it waits on its delegates, N its chip's live delegates, as a goal's
+  header says it (5.8); "waiting on your words" while it waits on news
+  and its wake policy wakes it on words (its document's `wake`), from
+  the person signed in, who requested it; jig's word otherwise. A line
+  of the chats page has no wake policy, so it keeps jig's word for
+  news.
+- **A chat's conversation** is the chat's own, drawn from jig's thread
+  (jig's `client/domain/objects.md`, section 10), never its runs'
+  mechanics (`chat.html`, the mockups' first run):
+  - *its request,* first, under "You" (or the requester's name): the
+    chat's specification's words (its document's `spec`), a paragraph
+    for each of its lines, where the window holds the conversation's
+    start, its first line with no older page;
+  - *the agent's words,* each assistant message's text under "Temper",
+    whole within the receiving bounds (5.4);
+  - *its calls,* after its message's text: each delegation as its
+    task's card (5.7), then the message's other calls folded in one
+    line, "1 tool call" or "N tool calls", then their tools' names in
+    order, a name called again given once with "×N" ("2 tool calls"
+    and "read · edit"); a call that a card stands for is neither
+    counted nor named;
+  - *the person's words,* the thread's words and each words line a
+    person sent (jig's `OwnerActivity::Words`, by a person), under
+    "You" or the party's name, a paragraph for each line, with "Being
+    sent" or "Sent" until the engine has it, and no word once read;
+  - *not drawn:* a run's beginning and end, the task's milestones, and
+    every message a turn's person, tool or system speaks, which are
+    the run's inputs: its opening, its calls' results, and what woke
+    it, a result delivered among them. A result block still anchors
+    its task's card where the call that made it is not in the window
+    (5.7), drawn on the agent's side, never under "You";
+  - *its end,* once the chat has ended, after the conversation: one
+    line, "Ended", then, for a report, " · its report, “REPORT”", the
+    report's words whole; a failed or cancelled chat's line is its
+    phase's word and its reason. The result is not drawn again.
+- **The chats list** (`chats.html`), under the heading "Your chats",
+  under the demo's start too (5.6), is one list: the live group's
+  lines by last activity and the ended page's by when each ended,
+  merged newest first, a tie by the lower number first. "All", "Live"
+  and "Closed", three buttons, the chosen one pressed, filter it in
+  the page, reading nothing; "All" when the page opens. Under "All" or
+  "Closed", while an older page of ended chats remains, "More closed
+  chats" reads it, in place of the last. With no line to show it says
+  "No chats yet.", or under a filter "No live chats." or "No closed
+  chats.". A line is the chat's number, "TN", a link to its page, then
+  its title, its status, its spend as its chatbar says it, and "1
+  delegate" or "N delegates" while it has live ones, and the time it
+  ended or was last active.
 - **A task's page** is of its kind, as `task.html` lays each out: a
   tracked task's, a goal's (5.8); an agent's task's, for an agent's
   task with no priority (5.9). A task with the chat label opens as
@@ -915,6 +966,22 @@ Each of an authority's lists shows at most the rows per window, then
 jig's mark (jig's `client/domain/view.md`, section 7), which adds
 nothing to the view's limits.
 
+Both presets receive a small conversation's turns whole: four rows
+(`rows`, which bounds a turn's messages and a message's blocks as well
+as a page's lines), and 4096 bytes of text (`text`, which jig's
+transcript shares among one turn's texts, its calls' names, inputs and
+outcomes, and its results' summaries), so the first run's largest
+turn, the CSV chat's first at about 1.4 KB with its `delegate`'s
+input, arrives whole, and each text shows whole. A chat's window holds
+16 lines (the domain's chat page), and the page reads the page before
+its oldest while an older one remains and the window has room for a
+page, `rows` lines, so a conversation of a dozen lines shows whole,
+with no "Older". Past that, "Older" reads the page before, and the
+lines the window lets go are said ("Earlier lines omitted N", jig's
+`Left`). The engine's pages keep their own rows (its
+`documents.rows`, at most the client's). These bounds rise for every
+page, since jig's transcript reads the client's (section 11).
+
 ### 5.5 LLM accounts' words
 
 temper's phrasebook words what jig's accounts document holds (jig's
@@ -993,10 +1060,11 @@ OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
   chat", the status "Ready", and "Demo model"; the banner; the context
   line; the level-1 heading "What shall we change?"; "Try a request in
   OWNER/NAME. Follow the task from its branch to a landed change."; a
-  list named "Suggested requests" of one button per cue, each named by
-  its cue's words; "The demo model plays these requests from a
-  script."; then the page's composer and the person's chats, as on any
-  chats page. A chat starts with its first message, so the start has
+  list named "Suggested requests" of one button per suggested request,
+  the demo's `llm.asked` cues in order and never its `llm.cued`
+  (`../protocol/setup.md`, 8.4), each named by its cue's words; "The
+  demo model plays these requests from a script."; then the page's
+  composer and "Your chats", as on any chats page (3.5). A chat starts with its first message, so the start has
   no task and no number; once a suggestion or the composer starts the
   chat, its page keeps the frame (3.5).
 - **The context line,** after the banner: "PROJECT · OWNER/NAME on Demo
@@ -1036,13 +1104,12 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   after the inbox entry's "M: " (temper's inbox words,
   `temper-engine-domain`'s `inbox_words`); or else, while the task
   lives, after the window's last line, as one of the chat's live
-  delegates (its document's `delegates`). Both presets keep two lines
-  (`rows`), so the chat's next turn and its run's end push the call
-  out while the task runs, and when it ends, the result that woke the
-  chat is what is left of the delegation. Their turn's text budget
-  (`text`, 256 bytes) cuts the call's acknowledgement as well, so a
-  call shows its card only once jig's thread keys its tasks (section
-  11). Those words name a person's number as well as a task's: a
+  delegates (its document's `delegates`). The chat's window holds a
+  small conversation whole, its turns with their calls'
+  acknowledgements (5.4), so the first run's change shows at the call
+  that made it; in a longer conversation the call may leave the
+  window, and the card shows at its result, or after the window while
+  the task lives. Those words name a person's number as well as a task's: a
   result shows a card only once its task's document says this chat
   requested it (its `requester`), and keeps its work summary
   otherwise; such a number still takes one of the watches while the
@@ -1063,7 +1130,8 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   - its result's words, once it has ended;
   - for a change, its steps, a list named "Steps": "Branch pushed",
     "Pull request opened", "CI passed", "Landed";
-  - a link to its page, "Task N" (3.5, "Links are by number").
+  - a link to its page, named "Task N" and reading "Task N ↗" (3.5,
+    "Links are by number").
 - **Its state,** in temper's words, from its document: "Running" while
   it lives, "Held" while held (why, on its page and in the inbox);
   once ended, "Landed" for a change done with a change's result,
@@ -1093,7 +1161,8 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
   and steps ticked. The view lays them out with the phrasebook's words.
 - **The first run:** the chat is task 1 and the change it delegates
   task 2, so the person reads "T2 · CHANGE", Running, then Landed
-  (`../draft/first-run.md`, 2.1).
+  (`../draft/first-run.md`, 2.1), and after the card the chat's next
+  call, folded, "1 tool call" and "wait" (3.5).
 
 ### 5.8 A goal's page
 
@@ -2048,6 +2117,21 @@ own tests:
 - **A turn's time** ("21:01" in the mockups, "Just now" in the
   first-run mockup's earlier draft): the view keeps no clock to say it
   against. Default: not drawn.
+- **A chat's own receiving bounds** (5.4): jig's transcript cuts a
+  turn by the client's `rows` and `text`, which every page shares, so
+  a whole turn in the chat raises them for all, and the view's priced
+  envelope with them. Default: the presets' 4 rows and 4096 bytes; a
+  transcript bound of its own in jig's thread is the candidate, jig's.
+- **Which person messages are the person's** (3.5): jig's turns keep no
+  provenance, so a chat draws none of a turn's person messages, and
+  the person's words from the thread's words alone. A charter whose
+  person's words reach the chat only inside a turn would show none of
+  them. Default: as drawn; a turn's message kind from smith's record
+  is the candidate, jig's.
+- **"Mark seen" with nothing unseen:** the chat's document carries no
+  unread count (a task query's line does, its `conversation`), so the
+  chatbar offers it always. Default: always; the chat reading its own
+  line is the candidate.
 - **A delegation's tasks, keyed** (5.7): jig's thread keeps a
   `delegate` call's `objects` empty, so the domain reads the tasks
   from temper's acknowledgement and, at a result, from temper's inbox
