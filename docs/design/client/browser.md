@@ -493,11 +493,14 @@ view draws, never changing a view to suit a sample.
   invented. The gallery's own documents carry what the domain's
   fixtures don't: spend in the contract's unit (0.8, not 1), and the
   providers, accounts and their holders by name.
-- **Its bounds** are the browser's shipped client limits
+- **Its bounds** are the browser's shipped client limits as they are
   (`temper-client-shell-terminal`'s `native()`, which the browser's
-  shell takes), with the windows a world needs widened (its rows, reads,
-  text), each widening named with its reason; the view's bounds are
-  derived from them as the shell derives its own.
+  shell takes), never widened, and the view's bounds are derived from
+  them as the shell derives its own: a page shows what a person's
+  browser would, a window's rows and a chat's lines included (`README.md`,
+  5.4), so that its outline is the live page's (`../draft/qa-web.md`,
+  8.2). A world holds more than a window shows; the page shows the
+  window, and the state's test row says what it shows.
 - **Names,** binding once landed: a state a mockup draws is named by
   its address, `<page>-<world>[-<step>][-<task>]` (`chat-solo-T10` for
   `chat.html?world=solo&task=T10`, `chats-first-run-1` for
