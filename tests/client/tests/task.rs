@@ -5,7 +5,184 @@ use jig_client_world::{
 use skein_fake_person::{Face, Find, Found, Step, Target, TreeFace};
 use skein_ui::Role;
 use skein_world::domain::Verdict;
-use temper_client_world::{app::Temper, fixtures};
+use temper_client_world::{app::Temper, fixtures, front::Joint};
+
+fn running_delegate_page() -> (jig_client_world::harness::World<Temper, Joint>, jig_client_world::harness::ClientId, u64)
+{
+    let mut world = fixtures::world(fixtures::SEED);
+    let fixtures::Dependents { first, .. } = fixtures::goal_with_dependent_delegates(world.front());
+    let person = world.client(fixtures::PARTY, fixtures::task_page(first));
+    (world, person, first)
+}
+
+#[test]
+fn a_message_from_a_delegates_page_reaches_its_run() {
+    let (mut world, person, task) = running_delegate_page();
+    let words = b"Look closely at the retry path";
+    world.person(
+        person,
+        vec![
+            Step::See {
+                find: Find::text("Steer this task · words reach its live run at the next turn.".as_bytes()),
+                within: fixtures::WITHIN,
+            },
+            Step::See { find: Find::named(Role::TextArea, b"Message"), within: fixtures::WITHIN },
+            Step::Type { find: Find::named(Role::TextArea, b"Message"), words: words.as_slice().into() },
+            Step::Press { find: Find::named(Role::Button, b"Send") },
+            Step::See { find: conversation(Find::text(words)), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+
+    let row = world.front().engine.task(task).expect("messaged delegate");
+    assert!(row.inbox.iter().any(|message| {
+        message.from == jig_domain_tasks::Party::Person(fixtures::PARTY) && message.words.as_ref() == words
+    }));
+    let next_turn = row.turn + 1;
+    let number = fixtures::read_messages(world.front(), task);
+    let row = world.front().engine.task(task).expect("delegate after reading");
+    assert_eq!(row.turn, next_turn);
+    assert_eq!(row.last_message, number);
+    assert!(row.inbox.iter().all(|message| message.number > number), "the committed turn took the message");
+    world.person(
+        person,
+        vec![
+            Step::See { find: conversation(Find::text(b"I will follow that direction")), within: fixtures::WITHIN },
+            Step::See { find: conversation(Find::text(words)), within: fixtures::WITHIN },
+            Step::Gone { find: Find::text(b"Being sent"), within: fixtures::WITHIN },
+            Step::Gone { find: Find::text(b"Sent"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+}
+
+fn conversation(find: Find) -> Find {
+    find.within(Box::new([Target::ExactRole { role: Role::Log, name: b"Conversation".as_slice().into() }]))
+}
+
+#[test]
+fn a_delegate_stopped_from_its_page_is_held_then_released() {
+    use jig_domain_tasks as tasks;
+    let (mut world, person, task) = running_delegate_page();
+    let attempt = world.front().engine.task(task).expect("running delegate").attempt;
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Stop"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Stop") },
+            Step::See { find: Find::named(Role::Dialog, b"Stop"), within: fixtures::WITHIN },
+            Step::See {
+                find: Find::text(b"Its run stops, and the task is held until it is released."),
+                within: fixtures::WITHIN,
+            },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::See { find: Find::named(Role::Button, b"Release task"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    assert!(matches!(world.front().engine.task(task).expect("stopped delegate").phase, tasks::Phase::Held { .. }));
+    world.person(
+        person,
+        vec![
+            Step::Press { find: Find::named(Role::Button, b"Release task") },
+            Step::See { find: Find::named(Role::Dialog, b"Release task"), within: fixtures::WITHIN },
+            Step::See {
+                find: Find::text(b"The next run resumes its conversation; tries count again from zero"),
+                within: fixtures::WITHIN,
+            },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::Gone { find: Find::named(Role::Button, b"Release task"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    let row = world.front().engine.task(task).expect("released delegate");
+    assert!(matches!(row.phase, tasks::Phase::Active(tasks::Active::Running { .. })));
+    assert!(row.attempt > attempt, "release assigned a new run");
+    assert_eq!(row.tries, tasks::Tries::NONE);
+}
+
+#[test]
+fn a_goal_cancelled_from_its_page_ends_its_delegates() {
+    use jig_domain_tasks as tasks;
+    let mut world = fixtures::world(fixtures::SEED);
+    let fixtures::Dependents { goal, first, second } = fixtures::goal_with_dependent_delegates(world.front());
+    let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Cancel"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Cancel") },
+            Step::See { find: Find::named(Role::Dialog, b"Cancel"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"Dangerous action: review its consequences"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"1 running tasks"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"1 waiting tasks"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::See { find: Find::named(Role::Status, b"Cancelled"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    for task in [first, second] {
+        let key = temper_engine_domain::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task)));
+        let Some(temper_engine_domain::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row)))) =
+            world.front().engine.store.rows.get(&key)
+        else {
+            panic!("delegate {task} has an ended record");
+        };
+        assert!(matches!(row.phase, tasks::Phase::Ended(tasks::Ending::Cancelled { .. })), "delegate {task} cancelled");
+    }
+}
+
+#[test]
+fn a_waiting_delegates_message_is_refused_with_its_reason() {
+    let mut world = fixtures::world(fixtures::SEED);
+    let fixtures::Dependents { second, .. } = fixtures::goal_with_dependent_delegates(world.front());
+    let person = world.client(fixtures::PARTY, fixtures::task_page(second));
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::text(b"Message"), within: fixtures::WITHIN },
+            Step::See { find: Find::text(b"This object waits for someone else"), within: fixtures::WITHIN },
+            Step::Gone { find: Find::named(Role::TextArea, b"Message"), within: fixtures::WITHIN },
+            Step::Gone { find: Find::named(Role::Button, b"Send"), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+    assert!(
+        world
+            .front()
+            .engine
+            .task(second)
+            .expect("waiting delegate")
+            .inbox
+            .iter()
+            .all(|message| { message.from != jig_domain_tasks::Party::Person(fixtures::PARTY) }),
+        "the waiting delegate received no person message"
+    );
+}
+
+#[test]
+fn an_agents_older_turns_are_read_by_older() {
+    let (mut world, person, task) = running_delegate_page();
+    fixtures::extend_delegate_conversation(world.front(), task);
+    world.person(
+        person,
+        vec![
+            Step::See { find: conversation(Find::text(b"The latest findings")), within: fixtures::WITHIN },
+            Step::Gone { find: conversation(Find::text(b"Findings in progress")), within: fixtures::WITHIN },
+            Step::See { find: Find::named(Role::Button, b"Older"), within: fixtures::WITHIN },
+            Step::Press { find: Find::named(Role::Button, b"Older") },
+            Step::See { find: conversation(Find::text(b"Findings in progress")), within: fixtures::WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
+}
 
 #[test]
 fn a_goals_plan_says_which_task_a_delegate_waits_for() {

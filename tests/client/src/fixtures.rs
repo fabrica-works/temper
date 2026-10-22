@@ -427,7 +427,6 @@ pub struct Dependents {
 }
 /// A tracked goal with two report delegates; the first has spent, the second waits for it.
 pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
-    use smith_domain_session::llm;
     use temper_engine_domain_world::fixtures::report_delegate;
     *front = Joint::with_delegates(SEED, &domain_limits());
     let goal = make_goal_with_delegation(front, false, Some(DEPENDENT_DELEGATES));
@@ -459,30 +458,52 @@ pub fn goal_with_dependent_delegates(front: &mut Joint) -> Dependents {
     driver.settle();
     let first = driver.last_assignment();
     assert_eq!(first.task, dependents.first, "first delegate runs before its dependant");
-    let mut turn = temper_worker_domain_world::protocol::session_turn(
-        FIRST_REPLY_TURN,
-        DELEGATE_SPEND,
-        DELEGATE_PROGRESS.len(),
-        true,
-    );
-    turn.messages[0].content = Box::new([llm::Block::Text { text: DELEGATE_PROGRESS.into(), replay: None }]);
+    delegate_turn(front, first.task, None, DELEGATE_PROGRESS);
+    dependents
+}
+/// Commit the running delegate's next turn taking all the person's pending words.
+/// Its numbered input fence removes those words from the engine's unread inbox.
+pub fn read_messages(front: &mut Joint, task: u64) -> u64 {
+    let number = front
+        .engine
+        .task(task)
+        .expect("running delegate")
+        .inbox
+        .iter()
+        .rev()
+        .find(|message| message.from == tasks::Party::Person(PARTY))
+        .expect("pending person message")
+        .number;
+    delegate_turn(front, task, Some(number), b"I will follow that direction");
+    number
+}
+/// Push the initial turn just beyond the client's retained activity window.
+pub fn extend_delegate_conversation(front: &mut Joint, task: u64) {
+    let window = domain_limits().client.domain.rows;
+    for _ in 1..window {
+        delegate_turn(front, task, None, b"The investigation continues");
+    }
+    delegate_turn(front, task, None, b"The latest findings");
+}
+fn delegate_turn(front: &mut Joint, task: u64, read: Option<u64>, words: &[u8]) {
+    use smith_domain_session::llm;
+    let driver = &mut front.engine;
+    let run = driver.task(task).expect("running delegate");
+    let attempt = run.attempt;
+    let number = run.turn + 1;
+    // The initial turn spends three; later turns keep that cumulative total.
+    let spent = run.run_spent.max(DELEGATE_SPEND);
+    let mut turn =
+        temper_worker_domain_world::protocol::session_turn(number, spent, words.len(), number == FIRST_REPLY_TURN);
+    turn.messages[0].content = Box::new([llm::Block::Text { text: words.into(), replay: None }]);
     let body = smith_protocol_channel::encode_turn(
         &turn,
         &smith_transcript::CEILINGS,
         &temper_worker_domain_world::protocol::endpoints(),
     )
     .expect("delegate turn encodes");
-    driver.send(temper_engine_domain_world::protocol::turn(
-        QUESTION_WORKER,
-        first.task,
-        first.attempt,
-        FIRST_REPLY_TURN,
-        DELEGATE_SPEND,
-        None,
-        &body,
-    ));
+    driver.send(temper_engine_domain_world::protocol::turn(QUESTION_WORKER, task, attempt, number, spent, read, &body));
     driver.settle();
-    dependents
 }
 /// The same goal after its first delegate's report unblocks the second.
 pub fn goal_with_a_finished_dependency(front: &mut Joint) -> Dependents {
