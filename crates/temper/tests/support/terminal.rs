@@ -53,7 +53,9 @@ fn typed_control(bytes: &[u8], control: &[u8], words: &[u8]) -> Option<Vec<u8>> 
         let line = line.trim_ascii_start();
         let Some(line) = line.strip_prefix(b"[") else { continue };
         let Some(end) = line.iter().position(|byte| *byte == b']') else { continue };
-        if line.get(end + 2..) != Some(control) || !line[..end].iter().all(u8::is_ascii_digit) {
+        // A link's outward mark follows its name for show; the person types the name (5.7).
+        let label = line.get(end + 2..).map(|label| label.strip_suffix(" ↗".as_bytes()).unwrap_or(label));
+        if label != Some(control) || !line[..end].iter().all(u8::is_ascii_digit) {
             continue;
         }
         let mut typed = line[..end].to_vec();
