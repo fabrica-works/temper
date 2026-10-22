@@ -92,17 +92,58 @@ fn assert_owned_limits(limits: &serde_json::Value) {
 }
 
 #[test]
+fn the_clusters_description_is_the_labs_canonical_form() {
+    let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lab/cluster/experiment.json"))
+        .expect("cluster description");
+    let mut value: serde_json::Value = serde_json::from_slice(&bytes).expect("cluster JSON");
+    // Sort explicitly, including if a dependency enables serde_json's preserve_order.
+    value.sort_all_objects();
+    assert_eq!(bytes, (serde_json::to_string(&value).expect("canonical JSON") + "\n").as_bytes());
+    let mut remaining = vec![&value];
+    while let Some(item) = remaining.pop() {
+        match item {
+            serde_json::Value::Number(number) => assert!(
+                number.as_i64().is_some_and(|n| (-(1_i64 << 53) + 1..=(1_i64 << 53) - 1).contains(&n)),
+                "lab integers must be within ±(2^53−1): {number}"
+            ),
+            serde_json::Value::Array(items) => remaining.extend(items),
+            serde_json::Value::Object(items) => remaining.extend(items.values()),
+            serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::String(_) => {}
+        }
+    }
+    let scratch = support::Scratch::startup("cluster-canonical-description");
+    let cluster = cluster_documents(scratch.path());
+    for process in value["processes"].as_array().expect("cluster processes") {
+        let name = process["name"].as_str().expect("process name");
+        let memory = match name {
+            "llm" => serde_json::Value::Null,
+            "engine" => cluster_document(&cluster, name)["engine"]["memory_bytes"].clone(),
+            "w1" | "w2" => cluster_document(&cluster, name)["workers"][0]["memory_bytes"].clone(),
+            _ => panic!("unknown cluster process {name}"),
+        };
+        assert_eq!(process["memory_bytes"], memory, "{name}'s bound must match its document");
+    }
+    scratch.remove();
+}
+
+fn cluster_documents(scratch: &std::path::Path) -> support::cluster::Cluster {
+    support::cluster::Cluster::documents(
+        scratch,
+        &[("llm", "address", "127.0.0.1:1"), ("engine", "workers", "127.0.0.1:2")],
+    )
+}
+
+fn cluster_document(cluster: &support::cluster::Cluster, process: &str) -> serde_json::Value {
+    serde_json::from_slice(&std::fs::read(cluster.dir(process).join("config/temper.json")).expect("cluster document"))
+        .expect("cluster document JSON")
+}
+
+#[test]
 fn the_clusters_documents_check_as_their_shapes() {
     use temper_service::startup::{self, Shape};
     let scratch = support::Scratch::startup("cluster-documents");
-    let cluster = support::cluster::Cluster::documents(
-        scratch.path(),
-        &[("llm", "address", "127.0.0.1:1"), ("engine", "workers", "127.0.0.1:2")],
-    );
-    let engine: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(cluster.dir("engine").join("config/temper.json")).expect("lab/cluster/engine.json"),
-    )
-    .expect("engine JSON");
+    let cluster = cluster_documents(scratch.path());
+    let engine = cluster_document(&cluster, "engine");
     let engine_limits = &engine["engine"]["limits"]["overrides"];
     assert_eq!(
         engine_limits["fleet.grace_ms"],

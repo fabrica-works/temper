@@ -145,7 +145,7 @@
     "owners": [{{"provider": 1, "subject": "owner-a"}}],
     "providers": [{{"number": 1, "kind": "link"}}, {{"number": 2, "kind": "deployment"}}],
     "connectors": [1],
-    "memory_bytes": 1152921504606846976,
+    "memory_bytes": 4503599627370496,
     "rules": {{
       "ceiling": {{
         "tools": 0,

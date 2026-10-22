@@ -29,7 +29,7 @@
           "link.silence_ms": 1000
         }}
       }},
-      "memory_bytes": 1152921504606846976
+      "memory_bytes": 4503599627370496
     }}
   ],
   "application": {{
