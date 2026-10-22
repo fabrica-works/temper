@@ -27,8 +27,8 @@ button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 /* .terminal-topbar: one sticky banner in the mockup's order. */
 .temper-banner { position: sticky; top: 0; z-index: 12; min-height: 49px; display: flex; align-items: center; gap: 16px; padding: 0 23px; border-bottom: 1px solid var(--temper-line); background: var(--temper-topbar); }
-.temper-banner > button { min-width: 0; max-width: 18em; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 5px; padding: 5px 0; background: transparent; color: #5f5a52; font-weight: 400; letter-spacing: inherit; white-space: nowrap; }
-.temper-banner > button::after { content: '⌄' / ''; color: #a59d91; padding-left: 4px; }
+.temper-banner > button { min-width: 0; max-width: 18em; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 5px; padding: 5px 0; background: transparent; color: #5f5a52; white-space: nowrap; }
+.temper-banner > button[aria-pressed=true] { color: var(--temper-ink); font-weight: 700; }
 .temper-banner > button:hover { color: var(--temper-accent); }
 /* .terminal-brand and .terminal-divider: decorative mask and rule. */
 .temper-brand { display: flex; align-items: center; gap: 8px; margin: 0; font: 700 16px/1 'DM Sans', ui-sans-serif, system-ui, sans-serif; letter-spacing: -.045em; white-space: nowrap; }
@@ -161,8 +161,6 @@ section.temper-accounts button:hover { text-decoration: underline; }
   .temper-row > p:nth-of-type(3) { order: 4; }
   .temper-time { order: 5; flex: 0 0 100%; text-align: left; }
 }
-/* .terminal-variant: chat pages inherit the terminal body type, including their banner. */
-body:has(.temper-main.temper-chat) { font-size: 13px; letter-spacing: -.018em; }
 /* .terminal-shell: the log owns scrolling and the frame owns the viewport. */
 #app:has(> .temper-chat) { height: 100vh; height: 100dvh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 #app:has(> .temper-chat) > :not(.temper-chat) { flex: none; }
