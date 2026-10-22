@@ -25,6 +25,8 @@ pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
     // when the delegate and amend schemas landed.
     const STRINGS: u32 = 16_384;
     const REQUEST: u32 = 65_536;
+    // Larger wire chunks keep the zero-latency real-loop peer cheap.
+    const WIRE_CHUNK: u32 = 4096;
     let mut config = skein_llm_world::fake::config();
     config.latency_min = Duration::ZERO;
     config.latency_max = Duration::ZERO;
@@ -32,6 +34,9 @@ pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
     config.answer_bytes = config.answer_bytes.max(STRINGS);
     config.query_bytes = config.query_bytes.max(STRINGS);
     let mut protocol = skein_llm_world::fake::limits(&skein_llm_world::limits());
+    protocol.http.read = WIRE_CHUNK;
+    protocol.http.send = WIRE_CHUNK;
+    protocol.sse.chunk = WIRE_CHUNK;
     protocol.documents.openai.request = REQUEST;
     protocol.documents.openai.strings = STRINGS;
     protocol.documents.openai.answer = protocol.documents.openai.answer.max(STRINGS);
