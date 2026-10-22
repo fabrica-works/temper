@@ -411,7 +411,13 @@ Starting, ending, `iterate`'s passes, room and timers are jig's
   of a managed or owned Forgejo, a connect's, an adoption's access) and
   carries what passes between it, the root and the forge's records. It
   holds an admin's token or a GitHub App's key only while a plan runs
-  (forge.md, 2.6; setup.md, the setup host in the engine).
+  (forge.md, 2.6; setup.md, the setup host in the engine). On close,
+  the setup adapter retains closing requested separately from host
+  `Close` sent; it drains host output independently of active notes,
+  store, forge and events gates, sends `Close` once bounded host room
+  permits, and completes only on actual `Closed` after io settlement
+  (setup.md, 5.1 and 13.1). No application note-pop order is required;
+  active-phase gates and skein's host/caller semantics remain in force.
 - **The webhooks' listener,** the forge component's own, when
   `application.webhooks` names it: each delivery verified as it streams,
   answered, then made a hint, which the routing hands the root as a forge
@@ -498,6 +504,13 @@ No store; starting, ending and smith's payloads are jig's (jig's
 - **The checkout's io.** Each `git::Op` the root asks for goes to the git
   component, which answers it with exactly one terminal; `Make` is file
   operations under the worker's root directory (git.md, section 4).
+- **Local channel refusals** use jig's public `u16` constants
+  `REFUSED_LIMITS = 2` and `REFUSED_FRAMING = 3` from
+  `jig-protocol-worker-link`, including diagnostic matches (jig's
+  `protocol/channel.md`, 10.1; skein's `channel.md`, 5.1). These are
+  channel reasons, separate from jig's application reasons at 256 and
+  above. Existing worker diagnostic tests check those matches; the
+  wire and `Closed` facts keep their values.
 - **Starting:** configuration, the components, the worker's root
   directory opened, then the link dialled at once (jig's
   `protocol/service.md`, section 6).

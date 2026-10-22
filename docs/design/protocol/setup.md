@@ -309,6 +309,20 @@ it, and nothing but the setup host writes what it makes.
   forge not connected, named, until the next start or a managed connect;
   the engine and every other forge run on.
 
+- **Closing progresses without diagnostic consumption.** The service's
+  setup adapter tracks closing requested separately from host `Close`
+  sent. A close request enters closing once, even when active work's
+  room gates are full. While closing it drains the host's outputs
+  independently of notes, store, forge and events room, discarding
+  non-`Closed` outputs as the shutdown path does. It sends `Close` once
+  bounded host room permits, at most once, and continues io settlement
+  and draining until the actual `Closed`. Neither requesting close nor
+  sending it requires the application to pop notes; sending it never
+  completes shutdown. Active-phase room gates still protect their
+  downstream writes. Host `Close` and outside-caller terminal semantics
+  remain those of skein's host (skein's `forge-setup.md`, 6.3) and
+  programming-model.md, 5.2: closed follows settlement, never a request.
+
 ### 5.2 The setup host's plans
 
 | Plan | Forge | When | skein's `forge-setup.md` |
@@ -1289,7 +1303,10 @@ defaults for a person's real work are open (section 16).
   Create, and records it: a chat started before the account stays on
   the demo model, and a chat started after takes the charter's first,
   `gpt-6-luna` once an OpenAI key serves it. The composer's line says
-  which, before the start (`../client/README.md`, 5.5).
+  which, before the start, from jig's `resolved_default` preview in
+  `me`, never by guessing from catalogue order (`../client/README.md`,
+  5.5). The request keeps its omitted choice; the preview does not turn
+  it into an explicit one.
 - **One worker,** in the process, its `root` `workspaces` in the data
   directory, its `git` the machine's, or null (8.2); the deployment's directory
   `deployment` in the data directory; the clients' listener
@@ -2071,6 +2088,14 @@ relies on.
   connect, the row "Connecting" between; a stop leaving the forge not
   connected, named; `failed` leaving it "Set up failed" with its reason;
   with no pipe, the row naming the commands (6.5).
+- **The setup host's close** (5.1), in the existing temper-service
+  setup step fixture: notes full and never popped, host outputs full
+  before close is requested, and `Closed` behind the active notes,
+  store, forge and events gates. The close request is retained, host
+  `Close` is sent once when its bounded room permits, and only the
+  actual host/socket terminal events and io settlement complete it.
+  Events and counts establish the order, with no sleeps, new harness,
+  unbounded queue or timeout change.
 - **The fake's start-time adoption** (8.4), in temper-service's step
   tests: at the start, one `Adopt` for each of the fake entry's
   repositories, in order, its given listener the webhooks' when the

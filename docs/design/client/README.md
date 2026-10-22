@@ -273,6 +273,10 @@ credential.
 - **Another party's kept work** stays parked and is not shown (jig's
   `client/domain/client.md`, section 11); the terminal says so in a line
   of its own (6.6).
+- **Pending reads at sign-in** end visibly in jig's existing forms,
+  on successful installation even before the first `me`, and on
+  sign-out (jig's `client/domain/client.md`, sections 7 and 12).
+  Whoever asked must ask again; no read is replayed automatically.
 - **Kept work dropped:** the domain hands `jig-client`'s `Dropped {
   count }` to the shell (jig's `client/domain/root.md`, section 8), and
   the terminal says so in a line of its own (6.6).
@@ -1161,12 +1165,15 @@ against the real issuer (JP13). The words for each offered source are:
   every page: `me`, the accounts document and its readiness:
   - *MODEL* is the draft's model (a task's LLM choice; a new chat's,
     its template's), then " · EFFORT" where the choice names an effort.
-    Where the template names none, it is the charter's default as jig
-    resolves it at Create (`../protocol/setup.md`, 8.3): the first
-    model `me` offers for the project, in its order, whose LLM provider
-    is usable for the work's payer (`PayerReadiness`). `me`'s order,
-    the configuration's, stands in for the charter's, which jig's
-    contract does not carry (section 11).
+    Where the template names none, it is the supplied
+    `resolved_default` beside that template in `me` (jig's
+    `client/domain/contract.md`, 5.1), using Create's resolver, charter
+    order, effective authority and current receiving-party payer.
+    The composer never infers a default from the project catalogue's
+    order, including a clipped catalogue. With no preview it uses
+    "Using the default model". The preview is an observation, not a
+    reservation: the draft keeps configured intent, and Create resolves
+    omission once (`../protocol/setup.md`, 8.3).
   - *The account* is named only when the payer is you: your new chat,
     or a task funded by your pool. The accounts document lists only
     your own accounts, in `(place, number)` order. In this slice the
@@ -2327,6 +2334,14 @@ The tiers, the fakes and the budgets are `../domain/testing.md`'s (sections 2,
 4 and 6.1); the client's joint world is its 2.1 and 6.3. The client's
 own tests:
 
+- **Credential-boundary consumption** is checked in the existing
+  domain and composed-client fixtures, including the terminal shell's
+  startup `Held` sign-in after its children have asked reads (3.4).
+  Every cancelled read is consumed visibly and its asker must ask again;
+  no new retry policy is implied. The preview's existing view tests
+  render jig's supplied `resolved_default`, with catalogue and charter
+  orders opposed, explicit choice and no preview, preserving omitted
+  request intent (5.5).
 - **Step tests:** the domain's pages (what each watches and reads as it
   opens and closes, each act as the operations it sends, the
   confirmation's rule of 3.6, routing by asker; a chat's delegations,
@@ -2632,15 +2647,6 @@ own tests:
 - **The composer's placeholder** ("Try a suggested request…", the
   first-run mockup's earlier draft): skein-ui's text area has none, and adding
   one is a change to skein's API and a repin. Default: not drawn.
-- **A new chat's default model on its composer's line** (5.5): jig
-  resolves a template's default at Create from its charter's models, in
-  the charter's order, and its contract gives the client no charter's
-  order, so the line takes `me`'s, which is the configuration's. A
-  charter that orders its models otherwise makes the line name another
-  model than the chat then runs. jig could give, in `me`, each
-  template's default as it would resolve it for the person, or each
-  charter's order (a jig addition, past story-b's M2). Default: `me`'s
-  order, which the owned example's charters keep.
 - **The composer's selected account and source** (5.5): jig's
   `PayerReadiness` could carry the account and source its selection
   chose (`jig-domain-core`'s `catalogue.rs` already calls `select`).

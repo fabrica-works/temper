@@ -369,14 +369,30 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   any host: the box's harness waits on it once it has added the
   deployment's key (section 10).
 - **`ended`** is met by a delivery that shows the subject ended, or by
-  its watch's end because it ended. For `task N`, the answer is then the
-  task as a read of it gives it once ended, so it says how it ended.
+  its watch's end because it ended. For `task N`, completion is checked
+  by the task's number and terminal phase as below; its answer says
+  how it ended.
+- **`wait task N --until ended` watches first.** A watch on a subject
+  that has ended is refused `Unknown` (jig's
+  `client/domain/contract.md`, sections 6 and 7.2). On that opening
+  refusal or `SubjectEnded`, the tool reads N through the existing
+  authorized task read. On both paths, a `Historical` record or a
+  live-form task establishes completion only when its returned number
+  is N and its phase is terminal. `Unknown` alone never means success.
+  A nonterminal or wrong-number result fails visibly; it cannot succeed or
+  leave the wait hanging. A valid terminal uses the ordinary result
+  renderer. Unknown, hidden or forgotten history keeps status 2;
+  Busy, sign-out and read failures keep their ordinary statuses (6.3).
+  The read follows the watch, so the engine's retained-load durability
+  barrier leaves no gap at live retirement. This adds no retry or
+  timer policy and changes no other condition or run/tree wait.
 - **`--timeout`:** 300 seconds by default, at most 3600; answered with
   the current document, its digest, and that the condition is not met
   (6.3).
 - **A watch that ends under a wait** (jig's `client/domain/contract.md`,
   7.2) answers it: met where the condition is `ended` and the subject
-  ended; refused where the party may no longer see the subject; failed
+  ended, with `task N` first requiring the matching terminal read above;
+  refused where the party may no longer see the subject; failed
   where the sign-in ended; otherwise, not met, with the last document
   and its digest (6.3). An engine that stops ends no watch: jig's
   client opens again a watch the engine let go as it stopped (jig's
@@ -803,6 +819,12 @@ may change with them.
   conflict, since each call's keys are its own (section 4). Either is
   the tools' bug: it exits 1, says so, and the guide says to report it
   as a finding (11.5).
+- **A task wait's final read** follows 5.4 on both an `Unknown`
+  opening and `SubjectEnded`: status 0 requires N and a terminal phase,
+  for both `Historical` and live-form records. Unknown or hidden
+  history remains status 2; a nonterminal or wrong-number result fails
+  visibly, never reports completion. Busy, sign-out and other read
+  failures keep their ordinary statuses.
 - **A call cut by a signal** ends at once and exits 128 plus the
   signal's number, never 0 (8.2).
 - **A call whose link stays down** past its deadline exits 1, and what
@@ -1111,6 +1133,12 @@ done, since a key is free again past the engine's retention (section 7).
   call.
 - **Digests and conditions:** a digest moves with a document's change
   and only then; each condition over documents that meet and miss it.
+- **Task waits,** in the existing tools step fixture: `Unknown` and
+  `SubjectEnded` each followed by real `Historical` and live-form
+  terminal records, nonterminal and wrong-number records, unknown or
+  hidden history, Busy, sign-out and read failure. Only matching
+  terminal records meet `ended`; each path emits exactly one result
+  and releases its handles and timer. No new harness (5.4).
 - **The boundary:** `src/jig/` names no temper item (section 4).
 - **The bounds:** each of the tools' ceilings within the client's limit
   it reads from, and a picker's page within a result's text (section
@@ -1125,9 +1153,12 @@ done, since a key is free again past the engine's retention (section 7).
 beside the fake person, as a scripted agent making calls (`README.md`,
 section 10; `../domain/testing.md`, 6.3). Area 1's stories: a chat started, its
 reply waited for, a message, a turn too large for a page read whole,
-the chat closed; a repository adopted; a held task released. A turn
-too large for a page exists only where the engine's bound on a turn
-passes its page bound, so the world's profile sets it so. The world's
+the chat closed; a repository adopted; a held task released. The
+existing agent story also waits for a task whose end was observed before
+`wait task N --until ended` begins, checking the matching terminal
+answer (5.4). A turn too large for a page exists only where the engine's
+bound on a turn passes its page bound, so the world's profile sets it
+so. The world's
 faults hold: a call cut by a link drop or an engine restart, asked
 again under its named key, is made once. Each area adds its
 stories. Area 5's, over the engine root's accounts child with each
