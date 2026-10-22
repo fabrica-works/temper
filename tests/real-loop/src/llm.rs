@@ -19,10 +19,12 @@ pub struct Recipe {
 #[must_use]
 pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
     // Smith's configured peer bounds, for an agent's prompt and finish call.
+    // REQUEST is this fake's admission, not production's bound (50,331,648 B
+    // from the template's window, crates/temper-init/template/agent.json).
     // The first-turn request with a workspace mounted measured 31,007 B
-    // when the delegate and amend schemas landed, leaving 1,761 B.
+    // when the delegate and amend schemas landed.
     const STRINGS: u32 = 16_384;
-    const REQUEST: u32 = 32_768;
+    const REQUEST: u32 = 65_536;
     let mut config = skein_llm_world::fake::config();
     config.latency_min = Duration::ZERO;
     config.latency_max = Duration::ZERO;
