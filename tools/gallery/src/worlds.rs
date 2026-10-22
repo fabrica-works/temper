@@ -161,6 +161,32 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                 jig_client::Down::Read { read, what: jig_client::Readable::Family { .. } } => {
                     demo(&mut root, w, read, &mut out);
                 }
+                jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { record, .. } }
+                    if record.family == FORGE =>
+                {
+                    use temper_client_protocol_wire::{self as wire, v1 as w};
+                    let watching = wire::decode_watching(
+                        &record.bytes,
+                        &temper_client_domain::forge::wire_limits(&limits.forge).expect("wire limits"),
+                    )
+                    .expect("gallery change watch");
+                    let w::Watch::Change(subject) = watching.watch();
+                    if let Some(panel) = change_panel(w, subject.task()) {
+                        for up in [
+                            jig_client::Up::Watched { watch, event: c::WatchEvent::Opened },
+                            jig_client::Up::FamilyDelivered {
+                                watch,
+                                record: jig_client::Family {
+                                    family: wire::FORGE,
+                                    version: wire::CLIENT_VERSION,
+                                    bytes: wire::change_panel(&panel),
+                                },
+                            },
+                        ] {
+                            step(&mut root, Event::Client { event: jig_client::Event::Up { up } }, &mut out);
+                        }
+                    }
+                }
                 jig_client::Down::Save { .. }
                 | jig_client::Down::Erase { .. }
                 | jig_client::Down::Send { .. }
@@ -175,6 +201,64 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
         assert!(root.demo().expect("answered demo").1.model);
     }
     root
+}
+fn change_panel(w: World, task: u64) -> Option<temper_client_protocol_wire::v1::ChangePanel> {
+    use temper_client_protocol_wire::v1 as w;
+    let l = temper_client_domain::forge::wire_limits(&limits().forge).expect("wire limits");
+    let (branch, head_prefix, pull_number, pull_address, step) = match (w, task) {
+        (Reference, 28) => {
+            let mut ahead = List::with_capacity(1);
+            ahead.push(26).expect("task ahead");
+            (
+                b"temper/28/build-path-one-cache-per-lane".as_slice(),
+                [0xc4, 0x0e, 0x9b, 0x20],
+                216,
+                b"https://github.com/acme/kit/pull/216".as_slice(),
+                w::Step::Queued(w::Queued::new(&l, w::QueuedParts { place: 2, ahead }).expect("queued")),
+            )
+        }
+        (Reference, 24) => {
+            let mut merge = [0; 32];
+            merge[..4].copy_from_slice(&[0x4e, 0x1a, 0x9c, 0x70]);
+            (
+                b"temper/24/fake-server-replay-fixtures".as_slice(),
+                [0x8b, 0x2d, 0x41, 0x00],
+                212,
+                b"https://github.com/acme/kit/pull/212".as_slice(),
+                w::Step::Landed(w::Landed::new(&l, w::LandedParts { merge }).expect("landed")),
+            )
+        }
+        _ => return None,
+    };
+    let mut head = [0; 32];
+    head[..4].copy_from_slice(&head_prefix);
+    Some(
+        w::ChangePanel::new(
+            &l,
+            w::ChangePanelParts {
+                task,
+                forge: 1,
+                owner: Box::from(b"acme".as_slice()),
+                name: Box::from(b"kit".as_slice()),
+                branch: Box::from(branch),
+                landing: Box::from(b"main".as_slice()),
+                head: Some(head),
+                pull: Some(
+                    w::Pull::new(&l, w::PullParts { number: pull_number, address: Box::from(pull_address) })
+                        .expect("pull"),
+                ),
+                step,
+                hold: None,
+                runs: None,
+                ci: w::Ci::Passed,
+                gates: List::with_capacity(0),
+                repairs: w::Used::new(&l, w::UsedParts { used: 0, limit: 3 }).expect("repairs"),
+                resolutions: w::Used::new(&l, w::UsedParts { used: 0, limit: 3 }).expect("resolutions"),
+                updates: w::Used::new(&l, w::UsedParts { used: 0, limit: 3 }).expect("updates"),
+            },
+        )
+        .expect("change panel"),
+    )
 }
 fn demo(root: &mut Domain, w: World, read: Token, out: &mut Queue<Request>) {
     use temper_client_protocol_wire::{self as wire, v1};
@@ -414,6 +498,23 @@ fn proposal() -> c::ReadValue {
 }
 fn read_value(w: World, what: &c::Read, then: Then) -> Option<c::ReadValue> {
     match what {
+        c::Read::Tasks { query: c::TaskQuery { parent: Some(parent), phase, .. }, .. }
+            if *phase == Some(c::PhaseClass::Ended) =>
+        {
+            let children = facts(w, *parent).children;
+            let mut rows = List::with_capacity(u32::try_from(children.len()).expect("small children"));
+            for child in children {
+                let task = document(w, *child);
+                if matches!(task.chip.phase, c::Phase::Done | c::Phase::Ended) {
+                    rows.push(task_line(task)).expect("ended child");
+                }
+            }
+            Some(c::ReadValue::Tasks(Box::new(c::TaskPage {
+                live: List::with_capacity(0),
+                live_after: None,
+                ended: c::EndedGroup::Rows { rows, after: None, cut: false },
+            })))
+        }
         c::Read::Tasks { .. } => Some(c::ReadValue::Tasks(Box::new(c::TaskPage {
             live: List::with_capacity(0),
             live_after: None,

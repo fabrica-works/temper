@@ -581,6 +581,8 @@ view draws, never changing a view to suit a sample.
 | `task-releasing` | `task-held` with Release pressed: its confirmation |
 | `accounts-signin` | a sign-in started, its address shown |
 | `accounts-refused` | an account's request refused, its alert |
+| `task-reference-T28` | the reference world's change T28, queued 2nd after T26 |
+| `task-reference-T24` | the reference world's change T24, landed, its ended task T25 |
 
 ### 7.3 Its tests
 

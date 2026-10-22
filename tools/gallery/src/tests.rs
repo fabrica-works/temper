@@ -230,6 +230,39 @@ const HOLDS: [Holds; samples::N] = [
         parts: &[Part::Named { role: Role::Link, name: "Open the sign-in page" }],
     },
     Holds { name: "accounts-refused", heading: "Accounts", parts: &[Part::Named { role: Role::Alert, name: "" }] },
+    Holds {
+        name: "task-reference-T28",
+        heading: "Build path: one cache per lane",
+        parts: &[
+            Part::Named { role: Role::Item, name: "Queued · 2nd" },
+            Part::Named { role: Role::Paragraph, name: "2nd in the queue for main, after Task 26." },
+            Part::Named {
+                role: Role::Text,
+                name: "PR #216 · acme/kit · temper/28/build-path-one-cache-per-lane → main",
+            },
+            Part::Named { role: Role::Paragraph, name: "CI at its head" },
+            Part::Named { role: Role::Paragraph, name: "Passed" },
+            Part::Named { role: Role::Paragraph, name: "No other gate." },
+            Part::Named { role: Role::Text, name: "Repairs 0 of 3 · resolutions 0 of 3 · updates 0 of 3" },
+            Part::Named { role: Role::Link, name: "View on forge ↗" },
+            Part::Named { role: Role::Tree, name: "Its tasks" },
+            Part::Named { role: Role::Paragraph, name: "Produce T28's branch" },
+        ],
+    },
+    Holds {
+        name: "task-reference-T24",
+        heading: "Fake server: replay fixtures",
+        parts: &[
+            Part::Named { role: Role::Item, name: "Landed" },
+            Part::Named { role: Role::Paragraph, name: "Landed · merge commit 4e1a9c7" },
+            Part::Named {
+                role: Role::Text, name: "PR #212 · acme/kit · temper/24/fake-server-replay-fixtures → main"
+            },
+            Part::Named { role: Role::Tree, name: "Its tasks" },
+            Part::Named { role: Role::Paragraph, name: "Produce T24's branch" },
+            Part::Absent { role: Role::Paragraph, name: "More of its ended tasks are not shown." },
+        ],
+    },
 ];
 fn in_main(role: Role, name: &str) -> Find {
     Find::named(role, name.as_bytes())
