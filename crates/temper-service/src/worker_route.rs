@@ -203,7 +203,8 @@ pub fn process(event: smith_host_protocol::ProcessEvent) -> Option<temper_worker
         ProcessEvent::Exited { agent, exit } => smith::process::Event::Exited { owner: agent, exit: exited(exit) },
         ProcessEvent::Reaped { agent, detail } => smith::process::Event::Reaped { owner: agent, detail },
         ProcessEvent::Channel { agent, event } => match *event {
-            OpenEvent::Opened { .. } | OpenEvent::Live { .. } | OpenEvent::WriteFailed => return None,
+            OpenEvent::Opened { .. } | OpenEvent::WriteFailed => return None,
+            OpenEvent::Live { .. } => smith::process::Event::Progress { owner: agent },
             OpenEvent::Hangup { .. } => smith::process::Event::Hangup { owner: agent },
             OpenEvent::Sent { .. } => smith::process::Event::Sent { owner: agent },
             OpenEvent::Unsent { .. } => smith::process::Event::Unsent { owner: agent },
@@ -315,8 +316,8 @@ fn channel(event: smith_host_protocol::OpenEvent) -> Option<smith::Up> {
         OpenEvent::Refused { account, code, reason } => smith::Up::Refused { account, code, reason },
         OpenEvent::Call { call, name, deadline, ask } => smith::Up::Call { call, name, deadline, ask },
         OpenEvent::Withdraw { call } => smith::Up::Withdraw { call },
-        OpenEvent::Opened { .. }
-        | OpenEvent::Live { .. }
+        OpenEvent::Live { .. }
+        | OpenEvent::Opened { .. }
         | OpenEvent::WriteFailed
         | OpenEvent::Hangup { .. }
         | OpenEvent::Sent { .. }
