@@ -532,7 +532,7 @@ impl World {
                 top::Request::ApplicationPart { request, .. } => {
                     top::step(&mut self.top, &self.env, top::Event::Adopt { request }, &mut self.top_out);
                 }
-                top::Request::ApplicationDone { .. } => {}
+                top::Request::ApplicationDone { .. } | top::Request::Marked { .. } => {}
                 top::Request::ApplicationAgain { .. } => panic!("application capacity available"),
                 top::Request::Adopted { reply_to, result } => {
                     let outcome = match &result {
@@ -560,7 +560,6 @@ impl World {
                         self.stored.insert(key(&record), record).expect("world store capacity");
                     }
                 }
-                top::Request::Marked { .. } => {}
                 top::Request::Save { record, .. } => {
                     if matches!(record, top::Stored::Writer(_)) {
                         self.writer_saves += 1;

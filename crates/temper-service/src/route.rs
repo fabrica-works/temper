@@ -141,6 +141,7 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
             },
             root::Delivery::Procedure { .. }
             | root::Delivery::Application { .. }
+            | root::Delivery::Panel { .. }
             | root::Delivery::WebReply { .. }
             | root::Delivery::CarriedUnused { .. }
             | root::Delivery::Read { .. }

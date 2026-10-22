@@ -11,7 +11,6 @@ use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use jig_domain_views as views;
 
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates the core's ask vocabulary")]
 pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision, connector: u16, ask: core::Ask) {
@@ -45,14 +44,8 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             }
             None
         }
-        // temper's forge serves no client documents or application requests
-        // yet: they are answered as unknown, as `examples/ops` answers what it
-        // does not serve (brief D13; jig's `domain/connectors.md`, 5.5).
-        core::Ask::Document { watcher, .. } => {
-            domain.work.push(Work::Core(core::Event::View(views::Event::Made {
-                watcher,
-                outcome: views::Made::Gone { why: views::End::Gone },
-            })));
+        core::Ask::Document { watcher, scope, subject, .. } => {
+            super::panels::document(domain, env, decision, connector, watcher, scope, subject);
             None
         }
         core::Ask::Read { reply, .. } => {

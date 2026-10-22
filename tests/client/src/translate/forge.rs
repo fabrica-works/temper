@@ -226,7 +226,8 @@ pub fn incoming(
                 },
             )));
         }
-        delivery @ (Delivery::SourceSignedOut { .. }
+        delivery @ (Delivery::Panel { .. }
+        | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }

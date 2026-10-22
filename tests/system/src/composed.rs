@@ -701,6 +701,7 @@ impl World {
             Delivery::Result { .. } => {}
             other @ (Delivery::Host(_)
             | Delivery::Procedure { .. }
+            | Delivery::Panel { .. }
             | Delivery::Refuse { .. }
             | Delivery::Read { .. }
             | Delivery::Document { .. }

@@ -284,6 +284,7 @@ fn delivery_packet(
         }
         // Jig has no separate live requester Result; the task document carries it.
         Delivery::Application { .. }
+        | Delivery::Panel { .. }
         | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)

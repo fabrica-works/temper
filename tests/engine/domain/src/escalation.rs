@@ -783,6 +783,7 @@ impl World {
                 .expect("independent exact final report and funding"),
             Delivery::Link { down: host::LinkDown::Grant { .. }, .. } => {}
             Delivery::Application { .. }
+            | Delivery::Panel { .. }
             | Delivery::WebReply { .. }
             | Delivery::CarriedUnused { .. }
             | Delivery::Link { .. }

@@ -425,6 +425,9 @@ pub enum PartyInput {
         read: core::reads::Read,
     },
     /// Watch one subject's whole document on a live sign-in.
+    /// A forge panel uses `Watched::Application` in its project's scope, the
+    /// configured forge connector, and the change task's number as its token
+    /// (domain/root.md, 5.1; client/forge.md, 9.2). The core admits its project role.
     Watch {
         watcher: Token,
         sign_in: u64,
@@ -665,7 +668,8 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
         | Delivery::Assigned { .. }
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }) => Request::Worker(WorkerRequest::Deliver(delivery)),
-        delivery @ (Delivery::Application { .. }
+        delivery @ (Delivery::Panel { .. }
+        | Delivery::Application { .. }
         | Delivery::WebReply { .. }
         | Delivery::CarriedUnused { .. }
         | Delivery::Read { .. }

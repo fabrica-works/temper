@@ -51,6 +51,11 @@ pub struct Limits {
 /// resumed by the root and never passed to the protocol as child events.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Delivery {
+    /// Whole forge panel, held with the decision that requested it (domain/root.md, 5.1).
+    Panel {
+        watcher: Token,
+        panel: Box<temper_engine_domain_forge::Panel>,
+    },
     SourceSignedOut {
         to: ReplyTo,
         channel: Token,
@@ -392,6 +397,24 @@ impl Decision {
         let within = match &delivery {
             Delivery::Result { words, .. } => {
                 words.len() <= usize::try_from(limits.result_bytes).expect("u32 fits usize")
+            }
+            Delivery::Panel { panel, .. } => {
+                let mut owned = panel
+                    .owner
+                    .len()
+                    .saturating_add(size_of::<temper_engine_domain_forge::Panel>())
+                    .saturating_add(panel.name.len())
+                    .saturating_add(panel.branch.len())
+                    .saturating_add(panel.landing.len())
+                    .saturating_add(
+                        panel.gates.len().saturating_mul(size_of::<temper_engine_domain_forge::PanelGate>()),
+                    );
+                if let temper_engine_domain_forge::PanelStep::Queued { ahead, .. } = &panel.step {
+                    owned = owned.saturating_add(ahead.len().saturating_mul(size_of::<u64>()));
+                }
+                panel.within()
+                    && owned
+                        <= usize::try_from(limits.result_bytes.max(limits.transcript_bytes)).expect("u32 fits usize")
             }
             Delivery::Fleet(event) => fleet_delivery_within(event),
             Delivery::Relay { word, .. } => {

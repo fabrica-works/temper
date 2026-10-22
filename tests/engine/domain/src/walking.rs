@@ -832,6 +832,7 @@ impl World {
             | Delivery::ForgeCall { .. }
             | Delivery::Procedure { .. }
             | Delivery::Application { .. }
+            | Delivery::Panel { .. }
             | Delivery::WebReply { .. }
             | Delivery::CarriedUnused { .. }
             | Delivery::Read { .. }

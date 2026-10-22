@@ -175,7 +175,7 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
             );
         }
         core::Held::ApplicationDelivery { .. } => {
-            unreachable!("temper's forge serves no client document or application request")
+            unreachable!("application delivery is taken where it is made (panels.rs)")
         }
         core::Held::NotesWritten { .. } | core::Held::NotesDeleted { .. } => {
             unreachable!("the current application has no note caller")

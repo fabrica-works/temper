@@ -8,6 +8,7 @@ pub(crate) mod host_route;
 pub use host_route::{HostDelivery, HostRequest};
 pub(crate) mod landing;
 mod now;
+mod panels;
 pub(crate) mod policy_translate;
 pub(crate) mod proposals;
 mod tools;

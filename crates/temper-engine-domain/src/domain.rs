@@ -789,6 +789,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
         | Delivery::ForgeCall { .. }
         | Delivery::Procedure { .. }
         | Delivery::Assigned { .. }
+        | Delivery::Panel { .. }
         | Delivery::Application { .. }
         | Delivery::WebReply { .. }
         | Delivery::CarriedUnused { .. }

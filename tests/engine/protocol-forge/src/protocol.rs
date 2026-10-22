@@ -406,7 +406,7 @@ impl Protocol {
                 top::Request::ApplicationPart { request, .. } => {
                     top::step(&mut self.top, &self.env, top::Event::Adopt { request }, &mut self.top_out);
                 }
-                top::Request::ApplicationDone { .. } => {}
+                top::Request::ApplicationDone { .. } | top::Request::Marked { .. } => {}
                 top::Request::ApplicationAgain { .. } => panic!("application capacity available"),
                 top::Request::Adopted { reply_to, result } => {
                     let outcome = match &result {
@@ -434,7 +434,6 @@ impl Protocol {
                         self.stored.insert(key(&record), record).expect("world store capacity");
                     }
                 }
-                top::Request::Marked { .. } => {}
                 top::Request::Save { record, .. } => {
                     let key = key(&record);
                     self.stored.insert(key, record).expect("world store capacity");

@@ -497,7 +497,9 @@ impl Joint {
                 }
                 if let engine::Request::Party(
                     engine::PartyRequest::Deliver(
-                        engine::Delivery::Document { watcher, .. } | engine::Delivery::WatchEnded { watcher, .. },
+                        engine::Delivery::Document { watcher, .. }
+                        | engine::Delivery::WatchEnded { watcher, .. }
+                        | engine::Delivery::Panel { watcher, .. },
                     )
                     | engine::PartyRequest::WatchRefused { watcher, .. }
                     | engine::PartyRequest::RunText { watcher, .. },

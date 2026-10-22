@@ -2008,6 +2008,23 @@ pub(crate) fn outputs(
                 domain.work.push(Work::Brief(event));
             }
             forge::Request::BriefTaken { .. } => unreachable!("the root takes completed sections directly"),
+            forge::Request::Marked { tasks } => {
+                const {
+                    assert!(
+                        forge::MARKED <= crate::limits::VIEWS.subjects_per_change,
+                        "forge marks fit the views subject budget"
+                    );
+                }
+                assert!(tasks.len() <= usize::try_from(forge::MARKED).expect("u32 fits usize"), "bounded panel marks");
+                let mut subjects = List::with_capacity(forge::MARKED);
+                for task in tasks {
+                    subjects.push(Token::new(task)).expect("bounded panel marks");
+                }
+                domain.work.push(Work::Core(jig_domain_core::Event::Marked {
+                    connector: domain.config.forge_connector,
+                    subjects,
+                }));
+            }
             forge::Request::Save { record, release, read_afresh } => {
                 if let Some(name) = read_afresh
                     && let Some(resource) = hub_name(domain.config.forge_connector, &name, &env.limits.tasks)
