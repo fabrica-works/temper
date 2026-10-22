@@ -2,6 +2,7 @@ mod acts;
 mod address;
 mod demo;
 mod fixtures;
+mod forge_words;
 mod form;
 mod pages;
 use crate::{Address, Event, Fact, Request, forge};

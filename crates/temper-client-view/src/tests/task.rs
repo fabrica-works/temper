@@ -78,6 +78,14 @@ fn a_forge_resource_on_the_page_is_in_the_forges_words() {
     assert!(skein_lib::bytes::find(&fixtures::text(&tree), b"acme/shop on forge.example").is_some());
 }
 #[test]
+fn a_delegate_branch_resource_on_the_page_is_in_words() {
+    let tree = asked(c::Part::Resource {
+        connector: fixtures::FORGE,
+        path: fixtures::path(&[&1_u16.to_be_bytes(), &1_u32.to_be_bytes(), b"temper/1/c2"]),
+    });
+    assert!(skein_lib::bytes::find(&fixtures::text(&tree), b"branch temper/1/c2 of repository 1 on forge 1").is_some());
+}
+#[test]
 fn a_forge_panel_on_the_page_says_shown_on_the_forge() {
     let tree = asked(c::Part::Panel { connector: fixtures::FORGE, task: TASK });
     assert!(skein_lib::bytes::find(&fixtures::text(&tree), b"Shown on the forge.").is_some());

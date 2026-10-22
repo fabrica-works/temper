@@ -216,3 +216,18 @@ fn an_ended_chip_supplies_its_state_and_reason() {
         assert_eq!(facts.steps, Some(0));
     }
 }
+
+#[test]
+fn merge_commits_are_whole_lowercase_hex_ids_of_at_least_seven_bytes() {
+    for (words, expected) in [
+        (MERGE, Some(MERGE)),
+        (b"abc1234".as_slice(), Some(b"abc1234".as_slice())),
+        (b"abc123", None),
+        (b"ABC1234", None),
+        (b"abc123g", None),
+        (b"landed it", None),
+        (b"", None),
+    ] {
+        assert_eq!(delegation::merge_commit(words), expected);
+    }
+}

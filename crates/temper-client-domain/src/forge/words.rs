@@ -238,8 +238,9 @@ pub enum ResourceWord {
     DeleteBranch,
     OtherKind,
     Shown,
+    AdoptedBranch,
 }
-pub const RESOURCES: [ResourceWord; 24] = [
+pub const RESOURCES: [ResourceWord; 25] = [
     ResourceWord::Connector,
     ResourceWord::Repository,
     ResourceWord::Branch,
@@ -264,6 +265,7 @@ pub const RESOURCES: [ResourceWord; 24] = [
     ResourceWord::DeleteBranch,
     ResourceWord::OtherKind,
     ResourceWord::Shown,
+    ResourceWord::AdoptedBranch,
 ];
 impl ResourceWord {
     #[must_use]
@@ -293,6 +295,7 @@ impl ResourceWord {
             Self::DeleteBranch => 21,
             Self::OtherKind => 22,
             Self::Shown => 23,
+            Self::AdoptedBranch => 24,
         };
         PhraseId { owner: owner(connector), number }
     }
@@ -306,6 +309,7 @@ pub fn resource_english(word: ResourceWord) -> (&'static [&'static [u8]], &'stat
         ResourceWord::Pull => (&[b"pull request #", b" of ", b" on ", b""], &[Name, Name, Name]),
         ResourceWord::Issue => (&[b"issue #", b" of ", b" on ", b""], &[Name, Name, Name]),
         ResourceWord::Adopted => (&[b"repository ", b" on forge ", b""], &[Number, Number]),
+        ResourceWord::AdoptedBranch => (&[b"branch ", b" of repository ", b" on forge ", b""], &[Name, Number, Number]),
         ResourceWord::Path => (&[b"", b""], &[Name]),
         ResourceWord::Read => (&[b"read"], &[]),
         ResourceWord::Push => (&[b"push"], &[]),
@@ -354,6 +358,7 @@ pub enum Resource<'a> {
     Pull { host: &'a [u8], owner: &'a [u8], name: &'a [u8], number: &'a [u8] },
     Issue { host: &'a [u8], owner: &'a [u8], name: &'a [u8], number: &'a [u8] },
     Adopted { forge: u16, repository: u32 },
+    AdoptedBranch { forge: u16, repository: u32, branch: &'a [Box<[u8]>] },
     Other,
 }
 #[must_use]
@@ -363,6 +368,13 @@ pub fn resource(path: &[Box<[u8]>]) -> Resource<'_> {
             forge: Reader::new(forge).u16().expect("two bytes"),
             repository: Reader::new(repository).u32().expect("four bytes"),
         },
+        [forge, repository, branch @ ..] if forge.len() == 2 && repository.len() == 4 && !branch.is_empty() => {
+            Resource::AdoptedBranch {
+                forge: Reader::new(forge).u16().expect("two bytes"),
+                repository: Reader::new(repository).u32().expect("four bytes"),
+                branch,
+            }
+        }
         [prefix, host, owner, name] if prefix.as_ref() == b"forge" => Resource::Repository { host, owner, name },
         [prefix, host, owner, name, tag, branch @ ..]
             if prefix.as_ref() == b"forge" && tag.as_ref() == b"branch" && !branch.is_empty() =>
@@ -445,6 +457,14 @@ pub fn path(path: &[Box<[u8]>], most: u32) -> (ResourceWord, Box<[Hole]>) {
         Resource::Adopted { forge, repository } => {
             (ResourceWord::Adopted, Box::new([Hole::Number(u64::from(repository)), Hole::Number(u64::from(forge))]))
         }
+        Resource::AdoptedBranch { forge, repository, branch } => (
+            ResourceWord::AdoptedBranch,
+            Box::new([
+                Hole::Name(joined(branch, most)),
+                Hole::Number(u64::from(repository)),
+                Hole::Number(u64::from(forge)),
+            ]),
+        ),
         Resource::Other => (ResourceWord::Path, Box::new([Hole::Name(joined(path, most))])),
     }
 }

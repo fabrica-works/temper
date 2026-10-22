@@ -104,17 +104,10 @@ pub fn facts(task: &c::Task) -> Facts<'_> {
     }
     .or(reason);
     let said = match words {
-        Some(words) => {
-            let mut commit = state == State::Landed && words.len() >= 7;
-            for byte in words {
-                commit &= byte.is_ascii_digit() || (b'a'..=b'f').contains(byte);
-            }
-            Some(if commit {
-                Said::Merge(words.get(..7).expect("commit has seven hex bytes"))
-            } else {
-                Said::Words(words)
-            })
-        }
+        Some(words) => Some(match if state == State::Landed { merge_commit(words) } else { None } {
+            Some(commit) => Said::Merge(commit.get(..7).expect("commit has seven hex bytes")),
+            None => Said::Words(words),
+        }),
         None => None,
     };
     Facts {
@@ -125,6 +118,19 @@ pub fn facts(task: &c::Task) -> Facts<'_> {
         said,
         steps: if kind == Kind::Change { Some(if state == State::Landed { 4 } else { 0 }) } else { None },
     }
+}
+/// The engine's landing words are a whole merge commit id when they are lowercase hex.
+#[must_use]
+pub fn merge_commit(words: &[u8]) -> Option<&[u8]> {
+    if words.len() < 7 {
+        return None;
+    }
+    for byte in words {
+        if !byte.is_ascii_digit() && !(b'a'..=b'f').contains(byte) {
+            return None;
+        }
+    }
+    Some(words)
 }
 fn ending(how: &c::Ending) -> (State, Option<&c::ResultValue>, Option<&[u8]>) {
     match how {
