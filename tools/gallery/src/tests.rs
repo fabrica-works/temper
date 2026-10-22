@@ -66,7 +66,7 @@ const HOLDS: [Holds; samples::N] = [
         heading: "T10 · Add a --json flag to tally report",
         parts: &[
             Part::Named { role: Role::Button, name: "Accept" },
-            Part::Named { role: Role::Paragraph, name: "JSON output for tally report" },
+            Part::Named { role: Role::Heading { level: 2 }, name: "JSON output for tally report" },
         ],
     },
     Holds {
@@ -74,7 +74,7 @@ const HOLDS: [Holds; samples::N] = [
         heading: "Inbox",
         parts: &[
             Part::Named { role: Role::Button, name: "Answer" },
-            Part::Named { role: Role::Paragraph, name: "JSON output for tally report" },
+            Part::Named { role: Role::Heading { level: 2 }, name: "JSON output for tally report" },
             Part::Named { role: Role::Button, name: "Accept" },
             Part::Named { role: Role::Paragraph, name: "The old parser accepts" },
         ],
@@ -215,7 +215,7 @@ const HOLDS: [Holds; samples::N] = [
         heading: "T10 · Add a --json flag to tally report",
         parts: &[
             Part::Named { role: Role::TextArea, name: "Reason" },
-            Part::Named { role: Role::Paragraph, name: "JSON output for tally report" },
+            Part::Named { role: Role::Heading { level: 2 }, name: "JSON output for tally report" },
             Part::Named { role: Role::Button, name: "Accept" },
         ],
     },

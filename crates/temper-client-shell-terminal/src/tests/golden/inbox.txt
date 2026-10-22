@@ -22,12 +22,13 @@ Menu:
   Project 1
   [16] Task 9
   Waiting under 1 min
-  Add OAuth login
-  It touches sign-in.
-  ### Proposed tasks
+  ## Add OAuth login
+  Why:
+    It touches sign-in.
+  Budget:
+    Funds 40 from your pool · 120 left, 80 after
   May spend 40
   May delegate 1 tasks, depth 1
-  Funds 40 from your pool · 120 left, 80 after
 - ### Question
   Project 1
   [17] Task 9

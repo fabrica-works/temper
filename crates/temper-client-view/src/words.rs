@@ -149,6 +149,10 @@ pub enum Word {
     TaskWho,
     ChatSpend,
     ChatbarSpend,
+    ProposalWhy,
+    ProposalLanding,
+    ProposalBudget,
+    ProposalInbox,
     ChatDelegates,
     ChatTime,
     ChatHint,
@@ -336,8 +340,8 @@ pub enum Word {
 // The change panel adds 86 forge phrases (2000–2085).
 // Three empty and partial ended-children phrases (5.10).
 // A chat's numbered composer placeholder (3.5).
-const PHRASES: u32 = 774;
-const ALL: [Word; 304] = [
+const PHRASES: u32 = 778;
+const ALL: [Word; 308] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -474,6 +478,10 @@ const ALL: [Word; 304] = [
     Word::TaskWho,
     Word::ChatSpend,
     Word::ChatbarSpend,
+    Word::ProposalWhy,
+    Word::ProposalLanding,
+    Word::ProposalBudget,
+    Word::ProposalInbox,
     Word::ChatDelegates,
     Word::ChatTime,
     Word::ChatHint,
@@ -789,6 +797,10 @@ impl Word {
             Self::TaskWho => 1075,
             Self::ChatSpend => 144,
             Self::ChatbarSpend => 1400,
+            Self::ProposalWhy => 1401,
+            Self::ProposalLanding => 1402,
+            Self::ProposalBudget => 1403,
+            Self::ProposalInbox => 1404,
             Self::ChatDelegates => 145,
             Self::ChatTime => 184,
             Self::ChatHint => 185,
@@ -1311,6 +1323,10 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ChatbarSpend => {
             (&[b"", b" spent \xc2\xb7 of ", b" \xc2\xb7 delegates spent ", b""], &[Number, Number, Number])
         }
+        Word::ProposalWhy => (&[b"Why"], &[]),
+        Word::ProposalLanding => (&[b"Landing"], &[]),
+        Word::ProposalBudget => (&[b"Budget"], &[]),
+        Word::ProposalInbox => (&[b"Open in inbox \xe2\x86\x97"], &[]),
         Word::ChatSpend => (&[b"Spent ", b"; delegates spent ", b""], &[Number, Number]),
         Word::ChatDelegates => (&[b"", b" delegates"], &[Number]),
         Word::ChoiceProvider | Word::ChatTime => (&[b"", b""], &[Name]),

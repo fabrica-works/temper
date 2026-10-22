@@ -7,7 +7,63 @@ pub(super) fn draw(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u3
     reason(b, page);
     facts(b, page, words, rows);
 }
+fn batch(page: &c::ReadValue) -> Option<&skein_lib::List<c::ProposedTask>> {
+    match page {
+        c::ReadValue::OwnerProposal(proposal) => match &proposal.action {
+            c::OwnerProposalAction::Batch(tasks) => Some(tasks),
+            c::OwnerProposalAction::Effect { .. }
+            | c::OwnerProposalAction::ProcedureEffect { .. }
+            | c::OwnerProposalAction::Amend { .. }
+            | c::OwnerProposalAction::Widen { .. }
+            | c::OwnerProposalAction::Release { .. } => None,
+        },
+        c::ReadValue::Proposal(proposal) => match &proposal.action {
+            c::ProposalAction::Batch { tasks, .. } => Some(tasks),
+            c::ProposalAction::Effect { .. } | c::ProposalAction::Amend { .. } | c::ProposalAction::Widen { .. } => {
+                None
+            }
+        },
+        c::ReadValue::Task(_)
+        | c::ReadValue::Tasks(_)
+        | c::ReadValue::OwnerProject(_)
+        | c::ReadValue::Historical(_)
+        | c::ReadValue::Me(_)
+        | c::ReadValue::Question(_)
+        | c::ReadValue::Escalation(_)
+        | c::ReadValue::OwnerEscalation(_)
+        | c::ReadValue::PersonTask(_)
+        | c::ReadValue::OwnerPersonTask(_)
+        | c::ReadValue::Result(_)
+        | c::ReadValue::Ended(_)
+        | c::ReadValue::OwnerEnded(_)
+        | c::ReadValue::History(_)
+        | c::ReadValue::Turn(_)
+        | c::ReadValue::Activity(_)
+        | c::ReadValue::Inbox(_)
+        | c::ReadValue::OwnerInbox(_)
+        | c::ReadValue::Spend(_)
+        | c::ReadValue::OwnerSpend(_)
+        | c::ReadValue::Project(_)
+        | c::ReadValue::Notes(_)
+        | c::ReadValue::Deployment(_)
+        | c::ReadValue::OwnerDeployment(_) => None,
+    }
+}
 pub(super) fn reason(b: &mut Builder, page: &c::ReadValue) {
+    if let Some(tasks) = batch(page) {
+        for task in tasks {
+            let written = task.spec.specification.words.bytes();
+            let end = skein_lib::bytes::find(written, b"\n").unwrap_or(written.len());
+            text(b, Role::Heading { level: 2 }, written.get(..end).expect("title prefix"));
+            if end < written.len() {
+                skein_ui::markdown::read(written.get(end..).expect("spec body"), 3, b);
+            }
+        }
+    } else {
+        why(b, page);
+    }
+}
+fn why(b: &mut Builder, page: &c::ReadValue) {
     match page {
         c::ReadValue::OwnerProposal(proposal) => super::document(b, &proposal.reason),
         c::ReadValue::Proposal(proposal) => text(b, Role::Paragraph, proposal.why.bytes()),
@@ -38,6 +94,10 @@ pub(super) fn reason(b: &mut Builder, page: &c::ReadValue) {
     }
 }
 pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u32) {
+    if let Some(tasks) = batch(page) {
+        batch_facts(b, page, tasks, words, rows);
+        return;
+    }
     match page {
         c::ReadValue::OwnerProposal(proposal) => match &proposal.action {
             c::OwnerProposalAction::Batch(tasks) => proposed(b, tasks, words, rows),
@@ -109,6 +169,43 @@ pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u
         | c::ReadValue::OwnerDeployment(_) => {}
     }
 }
+fn batch_facts(
+    b: &mut Builder,
+    page: &c::ReadValue,
+    tasks: &skein_lib::List<c::ProposedTask>,
+    words: &Words,
+    rows: u32,
+) {
+    b.open(Role::Slot);
+    b.style(crate::look::PROPOSAL_FACTS);
+    text(b, Role::Term, &words.say(Word::ProposalWhy, &[]));
+    b.open(Role::Description);
+    why(b, page);
+    b.close();
+    proposed(b, tasks, words, rows);
+    text(b, Role::Term, &words.say(Word::ProposalBudget, &[]));
+    b.open(Role::Description);
+    super::decision(b, words, Some(page), c::ActKind::Accept);
+    b.close();
+    b.close();
+    for task in window(b, words, tasks.as_slice(), rows) {
+        phrase(b, words, P::ProposalBudget, &[Hole::Number(task.budget)]);
+    }
+    if let c::ReadValue::Proposal(proposal) = page {
+        phrase(b, words, P::Spend, &[Hole::Number(proposal.needs.budget)]);
+        phrase(
+            b,
+            words,
+            P::Delegation,
+            &[Hole::Number(u64::from(proposal.needs.tasks)), Hole::Number(u64::from(proposal.needs.depth))],
+        );
+        for grant in window(b, words, proposal.needs.grants.as_slice(), rows) {
+            crate::forge::drawn(b, &c::Part::Kind { connector: grant.connector, kind: grant.kind }, words);
+            pattern(b, &grant.pattern, words, rows);
+        }
+    }
+}
+
 fn task_hold(b: &mut Builder, task: &c::Task, words: &Words, rows: u32) {
     match &task.hold {
         Some(c::TaskHold::Owner(hold)) => held(b, hold, words, rows),
@@ -121,11 +218,11 @@ fn held(b: &mut Builder, hold: &c::OwnerChipHold, words: &Words, _rows: u32) {
     phrase(b, words, P::HoldRevision, &[Hole::Number(hold.revision)]);
 }
 fn proposed(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &Words, rows: u32) {
-    text(b, Role::Heading { level: 3 }, &words.say_card(P::ProposedTasks, &[]));
     for task in window(b, words, tasks.as_slice(), rows) {
-        b.open(Role::Region);
+        text(b, Role::Term, &words.say(Word::Goal, &[]));
+        b.open(Role::Description);
         phrase(b, words, P::ProposalTask, &[Hole::Number(task.number)]);
-        specification(b, &task.spec, words);
+        super::specification_facts(b, &task.spec, words);
         match task.executor {
             c::OwnerExecutor::Agent { charter } => phrase(b, words, P::Charter, &[Hole::Number(u64::from(charter))]),
             c::OwnerExecutor::Procedure { code, .. } => {
@@ -133,14 +230,7 @@ fn proposed(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &W
             }
             c::OwnerExecutor::Person(_) => words.text(b, Word::PersonTask, &[]),
         }
-        phrase(b, words, P::ProposalBudget, &[Hole::Number(task.budget)]);
         authority(b, &task.authority, words, rows);
-        for resource in window(b, words, task.resources.as_slice(), rows) {
-            crate::forge::owner_part(b, resource, words);
-        }
-        if let Some(priority) = task.priority {
-            words.text(b, Word::Priority, &[Hole::Number(u64::from(priority))]);
-        }
         for dependency in &task.dependencies {
             phrase(b, words, P::Input, &[Hole::Number(*dependency)]);
         }
@@ -148,7 +238,21 @@ fn proposed(b: &mut Builder, tasks: &skein_lib::List<c::ProposedTask>, words: &W
             status(b, words, P::Cut, &[]);
         }
         b.close();
+        text(b, Role::Term, &words.say(Word::ProposalLanding, &[]));
+        b.open(Role::Description);
+        for resource in window(b, words, task.resources.as_slice(), rows) {
+            b.open(Role::Paragraph);
+            crate::forge::owner_part(b, resource, words);
+            b.close();
+        }
+        if let Some(priority) = task.priority {
+            text(b, Role::Paragraph, &words.say(Word::Priority, &[Hole::Number(u64::from(priority))]));
+        }
+        b.close();
     }
+}
+pub(super) fn has_rows(page: &c::ReadValue) -> bool {
+    batch(page).is_some()
 }
 fn authority_change(
     b: &mut Builder,

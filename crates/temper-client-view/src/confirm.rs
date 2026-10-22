@@ -37,9 +37,31 @@ pub(crate) fn card(b: &mut Builder, root: &Domain, card: &Card, words: &Words, b
 }
 pub(crate) fn facts(b: &mut Builder, page: &ReadValue, words: &Words, rows: u32) {
     crate::cards::proposal_facts(b, page, words, rows);
-    crate::cards::decision(b, words, Some(page), ActKind::Accept);
+    if !crate::cards::proposal_has_rows(page) {
+        crate::cards::decision(b, words, Some(page), ActKind::Accept);
+    }
 }
 pub(crate) fn controls(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings) {
+    card_controls(b, root, card, words, bindings);
+    if proposal_object(card.object) {
+        let name = words.say(Word::ProposalInbox, &[]);
+        crate::link(
+            b,
+            &name,
+            bindings.insert(Act::Go {
+                address: temper_client_domain::Address::Inbox {
+                    filter: temper_client_domain::address::Filter {
+                        kind: Some(temper_client_domain::address::Kind::Proposal),
+                        ..temper_client_domain::address::Filter::ALL
+                    },
+                },
+            }),
+        );
+        b.text(Run::Plain, &name);
+        b.close();
+    }
+}
+fn card_controls(b: &mut Builder, root: &Domain, card: &Card, words: &Words, bindings: &mut Bindings) {
     let Some(page) = &card.page else { return };
     if let Some(outcome) = &card.outcome {
         match outcome {
@@ -102,6 +124,7 @@ pub(crate) fn controls(b: &mut Builder, root: &Domain, card: &Card, words: &Word
         }
     }
 }
+
 pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
     let Some(open) = root.pages().confirmation() else { return };
     if open.act == ActKind::Cancel && root.pages().chat().is_some() {
@@ -153,7 +176,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         b.name(&words.say(word, &[]));
         b.text(Run::Plain, &words.say(word, &[]));
         crate::cards::proposal(b, page, words, rows);
-        crate::cards::decision(b, words, Some(page), open.act);
+        if open.act != ActKind::Accept || !crate::cards::proposal_has_rows(page) {
+            crate::cards::decision(b, words, Some(page), open.act);
+        }
         if let Some(reason) = &card.words {
             b.open(Role::Paragraph);
             b.text(Run::Plain, reason.bytes());
@@ -229,5 +254,18 @@ fn delegate(b: &mut Builder, task: u64, word: Word, words: &Words, bindings: &mu
         b.name(&words.say(word, &[Hole::Number(task)]));
         b.bind(bindings.insert(Act::DelegateFate { task, fate }));
         b.close();
+    }
+}
+
+fn proposal_object(object: jig_client::contract::ObjectKey) -> bool {
+    use jig_client::contract::ObjectKey;
+    match object {
+        ObjectKey::Proposal(_) => true,
+        ObjectKey::Task(_)
+        | ObjectKey::Question { .. }
+        | ObjectKey::Escalation(_)
+        | ObjectKey::PersonTask(_)
+        | ObjectKey::Result(_)
+        | ObjectKey::Note { .. } => false,
     }
 }

@@ -147,6 +147,9 @@ pub fn document(b: &mut Builder, value: &c::DocumentText) {
 }
 pub fn specification(b: &mut Builder, value: &c::SpecificationDocument, words: &Words) {
     document(b, &value.specification.words);
+    specification_facts(b, value, words);
+}
+pub(super) fn specification_facts(b: &mut Builder, value: &c::SpecificationDocument, words: &Words) {
     for parameter in &value.specification.parameters {
         match parameter {
             c::ParameterDocument::Number { name, value } => {
@@ -299,4 +302,8 @@ pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {
         | c::HoldCategory::Procedure => None,
     };
     text(b, Role::Paragraph, &words.say_word(jig_client::words::Word::hold(value), number.as_slice()));
+}
+
+pub(crate) fn proposal_has_rows(page: &c::ReadValue) -> bool {
+    proposal::has_rows(page)
 }

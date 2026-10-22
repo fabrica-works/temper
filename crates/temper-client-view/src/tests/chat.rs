@@ -1458,6 +1458,23 @@ fn a_proposal_stands_once_at_its_first_call_after_the_messages_text() {
     assert!(skein_lib::bytes::find(&said, b"propose").is_none());
 }
 
+#[test]
+fn a_chat_proposal_links_to_the_inbox_filtered_to_proposals() {
+    let mut view = fixtures::page_view(&proposal_root());
+    let link = fixtures::find(view.tree(), Role::Link, "Open in inbox ↗".as_bytes()).expect("inbox link");
+    assert_eq!(
+        crate::act(&mut view, link, skein_ui::Act::Press),
+        Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
+            address: temper_client_domain::Address::Inbox {
+                filter: temper_client_domain::address::Filter {
+                    kind: Some(temper_client_domain::address::Kind::Proposal),
+                    ..temper_client_domain::address::Filter::ALL
+                }
+            }
+        }))
+    );
+}
+
 fn named_count(tree: &skein_ui::Tree, role: Role, name: &[u8]) -> u32 {
     let mut count = 0_u32;
     for node in tree.nodes() {

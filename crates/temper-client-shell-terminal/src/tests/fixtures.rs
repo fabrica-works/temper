@@ -431,7 +431,7 @@ pub fn inbox_page() -> skein_ui::Tree {
             builder.open(Role::Paragraph);
             builder.text(Run::Plain, &time);
             builder.close();
-            builder.open(Role::Paragraph);
+            builder.open(if *kind == b"Proposal" { Role::Heading { level: 2 } } else { Role::Paragraph });
             builder.text(Run::Plain, body);
             builder.close();
             if *kind == b"Proposal" {

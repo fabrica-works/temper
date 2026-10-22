@@ -69,3 +69,180 @@ fn dependency_refusals_use_jigs_words() {
         assert_eq!(fixtures::text(&builder.finish()).as_ref(), expected);
     }
 }
+
+pub(super) fn batch_proposal() -> c::ReadValue {
+    let mut task = fixtures::task::document();
+    task.authority.authority.spend = 6;
+    task.authority.authority.delegation.tasks = 1;
+    task.authority.authority.delegation.depth = 1;
+    task.spec.specification.words =
+        c::DocumentText::complete(c::Text::new(Box::from(*b"Ship update\nDetails"), 32).unwrap());
+    let mut resources = skein_lib::List::with_capacity(1);
+    resources
+        .push(c::OwnerPart {
+            connector: fixtures::FORGE,
+            kind: c::OwnerPartKind::Resource,
+            key: c::OwnerPartKey::Path(fixtures::path(&[
+                b"forge",
+                b"github.com",
+                b"robin",
+                b"tally",
+                b"branch",
+                b"main",
+            ])),
+        })
+        .unwrap();
+    let mut tasks = skein_lib::List::with_capacity(1);
+    tasks
+        .push(c::ProposedTask {
+            number: 1,
+            spec: task.spec,
+            executor: c::OwnerExecutor::Agent { charter: 2 },
+            contract: task.result_contract,
+            authority: task.authority,
+            deadline: c::NewDeadline::Named,
+            budget: 6,
+            funder: task.budget.funder,
+            dependencies: skein_lib::List::with_capacity(0),
+            resources,
+            wake: task.wake,
+            priority: Some(2),
+            cut: false,
+        })
+        .unwrap();
+    let root = fixtures::chat::proposal_root();
+    let mut page = None;
+    for card in root.pages().cards().unwrap() {
+        if let Some(value) = &card.page {
+            page = Some(value.clone());
+            break;
+        }
+    }
+    let mut page = page.unwrap();
+    let c::ReadValue::OwnerProposal(proposal) = &mut page else { panic!("proposal") };
+    proposal.action = c::OwnerProposalAction::Batch(tasks);
+    proposal.funding = skein_lib::List::with_capacity(1);
+    proposal
+        .funding
+        .push(c::OwnerFundingOffer {
+            source: c::Funder::Pool { project: fixtures::PROJECT, person: 73, period: 1 },
+            needed: FUNDS,
+            left: Some(LEFT),
+            after: Some(AFTER),
+        })
+        .unwrap();
+    page
+}
+
+#[test]
+fn a_proposals_title_and_labelled_facts_follow_the_mockup() {
+    use skein_ui::Role;
+    let mut builder = Builder::new(&fixtures::tree_limits());
+    crate::cards::proposal(&mut builder, &batch_proposal(), &fixtures::words(), 4);
+    let tree = builder.finish();
+    assert!(fixtures::find(&tree, Role::Heading { level: 2 }, b"Ship update").is_some());
+    assert!(fixtures::find(&tree, Role::Heading { level: 3 }, b"Proposed tasks").is_none());
+    let mut labels = skein_lib::List::with_capacity(4);
+    for node in tree.nodes() {
+        if node.role == Role::Term {
+            labels.push(node.name.as_deref().unwrap()).unwrap();
+        }
+    }
+    assert_eq!(labels.as_slice(), [b"Why".as_slice(), b"Goal", b"Landing", b"Budget"]);
+    for (label, expected) in [
+        (b"Why".as_slice(), b"Make a goal".as_slice()),
+        (b"Goal", b"Agent charter 2"),
+        (b"Landing", b"branch main of robin/tally on github.com"),
+        (b"Budget", b"Funding needed: 40"),
+    ] {
+        let at = super::chat::named_position(tree.nodes(), Role::Term, Some(label)).unwrap();
+        let description = at + usize::try_from(tree.nodes()[at].size).unwrap();
+        assert_eq!(tree.nodes()[description].role, Role::Description);
+        assert!(skein_lib::bytes::find(&fixtures::node_text(&tree, description), expected).is_some());
+    }
+    let priority = super::chat::named_position(tree.nodes(), Role::Paragraph, Some(b"Priority 2"))
+        .expect("separate priority paragraph");
+    assert!(!fixtures::node_text(&tree, priority).starts_with(b"branch"));
+}
+
+fn document_proposal() -> c::ReadValue {
+    let key = fixtures::chat::PROPOSAL;
+    c::ReadValue::Proposal(Box::new(c::Proposal {
+        key,
+        project: fixtures::PROJECT,
+        proposer: key.proposer,
+        why: fixtures::first_run::text(b"It touches sign-in."),
+        action: c::ProposalAction::Batch { tasks: skein_lib::List::with_capacity(0), own: true },
+        needs: c::Authority {
+            models: None,
+            budget: FUNDS,
+            grants: skein_lib::List::with_capacity(0),
+            task_kinds: skein_lib::List::with_capacity(0),
+            depth: 1,
+            tasks: 1,
+            deadline: None,
+            tools: skein_lib::List::with_capacity(0),
+            note_scopes: skein_lib::List::with_capacity(0),
+        },
+        funding: c::Budget { total: LEFT, own: 0, ended: 0, reserved: 0, left: LEFT, funder: c::Actor::Party(73) },
+        waiting: c::Recipient::Party(73),
+        trail: skein_lib::List::with_capacity(0),
+        since: skein_lib::Wall::EPOCH,
+        acts: skein_lib::List::with_capacity(0),
+        ending: None,
+    }))
+}
+fn occurrences(tree: &skein_ui::Tree, text: &[u8]) -> usize {
+    let written = fixtures::text(tree);
+    let mut count = 0_usize;
+    for part in written.windows(text.len()) {
+        if part == text {
+            count = count.checked_add(1).unwrap();
+        }
+    }
+    count
+}
+#[test]
+fn proposal_titles_head_the_cards_and_funding_is_said_once_in_both_pages() {
+    use skein_ui::Role;
+    for (page, owner) in [(batch_proposal(), true), (document_proposal(), false)] {
+        for root in [
+            fixtures::chat::proposal_root_with_document(None, Some(page.clone())),
+            fixtures::inbox_with_document(
+                temper_client_domain::address::Filter::ALL,
+                Some((
+                    c::Read::Proposal {
+                        proposal: c::ProposalKey {
+                            proposer: c::Proposer::Task(fixtures::INBOX_TASK),
+                            number: fixtures::INBOX_QUESTION,
+                        },
+                    },
+                    page,
+                )),
+            ),
+        ] {
+            let view = fixtures::page_view(&root);
+            let tree = view.tree();
+            let budget = super::chat::named_position(tree.nodes(), Role::Term, Some(b"Budget")).expect("Budget row");
+            let description = budget.checked_add(usize::try_from(tree.nodes()[budget].size).unwrap()).unwrap();
+            if owner {
+                let title = super::chat::named_position(tree.nodes(), Role::Heading { level: 2 }, Some(b"Ship update"))
+                    .expect("proposal title heads the card");
+                assert!(title < budget);
+                for expected in [b"Funding needed: 40".as_slice(), b"Funding left: 120", b"Funding after: 80"] {
+                    assert!(skein_lib::bytes::find(&fixtures::node_text(tree, description), expected).is_some());
+                    assert_eq!(occurrences(tree, expected), 1);
+                }
+                for expected in [b"May spend 6".as_slice(), b"May delegate 1 tasks, depth 1", b"Budget 6"] {
+                    assert_eq!(occurrences(tree, expected), 1);
+                }
+            } else {
+                let funding = b"Funds 40 from your pool \xc2\xb7 120 left, 80 after";
+                assert!(skein_lib::bytes::find(&fixtures::node_text(tree, description), funding).is_some());
+                for expected in [funding.as_slice(), b"May spend 40", b"May delegate 1 tasks, depth 1"] {
+                    assert_eq!(occurrences(tree, expected), 1);
+                }
+            }
+        }
+    }
+}

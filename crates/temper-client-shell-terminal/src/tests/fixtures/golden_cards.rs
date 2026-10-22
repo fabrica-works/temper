@@ -16,7 +16,6 @@ pub fn proposal(builder: &mut Builder) {
     let page = c::ReadValue::Proposal(Box::new(proposal));
     let words = super::page_words();
     temper_client_view::cards::proposal(builder, &page, &words, WINDOW);
-    temper_client_view::cards::decision(builder, &words, Some(&page), c::ActKind::Accept);
 }
 pub fn held(builder: &mut Builder) {
     let mut task = jig_client_world::stories::task();

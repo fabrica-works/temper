@@ -50,7 +50,7 @@ fn press(root: &mut temper_client_domain::Domain, act: Act) {
 fn open(root: &mut temper_client_domain::Domain, act: ActKind) {
     press(root, Act::Decide { object: ObjectKey::Proposal(PROPOSAL), revision: None, act });
 }
-const ACCEPT_WORDS: [&[u8]; 4] = [b"Proposed tasks", b"Funding needed: 5", b"Funding left: 20", b"Funding after: 15"];
+const ACCEPT_WORDS: [&[u8]; 4] = [b"Why", b"Funding needed: 5", b"Funding left: 20", b"Funding after: 15"];
 #[test]
 fn the_accept_confirmation_says_what_it_grants_costs_and_leaves_in_the_pool() {
     let mut root = root(ActKind::Accept, Admission::Allowed);
@@ -157,22 +157,29 @@ fn the_inbox_keeps_proposal_and_decision_facts_before_its_controls() {
         assert_ne!(node.role, Role::Button);
         assert_ne!(node.role, Role::TextArea);
     }
-    assert!(reason.expect("reason") < details);
+    assert!(reason.expect("reason") > details);
 }
 
 #[test]
-fn chat_and_task_cards_keep_their_flat_reason_facts_and_controls() {
+fn proposal_rows_and_task_release_keep_their_own_shapes() {
     for (root, expected) in [
         (
             fixtures::chat::proposal_root(),
             &[
+                Role::Slot,
+                Role::Term,
+                Role::Text,
+                Role::Description,
                 Role::Paragraph,
                 Role::Text,
-                Role::Heading { level: 3 },
+                Role::Term,
                 Role::Text,
+                Role::Description,
                 Role::Button,
                 Role::TextArea,
                 Role::Button,
+                Role::Link,
+                Role::Text,
             ][..],
         ),
         (fixtures::task::held_root(), &[Role::Paragraph, Role::Text, Role::Paragraph, Role::Text, Role::Button][..]),
@@ -196,10 +203,11 @@ fn chat_and_task_cards_keep_their_flat_reason_facts_and_controls() {
             fixtures::domain_limits().client.domain.rows,
         );
         let tree = builder.finish();
-        let mut roles = List::with_capacity(8);
+        let mut roles = List::with_capacity(32);
         for node in tree.nodes() {
             roles.push(node.role).expect("flat card shape");
         }
         assert_eq!(roles.as_slice(), expected);
     }
 }
+
