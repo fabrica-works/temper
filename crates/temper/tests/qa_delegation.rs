@@ -86,7 +86,6 @@ fn result_anchor_preserves_the_landed_words_and_task_link() {
 }
 
 #[test]
-#[ignore = "the presets' turn text budget (CUE_BYTES, 256 B) cuts the delegate call's acknowledgement, so its call anchor names no task until jig's thread keys a call's tasks (client README 11)"]
 fn original_delegate_call_uses_the_ended_task_document() {
     let scratch = Scratch::startup("qa-delegation-original-call");
     let mut arguments = vec!["box".into()];
@@ -112,13 +111,9 @@ fn original_delegate_call_uses_the_ended_task_document() {
     person.type_on(b"Start a chat: (empty) (enter sends)", b"Add CSV export to widget");
     person.type_on(b"Start", b"");
     person.wait_for("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes(), WITHIN);
-    // Walk past the wake, its heard result, and the wait turn to the
-    // original delegate call. It must use the ended task's own document.
-    person.type_on(b"Older", b"");
-    person.wait_for(b"* Earlier lines omitted 3\n  0000000000000003000000000000000000000000\n  Run 3 began", WITHIN);
-    person.type_on(b"Older", b"");
-    person.wait_for(b"* Earlier lines omitted 5\n  Temper\n  wait\n  Run 1 ended", WITHIN);
-    person.type_on(b"Older", b"");
+    // The small conversation is whole (client/README.md, 5.4), its first turn
+    // within the committed turn's own text budget: the original delegate call
+    // carries the card, from the ended task's own document (5.7).
     person.wait_for(
         "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.\n  Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit 0000000\n".as_bytes(),
         WITHIN,
