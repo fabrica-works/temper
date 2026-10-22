@@ -827,7 +827,9 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   the engine's refusal as jig's link names it (`unauthorized`,
   `application`, `busy`, `replaced`, `not-admitted`, `stopping`), or
   the worker's own (`terms`, `malformed`); the engine's text, which jig
-  does not keep, is not in it. The sign-in link stays on stdout
+  does not keep, is not in it. A refusal is noted once until its
+  reason changes or the worker links: jig's link backs the redials off,
+  and a repeat of the same refusal prints nothing. The sign-in link stays on stdout
   (section 4).
 - **Each line's address is its listener's bound one:** the clients'
   server keeps its own, as the sign-in link reads it; the workers'
