@@ -263,6 +263,10 @@ impl Referee<Proc> for Judge {
             let state = borrowed.as_mut().expect("spawned forge");
             let Proc::Forge(forge) = &mut children[0] else { panic!("forge admission order") };
             service.forge_address = forge.address();
+            for proc in workers.iter_mut() {
+                let Proc::Service(worker) = proc else { panic!("worker root") };
+                worker.forge_address = forge.address();
+            }
             if let Some(address) = forge.address()
                 && let Some(scripts) = peer.scripts.take()
             {
@@ -383,8 +387,35 @@ pub(crate) fn run_cluster(
     recipe: impl FnOnce() -> llm::Recipe,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
 ) -> CheckedOutcome<Proc> {
-    let (engine, worker_scratch) = scratch.split_first().expect("engine scratch");
-    let mut world = World::new_controlled_checked(|controls| Judge {
+    let mut world = World::new_controlled_checked(|controls| cluster_judge(controls, workers, None));
+    cluster_roots(&mut world, workers, scratch, recipe, None, steps);
+    world.run(&skein_shell::Clock::new(), crate::PATIENCE)
+}
+
+pub(crate) fn run_cluster_forge(
+    workers: &[&'static str],
+    scratch: &[skein_scratch::Scratch],
+    fixture: forge::Fixture,
+    scripts: Scripts,
+    steps: impl FnOnce() -> Vec<crate::calls::Step>,
+) -> skein_world::real::Outcome<Proc> {
+    let state = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let mut world = World::new_controlled(|controls| cluster_judge(controls, workers, Some(state.clone())));
+    cluster_roots(&mut world, workers, scratch, || llm::scripted(Box::new([])), Some((fixture, scripts)), steps);
+    world.spawn(|| {
+        let (forge, peer) = forge::State::new(fixture);
+        *state.borrow_mut() = Some(forge);
+        Proc::Forge(Box::new(peer))
+    });
+    world.run(&skein_shell::Clock::new(), crate::PATIENCE)
+}
+
+fn cluster_judge(
+    controls: Controls,
+    workers: &[&'static str],
+    forge: Option<std::rc::Rc<std::cell::RefCell<Option<forge::State>>>>,
+) -> Judge {
+    Judge {
         controls,
         workers: workers.to_vec(),
         engine_stopping: false,
@@ -392,30 +423,46 @@ pub(crate) fn run_cluster(
         finished: false,
         armed: false,
         wake: None,
-        forge: None,
-    });
+        forge,
+    }
+}
+
+fn cluster_roots<R: Referee<Proc>>(
+    world: &mut World<Proc, R>,
+    workers: &[&'static str],
+    scratch: &[skein_scratch::Scratch],
+    recipe: impl FnOnce() -> llm::Recipe,
+    forge: Option<(forge::Fixture, Scripts)>,
+    steps: impl FnOnce() -> Vec<crate::calls::Step>,
+) {
+    let (engine, worker_scratch) = scratch.split_first().expect("engine scratch");
     world.spawn(|| {
-        Proc::Llm(Box::new(Llm { peer: llm::peer(recipe()).expect("cluster LLM"), scripts: None, cue: false }))
+        Proc::Llm(Box::new(Llm {
+            peer: llm::peer(recipe()).expect("cluster LLM"),
+            scripts: forge.map(|(_, scripts)| scripts),
+            cue: false,
+        }))
     });
     world.spawn_signals(|signals| {
         Proc::Service(Box::new(ServiceHost::cluster(
             engine.path(),
             signals,
             crate::cluster::Shape::Engine(workers.to_vec()),
+            forge.map(|(fixture, _)| fixture),
         )))
     });
-    host(&mut world, &engine.path().join("data"), steps, false, u32::try_from(workers.len()).expect("worker count"));
+    host(world, &engine.path().join("data"), steps, false, u32::try_from(workers.len()).expect("worker count"));
     for (name, scratch) in workers.iter().zip(worker_scratch) {
         world.spawn_signals(|signals| {
             Proc::Service(Box::new(ServiceHost::cluster(
                 scratch.path(),
                 signals,
                 crate::cluster::Shape::Worker { name, engine: None },
+                forge.map(|(fixture, _)| fixture),
             )))
         });
     }
     let mut git = crate::git::program();
     git.instances = u32::try_from(workers.len()).expect("worker git count");
     world.host_roots(git, crate::git::roots);
-    world.run(&skein_shell::Clock::new(), crate::PATIENCE)
 }

@@ -3,7 +3,7 @@
 
 pub mod case;
 pub mod cluster;
-pub use cluster::{Cluster, run_cluster};
+pub use cluster::{Cluster, run_cluster, run_cluster_forge};
 pub mod fixtures;
 pub mod forge;
 pub mod git;

@@ -108,8 +108,13 @@ impl ServiceHost {
     }
 }
 impl ServiceHost {
-    pub(crate) fn cluster(path: &std::path::Path, signals: Fd, shape: crate::cluster::Shape) -> Self {
-        Self::with_shape(path.join("data"), signals, None, false, Some(shape))
+    pub(crate) fn cluster(
+        path: &std::path::Path,
+        signals: Fd,
+        shape: crate::cluster::Shape,
+        fixture: Option<crate::forge::Fixture>,
+    ) -> Self {
+        Self::with_shape(path.join("data"), signals, fixture, false, Some(shape))
     }
     fn directories(path: &std::path::Path, cluster: bool) -> temper::directories::Directories {
         if cluster {

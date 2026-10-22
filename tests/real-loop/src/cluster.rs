@@ -1,5 +1,5 @@
 //! Engine and named workers on one ring (protocol/README.md, 15.6).
-use crate::{calls, fixtures, llm, service::ServiceHost, world};
+use crate::{calls, fixtures, forge, llm, service::ServiceHost, world};
 use skein_io::kernel::{Complete, Done, Op};
 use std::{fmt::Write as _, net::SocketAddr, os::unix::fs::DirBuilderExt, path::Path};
 
@@ -9,7 +9,7 @@ pub const PLACED: &[u8] = b"cluster-placed";
 pub struct Cluster {
     ran: crate::Ran,
     _scratch: Vec<crate::Scratch>,
-    _git: temper_fake_git_hosted::Typed,
+    _git: Option<temper_fake_git_hosted::Typed>,
 }
 impl std::ops::Deref for Cluster {
     type Target = crate::Ran;
@@ -35,20 +35,38 @@ pub fn run_cluster(
     recipe: impl FnOnce() -> llm::Recipe,
     steps: impl FnOnce() -> Vec<calls::Step>,
 ) -> Cluster {
+    let git = temper_fake_git_hosted::fixtures::scenario().transport;
+    crate::git::share(Some(git.clone()));
+    run_with(workers, Some(git), |scratch| crate::Outcome::Checked(world::run_cluster(workers, scratch, recipe, steps)))
+}
+
+/// The cluster's services and hosted git share one forge, as in `run_forge`.
+#[must_use]
+pub fn run_cluster_forge(
+    workers: &[&'static str],
+    fixture: forge::Fixture,
+    scripts: fn(SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]>,
+    steps: impl FnOnce() -> Vec<calls::Step>,
+) -> Cluster {
+    run_with(workers, None, |scratch| {
+        crate::Outcome::Forge(world::run_cluster_forge(workers, scratch, fixture, scripts, steps))
+    })
+}
+
+fn run_with(
+    workers: &[&'static str],
+    git: Option<temper_fake_git_hosted::Typed>,
+    run: impl FnOnce(&[crate::Scratch]) -> crate::Outcome,
+) -> Cluster {
     assert!(!workers.is_empty(), "cluster workers");
     for (position, name) in workers.iter().enumerate() {
         assert!(!workers[..position].contains(name), "distinct worker names");
     }
     let scratch: Vec<_> = std::iter::once("engine").chain(workers.iter().copied()).map(crate::Scratch::new).collect();
-    let git = temper_fake_git_hosted::fixtures::scenario().transport;
-    crate::git::share(Some(git.clone()));
-    let outcome = world::run_cluster(workers, &scratch, recipe, steps);
+    let outcome = run(&scratch);
     crate::git::share(None);
     let mut scratch = scratch.into_iter();
-    let ran = crate::checked(crate::Ran {
-        outcome: crate::Outcome::Checked(outcome),
-        scratch: scratch.next().expect("engine scratch"),
-    });
+    let ran = crate::checked(crate::Ran { outcome, scratch: scratch.next().expect("engine scratch") });
     let cluster = Cluster { ran, _scratch: scratch.collect(), _git: git };
     for name in workers {
         assert_eq!(cluster.worker(name).end(), Some(&crate::End::Drained), "{name} drained");
