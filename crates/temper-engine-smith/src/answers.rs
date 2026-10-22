@@ -203,15 +203,16 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
             text.number(*task)?;
             text.add(b" is at spec revision ")?;
             text.number(*revision)?;
-            text.add(b"; changed: ")?;
-            let mut separator = b"".as_slice();
+            let mut separator = b"; changed: ".as_slice();
             match changed.tracked {
                 Some(jig_domain_tasks::Tracking::Tracked { priority }) => {
+                    text.add(separator)?;
                     text.add(b"priority ")?;
                     text.number(u64::from(priority))?;
                     separator = b", ";
                 }
                 Some(jig_domain_tasks::Tracking::Untracked) => {
+                    text.add(separator)?;
                     text.add(b"untracked")?;
                     separator = b", ";
                 }

@@ -465,6 +465,11 @@ const ANSWER_CASES: &[(engine::CallAnswer, &[u8], bool)] = &[
     ),
     (engine::CallAnswer::Revised { task: CALL_TASK, revision: 2 }, b"Done: task 23 is at spec revision 2", false),
     (
+        engine::CallAnswer::Amended { task: 3, revision: 1, changed: engine::Changed { tracked: None, fields: 0 } },
+        b"Done: task 3 is at spec revision 1",
+        false,
+    ),
+    (
         engine::CallAnswer::Amended { task: 3, revision: 1, changed: engine::Changed {
             tracked: None, fields: engine::Changed::AUTHORITY | engine::Changed::INSTRUCTIONS,
         } },
