@@ -334,3 +334,112 @@ pub fn run_story<T>(
         checked: checked.take().expect("the finished person's forge check ran"),
     }
 }
+
+/// A box driven through ctl, with evidence taken before its stop.
+pub struct CtlOutcome<T> {
+    pub exit: Option<Exit>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub left: Option<Vec<u32>>,
+    pub calls: Vec<super::Ended>,
+    pub checked: Option<T>,
+}
+struct CtlJudge<'a, F, T> {
+    check: Option<F>,
+    checked: &'a Cell<Option<T>>,
+    stopping: bool,
+    cleanup: bool,
+    settled: bool,
+    deadline: Time,
+}
+impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
+    fn act(&mut self, now: Time, procs: &mut [Process]) {
+        let [Process::Binary(binary), Process::Calls(calls)] = procs else { panic!("box and ctl") };
+        let failed = calls.ends().iter().any(|call| call.exit != Some(Exit::Code(0)));
+        let expired = now >= self.deadline;
+        if !self.stopping && (calls.idle() || failed || expired || binary.exit_status().is_some()) {
+            if calls.idle() && !failed && !expired && binary.exit_status().is_none() {
+                self.checked.set(Some(self.check.take().expect("one live check")()));
+            }
+            calls.cancel();
+            binary.signal(Signal::Terminate);
+            self.stopping = true;
+        }
+        let left = binary.tree_status().live_at_leader_exit.as_ref().is_some_and(|pids| !pids.is_empty());
+        if !self.cleanup && (left || expired) && !binary.is_empty() {
+            binary.signal_tree(Signal::Kill);
+            self.cleanup = true;
+        }
+    }
+    fn observe(&mut self, _now: Time, procs: &[Process]) {
+        self.settled = self.stopping && procs.iter().all(Host::is_empty);
+    }
+    fn next_deadline(&self) -> Option<Time> {
+        (!self.stopping).then_some(self.deadline)
+    }
+    fn overdue(&self, _now: Time) -> Option<String> {
+        None
+    }
+    fn passed(&self) -> bool {
+        self.settled
+    }
+}
+/// Uses the box's printed link for ctl sign-in, then drains the supervised tree.
+/// A refused call stops the story immediately and retains its diagnostic.
+#[must_use]
+pub fn run_ctl<T>(
+    directory: &Path,
+    flags: Vec<String>,
+    client_root: &Path,
+    steps: Vec<super::ctl::Step>,
+    deadline: Duration,
+    check: impl FnOnce() -> T,
+) -> CtlOutcome<T> {
+    let clock = Clock::new();
+    let mut binary = Binary::start_with_tree(
+        Command {
+            program: env!("CARGO_BIN_EXE_temper").into(),
+            arguments: std::iter::once("box".into()).chain(flags.into_iter().map(Into::into)).collect(),
+            directory: directory.into(),
+            environment: Vec::new(),
+        },
+        Mode::Pipes,
+        262_144,
+        Expectation::Supervise,
+        false,
+    )
+    .expect("temper box starts");
+    let streams = binary.take_streams().expect("box pipes");
+    let mut fds = streams.descriptors();
+    let root = skein_shell::open_root(client_root).expect("client root");
+    fds.push(root);
+    let checked = Cell::new(None);
+    let mut world = real::World::new(CtlJudge {
+        check: Some(check),
+        checked: &checked,
+        stopping: false,
+        cleanup: false,
+        settled: false,
+        // Leave ten seconds for cancellation, pipe drain and reaping.
+        deadline: clock.now().now.saturating_add(Duration::from_nanos(
+            deadline.as_nanos().saturating_sub(Duration::from_secs(10).as_nanos()),
+        )),
+    });
+    world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
+    world.spawn_with_fds(fds, || Process::Calls(Box::new(super::ctl::Calls::new(root, steps, Some(&streams), None))));
+    let ended = world.run(&clock, deadline);
+    assert!(ended.procs.iter().all(Host::is_empty), "box and ctl io settles");
+    let [Process::Binary(binary), Process::Calls(calls)] = ended.procs.as_slice() else { panic!("box and ctl") };
+    CtlOutcome {
+        exit: binary.exit_status(),
+        stdout: calls.stdout().to_vec(),
+        stderr: binary.stderr().to_vec(),
+        left: binary.tree_status().live_at_leader_exit.clone(),
+        calls: calls
+            .ends()
+            .iter()
+            .map(|call| super::Ended { exit: call.exit, stdout: call.stdout.clone(), stderr: call.stderr.clone() })
+            .collect(),
+        checked: checked.take(),
+    }
+}

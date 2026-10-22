@@ -314,6 +314,10 @@ impl Calls {
     pub fn ends(&self) -> &[Ended] {
         &self.ends
     }
+    /// All bytes read from the box's stdout, including an incomplete link on failure.
+    pub(super) fn stdout(&self) -> &[u8] {
+        &self.link
+    }
     pub(super) fn pending(&self) -> Option<&Ended> {
         self.child.as_ref().map(|child| &child.ended)
     }

@@ -566,6 +566,180 @@ fn a_first_run_answers_on_the_demo() {
     first_run(false);
 }
 
+/// domain/testing.md, 2.6; protocol/setup.md, 13.4, "A first run set up for real".
+#[test]
+fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
+    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
+    use std::{
+        fs,
+        os::unix::fs::{DirBuilderExt, PermissionsExt},
+    };
+    use support::ctl::{Call, Step};
+
+    let (forgejo, runner) = support::owned::binaries();
+    let scratch = support::Scratch::new("forgejo-from-client");
+    let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
+    for path in &paths {
+        fs::create_dir(path).expect("empty first-run directory");
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("private first-run directory");
+    }
+    let flags: Vec<String> = ["--config", "--data", "--cache"]
+        .into_iter()
+        .zip(&paths)
+        .flat_map(|(flag, path)| [flag.into(), path.display().to_string()])
+        .collect();
+    let cached = [
+        paths[2].join(format!("forgejo/{VERSION}/forgejo")),
+        paths[2].join(format!("forgejo-runner/{RUNNER_VERSION}/forgejo-runner")),
+    ];
+    for (source, target) in [forgejo, runner].iter().zip(&cached) {
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(target.parent().expect("cache parent"))
+            .expect("private binary cache");
+        fs::copy(source, target).expect("copy pinned executable, never link it");
+        fs::set_permissions(target, fs::Permissions::from_mode(0o700)).expect("private executable");
+    }
+    let before = cached.each_ref().map(|path| cached_binary_fingerprint(path));
+    for run in ["first", "second"] {
+        let client_root = scratch.path().join(run);
+        fs::create_dir(&client_root).expect("fresh client root");
+        fs::set_permissions(&client_root, fs::Permissions::from_mode(0o700)).expect("private client root");
+        let mut steps = vec![Step::Run(Call::sign_in())];
+        if run == "first" {
+            steps.extend([
+                Step::Run(Call::new(&["forges"])),
+                Step::Run(Call::new(&["forges", "--json"])),
+                Step::Run(Call::new(&["forge-setup", "3"])),
+            ]);
+        }
+        // Real preparation, hashing two releases, runner registration and reconcile
+        // take seconds; allow three minutes, plus ten seconds to stop and reap.
+        steps.extend([
+            Step::Run(Call::new(&["wait", "forges", "--until", "settled", "--timeout", "180s"])),
+            Step::Run(Call::new(&["forges"])),
+        ]);
+        let clock = skein_shell::Clock::new();
+        let began = clock.now().now;
+        let ended = support::boxed::run_ctl(
+            scratch.path(),
+            flags.clone(),
+            &client_root,
+            steps,
+            Duration::from_secs(190),
+            || {
+                let document: serde_json::Value =
+                    serde_json::from_slice(&fs::read(paths[0].join("temper.json")).expect("first-run configuration"))
+                        .expect("configuration JSON");
+                let forge = document["application"]["forges"]
+                    .as_array()
+                    .expect("forges")
+                    .iter()
+                    .find(|forge| forge["number"] == 3)
+                    .expect("forge 3");
+                let address: std::net::SocketAddr =
+                    forge["api"]["socket"].as_str().expect("forge 3 address").parse().expect("socket");
+                let record = fs::metadata(paths[1].join("box/started/3")).expect("started group record");
+                assert!(record.is_file(), "the box kept forge 3's started record");
+                assert_eq!(record.permissions().mode() & 0o777, 0o600, "private started record");
+                (address, support::owned::answer(address.port(), "/api/v1/version", None))
+            },
+        );
+        eprintln!("{run} Forgejo setup run: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
+        let stderr = String::from_utf8_lossy(&ended.stderr);
+        assert_eq!(ended.exit, Some(Exit::Code(0)), "{run}: {stderr}");
+        assert_eq!(ended.left, Some(Vec::new()), "{run}: no process outlived the box: {stderr}");
+        assert_forgejo_setup_rows(run, &ended.calls, &stderr);
+        let (address, version) = ended.checked.expect("the live forge check ran");
+        let version = version.unwrap_or_else(|why| panic!("{run}: live Forgejo version: {why:?}; box: {stderr}"));
+        assert_eq!(version["version"].as_str().expect("version").split('+').next(), Some(VERSION));
+        let link = support::printed_link(&ended.stdout).expect("box sign-in link");
+        assert_eq!(ended.stdout, [link, b"\n"].concat(), "one printed link");
+        assert_eq!(support::boxed::status(address, "/api/v1/version"), None, "Forgejo stopped with its box");
+        for (path, fingerprint) in cached.iter().zip(&before) {
+            assert_eq!(&cached_binary_fingerprint(path), fingerprint, "cached binary unchanged");
+            assert!(
+                !path
+                    .with_file_name(format!("{}.part", path.file_name().expect("binary name").to_str().expect("UTF-8")))
+                    .exists(),
+                "no partial download"
+            );
+        }
+        let wrote = format!("box: wrote the configuration, {}\n", paths[0].join("temper.json").display());
+        assert_eq!(stderr.contains(&wrote), run == "first", "only the first box writes configuration");
+    }
+    scratch.remove();
+}
+
+fn assert_forgejo_setup_rows(run: &str, calls: &[support::Ended], stderr: &str) {
+    for call in calls {
+        assert_eq!(
+            call.exit,
+            Some(Exit::Code(0)),
+            "{run}: ctl stdout: {}; stderr: {}; box: {stderr}",
+            String::from_utf8_lossy(&call.stdout),
+            String::from_utf8_lossy(&call.stderr)
+        );
+    }
+    assert_eq!(calls.len(), if run == "first" { 6 } else { 3 }, "all ctl calls ran: {stderr}");
+    if run == "first" {
+        assert!(
+            String::from_utf8_lossy(&calls[1].stdout)
+                .lines()
+                .any(|line| line == "forge 3 · Forgejo · owned · Not set up")
+        );
+        let offered = support::ctl::json(&calls[2]);
+        let forge = offered["forges"]
+            .as_array()
+            .expect("forge rows")
+            .iter()
+            .find(|forge| forge["number"] == 3)
+            .expect("forge 3 row");
+        assert_eq!(forge["offer"], "offered");
+        assert_eq!(forge["state"], "not_set_up");
+        assert!(calls[3].stdout.starts_with(b"setting up\n"));
+        // Preparation and reconcile are silent on success; Forgejo's startup
+        // and the runner's lines reach the box with their step prefixes.
+        for step in ["forgejo 3: ", "runner 3: "] {
+            assert!(stderr.lines().any(|line| line.starts_with(step)), "group step {step}: {stderr}");
+        }
+    } else {
+        assert!(
+            !stderr.lines().any(|line| line.starts_with("fetch ") || line.contains("download")),
+            "the restarted group fetches nothing: {stderr}"
+        );
+    }
+    // M4 connects the forge at `started`; M3 leaves the first run NotConnected.
+    // The next box connects at startup from the group's reconciled files.
+    let expected = if run == "first" {
+        "forge 3 · Forgejo · owned · Not connected"
+    } else {
+        "forge 3 · Forgejo · owned · Connected as temper (3)"
+    };
+    assert!(
+        String::from_utf8_lossy(&calls.last().expect("forges read").stdout).lines().any(|line| line == expected),
+        "{run}: forges row: {}; box: {stderr}",
+        String::from_utf8_lossy(&calls.last().expect("forges read").stdout)
+    );
+}
+
+fn cached_binary_fingerprint(path: &std::path::Path) -> (u64, [u8; 32]) {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path).expect("cached binary");
+    let length = file.metadata().expect("cached metadata").len();
+    let mut hash = skein_lib::sha256::Sha256::new();
+    let mut bytes = vec![0; 65_536].into_boxed_slice();
+    loop {
+        let count = file.read(&mut bytes).expect("binary chunk");
+        if count == 0 {
+            break;
+        }
+        hash.update(&bytes[..count]);
+    }
+    (length, hash.finish())
+}
+
 #[test]
 #[ignore = "jig seeds no deployment owner in init's configuration; ctl omits the kept deployment account"]
 fn a_first_run_answers_on_the_demo_and_a_second_finds_it_seeded() {
