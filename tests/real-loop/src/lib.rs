@@ -8,6 +8,7 @@ pub mod git;
 pub mod landing;
 pub mod llm;
 pub mod scripts;
+pub mod template_bounds;
 
 /// A real deadline bounds every story, including startup and drain.
 pub const PATIENCE: skein_lib::Duration = skein_lib::Duration::from_secs(10);
