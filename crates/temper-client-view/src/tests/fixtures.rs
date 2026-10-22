@@ -1177,3 +1177,5 @@ fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Tok
         },
     );
 }
+
+pub mod panel;

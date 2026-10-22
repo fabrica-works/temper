@@ -133,3 +133,5 @@ fn dropped_work_goes_to_the_shell_with_its_count() {
     assert_eq!(out.pop(), Some(Request::Dropped { count: 2 }));
     assert!(out.is_empty());
 }
+
+mod change;

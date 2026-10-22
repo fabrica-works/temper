@@ -146,3 +146,34 @@
 .temper-task-amend > button { padding: 7px 11px; border: 1px solid #dcd5ca; border-radius: 4px; font: 600 11px/1.35 var(--temper-mono); }
 .temper-task-amend > p, .temper-task-amend > [role=status] { flex: 1 0 100%; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .temper-task-amend { margin-inline: 14px; } }
+
+/* .card.card-pad: the change's panel, containing its supplied parts. */
+.temper-change { margin: 0 24px 22px; padding: 18px 22px; border: 1px solid var(--temper-line); border-radius: 11px; background: var(--temper-paper); min-width: 0; overflow-wrap: anywhere; }
+/* .tag.accent: the change's identity in the header. */
+.temper-task-heading > .temper-meta:first-of-type > .temper-change-tag:first-child { background: var(--temper-accent-pale); color: var(--temper-accent-dark); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+/* .steps: six columns, with the supplied current and completed slots. */
+.temper-change .temper-steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; margin: 22px 0; padding: 0; list-style: none; }
+/* .step: the quiet slots ahead of the current step. */
+.temper-change .temper-step { border-top: 3px solid var(--temper-line); padding-top: 9px; font-size: 11px; color: var(--temper-muted); }
+/* .step.done: completed slots. */
+.temper-change .temper-step-done { border-color: var(--temper-green); color: var(--temper-green); }
+/* .step.current: the supplied current slot. */
+.temper-change .temper-step-current { border-color: var(--temper-accent); color: var(--temper-accent-dark); font-weight: 700; }
+/* .notice: the held step and its reason. */
+.temper-change .temper-change-hold { padding: 15px 18px; border-radius: 11px; background: var(--temper-amber-pale); color: var(--temper-amber); border: 1px solid var(--temper-line); font-size: 12px; line-height: 1.5; }
+/* .gate: a name and its verdict in one row. */
+.temper-change .temper-gate { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--temper-line); font-size: 11px; }
+/* .section-heading: the two regions inside the change's card. */
+.temper-change > [role=region] > h2 { margin: 20px 0 7px; font-size: 14px; font-weight: 700; }
+/* .gate strong: the name carries the row's weight. */
+.temper-change .temper-gate > p:first-child { font-weight: 700; }
+/* .gate span: its state stays muted. */
+.temper-change .temper-gate > p { margin: 0; }
+.temper-change .temper-gate > p + p { color: var(--temper-muted); }
+/* .gate:last-child: no trailing rule. */
+.temper-change .temper-gate:last-child { border: 0; }
+/* .steps at phone width: three columns in the same order. */
+@media (max-width: 600px) {
+  .temper-change { margin-inline: 14px; }
+  .temper-change .temper-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; }
+}

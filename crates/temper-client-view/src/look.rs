@@ -173,6 +173,16 @@ pub const ENDED: Style = Style { owner: owner(), token: 83 };
 pub const DAY: Style = Style { owner: owner(), token: 84 };
 /// The banner's menu, folded by the browser at phone width.
 pub const MENU: Style = Style { owner: owner(), token: 85 };
+/// A change's card on its task page (client/README.md, 5.10).
+pub const CHANGE: Style = Style { owner: owner(), token: 86 };
+/// The tag naming a change in its task page's header (5.10).
+pub const CHANGE_TAG: Style = Style { owner: owner(), token: 87 };
+/// The step a change is at (5.10).
+pub const STEP_CURRENT: Style = Style { owner: owner(), token: 88 };
+/// The notice of a held change (5.10).
+pub const CHANGE_HOLD: Style = Style { owner: owner(), token: 89 };
+/// One of a change's gates, CI's among them (5.10).
+pub const GATE: Style = Style { owner: owner(), token: 90 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -264,6 +274,11 @@ pub const NAMES: Names<'static> = Names {
         b"temper-ended",
         b"temper-day",
         b"temper-menu",
+        b"temper-change",
+        b"temper-change-tag",
+        b"temper-step-current",
+        b"temper-change-hold",
+        b"temper-gate",
     ],
     regions: &[b"temper-link"],
 };

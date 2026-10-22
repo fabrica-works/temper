@@ -47,7 +47,15 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         }
         text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
         b.close();
-        header(b, task, root.pages().me(root.client()), words, bindings);
+        let panel = temper_client_domain::forge::change::for_task(root.forge().panel(), task.chip.task);
+        let change = super::change::shown(panel);
+        header(b, task, root.pages().me(root.client()), words, bindings, panel);
+        if let Some(change) = change {
+            // Word capacity prices the full pull address and label; Limits::of
+            // guarantees at least this text bound for every view preset.
+            let text_bound = words.capacity().expect("checked text capacity");
+            super::change::toolbar(b, change, words, text_bound);
+        }
         if page.shape == Shape::Tracked {
             if root.pages().confirmation().is_none()
                 && match &page.amending {
@@ -74,6 +82,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             asked(b, task, words);
             result(b, task, words, look::TASK_CARD);
         }
+        if let Some(change) = change {
+            super::change::start(b, change, words, bindings);
+        }
         if let Some(document) = root.client().document(page.tree)
             && let Some(Latest::Jig(tree)) = document.latest
         {
@@ -82,6 +93,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
                 c::Executor::Agent { .. } | c::Executor::Party { .. } | c::Executor::Role { .. } => Word::Plan,
             };
             plan(b, tree, root, words, bindings, rows, word);
+        }
+        if let Some(change) = change {
+            super::change::finish(b, change, words);
         }
         if page.shape == Shape::Tracked {
             latest(b, page.latest.as_deref(), words, bindings);
@@ -223,18 +237,43 @@ pub(crate) fn amendment(b: &mut Builder, root: &Domain, words: &Words, bindings:
     amendment_outcome(b, root, words, bindings);
     b.close();
 }
-pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words: &Words, bindings: &mut Bindings) {
+pub(crate) fn header(
+    b: &mut Builder,
+    task: &c::Task,
+    me: Option<&c::Me>,
+    words: &Words,
+    bindings: &mut Bindings,
+    panel: Option<&temper_client_domain::forge::panel::Panel>,
+) {
+    let panel = temper_client_domain::forge::change::for_task(panel, task.chip.task);
+    let change = super::change::shown(panel);
     region(b, Word::TaskHeader, words);
     b.style(look::TASK_HEADING);
     b.open(Role::Slot);
     b.style(look::META);
-    if let Some(priority) = task.priority {
+    if change.is_none()
+        && let Some(priority) = task.priority
+    {
         text(b, Role::Paragraph, &words.say(Word::GoalPriority, &[Hole::Number(u64::from(priority))]));
     }
-    b.open(Role::Slot);
-    text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
-    executor(b, task.chip.executor, words);
-    b.close();
+    if change.is_some() {
+        b.open(Role::Paragraph);
+        b.style(look::CHANGE_TAG);
+        b.text(
+            Run::Plain,
+            &super::change::say(
+                words,
+                temper_client_domain::forge::words::ChangeWord::Tag,
+                &[Hole::Number(task.chip.task)],
+            ),
+        );
+        b.close();
+    } else {
+        b.open(Role::Slot);
+        text(b, Role::Paragraph, &words.say(Word::Task, &[Hole::Number(task.chip.task)]));
+        executor(b, task.chip.executor, words);
+        b.close();
+    }
     let mut named = false;
     if let Some(me) = me {
         for project in &me.projects {
@@ -249,7 +288,11 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     if !named {
         text(b, Role::Paragraph, &words.say(Word::Project, &[Hole::Number(u64::from(task.project))]));
     }
-    if let c::ChipPhase::Owner { details, .. } = task.chip.details.as_ref()
+    if let Some(panel) = panel {
+        if let Some(word) = temper_client_domain::forge::change::unavailable(&panel.state) {
+            text(b, Role::Paragraph, &super::change::say(words, word, &[]));
+        }
+    } else if let c::ChipPhase::Owner { details, .. } = task.chip.details.as_ref()
         && let Some(part) = &details.procedure
     {
         crate::forge::owner_part(b, part, words);
@@ -270,6 +313,9 @@ pub(crate) fn header(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
     state(b, task::header_state(task, me), words);
     requester(b, task.requester, me, words);
     b.close();
+    if let Some(change) = change {
+        super::change::pull(b, change, words);
+    }
     b.close();
 }
 

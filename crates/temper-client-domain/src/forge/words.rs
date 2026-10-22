@@ -1,4 +1,4 @@
-//! Adoption phrases as checked English data (client/README.md, 4.4 and 4.7).
+//! Forge phrases as checked English data (client/README.md, 4.4, 4.7 and 5.10).
 use super::{Broken, Kinds, Role};
 use alloc::boxed::Box;
 use skein_lib::{List, Reader, Writer, bytes::copy_of};
@@ -502,5 +502,344 @@ pub const fn role(role: Role) -> Word {
         Role::Adopted => Word::AdoptedRole,
         Role::Fork => Word::Fork,
         Role::Context => Word::Context,
+    }
+}
+
+/// The change page's vocabulary (client/README.md, 5.10).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChangeWord {
+    Tag,
+    Pull,
+    NoPull,
+    Repository,
+    View,
+    Loading,
+    Unknown,
+    Ended,
+    Producing,
+    Opening,
+    Checking,
+    Gating,
+    Queued,
+    Landed,
+    QueuedSt,
+    QueuedNd,
+    QueuedRd,
+    QueuedTh,
+    ProduceLine,
+    OpenLine,
+    RecreateLine,
+    ReopenLine,
+    CheckLine,
+    GateLine,
+    QueueSt,
+    QueueNd,
+    QueueRd,
+    QueueTh,
+    After,
+    Comma,
+    And,
+    More,
+    Tasks,
+    Period,
+    FirstLine,
+    UpdateLine,
+    ResolveLine,
+    RepairCi,
+    RepairGate,
+    RepairSemantic,
+    LandingLine,
+    LandedLine,
+    Held,
+    HeldProducing,
+    HeldOpening,
+    HeldRecreating,
+    HeldReopening,
+    HeldChecking,
+    HeldGating,
+    HeldQueued,
+    HeldFirst,
+    HeldUpdating,
+    HeldResolving,
+    HeldRepairing,
+    HeldLanding,
+    HeldLanded,
+    Stalled,
+    RepairsSpent,
+    ResolutionsSpent,
+    UpdatesSpent,
+    Moved,
+    Missing,
+    Closed,
+    Retargeted,
+    FailedHold,
+    Rejected,
+    Gates,
+    Ci,
+    NotYet,
+    Running,
+    Passed,
+    Failed,
+    ReviewBlocking,
+    ReviewAdvisory,
+    ApprovalBlocking,
+    ApprovalAdvisory,
+    CheckBlocking,
+    CheckAdvisory,
+    Waiting,
+    Approved,
+    Changes,
+    NoGate,
+    Repairs,
+    Resolutions,
+    Updates,
+    Separator,
+}
+pub type ChangeRow = (ChangeWord, &'static [&'static [u8]], &'static [HoleKind]);
+pub const CHANGES: [ChangeRow; 86] = [
+    (ChangeWord::Tag, &[b"Change \xc2\xb7 Task ", b""], &[Number]),
+    (ChangeWord::Pull, &[b"PR #", b" \xc2\xb7 "], &[Number]),
+    (ChangeWord::NoPull, &[b"No pull request yet \xc2\xb7 "], &[]),
+    (ChangeWord::Repository, &[b"", b" \xc2\xb7 ", b" \xe2\x86\x92 ", b""], &[Name, Name, Name]),
+    (ChangeWord::View, &[b"View on forge \xe2\x86\x97"], &[]),
+    (ChangeWord::Loading, &[b"Loading the change from the forge."], &[]),
+    (ChangeWord::Unknown, &[b"The forge knows no change for this task."], &[]),
+    (ChangeWord::Ended, &[b"The forge cannot show this change."], &[]),
+    (ChangeWord::Producing, &[b"Producing"], &[]),
+    (ChangeWord::Opening, &[b"Opening"], &[]),
+    (ChangeWord::Checking, &[b"Checking"], &[]),
+    (ChangeWord::Gating, &[b"Gating"], &[]),
+    (ChangeWord::Queued, &[b"Queued"], &[]),
+    (ChangeWord::Landed, &[b"Landed"], &[]),
+    (ChangeWord::QueuedSt, &[b"Queued \xc2\xb7 ", b"st"], &[Number]),
+    (ChangeWord::QueuedNd, &[b"Queued \xc2\xb7 ", b"nd"], &[Number]),
+    (ChangeWord::QueuedRd, &[b"Queued \xc2\xb7 ", b"rd"], &[Number]),
+    (ChangeWord::QueuedTh, &[b"Queued \xc2\xb7 ", b"th"], &[Number]),
+    (ChangeWord::ProduceLine, &[b"Producing its branch."], &[]),
+    (ChangeWord::OpenLine, &[b"Opening its pull request."], &[]),
+    (ChangeWord::RecreateLine, &[b"Making its branch again at the head temper last knew."], &[]),
+    (ChangeWord::ReopenLine, &[b"Reopening its pull request."], &[]),
+    (ChangeWord::CheckLine, &[b"Waiting for CI at its head."], &[]),
+    (ChangeWord::GateLine, &[b"Waiting for its gates at its head."], &[]),
+    (ChangeWord::QueueSt, &[b"", b"st in the queue for ", b""], &[Number, Name]),
+    (ChangeWord::QueueNd, &[b"", b"nd in the queue for ", b""], &[Number, Name]),
+    (ChangeWord::QueueRd, &[b"", b"rd in the queue for ", b""], &[Number, Name]),
+    (ChangeWord::QueueTh, &[b"", b"th in the queue for ", b""], &[Number, Name]),
+    (ChangeWord::After, &[b", after "], &[]),
+    (ChangeWord::Comma, &[b", "], &[]),
+    (ChangeWord::And, &[b" and "], &[]),
+    (ChangeWord::More, &[b"", b" more"], &[Number]),
+    (ChangeWord::Tasks, &[b"", b" tasks"], &[Number]),
+    (ChangeWord::Period, &[b"."], &[]),
+    (ChangeWord::FirstLine, &[b"First in the queue for ", b"."], &[Name]),
+    (ChangeWord::UpdateLine, &[b"Updating from ", b"."], &[Name]),
+    (ChangeWord::ResolveLine, &[b"Resolving its conflicts with ", b"."], &[Name]),
+    (ChangeWord::RepairCi, &[b"Repairing: CI failed at its head."], &[]),
+    (ChangeWord::RepairGate, &[b"Repairing: gate ", b" asked for changes."], &[Number]),
+    (ChangeWord::RepairSemantic, &[b"Repairing: a semantic conflict with ", b"."], &[Name]),
+    (ChangeWord::LandingLine, &[b"Merging at its head."], &[]),
+    (ChangeWord::LandedLine, &[b"Landed \xc2\xb7 merge commit ", b""], &[Name]),
+    (ChangeWord::Held, &[b"Held while ", b": ", b"."], &[Name, Name]),
+    (ChangeWord::HeldProducing, &[b"producing"], &[]),
+    (ChangeWord::HeldOpening, &[b"opening"], &[]),
+    (ChangeWord::HeldRecreating, &[b"recreating"], &[]),
+    (ChangeWord::HeldReopening, &[b"reopening"], &[]),
+    (ChangeWord::HeldChecking, &[b"checking"], &[]),
+    (ChangeWord::HeldGating, &[b"gating"], &[]),
+    (ChangeWord::HeldQueued, &[b"queued"], &[]),
+    (ChangeWord::HeldFirst, &[b"first in the queue"], &[]),
+    (ChangeWord::HeldUpdating, &[b"updating"], &[]),
+    (ChangeWord::HeldResolving, &[b"resolving"], &[]),
+    (ChangeWord::HeldRepairing, &[b"repairing"], &[]),
+    (ChangeWord::HeldLanding, &[b"landing"], &[]),
+    (ChangeWord::HeldLanded, &[b"landed"], &[]),
+    (ChangeWord::Stalled, &[b"its wait stalled"], &[]),
+    (ChangeWord::RepairsSpent, &[b"its repairs are spent"], &[]),
+    (ChangeWord::ResolutionsSpent, &[b"its resolutions are spent"], &[]),
+    (ChangeWord::UpdatesSpent, &[b"its updates are spent"], &[]),
+    (ChangeWord::Moved, &[b"its branch was moved on the forge"], &[]),
+    (ChangeWord::Missing, &[b"its branch is missing on the forge"], &[]),
+    (ChangeWord::Closed, &[b"its pull request was closed on the forge"], &[]),
+    (ChangeWord::Retargeted, &[b"its pull request was retargeted on the forge"], &[]),
+    (ChangeWord::FailedHold, &[b"a delegate or a write failed for good"], &[]),
+    (ChangeWord::Rejected, &[b"a person rejected a gate"], &[]),
+    (ChangeWord::Gates, &[b"Gates at its head"], &[]),
+    (ChangeWord::Ci, &[b"CI at its head"], &[]),
+    (ChangeWord::NotYet, &[b"Not yet"], &[]),
+    (ChangeWord::Running, &[b"Running"], &[]),
+    (ChangeWord::Passed, &[b"Passed"], &[]),
+    (ChangeWord::Failed, &[b"Failed"], &[]),
+    (ChangeWord::ReviewBlocking, &[b"Gate ", b" \xc2\xb7 review \xc2\xb7 blocking"], &[Number]),
+    (ChangeWord::ReviewAdvisory, &[b"Gate ", b" \xc2\xb7 review \xc2\xb7 advisory"], &[Number]),
+    (ChangeWord::ApprovalBlocking, &[b"Gate ", b" \xc2\xb7 approval \xc2\xb7 blocking"], &[Number]),
+    (ChangeWord::ApprovalAdvisory, &[b"Gate ", b" \xc2\xb7 approval \xc2\xb7 advisory"], &[Number]),
+    (ChangeWord::CheckBlocking, &[b"Gate ", b" \xc2\xb7 check \xc2\xb7 blocking"], &[Number]),
+    (ChangeWord::CheckAdvisory, &[b"Gate ", b" \xc2\xb7 check \xc2\xb7 advisory"], &[Number]),
+    (ChangeWord::Waiting, &[b"Waiting"], &[]),
+    (ChangeWord::Approved, &[b"Approved"], &[]),
+    (ChangeWord::Changes, &[b"Changes asked"], &[]),
+    (ChangeWord::NoGate, &[b"No other gate."], &[]),
+    (ChangeWord::Repairs, &[b"Repairs ", b" of ", b""], &[Number, Number]),
+    (ChangeWord::Resolutions, &[b"resolutions ", b" of ", b""], &[Number, Number]),
+    (ChangeWord::Updates, &[b"updates ", b" of ", b""], &[Number, Number]),
+    (ChangeWord::Separator, &[b" \xc2\xb7 "], &[]),
+];
+impl ChangeWord {
+    #[must_use]
+    pub fn id(self, connector: u16) -> PhraseId {
+        for (index, (word, _, _)) in CHANGES.iter().enumerate() {
+            if *word == self {
+                return PhraseId {
+                    owner: owner(connector),
+                    number: 2000_u16
+                        .checked_add(u16::try_from(index).expect("change vocabulary fits"))
+                        .expect("change id fits"),
+                };
+            }
+        }
+        unreachable!("closed change vocabulary")
+    }
+}
+/// Byte bounds of the change's named holes; number holes carry no bytes.
+#[must_use]
+pub fn change_name_bytes(word: ChangeWord, index: usize) -> u32 {
+    match word {
+        ChangeWord::Repository => {
+            if index == 0 {
+                513
+            } else {
+                256
+            }
+        }
+        ChangeWord::QueueSt | ChangeWord::QueueNd | ChangeWord::QueueRd | ChangeWord::QueueTh if index == 1 => 256,
+        ChangeWord::FirstLine | ChangeWord::UpdateLine | ChangeWord::ResolveLine | ChangeWord::RepairSemantic => 256,
+        ChangeWord::LandedLine => 7,
+        ChangeWord::Held => {
+            if index == 0 {
+                18
+            } else {
+                // "its pull request was retargeted on the forge".
+                44
+            }
+        }
+        ChangeWord::QueueSt
+        | ChangeWord::QueueNd
+        | ChangeWord::QueueRd
+        | ChangeWord::QueueTh
+        | ChangeWord::Tag
+        | ChangeWord::Pull
+        | ChangeWord::NoPull
+        | ChangeWord::View
+        | ChangeWord::Loading
+        | ChangeWord::Unknown
+        | ChangeWord::Ended
+        | ChangeWord::Producing
+        | ChangeWord::Opening
+        | ChangeWord::Checking
+        | ChangeWord::Gating
+        | ChangeWord::Queued
+        | ChangeWord::Landed
+        | ChangeWord::QueuedSt
+        | ChangeWord::QueuedNd
+        | ChangeWord::QueuedRd
+        | ChangeWord::QueuedTh
+        | ChangeWord::ProduceLine
+        | ChangeWord::OpenLine
+        | ChangeWord::RecreateLine
+        | ChangeWord::ReopenLine
+        | ChangeWord::CheckLine
+        | ChangeWord::GateLine
+        | ChangeWord::After
+        | ChangeWord::Comma
+        | ChangeWord::And
+        | ChangeWord::More
+        | ChangeWord::Tasks
+        | ChangeWord::Period
+        | ChangeWord::RepairCi
+        | ChangeWord::RepairGate
+        | ChangeWord::LandingLine
+        | ChangeWord::HeldProducing
+        | ChangeWord::HeldOpening
+        | ChangeWord::HeldRecreating
+        | ChangeWord::HeldReopening
+        | ChangeWord::HeldChecking
+        | ChangeWord::HeldGating
+        | ChangeWord::HeldQueued
+        | ChangeWord::HeldFirst
+        | ChangeWord::HeldUpdating
+        | ChangeWord::HeldResolving
+        | ChangeWord::HeldRepairing
+        | ChangeWord::HeldLanding
+        | ChangeWord::HeldLanded
+        | ChangeWord::Stalled
+        | ChangeWord::RepairsSpent
+        | ChangeWord::ResolutionsSpent
+        | ChangeWord::UpdatesSpent
+        | ChangeWord::Moved
+        | ChangeWord::Missing
+        | ChangeWord::Closed
+        | ChangeWord::Retargeted
+        | ChangeWord::FailedHold
+        | ChangeWord::Rejected
+        | ChangeWord::Gates
+        | ChangeWord::Ci
+        | ChangeWord::NotYet
+        | ChangeWord::Running
+        | ChangeWord::Passed
+        | ChangeWord::Failed
+        | ChangeWord::ReviewBlocking
+        | ChangeWord::ReviewAdvisory
+        | ChangeWord::ApprovalBlocking
+        | ChangeWord::ApprovalAdvisory
+        | ChangeWord::CheckBlocking
+        | ChangeWord::CheckAdvisory
+        | ChangeWord::Waiting
+        | ChangeWord::Approved
+        | ChangeWord::Changes
+        | ChangeWord::NoGate
+        | ChangeWord::Repairs
+        | ChangeWord::Resolutions
+        | ChangeWord::Updates
+        | ChangeWord::Separator => 0,
+    }
+}
+pub fn extend_change(connector: u16, shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>) {
+    for (word, literals, kinds) in CHANGES {
+        let mut holes = List::with_capacity(3);
+        let mut segments = List::with_capacity(7);
+        for (index, literal) in literals.iter().enumerate() {
+            segments.push(Segment::Text(copy_of(literal))).expect("change segments fit");
+            if let Some(kind) = kinds.get(index) {
+                holes.push(HoleShape { kind: *kind, bytes: change_name_bytes(word, index) }).expect("change holes fit");
+                segments
+                    .push(Segment::Hole { index: u16::try_from(index).expect("three holes"), kind: *kind })
+                    .expect("change segments fit");
+            }
+        }
+        let id = word.id(connector);
+        shapes
+            .push(PhraseShape {
+                id,
+                holes: holes.into_boxed(),
+                plural: if word == ChangeWord::Tasks { Some(0) } else { None },
+            })
+            .expect("change shapes fit");
+        let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
+        let forms: Box<[Form]> = if word == ChangeWord::Tasks {
+            Box::new([
+                Form {
+                    class: PluralClass::One,
+                    segments: Box::new([
+                        Segment::Text(copy_of(b"")),
+                        Segment::Hole { index: 0, kind: Number },
+                        Segment::Text(copy_of(b" task")),
+                    ]),
+                },
+                other,
+            ])
+        } else {
+            Box::new([other])
+        };
+        phrases.push(Phrase { id, forms }).expect("change phrases fit");
     }
 }

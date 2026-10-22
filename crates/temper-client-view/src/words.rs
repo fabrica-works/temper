@@ -324,7 +324,8 @@ pub enum Word {
 // The composer's line and its chooser replace seven choice phrases (5.5).
 // A task's name over its words in a chat (client/README.md, 3.5).
 // Forty-seven time form, calendar and placement phrases (5.12).
-const PHRASES: u32 = 657;
+// The change panel adds 86 forge phrases (2000–2085).
+const PHRASES: u32 = 743;
 const ALL: [Word; 295] = [
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
@@ -1038,6 +1039,7 @@ impl Words {
         crate::accounts::words::extend(&mut shapes, &mut phrases);
         crate::cards::words::extend(text, &mut shapes, &mut phrases);
         temper_client_domain::forge::words::extend(connector, text, &mut shapes, &mut phrases);
+        temper_client_domain::forge::words::extend_change(connector, &mut shapes, &mut phrases);
         resource_phrases(connector, joined, &mut shapes, &mut phrases);
         let language = Language {
             plural: PluralRule::English,

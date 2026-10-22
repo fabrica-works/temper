@@ -15,7 +15,7 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 85] = [
+    let named: [(skein_ui::Style, &[u8]); 90] = [
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
@@ -99,6 +99,11 @@ fn each_style_or_region_is_named_under_temper() {
         (TASK_DANGER, b"temper-task-danger"),
         (TASK_AMEND, b"temper-task-amend"),
         (DAY, b"temper-day"),
+        (CHANGE, b"temper-change"),
+        (CHANGE_TAG, b"temper-change-tag"),
+        (STEP_CURRENT, b"temper-step-current"),
+        (CHANGE_HOLD, b"temper-change-hold"),
+        (GATE, b"temper-gate"),
         (ENDED, b"temper-ended"),
         (MENU, b"temper-menu"),
     ];
@@ -279,6 +284,7 @@ fn the_task_tokens_stay_on_their_roles() {
         None,
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        None,
     );
     let done = builder.finish();
     let activity = super::task::activity_tree(&[super::task::activity_news()]);

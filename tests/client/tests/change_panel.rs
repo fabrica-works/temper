@@ -183,7 +183,8 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
     }
     assert!(gate.spec.parameters.contains(&tasks::Parameter::Bytes { name: 8, value: hexadecimal.as_bytes().into() }));
 
-    world.person(person, vec![Step::See { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN }]);
+    let gate_line = b"Waiting for its gates at its head.";
+    world.person(person, vec![Step::See { find: Find::text(gate_line), within: fixtures::WITHIN }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     keep_panel(&world, person, &mut panels);
@@ -221,7 +222,8 @@ fn a_change_handed_its_pushed_branch_lands_after_ci_and_its_gate() {
     assert_eq!(landed.main, merge);
     assert_ne!(merge, checked.main);
 
-    world.person(person, vec![Step::See { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN }]);
+    let merge_line = "Landed · merge commit ".as_bytes();
+    world.person(person, vec![Step::See { find: Find::text(merge_line), within: fixtures::WITHIN }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     keep_panel(&world, person, &mut panels);
@@ -328,7 +330,10 @@ fn a_forge_procedure_without_a_change_has_an_unknown_panel() {
         "the existing procedure fixture has no connector change"
     );
     let person = world.client(fixtures::PARTY, fixtures::task_page(task));
-    world.person(person, vec![Step::See { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN }]);
+    world.person(
+        person,
+        vec![Step::See { find: Find::text(b"The forge knows no change for this task."), within: fixtures::WITHIN }],
+    );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
     let panel = world.root(person).person().forge().panel().expect("procedure's panel slot");

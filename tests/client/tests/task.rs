@@ -456,7 +456,10 @@ fn a_forge_panel_on_a_goals_page_says_shown_on_the_forge() {
     let mut world = fixtures::world(fixtures::SEED);
     let goal = fixtures::goal_with_forge_panel(world.front());
     let person = world.client(fixtures::PARTY, fixtures::task_page(goal));
-    world.person(person, vec![Step::See { find: Find::text(b"Shown on the forge."), within: fixtures::WITHIN }]);
+    world.person(
+        person,
+        vec![Step::See { find: Find::text(b"The forge knows no change for this task."), within: fixtures::WITHIN }],
+    );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
 }

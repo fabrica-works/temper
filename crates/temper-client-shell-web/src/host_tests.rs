@@ -195,8 +195,10 @@ mod memory_literal;
 // A task's name over its words in a chat adds one phrase (148 B).
 // The four time forms add 47 phrases x 148 B = 6,956 B.
 // jig 388a71ec counts reads in max_out and prices each as a PendingRead: +12,483,662,288 B.
+// The change panel adds 86 forge phrases (12,728 B); its full address and
+// combined pull/bounds texts fit the existing maximum text envelope.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274682658517;
+const WEB_BYTES: u64 = 274682671245;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

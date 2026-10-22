@@ -325,6 +325,7 @@ fn header(task: &c::Task, me: Option<&c::Me>) -> Tree {
         me,
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+        None,
     );
     builder.finish()
 }
@@ -1410,6 +1411,7 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
                 Some(&me),
                 &words,
                 &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+                None,
             );
             let tree = builder.finish();
             assert_status(&tree, expected, look::STATUS_WAITING);
@@ -1428,6 +1430,7 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
                 Some(&me),
                 &words,
                 &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
+                None,
             );
             assert_status(&builder.finish(), expected, look::STATUS_WAITING);
         }

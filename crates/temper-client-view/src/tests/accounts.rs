@@ -462,8 +462,10 @@ mod memory_literal;
 // A committed turn's own text budget prices both conversation drawings.
 // A task's name over its words in a chat adds one phrase (148 B).
 // The four time forms add 47 phrases x 148 B = 6,956 B.
+// The change panel adds 86 forge phrases (12,728 B); its full address and
+// combined pull/bounds texts fit the existing maximum text envelope.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6995931823;
+const ACCOUNT_BYTES: u64 = 6995944551;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
