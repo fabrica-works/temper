@@ -48,7 +48,7 @@ test-threads = 1
 # The live tier (docs/design/domain/testing.md, 2.7): crates/temper's live binary
 # alone, one test at a time, which scripts/proof-live.sh runs.
 default-filter = "binary(=live)"
-global-timeout = "40m"
+global-timeout = "50m"
 test-threads = 1
 retries = 0
 

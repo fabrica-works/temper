@@ -239,6 +239,11 @@ enum Action {
     Signal,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Admission {
+    Batch,
+    Open,
+}
 pub struct Calls {
     root: Option<Fd>,
     client: Box<[u8]>,
@@ -252,6 +257,7 @@ pub struct Calls {
     started: Option<(Child, usize)>,
     cutting: bool,
     cancelling: bool,
+    admission: Admission,
     retry: Option<Time>,
     forgejo: Option<u32>,
     ends: Vec<Ended>,
@@ -268,6 +274,21 @@ impl Calls {
         calls.client = client.as_os_str().as_bytes().into();
         calls.link = format!("{link}\n").into_bytes();
         calls
+    }
+    /// Keep the root available between a live referee's read batches.
+    pub fn hold(&mut self) {
+        self.admission = Admission::Open;
+    }
+    pub fn release(&mut self) {
+        self.admission = Admission::Batch;
+    }
+    #[must_use]
+    pub fn link(&self) -> &[u8] {
+        super::printed_link(&self.link).expect("serve printed its link")
+    }
+    #[must_use]
+    pub fn idle(&self) -> bool {
+        self.done()
     }
     /// Queue another step before this batch runs.
     pub fn push(&mut self, step: Step) {
@@ -310,6 +331,7 @@ impl Calls {
             started: None,
             cutting: false,
             cancelling: false,
+            admission: Admission::Batch,
             retry: None,
             forgejo,
             ends: Vec::new(),
@@ -487,6 +509,7 @@ impl Host for Calls {
             child.drive(&mut self.submit, self.cancelling);
         }
         if self.done()
+            && self.admission == Admission::Batch
             && let Some(root) = self.root.take()
         {
             self.close(root);

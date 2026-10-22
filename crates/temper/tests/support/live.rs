@@ -1,11 +1,11 @@
-//! The retained native stories with fake completions until live sign-in is available.
+//! A fresh `ChatGPT` sign-in and the native chat/change stories on real Responses.
 use super::{Process, Seen, forgejo::Throwaway, person, write_private};
 use jig_protocol_store::{codec, transcripts};
 use serde_json::Value;
 use skein_io::kernel::Signal;
 use skein_lib::{Duration, Time};
 use skein_shell::{Clock, Host};
-use skein_world::{Referee, end_to_end::Streams, real};
+use skein_world::{Referee, real};
 use std::{
     cell::RefCell,
     fs,
@@ -13,15 +13,32 @@ use std::{
     rc::Rc,
 };
 
-#[must_use]
-pub fn configure(directory: &Path, forge: &Throwaway) -> skein_fake_peers::llm::Peer {
+pub fn configure(directory: &Path, forge: &Throwaway) {
     let path = directory.join("temper.json");
     let mut value: Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
+    let owned: Value = serde_json::from_slice(super::owned::EXAMPLE).expect("owned example");
+    value["engine"]["llm"] = owned["engine"]["llm"].clone();
+    value["engine"]["charters"][0]["model"] = "gpt-6-luna".into();
+    value["engine"]["charters"][0]["alternatives"] = serde_json::json!([]);
+    value["engine"]["limits"]["overrides"]["documents.rows"] = 32.into();
     value["engine"]["charters"][0]["turns"] = 5.into();
     value["engine"]["charters"][0]["time_ms"] = 240_000.into();
     let agent_path = directory.join("agent.json");
-    let mut agent: Value = serde_json::from_slice(&fs::read(&agent_path).expect("agent")).expect("agent JSON");
+    let mut agent: Value = serde_json::from_slice(super::owned::SHIPPED[0].1).expect("owned agent JSON");
+    if let Some(program) = agent["programs"].get_mut("claude_code") {
+        let claude = std::env::var_os("PATH").and_then(|path| {
+            std::env::split_paths(&path).map(|directory| directory.join("claude")).find(|program| program.is_file())
+        });
+        if let Some(claude) = claude {
+            program["path"] = serde_json::json!(claude);
+            program["directory"] = serde_json::json!(directory.join("programs"));
+        } else {
+            agent["programs"].as_object_mut().expect("programs").remove("claude_code");
+        }
+    }
     agent["profile"]["policy"]["max_turns"] = 5.into();
+    value["workers"][0]["limits"]["overrides"]["hub.event_bytes"] = 4096.into();
+    value["application"]["limits"]["overrides"]["checkout.message_bytes"] = 4098.into();
     let scripts = super::landing_scripts(super::ANSWER, forge);
     let skein_fake_llm_domain::api::Line::Call { arguments, .. } = &scripts[0].turns[0].lines[0] else {
         panic!("the process fixture delegates the coding procedure");
@@ -37,7 +54,6 @@ pub fn configure(directory: &Path, forge: &Throwaway) -> skein_fake_peers::llm::
     write_private(&directory.join("charters/chat.txt"), instructions.as_bytes());
     write_private(&path, &serde_json::to_vec(&value).expect("live configuration JSON"));
     write_private(&agent_path, &serde_json::to_vec(&agent).expect("live agent JSON"));
-    super::fake_llm(scripts)
 }
 
 pub struct Pushed {
@@ -47,6 +63,14 @@ pub struct Pushed {
     pub wall_seconds: u64,
 }
 type Push = super::forgejo::BranchHead;
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Starting,
+    Signing,
+    Running,
+    Stopping,
+    Settled,
+}
 struct Judge<'a> {
     directory: &'a Path,
     forge: &'a Throwaway,
@@ -54,8 +78,9 @@ struct Judge<'a> {
     pushed: Rc<RefCell<Option<Push>>>,
     poll: Time,
     deadline: Time,
-    ended: bool,
-    settled: bool,
+    phase: Phase,
+    signing_until: Time,
+    checked: usize,
 }
 fn files(directory: &Path, output: &mut Vec<PathBuf>) {
     if !directory.exists() {
@@ -106,69 +131,197 @@ fn pushed(directory: &Path, forge: &Throwaway, baseline: &[u8]) -> Option<Push> 
     }
     None
 }
+fn account_ready(value: &Value) {
+    let account = value["accounts"]["party"]
+        .as_array()
+        .expect("person's accounts")
+        .iter()
+        .find(|account| account["provider"] == 1)
+        .expect("ChatGPT sign-in produced the person's account");
+    assert_eq!(account["plan"], true, "ChatGPT is a plan");
+    let source = account["sources"]
+        .as_array()
+        .expect("sources")
+        .iter()
+        .find(|source| source["kind"] == "sign_in")
+        .expect("a signed-in source");
+    assert!(
+        source["usable"] == true && source["state"]["kind"] == "granted",
+        "live account {} cannot run: state={}, reset={}",
+        account["number"],
+        source["state"],
+        source["spent_until"]
+    );
+}
+fn tasks_ready(value: &Value) {
+    match value {
+        Value::Object(fields) => {
+            assert!(
+                !fields
+                    .get("phase")
+                    .and_then(Value::as_str)
+                    .is_some_and(|phase| matches!(phase, "failed" | "cancelled")),
+                "live task cannot answer: {value}"
+            );
+            for child in fields.values() {
+                tasks_ready(child);
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                tasks_ready(child);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+impl Judge<'_> {
+    fn running(&self) -> bool {
+        matches!(self.phase, Phase::Running | Phase::Stopping | Phase::Settled)
+    }
+    fn stopping(&self) -> bool {
+        matches!(self.phase, Phase::Stopping | Phase::Settled)
+    }
+    fn account(&mut self, now: Time, procs: &mut [Process]) {
+        use super::ctl::{Call, Step};
+        let Process::Calls(calls) = &mut procs[2] else { panic!("live ctl") };
+        if self.phase == Phase::Starting
+            && let [_, connected, ..] = calls.ends()
+        {
+            assert_eq!(
+                connected.exit,
+                Some(skein_io::kernel::Exit::Code(0)),
+                "connect: {}",
+                String::from_utf8_lossy(&connected.stderr)
+            );
+            // This is the authorization address, never the browser's final callback or a token.
+            eprintln!("{}", String::from_utf8_lossy(&connected.stdout));
+            self.phase = Phase::Signing;
+        }
+        if !self.running() && calls.ends().len() >= SETUP_CALLS {
+            for ended in calls.ends() {
+                assert_eq!(
+                    ended.exit,
+                    Some(skein_io::kernel::Exit::Code(0)),
+                    "live sign-in: {}",
+                    String::from_utf8_lossy(&ended.stderr)
+                );
+            }
+            let [_, _, _, account] = calls.ends() else { panic!("live setup calls") };
+            account_ready(&super::ctl::json(account));
+            let link = calls.link().to_vec();
+            self.checked = SETUP_CALLS;
+            self.phase = Phase::Running;
+            let Process::Person(person) = &mut procs[1] else { panic!("native person") };
+            person.ctl_ready(&link);
+        }
+        if !self.running() {
+            return;
+        }
+        let Process::Calls(calls) = &mut procs[2] else { panic!("live ctl") };
+        for ended in &calls.ends()[self.checked..] {
+            assert_eq!(
+                ended.exit,
+                Some(skein_io::kernel::Exit::Code(0)),
+                "live health read: {}",
+                String::from_utf8_lossy(&ended.stderr)
+            );
+            let value = super::ctl::json(ended);
+            if value.get("accounts").is_some() {
+                account_ready(&value);
+            } else {
+                tasks_ready(&value);
+            }
+        }
+        self.checked = calls.ends().len();
+        if self.phase == Phase::Running && now >= self.poll && calls.idle() {
+            for arguments in [
+                &["accounts", "--json"][..],
+                &["tasks", "--project", "1", "--json"],
+                &["tasks", "--project", "1", "--ended", "--json"],
+            ] {
+                calls.push(Step::Run(Call::new(arguments)));
+            }
+        }
+    }
+}
+const SETUP_CALLS: usize = 4;
+fn sign_in_within() -> Duration {
+    jig_protocol_config::profile::profile(jig_protocol_config::profile::Profile::Small).driver.client.sign_in_time
+}
 impl Referee<Process> for Judge<'_> {
     fn act(&mut self, now: Time, procs: &mut [Process]) {
-        if !self.ended && self.pushed.borrow().is_none() && now >= self.poll {
-            *self.pushed.borrow_mut() = pushed(self.directory, self.forge, &self.baseline);
-            self.poll = now.saturating_add(Duration::from_millis(100));
+        self.account(now, procs);
+        if self.phase == Phase::Running && now >= self.poll {
+            assert!(completions(self.directory) <= 25, "live completion budget exceeded");
+            if self.pushed.borrow().is_none() {
+                *self.pushed.borrow_mut() = pushed(self.directory, self.forge, &self.baseline);
+            }
+            self.poll = now.saturating_add(Duration::from_millis(500));
         }
         let Process::Person(person) = &procs[1] else { panic!("native person") };
-        if !self.ended
+        if !self.stopping()
             && person.finished
             && person.client.as_ref().is_some_and(Host::is_empty)
             && self.pushed.borrow().is_some()
         {
+            let Process::Calls(calls) = &mut procs[2] else { panic!("live ctl") };
+            if !calls.idle() {
+                return;
+            }
+            calls.release();
             let Process::Binary(binary) = &mut procs[0] else { panic!("binary") };
             binary.signal(Signal::Terminate);
-            for proc in procs {
-                if let Process::Peer(peer) = proc {
-                    peer.shutdown();
-                }
-            }
-            self.ended = true;
+            self.phase = Phase::Stopping;
         }
     }
     fn observe(&mut self, now: Time, procs: &[Process]) {
-        self.settled = self.ended && procs.iter().all(Host::is_empty);
+        if self.stopping() && procs.iter().all(Host::is_empty) {
+            self.phase = Phase::Settled;
+        }
         let Process::Binary(binary) = &procs[0] else { panic!("binary") };
         let Process::Person(person) = &procs[1] else { panic!("native person") };
+        assert!(person.failed.is_none(), "{}", person.failed.as_deref().unwrap_or("person"));
         assert!(
-            person.failed.is_none(),
-            "{}; {}",
-            person.failed.as_deref().unwrap_or("person"),
-            String::from_utf8_lossy(binary.stderr())
-        );
-        assert!(
-            self.ended || binary.exit_status().is_none(),
+            self.stopping() || binary.exit_status().is_none(),
             "serve failed: {}",
             String::from_utf8_lossy(binary.stderr())
         );
-        assert!(now < self.deadline || self.settled, "live story deadline; pushed={}", self.pushed.borrow().is_some());
+        assert!(self.running() || now < self.signing_until, "ChatGPT sign-in deadline");
+        assert!(
+            now < self.deadline || self.phase == Phase::Settled,
+            "live story deadline; pushed={}",
+            self.pushed.borrow().is_some()
+        );
     }
     fn next_deadline(&self) -> Option<Time> {
-        (!self.settled).then_some(if self.ended || self.pushed.borrow().is_some() {
+        (self.phase != Phase::Settled).then_some(if !self.running() {
+            self.signing_until.min(self.deadline)
+        } else if self.stopping() {
             self.deadline
         } else {
             self.poll.min(self.deadline)
         })
     }
     fn overdue(&self, now: Time) -> Option<String> {
-        (!self.settled && now >= self.deadline).then(|| "live native stories did not settle".into())
+        (self.phase != Phase::Settled && now >= self.deadline).then(|| "live native stories did not settle".into())
     }
     fn passed(&self) -> bool {
-        self.settled
+        self.phase == Phase::Settled
     }
 }
+
 #[must_use]
-pub fn run(directory: &Path, forge: &Throwaway, peer: skein_fake_peers::llm::Peer, deadline: Duration) -> Pushed {
+pub fn run(directory: &Path, forge: &Throwaway, deadline: Duration) -> Pushed {
+    use super::ctl::{Call, Calls, Step};
     let clock = Clock::new();
     let started = clock.now().now;
     let mut binary = super::serve(directory);
     let streams = binary.take_streams().expect("binary pipes");
     let mut fds = streams.descriptors();
-    let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };
-    let root = skein_shell::open_root(directory).expect("client's parent root");
-    fds.push(root);
+    let ctl_root = skein_shell::open_root(directory).expect("ctl parent root");
+    fds.push(ctl_root);
+    let root = skein_shell::open_root(directory).expect("native parent root");
     let pushed = Rc::new(RefCell::new(None));
     let mut world = real::World::new(Judge {
         directory,
@@ -177,30 +330,43 @@ pub fn run(directory: &Path, forge: &Throwaway, peer: skein_fake_peers::llm::Pee
         pushed: pushed.clone(),
         poll: started,
         deadline: started.saturating_add(deadline),
-        ended: false,
-        settled: false,
+        phase: Phase::Starting,
+        signing_until: started.saturating_add(sign_in_within()),
+        checked: 0,
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
-    world.spawn_with_fds(fds, || {
-        Process::Person(Box::new(person::Person::new(root, input, output, person::adopt_and_change(forge))))
+    world.spawn_with_fds(vec![root], || {
+        Process::Person(Box::new(person::Person::waiting_for_ctl(root, person::live_adopt_and_change(forge))))
     });
-    world.spawn(|| Process::Peer(Box::new(peer)));
+    world.spawn_with_fds(fds, || {
+        let mut calls = Calls::new(
+            ctl_root,
+            vec![
+                Step::Run(Call::sign_in()),
+                Step::Run(Call::new(&["connect", "1", "--key", "live-sign-in"])),
+                Step::Run(Call::new(&["wait", "accounts", "--until", "settled", "--json"])),
+                Step::Run(Call::new(&["accounts", "--json"])),
+            ],
+            Some(&streams),
+            None,
+        );
+        calls.hold();
+        Process::Calls(Box::new(calls))
+    });
     let outcome = world.run(&clock, deadline);
     assert!(outcome.procs.iter().all(Host::is_empty), "all real io settles");
     let Process::Binary(binary) = &outcome.procs[0] else { panic!("binary") };
+    assert_eq!(binary.exit_status(), Some(skein_io::kernel::Exit::Code(0)));
     let Process::Person(person) = &outcome.procs[1] else { panic!("native person") };
     let (branch, pushed) = pushed.borrow_mut().take().expect("a new run commit was pushed");
     Pushed {
-        seen: Seen {
-            signed_in: person.client.as_ref().expect("client").seen().signed_in,
-            finished: person.finished,
-            stderr: binary.stderr().to_vec(),
-        },
+        seen: Seen { signed_in: 1, finished: person.finished, stderr: binary.stderr().to_vec() },
         branch,
         pushed,
         wall_seconds: clock.now().now.saturating_since(started).as_nanos() / 1_000_000_000,
     }
 }
+
 #[must_use]
 pub fn completions(directory: &Path) -> u32 {
     let value = fs::read(directory.join("temper.json")).expect("configuration");

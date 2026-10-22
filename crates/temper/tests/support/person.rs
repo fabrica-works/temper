@@ -193,6 +193,7 @@ pub struct Person {
     project: ProjectSelection,
     pub failed: Option<String>,
     begin: Begin,
+    directory: Box<[u8]>,
     seed: u64,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
@@ -213,6 +214,21 @@ impl Person {
     }
     #[must_use]
     pub fn new(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
+        Self::build(root, Some(input), Some(output), script)
+    }
+    /// Wait for ctl to finish a sign-in in its own directory; load it through the native shell.
+    #[must_use]
+    pub fn waiting_for_ctl(root: Fd, script: Script) -> Self {
+        let mut person = Self::build(root, None, None, Script { begin: Begin::Token, ..script });
+        person.directory = b"client".as_slice().into();
+        person
+    }
+    pub fn ctl_ready(&mut self, link: &[u8]) {
+        assert!(self.bytes.is_empty(), "one handover from ctl");
+        self.bytes.extend_from_slice(link);
+        self.bytes.push(b'\n');
+    }
+    fn build(root: Fd, input: Option<Fd>, output: Option<Fd>, script: Script) -> Self {
         let steps = if script.begin == Begin::LinkWithKey {
             use skein_ui::Role;
             let mut setup = vec![
@@ -236,8 +252,8 @@ impl Person {
             client: None,
             root: Some(root),
             actor: skein_fake_person::Person::new(steps),
-            input: Some(input),
-            output: Some(output),
+            input,
+            output,
             reading: false,
             closing: 0,
             bytes: Vec::new(),
@@ -249,6 +265,7 @@ impl Person {
             project: ProjectSelection::Pending,
             failed: None,
             begin: script.begin,
+            directory: b"private".as_slice().into(),
             // Fresh demo clients must not reuse the same request names when
             // signing the same owner in again on the same deployment.
             seed: if script.begin == Begin::Link {
@@ -305,7 +322,7 @@ impl Person {
                 NativeClient::new(
                     Settings {
                         engine: skein_io::Addr::Ip(address),
-                        directory: b"private".as_slice().into(),
+                        directory: self.directory.clone(),
                         limits: temper_client_shell_terminal::limits::native(),
                     },
                     self.root.take().expect("client root"),
@@ -508,6 +525,18 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
     ]);
     Script { steps: steps.into_boxed_slice(), begin: Begin::LinkWithKey }
 }
+/// A person's live sitting keeps the native stories, allowing real completions their budget.
+#[must_use]
+pub fn live_adopt_and_change(forge: &super::forgejo::Throwaway) -> Script {
+    let mut script = adopt_and_change(forge);
+    for step in &mut script.steps {
+        if let Step::See { within, .. } = step {
+            *within = skein_lib::Duration::from_secs(1_740);
+        }
+    }
+    script
+}
+
 #[must_use]
 pub fn found() -> Script {
     Script {
