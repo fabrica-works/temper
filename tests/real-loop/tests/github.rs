@@ -86,8 +86,7 @@ fn a_chats_clone_and_push_carry_its_installations_token() {
     let change = &delivered["task"]["chip"]["details"]["owner"]["details"]["ending"]["done"]["change"];
     assert!(change.is_object(), "coder delivered a change: {delivered}");
     let branches: Vec<_> = seen.branches.iter().filter(|(name, _)| name.as_slice() != b"main").collect();
-    assert_eq!(branches.len(), 1, "one pushed branch");
-    let (_, branch) = branches[0];
+    let [(_, branch)] = branches.as_slice() else { panic!("one pushed branch: {branches:?}") };
     assert_eq!(branch.tree.get(b"README.md".as_slice()).expect("README"), &[landing::README, landing::EDIT].concat());
     assert_eq!(delivered["task"]["chip"]["task"], CODER);
     assert_eq!(change["kind"], 2, "the coder's produced change");
