@@ -120,7 +120,16 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
         if open.act == ActKind::Stop {
             words.text(b, Word::StopHolds, &[]);
         } else {
-            crate::cards::decision(b, words, Some(&ReadValue::Task(Box::new(task.clone()))), ActKind::Cancel);
+            // The task's own offers, read in place: cards::decision would take the document as a ReadValue.
+            let facts = jig_client::facts::DecisionFacts {
+                dangerous: jig_client::facts::dangerous(ActKind::Cancel),
+                effect: jig_client::facts::effect(task.acts.as_slice(), ActKind::Cancel).copied(),
+                funding: skein_lib::List::with_capacity(0),
+                funds: None,
+            };
+            for fact in &jig_client::words::decision(&facts, &words.book, words.language) {
+                crate::cards::text(b, Role::Paragraph, fact);
+            }
         }
         button(b, bindings, words, Word::Confirm, Act::Confirm);
         button(b, bindings, words, Word::Cancel, Act::Cancel);
