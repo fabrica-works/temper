@@ -740,8 +740,13 @@ keeps (`../protocol/configuration.md`, section 2).
     "Almost ready": a list of "Forge: FORGE, connected as LOGIN" or
     "Forge: FORGE · CONNECTION" (with its "Each step"), or "Forge: none
     yet" with "Connect a forge", to the Forge step; "Model: ACCOUNT",
-    the first usable account's heading (5.5, An account), or "Model:
-    none yet" with "Connect a model", to the Model step; and "Project
+    the first usable account's heading (5.5, An account), or, while
+    a sign-in of the person's is under way on the `accounts` document
+    and no account is usable, "Model: PROVIDER · signing in", PROVIDER
+    its LLM provider's name (5.5), with no act, so that a person come
+    back from the sign-in reads it as under way; or "Model: none yet"
+    with "Connect a model", to the Model step; and no model line until
+    the `accounts` document is delivered; and "Project
     PROJECT, with ORG/NAME" once the forge's first repository is on its
     row. Once that repository is adopted (`forge.md`, 5.4, Ready), its
     heading is "ORG/NAME is ready", with "Open PROJECT", to the chats
@@ -3478,7 +3483,9 @@ own tests:
   again on a rebuild or from a root made at the returned address,
   which draws the source's sign-in, then its end; from the welcome's
   Model step, the same with `Return` naming `/welcome?at=ready`, and a
-  root made there drawing Ready naming the account made; a program's login declared from
+  root made there drawing Ready with no model line until the
+  `accounts` document is delivered, then "Model: ChatGPT · signing
+  in" while the sign-in is under way, then the account made; a program's login declared from
   Details and its command shown on Ready; the accounts page's rows
   folded, one opened and a key added to its account from the row; a
   limited account's words, "Use the API key first" moving its key
