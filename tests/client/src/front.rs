@@ -21,6 +21,8 @@ pub struct Joint {
     pub answer_runs: bool,
     pub reply_runs: bool,
     pub runs_answered: u32,
+    reply_pieces: Option<&'static [&'static [u8]]>,
+    held_reply: Option<HeldReply>,
     pub park_runs: bool,
     settles_with_a_deadline_armed: bool,
     keyed_fault: Option<RequestEnvelope>,
@@ -44,6 +46,14 @@ pub struct Joint {
     sign_outs: BTreeMap<ClientId, VecDeque<Option<u64>>>,
     truth: jig_client_world::joint::truth::Truth,
 }
+struct HeldReply {
+    task: u64,
+    attempt: u64,
+    read: Option<u64>,
+    pieces: &'static [&'static [u8]],
+    next: usize,
+    words: Vec<u8>,
+}
 fn engine_limits() -> engine::Limits {
     let mut limits = temper_engine_domain_world::fixtures::forge_limits();
     // The world's own bound, not production's: automatic Seen takes a key per arrival.
@@ -56,6 +66,80 @@ fn engine_limits() -> engine::Limits {
     limits
 }
 impl Joint {
+    /// The next chat run's reply, written in these pieces: the first is sent at the
+    /// run's assignment and each later part at one `release_reply` (testing.md 6.3).
+    pub fn reply_in_pieces(&mut self, pieces: &'static [&'static [u8]]) {
+        assert!(self.reply_pieces.is_none() && self.held_reply.is_none(), "one scripted reply at a time");
+        assert!(!pieces.is_empty() && pieces.iter().all(|piece| !piece.is_empty()), "a reply has nonempty pieces");
+        self.reply_pieces = Some(pieces);
+    }
+
+    /// Send the held reply's next part: its next piece, or, once every piece is sent,
+    /// the committed turn with the whole text and the run's answer. False when no reply
+    /// is held.
+    pub fn release_reply(&mut self) -> bool {
+        let Some(mut reply) = self.held_reply.take() else { return false };
+        if let Some(bytes) = reply.pieces.get(reply.next) {
+            self.engine.send(temper_engine_domain_world::protocol::up(
+                Token::new(7),
+                jig_domain_host::LinkUp::Piece {
+                    run: Token::new(reply.task),
+                    attempt: Token::new(reply.attempt),
+                    piece: jig_domain_host::Piece {
+                        turn: 1,
+                        retry: 0,
+                        kind: jig_domain_host::LiveKind::Text,
+                        offset: u64::try_from(reply.words.len()).expect("scripted reply length fits"),
+                        bytes: (*bytes).into(),
+                    },
+                },
+                engine::Parts::none(),
+            ));
+            reply.words.extend_from_slice(bytes);
+            reply.next += 1;
+            self.held_reply = Some(reply);
+        } else {
+            self.finish_reply(reply.task, reply.attempt, reply.read, Some(&reply.words));
+        }
+        self.settle();
+        true
+    }
+
+    fn finish_reply(&mut self, task: u64, attempt: u64, read: Option<u64>, words: Option<&[u8]>) {
+        self.runs_answered += 1;
+        if let Some(words) = words {
+            let mut turn = temper_worker_domain_world::protocol::session_turn(1, 1, words.len(), true);
+            turn.messages[0].content = Box::new([Block::Text { text: words.into(), replay: None }]);
+            let body = smith_protocol_channel::encode_turn(
+                &turn,
+                &smith_transcript::CEILINGS,
+                &temper_worker_domain_world::protocol::endpoints(),
+            )
+            .expect("scripted reply encodes");
+            self.engine.send(temper_engine_domain_world::protocol::turn(
+                Token::new(7),
+                task,
+                attempt,
+                1,
+                1,
+                read,
+                &body,
+            ));
+            self.engine.settle();
+        }
+        self.engine.answer(
+            Token::new(7),
+            task,
+            attempt,
+            u64::from(words.is_some()),
+            jig_domain_tasks::End::Finished {
+                result: jig_domain_tasks::TaskResult::Report { words: b"Answered by the run".as_slice().into() },
+                cancel_delegates: false,
+            },
+            engine::Parts::none(),
+        );
+    }
+
     #[must_use]
     pub fn answers_to_lose(&self) -> u32 {
         self.lose_answers
@@ -449,6 +533,8 @@ impl Joint {
             answer_runs: false,
             reply_runs: false,
             runs_answered: 0,
+            reply_pieces: None,
+            held_reply: None,
             park_runs: false,
             settles_with_a_deadline_armed: program,
             keyed_fault: None,
@@ -762,49 +848,24 @@ impl Joint {
                     engine::Parts::none(),
                 );
             }
-            if !self.answer_runs
-                && let engine::Delivery::Assigned { assignment, .. } = &delivery
-            {
-                self.hosting.insert(assignment.task, assignment.attempt);
-            }
-            if self.answer_runs
-                && let engine::Delivery::Assigned { assignment, .. } = &delivery
-            {
-                self.runs_answered += 1;
-                if self.reply_runs {
-                    let words = format!("Answered, run {}", self.runs_answered);
-                    let mut turn = temper_worker_domain_world::protocol::session_turn(1, 1, words.len(), true);
-                    turn.messages[0].content = Box::new([Block::Text { text: words.as_bytes().into(), replay: None }]);
-                    let body = smith_protocol_channel::encode_turn(
-                        &turn,
-                        &smith_transcript::CEILINGS,
-                        &temper_worker_domain_world::protocol::endpoints(),
-                    )
-                    .expect("scripted reply encodes");
-                    self.engine.send(temper_engine_domain_world::protocol::turn(
-                        Token::new(7),
-                        assignment.task,
-                        assignment.attempt,
-                        1,
-                        1,
-                        assignment.messages.last().map(|word| word.number),
-                        &body,
-                    ));
-                    self.engine.settle();
+            if let engine::Delivery::Assigned { assignment, .. } = &delivery {
+                let read = assignment.messages.last().map(|word| word.number);
+                if let Some(pieces) = self.reply_pieces.take() {
+                    self.held_reply = Some(HeldReply {
+                        task: assignment.task,
+                        attempt: assignment.attempt,
+                        read,
+                        pieces,
+                        next: 0,
+                        words: Vec::new(),
+                    });
+                    assert!(self.release_reply(), "the assignment holds its first piece");
+                } else if self.answer_runs {
+                    let words = self.reply_runs.then(|| format!("Answered, run {}", self.runs_answered + 1));
+                    self.finish_reply(assignment.task, assignment.attempt, read, words.as_deref().map(str::as_bytes));
+                } else {
+                    self.hosting.insert(assignment.task, assignment.attempt);
                 }
-                self.engine.answer(
-                    Token::new(7),
-                    assignment.task,
-                    assignment.attempt,
-                    u64::from(self.reply_runs),
-                    jig_domain_tasks::End::Finished {
-                        result: jig_domain_tasks::TaskResult::Report {
-                            words: b"Answered by the run".as_slice().into(),
-                        },
-                        cancel_delegates: false,
-                    },
-                    engine::Parts::none(),
-                );
             }
             self.packet(engine::Request::Party(engine::PartyRequest::Deliver(delivery)));
         }
