@@ -384,11 +384,51 @@ deployment's page):
 ### 5.4 The deployment's page
 
 The forge's part of the deployment's connectors (jig's
-`client/domain/pages.md`, section 7), on temper's `Forges` page
-(`README.md`, 3.5), read for a person whose role on project 0 is
-`Owner`, in standalone the deployment's owner; any other's read is
-refused, in jig's words (`README.md`, section 8). A row for each
-configured forge, by its number, its kind and its `web` address, says:
+`client/domain/pages.md`, section 7), on two pages of temper's
+(`README.md`, 3.5; with the user, 2026-10-23): `Forges`, which manages
+the forges the person has, and `ConnectForge`, a flow that connects one
+more. Each is read for a person whose role on project 0 is `Owner`, in
+standalone the deployment's owner; any other's read is refused, in
+jig's words (`README.md`, section 8). Their mockups are `forges.html`
+and `connect-forge.html`.
+
+- **The Forges page** lists the person's forges: each configured forge,
+  fakes aside, whose connection is setting up, set up failed, connecting,
+  connected or stopped, or not connected where its records say why. A
+  forge not connected or not set up, with nothing to say, is not
+  listed: it is a choice of the flow. Under the heading "Your forges",
+  with their count, and "+ Add a forge", a link to `ConnectForge`; with
+  none, "No forge of yours yet." and "Connect a forge". Each row is
+  folded to its name, its number, kind and `web` address, its
+  connection's words and, connected, its repositories, each with its
+  project; opened, it holds the rest of the row's parts below and its
+  actions. Every row starts folded.
+- **The playground's forge,** the fake the demo names, follows under
+  "The playground", folded, while the demo's forge half holds
+  (`README.md`, 4.8): "Playground forge · the playground's, until a
+  forge of yours connects · OWNER/NAME". Once the demo has ended
+  (`../draft/first-run.md`, 2.3), it shows nowhere.
+- **Connecting a forge,** `ConnectForge`, is four steps, named along its
+  top: Choose, Details, Setting up ("Connecting" for GitHub and a
+  Forgejo elsewhere) and Ready. Choose is a card for each forge offered
+  to connect, in this order: GitHub, while not connected; "Forgejo on
+  this machine", an owned Forgejo not set up whose offer is offered
+  (`README.md`, 4.6); "A Forgejo elsewhere", a Forgejo not owned and
+  not connected. Details are the chosen action's fields (below).
+  Setting up shows the forge's connection as its row says it, with each
+  of the box's steps. Ready ends on the work: "OWNER/NAME is ready",
+  with "Open PROJECT", the project the set up adopted it into, and the
+  forge's address; on GitHub, the account of its first installation.
+  Leaving the
+  flow leaves what runs running; the banner then says it.
+- **Elsewhere:** while a forge sets up or connects, the banner says its
+  step with a link to the flow at that step (`README.md`, 5.1); the
+  navigation's "Forges" carries a dot, amber while a forge sets up or
+  connects, red while one needs the person: set up failed, stopped, or
+  not connected with a reason (`README.md`, 5.3).
+
+A row for each forge, by its number, its kind and its `web` address,
+says:
 
 - **Its connection,** one of:
 
@@ -476,8 +516,13 @@ admin", with its forge number and bot (`../protocol/setup.md`, section
 | Install the App; Install on another account | GitHub, connected: "Install the App" before any accepted installation, "Install on another account" after one | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
 | New repository | Forgejo owned or managed, connected | the set up's same fields: organization (default `work`), repository (default `hello`) and an existing project; the general form of the first repository (`../protocol/setup.md`, section 15) |
 | Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
-| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
+| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | its organization (default `work`), its repository (default `hello`) and its project: a new one, named as the repository, or an existing one (`../protocol/setup.md`, section 15; a new project waits on jig's projects at runtime); then the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled, and the repository made and adopted into the project; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
 | Set up again | the row's offer offered, set up failed | the same ask again: what the last one left is kept, a fetched binary hashed and not fetched again |
+
+Connect, but on a stopped forge or one whose records say why it is not
+connected, "Connect as its admin" and "Set up a Forgejo here" are the
+flow's, at its Details; every other action is a row's, in its opened
+part.
 
 A pasted value is a field of its own (`README.md`, 3.6 and section 8),
 emptied as the request leaves and shown nowhere, then or after; the

@@ -999,7 +999,7 @@ running its commands, and the client names them (6.5).
      "mode": {"fake": {
        "listen": {"socket": "127.0.0.1:8369"},
        "git": "demo/bin/git",
-       "owner": "demo",
+       "owner": "playground",
        "repositories": [{"name": "widget", "landing": "main"}]}}}
   ]
   ```
@@ -1367,7 +1367,7 @@ defaults for a person's real work are open (section 16).
   reaches a socket.
 - **Two `setup` entries:**
   - forge 1's, fake, in `demo/forge`, its `git` the demo's link (8.2),
-    its bot `temper`, its `owner` `demo`, its one repository `widget`,
+    its bot `temper`, its `owner` `playground`, its one repository `widget`,
     landing on `main` (8.4);
   - forge 3's, owned, in `forge-3`, `"start": "asked"` (7.1): its
     `forgejo` and `runner.binary` `"fetched"` (6.6); its runner the
@@ -1443,7 +1443,7 @@ own binary, the engine sets itself up on the fake as on an owned one,
 and a seed adds the demo model's key and adopts the demo's repository
 through the client's protocol. Its bar: one suggested request landed
 end to end on the demo model, by the engine's own loop with nothing
-staged. The chat delegates a change on `demo/widget`; its coding agent
+staged. The chat delegates a change on `playground/widget`; its coding agent
 edits a file; the worker commits and pushes the branch with `temper
 fake git`, on the fake forge's git route; the change opens its pull
 request, passes the fake's CI and lands into `main`; and the chat says
@@ -1493,26 +1493,29 @@ them as it does any Forgejo.
 
   Each is checked as skein checks a script's turns (its section 2.3).
   No turn holds a hold, a failing line or opaque bytes.
-- **Its words,** as `temper init` writes them (8.2): one `asked` script
+- **Its words,** as `temper init` writes them (8.2), the playground's,
+  as the person meets the demo (`../draft/first-run.md`, 2.3; the
+  client's phrasebook, `../client/README.md`, 5.6): one `asked` script
   for each request the client suggests in the demo project
   (`../client/mockups/first-run.html`), "Add CSV export to widget", "Add
   a dark theme to widget" and "Fix widget's empty search state"; one
   `cued` script, for the coding agent of the change the first
   delegates; and an
-  `otherwise` that says it is the demo model, which answers only the
+  `otherwise` that says it is the scripted model, the playground's,
+  which answers only the
   suggested requests, and how to connect a real one from the client's
   accounts page. Each turn is an object, its tokens its lines' bytes
   divided by 4, rounded up. Their content is the demo's follow-up
   (`../draft/first-run.md`, section 8).
   - *"Add CSV export to widget",* the chat's, three turns, each
     finishing `tool_calls`:
-    1. the text "I’ll delegate this change in demo/widget. It will push
-       a branch, open a pull request, check CI and land into main on
-       Demo forge.", then `delegate`, one item: the change procedure,
+    1. the text "I’ll delegate this change in playground/widget. It
+       will push a branch, open a pull request, check CI and land into
+       main on Playground forge.", then `delegate`, one item: the change procedure,
        `{"kind": "procedure", "connector": 1, "code": 2}`; its spec's words
        `Export widget's table as CSV`, and its parameters the repository,
        `{"kind": "resource", "connector": 1, "resource": 1}`, the fake's
-       `demo/widget` (below), and the bytes `main`; its contract a
+       `playground/widget` (below), and the bytes `main`; its contract a
        change on connector 1, kind 1, in at most 128 words; its
        authority the one the real loop's landing story gives its change
        (`tests/real-loop`'s `landing.rs`), its grants on the project's
@@ -1520,8 +1523,8 @@ them as it does any Forgejo.
        `{"kind": "agent", "number": 2}`;
     2. `{"call": "wait", "arguments": {}}`;
     3. once the change's result wakes the chat, the text "CSV export is
-       available from widget’s table. The change landed on Demo forge.
-       This was a scripted demo change.", then the same `wait`.
+       available from widget’s table. The change landed on Playground
+       forge. This was a scripted change.", then the same `wait`.
 
     The two texts are the mockups' first run's
     (`../client/mockups/world-first-run.js`), with their typographic
@@ -1546,8 +1549,8 @@ them as it does any Forgejo.
     (`../domain/forge.md`); the coding charter's agent writes no git.
   - *The dark theme, the empty search, and `otherwise`,* one turn each:
     its text line, answering what it would change and why, then
-    `{"call": "finish", "arguments": {"form": "report", "text": "The demo
-    changes nothing.", "fields": {}}}`, finishing `tool_calls`. The
+    `{"call": "finish", "arguments": {"form": "report", "text": "The
+    playground changes nothing.", "fields": {}}}`, finishing `tool_calls`. The
     chat is ended by its requester (`../domain/agent.md`, 4.6), so the
     `finish` ends only the run's turn: its report is discarded, no try
     is spent, and the chat waits for the person's next words, its
@@ -1609,7 +1612,7 @@ them as it does any Forgejo.
   - *its repositories,* `fake.repositories`, each the owner's, in the
     protocol's `config.repositories` and the domain alike, numbered
     from 1 in the list's order at every start, so the box's
-    `demo/widget` and the QA loop's `fake/widget` are each 1; on its
+    `playground/widget` and the QA loop's `fake/widget` are each 1; on its
     `landing` branch, one commit of `temper-fake`'s constants, its
     files, author and time alike, so its head is the same commit at
     every start: `README.md`; `src/main.rs`, whose `main` prints
@@ -2309,14 +2312,14 @@ it checks of this document:
 - **A first run,** a test of its own: `temper box` on three empty
   scratch directories writes the configuration (8.2), says so, and
   prints one sign-in link, which signs the owner in; the demo forge is
-  connected and `demo/widget` adopted into project 1. The owner sends
+  connected and `playground/widget` adopted into project 1. The owner sends
   "Add CSV export to widget" to the project's chat, which runs on the
   demo model with no pick (8.3); the chat's last message says the
   change landed, its delegated task ended landed, and the test's own
-  clone of `demo/widget` by the demo's link, run as the worker runs
+  clone of `playground/widget` by the demo's link, run as the worker runs
   git, holds `main` one commit past the seeded head, its `src/main.rs`
   the coding agent's edit (8.4). The test reads the one hook on
-  `demo/widget`, at the box's webhooks' listener, on the fake's API with
+  `playground/widget`, at the box's webhooks' listener, on the fake's API with
   the handover's token, and prints each box run's time, asserting no
   time. A delivery's acceptance is shown by
   `tests/real-loop/tests/forge.rs`'s

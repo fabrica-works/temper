@@ -721,7 +721,7 @@ and 10).
   fake git`, checked and landed into the fake's `main` on the demo
   model, and the chat says so, its card for the change reading it
   landed (../protocol/setup.md, 8.4 and 13.4; ../client/README.md, 5.7).
-  The test reads the one hook on `demo/widget` at the box's webhooks'
+  The test reads the one hook on `playground/widget` at the box's webhooks'
   listener with the handover's token and prints each box run's time,
   asserting no time. A delivery's acceptance is shown by
   `tests/real-loop/tests/forge.rs`'s

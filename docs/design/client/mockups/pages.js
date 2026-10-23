@@ -1269,7 +1269,7 @@
       ['Forgejo on this machine, without the box', { ...owned, state: 'not set up', box: false }],
       ['A Forgejo elsewhere', null],
     ].map(([heading, f]) => `<h3>${esc(heading)}</h3>${flowSteps(flowCurrent(f), f?.kind === 'GitHub' ? 'Connecting' : 'Setting up')}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}`).join('')}</section>` : '';
-    return listPage('forges', [['Forges', 'forges.html'], ['Connect a forge']], `<div class="section-heading" style="margin-top:0"><h2>Connect a forge ${ahead('client', 'a page for connecting a forge, apart from the Forges page; client forge.md 5.4 draws one page')}</h2></div>${flowSteps(which ? flowCurrent(f) : 0, f?.kind === 'GitHub' ? 'Connecting' : 'Setting up')}${which ? `${flowCurrent(f) === 1 ? `<p><a class="text-link" href="${esc(u('connect-forge.html'))}">‹ All forges</a></p>` : ''}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}` : choose}${variants}`);
+    return listPage('forges', [['Forges', 'forges.html'], ['Connect a forge']], `<div class="section-heading" style="margin-top:0"><h2>Connect a forge</h2></div>${flowSteps(which ? flowCurrent(f) : 0, f?.kind === 'GitHub' ? 'Connecting' : 'Setting up')}${which ? `${flowCurrent(f) === 1 ? `<p><a class="text-link" href="${esc(u('connect-forge.html'))}">‹ All forges</a></p>` : ''}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}` : choose}${variants}`);
   };
   pages.forges = () => {
     const owned = world.forges.find(f => f.n === 3);

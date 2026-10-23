@@ -113,7 +113,7 @@ Forgejo and model).
 - **The demo starts only when chosen.** Its state is the engine's: not
   started, running, ended. The fakes become asked groups of the box,
   started on the engine's ask; the engine sets the demo up itself, the
-  demo model's account and `demo/widget` adopted into the project, as
+  demo model's account and `playground/widget` adopted into the project, as
   forgejo-setup's M4 makes and adopts an owned forge's first
   repository. The seed (3.6) and its link step go: serve's first link
   is the person's.
@@ -123,7 +123,7 @@ Forgejo and model).
   the engine records it, asks the box to stop the fake forge (a pipe
   line, `stop FORGE`), and leaves the forge in its domain as ended, so
   that nothing that lists forges shows it. The demo's open chats end;
-  `demo/widget` leaves the project's repositories; its tasks, chats and
+  `playground/widget` leaves the project's repositories; its tasks, chats and
   landings stay readable. A start reads the same record, so a restart
   and the moment of the end look alike. A demo never started is ended
   the same way, and never starts.
@@ -137,13 +137,11 @@ Forgejo and model).
   a branch to main."; the banner "This is the playground: a scripted
   model and a playground forge."; the names Scripted model and
   Playground forge (the client's phrasebook, `../client/README.md`,
-  5.6), and the repository `playground/widget`. Its step changes
-  setup.md 8.4's words to match: the fake's owner `playground`; the
-  CSV's texts "…land into main on Playground forge." and "…The change
-  landed on Playground forge. This was a scripted change."; the dark
-  theme's "The playground plays only the CSV export as a change";
-  "The playground changes nothing."; and `otherwise` saying it is the
-  scripted model.
+  5.6), and the repository `playground/widget`, the fake's owner
+  `playground`. setup.md 8.4 holds the scripts' words; the client's
+  README, its pages (3.5: `Welcome`, `ConnectForge`), the setup strip
+  (5.1, 5.6) and the demo's halves ending for good (4.8); its
+  `forge.md`, 5.4, the Forges page and the flow.
 
 ## 3. The pieces
 
@@ -250,7 +248,7 @@ experience; good defaults for a person's real work are open (section 8).
 
 ### 3.6 The demo's seed
 
-- **The repository** is the fake forge's seed: `demo/widget`, a few
+- **The repository** is the fake forge's seed: `playground/widget`, a few
   files and a check workflow the fake's CI answers.
 - **Adoption is the client's,** never configuration's: repositories are
   never configured (configuration.md, section 8). Once `temper serve`
@@ -324,7 +322,9 @@ experience; good defaults for a person's real work are open (section 8).
    wording.
 5. **The welcome and the demo's end** (2.3): the demo's state in the
    engine, the fakes asked, the seed's acts in the engine, `stop` on
-   the pipe, the welcome and its wizard in the client.
+   the pipe, the welcome and its wizard in the client, and the
+   playground's words in the fake's scripts, `temper init`'s document
+   and the client.
 
 ## 6. Testing
 
