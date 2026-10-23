@@ -525,15 +525,17 @@ in the lower world that owns it, never here.
     1. a direct landing (`tests/real-loop/tests/github_land.rs`), on
        story 6's layer and connection: the App connected with `temper
        ctl forge-connect` and installed on `acme`, the person adopts
-       `acme/app`, and a chat asks for a change whose coder reads, edits
-       and finishes it and whose reviewer approves, as `fuzzy_landing`'s
-       scripts run on Forgejo. The layer's CI reports the head's check
-       run, context `ci`, pending then passed, within the story's
-       latency; the change is merged at that head and ends landed. The
-       layer's record shows one merge, at the head the coder pushed, by
+       `acme/app`, and a chat asks through `change` for a change whose
+       coder reads, edits and finishes it and whose reviewer approves,
+       as `fuzzy_landing`'s scripts run on Forgejo. The layer's CI
+       reports the head's check run, context `check`, passed with no
+       latency; the change is merged at that head and ends landed.
+       The layer's record shows one pull request and one merge, at the
+       head the coder pushed, by
        a token minted for `acme`'s installation, and the change task's
        result names the pull request and its merge commit, which is the
-       tip of `main` on the layer. A whole chat: at most 3 s (1.5 s
+       tip of `main` on the layer and holds the coder's README. The chat
+       hears the landing before replying. A whole chat: at most 3 s (1.5 s
        before the user's doubling of 10-22, provisional);
     2. GitHub connected through the manifest flow from `temper ctl`,
        the browser's steps as the requests above;
@@ -1205,11 +1207,12 @@ and 10).
   story above, by `crates/temper/tests/support/github_land.rs` on
   `support/github.rs`'s steps: the chat asks for a change, scripted as
   the real loop's story 1 is (2.4), and the story waits until the
-  change task has ended. Then the worker and the engine are restarted
-  as above. Its Musts, after the restart: the change task ended landed,
-  its result the same pull request and merge commit as in the first
-  life; the layer saw one merge and one pull request opened across both
-  lives, and no task was made after the restart; the forge reconnects as
+  change task has ended landed and the chat has replied and closed.
+  Then the worker and the engine are restarted as above. Its Musts,
+  after the restart: the change task ended landed, its result the
+  same pull request and merge commit as in the first life; the layer
+  saw one merge and one pull request opened across both lives, and no
+  task was made after the restart; the forge reconnects as
   in the App's story. Its aim is the App's story's.
 - **Outside the suites:** nextest profile `process`, run by
   `scripts/proof-one-process.sh`, which builds the binary and the fake

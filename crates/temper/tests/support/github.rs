@@ -565,18 +565,18 @@ pub(super) fn objects(address: SocketAddr, commit: u64) -> Value {
     serde_json::from_slice(&response[at + 4..]).expect("objects JSON")
 }
 
-struct App {
-    id: u64,
-    pem: Secret,
+pub(crate) struct App {
+    pub(crate) id: u64,
+    pub(crate) pem: Secret,
 }
 // These requests go to other processes' real listeners; unlike the one-ring
 // tier, a bounded synchronous exchange cannot hold the server's loop up.
-struct Response {
-    status: u16,
-    location: Option<String>,
-    body: Vec<u8>,
+pub(crate) struct Response {
+    pub(crate) status: u16,
+    pub(crate) location: Option<String>,
+    pub(crate) body: Vec<u8>,
 }
-fn request_url(address: SocketAddr, method: &str, url: &str, media: &str, body: &[u8]) -> Response {
+pub(crate) fn request_url(address: SocketAddr, method: &str, url: &str, media: &str, body: &[u8]) -> Response {
     let origin = format!("http://{address}");
     let target = url.strip_prefix(&origin).expect("only the expected fake or engine origin");
     assert!(target.starts_with('/'), "local HTTP target");
@@ -611,7 +611,7 @@ fn request(address: SocketAddr, method: &str, target: &str, media: &str, body: &
         .map(|(_, value)| value.trim().to_owned());
     Response { status, location, body: bytes[at + 4..].to_vec() }
 }
-fn make_app(address: SocketAddr, clients: SocketAddr, scratch: &Path) -> App {
+pub(crate) fn make_app(address: SocketAddr, clients: SocketAddr, scratch: &Path) -> App {
     use skein_forge::github::setup;
     use std::fmt::Write as _;
     let origin = format!("http://{clients}");
@@ -657,19 +657,19 @@ fn make_app(address: SocketAddr, clients: SocketAddr, scratch: &Path) -> App {
     app
 }
 
-struct Scan {
+pub(crate) struct Scan {
     pem: Vec<u8>,
     der: Box<[u8]>,
     encoded: Vec<u8>,
 }
 impl Scan {
-    fn new(pem: &[u8]) -> Self {
+    pub(crate) fn new(pem: &[u8]) -> Self {
         let compact: String =
             std::str::from_utf8(pem).expect("PEM text").lines().filter(|line| !line.starts_with("-----")).collect();
         let der = base64::decode(base64::Alphabet::Standard, compact.as_bytes(), 4096).expect("App DER");
         Self { pem: pem.to_vec(), der, encoded: compact.into_bytes() }
     }
-    fn clean(&self, bytes: &[u8]) {
+    pub(crate) fn clean(&self, bytes: &[u8]) {
         assert!(
             !bytes.windows(40).any(|part| part.starts_with(b"ghs_") && part[4..].iter().all(u8::is_ascii_alphanumeric)),
             "Must: no installation token outside jig's secrets store"
@@ -683,7 +683,7 @@ impl Scan {
             );
         }
     }
-    fn files(&self, root: &Path, secrets: &Path, downloaded: &Path) {
+    pub(crate) fn files(&self, root: &Path, secrets: &Path, downloaded: &Path) {
         assert!(secrets.is_dir(), "excluded directory is jig's secrets store");
         let mut pending = vec![root.to_path_buf()];
         while let Some(path) = pending.pop() {

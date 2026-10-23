@@ -2705,3 +2705,9 @@ fn a_restarted_workstation_keeps_the_directors_question_and_answers_it_once_as_p
     oracle::assert_met(&oracle::step_4_6(&run.observed(acts::READS_4_6)));
     assert_eq!(run.first_placed().get(&case::HANG).map(String::as_str), Some("ws"));
 }
+
+// domain/testing.md, 2.6: the chat's connected GitHub change survives both services restarting.
+#[test]
+fn a_chats_change_lands_on_connected_github_and_is_found_after_a_restart() {
+    support::github_land::restart();
+}

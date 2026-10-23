@@ -157,6 +157,8 @@ pub struct Seen {
     /// The git-call count when each recorded ctl call first completed.
     pub git_after_call: Vec<usize>,
     pub branches: BTreeMap<Vec<u8>, Branch>,
+    /// Pull creation and merging on acme/app, retained in the layer's order.
+    pub pulls: Vec<domain::Observation>,
 }
 impl Seen {
     pub(crate) fn checkpoint(&mut self, peer: &Peer, calls: &[crate::calls::Called]) {
@@ -174,16 +176,18 @@ impl Seen {
             layer.installations().iter().map(|row| (row.id, row.account, row.login.to_vec())).collect();
         let mut forge = handle.borrow_mut();
         while let Some(observation) = forge.domain.pop_observation() {
-            if let domain::Observation::Moved { repository, branch, .. } = observation
+            if matches!(&observation,
+                domain::Observation::Opened { repository, .. } | domain::Observation::Merged { repository, .. }
+                if repository.as_ref() == b"acme/app")
+            {
+                self.pulls.push(observation);
+                continue;
+            }
+            if let domain::Observation::Moved { repository, branch, to: head, .. } = observation
                 && repository.as_ref() == b"acme/app"
             {
-                let api::Answer::Commit(head) = forge
-                    .domain
-                    .inspect(&forge.config, &repository, &api::Read::Branch { branch: branch.clone() })
-                    .expect("pushed branch")
-                else {
-                    panic!("branch head")
-                };
+                // A landed topic branch may already be deleted. Its move records
+                // the pushed object, which remains available after that cleanup.
                 let object = forge.domain.object(head).expect("pushed object");
                 self.branches.insert(
                     branch.to_vec(),
