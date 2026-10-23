@@ -129,6 +129,30 @@ impl Cluster {
         self.bindings.insert(format!("proc.{member}.dir"), new.to_str().expect("member path").into());
         assert_eq!(self.specs[index]["name"], name);
     }
+    /// Copy one member's description under a new name before reserving world roots.
+    /// Source templates stay the same; the story shapes the copied documents after preparation.
+    pub fn copy(&mut self, member: &str, name: &str) {
+        assert!(!self.specs.iter().any(|spec| spec["name"] == name), "duplicate process {name}");
+        let mut spec = self.specs[self.index(member)].clone();
+        let directory = self.dir(member).parent().expect("scratch").join(name);
+        private_directory(&directory);
+        assert!(
+            self.bindings
+                .insert(format!("proc.{name}.dir"), directory.to_str().expect("member path").into())
+                .is_none(),
+            "duplicate binding {name}"
+        );
+        spec["name"] = name.into();
+        for arg in spec["argv"].as_array_mut().expect("argv") {
+            *arg = string(arg).replace(&format!("proc.{member}."), &format!("proc.{name}.")).into();
+        }
+        for ready in spec["ready"].as_array_mut().expect("ready captures") {
+            if let Some(prefix) = ready["prefix"].as_str() {
+                ready["prefix"] = prefix.replace(&format!("linked {member} "), &format!("linked {name} ")).into();
+            }
+        }
+        self.specs.push(spec);
+    }
     /// Prepare files once; starting this member retains the story's edits.
     pub fn prepare(&mut self, process: &str) -> PathBuf {
         assert!(!self.prepared.contains(process), "prepare once");
