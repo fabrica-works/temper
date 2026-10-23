@@ -1920,7 +1920,10 @@ them as it does any Forgejo.
   nothing twice. A start while another is under way waits for it and
   takes its answer. The answer is kept in memory alone, as `SetUp`'s
   is (`../client/README.md`, section 8): the same key while it is held
-  answers the same outcome, and after a restart, unknown.
+  answers the same outcome, and after a restart, unknown. A restart
+  during a start leaves the record running and an act undone; the
+  client's next start, which it sends once a session while the demo
+  runs (`../client/README.md`, 4.8), makes it.
 - **A restart** of the box starts no fake until serve asks: serve's
   start reads the demo running and asks for its group (above), its
   preparation draws a new handover, and the engine takes it at

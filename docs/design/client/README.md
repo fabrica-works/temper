@@ -1287,7 +1287,13 @@ of each (`../draft/first-run.md`, 3.6).
   once it failed, the side holds the demo as running, the demo's start
   saying the start is under way, its suggestions waiting, or why it
   failed, with "Try again", which sends a start under a new key (5.6).
-  Answered running, or unknown, the side reads the demo again.
+  Answered running, or unknown, the side reads the demo again. Once in
+  a session, the first time the side reads the demo running with no
+  start of its own sent, it sends `StartDemo` too, which finds what is
+  done and changes nothing shown; answered start failed, the demo's
+  start shows it as above. It mends a start a restart cut short, whose
+  record says running while its acts are not done
+  (`../protocol/setup.md`, 8.4).
 - **The model's half** holds while the demo is running (above) and no account
   of the `accounts` document, the one the accounts' banner keeps (5.1),
   of an LLM provider other than the demo's is usable. While that
