@@ -5,6 +5,7 @@ use crate::{
     words::{Word, Words},
 };
 use skein_ui::{Builder, Role, Run};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Address, Domain, Step, forge::forges::Connection, pages::Act};
 
 fn text(b: &mut Builder, w: &Words, role: Role, word: Word) {
@@ -141,7 +142,13 @@ pub(crate) fn main(
             Step::Ready => Step::Model { way: None },
         };
         go(b, w, bindings, Word::WelcomeBack, back);
-        control(b, w, bindings, Word::WelcomeLater, Act::Go { address: Address::Chats });
+        control(
+            b,
+            w,
+            bindings,
+            Word::WelcomeLater,
+            Act::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } },
+        );
         if playground {
             control(b, w, bindings, Word::WelcomePlaygroundInstead, Act::Playground);
         }

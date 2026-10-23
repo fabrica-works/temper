@@ -8,6 +8,7 @@ use alloc::boxed::Box;
 use jig_client::contract::{InboxGroup, ObjectKey, OwnerHistoricalValue, Proposer, ReadValue, ResultValue};
 use skein_lib::Decimal;
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
+use temper_client_domain::PlanFilter;
 use temper_client_domain::{
     Address, Domain,
     address::{Filter, Kind},
@@ -79,6 +80,13 @@ pub(crate) fn main(
         b.text(Run::Plain, &said);
         b.close();
         if heading == Word::NeedsYou {
+            control(
+                b,
+                bindings,
+                Role::Link,
+                &words.say(Word::NewChatLink, &[]),
+                Act::Go { address: Address::Chats { filter: temper_client_domain::ChatsFilter::All, start: true } },
+            );
             filters(b, root, inbox.filter, words, bindings);
         }
         b.close();
@@ -126,15 +134,17 @@ fn filter_control(b: &mut Builder, bindings: &mut Bindings, name: &[u8], filter:
 fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Slot);
     b.style(look::FILTERS);
-    b.open(Role::Slot);
-    filter_control(
-        b,
-        bindings,
-        &words.say(Word::AllProjects, &[]),
-        Filter { project: None, ..filter },
-        filter.project.is_none(),
-    );
-    if let Some(me) = root.pages().me(root.client()) {
+    if let Some(me) = root.pages().me(root.client())
+        && me.projects.len() >= 2
+    {
+        b.open(Role::Slot);
+        filter_control(
+            b,
+            bindings,
+            &words.say(Word::AllProjects, &[]),
+            Filter { project: None, ..filter },
+            filter.project.is_none(),
+        );
         for project in &me.projects {
             let fallback = words.say(Word::Project, &[Hole::Number(u64::from(project.project))]);
             let name = match &project.name {
@@ -149,8 +159,8 @@ fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindin
                 filter.project == Some(project.project),
             );
         }
+        b.close();
     }
-    b.close();
     b.open(Role::Disclosure);
     b.style(look::KIND_MENU);
     let chosen = match filter.kind {
@@ -276,7 +286,7 @@ fn entry(
                     | ObjectKey::PersonTask(_)
                     | ObjectKey::Note { .. },
                     _,
-                ) => Act::Go { address: Address::Task { task } },
+                ) => Act::Go { address: Address::Task { task, filter: PlanFilter::All } },
             },
         );
     }

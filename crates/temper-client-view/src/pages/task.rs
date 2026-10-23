@@ -8,6 +8,7 @@ use alloc::boxed::Box;
 use jig_client::{Latest, contract as c};
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::{Builder, Role, Run, phrases::Hole};
+use temper_client_domain::PlanFilter;
 use temper_client_domain::{
     Address, Domain,
     pages::{
@@ -593,7 +594,7 @@ fn chip(b: &mut Builder, chip: &c::Chip, words: &Words, bindings: &mut Bindings)
 }
 pub(crate) fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut Bindings) {
     let name = words.say(Word::Task, &[Hole::Number(task)]);
-    crate::link(b, &name, bindings.insert(Act::Go { address: Address::Task { task } }));
+    crate::link(b, &name, bindings.insert(Act::Go { address: Address::Task { task, filter: PlanFilter::All } }));
     b.text(Run::Plain, &name);
     b.close();
 }
@@ -713,7 +714,7 @@ fn folded(b: &mut Builder, counts: &[(c::Phase, u32)], held_below: u32, words: &
 pub(crate) struct Plan<'a> {
     pub word: Word,
     pub ended: Option<(&'a c::TaskPage, bool)>,
-    pub goal: Option<(task::Filter, u32)>,
+    pub goal: Option<(PlanFilter, u32)>,
 }
 impl<'a> Plan<'a> {
     fn of(page: &'a task::Task, task: &c::Task) -> Self {
@@ -770,7 +771,7 @@ impl<'a> Plan<'a> {
             }
             b.open(Role::Slot);
             b.style(look::FILTERS);
-            for (value, word) in [(task::Filter::All, Word::AllPlan), (task::Filter::Live, Word::LivePlan)] {
+            for (value, word) in [(PlanFilter::All, Word::AllPlan), (PlanFilter::Live, Word::LivePlan)] {
                 b.open(Role::Button);
                 b.name(&words.say(word, &[]));
                 if filter == value {
@@ -812,7 +813,7 @@ pub(crate) fn plan(
     let mut ended_rows = EndedRows::new(part.ended, tree);
     part.heading(b, words, bindings, &ended_rows);
     let Plan { word, ended, goal } = part;
-    if let Some((task::Filter::Live, _)) = goal {
+    if let Some((PlanFilter::Live, _)) = goal {
         ended_rows.lines = &[];
         ended_rows.more = false;
     }
@@ -890,7 +891,7 @@ pub(crate) fn plan(
     b.close();
     if !has_tree_content {
         let word = match (ended, goal) {
-            (_, Some((task::Filter::Live, _))) | (None, _) => Word::NoLiveTasks,
+            (_, Some((PlanFilter::Live, _))) | (None, _) => Word::NoLiveTasks,
             (Some((_, true)), _) => Word::ItsTasksNone,
             (Some((_, false)), _) => Word::ItsTasksNoneYet,
         };

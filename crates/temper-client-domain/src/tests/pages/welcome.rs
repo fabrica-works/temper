@@ -1,3 +1,4 @@
+use crate::ChatsFilter;
 use crate::tests::{demo, fixtures as f};
 use crate::{
     Action, Address, Domain, Event, Place, Request, Step, forge,
@@ -135,7 +136,7 @@ fn account(root: &mut Domain, watch: Token, provider: u32, usable: bool) -> Queu
 }
 fn moved(mut out: Queue<Request>, replace: bool) -> bool {
     while let Some(request) = out.pop() {
-        if request == (Request::Show { address: Address::Chats, replace }) {
+        if request == (Request::Show { address: Address::Chats { filter: ChatsFilter::All, start: false }, replace }) {
             return true;
         }
     }
@@ -272,7 +273,10 @@ fn leaving_the_welcome_keeps_the_sessions_forges() {
     let (mut root, _, _, forges) = opened(true, Step::Welcome);
     let watch = forges.unwrap();
     up(&mut root, Up::Watched { watch, event: c::WatchEvent::Opened });
-    let mut out = event(&mut root, Event::Went { place: Place::Address(Address::Chats) });
+    let mut out = event(
+        &mut root,
+        Event::Went { place: Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+    );
     let mut closed = false;
     while let Some(request) = out.pop() {
         if let Request::Client { request: jig_client::Request::Down { down: Down::Close { watch: closing } } } = request
@@ -360,7 +364,7 @@ fn strip_forges(root: &mut Domain, watch: Token, connection: Option<w::Connectio
 fn the_setup_strip_shows_while_there_is_no_demo_and_the_first_run_is_not_over() {
     use forge::listed;
     let (mut root, _, accounts, forges) = opened(true, Step::Model { way: None });
-    event(&mut root, Event::Went { place: Place::Address(Address::Chats) });
+    event(&mut root, Event::Went { place: Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) });
     assert!(listed::setup(&root).is_none());
     account(&mut root, accounts, 18, false);
     strip_forges(&mut root, forges.unwrap(), None);

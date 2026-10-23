@@ -156,7 +156,7 @@ pub fn codec() -> jig_protocol_transcript::Limits {
 
 #[must_use]
 pub fn chats_page() -> temper_client_domain::Address {
-    temper_client_domain::Address::Chats
+    temper_client_domain::Address::Chats { filter: temper_client_domain::ChatsFilter::All, start: false }
 }
 #[must_use]
 pub fn chats(driver: &Driver) -> u32 {
@@ -784,7 +784,7 @@ fn make_goal_named(
 }
 #[must_use]
 pub fn task_page(task: u64) -> temper_client_domain::Address {
-    temper_client_domain::Address::Task { task }
+    temper_client_domain::Address::Task { task, filter: temper_client_domain::PlanFilter::All }
 }
 #[must_use]
 pub fn plan_item(task: u64, status: &[u8]) -> skein_fake_person::Find {

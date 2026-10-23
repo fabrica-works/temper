@@ -115,7 +115,10 @@ fn draw(
         heading(w, row.account, provider, name, display, holder, plan, sources, accounts::current_me(root.client()));
     let deciding = sources.get(0);
     let pays = pays(w, plan, uses, bindings.counts().uses);
-    let use_line = use_line(w, runs, waiting);
+    let use_line: Box<[u8]> = match row.holder {
+        c::AccountHolder::Own => Box::new([]),
+        c::AccountHolder::Deployment => use_line(w, runs, waiting),
+    };
     let models = models(root, w, provider, text_bytes / 4);
     b.open(Role::Disclosure);
     b.style(crate::look::ACCOUNT_ROW);
@@ -128,7 +131,7 @@ fn draw(
         &summary_state(w, deciding),
         &words::say(w, W::Separator, &[]),
         &pays,
-        &words::say(w, W::Separator, &[]),
+        if use_line.is_empty() { b"" } else { &separator },
         &use_line,
     ]);
     b.description(&summary);
@@ -190,8 +193,10 @@ fn draw(
         pair(b, w, W::Models, &models);
     }
     pair(b, w, W::PaysFor, &pays);
-    pair(b, w, W::UsedBy, &chips(w, runs, waiting));
-    pair(b, w, W::WaitingFor, &chips(w, waiting, None));
+    if row.holder == c::AccountHolder::Deployment {
+        pair(b, w, W::UsedBy, &chips(w, runs, waiting));
+        pair(b, w, W::WaitingFor, &chips(w, waiting, None));
+    }
     let mut has_key = false;
     for source in sources {
         has_key |= source.kind == c::OwnerAccountKind::Key;

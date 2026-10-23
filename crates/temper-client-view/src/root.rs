@@ -94,7 +94,7 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
         temper_client_domain::Address::Welcome { .. } => {}
         temper_client_domain::Address::ConnectModel { .. }
         | temper_client_domain::Address::Accounts
-        | temper_client_domain::Address::Chats
+        | temper_client_domain::Address::Chats { .. }
         | temper_client_domain::Address::Chat { .. }
         | temper_client_domain::Address::Task { .. }
         | temper_client_domain::Address::Inbox { .. }
@@ -126,7 +126,7 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
         );
     } else if let temper_client_domain::Address::Inbox { .. } = root.pages().address() {
         crate::pages::inbox::main(&mut builder, root, &view.forge_words, &mut view.pages, view.rows, &mut times);
-    } else if *root.pages().address() == temper_client_domain::Address::Chats {
+    } else if let temper_client_domain::Address::Chats { .. } = root.pages().address() {
         crate::pages::chats::main(
             &mut builder,
             root,
@@ -191,7 +191,10 @@ pub fn href(view: &mut View, node: NodeId) -> Option<Box<[u8]>> {
     }
     match act(view, node, Act::Press)? {
         Action::Pages(temper_client_domain::pages::Act::OpenProject { .. }) => {
-            Some(temper_client_domain::address::print(&temper_client_domain::Address::Chats))
+            Some(temper_client_domain::address::print(&temper_client_domain::Address::Chats {
+                filter: temper_client_domain::ChatsFilter::All,
+                start: false,
+            }))
         }
         Action::Pages(temper_client_domain::pages::Act::Go { address }) => {
             Some(temper_client_domain::address::print(&address))

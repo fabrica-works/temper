@@ -1,5 +1,6 @@
 //! temper's pages own their handles and navigation (client/README.md, 3.1).
 use crate::{Address, Limits, owner::Owner};
+use crate::{ChatsFilter, PlanFilter};
 use alloc::boxed::Box;
 use jig_client::{
     Client, Handle, Latest, Link, Told, Watchable,
@@ -92,10 +93,10 @@ pub enum Act {
     Older,
     ClosedChats,
     ChatFilter {
-        filter: chats::Filter,
+        filter: ChatsFilter,
     },
     PlanFilter {
-        filter: task::Filter,
+        filter: PlanFilter,
     },
     Filter {
         filter: crate::address::Filter,
@@ -342,8 +343,8 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             unreachable!("suggestions are resolved by the root")
         }
         Event::Act { act: Act::ClosedChats } => closed_chats(pages, out),
-        Event::Act { act: Act::ChatFilter { filter } } => chat_filter(pages, filter),
-        Event::Act { act: Act::PlanFilter { filter } } => plan_filter(pages, filter),
+        Event::Act { act: Act::ChatFilter { filter } } => chat_filter(pages, filter, out),
+        Event::Act { act: Act::PlanFilter { filter } } => plan_filter(pages, filter, out),
         Event::Act { act: Act::Filter { filter } } => out.push(Request::Show { address: Address::Inbox { filter } }),
         Event::Act { act: act @ (Act::MessageWords { .. } | Act::Send | Act::Older) } => {
             if let Some(chat) = &mut pages.chat {
@@ -384,7 +385,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         } => confirmation(pages, env, client, act, out),
         Event::Act { act: Act::OpenProject { project } } => {
             choose_project(pages, client, project);
-            out.push(Request::Show { address: Address::Chats });
+            out.push(Request::Show { address: Address::Chats { filter: ChatsFilter::All, start: false } });
         }
         Event::Act { act: Act::Project { project } } => choose_project(pages, client, project),
         Event::Act { act: Act::SignOut } => out.push(Request::Client(jig_client::Event::SignOut)),
@@ -466,15 +467,15 @@ fn closed_chats(pages: &mut Pages, out: &mut Queue<Request>) {
         chats.older(out);
     }
 }
-fn chat_filter(pages: &mut Pages, filter: chats::Filter) {
-    if let Some(chats) = &mut pages.chats {
-        chats.filter = filter;
+fn chat_filter(pages: &Pages, filter: ChatsFilter, out: &mut Queue<Request>) {
+    if pages.chats.is_some() {
+        out.push(Request::Show { address: Address::Chats { filter, start: false } });
     }
 }
 
-fn plan_filter(pages: &mut Pages, filter: task::Filter) {
-    if let Some(task) = &mut pages.task {
-        task.filter = filter;
+fn plan_filter(pages: &Pages, filter: PlanFilter, out: &mut Queue<Request>) {
+    if let Some(task) = &pages.task {
+        out.push(Request::Show { address: Address::Task { task: task.number, filter } });
     }
 }
 
@@ -488,6 +489,21 @@ fn contains(me: &Me, project: Option<u32>) -> bool {
 }
 
 fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<Request>) {
+    if let (Address::Chats { .. }, Address::Chats { filter, .. }, Some(page)) =
+        (&pages.address, &address, &mut pages.chats)
+    {
+        page.filter = *filter;
+        pages.address = address;
+        return;
+    }
+    if let (Address::Task { task: current, .. }, Address::Task { task, filter }, Some(page)) =
+        (&pages.address, &address, &mut pages.task)
+        && current == task
+    {
+        page.filter = *filter;
+        pages.address = address;
+        return;
+    }
     if (!pages.accounts_open
         && pages.inbox.is_none()
         && pages.chats.is_none()
@@ -521,14 +537,18 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
         if let Some(task) = pages.task.take() {
             pages.next = task.leave(out);
         }
-        if let Address::Task { task } = address {
-            pages.task = Some(task::Task::new(task, pages.next, &env.limits, out));
+        if let Address::Task { task, filter } = address {
+            let mut page = task::Task::new(task, pages.next, &env.limits, out);
+            page.filter = filter;
+            pages.task = Some(page);
         }
         if let Address::Chat { task } = address {
             pages.chat = Some(chat::Chat::new(task, pages.next, &env.limits, out));
         }
-        if address == Address::Chats {
-            pages.chats = Some(chats::Chats::new(pages.next));
+        if let Address::Chats { filter, .. } = address {
+            let mut page = chats::Chats::new(pages.next);
+            page.filter = filter;
+            pages.chats = Some(page);
         }
         if let Address::Inbox { filter } = address {
             pages.inbox = Some(inbox::Inbox::new(filter, pages.next, &env.limits, out));
@@ -545,7 +565,7 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
                 way.source
             }
             Address::Inbox { .. }
-            | Address::Chats
+            | Address::Chats { .. }
             | Address::Accounts
             | Address::Forges
             | Address::ConnectForge { .. }
@@ -589,7 +609,7 @@ fn open_result(pages: &mut Pages, task: u64, through: u64, out: &mut Queue<Reque
             })),
         }));
     }
-    out.push(Request::Show { address: Address::Task { task } });
+    out.push(Request::Show { address: Address::Task { task, filter: PlanFilter::All } });
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
@@ -903,7 +923,7 @@ fn returned(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
             way.source = None;
         }
         Address::Inbox { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Accounts
         | Address::Forges
         | Address::ConnectForge { .. }

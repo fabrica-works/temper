@@ -62,12 +62,6 @@ pub(crate) fn main(
                 words,
             );
         }
-        if let Some((demo, halves)) = root.demo()
-            && halves.model
-            && task.project == demo.project
-        {
-            text(b, Role::Paragraph, &words.say(Word::DemoModelName, &[]));
-        }
         b.close();
         b.open(Role::Slot);
         spend(b, task, words);

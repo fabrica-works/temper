@@ -1,6 +1,7 @@
 use jig_client_world::harness::{App, ClientId, Duty, Front};
 use skein_lib::{Duration, Env, Queue, Time, Wall};
 use skein_ui::Role;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{self as d, Address, Choice, Step};
 use temper_client_world::{
     app::{Root, Temper},
@@ -133,7 +134,12 @@ fn setting_up_forgejo_here_from_the_welcome() {
         "Forgejo on this machine · Setting up: preparing · work/hello, into Project 1".as_bytes(),
     );
     node(&model, Role::Disclosure, b"Each step");
-    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    pump(
+        &mut front,
+        &mut root,
+        &mut now,
+        d::Event::Went { place: d::Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+    );
     let strip = view(&root);
     node(&strip, Role::Region, b"Setup");
     node(&strip, Role::Link, b"View");
@@ -153,7 +159,12 @@ fn setting_up_forgejo_here_from_the_welcome() {
     front.engine.send(temper_engine_domain::Event::Forge(Box::new(forge::Event::FirstMade { forge: OWNED, id: 42 })));
     front.engine.settle();
     // Creation is observed and adopted while the person is on another page.
-    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    pump(
+        &mut front,
+        &mut root,
+        &mut now,
+        d::Event::Went { place: d::Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+    );
     assert_eq!(front.applications_admitted(), before + 1, "one adoption admitted");
     assert!(front.engine_adopted(OWNED, 42));
     for _ in 0_u32..2 {
@@ -204,7 +215,12 @@ fn a_connected_forge_and_usable_model_remove_the_setup_strip_and_dot() {
     let (mut front, mut root) = accounts::forge_fixture(fixtures::SEED);
     let mut now = Time::ZERO.saturating_add(Duration::from_secs(1));
     connection(&mut front, Connection::Connecting);
-    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    pump(
+        &mut front,
+        &mut root,
+        &mut now,
+        d::Event::Went { place: d::Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+    );
     let strip = view(&root);
     node(&strip, Role::Region, b"Setup");
     node(&strip, Role::Link, b"View");
@@ -218,7 +234,12 @@ fn a_connected_forge_and_usable_model_remove_the_setup_strip_and_dot() {
     }
     accounts::kept(&mut front);
     connection(&mut front, Connection::Connected { id: 1, login: b"temper".as_slice().into() });
-    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    pump(
+        &mut front,
+        &mut root,
+        &mut now,
+        d::Event::Went { place: d::Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+    );
     let ready = view(&root);
     assert!(!ready.tree().nodes().iter().any(|n| n.role == Role::Region && n.name.as_deref() == Some(b"Setup")));
     assert!(!ready.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&temper_client_view::look::NAV_LIMITED)

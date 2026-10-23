@@ -201,7 +201,6 @@ section.temper-accounts button:hover { text-decoration: underline; }
 .temper-main .temper-chatbar > div { display: flex; align-items: center; gap: 16px; min-width: 0; white-space: nowrap; }
 .temper-main .temper-chatbar > div:first-child { flex: 0 1 auto; }
 .temper-main .temper-chatbar > div:last-child { flex: none; color: var(--temper-muted); }
-.temper-main.temper-chat .temper-chatbar > div:first-child > p { color: var(--temper-muted); font-weight: 400; }
 .temper-chat .temper-chatbar h1 { flex: none; margin: 0; color: var(--temper-accent); font: 700 11px/1.58 var(--temper-mono); letter-spacing: inherit; }
 .temper-main .temper-chatbar p { margin: 0; }
 .temper-main .temper-chatbar > div:first-child > p { overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 700; }

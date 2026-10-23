@@ -1,4 +1,5 @@
 use skein_ui::Role;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{self as d, Address, Place};
 use temper_client_world::{
     app::Root,
@@ -42,7 +43,7 @@ fn press(front: &mut Joint, root: &mut Root, role: Role, name: &[u8], act: skein
 #[test]
 fn the_banner_key_way_opens_details_and_ready_removes_the_banner() {
     let (mut front, mut root) = accounts::empty_fixture(fixtures::SEED);
-    go(&mut front, &mut root, Address::Chats);
+    go(&mut front, &mut root, Address::Chats { filter: ChatsFilter::All, start: false });
     assert!(text(&root).contains("Agents need an LLM account to run."));
     press(&mut front, &mut root, Role::Link, b"Use an API key", skein_ui::Act::Press);
     assert_eq!(

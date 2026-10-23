@@ -225,7 +225,12 @@ impl Person {
     fn new(root: Fd, scenario: Story) -> Self {
         let steps = match scenario {
             Story::Chat { words } | Story::ChatReadThenWait { words } => vec![
-                Step::Go { address: temper_client_domain::Address::Chats },
+                Step::Go {
+                    address: temper_client_domain::Address::Chats {
+                        filter: temper_client_domain::ChatsFilter::All,
+                        start: false,
+                    },
+                },
                 Step::See { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), within: CHAT_WITHIN },
                 Step::Type { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), words: words.into() },
                 Step::Press { find: Find::named(skein_ui::Role::Button, b"Start") },

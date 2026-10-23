@@ -32,7 +32,7 @@ Change model:
   [14] Reset choice
 [15] Start a chat: (empty) (enter sends)
 temper · Enter to start · Shift+Enter for newline
-[16] Start
+[16] Start chat
 ## Your chats
 [17] All (pressed)
 [18] Live

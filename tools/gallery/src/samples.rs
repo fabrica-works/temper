@@ -3,6 +3,7 @@ use crate::driver::{limits, step};
 use jig_client::contract as c;
 use skein_lib::{Queue, Token};
 use temper_client_domain::{Action, Address, Domain, Event, Request, address::Filter, pages::Act};
+use temper_client_domain::{ChatsFilter, PlanFilter};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum World {
@@ -39,17 +40,23 @@ pub struct Sample {
 }
 pub const N: usize = 45;
 #[must_use]
+fn task(task: u64) -> Address {
+    Address::Task { task, filter: PlanFilter::All }
+}
+
+#[must_use]
 pub fn samples() -> [Sample; N] {
+    const CHATS: Address = Address::Chats { filter: ChatsFilter::All, start: false };
     use Then::{
         AccountRefused, Closing, Declined, Filled, Held, KeyReady, OutOfDate, Refused, Rejecting, Releasing, Renewed,
         Shown, SignInReady, SignInRefused, SignedOut, SigningIn,
     };
     use World::{Bare, FirstRun, Reference, Solo};
     [
-        Sample { name: "chats-solo", world: Solo, address: Address::Chats, then: Shown },
+        Sample { name: "chats-solo", world: Solo, address: CHATS, then: Shown },
         Sample { name: "chat-solo-T10", world: Solo, address: Address::Chat { task: 10 }, then: Shown },
         Sample { name: "inbox-solo", world: Solo, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
-        Sample { name: "task-solo-T3", world: Solo, address: Address::Task { task: 3 }, then: Shown },
+        Sample { name: "task-solo-T3", world: Solo, address: task(3), then: Shown },
         Sample { name: "accounts-solo", world: Solo, address: Address::Accounts, then: Shown },
         Sample {
             name: "welcome-first-run-0",
@@ -57,7 +64,7 @@ pub fn samples() -> [Sample; N] {
             address: Address::Welcome { step: temper_client_domain::Step::Welcome },
             then: Shown,
         },
-        Sample { name: "chats-first-run-1", world: FirstRun { step: 1 }, address: Address::Chats, then: Shown },
+        Sample { name: "chats-first-run-1", world: FirstRun { step: 1 }, address: CHATS, then: Shown },
         Sample {
             name: "connect-forge-first-run-6",
             world: FirstRun { step: 6 },
@@ -71,11 +78,11 @@ pub fn samples() -> [Sample; N] {
             address: Address::ConnectForge { forge: None },
             then: Shown,
         },
-        Sample { name: "chats-setup-strip", world: Bare, address: Address::Chats, then: Shown },
+        Sample { name: "chats-setup-strip", world: Bare, address: CHATS, then: Shown },
         Sample { name: "adoption", world: Reference, address: Address::Adopt { project: 1 }, then: Shown },
         Sample { name: "adoption-filled", world: Reference, address: Address::Adopt { project: 1 }, then: Filled },
         Sample { name: "adoption-refused", world: Reference, address: Address::Adopt { project: 1 }, then: Refused },
-        Sample { name: "chats-reference", world: Reference, address: Address::Chats, then: Shown },
+        Sample { name: "chats-reference", world: Reference, address: CHATS, then: Shown },
         Sample { name: "chat-reference-T1", world: Reference, address: Address::Chat { task: 1 }, then: Shown },
         Sample { name: "chat-solo-T6", world: Solo, address: Address::Chat { task: 6 }, then: Shown },
         Sample {
@@ -104,14 +111,14 @@ pub fn samples() -> [Sample; N] {
         },
         Sample { name: "accounts-reference", world: Reference, address: Address::Accounts, then: Shown },
         Sample { name: "accounts-first-run-1", world: FirstRun { step: 1 }, address: Address::Accounts, then: Shown },
-        Sample { name: "signed-out", world: Bare, address: Address::Chats, then: SignedOut },
-        Sample { name: "out-of-date", world: Bare, address: Address::Chats, then: OutOfDate },
-        Sample { name: "chats-empty", world: Bare, address: Address::Chats, then: Shown },
+        Sample { name: "signed-out", world: Bare, address: CHATS, then: SignedOut },
+        Sample { name: "out-of-date", world: Bare, address: CHATS, then: OutOfDate },
+        Sample { name: "chats-empty", world: Bare, address: CHATS, then: Shown },
         Sample { name: "inbox-empty", world: Bare, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
         Sample { name: "chat-closing", world: Solo, address: Address::Chat { task: 6 }, then: Closing },
         Sample { name: "chat-rejecting", world: Solo, address: Address::Chat { task: 10 }, then: Rejecting },
-        Sample { name: "task-held", world: Solo, address: Address::Task { task: 3 }, then: Held },
-        Sample { name: "task-releasing", world: Solo, address: Address::Task { task: 3 }, then: Releasing },
+        Sample { name: "task-held", world: Solo, address: task(3), then: Held },
+        Sample { name: "task-releasing", world: Solo, address: task(3), then: Releasing },
         Sample {
             name: "connect-model-choose",
             world: Reference,
@@ -127,10 +134,10 @@ pub fn samples() -> [Sample; N] {
         model_sample("connect-model-renewed", temper_client_domain::WayKind::SignIn, Renewed),
         model_sample("connect-model-refused", temper_client_domain::WayKind::SignIn, SignInRefused),
         model_sample("connect-model-key-lost", temper_client_domain::WayKind::Key, AccountRefused),
-        Sample { name: "task-reference-T28", world: Reference, address: Address::Task { task: 28 }, then: Shown },
-        Sample { name: "task-reference-T24", world: Reference, address: Address::Task { task: 24 }, then: Shown },
-        Sample { name: "task-reference-T12", world: Reference, address: Address::Task { task: 12 }, then: Shown },
-        Sample { name: "task-solo-T9", world: Solo, address: Address::Task { task: 9 }, then: Shown },
+        Sample { name: "task-reference-T28", world: Reference, address: task(28), then: Shown },
+        Sample { name: "task-reference-T24", world: Reference, address: task(24), then: Shown },
+        Sample { name: "task-reference-T12", world: Reference, address: task(12), then: Shown },
+        Sample { name: "task-solo-T9", world: Solo, address: task(9), then: Shown },
     ]
 }
 fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: Then) -> Sample {
@@ -176,13 +183,13 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         World::Bare => return None,
     };
     let (page, task) = match sample.address {
-        Address::Chats => ("chats", None),
+        Address::Chats { .. } => ("chats", None),
         Address::Chat { task } => ("chat", Some(task)),
         Address::Inbox { .. } => ("inbox", None),
         Address::Accounts => ("accounts", None),
         Address::ConnectModel { .. } => ("connect-model", None),
         Address::Welcome { .. } => ("welcome", None),
-        Address::Task { task } => ("task", Some(task)),
+        Address::Task { task, .. } => ("task", Some(task)),
         Address::ConnectForge { .. } => ("connect-forge", None),
         Address::Forges => ("forges", None),
         Address::Adopt { .. } => return None,
@@ -196,7 +203,7 @@ pub fn mockup(sample: &Sample) -> Option<String> {
             format!("&forge={number}")
         }
         Address::Inbox { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Accounts
         | Address::ConnectModel { .. }
         | Address::Forges

@@ -1,4 +1,5 @@
 use super::*;
+use crate::PlanFilter;
 use jig_client::contract as c;
 const HELD: u64 = 12;
 const OUTPUTS: u32 = 16;
@@ -12,7 +13,7 @@ pub fn held_pages() -> crate::pages::Pages {
         &mut pages,
         &env(&limits),
         client.client(),
-        pages::Event::Went { address: Address::Task { task: chat::TASK } },
+        pages::Event::Went { address: Address::Task { task: chat::TASK, filter: PlanFilter::All } },
         &mut Queue::with_capacity(OUTPUTS),
     );
     let c::ReadValue::Escalation(held) = acts::held(c::ActKind::Release) else { panic!("hold") };

@@ -5,6 +5,7 @@ use skein_io::kernel::{Complete, Done, Fd, Op, Submit};
 use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
 use temper_client_domain::Address;
+use temper_client_domain::{ChatsFilter, PlanFilter};
 use temper_client_shell_terminal::client::{NativeClient, Settings, Start};
 /// Resolve the process story's Reply and task title together on one Item.
 /// Other semantic queries and interaction checks retain `TreeFace`'s contract.
@@ -68,7 +69,7 @@ pub fn answered_chat(words: &[u8], answer: &[u8]) -> Script {
     Script {
         begin: Begin::LinkWithKey,
         steps: Box::new([
-            Step::Go { address: Address::Chats },
+            Step::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } },
             Step::See { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), within: START_WITHIN },
             Step::Type { find: Find::named(skein_ui::Role::TextArea, b"Start a chat"), words: words.into() },
             Step::Press { find: Find::named(skein_ui::Role::Button, b"Start") },
@@ -157,7 +158,7 @@ pub fn demo_chat(task: u64, cue: &[u8], text: &[u8]) -> Script {
     Script {
         begin: Begin::Link,
         steps: Box::new([
-            Step::Go { address: Address::Chats },
+            Step::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } },
             Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Status, b"Ready"), within: START_WITHIN },
             Step::Gone { find: Find::exactly_named(Role::Status, b"Starting"), within: START_WITHIN },
@@ -243,7 +244,7 @@ pub fn demo_change() -> Script {
             Step::See { find: Find::text("CI passed. Landed · merge commit ".as_bytes()).within(card()), within: START_WITHIN },
             Step::Gone { find: Find::exactly_named(Role::Status, b"Applied"), within: START_WITHIN },
             // The owner's chat log holds the result's words alone, not its ending.
-            Step::Go { address: Address::Task { task: CHANGE } },
+            Step::Go { address: Address::Task { task: CHANGE, filter: PlanFilter::All } },
             Step::See {
                 find: Find::exactly_named(Role::Heading { level: 1 }, b"Export widget's table as CSV").within(details()),
                 within: START_WITHIN,
@@ -703,7 +704,7 @@ pub fn adopt_and_change(_forgejo: &super::forgejo::Throwaway) -> Script {
         Step::See { find: Find::text(b"Adopted acme/widget on forge 1 as owned."), within: super::WITHIN },
     ]);
     steps.extend([
-        Step::Go { address: Address::Chats },
+        Step::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } },
         Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: super::WITHIN },
         Step::Type {
             find: Find::named(Role::TextArea, b"Start a chat"),

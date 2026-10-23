@@ -125,7 +125,10 @@ fn welcome(root: &mut Domain, out: &mut Queue<Request>) {
     if let Some(over) = crate::pages::welcome::decision(root) {
         root.pages.decide_welcome();
         if over {
-            out.push(Request::Show { address: crate::Address::Chats, replace: true });
+            out.push(Request::Show {
+                address: crate::Address::Chats { filter: crate::ChatsFilter::All, start: false },
+                replace: true,
+            });
         }
     }
 }

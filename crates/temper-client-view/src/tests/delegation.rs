@@ -5,6 +5,7 @@ use skein_fake_person::{Face, Find, Found, Target, TreeFace};
 use skein_lib::{Env, List, Queue, Time, Wall};
 use skein_ui::Role;
 use temper_client_domain::{Address, Domain, Event, Request};
+use temper_client_domain::{ChatsFilter, PlanFilter};
 const CHANGE: u64 = 2;
 const CHAT: u64 = 1;
 const EXCHANGES: u32 = 64;
@@ -101,7 +102,7 @@ fn root_chat_with_reads(
         Some(chat) => chat.chip.task,
         None => CHAT,
     };
-    let (mut root, _, _) = fixtures::root_at(Address::Chats, receiving);
+    let (mut root, _, _) = fixtures::root_at(Address::Chats { filter: ChatsFilter::All, start: false }, receiving);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(receiving));
     temper_client_domain::step(
         &mut root,
@@ -404,7 +405,7 @@ fn a_running_change_shows_its_card_at_its_call() {
     assert_eq!(
         crate::act(&mut view, link, skein_ui::Act::Press),
         Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
-            address: Address::Task { task: CHANGE }
+            address: Address::Task { task: CHANGE, filter: PlanFilter::All }
         }))
     );
     assert_eq!(work_slots(&view), 0);

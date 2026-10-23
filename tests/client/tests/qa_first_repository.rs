@@ -3,6 +3,7 @@ use jig_client_world::harness::{ClientId, Until, World};
 use skein_fake_person::{Find, Step};
 use skein_lib::Token;
 use skein_ui::Role;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Address, Choice};
 use temper_client_world::{app::Temper, fixtures, front::Joint};
 use temper_engine_domain as engine;
@@ -209,7 +210,7 @@ fn leaving_the_flow_still_adopts_exactly_once() {
     let mut world = configured(true);
     let person = world.client(fixtures::PARTY, flow());
     setup(&mut world, person);
-    script(&mut world, person, vec![Step::Go { address: Address::Chats }]);
+    script(&mut world, person, vec![Step::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } }]);
     made(&mut world);
     connected(&mut world);
     let _ = world.run(Until::Steps(256));

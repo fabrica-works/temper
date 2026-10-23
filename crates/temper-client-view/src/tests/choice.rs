@@ -8,6 +8,7 @@ use super::fixtures;
 use jig_client::contract as c;
 use skein_lib::{List, Token};
 use skein_ui::{Builder, Role};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{self as d, Address};
 fn delivered(root: &mut d::Domain, watch: Token, value: c::Delivery) {
     fixtures::root_event(
@@ -38,7 +39,10 @@ fn banner(usable: Option<bool>) -> (d::Domain, Token) {
             })),
         );
     }
-    fixtures::root_event(&mut root, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    fixtures::root_event(
+        &mut root,
+        d::Event::Went { place: d::Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+    );
     (root, watch)
 }
 fn text(root: &d::Domain) -> String {
@@ -73,7 +77,7 @@ fn a_behind_accounts_document_removes_the_banner() {
 }
 #[test]
 fn missing_accounts_leave_start_available() {
-    assert!(fixtures::find(fixtures::page_view(&banner(Some(false)).0).tree(), Role::Button, b"Start").is_some());
+    assert!(fixtures::find(fixtures::page_view(&banner(Some(false)).0).tree(), Role::Button, b"Start chat").is_some());
 }
 #[test]
 fn the_accounts_page_has_no_accounts_banner() {
@@ -151,7 +155,7 @@ fn line_fixture(
     task_page: bool,
 ) -> (d::Domain, Token, Option<Token>, Token) {
     let (mut root, me_watch, watch, _, accounts_watch) = fixtures::root_at_full(
-        if task_page { Address::Chat { task: 9 } } else { Address::Chats },
+        if task_page { Address::Chat { task: 9 } } else { Address::Chats { filter: ChatsFilter::All, start: false } },
         &fixtures::limits(),
         b"Shop",
     );
@@ -159,7 +163,8 @@ fn line_fixture(
     let models = line_models(task_page);
     me.projects.get_mut(0).unwrap().models = models;
     if !task_page {
-        let template = fixtures::demo_root(Address::Chats, fixtures::PROJECT, true);
+        let template =
+            fixtures::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, fixtures::PROJECT, true);
         me.projects.get_mut(0).unwrap().templates =
             template.pages().me(template.client()).unwrap().projects.get(0).unwrap().templates.clone();
     }
@@ -321,7 +326,8 @@ fn catalogue(name: &[u8], efforts: &[&[u8]]) -> d::Domain {
     catalogue_rows(models)
 }
 fn catalogue_rows(models: List<c::MeModel>) -> d::Domain {
-    let (mut root, me_watch, _) = fixtures::root_at(Address::Chats, &fixtures::limits());
+    let (mut root, me_watch, _) =
+        fixtures::root_at(Address::Chats { filter: ChatsFilter::All, start: false }, &fixtures::limits());
     let mut me = d::pages::accounts::current_me(root.client()).unwrap().clone();
     let project = me.projects.get_mut(0).unwrap();
     project.templates = List::with_capacity(1);
@@ -450,7 +456,7 @@ fn the_chosen_model_and_effort_are_pressed() {
 fn an_invalid_draft_withholds_start() {
     let mut root = catalogue(b"needs-effort", &[b"high"]);
     edit(&mut root, d::pages::choice::Act::Model { index: 0 });
-    assert!(fixtures::find(catalogue_view(&root).tree(), Role::Button, b"Start").is_none());
+    assert!(fixtures::find(catalogue_view(&root).tree(), Role::Button, b"Start chat").is_none());
 }
 
 fn readiness(state: c::Readiness) -> c::PayerReadiness {
@@ -510,7 +516,7 @@ fn the_start_choice_is_a_sibling_before_entry() {
     assert_eq!(choice + usize::try_from(nodes[choice].size).unwrap(), entry);
     let children = &nodes[entry + 1..entry + usize::try_from(nodes[entry].size).unwrap()];
     let buttons: Vec<_> = children.iter().filter(|n| n.role == Role::Button).map(|n| n.name.as_deref()).collect();
-    assert_eq!(buttons, [Some(b"Start".as_slice())]);
+    assert_eq!(buttons, [Some(b"Start chat".as_slice())]);
 }
 fn edit(root: &mut d::Domain, act: d::pages::choice::Act) {
     fixtures::root_event(root, d::Event::Act { action: d::Action::Pages(d::pages::Act::Choice(act)) });

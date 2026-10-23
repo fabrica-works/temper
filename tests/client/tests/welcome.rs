@@ -1,6 +1,7 @@
 use jig_client_world::harness::{App, Duty, Front};
 use skein_lib::{Env, Queue, Secret, Wall};
 use skein_ui::Role;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{
     self as d, Address, Place, Step,
     pages::{Act, connect_model::Act as A},
@@ -83,7 +84,11 @@ fn a_first_run_welcome_without_a_demo() {
     let mut moved = false;
     for _ in 0..32 {
         while let Some(request) = out.pop() {
-            moved |= request == (d::Request::Show { address: Address::Chats, replace: true });
+            moved |= request
+                == (d::Request::Show {
+                    address: Address::Chats { filter: ChatsFilter::All, start: false },
+                    replace: true,
+                });
             if let Duty::Wire(request) = Temper::duty(request) {
                 front.wire(jig_client_world::harness::ClientId(0), now, Wall::EPOCH, request);
             }
@@ -116,7 +121,11 @@ fn a_configured_model_hides_the_banner_and_the_strips_model_half() {
     assert!(document.usable, "the configured model is usable");
     assert!(!document.accounts.iter().any(|line| d::forge::demo::usable_account(line, None)));
     assert_eq!(d::pages::welcome::decision(person), Some(false), "the forge is not connected");
-    accounts::event(&mut front, &mut root, d::Event::Went { place: Place::Address(Address::Chats) }.into());
+    accounts::event(
+        &mut front,
+        &mut root,
+        d::Event::Went { place: Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) }.into(),
+    );
     let setup = d::forge::listed::setup(root.person()).expect("forge setup remains");
     assert!(setup.forge);
     assert!(!setup.model);

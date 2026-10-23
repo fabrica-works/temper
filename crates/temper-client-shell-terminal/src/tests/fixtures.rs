@@ -388,6 +388,10 @@ pub fn inbox_page() -> skein_ui::Tree {
     builder.open(Role::Heading { level: 1 });
     builder.text(Run::Plain, b"Inbox");
     builder.close();
+    builder.open(Role::Link);
+    builder.name(&page_words().say(temper_client_view::words::Word::NewChatLink, &[]));
+    builder.link(binding());
+    builder.close();
     for name in [b"All projects".as_slice(), b"Shop", b"Second", b"All goals"] {
         builder.open(Role::Button);
         builder.name(name);
@@ -793,7 +797,7 @@ pub fn chats_page() -> skein_ui::Tree {
     b.bind(binding());
     b.close();
     b.open(Role::Button);
-    b.name(b"Start");
+    b.name(b"Start chat");
     b.bind(binding());
     b.close();
     b.open(Role::Heading { level: 2 });
@@ -818,7 +822,7 @@ pub fn chats_page() -> skein_ui::Tree {
             spend(7, 100, 2),
             Some(b"1 delegate".as_slice()),
         ),
-        (b"T8".as_slice(), b"Earlier".as_slice(), b"Ended".as_slice(), spend(4, 50, 0), None),
+        (b"T8".as_slice(), b"Earlier".as_slice(), b"Closed".as_slice(), spend(4, 50, 0), None),
     ] {
         b.open(Role::Item);
         b.open(Role::Link);

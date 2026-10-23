@@ -1,4 +1,5 @@
 use super::fixtures;
+use crate::ChatsFilter;
 use crate::pages::{Request, chats::Chats};
 use jig_client::{Event, Readable, Readout, Told, Watchable, contract::*};
 use skein_lib::{List, Queue};
@@ -163,12 +164,15 @@ fn new_chats_and_cues_keep_the_send_bound_when_receiving_grows() {
 
 #[test]
 fn chats_open_with_all_selected() {
-    assert_eq!(Chats::new(FIRST).filter, crate::pages::chats::Filter::All);
+    assert_eq!(Chats::new(FIRST).filter, ChatsFilter::All);
 }
 
 #[test]
-fn chat_filters_change_only_the_selection_and_emit_nothing() {
-    use crate::pages::{self, Act, Event, Pages, chats::Filter};
+fn chat_filter_moves_keep_the_draft_and_the_closed_page() {
+    use crate::{
+        ChatsFilter as Filter,
+        pages::{self, Act, Event, Pages},
+    };
     let limits = fixtures::limits();
     let root = crate::unlinked(&limits, fixtures::SEED);
     let mut pages = Pages::new();
@@ -177,7 +181,7 @@ fn chat_filters_change_only_the_selection_and_emit_nothing() {
         &mut pages,
         &fixtures::env(&limits),
         root.client(),
-        Event::Went { address: crate::Address::Chats },
+        Event::Went { address: crate::Address::Chats { filter: ChatsFilter::All, start: false } },
         &mut out,
     );
     while out.pop().is_some() {}
@@ -193,27 +197,51 @@ fn chat_filters_change_only_the_selection_and_emit_nothing() {
         let chats = pages.chats().expect("chats");
         (chats.live, chats.closed)
     };
+    let closed = TaskPage {
+        live: List::with_capacity(0),
+        live_after: None,
+        ended: EndedGroup::Rows { rows: List::with_capacity(0), after: None, cut: false },
+    };
+    pages::step(
+        &mut pages,
+        &fixtures::env(&limits),
+        root.client(),
+        Event::Told {
+            told: Told::Page {
+                handle: handles.1,
+                page: Readout::Jig(ReadResult::Value(ReadValue::Tasks(Box::new(closed.clone())))),
+            },
+        },
+        &mut out,
+    );
+    assert!(out.is_empty());
     for filter in [Filter::Live, Filter::Closed, Filter::All] {
-        for _ in 0_u32..2 {
-            pages::step(
-                &mut pages,
-                &fixtures::env(&limits),
-                root.client(),
-                Event::Act { act: Act::ChatFilter { filter } },
-                &mut out,
-            );
-            let chats = pages.chats().expect("chats");
-            assert_eq!(chats.filter, filter);
-            assert_eq!(&*chats.words, b"draft");
-            assert_eq!((chats.live, chats.closed), handles);
-            assert!(out.is_empty(), "a filter neither reads, watches, sends nor navigates");
-        }
+        let address = crate::Address::Chats { filter, start: false };
+        pages::step(
+            &mut pages,
+            &fixtures::env(&limits),
+            root.client(),
+            Event::Act { act: Act::ChatFilter { filter } },
+            &mut out,
+        );
+        assert_eq!(out.pop(), Some(Request::Show { address: address.clone() }));
+        assert!(out.is_empty());
+        pages::step(&mut pages, &fixtures::env(&limits), root.client(), Event::Went { address }, &mut out);
+        let chats = pages.chats().expect("chats");
+        assert_eq!(chats.filter, filter);
+        assert_eq!(&*chats.words, b"draft");
+        assert_eq!((chats.live, chats.closed), handles);
+        assert_eq!(chats.page.as_ref(), Some(&closed));
+        assert!(out.is_empty(), "a filter move reads nothing again");
     }
 }
 
 #[test]
 fn chat_filters_outside_chats_are_ignored_and_reopening_resets_them() {
-    use crate::pages::{self, Act, Event, Pages, chats::Filter};
+    use crate::{
+        ChatsFilter as Filter,
+        pages::{self, Act, Event, Pages},
+    };
     let limits = fixtures::limits();
     let root = crate::unlinked(&limits, fixtures::SEED);
     let mut pages = Pages::new();
@@ -227,7 +255,11 @@ fn chat_filters_outside_chats_are_ignored_and_reopening_resets_them() {
     );
     assert!(pages.chats().is_none());
     assert!(out.is_empty());
-    for address in [crate::Address::Chats, crate::Address::Accounts, crate::Address::Chats] {
+    for address in [
+        crate::Address::Chats { filter: ChatsFilter::All, start: false },
+        crate::Address::Accounts,
+        crate::Address::Chats { filter: ChatsFilter::All, start: false },
+    ] {
         pages::step(&mut pages, &fixtures::env(&limits), root.client(), Event::Went { address }, &mut out);
         while out.pop().is_some() {}
         if let Some(chats) = pages.chats() {
@@ -240,6 +272,12 @@ fn chat_filters_outside_chats_are_ignored_and_reopening_resets_them() {
             Event::Act { act: Act::ChatFilter { filter: Filter::Live } },
             &mut out,
         );
+        if pages.chats().is_some() {
+            assert_eq!(
+                out.pop(),
+                Some(Request::Show { address: crate::Address::Chats { filter: Filter::Live, start: false } })
+            );
+        }
         assert!(out.is_empty());
     }
 }
@@ -308,7 +346,12 @@ fn opened_chats() -> (crate::Domain, skein_lib::Token, skein_lib::Token) {
         },
         &mut out,
     );
-    crate::step(&mut root, &env, crate::Event::Went { place: Place::Address(Address::Chats) }, &mut out);
+    crate::step(
+        &mut root,
+        &env,
+        crate::Event::Went { place: Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+        &mut out,
+    );
     let mut watch = None;
     let mut read = None;
     while let Some(request) = out.pop() {
@@ -423,8 +466,15 @@ fn an_ending_chat_refreshes_the_first_closed_page_and_remains_listed() {
     crate::step(
         &mut root,
         &env,
-        crate::Event::Act { action: Action::Pages(Act::ChatFilter { filter: crate::pages::chats::Filter::Closed }) },
+        crate::Event::Act { action: Action::Pages(Act::ChatFilter { filter: ChatsFilter::Closed }) },
         &mut out,
+    );
+    assert_eq!(
+        out.pop(),
+        Some(crate::Request::Show {
+            address: crate::Address::Chats { filter: ChatsFilter::Closed, start: false },
+            replace: false,
+        })
     );
     assert!(out.is_empty());
 }

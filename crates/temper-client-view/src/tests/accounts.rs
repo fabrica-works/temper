@@ -654,6 +654,7 @@ fn only_settled_account_statuses_have_the_done_style() {
         );
     }
 }
+#[cfg(target_pointer_width = "64")]
 #[path = "../../../../testing/memory_literal.rs"]
 mod memory_literal;
 // Base 87c82f753: 4,420,462,083 + 304 added nodes x 574,364 B = 4,595,068,739 B.
@@ -697,7 +698,8 @@ mod memory_literal;
 // The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
 // The demo start's words, full failure text and retry nodes (1,724,026 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 11526788114;
+#[cfg(target_pointer_width = "64")]
+const ACCOUNT_BYTES: u64 = 11526788270;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -713,8 +715,12 @@ fn account_bounds_have_a_literal_price() {
     );
 }
 fn owner_root() -> (d::Domain, Token) {
+    let (root, deployment, _) = owner_root_with_accounts();
+    (root, deployment)
+}
+fn owner_root_with_accounts() -> (d::Domain, Token, Token) {
     let limits = fixtures::limits();
-    let (mut root, me_watch, _) = fixtures::root_at(d::Address::Accounts, &limits);
+    let (mut root, me_watch, _, _, accounts) = fixtures::root_at_full(d::Address::Accounts, &limits, b"Shop");
     let mut me = d::pages::accounts::current_me(root.client()).unwrap().clone();
     me.deployment_role = Some(c::HeldRole::Owner);
     let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
@@ -759,7 +765,7 @@ fn owner_root() -> (d::Domain, Token) {
     )
     .unwrap();
     deliver_deployment(&mut root, watch, deployment);
-    (root, watch)
+    (root, watch, accounts.expect("own accounts watch"))
 }
 #[test]
 fn an_owner_sees_deployment_accounts_after_their_own() {
@@ -1041,13 +1047,11 @@ fn accounts_are_folded_disclosures_with_their_state_and_line() {
     let summary = core::str::from_utf8(row.description.as_ref().unwrap()).unwrap();
     assert!(summary.contains("Ready"));
     assert!(summary.contains("Your own work, and projects where you’re the only member"));
-    assert!(summary.contains("no task uses it now"));
+    assert!(!summary.contains("no task uses it now"));
     // Opening is native shell state; every row keeps its content in the semantic tree.
     let at = tree.nodes().iter().position(|n| n.id == row.id).unwrap();
     let content = &tree.nodes()[at..at + usize::try_from(row.size).unwrap()];
-    for name in
-        [b"Pays for".as_slice(), b"Used by", b"Waiting for it", b"Add an API key", b"Sign out", b"Remove account"]
-    {
+    for name in [b"Pays for".as_slice(), b"Add an API key", b"Sign out", b"Remove account"] {
         assert!(content.iter().any(|n| n.name.as_deref() == Some(name)), "{name:?}");
     }
 }
@@ -1245,4 +1249,29 @@ fn deployment_account_facts_exclude_waiting_tasks_from_its_users() {
         let row = &tree.nodes()[at..at + usize::try_from(tree.nodes()[at].size).unwrap()];
         assert!(row.iter().any(|n| n.role == Role::Description && n.name.as_deref() == Some(value)), "{name:?}");
     }
+}
+
+#[test]
+fn only_deployment_rows_show_usage_facts_and_their_use_summary() {
+    let (mut root, deployment, accounts) = owner_root_with_accounts();
+    let mut doc = root.pages().accounts().unwrap().deployment(root.client()).unwrap().clone();
+    let row = doc.accounts.get_mut(0).unwrap();
+    row.runs = List::with_capacity(0);
+    row.waiting = List::with_capacity(0);
+    deliver_deployment(&mut root, deployment, doc);
+    deliver(&mut root, accounts, card_document(b"openai", b"alice", c::OwnerAccountKind::SignIn));
+    let view = fixtures::page_view(&root);
+    let mut rows: u32 = 0;
+    for row in view.tree().nodes().iter().filter(|n| n.styles.as_slice().contains(&crate::look::ACCOUNT_ROW)) {
+        let at = view.tree().nodes().iter().position(|n| n.id == row.id).unwrap();
+        let content = &view.tree().nodes()[at..at + usize::try_from(row.size).unwrap()];
+        let deployment = rows == 1;
+        for name in [b"Used by".as_slice(), b"Waiting for it"] {
+            assert_eq!(content.iter().any(|n| n.name.as_deref() == Some(name)), deployment);
+        }
+        let summary = core::str::from_utf8(row.description.as_deref().unwrap()).unwrap();
+        assert_eq!(summary.contains("no task uses it now"), deployment);
+        rows += 1;
+    }
+    assert_eq!(rows, 2);
 }

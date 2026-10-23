@@ -1,5 +1,6 @@
 //! One task's borrowed documents, first activity page and live run handle.
 use super::{Act, Request, inbox::Card};
+use crate::address::PlanFilter;
 use crate::{Address, Limits, owner::Owner};
 use alloc::boxed::Box;
 use jig_client::{Client, Handle, Key, Latest, Readable, Readout, Told, Watchable, contract as c};
@@ -272,11 +273,7 @@ pub struct Ended {
     pub reading: bool,
     pub stale: bool,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Filter {
-    All,
-    Live,
-}
+
 #[derive(Debug)]
 pub struct Task {
     pub number: u64,
@@ -285,7 +282,7 @@ pub struct Task {
     pub activity: Handle,
     pub run: Option<Handle>,
     pub ended: Option<Ended>,
-    pub filter: Filter,
+    pub filter: PlanFilter,
     pub shape: Shape,
     pub latest: Option<Box<c::ActivityPage>>,
     pub thread: jig_client::thread::Thread,
@@ -319,7 +316,7 @@ impl Task {
             activity,
             run: None,
             ended: None,
-            filter: Filter::All,
+            filter: PlanFilter::All,
             shape: Shape::Unknown,
             latest: None,
             thread,

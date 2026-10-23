@@ -1,5 +1,5 @@
 use crate::{
-    ModelWay, Step, WayKind,
+    ChatsFilter, ModelWay, PlanFilter, Step, WayKind,
     address::{Address, Filter, Kind, Place, parse, print},
 };
 
@@ -7,9 +7,9 @@ use crate::{
 fn each_page_round_trips_through_its_path() {
     let pages: [(Address, &[u8]); 5] = [
         (Address::Inbox { filter: Filter::ALL }, b"/"),
-        (Address::Chats, b"/chats"),
+        (Address::Chats { filter: ChatsFilter::All, start: false }, b"/chats"),
         (Address::Chat { task: 7 }, b"/chats/7"),
-        (Address::Task { task: 7 }, b"/tasks/7"),
+        (Address::Task { task: 7, filter: PlanFilter::All }, b"/tasks/7"),
         (Address::Adopt { project: 3 }, b"/projects/3/adopt"),
     ];
     for (address, path) in pages {
@@ -87,7 +87,7 @@ fn a_field_it_cannot_read_is_dropped() {
 fn one_trailing_slash_is_ignored() {
     for (path, expected) in [
         (&b"/chats/7/"[..], Place::Address(Address::Chat { task: 7 })),
-        (b"/chats/", Place::Address(Address::Chats)),
+        (b"/chats/", Place::Address(Address::Chats { filter: ChatsFilter::All, start: false })),
         (b"/chats/7//", Place::Missing),
     ] {
         assert_eq!(parse(path), expected, "{path:?}");
@@ -277,5 +277,43 @@ fn a_return_source_is_printed_and_read_only_on_a_sign_in_way() {
             let Place::Address(address) = parse(&input) else { panic!("known path") };
             assert_eq!(print(&address).strip_prefix(base).expect("same path"), canonical.as_bytes(), "{query}");
         }
+    }
+}
+
+#[test]
+fn chats_and_plan_filters_round_trip_with_the_starts_focus() {
+    use crate::{ChatsFilter as Chats, PlanFilter as Plan};
+    let cases: &[(Address, &[u8])] = &[
+        (Address::Chats { filter: Chats::All, start: false }, b"/chats"),
+        (Address::Chats { filter: Chats::Live, start: false }, b"/chats?state=live"),
+        (Address::Chats { filter: Chats::Closed, start: false }, b"/chats?state=closed"),
+        (Address::Chats { filter: Chats::All, start: true }, b"/chats?at=start"),
+        (Address::Chats { filter: Chats::Live, start: true }, b"/chats?state=live&at=start"),
+        (Address::Chats { filter: Chats::Closed, start: true }, b"/chats?state=closed&at=start"),
+        (Address::Task { task: 7, filter: Plan::All }, b"/tasks/7"),
+        (Address::Task { task: 7, filter: Plan::Live }, b"/tasks/7?state=live"),
+    ];
+    for (address, path) in cases {
+        assert_eq!(print(address).as_ref(), *path);
+        assert_eq!(parse(path), Place::Address(address.clone()));
+    }
+}
+
+#[test]
+fn chats_and_plan_drop_each_unreadable_field_independently() {
+    for (path, canonical) in [
+        (b"/chats?state=nope".as_slice(), b"/chats".as_slice()),
+        (b"/tasks/7?state=nope", b"/tasks/7"),
+        (b"/tasks/7?state=closed", b"/tasks/7"),
+        (b"/chats?at=start&state=live", b"/chats?state=live&at=start"),
+        (b"/chats?at=start&state=nope", b"/chats?at=start"),
+        (b"/chats?at=nope&state=closed", b"/chats?state=closed"),
+        (b"/chats?state=nope&state=live&state=closed&at=nope&at=start", b"/chats?state=live&at=start"),
+        (b"/tasks/7?state=closed&state=live&at=start", b"/tasks/7?state=live"),
+        (b"/chats?state=Live&at=Start", b"/chats"),
+        (b"/chats?state=live=closed&at=start=nope", b"/chats"),
+        (b"/chats?state&at&unknown=live", b"/chats"),
+    ] {
+        assert_eq!(parse(path), parse(canonical), "{path:?}");
     }
 }

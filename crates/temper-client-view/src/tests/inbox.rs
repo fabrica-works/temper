@@ -2,6 +2,7 @@ use super::fixtures;
 use crate::look;
 use jig_client::contract as c;
 use skein_ui::{Node, State, Tree};
+use temper_client_domain::PlanFilter;
 use temper_client_domain::{
     Address, Domain, Event,
     address::{Filter, Kind},
@@ -69,7 +70,7 @@ fn an_entry_naming_a_task_links_to_its_page_by_number() {
     assert_eq!(
         crate::act(&mut view, node, Act::Press),
         Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Go {
-            address: Address::Task { task: fixtures::INBOX_TASK }
+            address: Address::Task { task: fixtures::INBOX_TASK, filter: PlanFilter::All }
         }))
     );
 }
@@ -586,5 +587,64 @@ fn result_updates_name_the_ending_and_show_only_the_first_nonempty_result_line()
         assert!(has_named(card, Role::Heading { level: 3 }, heading));
         assert!(has_named(card, Role::Paragraph, b"First line"));
         assert!(skein_lib::bytes::find(&fixtures::text(view.tree()), b"Second line").is_none());
+    }
+}
+
+#[test]
+fn the_heading_offers_a_new_chat_link_before_the_filters() {
+    let root = fixtures::inbox_root();
+    let mut view = fixtures::page_view(&root);
+    let tree = view.tree();
+    let needs = subtree(tree, heading(tree, b"Needs you"));
+    let mut link = None;
+    let mut filters = None;
+    for (index, node) in needs.iter().enumerate() {
+        if node.role == Role::Link && node.name.as_deref() == Some(b"+ New chat".as_slice()) {
+            link = Some(index);
+        }
+        if node.styles.as_slice().contains(&look::FILTERS) {
+            filters = Some(index);
+        }
+    }
+    let link = link.expect("new chat link in heading");
+    let filters = filters.expect("heading filters");
+    assert!(link < filters);
+    let id = needs[link].id;
+    assert_eq!(crate::href(&mut view, id).as_deref(), Some(b"/chats?at=start".as_slice()));
+}
+
+#[test]
+fn the_project_filter_row_appears_only_for_two_or_more_projects() {
+    for count in [1, 2] {
+        let (mut root, me_watch, _) =
+            fixtures::root_at(Address::Inbox { filter: Filter::ALL }, &fixtures::domain_limits());
+        let mut me = root.pages().me(root.client()).unwrap().clone();
+        let mut projects = skein_lib::List::with_capacity(count);
+        for project in me.projects.iter().take(usize::try_from(count).unwrap()) {
+            projects.push(project.clone()).unwrap();
+        }
+        me.projects = projects;
+        fixtures::root_event(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch: me_watch,
+                        event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(me))),
+                    },
+                },
+            },
+        );
+        let view = fixtures::page_view(&root);
+        let filters = subtree(view.tree(), styled(view.tree(), look::FILTERS));
+        for name in [b"All projects".as_slice(), b"Shop", b"Second"] {
+            let mut shown = false;
+            for node in filters {
+                shown |= node.role == Role::Button && node.name.as_deref() == Some(name);
+            }
+            assert_eq!(shown, count >= 2, "{name:?}, {count}");
+        }
+        assert!(fixtures::find(view.tree(), Role::Disclosure, b"Kind").is_some());
+        assert!(fixtures::find(view.tree(), Role::Button, b"All goals").is_some());
     }
 }

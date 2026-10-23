@@ -2,6 +2,7 @@ use super::fixtures::{self, task as f};
 use jig_client::contract as c;
 use skein_lib::{Decimal, List, Writer};
 use skein_ui::{Builder, Role};
+use temper_client_domain::PlanFilter;
 const TASK: u64 = 9;
 const CHILD: u64 = 12;
 const PRIORITY: u32 = 1;
@@ -111,7 +112,9 @@ fn a_plans_chip_links_to_its_tasks_page_by_number() {
     let link = &tree.nodes()[index_of(&tree, Role::Link, b"Task 12")];
     assert_eq!(
         bindings.decode(link.binding.expect("bound").token, skein_ui::Act::Press),
-        Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task: CHILD } }))
+        Some(Action::Pages(Act::Go {
+            address: temper_client_domain::Address::Task { task: CHILD, filter: PlanFilter::All }
+        }))
     );
 }
 #[test]
@@ -568,7 +571,8 @@ fn the_bar_links_only_a_requesting_task_before_the_current_task_paragraph() {
         c::OwnerRequester::Deployment { project: fixtures::PROJECT },
     ] {
         let limits = fixtures::domain_limits();
-        let (mut root, _, watch, _) = fixtures::root_at_with_tree(Address::Task { task: TASK }, &limits);
+        let (mut root, _, watch, _) =
+            fixtures::root_at_with_tree(Address::Task { task: TASK, filter: PlanFilter::All }, &limits);
         let mut task = titled();
         task.priority = Some(PRIORITY);
         task.requester = requester;
@@ -607,7 +611,7 @@ fn the_bar_links_only_a_requesting_task_before_the_current_task_paragraph() {
             let id = link.id;
             assert_eq!(
                 crate::act(&mut view, id, skein_ui::Act::Press),
-                Some(Action::Pages(Act::Go { address: Address::Task { task: 7 } }))
+                Some(Action::Pages(Act::Go { address: Address::Task { task: 7, filter: PlanFilter::All } }))
             );
         }
     }
@@ -768,7 +772,9 @@ fn assert_activity_link(event: c::Activity, words: &[u8]) {
     assert_eq!(link.name.as_deref(), Some(b"Task 7".as_slice()));
     assert_eq!(
         bindings.decode(link.binding.expect("bound link").token, skein_ui::Act::Press),
-        Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task: RESULT_TASK } }))
+        Some(Action::Pages(Act::Go {
+            address: temper_client_domain::Address::Task { task: RESULT_TASK, filter: PlanFilter::All }
+        }))
     );
     assert_eq!(fixtures::node_text(&tree, content.as_slice()[1]).as_ref(), words);
 }
@@ -1106,7 +1112,9 @@ fn the_budget_card_names_each_funder() {
             let id = link.expect("funder link");
             assert_eq!(
                 crate::act(&mut view, id, skein_ui::Act::Press),
-                Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task } }))
+                Some(Action::Pages(Act::Go {
+                    address: temper_client_domain::Address::Task { task, filter: PlanFilter::All }
+                }))
             );
         }
     }
@@ -1691,7 +1699,9 @@ fn the_lineage_bar_links_the_parent_by_number_with_its_title() {
             let number = if lineage { CHILD } else { OTHER_DEPENDENCY };
             assert_eq!(
                 crate::act(&mut view, id, skein_ui::Act::Press),
-                Some(Action::Pages(Act::Go { address: temper_client_domain::Address::Task { task: number } })),
+                Some(Action::Pages(Act::Go {
+                    address: temper_client_domain::Address::Task { task: number, filter: PlanFilter::All }
+                })),
             );
         }
     }
@@ -2030,8 +2040,19 @@ fn press_button(root: &mut Domain, name: &[u8]) {
     let mut view = fixtures::page_view(root);
     let id = fixtures::find(view.tree(), Role::Button, name).expect("offered button");
     let action = crate::act(&mut view, id, skein_ui::Act::Press).expect("button binding");
-    fixtures::root_event(root, Event::Act { action });
+    if let Action::Pages(Act::PlanFilter { filter }) = action {
+        let task = root.pages().task().expect("task page").number;
+        fixtures::root_event(
+            root,
+            Event::Went {
+                place: temper_client_domain::Place::Address(temper_client_domain::Address::Task { task, filter }),
+            },
+        );
+    } else {
+        fixtures::root_event(root, Event::Act { action });
+    }
 }
+
 fn contains(tree: &Tree, expected: &[u8]) -> bool {
     skein_lib::bytes::find(&fixtures::text(tree), expected).is_some()
 }
@@ -2796,7 +2817,7 @@ fn goal_root(live: &[c::OwnerTreeRow], page: Option<c::TaskPage>, phase: c::Phas
 }
 #[test]
 fn a_goals_plan_draws_its_filter_before_the_read_and_binds_both_buttons() {
-    use temper_client_domain::pages::task::Filter;
+    use temper_client_domain::address::PlanFilter as Filter;
     let mut root = goal_root(&[], None, c::Phase::Running);
     for (filter, label) in [(Filter::All, b"All".as_slice()), (Filter::Live, b"Live only"), (Filter::All, b"All")] {
         let mut view = fixtures::page_view(&root);
@@ -2818,7 +2839,12 @@ fn a_goals_plan_draws_its_filter_before_the_read_and_binds_both_buttons() {
         let id = fixtures::find(view.tree(), Role::Button, label).unwrap();
         let action = crate::act(&mut view, id, skein_ui::Act::Press).unwrap();
         assert_eq!(action, Action::Pages(Act::PlanFilter { filter }));
-        fixtures::root_event(&mut root, Event::Act { action });
+        fixtures::root_event(
+            &mut root,
+            Event::Went {
+                place: temper_client_domain::Place::Address(temper_client_domain::Address::Task { task: TASK, filter }),
+            },
+        );
         assert_eq!(root.pages().task().unwrap().filter, filter);
     }
 }

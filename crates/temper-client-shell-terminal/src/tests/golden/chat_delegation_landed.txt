@@ -16,7 +16,6 @@ Playground:
   [9] Connect a forge
 T1 · Add CSV export to widget:
   * waiting on your words
-  Scripted model
   0 spent · of 1 · delegates spent 0
 demo · playground/widget on Playground forge
 Signed in as the deployment’s owner

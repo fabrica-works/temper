@@ -88,3 +88,37 @@ fn a_chat_has_a_day_and_turn_clocks_beside_separately_named_speakers() {
     let mut script = Script::new(steps.into_boxed_slice());
     assert_eq!(Harness::new(tier.setup()).run(&mut [&mut script]), Outcome::Done);
 }
+
+#[test]
+fn new_chat_focus_and_filter_survive_reload_and_back() {
+    let tier = Tier::new("new-chat-filter-address");
+    let see = |find| Step::Person(PersonStep::See { find, within: WITHIN });
+    let press = |role, name: &[u8]| Step::Person(PersonStep::Press { find: Find::exactly_named(role, name) });
+    let pressed = |position| Step::Keep {
+        selector: format!("main [aria-label='Your chats'] + * > button[aria-pressed='true']:nth-child({position})")
+            .into_bytes()
+            .into_boxed_slice(),
+        attribute: Some(b"aria-pressed".as_slice().into()),
+        name: b"pressed-filter".as_slice().into(),
+    };
+    let mut script = Script::new(Box::new([
+        see(Find::exactly_named(Role::Link, b"Set up temper")),
+        Step::Person(PersonStep::Go { address: b"/".as_slice().into() }),
+        see(tier.states().live),
+        see(Find::exactly_named(Role::Heading { level: 1 }, b"Inbox")),
+        press(Role::Link, b"+ New chat"),
+        see(Find::exactly_named(Role::TextArea, b"Start a chat")),
+        Step::Focused(Find::exactly_named(Role::TextArea, b"Start a chat")),
+        Step::Address(b"/chats?at=start".as_slice().into()),
+        press(Role::Button, b"Live"),
+        Step::Address(b"/chats?state=live".as_slice().into()),
+        Step::Person(PersonStep::Reload),
+        see(Find::exactly_named(Role::Button, b"Live")),
+        pressed(2),
+        Step::Back,
+        see(Find::exactly_named(Role::Button, b"All")),
+        Step::Address(b"/chats?at=start".as_slice().into()),
+        pressed(1),
+    ]));
+    assert_eq!(Harness::new(tier.setup()).run(&mut [&mut script]), Outcome::Done);
+}

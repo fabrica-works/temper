@@ -2,6 +2,7 @@
 use jig_client_world::harness::{App, ClientId, Duty, Front};
 use skein_lib::{Duration, Env, Queue, Time, Wall};
 use skein_ui::Role;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{self as d, Address, Place, Step, pages::Act};
 use temper_client_protocol_wire::v1 as w;
 use temper_client_world::{
@@ -79,12 +80,12 @@ fn not_started_welcome_and_strip_start_the_playground_in_its_project() {
         assert!(!has(&root, Role::Region, b"Playground"));
         assert!(front.demo_starts.is_empty());
         if strip {
-            go(&mut front, &mut root, Address::Chats);
+            go(&mut front, &mut root, Address::Chats { filter: ChatsFilter::All, start: false });
             assert!(has(&root, Role::Region, b"Setup"));
         }
         press(&mut front, &mut root, b"Try the playground");
         assert_eq!(front.demo_starts.len(), 1);
-        assert_eq!(root.person().pages().address(), &Address::Chats);
+        assert_eq!(root.person().pages().address(), &Address::Chats { filter: ChatsFilter::All, start: false });
         assert_eq!(root.person().pages().project(), Some(1));
         assert!(has(&root, Role::Region, b"Playground"));
         assert!(!has(&root, Role::Region, b"Setup"));
@@ -104,7 +105,7 @@ fn failed_start_survives_navigation_and_try_again_uses_a_new_key() {
     assert!(has(&root, Role::Status, b"Not started"));
     assert!(has(&root, Role::Alert, b"The playground did not start: the scripted model's account was refused."));
     go(&mut front, &mut root, Address::Accounts);
-    go(&mut front, &mut root, Address::Chats);
+    go(&mut front, &mut root, Address::Chats { filter: ChatsFilter::All, start: false });
     assert!(has(&root, Role::Button, b"Try again"));
     press(&mut front, &mut root, b"Try again");
     assert_eq!(front.demo_starts.len(), 2);
@@ -116,7 +117,7 @@ fn failed_start_survives_navigation_and_try_again_uses_a_new_key() {
 fn running_read_starts_once_silently_and_welcome_moves_once() {
     let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
     assert_eq!(front.demo_starts.len(), 1);
-    assert_eq!(root.person().pages().address(), &Address::Chats);
+    assert_eq!(root.person().pages().address(), &Address::Chats { filter: ChatsFilter::All, start: false });
     assert!(!has(&root, Role::Status, b"Starting"));
     let replaces = go(&mut front, &mut root, Address::Welcome { step: Step::Welcome });
     assert_eq!(replaces, 1);
@@ -128,7 +129,7 @@ fn running_read_starts_once_silently_and_welcome_moves_once() {
 #[test]
 fn absent_demo_still_has_the_setup_strip() {
     let (mut front, mut root) = accounts::forge_fixture(f::SEED);
-    go(&mut front, &mut root, Address::Chats);
+    go(&mut front, &mut root, Address::Chats { filter: ChatsFilter::All, start: false });
     assert!(has(&root, Role::Region, b"Setup"));
     assert!(!has(&root, Role::Region, b"Playground"));
 }
@@ -221,7 +222,7 @@ fn a_model_connected_removes_the_scripted_account_and_leaves_the_playground_forg
     assert!(!has(&root, Role::Heading { level: 2 }, b"Scripted"));
     let halves = root.person().demo().expect("running playground").1;
     assert_eq!(halves, d::forge::demo::Halves { model: false, forge: true });
-    go(&mut front, &mut root, Address::Chats);
+    go(&mut front, &mut root, Address::Chats { filter: ChatsFilter::All, start: false });
     assert!(has(&root, Role::Region, b"Playground"));
     assert!(has(&root, Role::Paragraph, b"This is the playground: a playground forge."));
     assert!(!has(&root, Role::Button, b"Connect a model"));
@@ -249,7 +250,7 @@ fn a_forge_connected_clears_the_demo_everywhere_and_welcome_moves_when_a_model_i
     assert!(d::forge::listed::playground(root.person()).is_none());
     assert!(!has(&root, Role::Region, b"Playground"));
     assert!(!has(&root, Role::Heading { level: 2 }, b"The playground"));
-    go(&mut front, &mut root, Address::Chats);
+    go(&mut front, &mut root, Address::Chats { filter: ChatsFilter::All, start: false });
     assert!(!has(&root, Role::Region, b"Playground"));
     assert!(!has(&root, Role::Button, b"Try the playground"));
     assert!(!has(&root, Role::Status, b"Ready"));
@@ -257,7 +258,7 @@ fn a_forge_connected_clears_the_demo_everywhere_and_welcome_moves_when_a_model_i
     // account before reopening Welcome, exercising both sources of usable facts.
     add_model(&mut front, &mut root);
     assert_eq!(go(&mut front, &mut root, Address::Welcome { step: Step::Welcome }), 1);
-    assert_eq!(root.person().pages().address(), &Address::Chats);
+    assert_eq!(root.person().pages().address(), &Address::Chats { filter: ChatsFilter::All, start: false });
     assert_eq!(front.demo_starts.len(), 1);
     assert_eq!(front.demo_removals.len(), 1);
 }

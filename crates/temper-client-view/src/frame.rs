@@ -1,6 +1,7 @@
 //! temper's banner, with navigation after the projects (client/README.md, 5).
 use skein_lib::{List, Token};
 use skein_ui::{Binding, Builder, Region, Role, Run};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Address, Domain, pages::Act};
 #[must_use]
 pub const fn owner() -> skein_ui::Owner {
@@ -219,7 +220,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         Address::ConnectForge { .. }
         | Address::Forges
         | Address::Welcome { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Chat { .. }
         | Address::Task { .. }
         | Address::ConnectModel { .. }
@@ -261,9 +262,9 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         builder,
         Role::Link,
         &words.say(crate::words::Word::Chats, &[]),
-        Act::Go { address: Address::Chats },
+        Act::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } },
         match root.pages().address() {
-            Address::Chats | Address::Chat { .. } => true,
+            Address::Chats { .. } | Address::Chat { .. } => true,
             Address::ConnectForge { .. }
             | Address::Forges
             | Address::Welcome { .. }
@@ -292,7 +293,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     if match root.pages().address() {
         Address::Accounts | Address::ConnectModel { .. } => true,
         Address::Inbox { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Welcome { .. }
         | Address::Forges
         | Address::ConnectForge { .. }
@@ -330,7 +331,7 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
         | Address::Welcome { .. }
         | Address::ConnectForge { .. }
         | Address::Forges => return,
-        Address::Chats
+        Address::Chats { .. }
         | Address::Chat { .. }
         | Address::Task { .. }
         | Address::Inbox { .. }
@@ -432,7 +433,7 @@ fn forges_entry(builder: &mut Builder, root: &Domain, words: &crate::words::Word
         Address::Accounts
         | Address::ConnectModel { .. }
         | Address::Welcome { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Chat { .. }
         | Address::Task { .. }
         | Address::Inbox { .. }
