@@ -92,6 +92,37 @@ pub fn deployment_account() -> Script {
         ]),
     }
 }
+/// The welcome's button leaves the tab; the next observation belongs to its come-back page.
+#[must_use]
+pub fn welcome_sign_in() -> Script {
+    use skein_ui::Role;
+    Script {
+        begin: Begin::Link,
+        steps: Box::new([
+            Step::Go { address: Address::Welcome { step: temper_client_domain::Step::Model { way: None } } },
+            Step::See { find: Find::exactly_named(Role::Button, b"Continue with ChatGPT"), within: START_WITHIN },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Continue with ChatGPT") },
+            Step::See { find: Find::named(Role::Paragraph, b"Model: ChatGPT"), within: START_WITHIN },
+        ]),
+    }
+}
+/// The same account's source is still signed in after a healthy service restart.
+#[must_use]
+pub fn kept_chatgpt_account(heading: &[u8]) -> Script {
+    use skein_ui::Role;
+    Script {
+        begin: Begin::Token,
+        steps: Box::new([
+            Step::Go { address: Address::Accounts },
+            Step::See { find: Find::exactly_named(Role::Disclosure, heading), within: START_WITHIN },
+            Step::See {
+                find: Find::text("ChatGPT sign-in · Ready".as_bytes())
+                    .within(Box::new([Target::Role { role: Role::Disclosure, name: heading.into() }])),
+                within: START_WITHIN,
+            },
+        ]),
+    }
+}
 /// Observe a ctl-started sign-in through the same person's served accounts page.
 #[must_use]
 pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
@@ -248,6 +279,10 @@ pub struct Person {
     begin: Begin,
     directory: Box<[u8]>,
     seed: u64,
+    departing: bool,
+    left: bool,
+    leave: Option<Box<[u8]>>,
+    return_address: Option<Address>,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
 }
@@ -268,6 +303,31 @@ impl Person {
     #[must_use]
     pub fn new(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
         Self::build(root, Some(input), Some(output), script)
+    }
+    #[must_use]
+    pub fn departing(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
+        let mut person = Self::new(root, input, output, script);
+        person.departing = true;
+        person.project = ProjectSelection::Selected;
+        person
+    }
+    pub fn leave(&mut self) -> Option<Box<[u8]>> {
+        self.leave.take()
+    }
+    /// Reopen the departed tab on its kept sign-in, once the native transport has drained.
+    pub fn come_back(&mut self, root: Fd, path: &[u8]) {
+        assert!(self.left, "the tab departed");
+        assert!(self.client.as_ref().is_some_and(Host::is_empty), "departing client drained");
+        let temper_client_domain::Place::Address(address) = temper_client_domain::address::parse(path) else {
+            panic!("the listener returned a client address");
+        };
+        self.client = None;
+        self.root = Some(root);
+        self.begin = Begin::Token;
+        self.seed = self.seed.checked_add(1).expect("fresh client seed");
+        self.return_address = Some(address);
+        self.left = false;
+        self.wake = Some(Time::ZERO);
     }
     /// Wait for ctl to finish a sign-in in its own directory; load it through the native shell.
     #[must_use]
@@ -361,6 +421,10 @@ impl Person {
             },
             completions: Queue::with_capacity(512),
             submissions: Queue::with_capacity(512),
+            departing: false,
+            left: false,
+            leave: None,
+            return_address: None,
         }
     }
     fn close(&mut self, fd: Fd) {
@@ -403,8 +467,9 @@ impl Person {
                 .parse()
                 .expect("socket address");
             self.signing_until = Some(now.saturating_add(START_WITHIN));
+            let make_client = if self.departing { NativeClient::departing } else { NativeClient::new };
             self.client = Some(
-                NativeClient::new(
+                make_client(
                     Settings {
                         engine: skein_io::Addr::Ip(address),
                         directory: self.directory.clone(),
@@ -442,6 +507,16 @@ impl Person {
             }
         }
         while let Some(notice) = client.notices() {
+            if let temper_client_shell_terminal::client::Shown::Notice(
+                temper_client_shell_terminal::route::Notice::Leave { to },
+            ) = notice
+            {
+                assert!(!self.left, "one tab departure");
+                self.left = true;
+                self.leave = Some(to);
+                client.close();
+                continue;
+            }
             assert!(
                 !matches!(
                     notice,
@@ -485,7 +560,17 @@ impl Person {
             self.wake = Some(now);
         }
         let signing_wake = self.wake;
-        if client.started() && self.project == ProjectSelection::Selected && !self.finished && self.failed.is_none() {
+        if client.started()
+            && let Some(address) = self.return_address.take()
+        {
+            client.go(address);
+        }
+        if client.started()
+            && !self.left
+            && self.project == ProjectSelection::Selected
+            && !self.finished
+            && self.failed.is_none()
+        {
             let before = self.actor.at();
             match self.actor.next(&mut ReplyFace::new(client.tree()), now) {
                 Next::Do(Doing::Act { node, act }) => assert!(client.act(node, act), "offered person act"),

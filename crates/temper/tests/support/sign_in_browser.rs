@@ -39,6 +39,7 @@ pub struct Visitor {
     handed: bool,
     status: Option<u16>,
     account_redirect: Option<Box<[u8]>>,
+    last_redirect: Option<(u16, Box<[u8]>)>,
 }
 impl std::fmt::Debug for Visitor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -66,6 +67,7 @@ impl Visitor {
             handed: false,
             status: None,
             account_redirect: None,
+            last_redirect: None,
         }
     }
     /// Hands over `url` to visit, once: a plain `http://` URL with a
@@ -95,6 +97,11 @@ impl Visitor {
     pub fn status(&self) -> Option<u16> {
         self.status
     }
+    /// The last redirect's status and Location, retained after following it.
+    #[must_use]
+    pub fn last_redirect(&self) -> Option<(u16, &[u8])> {
+        self.last_redirect.as_ref().map(|(status, location)| (*status, location.as_ref()))
+    }
     fn progress(&mut self, now: Time, wall: Wall) {
         let env = Env { now, wall, limits: limits().http };
         let Some(socket) = self.socket.filter(|_| self.connected) else { return };
@@ -111,6 +118,8 @@ impl Visitor {
                             .find(|header| header.name.eq_ignore_ascii_case(b"location"))
                             .map(|header| header.value.clone());
                         assert!(self.account_redirect.is_some(), "account sign-in redirect");
+                        self.last_redirect =
+                            Some((response.status, self.account_redirect.as_ref().expect("redirect Location").clone()));
                     }
                     self.calls.push(http::Request::Body(Down::Demand { read: Read::Arrived { max: BODY }, room: 0 }));
                 }

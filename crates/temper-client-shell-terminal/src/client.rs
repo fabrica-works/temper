@@ -79,6 +79,30 @@ impl NativeClient {
         seed: u64,
         start: Start,
     ) -> Result<Self, jig_client_protocol_http::Unlinked> {
+        Self::build(settings, directory, user, seed, start, domain::new)
+    }
+    /// A browser's root over the native transport: it sends `Return` and asks to `Leave`
+    /// (client/README.md 3.5, The tab's departure). The process tier's person
+    /// (domain/testing.md, 2.6); the terminal never makes one.
+    /// # Errors
+    /// Refuses a printed link that does not name the configured engine.
+    pub fn departing(
+        settings: Settings,
+        directory: Fd,
+        user: u32,
+        seed: u64,
+        start: Start,
+    ) -> Result<Self, jig_client_protocol_http::Unlinked> {
+        Self::build(settings, directory, user, seed, start, domain::new_departing)
+    }
+    fn build(
+        settings: Settings,
+        directory: Fd,
+        user: u32,
+        seed: u64,
+        start: Start,
+        make_root: fn(&domain::Limits, u64) -> domain::Domain,
+    ) -> Result<Self, jig_client_protocol_http::Unlinked> {
         let bounds = settings.limits;
         let mut memory = limits::worst_case(&bounds).expect("native capacities are checked");
         let (view_limits, forge_words) = limits::view(&bounds).expect("native view capacities are checked");
@@ -106,7 +130,7 @@ impl NativeClient {
             Start::Token => None,
         };
         shell.adopt(directory, user, seed);
-        let root = domain::new(&bounds.client, seed);
+        let root = make_root(&bounds.client, seed);
         Ok(Self {
             shell,
             root,
