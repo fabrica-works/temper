@@ -1,7 +1,7 @@
 //! The reference case on the cluster's processes (domain/testing.md, 2.6 and 5.3).
 use super::{Ended, Scratch, WITHIN, cluster, ctl};
 use serde_json::{Value, json};
-use skein_fake_llm_domain::api::{Finish, Line, Rule, Script};
+use skein_fake_llm_domain::api::{Error, Finish, Line, Report, Rule, Script};
 use skein_io::kernel::Exit;
 use skein_lib::{Duration, Time, base64};
 use skein_shell::{Clock, Host};
@@ -94,7 +94,26 @@ fn encode(scripts: &[Script], rules: &[Box<[Rule]>]) -> Value {
                             Line::Pieces { pieces } => json!({"pieces":pieces.iter().map(|piece| json!({
                                 "text":text(&piece.text),"hold":piece.hold.as_deref().map(text)
                             })).collect::<Vec<_>>()}),
-                            other @ (Line::Fail { .. } | Line::Opaque { .. }) => {
+                            Line::Fail { error, report, credentials } => {
+                                assert_eq!(*report, Report::none(), "case failure report unsupported: {report:?}");
+                                let error = match error {
+                                    Error::Overloaded => json!("overloaded"),
+                                    Error::RateLimited { retry_after } => json!({"rate_limited": {
+                                        "retry_after_ms": retry_after.as_nanos() / 1_000_000
+                                    }}),
+                                    Error::Unavailable => json!("unavailable"),
+                                    Error::ContextTooLong => json!("context_too_long"),
+                                    Error::Unauthorized => json!("unauthorized"),
+                                    Error::Exhausted { retry_after } => json!({"exhausted": {
+                                        "retry_after_ms": retry_after.map(|delay| delay.as_nanos() / 1_000_000)
+                                    }}),
+                                    Error::Refused => json!("refused"),
+                                    Error::Unsupported => json!("unsupported"),
+                                    Error::InvalidRequest => json!("invalid_request"),
+                                };
+                                json!({"fail": {"error": error, "credentials": credentials}})
+                            }
+                            other @ Line::Opaque { .. } => {
                                 panic!("case script line unsupported: {other:?}")
                             }
                         })
@@ -159,15 +178,21 @@ pub fn run(
     steps: Vec<calls::Step>,
     placed: &[u64],
 ) -> Run {
-    assert_eq!(workers, ["ws", "s1", "s2"], "case cast");
+    assert!(workers == ["ws"] || workers == ["ws", "s1", "s2"], "case cast");
+    let cast = if workers.len() == 1 { vec!["ws"] } else { vec!["ws", "s1", "s2"] };
+    if cast.len() == 1 {
+        assert!(placed.is_empty(), "one worker needs no placement mapping");
+    }
     let late = steps.iter().any(|step| matches!(step, calls::Step::AddWorker { .. }));
     let clock = Clock::new();
     let began = clock.now().now;
     let scratch = Scratch::new(&format!("case_process_{}", std::process::id()));
     let mut description = cluster::Cluster::read(scratch.path());
     description.rename("w1", "ws");
-    description.rename("w2", "s1");
-    description.copy("s1", "s2");
+    if cast.len() > 1 {
+        description.rename("w2", "s1");
+        description.copy("s1", "s2");
+    }
     description.record_llm();
     let [hosts] = super::free_addresses(&[]);
     description.bind("proc.engine.ready.workers", &hosts.to_string());
@@ -193,6 +218,7 @@ pub fn run(
     let result = std::rc::Rc::new(std::cell::RefCell::new(None));
     let mut world = real::World::new(Judge {
         members,
+        cast,
         stage: Stage::Forge,
         deadline: began.saturating_add(WITHIN),
         marked: began,
@@ -254,6 +280,7 @@ enum Stage {
 }
 struct Judge {
     members: cluster::Members,
+    cast: Vec<&'static str>,
     stage: Stage,
     deadline: Time,
     marked: Time,
@@ -335,21 +362,24 @@ impl Judge {
         // the lab's 2 would cut s2 from the placement read.
         value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
         value["engine"]["hosts"]["workers"][0]["name"] = "ws".into();
-        value["engine"]["hosts"]["workers"][1]["name"] = "s1".into();
-        value["engine"]["hosts"]["workers"]
-            .as_array_mut()
-            .expect("hosts")
-            .push(json!({"name":"s2","digest":"secrets/s2.digest"}));
+        value["engine"]["hosts"]["workers"].as_array_mut().expect("hosts").truncate(self.cast.len());
         let secret = b"s2-case-fixture-secret";
-        let mut hash = skein_lib::sha256::Sha256::new();
-        hash.update(secret);
-        let digest = hash.finish().iter().fold(String::new(), |mut hex, byte| {
-            use std::fmt::Write as _;
-            write!(hex, "{byte:02x}").expect("hex");
-            hex
-        });
-        super::write_private(&engine_dir.join("data/secrets/s2.digest"), digest.as_bytes());
-        for name in ["ws", "s1", "s2"] {
+        if self.cast.len() > 1 {
+            value["engine"]["hosts"]["workers"][1]["name"] = "s1".into();
+            value["engine"]["hosts"]["workers"]
+                .as_array_mut()
+                .expect("hosts")
+                .push(json!({"name":"s2","digest":"secrets/s2.digest"}));
+            let mut hash = skein_lib::sha256::Sha256::new();
+            hash.update(secret);
+            let digest = hash.finish().iter().fold(String::new(), |mut hex, byte| {
+                use std::fmt::Write as _;
+                write!(hex, "{byte:02x}").expect("hex");
+                hex
+            });
+            super::write_private(&engine_dir.join("data/secrets/s2.digest"), digest.as_bytes());
+        }
+        for &name in &self.cast {
             let dir = if name == "ws" { ws_dir.clone() } else { self.members.prepare(name) };
             let mut worker = read(&dir.join("config/temper.json"));
             if name == "s2" {
@@ -440,7 +470,9 @@ impl Judge {
                 continue;
             }
             success(ended);
-            if let Ok(document) = serde_json::from_slice::<Value>(&ended.stdout) {
+            if !self.placed.is_empty()
+                && let Ok(document) = serde_json::from_slice::<Value>(&ended.stdout)
+            {
                 live_channels(&document, &mut self.channels);
             }
         }
@@ -460,7 +492,8 @@ impl Judge {
             self.stage = Stage::Provision;
             return false;
         }
-        if matches!(self.ran.last(), Some(calls::Step::Call { argv, .. }) if self.arguments(argv)[0] == "chat")
+        if !self.placed.is_empty()
+            && matches!(self.ran.last(), Some(calls::Step::Call { argv, .. }) if self.arguments(argv)[0] == "chat")
             && !matches!(self.live.as_ref(), Some(value) if value["chat_act"] == self.ran.len())
         {
             // The harness's own read, as the provisioning is: the director's chat
@@ -596,7 +629,10 @@ impl Judge {
         let mut document = read(&path);
         document["models"] =
             json!([{"name":"fake","window":1_048_576,"output":8192},{"name":"owner","window":1_048_576,"output":8192}]);
+        document["added_keys"] =
+            json!([self.client.parent().expect("scratch").join(temper_real_loop_world::case::SECOND_KEY_FILE)]);
         document["cued"] = encode(&(self.scripts)(address), &(self.rules)());
+        assert!(self.cast.len() > 1 || !has_holds(&document["cued"]), "one worker has no placed hold");
         if has_holds(&document["cued"]) {
             let [control] = super::free_addresses(&[address, self.hosts]);
             self.control = Some(control);
@@ -605,6 +641,16 @@ impl Judge {
         write(&path, &document);
         self.members.up(&["llm"]);
         self.stage = Stage::Llm;
+    }
+    fn ws_ready(&mut self, now: Time, root: &mut cluster::Root) {
+        self.mark("ws ready", now);
+        if self.cast.len() == 1 {
+            self.queue(root);
+            self.stage = Stage::Acts;
+        } else {
+            self.members.up(&["s1"]);
+            self.stage = Stage::S1;
+        }
     }
     fn add_worker(&mut self, root: &mut cluster::Root) {
         let document = ctl::json(Self::calls(root).ends().last().expect("before add"));
@@ -671,11 +717,7 @@ impl Referee<cluster::Root> for Judge {
                 self.members.up(&["ws"]);
                 self.stage = Stage::Ws;
             }
-            Stage::Ws if self.members.is_up() => {
-                self.mark("ws ready", now);
-                self.members.up(&["s1"]);
-                self.stage = Stage::S1;
-            }
+            Stage::Ws if self.members.is_up() => self.ws_ready(now, root),
             Stage::S1 if self.members.is_up() => {
                 self.mark("s1 ready", now);
                 if self.late {
@@ -755,22 +797,24 @@ impl Referee<cluster::Root> for Judge {
         if let Some(stopped) = self.members.stopped() {
             assert_eq!(
                 stopped.iter().map(|member| member.name.as_str()).collect::<Vec<_>>(),
-                if self.late {
+                if self.cast.len() == 1 {
+                    vec!["ws", "engine", "llm", "forge"]
+                } else if self.late {
                     vec!["s2", "s1", "ws", "engine", "llm", "forge"]
                 } else {
                     // ws's first life by its act, then the cast in reverse start order: ws's second life last started.
                     vec!["ws", "ws", "s2", "s1", "engine", "llm", "forge"]
                 }
             );
-            for worker in ["ws", "s1", "s2"] {
+            for &worker in &self.cast {
                 assert_eq!(
                     self.members.linked(worker),
-                    if !self.late && worker == "ws" { 2 } else { 1 },
+                    if self.cast.len() > 1 && !self.late && worker == "ws" { 2 } else { 1 },
                     "{worker} linked once per life"
                 );
             }
             for member in stopped {
-                if ["ws", "s1", "s2"].contains(&member.name.as_str()) {
+                if self.cast.contains(&member.name.as_str()) {
                     assert_eq!(
                         member.stderr.split(|byte| *byte == b'\n').filter(|line| line.starts_with(b"linked ")).count(),
                         1,
@@ -952,7 +996,9 @@ impl Judge {
         for call in &self.calls {
             success(call);
         }
-        self.map_channels(accounts);
+        if !self.placed.is_empty() {
+            self.map_channels(accounts);
+        }
         let workers = std::mem::take(&mut self.workers);
         *self.run.borrow_mut() = Some(Run {
             calls: std::mem::take(&mut self.calls),
@@ -968,7 +1014,7 @@ impl Judge {
     fn check_tokens(&self) {
         let token = &self.admin_token;
         assert!(!token.is_empty());
-        for name in ["ws", "s1", "s2"] {
+        for &name in &self.cast {
             let dir = self.members.dir(name);
             let worker = read(&dir.join("config/temper.json"));
             let secret = worker["workers"][0]["secret"].as_str().expect("link secret");

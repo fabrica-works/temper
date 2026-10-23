@@ -2066,6 +2066,66 @@ fn the_opener_and_the_two_hour_check_run_on_three_workers_as_processes_without_p
     }
 }
 
+// Leaves out the director as asker, plan pacing, B's model, repeated questions,
+// and amending only A's model (domain/testing.md, 5.3's 4.4 row).
+// On ws alone, no s2: a worker's own sources and sign-in are undesigned.
+#[test]
+fn the_pace_question_reaches_the_person_and_its_answer_is_kept_as_processes_on_one_worker_without_plan_pacing() {
+    use temper_real_loop_world::case::{self, acts, oracle};
+    let run = support::case::run(
+        &["ws"],
+        case::fixture_4_4(),
+        case::scripts::step_4_4,
+        step_4_4_rules,
+        acts::step_4_4(),
+        &[],
+    );
+    oracle::assert_met(&oracle::step_4_4(&run.observed(acts::READS_4_4)));
+}
+fn step_4_4_rules() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]> {
+    Box::new([Box::new([]), Box::new([]), Box::new([]), Box::new([])])
+}
+
+// Leaves out s2's sign-in, credentials never copied between machines, B's work,
+// five hours and a session that never ends (domain/testing.md, 5.3's 4.5 row).
+// On ws alone, no s2: a worker's own sources and sign-in are undesigned.
+#[test]
+fn a_refused_key_holds_its_work_until_it_is_replaced_as_processes_on_one_worker_without_a_sign_in() {
+    use temper_real_loop_world::case::{self, acts, oracle};
+    let run = support::case::run(
+        &["ws"],
+        case::fixture(),
+        case::scripts::step_4_5_refused,
+        step_4_5_refused_rules,
+        acts::step_4_5_refused(),
+        &[],
+    );
+    oracle::assert_met(&oracle::step_4_5_refused(&run.observed(acts::READS_4_5_REFUSED)));
+}
+fn step_4_5_refused_rules() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]> {
+    Box::new([Box::new([]), Box::new([])])
+}
+
+// Leaves out s2's sign-in, credentials never copied between machines, B's work,
+// five hours and a session that never ends (domain/testing.md, 5.3's 4.5 row).
+// On ws alone, no s2: a worker's own sources and sign-in are undesigned.
+#[test]
+fn a_limited_account_holds_its_work_until_its_reset_as_processes_on_one_worker() {
+    use temper_real_loop_world::case::{self, acts, oracle};
+    let run = support::case::run(
+        &["ws"],
+        case::fixture(),
+        case::scripts::step_4_5_limited,
+        step_4_5_limited_rules,
+        acts::step_4_5_limited(),
+        &[],
+    );
+    oracle::assert_met(&oracle::step_4_5_limited(&run.observed(acts::READS_4_5_LIMITED)));
+}
+fn step_4_5_limited_rules() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]> {
+    Box::new([Box::new([]), Box::new([])])
+}
+
 // Shows the retained question and one answer across ws's two lives. Leaves out
 // the hang past grace, three questions and the other limits of testing.md, 5.3's 4.6 row.
 // The retry runs on s1 or s2 by that row's act order: ws stays ended and unlinked
