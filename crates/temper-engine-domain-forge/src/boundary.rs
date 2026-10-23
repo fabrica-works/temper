@@ -1266,4 +1266,6 @@ pub enum DemoState {
 pub enum BindAnswer {
     Bound,
     Another,
+    /// Every binding row is taken: rows outlive their members (protocol/sign-in.md, 5).
+    Full,
 }

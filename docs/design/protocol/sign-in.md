@@ -257,7 +257,7 @@ is `/sign-in/google?then=THEN&account=choose`, "Continue with Google"
 | cancelled, or Google's `error` | 400 | "The sign-in didn't finish" | `access_denied`: "You cancelled at Google. Nothing was kept."; another: "Google answered ERROR. Nothing was kept.", ERROR its code, escaped, at most 64 bytes | Continue with Google; Back to sign in |
 | expired: no cookie, a tag or state unknown, used or past its deadline, a restart since | 400 | "The sign-in didn't finish" | "It took too long, or temper restarted while you were at Google. Nothing was kept." | Continue with Google; Back to sign in |
 | unreachable: the key set or the token endpoint not reached | 502 | "The sign-in didn't finish" | "temper couldn't reach Google. Nothing was kept: try again in a moment." | Continue with Google; Back to sign in |
-| busy: pending full, the root not running, `MintRefused` | 503 | "temper couldn't sign you in just now" | "It is starting or stopping, or signing many people in at once. Nothing was kept: try again in a moment." | Continue with Google |
+| busy: pending full, the root not running, `MintRefused`, bindings full | 503 | "temper couldn't sign you in just now" | "It is starting or stopping, or signing many people in at once. Nothing was kept: try again in a moment." | Continue with Google |
 
 ## 5. The binding
 
@@ -273,10 +273,12 @@ is `/sign-in/google?then=THEN&account=choose`, "Continue with Google"
   address, subject }`, through the root as the forge's other events
   come. The connector answers `forge::Request::Bound { request, answer }`
   once its decision's commit is durable: `Bound` (bound before to this
-  `sub`, or bound now, its row saved) or `Another` (bound to another
-  `sub`, nothing written). The forge holds its bindings in memory, at
-  most `forge.bindings`, the configured members' count; a row past it
-  is refused at restart, as each family's is.
+  `sub`, or bound now, its row saved), `Another` (bound to another
+  `sub`, nothing written) or `Full` (a new address with every row taken,
+  nothing written: the busy page). The forge holds its bindings in
+  memory, at most `forge.bindings`, at least the configured members'
+  count; since rows outlive their members, a new member can find the
+  table full. A row past it is refused at restart, as each family's is.
 - **Never erased:** a binding outlives its member's removal; a store made
   again binds afresh (`store.md`, 4).
 

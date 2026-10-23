@@ -62,3 +62,14 @@ fn bindings_restore_at_the_capacity() {
 fn a_binding_past_restart_capacity_is_refused() {
     restore_rows(LIMITS.bindings.checked_add(1).unwrap());
 }
+#[test]
+fn a_new_address_past_the_table_is_full_without_a_write() {
+    let mut d = domain();
+    for address in [b"a@example.com".as_slice(), b"b@example.com", b"c@example.com", b"d@example.com"] {
+        bind(&mut d, address, SUBJECT);
+    }
+    assert_eq!(
+        bind(&mut d, ADDRESS, SUBJECT).as_ref(),
+        [Request::Bound { request: Token::new(1), answer: BindAnswer::Full }]
+    );
+}

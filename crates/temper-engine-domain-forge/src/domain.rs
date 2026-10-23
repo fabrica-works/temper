@@ -949,14 +949,15 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             assert!(crate::binding_address(&address) && subject.len() <= 255, "admitted binding fields");
             let answer = if let Some(bound) = d.bindings.get(&address) {
                 if *bound == subject { crate::BindAnswer::Bound } else { crate::BindAnswer::Another }
-            } else {
-                d.bindings.insert(address.clone(), subject.clone()).expect("configured members bound bindings");
+            } else if d.bindings.insert(address.clone(), subject.clone()).is_ok() {
                 out.push(Request::Save {
                     record: Stored::Binding { address, subject },
                     read_afresh: None,
                     release: None,
                 });
                 crate::BindAnswer::Bound
+            } else {
+                crate::BindAnswer::Full
             };
             out.push(Request::Bound { request, answer });
         }

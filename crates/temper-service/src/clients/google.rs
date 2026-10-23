@@ -613,6 +613,11 @@ impl Clients {
                             self.down(kit::Event::Mint { exchange: request, identity });
                             google.keep_pending(request, pending);
                         }
+                        forge::BindAnswer::Full => {
+                            if let Some(call) = pending.call {
+                                self.google_answer(call, 503, None, &pages::busy(&pending.then), None);
+                            }
+                        }
                         forge::BindAnswer::Another => {
                             if let Some(call) = pending.call {
                                 self.google_answer(
