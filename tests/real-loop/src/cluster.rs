@@ -47,11 +47,12 @@ pub fn run_cluster_forge(
     late: &[&str],
     fixture: forge::Fixture,
     scripts: fn(SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]>,
+    rules: fn() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]>,
     steps: impl FnOnce() -> Vec<calls::Step>,
 ) -> Cluster {
     assert!(late.iter().all(|name| workers.contains(name)), "configured late workers");
     run_with(workers, None, |scratch| {
-        crate::Outcome::Forge(world::run_cluster_forge(workers, late, scratch, fixture, scripts, steps))
+        crate::Outcome::Forge(world::run_cluster_forge(workers, late, scratch, fixture, scripts, rules, steps))
     })
 }
 
