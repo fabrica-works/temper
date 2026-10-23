@@ -554,6 +554,7 @@ fn start_answer(answer: forge::StartAnswer, limits: &w::Limits) -> Option<w::Out
                         forge::StartFailure::Account => w::StartFailure::Account,
                         forge::StartFailure::Adoption => w::StartFailure::Adoption,
                         forge::StartFailure::NotConnected => w::StartFailure::NotConnected,
+                        forge::StartFailure::NotGranted => w::StartFailure::NotGranted,
                     },
                 },
             )

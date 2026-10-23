@@ -250,6 +250,10 @@ fn starting_waits_and_each_failure_explains_why_with_try_again() {
         (w::StartFailure::Account, "The playground did not start: the scripted model's account was refused."),
         (w::StartFailure::Adoption, "The playground did not start: acme/shop was not adopted."),
         (w::StartFailure::NotConnected, "The playground did not start: Playground forge did not connect."),
+        (
+            w::StartFailure::NotGranted,
+            r#"The playground did not start: temper's configuration does not grant it its acts: add {"connector": 1, "may": ["close", "add_key", "remove_account", "adopt"]} to engine.acts, as temper init writes it."#,
+        ),
     ] {
         let mut root = f::demo_state_root(Address::Chats, w::DemoState::NotStarted);
         assert_eq!(root.forge().demo().unwrap().state, DemoState::NotStarted);

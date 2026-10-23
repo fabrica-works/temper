@@ -430,6 +430,7 @@ fn suggestions(
                 words.say(Word::DemoAdoptionFailed, &[Hole::Name(demo.owner.clone()), Hole::Name(demo.name.clone())])
             }
             StartFailure::NotConnected => words.say(Word::DemoNotConnected, &[]),
+            StartFailure::NotGranted => words.say(Word::DemoNotGranted, &[]),
         };
         text(b, Role::Alert, &message);
         b.open(Role::Button);

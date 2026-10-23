@@ -1,4 +1,4 @@
-family temper-client-wire 10
+family temper-client-wire 11
 
 # The role, as temper-engine-domain-forge's Role, in its order.
 enum Role { owned, adopted, fork, context }
@@ -27,7 +27,7 @@ record SetUpRefused { why: SetUpRefusal }
 enum StartRefusal { not_offered }
 record StartRefused { why: StartRefusal }
 record GroupFailed { why: bytes 256 }
-enum StartFailure { group: GroupFailed, account, adoption, not_connected }
+enum StartFailure { group: GroupFailed, account, adoption, not_connected, not_granted }
 record StartFailed { why: StartFailure }
 enum DemoState { not_started, running }
 

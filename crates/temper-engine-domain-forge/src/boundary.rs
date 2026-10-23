@@ -197,6 +197,7 @@ pub enum StartFailure {
     Account,
     Adoption,
     NotConnected,
+    NotGranted,
 }
 /// The demo's fake LLM, forge and project (protocol/setup.md, 8.4).
 #[derive(Clone, PartialEq, Eq, Debug)]

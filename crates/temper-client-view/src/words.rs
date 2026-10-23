@@ -345,6 +345,7 @@ pub enum Word {
     DemoAccountFailed,
     DemoAdoptionFailed,
     DemoNotConnected,
+    DemoNotGranted,
     DemoTryAgain,
 
     DemoRequest,
@@ -538,10 +539,10 @@ pub enum Word {
 // Thirty-one model-flow phrases (client/README.md, 5.5).
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
-// Seven demo start status, failure and retry phrases (5.6).
+// Eight demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
 const PHRASES: u32 = 1024;
-const ALL: [Word; 491] = [
+const ALL: [Word; 492] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -870,6 +871,7 @@ const ALL: [Word; 491] = [
     Word::DemoAccountFailed,
     Word::DemoAdoptionFailed,
     Word::DemoNotConnected,
+    Word::DemoNotGranted,
     Word::DemoTryAgain,
     Word::DemoRequest,
     Word::SuggestedRequests,
@@ -1378,6 +1380,7 @@ impl Word {
             Self::DemoAccountFailed => 1903,
             Self::DemoAdoptionFailed => 1904,
             Self::DemoNotConnected => 1905,
+            Self::DemoNotGranted => 1910,
             Self::DemoTryAgain => 1906,
 
             Self::DemoRequest => 191,
@@ -2107,6 +2110,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::DemoGroupFailed => (&[b"The playground did not start: its fakes did not start (", b")."], &[Name]),
         Word::DemoAccountFailed => (&[b"The playground did not start: the scripted model's account was refused."], &[]),
         Word::DemoAdoptionFailed => (&[b"The playground did not start: ", b"/", b" was not adopted."], &[Name, Name]),
+        Word::DemoNotGranted => (&[br#"The playground did not start: temper's configuration does not grant it its acts: add {"connector": 1, "may": ["close", "add_key", "remove_account", "adopt"]} to engine.acts, as temper init writes it."#], &[]),
         Word::DemoNotConnected => (&[b"The playground did not start: Playground forge did not connect."], &[]),
         Word::DemoTryAgain => (&[b"Try again"], &[]),
         Word::DemoHeading => (&[b"What shall we change?"], &[]),

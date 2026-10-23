@@ -663,6 +663,17 @@ fn demo_start_answers_print_their_words_json_and_status() {
             r#"{"start_failed":{"why":"not_connected"}}"#,
             1,
         ),
+        (
+            w::Outcome::StartFailed(
+                w::StartFailed::new(l, w::StartFailedParts { why: w::StartFailure::NotGranted }).unwrap(),
+            ),
+            concat!(
+                r#"the acts not granted: add {"connector": 1, "may": ["close", "add_key", "remove_account", "adopt"]} to engine.acts"#,
+                "\n"
+            ),
+            r#"{"start_failed":{"why":"not_granted"}}"#,
+            1,
+        ),
     ] {
         for json in [false, true] {
             let mut root = f::signed_in(f::PARTY);

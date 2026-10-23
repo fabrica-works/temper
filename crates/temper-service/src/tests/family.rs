@@ -1208,6 +1208,12 @@ fn demo_start_outcomes_encode_every_failure_and_unknown() {
             ),
         ),
         (
+            Some(forge::StartAnswer::Failed(forge::StartFailure::NotGranted)),
+            w::Outcome::StartFailed(
+                w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::NotGranted }).unwrap(),
+            ),
+        ),
+        (
             Some(forge::StartAnswer::Failed(forge::StartFailure::Group {
                 why: b"prepare 1 exited 1".as_slice().into(),
             })),

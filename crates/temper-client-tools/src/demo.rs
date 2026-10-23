@@ -36,6 +36,7 @@ fn text(answer: &StartAnswer, kept: bool, limits: &Limits, out: &mut Text) {
                 StartFailure::Account => out.put(b"the account refused"),
                 StartFailure::Adoption => out.put(b"the adoption refused"),
                 StartFailure::NotConnected => out.put(b"the forge not connected in time"),
+                StartFailure::NotGranted => out.put(br#"the acts not granted: add {"connector": 1, "may": ["close", "add_key", "remove_account", "adopt"]} to engine.acts"#),
             }
             out.put(b"\n");
         }
@@ -81,6 +82,7 @@ fn json(answer: &StartAnswer, kept: bool, out: &mut Encoder) {
                 StartFailure::Account => out.string(b"account"),
                 StartFailure::Adoption => out.string(b"adoption"),
                 StartFailure::NotConnected => out.string(b"not_connected"),
+                StartFailure::NotGranted => out.string(b"not_granted"),
             }
         }
         StartAnswer::Running | StartAnswer::Unknown => {}

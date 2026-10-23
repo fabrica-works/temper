@@ -727,8 +727,8 @@ fn deliver_role(root: &mut crate::Domain, me: skein_lib::Token, role: Option<c::
 }
 #[test]
 fn the_forge_end_rereads_once_settles_without_removal_and_none_clears_the_demo() {
-    // The deployment lists the demo model's account: the engine removes it at this end, not the client.
-    let (mut root, account, forges, watch) = ending_root_with_deployment();
+    let (mut root, account, forges, watch) = ending_root(Some(c::HeldRole::Owner));
+    let watch = watch.expect("running demo opens owner deployment watch");
     assert!(deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(false))).is_none());
     assert!(forge_rows(&mut root, forges, false).is_empty());
     let mut out = forge_rows(&mut root, forges, true);
@@ -763,7 +763,7 @@ fn both_ends_seen_in_one_pass_send_no_remove() {
     );
     let mut out = deliver_accounts(&mut root, account, ending_accounts(true));
     let read = demo_reread(&mut out);
-    assert!(root.demo().is_none(), "both halves ended");
+    assert_eq!(root.demo().unwrap().1, demo::Halves { model: false, forge: false });
     assert!(removed(&mut out).is_empty());
     let mut out = answer_no_demo(&mut root, read);
     assert!(closed(&out, watch));

@@ -535,7 +535,7 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
 #[test]
 fn demo_start_outcomes_round_trip_at_each_boundary() {
     let limits = v1::CEILINGS;
-    let mut outcomes = List::with_capacity(8);
+    let mut outcomes = List::with_capacity(9);
     for outcome in [
         v1::Outcome::Running,
         v1::Outcome::StartRefused(
@@ -545,7 +545,12 @@ fn demo_start_outcomes_round_trip_at_each_boundary() {
     ] {
         outcomes.push(outcome).expect("outcome room");
     }
-    for why in [v1::StartFailure::Account, v1::StartFailure::Adoption, v1::StartFailure::NotConnected] {
+    for why in [
+        v1::StartFailure::Account,
+        v1::StartFailure::Adoption,
+        v1::StartFailure::NotConnected,
+        v1::StartFailure::NotGranted,
+    ] {
         outcomes
             .push(v1::Outcome::StartFailed(
                 v1::StartFailed::new(&limits, v1::StartFailedParts { why }).expect("failure"),
