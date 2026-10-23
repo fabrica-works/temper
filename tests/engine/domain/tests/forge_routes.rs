@@ -1818,6 +1818,8 @@ fn an_amendment_while_gathering_discards_the_old_brief_without_claiming() {
             world.pending
         )
     });
+    let boundary = world.assigned.len();
+    let prior_attempts: Vec<_> = world.assigned.iter().map(|assignment| assignment.attempt).collect();
     world.send(engine::Event::Party(engine::PartyInput::Ask {
         models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(790)),
@@ -1861,7 +1863,15 @@ fn an_amendment_while_gathering_discards_the_old_brief_without_claiming() {
             for _ in 0..250 {
                 world.tick();
             }
-            assert_eq!(world.assigned.len(), 2, "an abandoned brief cannot assign after its delayed read");
+            // The amended repair may retry; the abandoned preparation may never claim.
+            for assignment in &world.assigned[boundary..] {
+                assert_eq!(assignment.task, repair, "only the revised repair may be assigned");
+                assert!(!prior_attempts.contains(&assignment.attempt), "no prior attempt can return");
+                let words = task_brief(assignment);
+                assert!(words.starts_with(b"revised repair\n"), "fresh amended spec: {words:?}");
+                assert!(!words.windows(b"make the fix".len()).any(|part| part == b"make the fix"));
+                assert!(!words.windows(b"Small fix".len()).any(|part| part == b"Small fix"));
+            }
             return;
         }
     }
@@ -1986,6 +1996,149 @@ fn a_review_whose_forge_reads_take_seconds_is_prepared_once() {
         })
         .collect();
     assert_eq!(reviews, [review], "only one review task is needed");
+}
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "one delayed blocking review, wakes during preparation and its landing")]
+fn a_review_whose_forge_reads_take_seconds_is_prepared_once_and_merges() {
+    let brief = temper_service::limits::profile(temper_service::limits::Profile::Small).root.brief;
+    let world = World::configured_brief(
+        true,
+        true,
+        false,
+        1000,
+        paths::Gate { agent: true, ..paths::Gate::default() },
+        None,
+        Some(brief),
+    );
+    let (mut world, _chat, producer, branch) =
+        change_world_in(world, paths::Change { no_ci: false, owner_gate: false, tracked: false });
+    world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 }));
+    let head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"review this diff", 1)
+        .expect("producer pushed");
+    // Even four domain reads take >1s; GitHub expands them into more HTTP requests.
+    world.fake_env.limits.latency_min = Duration::from_millis(300);
+    world.fake_env.limits.latency_max = Duration::from_millis(300);
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Change {
+                connector: 0,
+                kind: 2,
+                resource: forge_top::tag(forge_world::REPO.forge, forge_world::REPO.repository),
+                words: Box::from(&b"pushed"[..]),
+            },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    world.send(event);
+    let mut review = None;
+    for _ in 0..300 {
+        world.tick();
+        review = world.store.rows.values().find_map(|stored| match stored {
+            Record::Forge { row, .. } => match row.as_ref() {
+                forge_top::Stored::Change(row) => match row.delegate {
+                    Some((task, temper_engine_domain_forge_change::Delegate::Gate { .. }))
+                        if live_task(&world, task).phase == tasks::Phase::Active(tasks::Active::Preparing) =>
+                    {
+                        Some(task)
+                    }
+                    _ => None,
+                },
+                _ => None,
+            },
+            Record::Core(_) => None,
+        });
+        if review.is_some() {
+            break;
+        }
+    }
+    let review = review.expect("blocking review preparing before wakes");
+    let preparing = world.env.now;
+    // A changed CI answer and a delivery hint both reach the owned pull while
+    // its required brief section is still gathering; neither may replace its gate.
+    world.external(
+        1,
+        raw::Op::Write(raw::Write::Status {
+            commit: head,
+            context: Box::from(&b"pulse"[..]),
+            state: raw::Check::Pending,
+        }),
+    );
+    world.send(engine::Event::Forge(Box::new(forge_top::Event::Hint {
+        hint: skein_forge::api::Hint {
+            repository: forge_world::REPO,
+            change: skein_forge::api::Change::Item(1),
+            key: None,
+        },
+    })));
+    let mut changed_while_preparing = false;
+    for _ in 0..300 {
+        world.tick();
+        if live_task(&world, review).phase == tasks::Phase::Active(tasks::Active::Preparing) {
+            changed_while_preparing |= world.store.rows.values().any(|stored| {
+                matches!(stored,
+                Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::PullState(pull)
+                    if pull.ci == skein_forge::api::Ci::Pending))
+            });
+        }
+        if world.assigned.iter().any(|assignment| assignment.task == review) {
+            break;
+        }
+    }
+    assert!(changed_while_preparing, "the pull's Changed reaches its owner during the review gather");
+    let row = live_task(&world, review);
+    assert_eq!(row.refusals, 0, "first preparation: task={review}, phase={:?}, attempt={}", row.phase, row.attempt);
+    let assignments: Vec<_> = world.assigned.iter().filter(|assignment| assignment.task == review).collect();
+    let [assignment] = assignments.as_slice() else { panic!("review assigned once: {assignments:?}") };
+    assert!(world.env.now.as_nanos() - preparing.as_nanos() > Duration::from_secs(1).as_nanos());
+    assert!(task_brief(assignment).starts_with(b"Review this change at the named head\n"));
+    let event = world.protocol.answer(
+        Token::new(7),
+        review,
+        assignment.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Verdict { code: 1, fields: Box::new([]), words: Box::from(&b"approved"[..]) },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    world.send(event);
+    world.external(
+        1,
+        raw::Op::Write(raw::Write::Status {
+            commit: head,
+            context: Box::from(&b"pulse"[..]),
+            state: raw::Check::Passed,
+        }),
+    );
+    for _ in 0..300 {
+        world.tick();
+        if world.merges > 0 {
+            break;
+        }
+    }
+    assert_eq!(world.merges, 1, "the first review's verdict lands its change");
+    assert_eq!(world.assigned.iter().filter(|assignment| assignment.task == review).count(), 1);
+    let reviews: Vec<_> = world
+        .store
+        .rows
+        .values()
+        .filter_map(|stored| match stored {
+            Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row) | tasks::Stored::Ended(row)))
+                if row.spec.words.as_ref() == b"Review this change at the named head" =>
+            {
+                Some(row.number)
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(reviews, [review], "wakes cannot make a second review task");
 }
 
 #[test]
