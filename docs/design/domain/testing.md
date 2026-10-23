@@ -727,6 +727,19 @@ and 10).
   by the printed link, sees "Deployment accounts", adds an API key with
   "Use deployment accounts", and sees its deployment-held account there.
   It runs in under five seconds, without an LLM call or a real account.
+- **ChatGPT's sign-in from the welcome,** on the same fake-issuer
+  configuration: the person, its root a browser's (`../client/README.md`,
+  3.5, The tab's departure) over jig's native transport, opens the
+  welcome's Model step and presses "Continue with ChatGPT"; its root's
+  `Leave` names the issuer's address, which a visitor follows through
+  the issuer's redirect to the engine's listener, whose `303` names the
+  clients' origin and `/welcome?at=ready`; the person opens a client at
+  that address, and Ready names the account. `temper serve` then stops
+  and starts again on the same directory, and the accounts page shows
+  the account signed in. Without an LLM call or a real account. A
+  sign-in pending across a restart is not here: its return is never
+  kept, and skein's listener tier shows a sign-in started again with
+  none answered by the fixed page (skein's `oauth.md`, 6.5).
 - **Its endings.** The crash is the tier's one deliberate kill. It
   proves what a crash of every process keeps on disk, the page cache
   surviving it, not what a power loss does, which the one-process world

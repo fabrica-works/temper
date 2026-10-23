@@ -3475,7 +3475,9 @@ own tests:
   source, then one `Leave` for the address once `Return` is answered,
   none when it is refused, none from the terminal's root, and none
   again on a rebuild or from a root made at the returned address,
-  which draws the source's sign-in, then its end; a program's login declared from
+  which draws the source's sign-in, then its end; from the welcome's
+  Model step, the same with `Return` naming `/welcome?at=ready`, and a
+  root made there drawing Ready naming the account made; a program's login declared from
   Details and its command shown on Ready; the accounts page's rows
   folded, one opened and a key added to its account from the row; a
   limited account's words, "Use the API key first" moving its key
@@ -3517,7 +3519,11 @@ own tests:
   printed link, adds the deployment's key on `ConnectModel`, and
   adopts a repository on an owned Forgejo
   (`../protocol/setup.md`, section 2), with "It runs CI" checked, since
-  its runner runs Actions. And `temper open` itself, stdin and stdout
+  its runner runs Actions. ChatGPT's sign-in from the welcome's Model
+  step, against the fake issuer, the person's root a browser's: its
+  `Leave` followed through the issuer and the listener's `303` to
+  `/welcome?at=ready`, Ready there naming the account, and the account
+  still signed in on the accounts page after a restart. And `temper open` itself, stdin and stdout
   piped: it signs in by the printed link, prints the inbox, adopts a
   repository by commands, and exits 0 on `q` after a drained close.
   The first run (`../draft/first-run.md`, 2.1): the chat's card for the
@@ -3801,6 +3807,13 @@ own tests:
   the providers' facts, jig's `domain/providers.md`, 2.5); until then,
   each reads as the ending jig gives, in its words. Default: none drawn
   before jig's fact.
+- **A sign-in's end after the welcome's return** (3.5, The welcome):
+  a sign-in started at the welcome's Model step that ends refused or
+  failed comes back to Ready, which then says "Model: none yet" with
+  "Connect a model", and draws none of the ending's words, which the
+  accounts page and `ConnectModel` at the source still show.
+  Candidate: Ready draws the person's last ending under the model's
+  line while no account is usable. Default: as above.
 - **A sign-in started from another client** (3.5, `ConnectModel`): a
   page opened at a sign-in's way, by a reload or a link, knows no
   sign-in of its own, and offers the way's button again; the accounts
