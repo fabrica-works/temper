@@ -920,6 +920,42 @@ fn assistant_blocks(blocks: &[c::Block]) -> skein_ui::Tree {
     tree(&thread)
 }
 #[test]
+fn an_agents_pipe_table_keeps_its_rows_cells_and_empty_header() {
+    let tree =
+        assistant_blocks(&[c::Block::Text(fixtures::first_run::text(b"| | |\n|---|---|\n| Harness | Running |"))]);
+    let message = styled(&tree, crate::look::BY_AGENT);
+    let says = style_position(subtree(&tree, message), crate::look::SAYS).expect("agent's words");
+    let words = subtree(&tree, message + 1 + says);
+    let table = named_position(words, Role::Table, None).expect("table in agent's turn");
+    let table_at = message + 1 + says + 1 + table;
+    let nodes = subtree(&tree, table_at);
+    let mut rows = 0_u32;
+    let mut headers = 0_u32;
+    let mut cells = List::with_capacity(2);
+    for (offset, node) in nodes.iter().enumerate() {
+        if node.role == Role::Row {
+            rows += 1;
+        }
+        if node.role == Role::ColumnHeader {
+            headers += 1;
+            assert_eq!(node.size, 1, "empty header has no child");
+            if let Some(name) = &node.name {
+                assert!(name.is_empty());
+            }
+            assert!(node.text.is_empty());
+        }
+        if node.role == Role::Cell {
+            cells.push(offset).expect("two body cells");
+        }
+    }
+    assert_eq!(rows, 2);
+    assert_eq!(headers, 2);
+    assert_eq!(cells.len(), 2);
+    for (offset, expected) in cells.iter().zip([b"Harness".as_slice(), b"Running"]) {
+        assert_eq!(fixtures::node_text(&tree, table_at + 1 + offset).as_ref(), expected);
+    }
+}
+#[test]
 fn repeated_calls_fold_in_first_name_order_with_each_outcome_inside() {
     use fixtures::first_run as run;
     let tree = assistant_blocks(&[

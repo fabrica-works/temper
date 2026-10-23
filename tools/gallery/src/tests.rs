@@ -306,6 +306,49 @@ const HOLDS: [Holds; samples::N] = [
         ],
     },
 ];
+const SPENDS: [(&str, Role, &str); 10] = [
+    ("chat-solo-T10", Role::Paragraph, "0 spent · of 40 · delegates spent 0"),
+    ("chat-reference-T1", Role::Paragraph, "6 spent · of 100 · delegates spent 0"),
+    ("chat-solo-T6", Role::Paragraph, "1 spent · of 40 · delegates spent 0"),
+    ("chat-first-run-2-T1", Role::Paragraph, "0 spent · of 20 · delegates spent 0"),
+    ("chat-first-run-3-T1", Role::Paragraph, "0 spent · of 20 · delegates spent 0"),
+    ("chat-first-run-4-T4", Role::Paragraph, "0 spent · of 20 · delegates spent 0"),
+    ("chat-closing", Role::Paragraph, "1 spent · of 40 · delegates spent 0"),
+    ("chat-rejecting", Role::Paragraph, "0 spent · of 40 · delegates spent 0"),
+    ("chats-reference", Role::Paragraph, "6 spent · of 100 · delegates spent 0"),
+    ("chats-solo", Role::Paragraph, "1 spent · of 40 · delegates spent 0"),
+];
+#[test]
+fn each_chat_reads_its_allotment() {
+    for sample in samples::samples() {
+        if sample.name.starts_with("chat-") || matches!(sample.name, "chats-reference" | "chats-solo") {
+            let (_, role, spend) = SPENDS.iter().find(|row| row.0 == sample.name).expect("sample's spend row");
+            let view = view(&sample);
+            find(view.tree(), *role, spend, sample.name);
+        }
+    }
+}
+#[test]
+fn no_state_reads_of_zero() {
+    for sample in samples::samples() {
+        let view = view(&sample);
+        for node in view.tree().nodes() {
+            let mut text = Vec::new();
+            for run in &node.text {
+                text.extend_from_slice(&run.text);
+            }
+            for text in [node.name.as_deref(), Some(text.as_slice())].into_iter().flatten() {
+                // A space or end after zero: times (of 08:00) and fractions (of 0.5) are not allotments.
+                assert!(
+                    !text.windows(b"of 0 ".len()).any(|part| part == b"of 0 ") && !text.ends_with(b"of 0"),
+                    "{}: zero allotment in {:?}",
+                    sample.name,
+                    String::from_utf8_lossy(text)
+                );
+            }
+        }
+    }
+}
 fn in_main(role: Role, name: &str) -> Find {
     Find::named(role, name.as_bytes())
         .within(Box::new([skein_fake_person::Target::Role { role: Role::Main, name: Box::new([]) }]))
