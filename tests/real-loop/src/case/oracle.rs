@@ -1686,6 +1686,20 @@ fn rules_messages_and_endings(misses: &mut Vec<Miss>, observed: &Observed) {
         RULES_DROPPED,
         "no message may tell an owner the dropped rule",
     );
+    for read in [Read::RulesActivity, Read::ScopeActivity] {
+        let endings: Vec<_> =
+            check_activity(observed, read).into_iter().filter_map(|row| row.pointer("/line/run_ended")).collect();
+        step_check(
+            misses,
+            "5.1",
+            !endings.is_empty()
+                && endings
+                    .iter()
+                    .all(|ended| ended.pointer("/end/failed/class").and_then(Value::as_str) != Some("invalid")),
+            RULES_CONTROL,
+            "no run of the director or A may start invalid: a fresh start refused and retried would pass unseen",
+        );
+    }
     for (read, task, report) in [(Read::RulesEnded, RULES, RULES_REPORT), (Read::ScopeEnded, SCOPE, SCOPE_REPORT)] {
         let ended = task_document(observed, read);
         step_check(
@@ -1752,6 +1766,13 @@ mod rules_tests {
     fn ended(task: u64, report: &str) -> Value {
         json!({"task":{"chip":{"task":task,"phase":"ended"},"result":{"value":{"report":{"bytes":report}}}}})
     }
+    fn endings(task: u64, ends: &[Value]) -> Value {
+        let rows: Vec<Value> = ends
+            .iter()
+            .map(|end| json!({"event":{"owner":{"source":{"task":task,"line":{"run_ended":{"end":end}}}}}}))
+            .collect();
+        json!({"task":{"chip":{"task":task}},"activity":{"rows":rows}})
+    }
     fn met() -> Observed {
         let fresh = vec![user(&format!("{SCOPE}: {SCOPE_QUESTION}"))];
         let mut later = fresh.clone();
@@ -1772,6 +1793,8 @@ mod rules_tests {
                 ),
                 (Read::RulesEnded, ended(RULES, RULES_REPORT)),
                 (Read::ScopeEnded, ended(SCOPE, SCOPE_REPORT)),
+                (Read::RulesActivity, endings(RULES, &[json!("finished"), json!({"failed":{"class":"agent"}})])),
+                (Read::ScopeActivity, endings(SCOPE, &[json!("finished"), json!("parked")])),
             ]),
             told: vec![
                 told(Agent::Rules, OLD_RULES, &[user("Begin the work your brief describes.")]),
@@ -1915,6 +1938,22 @@ mod rules_tests {
         let mut observed = met();
         observed.told[A_ANSWERED].history = Box::new([user(DROPPED_RULE), user(SCOPE_ANSWER)]);
         rejects(&observed, RULES_DROPPED, "no message");
+    }
+    #[test]
+    fn no_run_may_start_invalid_and_hide_behind_its_retry() {
+        for read in [Read::RulesActivity, Read::ScopeActivity] {
+            let mut observed = met();
+            let rows =
+                observed.documents.get_mut(&read).expect("activity")["activity"]["rows"].as_array_mut().expect("rows");
+            rows.insert(
+                1,
+                json!({"event":{"owner":{"source":{"line":{"run_ended":{"end":{"failed":{"class":"invalid"}}}}}}}}),
+            );
+            rejects(&observed, RULES_CONTROL, "start invalid");
+            let mut observed = met();
+            observed.documents.remove(&read);
+            rejects(&observed, RULES_CONTROL, "start invalid");
+        }
     }
     #[test]
     fn both_original_tasks_must_end_with_their_reports() {

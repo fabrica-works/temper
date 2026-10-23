@@ -17,6 +17,58 @@ pub struct Encoding {
     pub deployment: [u8; 16],
 }
 
+/// A transcript tail as text alone. jig's tail copies the retained turns'
+/// encoded bytes, so a long one reaches their binary headers, which Smith's
+/// brief refuses as not UTF-8: keep what follows the last byte that is not
+/// text, behind a cut marker, never longer than the tail given. jig's own fix
+/// renders the turns as text.
+#[expect(clippy::disallowed_methods, reason = "the worker protocol checks a tail's text before Smith's brief")]
+pub(crate) fn text_tail(tail: &[u8]) -> Box<[u8]> {
+    const MARKER: &[u8] = b"[earlier bytes not text, cut]\n";
+    let mut from = 0_usize;
+    let mut at = 0_usize;
+    while let Some(rest) = tail.get(at..)
+        && !rest.is_empty()
+    {
+        let (valid, bad) = match ::core::str::from_utf8(rest) {
+            Ok(valid) => (valid, 0),
+            Err(problem) => {
+                let (valid, rest) = rest.split_at_checked(problem.valid_up_to()).expect("valid prefix inside the rest");
+                let valid = ::core::str::from_utf8(valid).expect("valid prefix");
+                (valid, problem.error_len().unwrap_or(rest.len()))
+            }
+        };
+        for (offset, char) in valid.char_indices() {
+            let text = match char {
+                '\n' | '\t' => true,
+                other => !other.is_control(),
+            };
+            if !text {
+                from = at.saturating_add(offset).saturating_add(char.len_utf8());
+            }
+        }
+        at = at.saturating_add(valid.len());
+        if bad != 0 {
+            at = at.saturating_add(bad);
+            from = at;
+        }
+    }
+    let kept = tail.get(from..).expect("text tail");
+    if from == 0 || tail.len() <= MARKER.len() {
+        return kept.into();
+    }
+    let kept = ::core::str::from_utf8(kept).expect("text after the last non-text byte");
+    let mut skip = kept.len().saturating_sub(tail.len().saturating_sub(MARKER.len()));
+    while !kept.is_char_boundary(skip) {
+        skip = skip.saturating_add(1);
+    }
+    let kept = kept.get(skip..).expect("a char boundary");
+    let mut text = Writer::new(MARKER.len().saturating_add(kept.len()));
+    text.put(MARKER).expect("marker within the tail's room");
+    text.put(kept.as_bytes()).expect("tail within its room");
+    text.finish()
+}
+
 /// An assignment and its application parts, or none when it cannot encode.
 #[must_use]
 pub fn down(
@@ -28,12 +80,14 @@ pub fn down(
     now: Time,
 ) -> Option<kit::Event> {
     let items = crate::translate::items(&assignment, forges, &values.tokens, &encoding.limits).ok()?;
-    let charter = smith_protocol_channel::encode_charter(
-        &temper_engine_smith::charter(&assignment),
-        &smith_charter::CEILINGS,
-        &encoding.endpoints,
-    )
-    .ok()?;
+    let mut charter = temper_engine_smith::charter(&assignment);
+    for (section, from) in charter.brief.sections.iter_mut().zip(&assignment.sections) {
+        if from.kind == root::BriefKind::Core(jig_domain_brief::Core::TranscriptTail) {
+            section.text = text_tail(&section.text);
+        }
+    }
+    let charter =
+        smith_protocol_channel::encode_charter(&charter, &smith_charter::CEILINGS, &encoding.endpoints).ok()?;
     let identity = identity(&encoding.deployment, assignment.task, assignment.conversation);
     let mut parts = List::with_capacity(1);
     let workspace = match items {

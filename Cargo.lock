@@ -3032,6 +3032,7 @@ dependencies = [
  "jig-client-protocol-wire",
  "jig-domain-accounts",
  "jig-domain-authority",
+ "jig-domain-brief",
  "jig-domain-core",
  "jig-domain-fleet",
  "jig-domain-host",

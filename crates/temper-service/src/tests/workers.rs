@@ -159,6 +159,55 @@ fn an_assignment_carries_its_items_encoded_charter_and_identity_value() {
     assert_eq!(token.token().expose(), b"forge-token-1234");
 }
 #[test]
+#[expect(clippy::disallowed_methods, reason = "ordinary tests assemble byte fixtures and inspect text")]
+fn a_fresh_start_whose_tail_reaches_the_turns_headers_still_encodes() {
+    let settings = fixtures::engine();
+    let encoding = fixtures::encoding(&settings);
+    let mut assignment = assignment_with_identity();
+    assignment.run.policy.resume = false;
+    // jig's tail copies the retained turns' encoded bytes, headers among them.
+    let mut tail = b"\x00\x00\x01\x2aearlier words of a turn that came before this one, ".to_vec();
+    tail.extend_from_slice(&[0xff, 0xfe, 0x00, 0x00, 0x00, 0x05]);
+    tail.extend_from_slice(b"The README's last line is in.");
+    let mut sections = assignment.sections.into_vec();
+    sections.push(temper_engine_domain::BriefSection {
+        kind: temper_engine_domain::BriefKind::Core(jig_domain_brief::Core::TranscriptTail),
+        body: temper_engine_domain::BriefBody::Text(tail.into()),
+    });
+    assignment.sections = sections.into_boxed_slice();
+    let values = fixtures::values_with_identity(1, b"forge-token-1234");
+    let event =
+        crate::assignment::down(assignment, &settings.forges, &encoding, &values, Token::new(8), Time::ZERO).unwrap();
+    let jig_protocol_engine_workers::Event::Down { down: jig_domain_host::LinkDown::Assign { assignment }, .. } = event
+    else {
+        panic!("assignment event")
+    };
+    let charter = &assignment.assignment.charter;
+    assert!(!decoded_charter(charter).resume());
+    assert!(skein_lib::bytes::find(charter, b"[earlier bytes not text, cut]\nThe README's last line is in.").is_some());
+}
+#[test]
+#[expect(clippy::disallowed_methods, reason = "ordinary tests assemble byte fixtures and inspect text")]
+fn a_tail_keeps_its_text_marked_and_never_grows() {
+    use crate::assignment::text_tail;
+    const MARKER: &[u8] = b"[earlier bytes not text, cut]\n";
+    // A text tail, its newlines and tabs among it, is unchanged.
+    assert_eq!(text_tail(b"I appended the line.\n\tDone.").as_ref(), b"I appended the line.\n\tDone.");
+    // A tail with no text after its last header is the marker alone, never its bytes.
+    assert_eq!(text_tail(&[0xff; 40]).as_ref(), MARKER);
+    assert_eq!(text_tail(&[0x00; 40]).as_ref(), MARKER);
+    // The marker's room is cut from the text's start, at a character's edge.
+    let mut long = b"\x00\x05".to_vec();
+    long.extend_from_slice("it’s done: the README’s line’s in, all of it".as_bytes());
+    let text = text_tail(&long);
+    assert!(text.starts_with(MARKER), "{text:?}");
+    assert!(::core::str::from_utf8(&text).is_ok(), "{text:?}");
+    assert!(text.ends_with(b"all of it"));
+    assert!(text.len() <= long.len());
+    // A tail too short for the marker keeps its text alone.
+    assert_eq!(text_tail(b"\x00\x05done").as_ref(), b"done");
+}
+#[test]
 fn an_assignment_that_cannot_encode_its_items_is_refused() {
     let settings = fixtures::engine();
     let encoding = fixtures::encoding(&settings);

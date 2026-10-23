@@ -51,6 +51,10 @@ pub enum Read {
     RulesQuestionWaiting,
     ScopeEnded,
     RulesEnded,
+    /// The director's whole activity once ended: its runs' endings.
+    RulesActivity,
+    /// A's whole activity once ended: its runs' endings.
+    ScopeActivity,
     ShapeEnded,
     MoverEnded,
 }
@@ -315,6 +319,8 @@ pub const READS_5_1: &[(Read, usize)] = &[
     (Read::RulesQuestionWaiting, 8),
     (Read::RulesEnded, RULES_ENDED),
     (Read::ScopeEnded, 11),
+    (Read::RulesActivity, 12),
+    (Read::ScopeActivity, 13),
 ];
 
 #[must_use]
@@ -364,6 +370,9 @@ pub fn step_5_1() -> Vec<calls::Step> {
         call(D1, argv!["release", number(RULES), "--hold", number(RULES_HOLD_REVISION), "--key", "rules-release"]),
         join(RULES_ENDED),
         call(D1, argv!["task", number(SCOPE), "--json"]),
+        // Every run's ending: a fresh start refused and retried would pass unseen.
+        call(D1, argv!["task", number(RULES), "--activity", "32", "--json"]),
+        call(D1, argv!["task", number(SCOPE), "--activity", "32", "--json"]),
     ]
 }
 
