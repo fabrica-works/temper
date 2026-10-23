@@ -751,7 +751,14 @@ and 10).
   the account signed in. Without an LLM call or a real account. A
   sign-in pending across a restart is not here: its return is never
   kept, and skein's listener tier shows a sign-in started again with
-  none answered by the fixed page (skein's `oauth.md`, 6.5).
+  none answered by the fixed page (skein's `oauth.md`, 6.5). The
+  browser's root over the native transport is the tier's alone:
+  `temper-client-shell-terminal`'s `NativeClient::departing`, behind
+  its `browser-root` feature, which only `crates/temper`'s
+  dev-dependencies turn on, so that the shipped `temper` has no such
+  root. The terminal's own root signs in from a page as the browser's
+  does up to its link, which the joint world shows; the tier's
+  fixed page is the ctl sign-in's.
 - **The build it runs in.** The tier runs the binary its build made,
   with or without its browser (`TEMPER_BUNDLE`; ../client/browser.md,
   2.6), and passes in both: where a start with `clients.bundle` `null`

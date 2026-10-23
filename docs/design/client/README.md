@@ -736,7 +736,14 @@ keeps (`../protocol/configuration.md`, section 2).
     with its first repository adopted, ticked, "FORGE · ORG/NAME, in
     PROJECT", on GitHub the repository Ready adopted; PROJECT reads
     "the new project NAME" for a new one. A GitHub forge with none
-    adopted yet reads "GitHub · no repository chosen yet". *The seam:* the Model step's
+    adopted yet reads "GitHub · no repository chosen yet", as a forge
+    connected with no first repository reads "FORGE · no repository
+    chosen yet"; a set up or a first repository that failed reads as
+    under way, its CONNECTION or its steps saying so. The line is one
+    paragraph, from the facts Ready reads on the forge's row (the
+    person's forge, its connection and its first repository, or the
+    set up's request until the row names it), and every line but the
+    ticked one keeps "Each step". *The seam:* the Model step's
     body is `ConnectModel`'s, the step's frame, heading, lead, set up
     line and foot the welcome's.
     *Ready* names the forge and the model as set up or under way, under
@@ -3467,7 +3474,9 @@ own tests:
   5.5's table, folded and opened, with each act and its outcome under
   its row, the deployment's and the playground's sections, and none of
   the person's own; `ConnectModel` at each step for each way, Ready's
-  words for each, and each ending's words and acts; the navigation's
+  words for each, and each ending's words and acts; the welcome's Model
+  step with no forge's line, and with each (3.5, The welcome): under
+  way with its steps, ticked, none adopted and failed; the navigation's
   dot in each colour and none; the banners' ways.
 - **Golden text:** temper's pages as skein's text shell prints them,
   kept as files beside the tests and changed only by hand: the inbox
@@ -3575,7 +3584,10 @@ own tests:
   store, no document and no answer, a pasted request lost and sent again
   making one connect, a replacement answering as another user refused,
   and a person whose role does not hold the deployment's connectors
-  refused; with jig's faults (drops,
+  refused; the welcome's Model step reading its forge's line from the
+  `forges` watch's row, under way while the forge connects, then
+  ticked with ORG/NAME and its project once its first repository is
+  adopted; with jig's faults (drops,
   the engine restarting, a double press, a reload with an adoption
   pending, kept work), each request made once. jig's check holds in
   every story, said in temper's phrasebook, which temper's world gives
