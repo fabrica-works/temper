@@ -249,7 +249,7 @@ fn try_the_playground_opens_the_chats_in_the_demos_project() {
 fn the_model_step_sends_the_accounts_acts() {
     use pages::connect_model::Act as A;
     let (mut root, _, _, _) = opened(false, Step::Model { way: None });
-    go(&mut root, Step::Model { way: Some(crate::ModelWay { provider: 17, kind: crate::WayKind::Key }) });
+    go(&mut root, Step::Model { way: Some(crate::ModelWay { source: None, provider: 17, kind: crate::WayKind::Key }) });
     event(&mut root, Event::AccountKey { value: Secret::new(b"private-test-key".as_slice().into()) });
     let mut out =
         event(&mut root, Event::Act { action: Action::Pages(Act::ConnectModel(A::Submit { name: [1; 16] })) });

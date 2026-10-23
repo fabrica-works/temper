@@ -275,7 +275,8 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
                     })
                 }
                 temper_client_protocol_wire::v1::Request::StartDemo => None,
-                temper_client_protocol_wire::v1::Request::Adopt(_) => return,
+                temper_client_protocol_wire::v1::Request::Adopt(_)
+                | temper_client_protocol_wire::v1::Request::Return(_) => return,
             };
             state.pending.insert(*key, SettingUp { intent, called: None });
         }

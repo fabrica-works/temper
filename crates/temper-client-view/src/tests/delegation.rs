@@ -182,6 +182,7 @@ fn root_chat_with_reads(
             } => reads.push(request),
             Request::Client { .. }
             | Request::Show { .. }
+            | Request::Leave { .. }
             | Request::SignOut
             | Request::Dropped { .. }
             | Request::Fact { .. } => {}

@@ -48,12 +48,13 @@ pub struct Domain {
     pub(crate) brief_sections: Map<u64, Box<[BriefSection]>>,
     pub(crate) run_workspaces: Map<u64, PreparedWorkspace>,
     pub(crate) forge: forge::Domain,
-    pub(crate) application: Option<(Token, forge::Ask)>,
+    pub(crate) application: Option<(Token, crate::Application)>,
     pub(crate) application_demo: Option<crate::route::demo::Context>,
     pub(crate) demo_contexts: Map<Token, crate::route::demo::Context>,
     pub(crate) demo_start: Option<crate::route::demo::Start>,
     pub(crate) demo_reply: Option<(Token, crate::route::demo::Phase)>,
     pub(crate) next_application_owner: u64,
+    pub(crate) returns: Map<Token, (Time, Wall)>,
     pub(crate) adoption_restore: Map<Token, Option<forge::Repository>>,
     pub(crate) forge_subscribing: Map<Token, forge::Subscriber>,
     pub(crate) forge_unsubscribing: Map<Token, (u64, forge::Topic)>,
@@ -307,6 +308,7 @@ impl Domain {
             demo_start: None,
             demo_reply: None,
             next_application_owner: 1,
+            returns: Map::with_capacity(limits.people.requests),
             adoption_restore: Map::with_capacity(limits.forge.adoptions),
             forge_subscribing: Map::with_capacity(limits.fleet.calls),
             forge_unsubscribing: Map::with_capacity(limits.fleet.calls),
@@ -591,6 +593,7 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             | Request::Setup { .. }
             | Request::SetUpGroup { .. }
             | Request::SetUp { .. }
+            | Request::Return { .. }
             | Request::Forge { .. }
             | Request::Store(crate::StoreRequest::Load { .. } | crate::StoreRequest::Read { .. })
             | Request::ToChild(_)

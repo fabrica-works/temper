@@ -14,7 +14,9 @@ fn an_adoption_of_a_repository_the_forge_lacks_is_refused_as_not_found() {
     adopt(&mut driver, request, 95);
     assert_eq!(
         outcomes(&driver),
-        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NotFound)))]
+        [&Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::ForgeRefused(
+            forge::AdoptionRefusal::NotFound
+        )))]
     );
     assert_eq!(driver.forge.as_ref().expect("forge stand").calls, 1);
 }
@@ -123,11 +125,11 @@ fn adopt(driver: &mut Driver, request: forge::Adoption, reply: u64) {
         key: [95; 16],
         digest: [5; 32],
         carried: None,
-        request: forge::Ask::Adopt(request),
+        request: temper_engine_domain::Application::Forge(forge::Ask::Adopt(request)),
     }));
     driver.settle();
 }
-fn outcomes(driver: &Driver) -> Vec<&Option<forge::Answered>> {
+fn outcomes(driver: &Driver) -> Vec<&Option<temper_engine_domain::ApplicationAnswer>> {
     driver
         .delivered
         .iter()
@@ -141,7 +143,9 @@ fn an_adoption_naming_a_forge_not_configured_is_refused_as_no_such_forge() {
     adopt(&mut driver, fixtures::adoption(2), 95);
     assert_eq!(
         outcomes(&driver),
-        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoSuchForge)))]
+        [&Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::ForgeRefused(
+            forge::AdoptionRefusal::NoSuchForge
+        )))]
     );
     assert_eq!(driver.forge.as_ref().expect("a forge stand").calls, 0);
 }
@@ -152,25 +156,27 @@ fn an_adoption_on_a_configured_forge_is_adopted_with_what_temper_may_do() {
     adopt(&mut driver, fixtures::adoption(1), 95);
     assert_eq!(
         outcomes(&driver),
-        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::Adopted(forge::AdoptedRepository {
-            repository: skein_forge::api::Repository { forge: 1, repository: 2 },
-            owner: Box::from(&b"org"[..]),
-            name: Box::from(&b"repo"[..]),
-            role: forge::Role::Owned,
-            home: true,
-            kinds: forge::Kinds {
-                read: true,
-                push: true,
-                open: true,
-                land: true,
-                review: true,
-                status: true,
-                comment: true,
-                issue: true,
-                branch: true
-            },
-            protection: forge::Protection::Absent,
-        })))]
+        [&Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::Adopted(
+            forge::AdoptedRepository {
+                repository: skein_forge::api::Repository { forge: 1, repository: 2 },
+                owner: Box::from(&b"org"[..]),
+                name: Box::from(&b"repo"[..]),
+                role: forge::Role::Owned,
+                home: true,
+                kinds: forge::Kinds {
+                    read: true,
+                    push: true,
+                    open: true,
+                    land: true,
+                    review: true,
+                    status: true,
+                    comment: true,
+                    issue: true,
+                    branch: true
+                },
+                protection: forge::Protection::Absent,
+            }
+        )))]
     );
 }
 
@@ -193,7 +199,9 @@ fn an_adoption_the_forge_user_may_not_read_is_refused_as_no_access() {
     adopt(&mut driver, request, 95);
     assert_eq!(
         outcomes(&driver),
-        [&Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(forge::AdoptionRefusal::NoAccess)))]
+        [&Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::ForgeRefused(
+            forge::AdoptionRefusal::NoAccess
+        )))]
     );
 }
 
@@ -217,4 +225,77 @@ fn an_adoption_sent_again_after_a_restart_is_answered_its_kept_outcome() {
     adopt(&mut restarted, fixtures::adoption(1), 96);
     assert_eq!(outcomes(&restarted), [&outcome]);
     assert_eq!(restarted.forge.as_ref().expect("forge stand").calls, calls_after_restart);
+}
+
+#[test]
+fn a_person_without_an_owner_role_returns_once_and_replays_the_answer() {
+    let mut driver = Driver::forge();
+    driver.settle();
+    driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
+        held: None,
+        reply_to: ReplyTo::new(Token::new(93)),
+        identity: people::Identity {
+            key: people::IdentityKey { provider: 0, subject: 99_u64.to_be_bytes().into() },
+            login: b"visitor".as_slice().into(),
+            name: b"Visitor".as_slice().into(),
+        },
+    }));
+    driver.settle();
+    let sign_in = driver.session();
+    driver.delivered.clear();
+    for replay in [false, true] {
+        driver.send(engine::Event::Party(engine::PartyInput::Application {
+            // Return always uses Own admission, even when the envelope names a project.
+            scope: people::ApplicationScope::Project(u32::MAX),
+            reply_to: ReplyTo::new(Token::new(94)),
+            sign_in,
+            key: [94; 16],
+            digest: [94; 32],
+            carried: None,
+            request: engine::Application::Return {
+                source: 7,
+                path: b"/accounts/connect?provider=1&way=sign-in&source=7".as_slice().into(),
+            },
+        }));
+        driver.settle();
+        assert_eq!(outcomes(&driver), [&Some(engine::ApplicationAnswer::Returning)], "replay {replay}");
+        assert_eq!(
+            driver.protocol.returns,
+            [(7, Box::from(b"/accounts/connect?provider=1&way=sign-in&source=7".as_slice()))]
+        );
+        driver.delivered.clear();
+    }
+    assert_eq!(driver.forge.as_ref().expect("forge stand").calls, 0);
+}
+
+fn return_ask(sign_in: u64) -> engine::Event {
+    engine::Event::Party(engine::PartyInput::Application {
+        scope: people::ApplicationScope::Own,
+        reply_to: ReplyTo::new(Token::new(94)),
+        sign_in,
+        key: [94; 16],
+        digest: [94; 32],
+        carried: None,
+        request: engine::Application::Return { source: 7, path: b"/welcome?at=ready".as_slice().into() },
+    })
+}
+#[test]
+fn a_return_replayed_after_restart_is_unknown_without_a_second_output() {
+    let mut first = driver();
+    first.send(return_ask(first.session()));
+    first.settle();
+    assert_eq!(outcomes(&first), [&Some(engine::ApplicationAnswer::Returning)]);
+    let mut restarted = Driver::configured(
+        first.store,
+        [temper_engine_domain_world::walking::config(71), temper_engine_domain_world::walking::config(71)],
+        &fixtures::forge_limits(),
+    );
+    restarted.forge = first.forge;
+    restarted.settle();
+    restarted.sign_in();
+    restarted.settle();
+    restarted.send(return_ask(restarted.session()));
+    restarted.settle();
+    assert_eq!(outcomes(&restarted), [&None]);
+    assert!(restarted.protocol.returns.is_empty());
 }

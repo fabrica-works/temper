@@ -376,6 +376,7 @@ fn stopping_continues_projection_deferred_finishing_without_new_commits() {
                 other @ (Request::Setup { .. }
                 | Request::SetUpGroup { .. }
                 | Request::SetUp { .. }
+                | Request::Return { .. }
                 | Request::Store(_)
                 | Request::Worker(_)
                 | Request::Party(_)

@@ -119,7 +119,7 @@ pub(crate) fn progress(domain: &mut Domain, env: &Env<Limits>, _decision: &mut D
     };
     domain.demo_start.as_mut().expect("start").phase = Phase::Adoption;
     domain.demo_reply = Some((request, Phase::Adoption));
-    applications::start(domain, admission, forge::Ask::Adopt(adoption));
+    applications::start(domain, admission, crate::Application::Forge(forge::Ask::Adopt(adoption)));
 }
 
 fn finish(domain: &mut Domain, answer: forge::StartAnswer) {
