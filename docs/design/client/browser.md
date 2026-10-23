@@ -1,6 +1,6 @@
 # The browser
 
-Provisional, 2026-10-05, revised 2026-10-22. temper's browser client: a
+Provisional, 2026-10-05, revised 2026-10-23. temper's browser client: a
 second shell of temper's client (`README.md`), beside the terminal, on
 skein's browser parts. What its pages do is the client's (`README.md`;
 `forge.md`), with the mockups' look (`mockups/`, reference material),
@@ -189,7 +189,7 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 
   | Page | Path |
   |---|---|
-  | `Inbox` | `/` |
+  | `Inbox { filter }` | `/`, and its filter's query |
   | `Chats` | `/chats` |
   | `Accounts` | `/accounts` |
   | `Chat { task }` | `/chats/<task>` |
@@ -198,8 +198,29 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 
   `<task>` and `<project>` are the task's and the project's numbers in
   decimal. A later page's path comes with it, in this shape
-  (`/projects/<project>/board`, `/projects/<project>/changes`). A page's filters (the inbox's project, kind and goal)
-  are not in its address (section 5).
+  (`/projects/<project>/board`, `/projects/<project>/changes`).
+- **The inbox's filter is its query:** the fields it sets, in one
+  order, `?project=<project>&kind=<kind>&goal=<goal>`, and none with
+  every field unset, so that `/` is the inbox unfiltered and
+  `/?kind=question&goal=9` one filtered by kind and goal. `<project>`
+  and `<goal>` are numbers in decimal, as a path's; `<kind>` is one of
+  `proposal`, `question`, `held` and `person-task`: the kind's button
+  word (`README.md`, 3.5's inbox), in lower case, its space a hyphen.
+  The codec reads the fields between `&`, each `name=value`, and drops
+  one it doesn't know, one whose value doesn't read as its field's
+  (`kind=reply`, `project=07`, a number past its type), and one named
+  again after a first that read; the rest set the filter. So a stale
+  or edited link opens the inbox less filtered, never refused, and its
+  address is replaced with the printed one. It reads numbers, not the
+  person's projects: a project the person isn't in shows an empty
+  inbox, which "All projects" undoes. The inbox's filter alone is in
+  an address: the chats list's and a goal's plan's are the page's,
+  "All" at each open (section 5), and another page's query is dropped,
+  `/chats/7?x=1` replaced with `/chats/7`.
+- **A filter chosen is a move** (below), with its history entry: a
+  link's, at the page's top with the focus on its heading, and back
+  returns to the filter before. Like any move it folds the open
+  disclosures (2.5), so the Kind menu closes on its choice.
 - **A path that is no page** opens the inbox, and the address is
   replaced with `/`. The codec never prints a path under `/jig`,
   `/bundle/` or `/test/`, nor `/robots.txt`.
@@ -440,9 +461,9 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   party's kept work, and kept work dropped at start, which the terminal
   says in lines of its own. Default: not shown; the small store lives
   as long as its tab, of one person.
-- **A page's filters in its address:** the inbox's project, kind and
-  goal. Default: not in the address; a reload shows the page
-  unfiltered.
+- **The other pages' filters in their address:** the chats list's
+  "All", "Live" and "Closed", and a goal's plan's. Default: not in the
+  address; a reload shows "All" (2.3). The inbox's is in its address.
 - **The bundle in the binary,** so that `temper serve` needs no
   directory. Default: a directory the configuration names (2.2).
 - **A dark palette,** following the system's preference as

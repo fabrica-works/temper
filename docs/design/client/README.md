@@ -1,6 +1,6 @@
 # temper's client
 
-Provisional, 2026-10-14, revised 2026-10-22. temper's client: temper's own
+Provisional, 2026-10-14, revised 2026-10-23. temper's client: temper's own
 presentation on jig's client, `jig-client`. Its crates; its client root,
 which holds `jig-client` and temper's pages, the LLM accounts' and the
 forges' among them; the forge's client family, its words, its one form
@@ -412,9 +412,12 @@ keeps (`../protocol/configuration.md`, section 2).
   and each kind, the chosen one pressed, and named "Kind" while every
   kind is shown, "Kind · Question" once one is chosen, in the word its
   pressed button says, so that the folded menu says what the list is
-  filtered by; then "All goals" and "Goal". A filter chosen keeps the
-  browser's address, the inbox's "/", so the disclosure stays as the
-  person left it.
+  filtered by; then "All goals" and "Goal". The filter is in the
+  inbox's address (`browser.md`, 2.3), "/?kind=question": a filter
+  chosen is a move to the inbox at that address, as a link pressed is,
+  so that a reload, back and a shared link keep it, and back undoes
+  the choice. The move folds the Kind menu, as a menu closes on its
+  choice, and its name says what was chosen.
 - **A card that needs the person** begins with a line: its kind as a
   tag, "Proposal", its project and the task's link, "Task N", and at
   its right how long it waits, "Waiting 12 min" (5.12's span), from
@@ -2411,15 +2414,16 @@ The terminal opens at the inbox (3.4) and reaches each page by its
 numbered link (6.5), never by a page's address: `temper open` takes the
 engine's address or the sign-in link (6.1). A browser opens a page by
 its address: a reload, or `/tasks/N` typed or opened, is a new client
-at that address (`browser.md`, 2.3). Of that open, the path and its
-load are the browser's; the rest is the client root's, the same under
-both shells: a root started at a page's address, its pages opening
-that page, asking its reads and drawing it once they answer. The
-client's joint world, `tests/client`, starts its clients so, with no
-shell (`fixtures::task_page`), and proves the root's part: in roadmap
-B2's story a fresh client started at a delegate's address draws its
-heading and its "Task brief", as the browser tier's task pages story
-does at `/tasks/3` (section 10).
+at that address (`browser.md`, 2.3), and an inbox's address holds its
+filter, so that `/?kind=question` opens the inbox filtered. Of that
+open, the path and its load are the browser's; the rest is the client
+root's, the same under both shells: a root started at a page's address,
+its pages opening that page, asking its reads and drawing it once they
+answer. The client's joint world, `tests/client`, starts its clients
+so, with no shell (`fixtures::task_page`), and proves the root's part:
+in roadmap B2's story a fresh client started at a delegate's address
+draws its heading and its "Task brief", as the browser tier's task
+pages story does at `/tasks/3` (section 10).
 
 ## 7. Signing in and the small store
 
