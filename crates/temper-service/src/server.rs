@@ -32,6 +32,7 @@ struct Connection {
     closing: bool,
     draining: bool,
     deadline: Time,
+    held: Option<Time>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Phase {
@@ -121,6 +122,7 @@ impl Server {
                                 closing: false,
                                 draining: false,
                                 deadline: self.env.now.saturating_add(self.env.limits.stall),
+                                held: None,
                             },
                         )
                         .expect("admitted connection");
@@ -132,7 +134,8 @@ impl Server {
                 if let Some(connection) = self.connections.get_mut(&owner)
                     && !connection.closing
                 {
-                    connection.deadline = self.env.now.saturating_add(self.env.limits.stall);
+                    connection.deadline =
+                        self.env.now.saturating_add(self.env.limits.stall).max(connection.held.unwrap_or(Time::ZERO));
                     let ended = match &up {
                         Up::End => connection.call.is_some(),
                         Up::Bytes(_) | Up::Room | Up::Failed(_) => false,
@@ -181,6 +184,23 @@ impl Server {
         }
         None
     }
+    /// Hold an application call through its own deadline, leaving the normal
+    /// stall interval for its ending page to reach the peer.
+    pub(crate) fn hold(&mut self, call: Token, deadline: Time) {
+        if let Some(owner) = self.owner(call) {
+            let connection = self.connections.get_mut(&owner).expect("held call");
+            let until = deadline.saturating_add(self.env.limits.stall);
+            connection.held = Some(until);
+            connection.deadline = connection.deadline.max(until);
+        }
+    }
+    pub(crate) fn release(&mut self, call: Token) {
+        if let Some(owner) = self.owner(call) {
+            let connection = self.connections.get_mut(&owner).expect("released call");
+            connection.held = None;
+            connection.deadline = self.env.now.saturating_add(self.env.limits.stall);
+        }
+    }
     pub fn answer(&mut self, call: Token, mut request: http::Request, out: &mut Queue<Routed>) {
         if let http::Request::Respond(response) = &mut request {
             crate::clients::policy::add(response);
@@ -201,6 +221,7 @@ impl Server {
         if let Some(owner) = self.owner(call) {
             let connection = self.connections.get_mut(&owner).expect("call owner");
             connection.call = None;
+            connection.held = None;
             if connection.reuse.take() == Some(http::Reuse::Keep) && self.phase < Phase::Closing {
                 connection.requests.push(http::Request::Next);
             } else {

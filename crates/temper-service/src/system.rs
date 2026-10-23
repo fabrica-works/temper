@@ -151,7 +151,17 @@ impl Service {
             .expect("client pass headroom")
             .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
             .expect("client routing room");
-        let clients = clients::Clients::new(&settings.jig, &settings.clients, seeds, client_room, &limits.journal)?;
+        let mut clients = clients::Clients::new(
+            &settings.jig,
+            &settings.clients,
+            seeds,
+            client_room,
+            &limits.journal,
+            settings.sign_in.as_ref(),
+        )?;
+        if let Some(sign_in) = &settings.sign_in {
+            clients.configure_google(sign_in, settings.limits.sign_in, seeds, &settings.jig);
+        }
         let setup_room = max.checked_add(SETUP_ROUTING_HEADROOM).expect("setup routing headroom");
         let setup = crate::setup::prepare(&settings, &mut forge_settings, &seeds.crypto, setup_room, under_box)?;
         let forge = crate::forge::Layer::new(
@@ -911,6 +921,7 @@ fn handover_diagnostics(settings: &settings::Engine, queue: u32, events: u32) ->
         .checked_mul(file_copies)?
         .checked_add(file_diagnostic.checked_mul(u64::try_from(settings.forges.len()).ok()?.checked_add(1)?)?)
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive sum of the composed service envelopes")]
 fn memory(
     settings: &settings::Engine,
     root: &temper_engine_domain::Limits,
@@ -967,10 +978,18 @@ fn memory(
         &root.journal,
     )?)?;
     if let Some(public) = &settings.clients.public {
-        // The HTTP mount retains its own copy of the configured Host name.
-        bytes = bytes.checked_add(u64::try_from(public.name.len()).ok()?)?;
+        // The clients retain the origin; listening gives the mount its Host copy.
+        bytes = bytes
+            .checked_add(u64::try_from(public.name.len()).ok()?.checked_mul(3)?)?
+            .checked_add(u64::try_from(public.host.len()).ok()?.checked_mul(2)?)?;
     }
     bytes = bytes.checked_add(clients::bundle::worst_case(&settings.limits.clients)?)?;
+    if settings.sign_in.is_some() {
+        bytes = bytes.checked_add(clients::google::worst_case(
+            settings.limits.sign_in,
+            limits::server(&settings.jig.limits).connections,
+        )?)?;
+    }
     if let Some(demo) = &settings.demo {
         let mut retained = List::<Box<[u8]>>::worst_case(u32::try_from(demo.cues.len()).ok()?)?
             .checked_add(u64::try_from(demo.owner.len()).ok()?)?
@@ -1178,4 +1197,23 @@ fn box_io(service: &mut Service) {
 
 fn box_bytes(line_bytes: u32) -> Option<u64> {
     u64::from(line_bytes).checked_add(1)?.checked_mul(2)
+}
+
+impl Service {
+    /// Start-time endpoints only; the browser and the issuer never choose a socket.
+    pub fn configure_google_endpoints(
+        &mut self,
+        runtime: clients::fetch::Runtime,
+    ) -> Result<(), clients::fetch::TooLarge> {
+        let extra = runtime.worst_case().ok_or(clients::fetch::TooLarge)?;
+        let bytes = self.bytes.checked_add(extra).ok_or(clients::fetch::TooLarge)?;
+        if bytes > self.memory_limit {
+            return Err(clients::fetch::TooLarge);
+        }
+        if let Some(engine) = &mut self.engine {
+            engine.clients.google_endpoints(runtime.endpoints);
+            self.bytes = bytes;
+        }
+        Ok(())
+    }
 }

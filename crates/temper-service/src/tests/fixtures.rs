@@ -85,6 +85,7 @@ pub fn engine() -> settings::Engine {
         jig: jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
             .expect("typed jig engine"),
         webhooks: None,
+        sign_in: None,
         clients: crate::startup::application::Clients {
             listener: jig_protocol_config::Address::Addr(http::address()),
             bundle: None,
@@ -840,7 +841,7 @@ pub use worker_git::{
 };
 pub fn clients() -> crate::clients::Clients {
     let engine = engine();
-    crate::clients::Clients::new(&engine.jig, &engine.clients, &seeds(), 64, &engine.limits.root.journal).unwrap()
+    crate::clients::Clients::new(&engine.jig, &engine.clients, &seeds(), 64, &engine.limits.root.journal, None).unwrap()
 }
 mod startup;
 pub use startup::{

@@ -13,14 +13,16 @@ use temper_engine_domain as root;
 pub mod bundle;
 #[cfg(test)]
 mod demo_tests;
+pub mod fetch;
 mod github;
+pub mod google;
 pub(crate) mod policy;
 pub(crate) mod printed;
 pub mod translation;
 const PREFIX: u64 = crate::tokens::CLIENTS;
 pub(crate) const DEMO_STARTS: u32 = 8;
 
-#[derive(Debug)]
+#[expect(missing_debug_implementations, reason = "clients hold pending OAuth secrets")]
 pub struct Clients {
     /// Bound address awaiting the system's note routing.
     pub(crate) listening: Option<::core::net::SocketAddr>,
@@ -34,6 +36,8 @@ pub struct Clients {
     server_out: Queue<crate::server::Routed>,
     replies: Map<Token, bundle::Reply>,
     github: Map<Token, github::Reply>,
+    pub(crate) google: Option<google::Google>,
+    google_replies: Map<Token, google::Reply>,
     pub(crate) github_calls: Queue<(Token, skein_http::server::Call)>,
     pub(crate) query_bytes: u32,
     send: u32,
@@ -80,10 +84,6 @@ fn invalid(what: What) -> Problems {
     problems
 }
 impl Clients {
-    #[expect(clippy::unused_self, reason = "task B consumes binding answers in this composition")]
-    pub(crate) fn bound(&mut self, _request: Token, _answer: temper_engine_domain_forge::BindAnswer) {
-        // Task B (o/sign-in-m2) adds pending sign-ins and consumes their binding answers here.
-    }
     pub(crate) fn demo_read(&mut self) -> Option<crate::HandoverRead> {
         self.demo_reads.pop()
     }
@@ -131,12 +131,14 @@ impl Clients {
     pub(crate) fn bound_address(&self) -> Option<::core::net::SocketAddr> {
         self.server.listening()
     }
+    #[expect(clippy::too_many_lines, reason = "startup constructs bounded queues beside the client component")]
     pub fn new(
         config: &config::Engine,
         clients: &crate::startup::application::Clients,
         seeds: &Seeds,
         room: u32,
         journal: &root::JournalLimits,
+        sign_in: Option<&crate::settings::SignIn>,
     ) -> Result<Self, Problems> {
         let config::Address::Addr(listener) = &clients.listener else {
             return Err(invalid(What::Form));
@@ -154,15 +156,27 @@ impl Clients {
             }
         }
         let link = if config.clients.link {
-            let provider = link_provider.ok_or(invalid(What::Refers))?;
+            let provider = match sign_in {
+                Some(sign_in) => sign_in.provider,
+                None => link_provider.ok_or(invalid(What::Refers))?,
+            };
             let mut identity = None;
             for owner in &config.owners {
                 if owner.identity.provider == provider {
-                    identity = Some(people::Identity {
-                        key: owner.identity.clone(),
-                        login: Box::from(b"owner".as_slice()),
-                        name: Box::from(b"Owner".as_slice()),
-                    });
+                    identity =
+                        Some(people::Identity {
+                            key: owner.identity.clone(),
+                            login: match sign_in {
+                                Some(sign_in) => google::member_login(sign_in, &owner.identity.subject)
+                                    .ok_or(invalid(What::Refers))?,
+                                None => Box::from(b"owner".as_slice()),
+                            },
+                            name: match sign_in {
+                                Some(sign_in) => google::member_login(sign_in, &owner.identity.subject)
+                                    .ok_or(invalid(What::Refers))?,
+                                None => Box::from(b"Owner".as_slice()),
+                            },
+                        });
                     break;
                 }
             }
@@ -210,6 +224,8 @@ impl Clients {
             mount_out: Queue::with_capacity(room),
             server_out: Queue::with_capacity(room),
             replies: Map::with_capacity(crate::limits::server(&config.limits).connections),
+            google: None,
+            google_replies: Map::with_capacity(crate::limits::server(&config.limits).connections),
             github: Map::with_capacity(crate::limits::server(&config.limits).connections),
             github_calls: Queue::with_capacity(crate::limits::server(&config.limits).connections),
             query_bytes: 2048,
@@ -248,7 +264,7 @@ impl Clients {
         if let Some(listener) = self.server.listening()
             && let Some(secret) = self.secret.take()
         {
-            self.links.push(printed::link(listener, &secret));
+            self.links.push(printed::link_public(listener, self.public.as_ref(), &secret));
         }
     }
     #[must_use]
@@ -261,12 +277,21 @@ impl Clients {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        crate::accounts::earliest(self.component.next_deadline(), self.server.next_deadline())
+        crate::accounts::earliest(
+            crate::accounts::earliest(self.component.next_deadline(), self.server.next_deadline()),
+            match &self.google {
+                Some(google) => google.next_deadline(),
+                None => None,
+            },
+        )
     }
     #[must_use]
     pub fn work_pending(&self, now: Time) -> bool {
         !self.closed
-            && (self.pending
+            && ((match &self.google {
+                Some(google) => google.work_pending(),
+                None => false,
+            }) || self.pending
                 || !self.secrets.is_empty()
                 || self.endings_ready()
                 || !self.demo_carries.is_empty()
@@ -312,6 +337,13 @@ impl Clients {
         self.server.opened()
     }
     pub fn up(&mut self, event: io::Event) -> bool {
+        let owner = event_owner(&event);
+        if let Some(owner) = owner
+            && owner.raw() & (1_u64 << 59_u32) != 0
+        {
+            self.google_up(event);
+            return true;
+        }
         let event = untag(event);
         let mut failed = false;
         if let io::Event::Failed { owner, .. } | io::Event::Closed { owner } = &event
@@ -353,6 +385,8 @@ impl Clients {
                     let claimed = http::claims(&http_settings(None), &head);
                     if claimed && self.mount.room() > 0 {
                         self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
+                    } else if !claimed && google::claims(&head.target) {
+                        self.google_call(call, head);
                     } else if !claimed && github::claims(&head.target) {
                         self.github_call(call, head);
                     } else {
@@ -360,7 +394,9 @@ impl Clients {
                     }
                 }
                 crate::server::Routed::Http { call, event } => {
-                    if self.github.contains_key(&call) {
+                    if self.google_replies.contains_key(&call) {
+                        self.google_event(call, event);
+                    } else if self.github.contains_key(&call) {
                         self.github_event(call, event);
                     } else if self.replies.get(&call).is_some() {
                         self.serve_event(call, event);
@@ -370,7 +406,12 @@ impl Clients {
                 }
             }
         }
-        self.closed = self.component_closed && self.server.closed();
+        self.closed = self.component_closed
+            && self.server.closed()
+            && match &self.google {
+                Some(google) => google.closed(),
+                None => true,
+            };
     }
     fn root(&mut self, value: root::Event, events: &mut Queue<root::Event>) {
         if self.starting.is_some() {
@@ -447,9 +488,10 @@ impl Clients {
                         Err(value) => self.down(*value),
                     }
                 }
-                kit::Request::Minted { .. } | kit::Request::MintRefused { .. } => {
-                    unreachable!("temper mints no application sign-ins");
+                kit::Request::Minted { exchange, credential, expires } => {
+                    self.google_minted(exchange, Some((credential, expires)));
                 }
+                kit::Request::MintRefused { exchange, .. } => self.google_minted(exchange, None),
                 kit::Request::Closed => self.component_closed = true,
             }
         }
@@ -479,6 +521,7 @@ impl Clients {
         self.server.fire(&mut self.server_out);
         let server_pending = self.server.advance(&mut self.server_out);
         self.server_requests();
+        self.google_advance(events);
         self.endings_step(events, forges, demo);
         self.advance(events, forges, demo);
         if self.closed {
@@ -848,4 +891,22 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
 
 fn http_settings(_public: Option<&crate::startup::application::Origin>) -> http::Settings {
     http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
+}
+
+fn event_owner(event: &io::Event) -> Option<Token> {
+    match event {
+        io::Event::Listening { owner, .. }
+        | io::Event::Accepted { owner, .. }
+        | io::Event::Connecting { owner, .. }
+        | io::Event::Connected { owner }
+        | io::Event::Stream { owner, .. }
+        | io::Event::Output { owner, .. }
+        | io::Event::Spawned { owner, .. }
+        | io::Event::Exited { owner, .. }
+        | io::Event::Usage { owner, .. }
+        | io::Event::Window { owner, .. }
+        | io::Event::Failed { owner, .. }
+        | io::Event::Closed { owner } => Some(*owner),
+        io::Event::Resized | io::Event::Shutdown { .. } => None,
+    }
 }

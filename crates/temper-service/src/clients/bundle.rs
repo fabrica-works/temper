@@ -65,6 +65,9 @@ pub fn kind(path: &[u8]) -> Option<&'static [u8]> {
 #[must_use]
 pub fn worst_case(limits: &crate::limits::Clients) -> Option<u64> {
     u64::from(limits.bundle_bytes)
+        // Filling the page briefly retains its old and new bytes, plus the fixed meta.
+        .checked_mul(2)?
+        .checked_add(64)?
         .checked_add(Map::<Box<[u8]>, File>::worst_case(limits.bundle_files)?)?
         .checked_add(u64::from(limits.bundle_files).checked_mul(u64::from(NAME_BYTES))?)?
         .checked_add(DIGEST_BYTES)?
@@ -295,5 +298,38 @@ impl Clients {
         } else {
             self.demand(call, left);
         }
+    }
+}
+
+impl Bundle {
+    /// Fill the page's sign-in ways before computing its entity tag (protocol/sign-in.md, 7).
+    pub fn fill_sign_in(&mut self, google: bool) -> Option<()> {
+        const HEX: &[u8] = b"0123456789abcdef";
+        let at = bytes::find(&self.page, b"</head>")?;
+        let meta = if google {
+            b"<meta name=\"temper-sign-in\" content=\"google\">".as_slice()
+        } else {
+            b"<meta name=\"temper-sign-in\" content=\"\">".as_slice()
+        };
+        let mut out = skein_lib::Writer::new(self.page.len().checked_add(meta.len())?);
+        out.put(self.page.get(..at)?).ok()?;
+        out.put(meta).ok()?;
+        out.put(self.page.get(at..)?).ok()?;
+        self.page = out.finish();
+        // The bundle reader uses FNV-1a, quoted as sixteen lower-case hex digits.
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for byte in &self.page {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x100_0000_01b3);
+        }
+        let mut tag = skein_lib::Writer::new(18);
+        tag.put(b"\"").ok()?;
+        for shift in (0_u32..16).rev() {
+            let nibble = usize::try_from((hash >> shift.checked_mul(4)?) & 15).ok()?;
+            tag.put(core::slice::from_ref(HEX.get(nibble)?)).ok()?;
+        }
+        tag.put(b"\"").ok()?;
+        self.etag = tag.finish();
+        Some(())
     }
 }

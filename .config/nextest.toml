@@ -8,8 +8,10 @@
 # stopped; a test past its slow period is flagged SLOW as it runs. The process,
 # live, QA and browser tiers have profiles of their own, at the end.
 
+# The private service composition keeps its sign-in world in sign_in.rs;
+# its seeded sweep belongs to the fuzzy profile alone.
 [profile.default]
-default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
+default-filter = "not test(/^tests::sign_in::fuzzy_/) & not binary(/^fuzzy_/) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
 global-timeout = "30s"
 slow-timeout = { period = "6s" }
 
@@ -20,7 +22,7 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/)"
+default-filter = "(binary(/^fuzzy_/) | (package(temper-service) & test(/^tests::sign_in::fuzzy_/))) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/)"
 global-timeout = "120s"
 slow-timeout = { period = "40s" }
 

@@ -864,7 +864,8 @@
       "listener": {{
         "socket": "127.0.0.1:0"
       }},
-      "bundle": null
+      "bundle": null,
+      "public": null
     }},
     "forges": [
       {{
@@ -913,7 +914,7 @@
         }}
       }}
     ],
-    "demo": null,
+    "demo": null, "sign_in": null,
     "landing": {{
       "deployment": [],
       "projects": [

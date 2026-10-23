@@ -212,7 +212,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 645973200424856,
+    "memory_bytes": 645702105497384,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -918,14 +918,15 @@
       "listener": {
         "socket": "127.0.0.1:7100"
       },
-      "bundle": null
+      "bundle": null,
+      "public": null
     },
     "webhooks": {
       "listener": {
         "socket": "127.0.0.1:7101"
       }
     },
-    "demo": null,
+    "demo": null, "sign_in": null,
     "setup": [
       {
         "forge": 1,

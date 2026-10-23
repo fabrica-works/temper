@@ -1,4 +1,5 @@
 // Fixture parsing without a deployment keeps written paths.
+#![expect(clippy::disallowed_macros, reason = "ordinary tests format configuration fixtures")]
 #![expect(clippy::disallowed_methods, reason = "ordinary test code edits UTF-8 configuration fixtures")]
 use super::fixtures;
 use crate::settings;

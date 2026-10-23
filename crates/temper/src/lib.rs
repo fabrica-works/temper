@@ -26,6 +26,7 @@ pub mod bundle;
 pub mod ctl;
 pub mod fake;
 pub mod forge;
+mod google_runtime;
 mod host;
 mod init;
 pub mod open;
@@ -323,6 +324,7 @@ fn prepare_with_store(
 ) -> Result<(service::Service, Box<[u8]>), String> {
     prepare_with_limits(directories, bytes, owned, false).map(|(service, store, _)| (service, store))
 }
+#[expect(clippy::too_many_lines, reason = "startup opens checked resources in dependency order")]
 fn prepare_with_limits(
     directories: &Directories,
     bytes: &[u8],
@@ -363,10 +365,19 @@ fn prepare_with_limits(
         }
     }
     files.entries = entries;
-    let bundle = match named.bundle.as_deref() {
+    let google = google_runtime::resolve(named.sign_in.as_ref())?;
+    let mut bundle = match named.bundle.as_deref() {
         Some(configured) => Some(bundle::read(configured, named.bundle_limits)?),
         None => bundle::own(named.bundle_limits)?,
     };
+    if let Some(bundle) = &mut bundle {
+        bundle.fill_sign_in(named.sign_in.is_some()).ok_or_else(|| {
+            format!(
+                "application.clients.bundle: {}: page has no </head>",
+                named.bundle.as_deref().map_or("embedded".into(), |name| String::from_utf8_lossy(name))
+            )
+        })?;
+    }
     let runtime = if let Some(worker) = &named.worker {
         let root_path = path(&worker.root);
         if std::fs::symlink_metadata(root_path).is_ok() {
@@ -404,6 +415,9 @@ fn prepare_with_limits(
         under_box,
     )
     .map_err(|why| String::from_utf8_lossy(&service::startup::lines(&why)).into_owned())?;
+    service
+        .configure_google_endpoints(google)
+        .map_err(|_| "application.sign_in: TLS roots exceed engine.memory_bytes")?;
     if let Some(agent) = &agent
         && let Some(program) = agent.programs.first()
     {

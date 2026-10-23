@@ -38,3 +38,17 @@ pub(crate) fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>
     text.append(skein_lib::Decimal::of(u64::from(address.port())).as_bytes()).ok()?;
     text.meet(skein_lib::stream::Read::Fill(text.len()))
 }
+pub(crate) fn link_public(
+    address: ::core::net::SocketAddr,
+    public: Option<&crate::startup::application::Origin>,
+    secret: &skein_lib::Secret,
+) -> Box<[u8]> {
+    let Some(public) = public else { return link(address, secret) };
+    let base = public.base();
+    let base = base.strip_suffix(b"/").expect("origin separator");
+    let path = jig_protocol_engine_clients_http::link_path(&super::http_settings(None), secret);
+    let mut out = skein_lib::Writer::new(base.len().checked_add(path.len()).expect("printed URL"));
+    out.put(base).expect("origin");
+    out.put(&path).expect("link");
+    out.finish()
+}

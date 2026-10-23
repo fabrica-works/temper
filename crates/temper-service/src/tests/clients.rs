@@ -150,6 +150,7 @@ fn a_sign_in_ending_waits_for_its_erase_to_commit() {
         &super::fixtures::seeds(),
         64,
         &journal,
+        None,
     )
     .unwrap();
     clients.commit(3, &[root::Write::Erase(root::Key::Core(core::Key::People(people::Key::SignIn(7))))]);
@@ -320,6 +321,7 @@ fn original_model_names_reach_the_root() {
 }
 
 #[test]
+#[expect(clippy::disallowed_macros, reason = "ordinary test formats an HTTP request")]
 fn clients_public_admits_the_public_and_listener_hosts_and_refuses_an_unknown_host() {
     for (host, status) in [
         ("temper.example.com:8443", "HTTP/1.1 404"),
@@ -341,6 +343,7 @@ fn clients_public_admits_the_public_and_listener_hosts_and_refuses_an_unknown_ho
             &super::fixtures::seeds(),
             64,
             &config.limits.root.journal,
+            None,
         )
         .unwrap();
         engine.clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut engine.events, &[], None);

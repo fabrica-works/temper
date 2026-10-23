@@ -246,6 +246,28 @@ pub fn limits(limits: &limits::Limits, git: &temper_worker_protocol_git::Limits,
             }
         }
     }
+    let sign_in = limits.sign_in;
+    for (name, value) in [
+        (b"sign_in.members".as_slice(), sign_in.members),
+        (b"sign_in.pending", sign_in.pending),
+        (b"sign_in.fetches", sign_in.fetches),
+        (b"sign_in.body_bytes", sign_in.body_bytes),
+        (b"sign_in.url_bytes", sign_in.url_bytes),
+        (b"sign_in.secret_bytes", sign_in.secret_bytes),
+    ] {
+        if value == 0 {
+            against(problems, name, b"a nonzero sign-in bound");
+        }
+    }
+    if sign_in.deadline == Duration::ZERO {
+        against(problems, b"sign_in.deadline_ms", b"a nonzero sign-in deadline");
+    }
+    if sign_in.members > limits.forge.bindings {
+        against(problems, b"sign_in.members", b"forge.bindings");
+    }
+    if sign_in.body_bytes > 65_536 {
+        against(problems, b"sign_in.body_bytes", b"skein-oauth's response bound");
+    }
     if limits.clients.bundle_files == 0 {
         against(problems, b"clients.bundle_files", b"a nonempty bundle");
     }
@@ -837,6 +859,9 @@ fn socket_count(
     let mut required = u64::from(limits::server(&engine.limits).connections).checked_add(1)?.checked_add(2)?;
     if members.webhooks.is_some() {
         required = required.checked_add(1)?.checked_add(u64::from(members.limits.forge_component.hooks))?;
+    }
+    if members.sign_in.is_some() {
+        required = required.checked_add(u64::from(members.limits.sign_in.fetches))?;
     }
     let mut sign_in = false;
     for provider in &engine.llm.providers {

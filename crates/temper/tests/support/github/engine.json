@@ -846,7 +846,7 @@
       }}
     ],
     "setup": [],
-    "demo": null,
+    "demo": null, "sign_in": null,
     "landing": {{
       "deployment": [],
       "projects": []

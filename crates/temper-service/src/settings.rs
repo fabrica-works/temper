@@ -138,6 +138,7 @@ pub struct Setup {
 pub struct Engine {
     pub jig: jig_protocol_config::Engine,
     pub clients: crate::startup::application::Clients,
+    pub sign_in: Option<SignIn>,
     pub webhooks: Option<skein_forge_connection::hooks::Webhooks>,
     pub files: Files,
     pub forges: Box<[Forge]>,
@@ -194,4 +195,18 @@ pub struct Worker {
     pub root: Box<[u8]>,
     /// The absolute path of the git program, or none on this machine.
     pub git: Option<Box<[u8]>>,
+}
+
+/// Checked Google registration; the client secret is private startup input.
+#[derive(Debug)]
+pub struct SignIn {
+    pub provider: u16,
+    pub client: Box<[u8]>,
+    pub secret: Secret,
+    pub issuer: Box<[u8]>,
+    pub authorization: Box<[u8]>,
+    pub token: Box<[u8]>,
+    pub keys: Box<[u8]>,
+    pub transport: Option<Transport>,
+    pub members: Box<[crate::startup::application::sign_in::Member]>,
 }

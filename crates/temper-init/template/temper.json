@@ -244,7 +244,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 443734131197754,
+    "memory_bytes": 443463036134804,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -996,6 +996,7 @@
         }
       }
     ],
+    "sign_in": null,
     "demo": {
       "llm": {
         "listen": {

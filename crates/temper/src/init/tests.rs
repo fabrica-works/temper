@@ -117,7 +117,7 @@ fn init_finds_ports_and_programs_and_writes_exact_modes_in_order() {
         assert_eq!(address.port() == preferred[0], !held, "{row}");
         assert!(TcpListener::bind(address).is_ok(), "{row}: reservation released");
         assert!(document["application"]["clients"]["bundle"].is_null());
-        assert!(document["application"]["clients"].as_object().unwrap().contains_key("public"));
+        assert!(document["application"]["clients"].as_object().expect("clients object").contains_key("public"));
         assert!(document["application"]["clients"]["public"].is_null());
         let agent: serde_json::Value =
             serde_json::from_slice(&fs::read(path(&dirs.config).join("agent.json")).expect("agent")).expect("JSON");

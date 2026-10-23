@@ -17,6 +17,13 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         };
     }
     match name {
+        b"sign_in.members" => limits.sign_in.members = u32::try_from(value).or(Err(Refused::Range))?,
+        b"sign_in.pending" => limits.sign_in.pending = u32::try_from(value).or(Err(Refused::Range))?,
+        b"sign_in.deadline_ms" => limits.sign_in.deadline = duration(value)?,
+        b"sign_in.fetches" => limits.sign_in.fetches = u32::try_from(value).or(Err(Refused::Range))?,
+        b"sign_in.body_bytes" => limits.sign_in.body_bytes = u32::try_from(value).or(Err(Refused::Range))?,
+        b"sign_in.url_bytes" => limits.sign_in.url_bytes = u32::try_from(value).or(Err(Refused::Range))?,
+        b"sign_in.secret_bytes" => limits.sign_in.secret_bytes = u32::try_from(value).or(Err(Refused::Range))?,
         b"routes.query_bytes" => limits.routes.query_bytes = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.journal.commits" => limits.root.journal.commits = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.journal.held" => limits.root.journal.held = u32::try_from(value).or(Err(Refused::Range))?,

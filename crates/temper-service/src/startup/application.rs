@@ -3,6 +3,7 @@ mod demo;
 mod landing;
 mod public;
 mod read;
+pub mod sign_in;
 use super::{Problems, What};
 use crate::{limits, settings};
 use alloc::boxed::Box;
@@ -14,6 +15,7 @@ use skein_lib::{List, bytes};
 #[derive(Debug)]
 pub struct Members {
     pub clients: Clients,
+    pub sign_in: Option<sign_in::SignIn>,
     pub webhooks: Option<Webhooks>,
     pub forges: Box<[Forge]>,
     pub demo: Option<settings::Demo>,
@@ -754,6 +756,8 @@ pub fn parse(
         Some(at) => clients(document, at, &path.member(b"clients"), true, problems),
         None => None,
     };
+    let sign_in_at = read::required(&mut object, document, b"sign_in", &path, problems);
+    let sign_in = sign_in::parse(document, sign_in_at, jig, bounds.sign_in, directories, problems);
     let landing_at = read::required(&mut object, document, b"landing", &path, problems);
     let at = read::required(&mut object, document, b"webhooks", &path, problems);
     let webhooks = webhooks(document, at, &path, problems);
@@ -816,6 +820,7 @@ pub fn parse(
     let (landing, landing_projects) = landing?;
     Some(Members {
         clients: clients?,
+        sign_in,
         webhooks,
         forges: forges.into_boxed(),
         demo,
@@ -873,7 +878,11 @@ fn listed_files(members: &Members, api_token_bytes: u32, token_bytes: u32, asked
         .expect("bounded forges")
         .checked_add(members.identities.len())
         .expect("bounded files");
-    let mut files = List::with_capacity(u32::try_from(count).expect("bounded files"));
+    let mut files =
+        List::with_capacity(u32::try_from(count.checked_add(2).expect("sign-in files")).expect("bounded files"));
+    if !asked && let Some(sign_in) = &members.sign_in {
+        sign_in::files(sign_in, members.limits.sign_in, &mut files);
+    }
     for (index, forge) in members.forges.iter().enumerate() {
         let path = read::index(&Path::root().member(b"application").member(b"forges"), index);
         let include = members.asked_owned.contains(&forge.number) == asked;
@@ -943,6 +952,7 @@ fn listed_files(members: &Members, api_token_bytes: u32, token_bytes: u32, asked
 }
 #[derive(Debug)]
 pub struct Resolved {
+    pub sign_in: Option<settings::SignIn>,
     pub webhooks: Option<skein_forge_connection::hooks::Webhooks>,
     pub forges: Box<[settings::Forge]>,
     pub identities: Box<[settings::Identity]>,
@@ -1143,7 +1153,15 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
     {
         webhooks = Some(skein_forge_connection::hooks::Webhooks { listener: *listener });
     }
-    Some(Resolved { forges: forges.into_boxed(), identities: identities.into_boxed(), webhooks })
+    Some(Resolved {
+        sign_in: match &members.sign_in {
+            Some(sign_in) => sign_in::resolve(sign_in, members.limits.sign_in, files, problems),
+            None => None,
+        },
+        forges: forges.into_boxed(),
+        identities: identities.into_boxed(),
+        webhooks,
+    })
 }
 
 fn joined(

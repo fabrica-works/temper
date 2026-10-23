@@ -4,6 +4,7 @@ pub(crate) mod checks;
 mod problems;
 use crate::{AccountsRuntime, Service, Worker, WorkerRuntime, settings};
 use alloc::boxed::Box;
+pub use application::sign_in::{Endpoints, SignIn, url as sign_in_url};
 pub use application::{Forge, Identity, Transport, USER_BYTES, User};
 pub use checks::redirect_ports;
 use jig_protocol_config::{self as config, Path, Segment, read};
@@ -209,6 +210,7 @@ pub struct Named {
     pub forges: Box<[Forge]>,
     pub identities: Box<[Identity]>,
     pub clients: config::Address,
+    pub sign_in: Option<SignIn>,
     /// `application.clients.bundle`, for the binary's read.
     pub bundle: Option<Box<[u8]>>,
     /// The bundle's limits, overrides applied.
@@ -456,6 +458,7 @@ pub fn named(document: &[u8], directories: &config::Directories) -> Result<Named
         ),
         redirects: redirects(&parsed.engine),
         clients: parsed.application.clients.listener,
+        sign_in: parsed.application.sign_in,
         bundle: parsed.application.clients.bundle,
         bundle_limits: parsed.application.limits.clients,
         webhooks: parsed.application.webhooks,
@@ -660,6 +663,7 @@ fn checked_start(
     let mut engine = settings::Engine {
         jig: parsed.engine,
         clients: parsed.application.clients,
+        sign_in: resolved.sign_in,
         webhooks: resolved.webhooks,
         files: settings::Files { entries: files.entries.clone() },
         forges: resolved.forges,

@@ -83,6 +83,9 @@ impl Peer {
     pub fn handoff(&mut self, engine: &mut Engine) {
         self.pump_until(engine, false, REQUEST_AT, REQUEST_WALL, |_, engine| !engine.clients.early.is_empty());
     }
+    pub fn is_closed(&self) -> bool {
+        self.closed > 0
+    }
     pub fn pump(&mut self, engine: &mut Engine, decide: bool) {
         self.pump_at(engine, decide, REQUEST_AT, REQUEST_WALL);
     }

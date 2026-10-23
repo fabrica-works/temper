@@ -3052,6 +3052,7 @@ dependencies = [
  "skein-fake-forge-domain",
  "skein-fake-forge-github",
  "skein-fake-forge-protocol",
+ "skein-fake-oauth",
  "skein-forge",
  "skein-forge-client",
  "skein-forge-connection",

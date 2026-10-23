@@ -24,6 +24,17 @@ pub struct Clients {
     /// The bundle's files' bytes in all, held in memory while `temper serve` runs.
     pub bundle_bytes: u32,
 }
+/// People's sign-ins (protocol/sign-in.md, 6).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SignIn {
+    pub members: u32,
+    pub pending: u32,
+    pub deadline: Duration,
+    pub fetches: u32,
+    pub body_bytes: u32,
+    pub url_bytes: u32,
+    pub secret_bytes: u32,
+}
 /// Temper's domain limits, each under its owner's prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -37,6 +48,7 @@ pub struct Limits {
     pub checkout: checkout::Limits,
     pub git_component: temper_worker_protocol_git::Limits,
     pub clients: Clients,
+    pub sign_in: SignIn,
 }
 /// Forge routes' query bound (protocol/configuration.md, 7).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -305,6 +317,15 @@ pub fn profile(profile: Profile) -> Limits {
             checkout: CHECKOUT,
             git_component: GIT,
             clients: CLIENTS,
+            sign_in: SignIn {
+                members: 64,
+                pending: 64,
+                deadline: Duration::from_secs(600),
+                fetches: 8,
+                body_bytes: 65_536,
+                url_bytes: 2048,
+                secret_bytes: 512,
+            },
         },
     }
 }
@@ -380,7 +401,7 @@ pub fn server(jig: &jig_protocol_config::Limits) -> crate::server::Limits {
             headers: 32,
             body: u64::from(jig.clients_http.body),
             read: jig.clients_http.read,
-            response: 1024,
+            response: 4096,
             send: jig.clients_http.send,
         },
         stall: Duration::from_secs(30),
