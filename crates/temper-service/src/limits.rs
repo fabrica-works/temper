@@ -234,6 +234,8 @@ const ROOT: Root = Root {
         bytes: 65_536,
         // At least loads.bytes: loads' worst case; jig small core.load_bytes.
         reply_bytes: 65_536,
+        // One authenticated read's owned bytes; jig small core.load_bytes.
+        read_bytes: 65_536,
         // Deep row admission bound for the root's largest forge.client.answer_bytes.
         transcript_bytes: 65_536,
     },

@@ -417,3 +417,16 @@ fn refused_people_timer_stays_due_without_child_mutation_until_room_returns() {
     assert_eq!(domain.core.people.next_wall_expiry(), None);
     assert_eq!(domain.deployment().commits, before.commits + 1);
 }
+
+#[test]
+fn authenticated_read_bytes_are_configured_and_counted() {
+    let (_, env) = root();
+    let mut limits = env.limits;
+    limits.loads.read_bytes = 65_536;
+    let before = crate::worst_case(&limits).expect("valid read bound");
+    limits.loads.read_bytes += 65_536;
+    assert_eq!(crate::limits::core_limits(&limits).load_bytes, 131_072);
+    assert!(crate::worst_case(&limits).expect("larger read bound") > before);
+    limits.loads.read_bytes = 0;
+    assert!(crate::worst_case(&limits).is_none());
+}

@@ -31,6 +31,7 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         b"root.loads.loads" => limits.root.loads.loads = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.loads.rows" => limits.root.loads.rows = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.loads.bytes" => limits.root.loads.bytes = u32::try_from(value).or(Err(Refused::Range))?,
+        b"root.loads.read_bytes" => limits.root.loads.read_bytes = value,
         b"root.loads.reply_bytes" => limits.root.loads.reply_bytes = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.loads.transcript_bytes" => {
             limits.root.loads.transcript_bytes = u32::try_from(value).or(Err(Refused::Range))?;

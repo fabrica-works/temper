@@ -17,8 +17,9 @@ fn agent_chat() -> (World<Temper, Joint>, ClientId, u64, (u64, u32)) {
 fn a_large_turns_rows_overlap_the_page_bound() {
     let (mut world, task, _) = large_chat();
     let (single, activity) = fixtures::turn_row_costs(world.front(), task);
-    assert!(single <= temper_engine_domain::LOAD_BYTES, "{single}");
-    assert!(temper_engine_domain::LOAD_BYTES < activity, "{activity}");
+    let bound = world.front().engine.env.limits.loads.read_bytes;
+    assert!(single <= bound, "{single}");
+    assert!(bound < activity, "{activity}");
 }
 
 #[test]

@@ -12,8 +12,14 @@ static HEAP: heap::Counting = heap::Counting;
 fn retired_and_abandoned_load_slots_and_a_partial_page_fit_without_payload_clones() {
     use root::{Range, loads};
     let slot = u32::try_from(core::mem::size_of::<Record>()).expect("small slot");
-    let limits =
-        loads::Limits { loads: 2, rows: 4, bytes: slot * 2 + 8, reply_bytes: 4 * (slot + 4), transcript_bytes: 4 };
+    let limits = loads::Limits {
+        read_bytes: 65_536,
+        loads: 2,
+        rows: 4,
+        bytes: slot * 2 + 8,
+        reply_bytes: 4 * (slot + 4),
+        transcript_bytes: 4,
+    };
     let mut out = Queue::<loads::Request>::with_capacity(1);
     let meter = Meter::new();
     let mut domain = loads::Loads::new(&limits);

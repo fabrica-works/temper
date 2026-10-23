@@ -95,8 +95,6 @@ pub(crate) fn environment_core(env: &Env<Limits>) -> Env<jig_domain_core::Limits
 /// jig's `crates/jig-protocol-config/src/profile/small.rs` sets it until
 /// temper's configuration names its own (domain/root.md, 10).
 pub const FILL_MARK: u64 = 268_435_456;
-/// The most owned bytes one authenticated store read brings (`small.rs`).
-pub const LOAD_BYTES: u64 = 65_536;
 /// Streams use temper's client's own budget of 16, above jig's small
 /// profile's 4 (`small.rs`, clients; protocol/configuration.md, 7).
 pub const WATCHES_PER_STREAM: u32 = 16;
@@ -114,7 +112,7 @@ pub const VIEWS: views::Limits = views::Limits {
 pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
     jig_domain_core::Limits {
         fill_mark: FILL_MARK,
-        load_bytes: LOAD_BYTES,
+        load_bytes: limits.loads.read_bytes,
         documents: limits.documents,
         templates: limits.templates,
         connectors: 1,

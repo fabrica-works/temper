@@ -29,6 +29,8 @@ pub struct Limits {
     /// Hard decoded store-answer bound, enforced by the store protocol too. The kept prefix can
     /// have a smaller budget than its incoming page.
     pub reply_bytes: u32,
+    /// Maximum owned bytes one authenticated read brings for a person.
+    pub read_bytes: u64,
     /// Soft per-row deep-owned-byte bound, covering transcripts and wrapped child rows; the first
     /// oversized row cuts the prefix.
     pub transcript_bytes: u32,
@@ -399,7 +401,8 @@ fn valid_range(range: &Range) -> bool {
 /// request or terminal.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.loads == 0
+    if limits.read_bytes == 0
+        || limits.loads == 0
         || limits.rows == 0
         || limits.reply_bytes < limits.bytes
         || u64::from(limits.bytes) < u64::try_from(size_of::<Record>()).ok()?

@@ -41,12 +41,13 @@ fn an_override_sets_the_field_its_dotted_name_names() {
     assert_eq!(limits.forge_component.log_catch_up, Duration::from_secs(86_400));
     assert_eq!(limits.forge_component.log_pages, 10);
     assert_eq!(limits.forge_component.delivery_bytes, 1_048_576);
-    let rows: [(&[u8], u64); 13] = [
+    let rows: [(&[u8], u64); 14] = [
         (b"forge.repositories", 3),
         (b"forge.client.calls", 5),
         (b"forge.client.settle_ms", 2_000),
         (b"checkout.remote_timeout_ms", 7_000),
         (b"root.loads.rows", 9),
+        (b"root.loads.read_bytes", 131_072),
         (b"clients.bundle_files", 2),
         (b"clients.bundle_bytes", 61),
         (b"forges.log_origins", 3),
@@ -64,6 +65,7 @@ fn an_override_sets_the_field_its_dotted_name_names() {
     assert_eq!(limits.forge.client.settle, Duration::from_secs(2));
     assert_eq!(limits.checkout.remote_timeout, Duration::from_millis(7_000));
     assert_eq!(limits.root.loads.rows, 9);
+    assert_eq!(limits.root.loads.read_bytes, 131_072);
     assert_eq!(limits.clients, limits::Clients { bundle_files: 2, bundle_bytes: 61 });
     assert_eq!((limits.forges.log_origins, limits.forge_component.log_origins), (3, 7));
     assert_eq!(limits.forge_component.log_poll, Duration::from_nanos(7_123_000_000));
