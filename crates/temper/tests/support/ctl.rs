@@ -56,6 +56,7 @@ impl Call {
 pub enum Step {
     Run(Call),
     Start(Call),
+    Join,
     Until(Call, &'static [u8]),
     Cut,
     Pause,
@@ -255,7 +256,7 @@ pub struct Calls {
     child: Option<Child>,
     action: Option<Action>,
     started: Option<(Child, usize)>,
-    cutting: bool,
+    awaiting_started: bool,
     cancelling: bool,
     admission: Admission,
     retry: Option<Time>,
@@ -287,6 +288,10 @@ impl Calls {
         super::printed_link(&self.link).expect("serve printed its link")
     }
     #[must_use]
+    pub fn foreground_idle(&self) -> bool {
+        self.steps.is_empty() && self.child.is_none() && self.action.is_none() && !self.awaiting_started
+    }
+    #[must_use]
     pub fn idle(&self) -> bool {
         self.done()
     }
@@ -306,7 +311,7 @@ impl Calls {
         self.cancelling = true;
         self.steps.clear();
         self.retry = None;
-        self.cutting = false;
+        self.awaiting_started = false;
         self.action = self.child.as_ref().map(|_| Action::Run);
     }
     /// Completed calls, in the order their steps ran.
@@ -333,7 +338,7 @@ impl Calls {
             child: None,
             action: None,
             started: None,
-            cutting: false,
+            awaiting_started: false,
             cancelling: false,
             admission: Admission::Batch,
             retry: None,
@@ -410,7 +415,7 @@ impl Calls {
         if self.started.as_ref().is_some_and(|(child, _)| child.finished()) {
             let (child, index) = self.started.take().expect("finished started call");
             self.ends[index] = child.ended;
-            self.cutting = false;
+            self.awaiting_started = false;
         }
         if !self.child.as_ref().is_some_and(Child::finished) {
             return;
@@ -435,7 +440,11 @@ impl Calls {
         }
     }
     fn advance(&mut self, now: Time) {
-        if self.cancelling || self.child.is_some() || self.cutting || self.retry.is_some_and(|retry| retry > now) {
+        if self.cancelling
+            || self.child.is_some()
+            || self.awaiting_started
+            || self.retry.is_some_and(|retry| retry > now)
+        {
             return;
         }
         if let Some(Action::Until(call, _)) = &self.action {
@@ -449,6 +458,7 @@ impl Calls {
                 self.start(call, false);
             }
             Some(Step::Start(call)) => self.start(call, true),
+            Some(Step::Join) => self.awaiting_started = self.started.is_some(),
             Some(Step::Until(call, bytes)) => {
                 self.action = Some(Action::Until(call.clone(), bytes));
                 self.start(call, false);
@@ -456,7 +466,7 @@ impl Calls {
             Some(Step::Cut) => {
                 let (child, _) = self.started.as_mut().expect("call still running at cut");
                 child.signals += 1;
-                self.cutting = true;
+                self.awaiting_started = true;
                 self.submit.push(Submit {
                     op: child.token(CUT),
                     kind: Op::Signal {

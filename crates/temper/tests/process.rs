@@ -906,11 +906,15 @@ impl skein_world::Referee<support::cluster::Root> for ClusterJudge {
         self.members.observe(now, hosts);
         if let Some(stopped) = self.members.stopped() {
             if self.workers {
-                assert_eq!(stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["w2", "w1", "engine", "llm"]);
+                assert_eq!(
+                    stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+                    ["w2", "w1", "engine", "llm", "forge"]
+                );
             } else {
-                let [engine, llm] = stopped else { panic!("engine and llm stopped") };
+                let [engine, llm, forge] = stopped else { panic!("engine, llm and forge stopped") };
                 assert_eq!(engine.name, "engine");
                 assert_eq!(llm.name, "llm");
+                assert_eq!(forge.name, "forge");
                 engine_lines(engine);
             }
             for member in stopped {
@@ -1804,11 +1808,29 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
         }
         if let Some(stopped) = self.members.stopped() {
             let expected = if self.story == ClusterStory::Restart {
-                vec![("w1", FIRST_LIFE), ("w1", SECOND_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+                vec![
+                    ("w1", FIRST_LIFE),
+                    ("w1", SECOND_LIFE),
+                    ("engine", FIRST_LIFE),
+                    ("llm", FIRST_LIFE),
+                    ("forge", FIRST_LIFE),
+                ]
             } else if self.story == ClusterStory::Kill {
-                vec![("w1", FIRST_LIFE), ("w2", FIRST_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+                vec![
+                    ("w1", FIRST_LIFE),
+                    ("w2", FIRST_LIFE),
+                    ("engine", FIRST_LIFE),
+                    ("llm", FIRST_LIFE),
+                    ("forge", FIRST_LIFE),
+                ]
             } else {
-                vec![("w2", FIRST_LIFE), ("w1", FIRST_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+                vec![
+                    ("w2", FIRST_LIFE),
+                    ("w1", FIRST_LIFE),
+                    ("engine", FIRST_LIFE),
+                    ("llm", FIRST_LIFE),
+                    ("forge", FIRST_LIFE),
+                ]
             };
             assert_eq!(stopped.iter().map(|s| (s.name.as_str(), s.life)).collect::<Vec<_>>(), expected);
             for member in stopped {
@@ -1960,4 +1982,31 @@ exec "$@"
 #[test]
 fn a_worker_pushes_to_github_by_its_installations_token() {
     support::github::push();
+}
+
+#[test]
+fn the_opener_runs_on_ws_and_s1_as_processes() {
+    use temper_real_loop_world::case::{self, acts, oracle};
+    let steps = acts::step_4_1();
+    let run = support::case::run(
+        &["ws", "s1"],
+        case::fixture_placed(),
+        case::scripts::step_4_1,
+        acts::step_4_1(),
+        &[case::DIRECTOR, case::A, case::CODER, case::REVIEW],
+    );
+    for (at, call) in run.calls().iter().enumerate() {
+        assert_eq!(
+            call.exit,
+            Some(skein_io::kernel::Exit::Code(0)),
+            "call {at}: {}",
+            String::from_utf8_lossy(&call.stderr)
+        );
+    }
+    let observed = run.observed(acts::READS_4_1).with_commands(&steps);
+    oracle::assert_met(&oracle::step_4_1(&observed));
+    assert_eq!(run.placed().get(&case::DIRECTOR).map(String::as_str), Some("ws"));
+    // Leaves out domain/testing.md 5.3's 4.1 row, s2's part, and A's and
+    // the reviewer's placement: an ended task's document names no worker.
+    // The harness checks after stop that only s1's workspace holds the design.
 }
