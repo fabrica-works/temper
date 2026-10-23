@@ -79,7 +79,7 @@ fn watch(mut out: Queue<Request>) -> Option<Token> {
     }
     None
 }
-fn opened(owner: bool) -> (crate::Domain, Token, Token) {
+pub(super) fn opened(owner: bool) -> (crate::Domain, Token, Token) {
     let mut root = crate::unlinked(&f::limits(), f::SEED);
     let (me, _) = f::start_accounts(&mut root, List::with_capacity(0));
     let c::WatchEvent::Delivered(c::Delivery::Me(mut frame)) = f::frame(f::PARTY) else { panic!("me") };

@@ -56,7 +56,7 @@ fn steps(b: &mut Builder, root: &Domain, w: &Words, current: Step) {
                 },
                 None => false,
             };
-            if connected && super::accounts::first_usable_heading(root, w).is_some() { 4 } else { 3 }
+            if connected && temper_client_domain::pages::welcome::model_usable(root) == Some(true) { 4 } else { 3 }
         }
     };
     crate::flow::steps(b, w, &[&welcome, &forge, &model, &ready], current);
@@ -117,27 +117,7 @@ pub(crate) fn main(
         Step::Forge { forge: forge_choice } => {
             text(b, w, Role::Heading { level: 1 }, Word::WelcomeForgeTitle);
             paragraph(b, w, Word::WelcomeForgeLead, look::WELCOME_LEAD);
-            if let Some(row) = crate::forge::connect::personal(root) {
-                crate::forge::connect::status(b, root, w, row, false);
-                crate::forge::connect::first_line(b, root, w, row);
-                crate::forge::connect::link(
-                    b,
-                    w,
-                    bindings,
-                    Word::ForgeView,
-                    Address::ConnectForge { forge: Some(temper_client_domain::Choice::Forge(row.number)) },
-                );
-            } else {
-                crate::forge::connect::body(
-                    b,
-                    root,
-                    w,
-                    bindings,
-                    forge,
-                    forge_choice,
-                    crate::forge::connect::Place::Welcome,
-                );
-            }
+            crate::forge::connect::welcome(b, root, w, bindings, forge, forge_choice);
         }
         Step::Model { .. } => {
             if let Some(row) = temper_client_domain::forge::connect::underway_forge(root.forges(), root.forge().demo())
@@ -217,14 +197,22 @@ fn ready(
         go(b, w, bindings, Word::WelcomeForgeTitle, Step::Forge { forge: None });
     }
     b.close();
-    b.open(Role::Item);
-    if let Some(account) = super::accounts::first_usable_heading(root, w) {
-        crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeModelAccount, &[Hole::Name(account)]));
-    } else {
-        text(b, w, Role::Paragraph, Word::WelcomeNoModel);
-        go(b, w, bindings, Word::WelcomeModelTitle, Step::Model { way: None });
+    if let Some(usable) = temper_client_domain::pages::welcome::model_usable(root) {
+        b.open(Role::Item);
+        if usable {
+            let account = match super::accounts::first_usable_heading(root, w) {
+                Some(account) => account,
+                None => crate::choice::new_chat_model(root, w),
+            };
+            crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeModelAccount, &[Hole::Name(account)]));
+        } else if let Some(provider) = super::accounts::own_signing_name(root, w) {
+            crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeModelSigningIn, &[Hole::Name(provider)]));
+        } else {
+            text(b, w, Role::Paragraph, Word::WelcomeNoModel);
+            go(b, w, bindings, Word::WelcomeModelTitle, Step::Model { way: None });
+        }
+        b.close();
     }
-    b.close();
     b.close();
     if let Some(row) = row
         && row.first.is_none()

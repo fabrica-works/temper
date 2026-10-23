@@ -1583,8 +1583,7 @@ them as it does any Forgejo.
             "cued": [{"cue": "Export widget's table as CSV",
                       "turns": ["..."]}],
             "otherwise": ["..."]},
-    "forge": 1, "project": {"name": "Playground", "policy": 1},
-    "client": "demo/client"}
+    "forge": 1, "project": {"name": "Playground", "policy": 1}}
   ```
 
   | Member | Type | Bounds |
@@ -1597,10 +1596,13 @@ them as it does any Forgejo.
   | `llm.otherwise` | a list of turns | 1 to 8 |
   | `forge` | u16 | the `forge` of one fake `setup` entry (section 8) |
   | `project` | `{"name", "policy"}` | the project the demo's start makes (below): `name` a project's name in jig's shape (jig's `domain/core.md`, 6.1), `Playground` as `temper init` writes it; `policy` the number of one of `engine.policies` (jig's `protocol/configuration.md`, section 3) |
-  | `client` | a data path | a private directory (section 3), unique among the document's directories; read and unused since the seed went (the demo's start, below), until the document's next change removes it |
 
   The scripts, `asked`, `cued` and `otherwise` together, fit skein's fake LLM's
   `script_bytes` (skein's `fake-llm.md`), which `temper-fake` sets.
+  Any other member is refused, naming it (configuration.md, section 1),
+  `client` among them: a document `temper init` wrote while the demo
+  had its seed is refused at its next start, naming
+  `application.demo.client`, until the member is removed.
 - **A turn** is skein's `Turn` (skein's `fake-llm.md`, section 2), in
   either of two spellings:
   - *a text:* one text line, finishing `stop`, its tokens its bytes

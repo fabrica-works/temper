@@ -787,8 +787,38 @@ fn paste_ended(service: &mut crate::Service, connected: bool, pem: &[u8]) -> Opt
 }
 #[test]
 fn paste_reads_the_carried_pem_keeps_identity_then_origin_connects_and_erases_after_root_decides() {
-    let mut service = service(8, Duration::from_secs(3600));
     let (pem, bundle) = carried_pem();
+    paste_connects(pem, bundle);
+}
+#[test]
+fn paste_reads_the_fakes_key_as_a_file_or_as_the_web_fields_restored_armour() {
+    let (pem, _) = carried_pem();
+    let restored = pem.expose().strip_suffix(b"\n").unwrap();
+    let body = restored
+        .strip_prefix(b"-----BEGIN RSA PRIVATE KEY-----\n")
+        .unwrap()
+        .strip_suffix(b"\n-----END RSA PRIVATE KEY-----")
+        .unwrap();
+    assert!(!body.contains(&b'\n'), "the web field's restored body is one line");
+    let lines = body.len().checked_add(63).unwrap().checked_div(64).unwrap();
+    let mut file = skein_lib::Writer::new(restored.len().checked_add(lines).unwrap());
+    file.put(b"-----BEGIN RSA PRIVATE KEY-----\n").unwrap();
+    for line in body.chunks(64) {
+        file.put(line).unwrap();
+        file.put(b"\n").unwrap();
+    }
+    file.put(b"-----END RSA PRIVATE KEY-----\n").unwrap();
+    let file = file.finish();
+    for bytes in [restored, pem.expose(), file.as_ref()] {
+        let mut bundle = skein_lib::Writer::new(bytes.len().checked_add(6).unwrap());
+        bundle.put(&[1, 1, 11, 0]).unwrap();
+        bundle.put(&u16::try_from(bytes.len()).unwrap().to_le_bytes()).unwrap();
+        bundle.put(bytes).unwrap();
+        paste_connects(Secret::new(Box::from(bytes)), Secret::new(bundle.finish()));
+    }
+}
+fn paste_connects(pem: Secret, bundle: Secret) {
+    let mut service = service(8, Duration::from_secs(3600));
     let digest = skein_lib::sha256::digest(bundle.expose());
     paste_start(&mut service, bundle, digest);
     let mut face = Face::new();

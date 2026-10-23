@@ -87,6 +87,7 @@ pub(crate) fn route_forge(
     for _ in 0..child.len() {
         match child.pop().expect("counted forge output") {
             forge::Request::Client { asked } => client(root, env, asked, out),
+            forge::Request::Leave { to } => out.push(Request::Leave { to }),
             forge::Request::Show { address } => {
                 let forge::Address::Adopt { project } = address;
                 out.push(Request::Show { address: Address::Adopt { project }, replace: false });
@@ -253,7 +254,8 @@ fn playground(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 
 fn forge_forges(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
-    let consumed = forge::forges::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child);
+    let consumed = forge::github::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child)
+        || forge::forges::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child);
     if consumed
         && let jig_client::Told::Answered { .. } = told
         && let Some(last) = root.forge.set_up()

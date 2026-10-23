@@ -3,13 +3,17 @@ use alloc::boxed::Box;
 use skein_lib::{List, Token};
 use skein_ui::{Act, Binding};
 use temper_client_domain::{Action, forge};
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Meaning {
     Field(forge::Text),
     Role(forge::Role),
     Home,
     Ci,
     Adopt,
+    AppId,
+    AppKey,
+    ConnectApp(u16),
+    Install { forge: u16, back: temper_client_domain::Address },
     SetUp(u16),
     SetupField(forge::forges::SetupField),
     SetupNew(bool),
@@ -48,7 +52,8 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
         if entry.token != token {
             continue;
         }
-        return match (entry.meaning, act) {
+        return match (entry.meaning.clone(), act) {
+            (Meaning::AppId, Act::Input { value }) => Some(Action::Forge(forge::Act::AppWrite { text: value })),
             (Meaning::SetupField(field), Act::Input { value }) => {
                 Some(Action::Forge(forge::Act::SetupWrite { field, text: value }))
             }
@@ -67,9 +72,13 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Home => Action::Forge(forge::Act::Home),
                 Meaning::Ci => Action::Forge(forge::Act::Ci),
                 Meaning::SetUp(forge) => Action::Forge(forge::Act::SetUp { forge }),
+                Meaning::ConnectApp(forge) => Action::Forge(forge::Act::ConnectApp { forge }),
+                Meaning::Install { forge, back } => {
+                    Action::Forge(forge::Act::Install { forge, back: temper_client_domain::address::print(&back) })
+                }
                 Meaning::Adopt => Action::Forge(forge::Act::Adopt),
                 Meaning::SetupNew(new) => Action::Forge(forge::Act::SetupNew { new }),
-                Meaning::Field(_) | Meaning::SetupField(_) => return None,
+                Meaning::AppId | Meaning::AppKey | Meaning::Field(_) | Meaning::SetupField(_) => return None,
             }),
             (_, Act::Input { .. } | Act::Submit | Act::Drawing { .. }) => None,
         };
@@ -111,4 +120,20 @@ fn check(values: &mut List<u32>, text: &[u8]) -> Option<()> {
 #[must_use]
 pub fn worst_case(capacity: u32) -> Option<u64> {
     List::<Entry>::worst_case(capacity)
+}
+
+/// Move secret input straight into the forge event, outside clonable actions.
+#[must_use]
+pub fn event(bindings: &Bindings, token: Token, act: Act) -> Option<temper_client_domain::Event> {
+    for entry in &bindings.entries {
+        if entry.token == token && entry.meaning == Meaning::AppKey {
+            if let Act::Input { value } = act {
+                return Some(temper_client_domain::Event::Forge(forge::Event::AppKey {
+                    value: skein_lib::Secret::new(value),
+                }));
+            }
+            return None;
+        }
+    }
+    Some(temper_client_domain::Event::Act { action: decode(bindings, token, act)? })
 }

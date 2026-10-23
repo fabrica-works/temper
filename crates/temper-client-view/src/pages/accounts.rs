@@ -642,3 +642,24 @@ pub(crate) fn first_usable_heading(root: &Domain, w: &Words) -> Option<Box<[u8]>
     }
     None
 }
+
+/// Ready names an own sign-in with the same provider words as its offered way.
+pub(crate) fn own_signing_name(root: &Domain, w: &Words) -> Option<Box<[u8]>> {
+    let document = accounts::document(root.client())?;
+    let me = accounts::current_me(root.client())?;
+    for signing in &document.signing {
+        if signing.holder != c::OwnerAccountHolder::Party(me.party.number) {
+            continue;
+        }
+        for offer in &me.providers {
+            if offer.provider == signing.provider {
+                let (brand, plan) = words::provider_words(offer.name.bytes());
+                return Some(crate::choice::shown(if offer.signed_in_plan { plan } else { brand }, w));
+            }
+        }
+        let label = words::say(w, W::Provider, &[]);
+        let number = words::say(w, W::Number, &[Hole::Number(u64::from(signing.provider))]);
+        return Some(words::join(&[&label, &number]));
+    }
+    None
+}

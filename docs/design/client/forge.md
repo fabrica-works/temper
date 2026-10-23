@@ -494,12 +494,26 @@ and `connect-forge.html`.
     own to print), its fields "App id" and "Private key" and its
     button, "Connect the App"; then "A pasted value is sent once and
     shown nowhere, then or after." "App id" is a line of digits, the
-    App's id as GitHub shows it; "Private key" is a secret field of
-    several lines, the PEM file's text as GitHub gives it. "Connect the
-    App" sends `Connect { forge, how: GitHubApp { id } }`, the key its
-    carried value, a bundle of one `Pasted` item, the text with one
-    final line feed taken off (`../protocol/credentials.md`, 2.2), and
-    empties the key's field as it leaves (below, a pasted value). The
+    App's id as GitHub shows it; "Private key" is a secret text field,
+    one line, where the person pastes the PEM file's text as GitHub
+    gives it. A browser draws it as a password input, masked and never
+    spellchecked, and strips its line feeds; skein's builder marks only
+    a text field secret, and a text area would show the key and offer
+    it to the browser's spellcheck. So the client restores the armour
+    alone: the text trimmed of spaces, tabs, CRs and LFs at both ends,
+    one LF put after `-----BEGIN RSA PRIVATE KEY-----` and one before
+    `-----END RSA PRIVATE KEY-----` where none is, nothing else changed
+    (the body's line breaks matter to no one: skein's parse ignores
+    them); a text that is not that armour goes as it is, for `Paste` to
+    refuse. "Connect the App" sends `Connect { forge, how: GitHubApp {
+    id } }`, the key its carried value, a bundle of one `Pasted` item
+    of that text (`../protocol/credentials.md`, 2.2), and empties the
+    key's field as it leaves (below, a pasted value). The bundle holds
+    4 KiB; the setup host takes an RS256 key of at most 1196 DER bytes
+    (skein-tls's `RS256_KEY_BYTES`: 2048 bits, the size GitHub gives),
+    about 1.7 KB of PEM, and refuses a larger one at `Paste`, in words
+    that never repeat the key. A secret text area, its line feeds kept,
+    is skein's to offer later (10). The
     page's own refusals, before anything is sent, the fields kept: a
     field empty, "Required."; an id that is not a number from 1 to
     2^64 − 1, "An App's id is a number, as GitHub shows it on the App's
@@ -1121,6 +1135,12 @@ made by the forge connector from what it keeps of the change
 - **A person's approval as a rule,** posted on the forge as the person
   (`../README.md`, section 8), which the approval's card would then
   say.
+- **A secret text area for the pasted key** (5.4). Default: the key is
+  a masked one-line field, its armour's line feeds restored by the
+  client; a text area skein can mark secret (spellcheck and
+  autocomplete off, its text masked) would keep the PEM's lines as
+  GitHub gives them and retire the restore. A change to skein's
+  builder and page, not temper's.
 - **A browser on another machine** for GitHub's connect. Default: the
   link names the clients' listener's fixed address, and the person
   opens it where that address reaches (in standalone, the engine's

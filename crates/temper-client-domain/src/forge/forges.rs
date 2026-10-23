@@ -6,6 +6,7 @@ use temper_client_protocol_wire::{self as wire, v1 as w};
 
 /// The wire bounds the session's forge rows.
 pub const ROWS: u32 = wire::FORGES;
+pub const INSTALLATIONS: u32 = wire::INSTALLATIONS;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Forgejo,
@@ -261,6 +262,8 @@ pub(crate) fn configure(side: &mut super::Side, limits: super::Limits, out: &mut
         side.forges = State::Unknown;
         if side.link == Link::SignedOut {
             side.set_up = None;
+            side.app_form.clear();
+            side.app = None;
         }
         side.changed();
         return;
@@ -571,7 +574,6 @@ pub(crate) fn adopted(
 }
 
 /// Bundle a pasted App's PEM for jig's carried value (protocol/credentials.md, 2.2).
-/// The caller strips one final LF before supplying these bytes.
 #[must_use]
 pub fn pasted_app_key(pem: &[u8]) -> Option<skein_lib::Secret> {
     if pem.is_empty() || pem.len() > 4090 {
@@ -583,6 +585,55 @@ pub fn pasted_app_key(pem: &[u8]) -> Option<skein_lib::Secret> {
     out.put(&length.to_le_bytes()).ok()?;
     out.put(pem).ok()?;
     Some(skein_lib::Secret::new(out.finish()))
+}
+
+/// Restore only RSA armour separators stripped by a password input, then bundle it.
+/// Body bytes stay untouched; Paste decides whether they form a key.
+#[must_use]
+pub fn restored_app_key(pem: &[u8]) -> Option<skein_lib::Secret> {
+    const BEGIN: &[u8] = b"-----BEGIN RSA PRIVATE KEY-----";
+    const END: &[u8] = b"-----END RSA PRIVATE KEY-----";
+    let pem = trimmed_app_key(pem);
+    let after_begin = pem.strip_prefix(BEGIN);
+    let before_end = pem.strip_suffix(END);
+    let begin_lf = match after_begin {
+        Some(rest) => !rest.starts_with(b"\r") && !rest.starts_with(b"\n"),
+        None => false,
+    };
+    let end_lf = match before_end {
+        Some(rest) => !rest.ends_with(b"\n"),
+        None => false,
+    };
+    let length = pem.len().checked_add(usize::from(begin_lf))?.checked_add(usize::from(end_lf))?;
+    if length == 0 || length > 4090 {
+        return None;
+    }
+    let mut out = skein_lib::Writer::new(length.checked_add(6)?);
+    out.put(&[1, 1, 11, 0]).ok()?;
+    out.put(&u16::try_from(length).ok()?.to_le_bytes()).ok()?;
+    let mut body = pem;
+    if begin_lf {
+        out.put(BEGIN).ok()?;
+        out.put(b"\n").ok()?;
+        body = body.strip_prefix(BEGIN)?;
+    }
+    if end_lf {
+        out.put(body.strip_suffix(END)?).ok()?;
+        out.put(b"\n").ok()?;
+        out.put(END).ok()?;
+    } else {
+        out.put(body).ok()?;
+    }
+    Some(skein_lib::Secret::new(out.finish()))
+}
+pub(crate) fn trimmed_app_key(mut pem: &[u8]) -> &[u8] {
+    while let Some(b' ' | b'\t' | b'\r' | b'\n') = pem.first() {
+        pem = pem.get(1..).expect("first byte exists");
+    }
+    while let Some(b' ' | b'\t' | b'\r' | b'\n') = pem.last() {
+        pem = pem.get(..pem.len().checked_sub(1).expect("last byte exists")).expect("shorter slice");
+    }
+    pem
 }
 
 /// Stable names and words for forge connection refusals (client/README.md, 4.6).
@@ -601,4 +652,25 @@ pub fn connect_refusal(why: &temper_client_protocol_wire::v1::ForgeRefusal) -> (
         temper_client_protocol_wire::v1::ForgeRefusal::Busy => (b"busy", b"busy"),
         temper_client_protocol_wire::v1::ForgeRefusal::NoKey => (b"no_key", b"no key"),
     }
+}
+
+/// One accepted, usable installation makes repositories reachable.
+#[must_use]
+pub fn accepted(row: &Row) -> bool {
+    for installation in &row.installations {
+        if !installation.stray && !installation.suspended {
+            return true;
+        }
+    }
+    false
+}
+#[must_use]
+pub fn slug(row: &Row) -> Option<&[u8]> {
+    if row.kind != Kind::GitHub {
+        return None;
+    }
+    let Connection::Connected { login, .. } = &row.connection else {
+        return None;
+    };
+    Some(login.strip_suffix(b"[bot]").unwrap_or(login))
 }

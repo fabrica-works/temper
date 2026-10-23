@@ -60,6 +60,9 @@ fn connection(row: &Row) -> Box<[u8]> {
     if forge::connect::failed(row) {
         return forge::words::forge_connection(row);
     }
+    if row.kind == Kind::GitHub && forge::connect::underway(row) {
+        return forge::words::forge_connection(row);
+    }
     match &row.connection {
         Connection::Connected { login, .. } => forge::words::forge_connected_as(login),
         Connection::NotConnected
@@ -97,6 +100,34 @@ fn personal(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, 
         crate::cards::text(b, Role::Paragraph, &forge::words::first_repository(first));
     }
     account(b, w, row);
+    connect::app_line(b, w, row);
+    if let Some(line) = forge::words::last_connect(row) {
+        crate::cards::text(b, Role::Paragraph, &line);
+    }
+    if row.kind == Kind::GitHub {
+        match row.connection {
+            Connection::Connected { .. } => connect::app_control(
+                b,
+                root,
+                w,
+                forge,
+                row.number,
+                if forge::forges::accepted(row) { Word::ForgeInstallAnother } else { Word::ForgeInstall },
+                Some(Address::Forges),
+            ),
+            Connection::NotConnected | Connection::Stopped { .. } => connect::link(
+                b,
+                w,
+                bindings,
+                Word::ForgeConnectApp,
+                Address::ConnectForge { forge: Some(Choice::Forge(row.number)) },
+            ),
+            Connection::NotSetUp
+            | Connection::SetUpFailed { .. }
+            | Connection::SettingUp { .. }
+            | Connection::Connecting => {}
+        }
+    }
     if forge::connect::failed(row) && row.offer == Offer::Offered {
         connect::setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
     } else {

@@ -7,6 +7,7 @@ pub mod demo;
 pub mod family;
 pub mod forges;
 mod form;
+pub mod github;
 pub mod listed;
 pub(crate) mod me;
 pub mod panel;
@@ -23,6 +24,7 @@ pub struct Limits {
 #[derive(Debug)]
 pub enum Event {
     Act { act: Act },
+    AppKey { value: skein_lib::Secret },
     Panel { subject: Option<panel::Subject> },
     Watched { handle: jig_client::Handle, watched: panel::Watched },
     Progress { request: skein_lib::Token, progress: skein_lib::RequestProgress },
@@ -34,6 +36,7 @@ pub enum Event {
 #[derive(Debug)]
 pub enum Request {
     Show { address: Address },
+    Leave { to: Box<[u8]> },
     Client { asked: jig_client::Event },
     Send { request: skein_lib::Token, name: Option<skein_lib::RequestKey>, ask: jig_client::Ask },
 }
@@ -44,6 +47,8 @@ pub struct Side {
     forges_open: bool,
     set_up: Option<Box<forges::SetUp>>,
     setup_form: forges::Draft,
+    app_form: github::Draft,
+    app: Option<github::Pending>,
     panel: Option<panel::Panel>,
     address: Option<Address>,
     served: Served,
@@ -63,6 +68,8 @@ impl Side {
             forges_open: false,
             set_up: None,
             setup_form: forges::Draft::new(),
+            app_form: github::Draft::new(),
+            app: None,
             panel: None,
             address: None,
             served: Served::Unknown,
@@ -130,12 +137,21 @@ impl Side {
     pub const fn setup_form(&self) -> &forges::Draft {
         &self.setup_form
     }
+    #[must_use]
+    pub const fn app_form(&self) -> &github::Draft {
+        &self.app_form
+    }
+    #[must_use]
+    pub const fn app(&self) -> Option<&github::Pending> {
+        self.app.as_ref()
+    }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("forge shown count fits");
     }
 }
 pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::AppKey { value } => github::key(side, value),
         Event::Panel { subject } => panel::subject(side, env.limits, subject, out),
         Event::Watched { handle, watched } => panel::watched(side, handle, watched, out),
         Event::Went { address } => {
@@ -207,6 +223,9 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
 fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::Go { address } => out.push(Request::Show { address }),
+        Act::AppWrite { text } => github::write(side, text, limits),
+        Act::ConnectApp { forge } => github::send(side, limits, forge, None, out),
+        Act::Install { forge, back } => github::send(side, limits, forge, Some(back), out),
         Act::StartDemo => demo::start(side, limits, false, out),
         Act::SetUp { forge } => forges::set_up(side, limits, forge, out),
         Act::SetupWrite { field, text } => forges::write(side, limits, field, text),
@@ -299,6 +318,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(6)?
         .checked_add(u64::from(limits.checks).checked_mul(4)?)?
         .checked_add(forges::worst_case(limits)?)?
+        .checked_add(4097 + 2048)?
+        .checked_add(u64::from(limits.field_bytes))?
         .checked_add(temper_client_protocol_wire::v1::Answer::worst_case_heap(&wire)?)?
         .checked_add(temper_client_protocol_wire::v1::DemoAnswer::worst_case_heap(&wire)?)?
         .checked_add(u64::from(wire.group_failed_why))?

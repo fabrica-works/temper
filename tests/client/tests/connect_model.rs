@@ -209,9 +209,8 @@ fn a_fresh_page_at_the_return_address_follows_the_watch_to_ready_without_departi
     assert!(front.engine.protocol.returns.is_empty());
     assert!(front.leaves.is_empty());
 }
-#[test]
-fn a_departing_welcome_model_step_returns_to_ready() {
-    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+fn departing_welcome_sign_in() -> (Joint, Root, u32) {
+    let (mut front, mut root) = accounts::empty_plan_fixture(fixtures::SEED);
     accounts::reopen(&mut front, &mut root, Address::Welcome { step: d::Step::Model { way: None } }, true);
     press(&mut front, &mut root, Role::Button, b"Continue with ChatGPT", skein_ui::Act::Press);
     let source = accounts::signing(&front);
@@ -220,8 +219,33 @@ fn a_departing_welcome_model_step_returns_to_ready() {
         address: b"https://issuer/visit".as_slice().into(),
     }));
     accounts::settle(&mut front, &mut root);
+    (front, root, source)
+}
+#[test]
+fn a_departing_welcome_model_step_returns_to_ready() {
+    let (front, _, source) = departing_welcome_sign_in();
     assert_eq!(front.engine.protocol.returns, [(source, Box::from(b"/welcome?at=ready".as_slice()))]);
     assert_eq!(front.leaves, [Box::from(b"https://issuer/visit".as_slice())]);
+}
+#[test]
+fn a_welcome_sign_in_come_back_at_ready_reads_it_under_way_then_its_account() {
+    const SUBJECT: &[u8] = b"subject";
+    const DISPLAY: &[u8] = b"alice@example.com";
+    let (mut front, mut root, source) = departing_welcome_sign_in();
+    let (_, returned) = front.engine.protocol.returns.last().expect("welcome return");
+    let Place::Address(address) = d::address::parse(returned) else { panic!("returned welcome address") };
+    accounts::reopen(&mut front, &mut root, address, true);
+    assert!(text(&root).contains("Model: ChatGPT · signing in"));
+    assert!(!text(&root).contains("Connect a model"));
+    front.engine.send(temper_engine_domain::Event::Account(jig_domain_accounts::Event::SignedIn {
+        source,
+        subject: SUBJECT.into(),
+        display: DISPLAY.into(),
+        declined: false,
+    }));
+    accounts::settle(&mut front, &mut root);
+    assert!(text(&root).contains("Model: ChatGPT · alice@example.com · OpenAI · held by Person"));
+    assert!(!text(&root).contains("Connect a model"));
 }
 #[test]
 fn an_unknown_return_source_is_removed_and_the_way_can_start_again() {

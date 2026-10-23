@@ -483,10 +483,11 @@ fn the_provider_keeps_its_supplied_name() {
     assert!(text(&task_root()).contains("Supplied Provider"));
 }
 #[test]
-fn the_accounts_banner_uses_its_slot_token() {
+fn the_accounts_banner_is_a_named_region() {
     let view = fixtures::page_view(&banner(Some(false)).0);
     let node = view.tree().nodes().iter().find(|n| n.styles.as_slice().contains(&crate::look::ACCOUNTS)).unwrap();
-    assert_eq!(node.role, Role::Slot);
+    assert_eq!(node.role, Role::Region);
+    assert_eq!(node.name.as_deref(), Some(b"LLM account".as_slice()));
 }
 #[test]
 fn the_account_line_precedes_entry_inside_the_composer_area() {

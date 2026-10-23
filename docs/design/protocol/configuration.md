@@ -365,8 +365,8 @@ for the worker to spawn (channel.md, section 4).
 
 **`demo`:** a first run's demo, or `null` for none, never missing
 (section 10): the fake LLM the box runs, its address, its LLM provider,
-its key's file and its scripts, and the seed's forge, the project its
-start makes and the client directory. Its members, their bounds and
+its key's file and its scripts, and the demo's forge and the project
+its start makes. Its members, their bounds and
 their checks against the document's LLM providers, `setup` and
 policies are setup.md, 8.4's,
 `temper-fake`'s. `temper serve` checks it whole and reads none of its
@@ -1119,7 +1119,7 @@ variable, else its default.
 | Directory | Flag, variable | Default | Holds | Kept |
 |---|---|---|---|---|
 | configuration | `--config DIR`, `TEMPER_CONFIG` | `$XDG_CONFIG_HOME/temper` | the document, `temper.json`; smith's agent configuration, `agent.json`; the charters' instructions; trusted roots' files | as a person's own files are: copied, synced or published, so it holds no secret |
-| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key, its git's link and its seed's client directory, in `demo/` (setup.md, 8.4); the box's records of the forges it has started, in `box/started/` (setup.md, 7.1); the programs directory | the deployment: backed up whole |
+| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key and its git's link, in `demo/` (setup.md, 8.4); the box's records of the forges it has started, in `box/started/` (setup.md, 7.1); the programs directory | the deployment: backed up whole |
 | cache | `--cache DIR`, `TEMPER_CACHE` | `$XDG_CACHE_HOME/temper` | binaries fetched again at will: an owned forge's Forgejo and runner, `temper forge fetch`'s in `forgejo/VERSION/` and `forgejo-runner/RUNNER_VERSION/` (setup.md, 6.6) | never backed up |
 
 - **The document is `temper.json` in the configuration directory,**
@@ -1148,8 +1148,7 @@ variable, else its default.
     `engine.hosts.workers`' `digest` and the worker's `secret`; each of
     `application.workers`' `root` (section 4) and of
     `application.setup`'s `directory` and a fake forge's `git` (setup.md,
-    section 8); and `application.demo`'s `llm.key` and `client`
-    (setup.md, 8.4);
+    section 8); and `application.demo`'s `llm.key` (setup.md, 8.4);
   - *cache paths:* an owned forge's `forgejo` and `runner.binary`, or
     `"fetched"` for `temper forge fetch`'s (setup.md, section 8 and 6.6);
   - *absolute paths,* refused when relative: each of

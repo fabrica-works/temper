@@ -55,7 +55,18 @@ fn press(root: &d::Domain, role: Role, name: &[u8]) -> d::Action {
     crate::act(&mut view, id, if role == Role::Choice { Act::Toggle } else { Act::Press }).expect("bound control")
 }
 pub(super) fn words_in_order(tree: &skein_ui::Tree, phrases: &[&str]) {
-    let bytes = f::text(tree);
+    let mut bytes = Vec::new();
+    for (index, node) in tree.nodes().iter().enumerate() {
+        if let Some(name) = &node.name
+            && f::node_text(tree, index).is_empty()
+        {
+            bytes.extend_from_slice(name);
+            bytes.push(b'\n');
+        }
+        for run in &node.text {
+            bytes.extend_from_slice(&run.text);
+        }
+    }
     let words = String::from_utf8_lossy(&bytes);
     let mut remaining = words.as_ref();
     for phrase in phrases {
@@ -78,7 +89,8 @@ fn choose_draws_a_card_per_choice_in_order() {
             "GitHub",
             "Your repositories on GitHub. temper makes its App there, or takes an App of yours, and you install it on the repositories you choose.",
             "In your browser, on GitHub · about two minutes",
-            "Choose",
+            "Connect GitHub",
+            "Use an App of your own ›",
             "Forgejo on this machine",
             "A forge of your own, run by temper box. No account needed: temper makes your first repository, and you start in it.",
             "Here · about a minute",
@@ -91,37 +103,40 @@ fn choose_draws_a_card_per_choice_in_order() {
     );
     let regions: Vec<_> =
         view.tree().nodes().iter().filter(|n| n.role == Role::Region).filter_map(|n| n.name.as_deref()).collect();
-    assert_eq!(regions, [b"GitHub".as_slice(), b"Forgejo on this machine", b"A Forgejo elsewhere"]);
+    assert_eq!(regions, [b"LLM account".as_slice(), b"GitHub", b"Forgejo on this machine", b"A Forgejo elsewhere"]);
     assert_eq!(
         press(&root, Role::Link, b"Show how"),
         d::Action::Pages(pages::Act::Go { address: Address::ConnectForge { forge: Some(Choice::Elsewhere) } })
     );
 }
 #[test]
-fn github_details_draw_both_ways_disabled_and_say_not_available_yet() {
+fn github_details_enable_the_app_of_ones_own_and_keep_tempers_app_disabled() {
+    let root = root(Some(Choice::Forge(GITHUB)), w::Connection::NotSetUp, w::Offer::Offered);
+    let view = f::browser_page_view(&root);
+    let disabled = node(view.tree(), Role::Button, b"Connect GitHub");
+    assert!(
+        view.tree().nodes().iter().find(|n| n.id == disabled).unwrap().states.as_slice().contains(&State::Disabled)
+    );
+    let button = node(view.tree(), Role::Button, b"Connect the App");
+    assert!(!view.tree().nodes().iter().find(|n| n.id == button).unwrap().states.as_slice().contains(&State::Disabled));
+    node(view.tree(), Role::TextField, b"App id");
+    let key = node(view.tree(), Role::TextField, b"Private key");
+    assert_eq!(view.tree().nodes().iter().find(|n| n.id == key).unwrap().entry, Some(skein_ui::EntryKind::Secret));
+}
+#[test]
+fn the_terminal_shows_ctl_or_the_web_page_instead_of_the_key_field() {
     let view = f::page_view(&root(Some(Choice::Forge(GITHUB)), w::Connection::NotSetUp, w::Offer::Offered));
-    for name in [b"Connect GitHub".as_slice(), b"Connect an App of your own"] {
-        let id = node(view.tree(), Role::Button, name);
-        assert!(view.tree().nodes().iter().find(|n| n.id == id).unwrap().states.as_slice().contains(&State::Disabled));
-    }
-    for name in [b"An organization, or none for your account".as_slice(), b"App id", b"Private key"] {
-        node(view.tree(), Role::TextField, name);
-    }
+    assert!(f::find(view.tree(), Role::TextField, b"App id").is_none());
+    assert!(f::find(view.tree(), Role::TextField, b"Private key").is_none());
+    assert!(f::find(view.tree(), Role::Button, b"Connect the App").is_none());
     words_in_order(
         view.tree(),
         &[
-            "‹ All forges",
-            "GitHub",
-            "Connect GitHub",
-            "Create an App and install it on your account or organization. Choose selected repositories.",
-            "Connect an App of your own",
-            "Its id, and its private key as GitHub gives it.",
-            "On GitHub, set the App’s setup URL to temper’s address followed by /forges/2/github/setup, and give it the permissions and events temper’s guide lists.",
-            "A pasted value is sent once and shown nowhere, then or after.",
-            "Connecting GitHub from temper is not available yet.",
+            "Paste the key on this page in a browser, or run temper ctl forge-connect 2 github-app ID FILE, FILE the key's file, readable by you alone.",
         ],
     );
 }
+
 #[test]
 fn forgejo_here_details_say_the_first_repository_and_set_it_up() {
     let mut root = here(w::Connection::NotSetUp);
@@ -280,7 +295,8 @@ fn a_forge_under_way_is_no_choice_in_the_welcome() {
 #[test]
 fn the_model_step_shows_the_set_up_under_way() {
     let mut forges = rows(w::Connection::Connecting, w::Offer::Offered);
-    *forges.get_mut(0).unwrap() = row(GITHUB, w::Kind::Github, w::Mode::Managed, connected(), w::Offer::NotOffered);
+    // The other forge is fully ready, so Model follows the owned forge still connecting.
+    *forges.get_mut(0).unwrap() = github_rows(true).get(0).unwrap().clone();
     let root = f::forge_root(Address::Welcome { step: Step::Model { way: None } }, forges);
     let view = f::page_view(&root);
     node(view.tree(), Role::Paragraph, "Forgejo on this machine · Connecting".as_bytes());
@@ -673,4 +689,188 @@ fn the_forges_row_names_the_first_repository_and_project() {
         assert!(!row.states.as_slice().contains(&State::Expanded));
         node(view.tree(), Role::Paragraph, first);
     }
+}
+
+pub(super) fn github_rows(accepted: bool) -> List<w::ForgeRow> {
+    let mut row = row(
+        GITHUB,
+        w::Kind::Github,
+        w::Mode::Connected,
+        w::Connection::Connected(
+            w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 9, login: b"my-app[bot]".as_slice().into() })
+                .unwrap(),
+        ),
+        w::Offer::NotOffered,
+    )
+    .into_parts();
+    row.ended = Some(
+        w::ConnectStopped::new(&w::CEILINGS, w::ConnectStoppedParts { why: b"fixture stopped".as_slice().into() })
+            .unwrap(),
+    );
+    row.installations = List::with_capacity(3);
+    if accepted {
+        row.installations
+            .push(
+                w::Installation::new(
+                    &w::CEILINGS,
+                    w::InstallationParts {
+                        id: 1,
+                        account: Some(
+                            w::Account::new(&w::CEILINGS, w::AccountParts { id: 10, login: b"acme".as_slice().into() })
+                                .unwrap(),
+                        ),
+                        suspended: false,
+                        stray: false,
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+    }
+    for (id, suspended, stray) in [(2, true, false), (3, false, true)] {
+        row.installations
+            .push(
+                w::Installation::new(&w::CEILINGS, w::InstallationParts { id, account: None, suspended, stray })
+                    .unwrap(),
+            )
+            .unwrap();
+    }
+    let mut rows = List::with_capacity(1);
+    rows.push(w::ForgeRow::new(&w::CEILINGS, row).unwrap()).unwrap();
+    rows
+}
+#[test]
+fn connecting_on_github_offers_install_with_its_way_back() {
+    for address in [
+        Address::ConnectForge { forge: Some(Choice::Forge(GITHUB)) },
+        Address::Welcome { step: Step::Forge { forge: Some(Choice::Forge(GITHUB)) } },
+    ] {
+        let root = f::forge_root(address.clone(), github_rows(false));
+        let view = f::browser_page_view(&root);
+        words_in_order(
+            view.tree(),
+            &["Install temper’s App", "my-app is connected to temper, and installed nowhere yet.", "Install on GitHub"],
+        );
+        let mut view = f::browser_page_view(&root);
+        let button = node(view.tree(), Role::Button, b"Install on GitHub");
+        assert_eq!(
+            crate::act(&mut view, button, Act::Press),
+            Some(d::Action::Forge(d::forge::Act::Install { forge: GITHUB, back: d::address::print(&address) }))
+        );
+    }
+}
+#[test]
+fn an_accepted_installation_makes_github_ready_until_the_picker() {
+    let root = f::forge_root(Address::ConnectForge { forge: Some(Choice::Forge(GITHUB)) }, github_rows(true));
+    let view = f::browser_page_view(&root);
+    words_in_order(
+        view.tree(),
+        &[
+            "GitHub is connected",
+            "Connected as my-app[bot].",
+            "temper’s App",
+            "my-app · ",
+            "acme",
+            "Adopt a repository",
+        ],
+    );
+}
+#[test]
+#[expect(clippy::disallowed_macros, reason = "the test captures Debug to verify secret redaction")]
+fn the_private_key_moves_as_a_secret_and_never_enters_the_view() {
+    let mut root = root(Some(Choice::Forge(GITHUB)), w::Connection::NotSetUp, w::Offer::Offered);
+    let mut view = f::browser_page_view(&root);
+    let id = node(view.tree(), Role::TextField, b"App id");
+    let event = crate::event(&mut view, id, Act::Input { value: b"7".as_slice().into() }).unwrap();
+    f::root_event(&mut root, event);
+    let key = node(view.tree(), Role::TextField, b"Private key");
+    let event =
+        crate::event(&mut view, key, Act::Input { value: b"private-app-fixture\nsecond line\n".as_slice().into() })
+            .unwrap();
+    assert!(!format!("{event:?}").contains("private-app-fixture"));
+    let d::Event::Forge(d::forge::Event::AppKey { .. }) = &event else {
+        panic!("the input moves straight into a secret key event");
+    };
+    f::root_event(&mut root, event);
+    let view = f::browser_page_view(&root);
+    assert!(!format!("{view:?}").contains("private-app-fixture"));
+    let field = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|n| n.role == Role::TextField && n.name.as_deref() == Some(b"Private key"))
+        .unwrap();
+    assert!(field.value.as_ref().unwrap().text.is_empty());
+    let written = field.value.as_ref().unwrap().written;
+    f::root_event(&mut root, d::Event::Act { action: d::Action::Forge(d::forge::Act::ConnectApp { forge: GITHUB }) });
+    let view = f::browser_page_view(&root);
+    let field = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|n| n.role == Role::TextField && n.name.as_deref() == Some(b"Private key"))
+        .unwrap();
+    assert!(field.value.as_ref().unwrap().written > written);
+    assert!(!root.forge().app_form().has_key());
+}
+#[test]
+fn a_connect_refusal_is_said_below_its_button() {
+    let mut root = root(Some(Choice::Forge(GITHUB)), w::Connection::NotSetUp, w::Offer::Offered);
+    f::root_event(
+        &mut root,
+        d::Event::Act { action: d::Action::Forge(d::forge::Act::AppWrite { text: b"7".as_slice().into() }) },
+    );
+    f::root_event(
+        &mut root,
+        d::Event::Forge(d::forge::Event::AppKey { value: skein_lib::Secret::new(b"fake-key".as_slice().into()) }),
+    );
+    let mut out = skein_lib::Queue::with_capacity(d::max_out(&f::limits()));
+    d::step(
+        &mut root,
+        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: f::NOW, limits: f::limits() },
+        d::Event::Act { action: d::Action::Forge(d::forge::Act::ConnectApp { forge: GITHUB }) },
+        &mut out,
+    );
+    let mut attempt = None;
+    while let Some(request) = out.pop() {
+        if let d::Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt: value, .. } },
+        } = request
+        {
+            attempt = Some(value);
+        }
+    }
+    f::root_event(
+        &mut root,
+        d::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt: attempt.unwrap(),
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Family(jig_client::Family {
+                        family: temper_client_protocol_wire::FORGE,
+                        version: temper_client_protocol_wire::CLIENT_VERSION,
+                        bytes: temper_client_protocol_wire::answer(
+                            &w::Answer::new(
+                                &w::CEILINGS,
+                                w::AnswerParts {
+                                    outcome: w::Outcome::ConnectRefused(
+                                        w::ConnectRefused::new(
+                                            &w::CEILINGS,
+                                            w::ConnectRefusedParts { why: w::ForgeRefusal::NoKey },
+                                        )
+                                        .unwrap(),
+                                    ),
+                                },
+                            )
+                            .unwrap(),
+                        ),
+                    })),
+                    why: None,
+                },
+            },
+        },
+    );
+    let view = f::browser_page_view(&root);
+    words_in_order(view.tree(), &["Connect the App", "The key did not reach temper: paste it again."]);
 }

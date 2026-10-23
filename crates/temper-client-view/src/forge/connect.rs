@@ -120,7 +120,7 @@ pub(crate) fn body(
                 Choice::Forge(number) => {
                     if let Some(row) = connect::row(number, root.forges(), root.forge().demo()) {
                         match row.kind {
-                            Kind::GitHub => github(b, w, row),
+                            Kind::GitHub => github(b, root, w, forge, row),
                             Kind::Forgejo => here(b, root, w, forge, row),
                         }
                     }
@@ -128,6 +128,33 @@ pub(crate) fn body(
             }
         }
         Shown::SettingUp(_) | Shown::Ready(_) => {}
+    }
+}
+/// The welcome keeps GitHub's installation and Ready steps in its own flow.
+pub(crate) fn welcome(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut Bindings,
+    forge: &mut ForgeBindings,
+    choice: Option<Choice>,
+) {
+    if let Some(row) = personal(root) {
+        if row.kind == Kind::GitHub
+            && let Connection::Connected { .. } = row.connection
+        {
+            if forge::forges::accepted(row) {
+                ready_card(b, root, w, bindings, row);
+            } else {
+                setting_up(b, root, w, forge, row);
+            }
+        } else {
+            status(b, root, w, row, false);
+            first_line(b, root, w, row);
+            link(b, w, bindings, Word::ForgeView, Address::ConnectForge { forge: Some(Choice::Forge(row.number)) });
+        }
+    } else {
+        body(b, root, w, bindings, forge, choice, Place::Welcome);
     }
 }
 fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, place: Place) {
@@ -151,6 +178,16 @@ fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, pl
                 }
             }
         };
+        if heading == Word::ForgeGitHub {
+            flow::card(b, &w.say(heading, &[]));
+            text(b, w, Role::Paragraph, words);
+            text(b, w, Role::Paragraph, note);
+            flow::control(b, Control::Disabled { name: &w.say(Word::ForgeConnectGitHub, &[]) });
+            link(b, w, bindings, Word::ForgeUseApp, place.address(Some(*choice)));
+            text(b, w, Role::Paragraph, Word::ForgeGitHubUnavailable);
+            b.close();
+            continue;
+        }
         flow::choice(
             b,
             &w.say(heading, &[]),
@@ -163,30 +200,103 @@ fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, pl
         );
     }
 }
-fn github(b: &mut Builder, w: &Words, row: &Row) {
+fn github(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
     flow::card(b, &w.say(Word::ForgeGitHub, &[]));
     text(b, w, Role::Heading { level: 3 }, Word::ForgeConnectGitHub);
     text(b, w, Role::Paragraph, Word::ForgeGitHubCreate);
-    field(b, w, Word::ForgeOrganization, false);
-    flow::control(b, Control::Disabled { name: &w.say(Word::ForgeConnectGitHub, &[]) });
-    text(b, w, Role::Heading { level: 3 }, Word::ForgeConnectApp);
-    text(b, w, Role::Paragraph, Word::ForgeAppDescription);
-    crate::cards::text(b, Role::Paragraph, &w.say(Word::ForgeSetupUrl, &[Hole::Number(u64::from(row.number))]));
-    field(b, w, Word::ForgeAppId, false);
-    field(b, w, Word::ForgePrivateKey, true);
-    flow::control(b, Control::Disabled { name: &w.say(Word::ForgeConnectApp, &[]) });
-    text(b, w, Role::Paragraph, Word::ForgePasted);
-    text(b, w, Role::Paragraph, Word::ForgeGitHubUnavailable);
-    b.close();
-}
-fn field(b: &mut Builder, w: &Words, word: Word, secret: bool) {
     b.open(Role::TextField);
-    if secret {
-        b.entry(skein_ui::EntryKind::Secret);
-    }
-    b.name(&w.say(word, &[]));
+    b.name(&w.say(Word::ForgeOrganization, &[]));
     b.state(State::Disabled);
     b.close();
+    flow::control(b, Control::Disabled { name: &w.say(Word::ForgeConnectGitHub, &[]) });
+    text(b, w, Role::Paragraph, Word::ForgeGitHubUnavailable);
+    text(b, w, Role::Heading { level: 3 }, Word::ForgeAppTitle);
+    text(b, w, Role::Paragraph, Word::ForgeAppDescription);
+    crate::cards::text(b, Role::Paragraph, &w.say(Word::ForgeSetupUrl, &[Hole::Number(u64::from(row.number))]));
+    if w.shell == crate::words::Shell::Terminal {
+        crate::cards::text(b, Role::Paragraph, &forge::words::app_terminal(row.number));
+    } else {
+        let draft = root.forge().app_form();
+        for (secret, word, meaning, required) in [
+            (false, Word::ForgeAppId, Meaning::AppId, draft.id.is_empty()),
+            (true, Word::ForgePrivateKey, Meaning::AppKey, !draft.has_key() && !draft.too_long),
+        ] {
+            b.open(Role::Slot);
+            b.open(Role::TextField);
+            b.name(&w.say(word, &[]));
+            b.bind(bindings.insert(meaning));
+            if secret {
+                b.entry(skein_ui::EntryKind::Secret);
+                b.value(b"", draft.key_written);
+            } else {
+                b.value(&draft.id, draft.written);
+            }
+            if draft.checked && (required || (!secret && draft.number().is_none())) {
+                b.state(State::Invalid);
+            }
+            b.close();
+            if draft.checked && required {
+                text(b, w, Role::Alert, Word::SetupRequired);
+            } else if draft.checked && !secret && draft.number().is_none() {
+                crate::cards::text(b, Role::Alert, forge::words::APP_ID);
+            }
+            b.close();
+        }
+        app_control(b, root, w, bindings, row.number, Word::ForgeConnectAppButton, None);
+        if draft.checked && draft.too_long {
+            crate::cards::text(b, Role::Alert, forge::words::APP_TOO_LONG);
+        }
+        text(b, w, Role::Paragraph, Word::ForgePasted);
+    }
+    if let Some(line) = forge::words::last_connect(row) {
+        crate::cards::text(b, Role::Alert, &line);
+    }
+    b.close();
+}
+pub(crate) fn app_control(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut ForgeBindings,
+    number: u16,
+    word: Word,
+    back: Option<Address>,
+) {
+    let pending = root.forge().app();
+    let busy = match pending {
+        Some(pending) => pending.answer.is_none(),
+        None => false,
+    };
+    let name = w.say(word, &[]);
+    if busy || root.forge().served() == forge::Served::OutOfDate {
+        flow::control(b, Control::Disabled { name: &name });
+    } else {
+        let meaning = match back {
+            Some(back) => Meaning::Install { forge: number, back },
+            None => Meaning::ConnectApp(number),
+        };
+        flow::control(b, Control::Button { name: &name, to: bindings.insert(meaning) });
+    }
+    if let Some(pending) = pending
+        && pending.forge == number
+        && let Some(answer) = &pending.answer
+    {
+        if let Some(words) = forge::words::app_refusal(answer.clone(), number) {
+            crate::cards::text(b, Role::Alert, &words);
+        }
+        if let forge::github::Answer::Entrance(refusal) = answer {
+            b.open(Role::Alert);
+            w.refusal(b, refusal.refusal(), w.name_bytes);
+            b.close();
+        }
+        if let forge::github::Answer::Link(address) = answer {
+            b.open(Role::Link);
+            b.name(&name);
+            b.text(Run::Plain, &name);
+            b.external(address);
+            b.close();
+        }
+    }
 }
 fn here(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
     let terminal = row.offer == Offer::NotUnderTheBox;
@@ -320,6 +430,21 @@ fn mark(current: usize, index: usize) -> Mark {
     }
 }
 pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
+    if row.kind == Kind::GitHub {
+        if forge::forges::slug(row).is_some() {
+            flow::card(b, &w.say(Word::ForgeInstallTitle, &[]));
+            crate::cards::text(b, Role::Paragraph, &forge::words::app_install(row));
+            app_control(b, root, w, bindings, row.number, Word::ForgeInstall, Some(root.pages().address().clone()));
+        } else {
+            flow::card(b, &w.say(Word::ForgeConnecting, &[]));
+            text(b, w, Role::Paragraph, Word::ForgeLeave);
+        }
+        if let Some(line) = forge::words::last_connect(row) {
+            crate::cards::text(b, Role::Alert, &line);
+        }
+        b.close();
+        return;
+    }
     flow::card(b, &w.say(Word::ForgeSettingUpTitle, &[]));
     first_line(b, root, w, row);
     if connect::failed(row) {
@@ -375,6 +500,7 @@ pub(crate) fn ready_card(b: &mut Builder, root: &Domain, w: &Words, bindings: &m
         if let Connection::Connected { login, .. } = &row.connection {
             crate::cards::text(b, Role::Paragraph, &w.say(Word::ForgeConnectedAs, &[Hole::Name(copy_of(login))]));
         }
+        app_line(b, w, row);
         adopt(b, root, w, bindings);
     }
     b.open(Role::Paragraph);
@@ -494,4 +620,18 @@ fn adoption_outcome(b: &mut Builder, w: &Words, adoption: &forge::Adoption, answ
     form.texts.get_mut(forge::Text::Owner.index()).expect("owner field").text.clone_from(&adoption.owner);
     form.texts.get_mut(forge::Text::Name.index()).expect("name field").text.clone_from(&adoption.name);
     super::page::outcome(b, &form, answer, w, w.name_bytes);
+}
+
+pub(crate) fn app_line(b: &mut Builder, w: &Words, row: &Row) {
+    if let Some(slug) = forge::forges::slug(row) {
+        b.open(Role::Slot);
+        text(b, w, Role::Term, Word::ForgeAppLabel);
+        b.open(Role::Description);
+        crate::cards::text(b, Role::Slot, &forge::words::app_head(slug, row.installations.is_empty()));
+        for (index, installation) in row.installations.iter().enumerate() {
+            crate::cards::text(b, Role::Slot, &forge::words::app_installation(installation, index == 0));
+        }
+        b.close();
+        b.close();
+    }
 }

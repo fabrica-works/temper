@@ -305,7 +305,7 @@ keeps (`../protocol/configuration.md`, section 2).
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back |
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
-| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the context line, only in the demo's project while the demo is running (4.8, 5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the placeholder "Message T6…", T6 the chat's number, shown while it is empty and never its name, and the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
+| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the context line, only in the demo's project while the demo is running (4.8, 5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it (a `delegate` or a `change`), or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the placeholder "Message T6…", T6 the chat's number, shown while it is empty and never its name, and the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree of its delegates, live and ended, with their counts and its filter, each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a goal's or a procedure's ended delegates, a page read once and again on a change | a goal's plan's filter (5.8); as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -688,7 +688,8 @@ keeps (`../protocol/configuration.md`, section 2).
     `accounts` document says so, its `usable`, which counts the
     configured model too (jig's `client/domain/contract.md`, 5.1); and
     with a demo, when an account of that document is usable whose LLM
-    provider is not the demo's (4.8). Its facts are in once the demo's
+    provider is not the demo's (4.8), and, for an owner, as 4.8's
+    model's half counts the deployment's. Its facts are in once the demo's
     read has answered, a demo or none, the `accounts` document is
     delivered, its accounts as far as it shows them, and, where the
     person's role holds the forges, the `forges` watch has delivered
@@ -1415,7 +1416,15 @@ of each (`../draft/first-run.md`, 3.6).
 - **The model's half** holds while the demo is running (above) and no account
   of the `accounts` document, the one the accounts' banner keeps (5.1),
   of an LLM provider other than the demo's is usable. While that
-  document is not delivered, or is cut, the half does not hold.
+  document is not delivered, or is cut, the half does not hold. For a
+  person whose deployment role is owner, the deployment's own accounts
+  count too: the half also needs that no account of the `deployment`
+  document held by the deployment, of a provider other than the demo's,
+  is usable, a source of it usable as an `accounts` line's is; the
+  demo model's own account, the deployment's of the demo's provider,
+  never counts. While that document is not delivered, or it or such an
+  account is cut, the half does not hold for an owner. For any other
+  person, the `deployment` document plays no part.
 - **The forge's half** holds while the demo is running (above) and the
   deployment's part (`forge.md`, 5.4) shows no forge connected but the
   demo's. That part is read only for a person whose role holds the
@@ -1424,7 +1433,8 @@ of each (`../draft/first-run.md`, 3.6).
   watch's rows (4.6).
 - **Ending for good,** with the welcome (`../draft/first-run.md`, 2.3,
   its step 5): the model's half ends when an account of another LLM
-  provider is first usable, and does not hold again; the demo ends
+  provider that counts for it (above) is first usable, the person's own
+  or, for an owner, the deployment's, and does not hold again; the demo ends
   when a forge of the person's first connects, and the read then
   answers none (`../protocol/setup.md`, 8.4). At the first of the two
   ends the side sees while its last answer is running, it removes the
@@ -1433,15 +1443,19 @@ of each (`../draft/first-run.md`, 3.6).
   `client/domain/contract.md`, 7.1: the `accounts` document lists the
   person's own), by jig's `Remove` (jig's `client/domain/contract.md`),
   as the accounts page's "Remove account" sends it, unconfirmed (3.5,
-  `Accounts`), once a session. The side watches `deployment` for this
-  alone, for a person whose deployment role is owner, from that end
-  until the `Remove` is sent, or the document lists no such account,
-  and then drops the watch; the end it saw holds it, whatever the
-  demo's read answers since. For any other person it sends nothing.
-  The answer shows nowhere: refused, the account stays, and Accounts
-  offers its Remove. Gone, it supplies no run: the model's half has
-  ended, and at the demo's end the demo model, its group stopped, no
-  longer answers.
+  `Accounts`), once a session, for a person whose deployment role is
+  owner; for any other person it sends nothing. The answer shows
+  nowhere: refused, the account stays, and Accounts offers its Remove.
+  Gone, it supplies no run: the model's half has ended, and at the
+  demo's end the demo model, its group stopped, no longer answers.
+- **One `deployment` watch,** for a person whose deployment role is
+  owner alone: the side opens it once it reads the demo running and
+  `me` says the role, and holds it for both of its uses, the model's
+  half before the first end (above) and the removal at it, until the
+  `Remove` is sent, or the document, at or after that end, lists no
+  such account; it then drops the watch and opens none again this
+  session. The end it saw holds the watch, whatever the demo's read
+  answers since. For any other person it opens none.
 - **What shows:** the demo's banner, while either half holds (5.1); the
   demo's start, on the chats page, while the model's half holds and
   the person is in the demo's project, or in none while its start is
@@ -1452,8 +1466,9 @@ of each (`../draft/first-run.md`, 3.6).
 - **State:** the last answer, the pending read's key, at most one, the
   start's key while it is out, at most one, and its failure, whether
   the link was live at the last pass, whether the demo model's
-  account's removal was sent this session, and the `deployment`
-  watch's key and the demo's provider while it waits, at most one.
+  account's removal was settled this session, sent or with none to
+  send, and the `deployment` watch's key and the demo's provider while
+  it is open, at most one.
   Bounded by the record's bounds (4.6).
 
 ## 5. The view
@@ -3432,6 +3447,13 @@ own tests:
   of the forge's family both ways, a change's panel's watch to the root
   with its scope, and its document encoded with the pull request's
   address on a GitHub forge, on a Forgejo and with no `web`.
+- **The demo's halves** (4.8), in the domain: the model's half held
+  on the demo model alone and ended by a usable account of another
+  provider, the person's own, and for an owner the deployment's too;
+  the demo provider's deployment account ending nothing; a member's
+  half reading `accounts` alone, with no `deployment` watch; the
+  owner's one watch, opened at the demo read running, held to the
+  removal and dropped then.
 - **The accounts pages' steps and views:** in the domain, the
   accounts page's acts each as its request from the row's names, one
   out at a time, those that confirm only once confirmed, a key's value

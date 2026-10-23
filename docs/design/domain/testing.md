@@ -931,8 +931,9 @@ and 10).
   - *the change:* the owner connects ChatGPT (`connect 1`, `wait
     accounts --until settled`) and opens a chat on gpt-6-luna in
     project 1 asking for one README line, unique to the run. The
-    chat's agent delegates the coding procedure on `work/hello`
-    (forge.md, section 8); the coder edits on the plan's grant, its
+    chat's agent calls `change`, naming `work/hello`, and the root
+    delegates the change procedure on it (agent.md, 4.3.1; forge.md,
+    section 8); the coder edits on the plan's grant, its
     pull's starter workflow passes on the owned runner, the change
     lands with no review, since init's landing rule names no gate, and
     the chat's reply, its turn's text with no `finish` (agent.md, 4.6),

@@ -348,14 +348,18 @@ fn unoffered_forge_has_no_owned_choose_card() {
 }
 
 #[test]
-fn github_details_disable_both_unavailable_connect_buttons() {
+fn github_details_enable_the_app_of_ones_own_and_keep_tempers_app_disabled() {
     let mut world = world();
-    let client = open(&mut world, at(GITHUB));
+    let client = world.client_with(f::PARTY, Address::Chats, f::domain_limits(), browser_client);
+    follow(&mut world, client, vec![see(Role::Heading { level: 1 }, b"Chats"), PersonStep::Go { address: at(GITHUB) }]);
     let words = text(&world, client);
-    assert!(words.contains("Connecting GitHub from temper is not available yet."), "{words}");
-    for name in [b"Connect GitHub".as_slice(), b"Connect an App of your own"] {
-        assert!(node(&world, client, Role::Button, name).states.as_slice().contains(&State::Disabled));
-    }
+    assert!(
+        words.contains("Connecting GitHub through temper’s own App is not available yet: use an App of your own."),
+        "{words}"
+    );
+    assert!(node(&world, client, Role::Button, b"Connect GitHub").states.as_slice().contains(&State::Disabled));
+    assert!(!node(&world, client, Role::Button, b"Connect the App").states.as_slice().contains(&State::Disabled));
+    assert_eq!(node(&world, client, Role::TextArea, b"Private key").entry, Some(skein_ui::EntryKind::Secret));
 }
 
 #[test]
@@ -414,7 +418,7 @@ fn connecting_and_connected_rows_select_their_flow_steps() {
         (GITHUB, forge::Connection::Connecting, b"Connecting", 1, b"Connect a forge"),
         (REMOTE, forge::Connection::Connecting, b"Connecting", 1, b"Connect a forge"),
         (OWNED, connected(), b"Ready", 2, b"Forgejo on this machine is connected"),
-        (GITHUB, connected(), b"Ready", 2, b"GitHub is connected"),
+        (GITHUB, connected(), b"Connecting", 2, "Install temper’s App".as_bytes()),
         (REMOTE, connected(), b"Ready", 2, b"Forgejo is connected"),
     ] {
         let mut world = world_for(number);
@@ -761,7 +765,6 @@ fn browser_reload_preserves_running_setup_without_resending() {
 }
 
 #[test]
-#[ignore = "needs: the accounts banner inside a landmark; choice.rs (20ae1feca, README 5.1) draws it in a bare slot, which breaks skein's ui.md 14; o/connect-model lifts it with the banner's fix, the region's name its call (director 708)"]
 fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
     for (page, has_strip) in [
         (Address::Chats, true),
@@ -811,4 +814,20 @@ fn failed_setup_flow_keeps_reason_and_offers_one_retry() {
     assert!(node(&world, client, Role::Button, b"Set up again").states.as_slice().contains(&State::Disabled));
     answer_setup(&mut world, forge::SetUpAnswer::Refused(forge::SetUpRefusal::Busy));
     follow(&mut world, client, vec![see(Role::Button, b"Set up again")]);
+}
+
+fn browser_client(seed: u64) -> (temper_client_world::app::Root, temper_client_world::app::View) {
+    use temper_client_world::app::{Root, View};
+    let limits = f::domain_limits();
+    let words = temper_client_view::words::Words::english(
+        f::FORGE,
+        limits.client.domain.text,
+        temper_client_view::words::Shell::Browser,
+    )
+    .expect("browser words fit the client bounds");
+    let bounds = f::view_bounds(&limits, &words);
+    (
+        Root::Person(Box::new(temper_client_domain::unlinked(&limits, seed))),
+        View::Person(Box::new(temper_client_view::View::new(&bounds, &limits, words, f::FORGE))),
+    )
 }

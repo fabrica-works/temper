@@ -135,7 +135,7 @@ fn a_program_way_shows_the_default_name_and_the_command_on_each_host() {
     assert!(String::from_utf8(fixtures::text(tree).into_vec()).unwrap().contains("temper program-login claude-pat"));
 }
 
-fn flow_fixture(kind: d::WayKind) -> (d::Domain, skein_lib::Token) {
+pub(super) fn flow_fixture(kind: d::WayKind) -> (d::Domain, skein_lib::Token) {
     let (mut root, me_watch, _, _, accounts_watch) = fixtures::root_at_full(
         d::Address::ConnectModel { way: Some(d::ModelWay { source: None, provider: PROVIDER, kind }) },
         &fixtures::limits(),
