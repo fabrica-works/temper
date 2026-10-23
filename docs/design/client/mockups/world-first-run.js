@@ -2,7 +2,7 @@
 // to 8.4). The default document's deployment: one project, the chat and
 // coding charters, one worker in temper's process, three forges (the
 // demo's fake, GitHub, an owned Forgejo not set up). The welcome offers
-// the demo or real setup; neither has started yet. The demo model plays
+// the playground or real setup; neither has started yet. The scripted model plays
 // its scripts, so every word an agent writes here is setup.md 8.4's. Times are minutes from Thursday
 // 22 October, 21:00 UTC.
 (function () {
@@ -24,17 +24,17 @@
         allotment: 100,
         ops: false,
         // The owned example's providers: OpenAI, with keys only (setup.md,
-        // 8.1), and the demo's.
+        // 8.1), and the playground's.
         ways: ['Use an API key'],
         providers: ['OpenAI'],
         restart: 'temper box',
       },
 
-      // The demo, as the forge's side reads it (client README, 4.8), and
+      // The playground, as the forge's side reads it (client README, 4.8), and
       // its cues, copied in (setup.md, 8.4). Each cue the mockup plays is
       // drawn at a step.
       demo: {
-        state: 'not started', provider: 'Demo', forge: 1, repo: 'widget',
+        state: 'not started', provider: 'Playground', forge: 1, repo: 'widget',
         cues: [CSV, DARK, 'Fix widget’s empty search state'],
         plays: { [CSV]: ['2', 'T1'], [DARK]: ['4', 'T4'] },
       },
@@ -43,7 +43,7 @@
 
       // The default document's forges, by number (setup.md, 8.3).
       forges: [
-        { n: 1, kind: 'Forgejo', name: 'Demo forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'not started' },
+        { n: 1, kind: 'Forgejo', name: 'Playground forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'not started' },
         { n: 2, kind: 'GitHub', web: 'https://github.com', mode: 'connected', state: 'not connected' },
         { n: 3, kind: 'Forgejo', web: 'http://127.0.0.1:8368', mode: 'owned', state: 'not set up', box: true, versions: { forgejo: '17.0.0', runner: '13.2.0' }, label: 'temper-host', person: 'sam', setup: { org: 'work', repo: 'hello', project: 'hello', newProject: true } },
       ],
@@ -73,31 +73,31 @@
   const steps = [
     {
       id: '0', label: '0', hour: 0, act: 1, title: 'The link opened',
-      summary: 'temper box started temper serve alone: the demo is configured but not started, and no forge or model is Sam’s. The link opens the welcome: try the demo, or set temper up.',
+      summary: 'temper box started temper serve alone: the playground is configured but not started, and no forge or model is Sam’s. The link opens the welcome: try the playground, or set temper up.',
       look: [
-        ['welcome.html', 'The welcome: the demo, or set up'],
+        ['welcome.html', 'The welcome: the playground, or set up'],
         ['chats.html', 'Chats behind it: the setup strip'],
       ],
       apply() {},
     },
     {
-      id: '1', label: '1', hour: 0, act: 1, title: 'The demo chosen',
-      summary: 'Sam chooses Try the demo. The engine asks temper box for the demo’s fakes, adds the demo model’s account and adopts demo/widget into Default itself, and the link’s page is the demo’s start.',
+      id: '1', label: '1', hour: 0, act: 1, title: 'The playground chosen',
+      summary: 'Sam chooses Try the playground. The engine asks temper box for the playground’s fakes, adds the scripted model’s account and adopts playground/widget into Default itself, and the link’s page is the playground’s start.',
       look: [
-        ['chats.html', 'Chats: the demo’s start'],
-        ['accounts.html', 'Accounts: the demo model’s key, the one account'],
-        ['forges.html', 'Forges: no forge of yours yet, and the demo’s, folded'],
+        ['chats.html', 'Chats: the playground’s start'],
+        ['accounts.html', 'Accounts: the scripted model’s key, the one account'],
+        ['forges.html', 'Forges: no forge of yours yet, and the playground’s, folded'],
         ['workers.html', 'Workers: one, in temper’s process'],
-        ['changes.html', 'Changes: demo/widget on Demo forge, nothing in flight'],
+        ['changes.html', 'Changes: playground/widget on Playground forge, nothing in flight'],
       ],
       apply(w) {
         w.demo.state = 'running';
-        w.accounts.push({ name: 'Demo', display: 'Demo model', provider: 'Demo', holder: 'Sam',
-          sources: [{ name: 'demo', kind: 'key', use: 'Idle', usage: null }] });
-        Object.assign(w.forges[0], { n: 1, kind: 'Forgejo', name: 'Demo forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'connected', login: 'temper', id: 2,
-          load: { used: 9, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 5], ['writes', 0], ['keeping up', 4], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['demo/widget', 0]] } });
+        w.accounts.push({ name: 'Playground', display: 'Scripted model', provider: 'Playground', holder: 'Sam',
+          sources: [{ name: 'playground', kind: 'key', use: 'Idle', usage: null }] });
+        Object.assign(w.forges[0], { n: 1, kind: 'Forgejo', name: 'Playground forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'connected', login: 'temper', id: 2,
+          load: { used: 9, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 5], ['writes', 0], ['keeping up', 4], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['playground/widget', 0]] } });
         w.repos.widget = {
-          name: 'demo/widget', forge: 1, branch: 'main', tip: '9f2c0a7',
+          name: 'playground/widget', forge: 1, branch: 'main', tip: '9f2c0a7',
           ci: { state: 'passing', at: 0 }, after: null, queue: [],
         };
       },
@@ -110,12 +110,12 @@
         ['task.html?task=T2', 'T2: the change, producing its branch'],
         ['task.html?task=T3', 'T3: the coding agent, calling its tools'],
         ['tasks.html', 'Tasks: the chat, its change and the change’s agent'],
-        ['chats.html', 'Chats: the demo’s start, and the chat under it'],
+        ['chats.html', 'Chats: the playground’s start, and the chat under it'],
       ],
       apply(w, id) {
         w.tasks.T1 = {
           title: CSV, by: 'Sam', template: 'chat', charter: 'chat', requester: 'Sam',
-          model: 'Demo model', account: 'Demo', hostKind: 'workers',
+          model: 'Scripted model', account: 'Playground', hostKind: 'workers',
           phase: 'idle', waitsOn: 'delegates', spend: 0, budget: null, made: 1, at: id,
         };
         w.tasks.T2 = {
@@ -126,7 +126,7 @@
         // 8.4), so its chip is that title too.
         w.tasks.T3 = {
           title: "Export widget's table as CSV", by: 'T2', briefBy: 'T1', charter: 'coding', parent: 'T2',
-          model: 'Demo model', account: 'Demo', hostKind: 'workers', worker: 'worker',
+          model: 'Scripted model', account: 'Playground', hostKind: 'workers', worker: 'worker',
           phase: 'running', run: { n: 1, since: 1, doing: 'calling edit' },
           spend: 0, made: 1, at: id,
           brief: "Export widget's table as CSV",
@@ -136,7 +136,7 @@
         w.transcripts.T1 = [
           DAY,
           { who: 'you', at: 1, text: CSV },
-          { who: 'agent', at: 1, text: 'I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.' },
+          { who: 'agent', at: 1, text: 'I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.' },
           { who: 'tools', at: 1, calls: [['delegate', 1]], made: ['T2'] },
           { who: 'tools', at: 1, calls: [['wait', 1]] },
         ];
@@ -152,7 +152,7 @@
         ['chat.html?task=T1', 'T1: T2’s card, Landed, and the chat’s last words'],
         ['task.html?task=T2', 'T2: landed'],
         ['task.html?task=T3', 'T3: its result'],
-        ['changes.html', 'Changes: the landing on demo/widget'],
+        ['changes.html', 'Changes: the landing on playground/widget'],
         ['inbox.html', 'Inbox: nothing needs Sam; T1 replied'],
       ],
       apply(w, id) {
@@ -165,7 +165,7 @@
         w.landings.unshift({ task: 'T2', repo: 'widget', at: 4, title: "Export widget's table as CSV" });
         w.transcripts.T1[2].read = true;
         w.transcripts.T1.push(
-          { who: 'agent', at: 4, text: 'CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.' },
+          { who: 'agent', at: 4, text: 'CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.' },
           { who: 'tools', at: 4, calls: [['wait', 1]] },
         );
         w.transcripts.T3.push(
@@ -176,7 +176,7 @@
     },
     {
       id: '4', label: '4', hour: 6 / 60, act: 1, title: 'A text-only request',
-      summary: 'Back on the demo’s start, Sam picks “Add a dark theme to widget”. Its script is one turn: an answer in words, then finish with a report, as setup.md 8.4 has it. That ends the chat, so its page has no composer: the README flags this as a likely flaw.',
+      summary: 'Back on the playground’s start, Sam picks “Add a dark theme to widget”. Its script is one turn: an answer in words, then finish with a report, as setup.md 8.4 has it. That ends the chat, so its page has no composer: the README flags this as a likely flaw.',
       look: [
         ['chat.html?task=T4', 'T4: answered, then ended, with no composer'],
         ['chats.html', 'Chats: T1 at rest, T4 ended'],
@@ -184,25 +184,25 @@
       apply(w, id) {
         w.tasks.T4 = {
           title: DARK, by: 'Sam', template: 'chat', charter: 'chat', requester: 'Sam',
-          model: 'Demo model', account: 'Demo', hostKind: 'workers',
-          phase: 'done', contract: 'report', result: 'The demo changes nothing.',
+          model: 'Scripted model', account: 'Playground', hostKind: 'workers',
+          phase: 'done', contract: 'report', result: 'The playground changes nothing.',
           spend: 0, budget: null, made: 5, ended: 5, at: id,
         };
         w.transcripts.T1[w.transcripts.T1.length - 2].read = true;
         w.transcripts.T4 = [
           DAY,
           { who: 'you', at: 5, text: DARK },
-          { who: 'agent', at: 5, text: 'I’d give widget’s table a second set of colours, chosen when your system prefers a dark theme, so that widget follows your system. The demo plays only the CSV export as a change: connect a model to make this one.' },
+          { who: 'agent', at: 5, text: 'I’d give widget’s table a second set of colours, chosen when your system prefers a dark theme, so that widget follows your system. The playground plays only the CSV export as a change: connect a model to make this one.' },
           { who: 'tools', at: 5, calls: [['finish', 1]] },
         ];
       },
     },
     {
       id: '5', label: '5', hour: 15 / 60, act: 2, title: 'A model connected',
-      summary: 'Sam follows “Connect a model” and adds an OpenAI API key. Another provider’s account is usable, so the model’s half of the demo ends: the banner says a demo forge alone, the chats page is a chats page, and T1’s next run takes the first of its charter’s models with an account, gpt-6-luna (setup.md, 8.3). The demo model steps aside: its account is gone from Accounts.',
+      summary: 'Sam follows “Connect a model” and adds an OpenAI API key. Another provider’s account is usable, so the model’s half of the playground ends: the banner says a playground forge alone, the chats page is a chats page, and T1’s next run takes the first of its charter’s models with an account, gpt-6-luna (setup.md, 8.3). The scripted model steps aside: its account is gone from Accounts.',
       look: [
-        ['accounts.html', 'Accounts: the new key; the demo model gone'],
-        ['chats.html', 'Chats: no demo’s start; the banner, a demo forge alone'],
+        ['accounts.html', 'Accounts: the new key; the scripted model gone'],
+        ['chats.html', 'Chats: no playground’s start; the banner, a playground forge alone'],
         ['chat.html?task=T1', 'T1: its composer’s line names the new key'],
         ['connect-forge.html', 'Connect a forge: GitHub, Forgejo on this machine, a Forgejo elsewhere'],
         ['connect-forge.html?forge=3', 'Forgejo on this machine: the set-up’s details'],
@@ -232,14 +232,14 @@
     },
     {
       id: '7', label: '7', hour: 19 / 60, act: 2, title: 'A Forgejo connected',
-      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the demo’s banner is gone. Sam’s first forge is connected, so the demo ends: its forge stops and leaves the Forges page, its open chat ends, and demo/widget leaves Default; what the demo did stays readable.',
+      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the playground’s banner is gone. Sam’s first forge is connected, so the playground ends: its forge stops and leaves the Forges page, its open chat ends, and playground/widget leaves Default; what the playground did stays readable.',
       look: [
         ['connect-forge.html?forge=3', 'Connect a forge: ready, and Open hello'],
         ['chats.html?project=hello', 'Chats in hello: no chat yet, no banner'],
         ['forges.html', 'Forges: forge 3 alone'],
-        ['chats.html', 'Chats in Default: the demo’s chats, ended'],
-        ['chat.html?task=T1', 'T1: ended with the demo'],
-        ['changes.html', 'Changes in Default: the demo’s landing kept'],
+        ['chats.html', 'Chats in Default: the playground’s chats, ended'],
+        ['chat.html?task=T1', 'T1: ended with the playground'],
+        ['changes.html', 'Changes in Default: the playground’s landing kept'],
         ['changes.html?project=hello', 'Changes in hello: work/hello, CI passing'],
         ['connect-forge.html', 'Connect a forge: GitHub and a Forgejo elsewhere left'],
         ['connect-forge.html#other-states', 'Connect a forge, below: its other paths'],
@@ -255,15 +255,15 @@
         w.forges[0].state = 'retired';
         w.repos.widget.retired = true;
         Object.assign(w.tasks.T1, { phase: 'done', ended: 19,
-          endedWhy: 'the demo ended when Forgejo on this machine connected' });
+          endedWhy: 'the playground ended when Forgejo on this machine connected' });
       },
     },
   ];
 
   MOCKUPS.worlds['first-run'] = {
     name: 'First run',
-    about: 'the owner’s first run after temper box: the welcome, the demo chosen and its end once a forge connects, a suggested request landed on the demo forge by the demo model’s script, a text-only one, then a real model connected, and a Forgejo set up here',
+    about: 'the owner’s first run after temper box: the welcome, the playground chosen and its end once a forge connects, a suggested request landed on the playground forge by the scripted model’s script, a text-only one, then a real model connected, and a Forgejo set up here',
     HOUR0: Date.UTC(2026, 9, 22, 21, 0),
-    initial, steps, upcoming: [], acts: { 1: 'The demo', 2: 'Going real' },
+    initial, steps, upcoming: [], acts: { 1: 'The playground', 2: 'Going real' },
   };
 })();

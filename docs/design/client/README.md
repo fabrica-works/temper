@@ -316,7 +316,7 @@ keeps (`../protocol/configuration.md`, section 2).
   each card temper's own (section 1).
 - **A chat's chatbar** (`chat.html`): its level-1
   heading "TN · TITLE", the chat's task number and its title (a
-  chat's first message); its status; then "Demo model" while the
+  chat's first message); its status; then "Scripted model" while the
   demo's model half holds and the chat is in the demo's project (5.6),
   its spend, and its acts.
 - **A conversation's turns** are named "You" when the turn is the
@@ -1113,7 +1113,7 @@ of each (`../draft/first-run.md`, 3.6).
     `client/domain/contract.md`, 7.1): its words and three buttons
     (5.5), on every page but the accounts page;
   - *the demo's banner,* while either of the demo's halves holds
-    (4.8): a region named "Demo", its words and its links (5.6), on
+    (4.8): a region named "Playground", its words and its links (5.6), on
     every page but the accounts and the forges pages, a chat's page and
     the demo's start among them, above their chatbars;
   - *the main:* the page at the address (3.5), its title its level-1
@@ -1343,7 +1343,7 @@ The words for each offered source are:
   - *The demo:* its line is keyed by MODEL's provider, the delivered
     `Demo.provider`, because its account is the deployment's and is
     outside the viewer's accounts document. Unless an eligible own
-    preferred or kept account wins, use 5.6's "Using Demo model ·
+    preferred or kept account wins, use 5.6's "Using Scripted model ·
     Default". Only `Unavailable` readiness changes it to "MODEL ·
     needs an account"; an unknown or missing row keeps the demo line,
     including on another member's chat.
@@ -1395,46 +1395,50 @@ The words for each offered source are:
 
 ### 5.6 The demo's words
 
-temper's phrasebook words the demo (4.8; the mockups' first run);
-OWNER/NAME is the demo's repository, and the cues the demo's, copied in:
+temper's phrasebook words the demo (4.8; the mockups' first run) as
+the playground, the person's name for it (with the user, 2026-10-23;
+`../draft/first-run.md`, 2.3); OWNER/NAME is the demo's repository, and
+the cues the demo's, copied in:
 
-- **The banner:** "This is a demo, running on a demo model and a demo
-  forge." while both halves hold, "This is a demo, running on a demo
-  model." or "This is a demo, running on a demo forge." while one
-  does; then "Connect a model", a link to `Accounts`, while the model's
+- **The banner:** "This is the playground: a scripted model and a
+  playground forge." while both halves hold, "This is the playground: a
+  scripted model." or "This is the playground: a playground forge."
+  while one does; then "Connect a model", a link to `Accounts`, while the model's
   half holds, and "Connect a forge", a link to `Forges`, while the
   forge's half holds. The client has no forges' page yet (o/github's):
   until it does, "Connect a forge" is a disabled button.
 - **The demo's start,** on the chats page, in place of its level-1
   heading "Chats" (`first-run.html`, the first run's first step): a
   chatbar, "New
-  chat", the status "Ready", and "Demo model", under the frame's
+  chat", the status "Ready", and "Scripted model", under the frame's
   banner (5.1); the context line; the level-1 heading "What shall we change?"; "Try a request in
   OWNER/NAME. Follow the task from its branch to a landed change."; a
   list named "Suggested requests" of one button per suggested request,
   the demo's `llm.asked` cues in order and never its `llm.cued`
   (`../protocol/setup.md`, 8.4), each named by its cue's words; "The
-  demo model plays these requests from a script."; then the page's
+  scripted model plays these requests from its script."; then the page's
   composer, with no heading of its own, and "Your chats", as on any
   chats page (3.5). A chat starts with its first message, so the start has
   no task and no number; once a suggestion or the composer starts the
   chat, its page keeps the frame (3.5).
-- **The context line,** after the chatbar: "PROJECT · OWNER/NAME on Demo
-  forge", PROJECT the project as the banner names it; then "Signed in
+- **The context line,** after the chatbar: "PROJECT · OWNER/NAME on
+  Playground forge", PROJECT the project as the banner names it; then "Signed in
   as the deployment’s owner" while `me`'s role on the deployment is
   `Owner`, else "Signed in as the project’s owner" while the person's
   role on the project is `Owner`, else "Signed in as NAME", the
   person's name as the banner shows it. OWNER/NAME is a node of its
   own, for the look.
-- **The composer's line,** for the demo's LLM provider: "Using Demo model ·
-  Default" (5.5). The demo's LLM provider serves one model, so the
+- **The composer's line,** for the demo's LLM provider: "Using Scripted
+  model · Default" (5.5). The demo's LLM provider serves one model, so the
   line names no other. While the model's half holds, a new chat's line
   is the demo's, since its model is the one with a usable account; a
   chat the demo's model ran keeps the demo's line after it, since jig
   records the model at Create (`../protocol/setup.md`, 8.3).
 - **Its names:** the configuration names the demo's provider, model
   and forge by identifiers ("demo"), so the phrasebook names them
-  "Demo model" and "Demo forge", as the demo's scripted words do.
+  "Scripted model" and "Playground forge", as the demo's scripted words
+  do once `../protocol/setup.md` 8.4 takes the playground's words
+  (`../draft/first-run.md`, 2.3).
 - **Not drawn:** the mockup's placeholder, "Try a suggested request…",
   and "Reset demo" (section 11).
 

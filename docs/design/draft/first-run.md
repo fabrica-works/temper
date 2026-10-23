@@ -100,16 +100,16 @@ in the first-run world (its step 0, the demo chosen at step 1, its end
 at step 7) and the first-run-real world (the wizard to a connected
 Forgejo and model).
 
-- **The link opens a welcome,** in the browser: "Try the demo" or "Set
-  up temper". The terminal asks nothing, since the box also runs
+- **The link opens a welcome,** in the browser: "Try the playground"
+  or "Set up temper". The terminal asks nothing, since the box also runs
   unattended and going real needs the browser. A document whose
   `application.demo` is null has no demo, and its welcome no demo card.
 - **Set up temper is a wizard:** Welcome, Forge, Model, Ready. Forge is
   the client's "Connect a forge" flow; Model is the accounts' ways the
   document offers; the forge comes first, so an owned forge's set-up
   runs while the person adds a model. Ready ends on the new project.
-  Each step offers Later, and "Try the demo" stays offered until a
-  forge of the person's connects.
+  Each step offers Later, and "Try the playground" stays offered until
+  a forge of the person's connects.
 - **The demo starts only when chosen.** Its state is the engine's: not
   started, running, ended. The fakes become asked groups of the box,
   started on the engine's ask; the engine sets the demo up itself, the
@@ -129,6 +129,21 @@ Forgejo and model).
   the same way, and never starts.
 - **Without the box** there is no pipe: the engine ends the demo and
   ignores the fake; stopping it is the service manager's.
+- **The person meets the demo as the playground.** "Demo" undersells
+  it and "fake" is harsh; the design keeps the demo as its concept's
+  name (`application.demo`, the `fake` mode, the demo's halves). The
+  words: the welcome's card "Try the playground", "A built-in scripted
+  model and forge. Ask one of three requests and follow its change from
+  a branch to main."; the banner "This is the playground: a scripted
+  model and a playground forge."; the names Scripted model and
+  Playground forge (the client's phrasebook, `../client/README.md`,
+  5.6), and the repository `playground/widget`. Its step changes
+  setup.md 8.4's words to match: the fake's owner `playground`; the
+  CSV's texts "…land into main on Playground forge." and "…The change
+  landed on Playground forge. This was a scripted change."; the dark
+  theme's "The playground plays only the CSV export as a change";
+  "The playground changes nothing."; and `otherwise` saying it is the
+  scripted model.
 
 ## 3. The pieces
 

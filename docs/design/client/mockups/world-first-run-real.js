@@ -1,5 +1,5 @@
-// The welcome's real setup: the same fresh deployment as the demo path,
-// with no demo started. Times are minutes from Thursday 22 October, 21:00.
+// The welcome's real setup: the same fresh deployment as the playground path,
+// with no playground started. Times are minutes from Thursday 22 October, 21:00.
 (function () {
   const MOCKUPS = window.MOCKUPS;
   const first = MOCKUPS.worlds['first-run'];
@@ -8,7 +8,7 @@
       id: '1', label: '1', hour: 0, act: 1, title: 'The link opened',
       summary: 'temper box started temper serve alone. The link opens the welcome; Sam chooses Set up temper, then Forgejo on this machine, and keeps its defaults.',
       look: [
-        ['welcome.html', 'The welcome: the demo, or set up'],
+        ['welcome.html', 'The welcome: the playground, or set up'],
         ['welcome.html?at=forge', 'Connect a forge'],
         ['welcome.html?at=forge&forge=3', 'Forgejo on this machine: its defaults'],
         ['chats.html', 'Chats behind it: the setup strip, no model'],
@@ -21,7 +21,7 @@
       look: [
         ['welcome.html?at=model', 'Connect a model, while Forgejo sets up'],
         ['welcome.html?at=model#other-states', 'Other ways, where the configuration offers them'],
-        ['forges.html', 'Forges: forge 3, setting up; no demo'],
+        ['forges.html', 'Forges: forge 3, setting up; no playground'],
         ['chats.html', 'Chats: the setup strip’s status'],
       ],
       apply(w) {
@@ -46,7 +46,7 @@
     },
     {
       id: '4', label: '4', hour: 4 / 60, act: 1, title: 'Ready',
-      summary: 'temper connected as the forge’s bot, made work/hello and adopted it into the new project hello. A forge of Sam’s is connected, so the demo, never started, is retired: nothing of it shows.',
+      summary: 'temper connected as the forge’s bot, made work/hello and adopted it into the new project hello. A forge of Sam’s is connected, so the playground, never started, is retired: nothing of it shows.',
       look: [
         ['welcome.html?at=ready', 'work/hello is ready'],
         ['chats.html?project=hello', 'Chats in hello: no chat yet, no strip'],
@@ -68,7 +68,7 @@
 
   MOCKUPS.worlds['first-run-real'] = {
     name: 'First run, set up',
-    about: 'the owner’s first run after temper box, choosing to set up temper: a Forgejo on this machine and an OpenAI key, through the welcome’s wizard; the demo never starts',
+    about: 'the owner’s first run after temper box, choosing to set up temper: a Forgejo on this machine and an OpenAI key, through the welcome’s wizard; the playground never starts',
     HOUR0: first.HOUR0, initial: first.initial,
     steps, upcoming: [], acts: { 1: 'Setting up' },
   };

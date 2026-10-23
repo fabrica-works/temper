@@ -272,7 +272,7 @@
   }
   // While the demo's model holds, its line names it, and "Default" for
   // the model while none is requested (5.6).
-  const DEMO_LINE = () => fact('temper: the demo’s model half holds, and no model is requested (client README, 5.6)', 'Using Demo model · Default');
+  const DEMO_LINE = () => fact('temper: the demo’s model half holds, and no model is requested (client README, 5.6)', 'Using Scripted model · Default');
   function usingLine(id) {
     if (modelHalf()) return DEMO_LINE();
     const t = T(id);
@@ -293,15 +293,15 @@
   const usableModel = () => world.accounts.some(a => a.sources.length);
   const ownForge = () => world.forges.some(f => f.mode !== 'fake' && f.state === 'connected');
   const welcomeMark = () => ahead('welcome', 'the first run’s welcome, and the demo started only when chosen: no mission yet');
-  const tryDemo = (label = 'Try the demo') => `<a href="${esc(u('chats.html?world=first-run&step=1'))}">${label}</a>`;
+  const tryDemo = (label = 'Try the playground') => `<a href="${esc(u('chats.html?world=first-run&step=1'))}">${label}</a>`;
   const noModelLine = () => `No model yet · <a class="text-link" href="${esc(u('welcome.html?at=model'))}">Connect a model</a>`;
   const modelHalf = () => demoRunning() && !world.accounts.some(a => a.provider !== demo.provider);
   const forgeHalf = () => demoRunning() && !world.forges.some(f => f.n !== demo.forge && f.state === 'connected');
   function demoBanner() {
     const m = modelHalf(), f = forgeHalf();
     if (!m && !f) return '';
-    const words = m && f ? 'This is a demo, running on a demo model and a demo forge.' : m ? 'This is a demo, running on a demo model.' : 'This is a demo, running on a demo forge.';
-    return `<aside class="first-run-banner" aria-label="Demo"><p>${fact('temper: the demo, as the forge’s side reads it, and which of its halves hold (client README, 4.8)', words)}</p><div class="terminal-proposal-actions">${m ? `<a href="${u('accounts.html')}">Connect a model</a>` : ''}${f ? forgeBannerAct() : ''}</div></aside>`;
+    const words = m && f ? 'This is the playground: a scripted model and a playground forge.' : m ? 'This is the playground: a scripted model.' : 'This is the playground: a playground forge.';
+    return `<aside class="first-run-banner" aria-label="Playground"><p>${fact('temper: the demo, as the forge’s side reads it, and which of its halves hold (client README, 4.8)', words)}</p><div class="terminal-proposal-actions">${m ? `<a href="${u('accounts.html')}">Connect a model</a>` : ''}${f ? forgeBannerAct() : ''}</div></aside>`;
   }
   function demoStrip() {
     const setup = demo?.state === 'not started' && (!ownForge() || !usableModel());
@@ -316,7 +316,7 @@
   }
   function demoContext() {
     if (!demoRunning()) return '';
-    return `<div class="compact-context first-run-context"><span>${project()} · ${fact('temper: the demo’s repository, and its forge', `<strong>${esc(world.repos[demo.repo].name)}</strong> on Demo forge`)}</span><span>${fact('jig: your role on the deployment', 'Signed in as the deployment’s owner')}</span></div>`;
+    return `<div class="compact-context first-run-context"><span>${project()} · ${fact('temper: the demo’s repository, and its forge', `<strong>${esc(world.repos[demo.repo].name)}</strong> on Playground forge`)}</span><span>${fact('jig: your role on the deployment', 'Signed in as the deployment’s owner')}</span></div>`;
   }
 
   // The forges the configuration names (client forge.md, 5.4); the demo's
@@ -782,11 +782,11 @@
     if (!modelHalf()) return listPage('chats', [['Chats']], `${params.has('project') ? `<div class="compact-context"><span>${project()} · ${fact('temper: the project’s repositories, and their forges', Object.values(world.repos).filter(r => !r.retired && inProject(r)).map(r => `${esc(r.name)} on ${esc(forgeName(forgeOf(r.forge)))}`).join(' · '))}</span></div>` : ''}<div class="welcome"><div class="section-heading" style="margin-top:0"><h2>Start a chat</h2></div>${composer}</div>${list}`);
     // The demo's start, in place of the page's heading (client README,
     // 5.6): a chat starts with its first message, so no task, no number.
-    const chatbar = `<div class="terminal-chatbar"><div class="terminal-chat-identity"><strong class="terminal-title">New chat</strong><span class="terminal-phase" role="status">Ready</span></div><div class="terminal-chat-meta"><span>${fact('temper: the demo’s model half holds', 'Demo model')}</span></div></div>`;
+    const chatbar = `<div class="terminal-chatbar"><div class="terminal-chat-identity"><strong class="terminal-title">New chat</strong><span class="terminal-phase" role="status">Ready</span></div><div class="terminal-chat-meta"><span>${fact('temper: the demo’s model half holds', 'Scripted model')}</span></div></div>`;
     const start = `<section class="first-run-empty" aria-labelledby="demo-start"><h1 id="demo-start">What shall we change?</h1>
       <p>Try a request in ${fact('temper: the demo’s repository', esc(world.repos[demo.repo].name))}. Follow the task from its branch to a landed change.</p>
       <ul class="suggestions" aria-label="Suggested requests">${demo.cues.map(suggestion).join('')}</ul>
-      <p class="first-run-hint">The demo model plays these requests from a script.</p></section>`;
+      <p class="first-run-hint">The scripted model plays these requests from its script.</p></section>`;
     return listPage('chats', null, `${demoContext()}${start}<div class="welcome">${composer}</div>${list}`, '', chatbar);
   };
 
@@ -991,7 +991,7 @@
       return `<section class="card queue-col"><div class="card-pad" style="padding-bottom:8px"><div class="card-top"><div><h2>${esc(key)} · landing queue</h2><p class="muted tiny" style="margin:5px 0 0">By goal priority, then by when ready.</p></div><span class="tag ${r.queue.length ? 'green' : ''}">${fact('temper: its landing queue', `${r.queue.length} ready`)}</span></div></div>${rows}</section>`;
     }).join('');
     const notReady = projectTasks().filter(k => T(k).kind === 'change' && ['producing', 'opening', 'checking', 'gating'].includes(T(k).stage));
-    const landings = world.landings.filter(l => projectRepos.some(([key]) => key === l.repo)).map(l => `<a href="${href(l.task)}">${fact('temper: a landing', `${l.task} ${esc(T(l.task) ? T(l.task).title : l.title)}`)}<small>${fact('temper: where and when it landed', `${esc(world.repos[l.repo].name)}${world.repos[l.repo].retired ? ' · the demo’s, ended' : ''} · ${clock(l.at)}${T(l.task) && T(l.task).parent ? ` · goal ${T(l.task).parent}` : ''}`)}</small></a>`).join('');
+    const landings = world.landings.filter(l => projectRepos.some(([key]) => key === l.repo)).map(l => `<a href="${href(l.task)}">${fact('temper: a landing', `${l.task} ${esc(T(l.task) ? T(l.task).title : l.title)}`)}<small>${fact('temper: where and when it landed', `${esc(world.repos[l.repo].name)}${world.repos[l.repo].retired ? ' · the playground’s, ended' : ''} · ${clock(l.at)}${T(l.task) && T(l.task).parent ? ` · goal ${T(l.task).parent}` : ''}`)}</small></a>`).join('');
     const open = world.findings.filter(f => f.state === 'open' && repos.some(([key]) => key === f.repo));
     return listPage('changes', [[project(), 'board.html'], ['Changes']], `
       <div class="compact-context"><span>${fact('temper: the forges and the repositories adopted on each', world.forges.filter(f => repos.some(([, r]) => r.forge === f.n)).map(f => `Forge · ${esc(forgeName(f))} · ${repos.filter(([, r]) => r.forge === f.n).map(([, r]) => esc(r.name)).join(', ')}`).join(' · '))}</span></div>
@@ -1142,7 +1142,7 @@
   function forgeBody(f) {
     if (['setting up', 'set up failed'].includes(f.state)) return forgeActs(f);
     const ok = f.state === 'connected';
-    const access = f.kind === 'Forgejo' ? { fake: 'temper’s own admin token · a fake forge, for the demo', owned: 'Site admin, with temper’s own token', managed: 'Site admin, with a token you gave', connected: 'Its bot’s tokens, which you gave' }[f.mode] : { managed: 'temper’s App, made on GitHub from temper’s manifest', connected: 'An App of your own, with the key you gave' }[f.mode];
+    const access = f.kind === 'Forgejo' ? { fake: 'temper’s own admin token · the playground’s forge', owned: 'Site admin, with temper’s own token', managed: 'Site admin, with a token you gave', connected: 'Its bot’s tokens, which you gave' }[f.mode] : { managed: 'temper’s App, made on GitHub from temper’s manifest', connected: 'An App of your own, with the key you gave' }[f.mode];
     const repos = Object.values(world.repos).filter(r => !r.retired && r.forge === f.n);
     const app = f.app ? `<div class="kv"><span>temper’s App</span><strong>${fact('temper: the App, and its installations', `${esc(f.app.slug)} · ${f.app.installs.map(i => `<a class="text-link" href="#" data-later="Mockup: the installation’s page, on GitHub.">${esc(i.account)}, ${esc(i.repos)} ↗</a>`).join(', ')}`)}</strong></div>` : '';
     return `<div class="repo-lines">${ok ? `<div class="kv"><span>Account</span><strong>${fact('temper: the user the forge’s records hold, by login and id', esc(`${f.login} · ${f.kind === 'GitHub' ? 'App user' : 'user'} ${f.id}`))}</strong></div>` : ''}
@@ -1221,19 +1221,19 @@
     const views = ['welcome', 'forge', 'model', 'ready'];
     const current = views.includes(at) ? at : 'welcome';
     const back = current === 'forge' && params.has('forge') ? 'forge' : views[Math.max(0, views.indexOf(current) - 1)];
-    const foot = `<div class="welcome-foot"><a class="text-link" href="${esc(u(`welcome.html?at=${back}`))}">‹ Back</a><a class="text-link" href="${esc(u('chats.html'))}">Later</a>${!ownForge() ? tryDemo('Try the demo instead') : ''}</div>`;
+    const foot = `<div class="welcome-foot"><a class="text-link" href="${esc(u(`welcome.html?at=${back}`))}">‹ Back</a><a class="text-link" href="${esc(u('chats.html'))}">Later</a>${!ownForge() ? tryDemo('Try the playground instead') : ''}</div>`;
     const heading = (text, tag = 'h2') => `<${tag}>${text} ${welcomeMark()}</${tag}>`;
     const eachStep = () => `<details class="welcome-progress"><summary>Each step</summary>${ownedProgress(f)}</details>`;
     let content;
     if (at === 'demo') {
-      content = `<p class="mock-note">Once the demo runs, the link opens Chats; the welcome is gone. <a class="text-link" href="${esc(u('chats.html'))}">Open Chats</a></p>`;
+      content = `<p class="mock-note">Once the playground runs, the link opens Chats; the welcome is gone. <a class="text-link" href="${esc(u('chats.html'))}">Open Chats</a></p>`;
     } else if (current === 'welcome') {
       const providers = world.config.providers || [...new Set(world.accounts.filter(a => a.provider !== demo?.provider).map(a => a.provider))];
       const ways = (world.config.ways || []).map(way => way === 'Use an API key' ? providers.map(p => `an ${esc(p)} API key`).join(' or ') : esc(way)).join(' or ');
       content = `${heading('Welcome to temper', 'h1')}<p class="welcome-lead">Ask for a change in a chat. temper’s agents make it on a branch, open a pull request, and land it once CI passes.</p>
-        <div class="welcome-choices"><section class="card card-pad"><h2>Try the demo</h2><p>A demo model and a demo forge on this machine, playing a script. Ask one of three requests and follow its change from a branch to main.</p><p class="muted">Nothing leaves this machine, and nothing costs. · Ready at once</p><a class="button primary" href="${esc(u('chats.html?world=first-run&step=1'))}">Try the demo</a></section>
+        <div class="welcome-choices"><section class="card card-pad"><h2>Try the playground</h2><p>A built-in scripted model and forge. Ask one of three requests and follow its change from a branch to main.</p><p class="muted">Nothing leaves this machine, and nothing costs. · Ready at once</p><a class="button primary" href="${esc(u('chats.html?world=first-run&step=1'))}">Try the playground</a></section>
         <section class="card card-pad"><h2>Set up temper</h2><p>Your forge: GitHub, or a Forgejo temper runs on this machine.<br>Your model: ${conf('the configuration’s ways to connect a model, and its providers', ways)}.</p><p class="muted">About five minutes</p><a class="button primary" href="${esc(u('welcome.html?at=forge'))}">Set up temper</a></section></div>
-        <p class="muted welcome-after">Started with the demo? Connect your own forge and model whenever you like; the demo then steps aside.</p>`;
+        <p class="muted welcome-after">Started in the playground? Connect your own forge and model whenever you like; the playground then steps aside.</p>`;
     } else if (current === 'forge') {
       const which = params.get('forge');
       const chosen = world.forges.find(f => String(f.n) === which && f.mode !== 'fake');
@@ -1281,7 +1281,7 @@
       ['Managed, for comparison', { n: 4, kind: 'Forgejo', name: 'Forgejo at forge.example', web: 'https://forge.example', mode: 'managed', state: 'connected', login: 'temper', id: 7 }],
       ['Connected, for comparison', { n: 5, kind: 'Forgejo', name: 'Forgejo at git.example', web: 'https://git.example', mode: 'connected', state: 'connected', login: 'ci-bot', id: 31 }],
     ].map(([heading, f]) => `<h3>${esc(heading)}</h3>${forgeRow(f, true)}`).join('')}</section>` : '';
-    return listPage('forges', [['Forges']], `<div class="section-heading" style="margin-top:0"><div><h2>Your forges <span class="subtle-count">${fact('temper: the person’s forges, demo excluded', esc(forges.length))}</span></h2><p class="muted tiny">Each forge temper is connected to, or setting up. Add one to bring its repositories to temper.</p></div><a class="button" href="${esc(u('connect-forge.html'))}">+ Add a forge</a></div><div class="stack">${forges.length ? forges.map((f, i) => forgeRow(f, i === 0)).join('') : `<div class="empty-state">No forge of yours yet. <a class="button primary" href="${esc(u('connect-forge.html'))}">Connect a forge</a></div>`}</div>${fake ? `<div class="section-heading"><h2>The demo</h2></div><details class="card forge-row forge-demo"><summary><span>${fact('temper: the demo’s forge and repository', 'Demo forge · the demo’s, kept so the demo always works · demo/widget')}</span></summary><div class="card-pad">${forgeBody(fake)}</div></details>` : ''}${worldKey === 'first-run' && demo?.state === 'retired' ? `<p class="gap-note">${ahead('demo’s end', 'the demo ending once a forge of the person’s connects: no mission yet')} The demo’s forge stopped when forge 3 connected; it no longer shows.</p>` : ''}${variants}`);
+    return listPage('forges', [['Forges']], `<div class="section-heading" style="margin-top:0"><div><h2>Your forges <span class="subtle-count">${fact('temper: the person’s forges, demo excluded', esc(forges.length))}</span></h2><p class="muted tiny">Each forge temper is connected to, or setting up. Add one to bring its repositories to temper.</p></div><a class="button" href="${esc(u('connect-forge.html'))}">+ Add a forge</a></div><div class="stack">${forges.length ? forges.map(f => forgeRow(f)).join('') : `<div class="empty-state">No forge of yours yet. <a class="button primary" href="${esc(u('connect-forge.html'))}">Connect a forge</a></div>`}</div>${fake ? `<div class="section-heading"><h2>The playground</h2></div><details class="card forge-row forge-demo"><summary><span>${fact('temper: the demo’s forge and repository', 'Playground forge · the playground’s, until a forge of yours connects · playground/widget')}</span></summary><div class="card-pad">${forgeBody(fake)}</div></details>` : ''}${worldKey === 'first-run' && demo?.state === 'retired' ? `<p class="gap-note">${ahead('playground’s end', 'the playground ending once a forge of the person’s connects: no mission yet')} The playground’s forge stopped when forge 3 connected; it no longer shows.</p>` : ''}${variants}`);
   };
 
   // ---- Mount ----------------------------------------------------------
