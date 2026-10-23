@@ -264,33 +264,9 @@ impl Protocol {
                 Ok(Vec::new())
             }
             engine::Request::Account(request) => {
-                self.accounts.push(request.clone());
-                Ok(match request {
-                    accounts::Request::Signing(accounts::Signing::Keep { source, .. }) => match self.key_failure {
-                        Some(why) => vec![engine::Event::Account(accounts::Event::Component(
-                            accounts::FromComponent::KeepFailed { account: source, why },
-                        ))],
-                        None => vec![granted(source, 1, false)],
-                    },
-                    accounts::Request::Component(accounts::ToComponent::Want { account }) => {
-                        vec![granted(account, 1, self.sign_in_sources.contains(&account))]
-                    }
-                    accounts::Request::Component(accounts::ToComponent::Rejected { account, generation }) => {
-                        vec![granted(account, generation + 1, self.sign_in_sources.contains(&account))]
-                    }
-                    accounts::Request::Component(
-                        accounts::ToComponent::Release { .. } | accounts::ToComponent::Close,
-                    )
-                    | accounts::Request::Programs { .. }
-                    | accounts::Request::CheckProgram { .. }
-                    | accounts::Request::SignOutProgram { .. }
-                    | accounts::Request::Granted { .. }
-                    | accounts::Request::Save { .. }
-                    | accounts::Request::Erase { .. }
-                    | accounts::Request::Signing(_)
-                    | accounts::Request::Answer { .. }
-                    | accounts::Request::Closed => Vec::new(),
-                })
+                let answer = self.account(&request);
+                self.accounts.push(request);
+                Ok(answer)
             }
             other @ (engine::Request::Store(_)
             | engine::Request::Worker(_)
@@ -307,6 +283,37 @@ impl Protocol {
             | engine::Request::Busy(_)
             | engine::Request::Drained
             | engine::Request::Stop) => Err(Box::new(other)),
+        }
+    }
+
+    /// The scripted account component's answer to one accounts request.
+    fn account(&self, request: &accounts::Request) -> Vec<engine::Event> {
+        match request {
+            accounts::Request::Signing(accounts::Signing::Keep { source, .. }) => match self.key_failure {
+                Some(why) => {
+                    vec![engine::Event::Account(accounts::Event::Component(accounts::FromComponent::KeepFailed {
+                        account: *source,
+                        why,
+                    }))]
+                }
+                None => vec![granted(*source, 1, false)],
+            },
+            accounts::Request::Component(accounts::ToComponent::Want { account }) => {
+                vec![granted(*account, 1, self.sign_in_sources.contains(account))]
+            }
+            accounts::Request::Component(accounts::ToComponent::Rejected { account, generation }) => {
+                vec![granted(*account, generation + 1, self.sign_in_sources.contains(account))]
+            }
+            accounts::Request::Component(accounts::ToComponent::Release { .. } | accounts::ToComponent::Close)
+            | accounts::Request::Programs { .. }
+            | accounts::Request::CheckProgram { .. }
+            | accounts::Request::SignOutProgram { .. }
+            | accounts::Request::Granted { .. }
+            | accounts::Request::Save { .. }
+            | accounts::Request::Erase { .. }
+            | accounts::Request::Signing(_)
+            | accounts::Request::Answer { .. }
+            | accounts::Request::Closed => Vec::new(),
         }
     }
 }

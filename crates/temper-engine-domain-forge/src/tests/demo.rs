@@ -221,6 +221,8 @@ fn restored_ended_demo_hides_repositories_but_keeps_lookups_and_refuses_setup() 
     outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(104),
             retention: Duration::from_secs(60),
@@ -249,6 +251,8 @@ fn an_ended_home_does_not_prevent_a_new_home_adoption() {
     outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(104),
             retention: Duration::from_secs(60),
