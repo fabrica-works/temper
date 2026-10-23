@@ -153,18 +153,32 @@ fn connected(front: &mut Joint, root: &mut Root) {
     })));
     accounts::settle(front, root);
 }
-fn demo_account(root: &Root) -> bool {
-    d::pages::accounts::document(root.person().client()).expect("accounts delivered").accounts.iter().any(|line| {
-        line.provider == Some(accounts::PROVIDER) && line.holder == jig_client::contract::OwnerAccountHolder::Deployment
-    })
+fn demo_account(front: &mut Joint, root: &mut Root) -> bool {
+    let address = root.person().pages().address().clone();
+    go(front, root, Address::Accounts);
+    let found = root
+        .person()
+        .pages()
+        .accounts()
+        .expect("accounts page")
+        .deployment(root.person().client())
+        .expect("deployment delivered by the real engine")
+        .accounts
+        .iter()
+        .any(|line| {
+            line.provider == Some(accounts::PROVIDER)
+                && line.holder == jig_client::contract::OwnerAccountHolder::Deployment
+        });
+    go(front, root, address);
+    found
 }
 #[test]
 fn a_model_connected_removes_the_scripted_account_and_leaves_the_playground_forge_banner() {
     let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
-    assert!(demo_account(&root));
+    assert!(demo_account(&mut front, &mut root));
     assert!(root.person().demo().expect("running playground").1.model);
     add_model(&mut front, &mut root);
-    assert!(!demo_account(&root));
+    assert!(!demo_account(&mut front, &mut root));
     assert_eq!(front.demo_removals.len(), 1);
     go(&mut front, &mut root, Address::Accounts);
     assert!(!has(&root, Role::Heading { level: 2 }, b"Scripted"));
@@ -185,7 +199,7 @@ fn a_model_connected_removes_the_scripted_account_and_leaves_the_playground_forg
 #[test]
 fn a_forge_connected_clears_the_demo_everywhere_and_welcome_moves_when_a_model_is_usable() {
     let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
-    assert!(demo_account(&root));
+    assert!(demo_account(&mut front, &mut root));
     go(&mut front, &mut root, Address::Forges);
     assert!(d::forge::listed::playground(root.person()).is_some());
     assert!(has(&root, Role::Heading { level: 2 }, b"The playground"));
@@ -193,7 +207,7 @@ fn a_forge_connected_clears_the_demo_everywhere_and_welcome_moves_when_a_model_i
     connected(&mut front, &mut root);
     assert_eq!(front.demo_reads, reads + 1);
     assert_eq!(front.demo_removals.len(), 1);
-    assert!(!demo_account(&root));
+    assert!(!demo_account(&mut front, &mut root));
     assert!(root.person().forge().demo().is_none());
     assert!(d::forge::listed::playground(root.person()).is_none());
     assert!(!has(&root, Role::Region, b"Playground"));

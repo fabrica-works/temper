@@ -412,6 +412,14 @@ impl Service {
         match order {
             Order::Record { forge } => self.records.write(forge),
             Order::Say { said } => {
+                if let Said::Stopped { forge } = said {
+                    let sink = self.sinks.get_mut(1).expect("stderr");
+                    if sink.takes() {
+                        let digits = Decimal::of(u64::from(forge));
+                        sink.push(lines::joined(&[b"box: forge ", digits.as_bytes(), b"'s group stopped\n"]))
+                            .expect("sink room checked");
+                    }
+                }
                 if let Some(control) = &mut self.control {
                     let line = match said {
                         Said::Step { step } => {
@@ -822,6 +830,12 @@ impl skein_shell::Host for Service {
                 && let Some(control) = &self.control
                 && control.sink.room()
                 && !control.sink.takes()
+            {
+                break;
+            }
+            if let Some(Order::Say { said: Said::Stopped { .. } }) = self.orders.iter().next()
+                && self.sinks.get(1).expect("stderr").room()
+                && !self.sinks.get(1).expect("stderr").takes()
             {
                 break;
             }
