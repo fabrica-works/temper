@@ -35,6 +35,17 @@ Each file also opens directly in a browser, with no build step; serving it keeps
 
 "Adopt a repository" is in the navigation, in the order of the client README's 5.3, but has no mockup (4.4).
 
+## Configuring's pages, drawn ahead (not yet in `pages.js`)
+
+Static drafts of the pages for temper's settings (`../../draft/configuring.md`, 5.1 and 5.2; `../README.md`, 5.13), from o/configuring's M2. They don't use the worlds. Each file opens on its own, with `howwork.css` next to the mockups' stylesheets. The example is the draft's: Pat owns the deployment, and a chat named "How we work" turns acme/handbook's `process.md` into proposal 12, made against revision 7. `configuring-options/index.html` lists the five questions the drafts were drawn for, each with its options. The questions are withdrawn: these pages are the user's to work on.
+
+| Page | Files |
+|---|---|
+| "How work runs": where it lives (1a the navigation's last entry, 1b a Setup menu, 1c under the person's name) and how it reads (2a one page of folded rows, 2b tabs) | `how-work-runs-1a.html` … `how-work-runs-2b.html` |
+| The proposal's card in a chat: an owner's (3a), a member's waiting for an owner (3a-member), the card carrying the review (3b), withdrawn when stale and redone (5a), accepted (5c) | `proposal-card-*.html` |
+| The review page: split first (4a), by area (4b), stale and withdrawn (5a), stale with Accept off (5b), accepted (5c) | `review-*.html` |
+| The questions, each with its options | `configuring-options/` |
+
 ## A world, at a step
 
 - **The worlds.** `world-reference.js` holds the reference case (`../../draft/reference-case.md`): a director, owners on two machines, pools, findings, an ops application, at hour 0, with the steps that move it on. `world-solo.js` holds a workflow unlike it: one developer, one repository, one laptop, chats and a goal set by hand, no coordinator, timers, pools or ops application. `world-first-run.js` holds a person's first run after `temper box`, from the welcome through the demo and its end (below). `world-first-run-real.js` follows the welcome’s real setup, without starting the demo, on a Forgejo here; `world-first-run-github.js` follows it on GitHub, with GitHub's own pages. `world-google-sign-in.js` holds a deployment at a name of its own (`../../draft/sign-in.md`): `temper serve` behind a TLS proxy, its people signing in with Google, and its managed Forgejo signing them in through temper. A page that reads wrong in one world assumed another's workflow.

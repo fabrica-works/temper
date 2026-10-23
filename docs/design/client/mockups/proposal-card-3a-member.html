@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How we work · temper</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="terminal-chat.css">
+  <link rel="stylesheet" href="terminal-pages.css">
+  <link rel="stylesheet" href="mockup.css">
+  <link rel="stylesheet" href="howwork.css">
+</head>
+<body class="terminal-variant">
+  <div class="terminal-shell">
+    <header class="terminal-topbar">
+      <a class="terminal-brand" href="#" aria-label="temper chats"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.5c1.5 5.6 2.9 7 8.5 8.5-5.6 1.5-7 2.9-8.5 8.5C10.5 12.9 9.1 11.5 3.5 10 9.1 8.5 10.5 7.1 12 1.5Z"></path><circle cx="18.5" cy="18.5" r="2" fill="currentColor"></circle></svg><span>temper</span></a>
+      <span class="terminal-divider" aria-hidden="true"></span>
+      <span class="terminal-project">acme/app <span aria-hidden="true">⌄</span></span>
+      <nav class="terminal-nav" aria-label="Main navigation"><a href="#">Inbox</a><a href="#" class="active" aria-current="page">Chats</a><a href="#">Board</a><a href="#">Changes</a><a href="#">Adopt a repository</a><a href="#">Forges</a><a href="#">Accounts</a><a href="#">How work runs</a></nav>
+      <div class="terminal-top-right"><span class="terminal-live"><i class="status-dot"></i> Live</span><span class="terminal-user">Lee</span><a class="terminal-user" href="#">Sign out</a></div>
+    </header>
+    <div class="terminal-chatbar"><div class="terminal-chat-identity"><h1 class="chatbar-heading"><span class="terminal-number">T21</span><span class="visually-hidden"> · </span><strong class="terminal-title">How we work</strong></h1><span class="terminal-phase waiting"><i class="pill-dot"></i> <span>waiting on an owner</span></span></div>
+        <div class="terminal-chat-meta"><span>chat · Configuring <i class="gap" title="Drawn ahead of temper’s build: the configuring agent’s stock role: draft configuring.md 6, not designed">ahead · configuring</i> · Opus · xhigh</span><span>0.4 spent</span><button type="button">Notes</button><button type="button">Stop</button><button type="button">Close</button></div></div>
+    <main class="terminal-thread" aria-label="Conversation"><div class="terminal-thread-inner">
+<div class="terminal-day">Today · Friday 23 October</div>
+<section class="terminal-turn terminal-turn-user"><div class="terminal-role">Lee <time>13:48</time></div><div class="terminal-turn-content"><span class="terminal-prompt">›</span><div><div class="md"><p>We work the way acme/handbook’s <code>process.md</code> says. Testers don’t need high effort, and sub-owners should stop after 4 hours.</p></div></div></div></section>
+<details class="terminal-work"><summary><span>3 tool calls</span> <span>read_document · settings · docs</span></summary><div class="terminal-work-detail"><div>read_document acme/handbook process.md (main)</div><div>settings</div><div>docs “deadline”</div></div></details>
+<section class="terminal-turn"><div class="terminal-role">Temper <time>13:49</time></div><div class="terminal-turn-content"><span class="terminal-prompt agent">✳</span><div><div class="md"><p>I read <code>process.md</code> on main. Most of it is how your agents work together: I’ll have owners read its “Owners” section at each run, so a change you land there reaches them without me.</p><p>One thing I can hold for you rather than ask agents to follow: the 4-hour cap. temper would stop a sub-owner 4 hours after its start, though it stops it mid-run too, where your text lets a milestone finish. Hold it, or leave it as a rule they follow?</p></div></div></div></section>
+<section class="terminal-turn terminal-turn-user"><div class="terminal-role">Lee <time>13:55</time></div><div class="terminal-turn-content"><span class="terminal-prompt">›</span><div><div class="md"><p>Hold it.</p></div></div></div></section>
+<section class="terminal-turn"><div class="terminal-role">Temper <time>13:56</time></div><div class="terminal-turn-content"><span class="terminal-prompt agent">✳</span><div><div class="md"><p>Here is how I’ll run that.</p></div></div></div></section><article class="terminal-proposal" aria-label="Proposal 12">
+      <div class="terminal-proposal-heading"><span class="terminal-proposal-type">PROPOSAL 12</span><span>Waiting for an owner</span></div>
+      <h2>Run work as acme/handbook says <i class="gap" title="Drawn ahead of temper’s build: designed in temper’s protocol/configuration.md 13 and client README 5.13 (o/configuring M2), not built">ahead · card</i></h2>
+      <dl><div><dt>Testers</dt><dd>GPT-5 high → GPT-5 medium</dd></div><div><dt>Sub-owners</dt><dd>new: temper stops one 4 h after its start</dd></div><div><dt>Advisors</dt><dd>removed: no new advisors</dd></div><div><dt>Owners</dt><dd>follow acme/handbook process.md, “Owners”</dd></div></dl>
+      <div class="terminal-proposal-actions"><a href="#" style="border-color:#ddd6cb">Review</a><span class="muted tiny hw-card-note">Pat or Kim decides: it is in their inbox.</span></div>
+    </article>
+    </div></main>
+    <footer class="terminal-composer-area"><div class="composer-line">Using your Claude subscription, through Claude Code · Opus · xhigh</div><div class="terminal-composer"><span class="terminal-input-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Message T21" placeholder="Message T21…"></textarea><span class="terminal-input-hint">Enter to send · Shift+Enter for newline</span><button type="button" class="terminal-send" aria-label="Send message"></button></div></footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,47 @@
+/* The new pages' parts, drawn ahead of temper's build in the product's
+   own palette: "How work runs", the review page, the proposal's card. */
+.hw-row .forge-name small { text-transform: none; }
+.hw-acts { margin-top: 12px; }
+.hw-pending { margin: 0 0 18px; }
+.hw-offer { margin-bottom: 8px; border-color: var(--accent-pale); background: #fffaf6; }
+.hw-offer h3 { margin: 0 0 6px; }
+.hw-offer p { margin: 0 0 12px; font-size: 12px; color: var(--muted); max-width: 640px; }
+.hw-rev { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.hw-rev p { margin: 4px 0 0; }
+.hw-history { padding: 4px 0; }
+.hw-hist { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 10px 18px; border-bottom: 1px solid #f0ede8; font-size: 12px; }
+.hw-hist:last-child { border-bottom: 0; }
+.hw-hist p { margin: 0; }
+.hw-hist-no { font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); }
+.hw-hist-more { grid-template-columns: 1fr; }
+.hw-head-meta { color: var(--muted); font-weight: 400; }
+.hw-review { display: grid; gap: 12px; }
+.hw-group h3, .hw-effect h3 { margin: 0 0 2px; }
+.hw-group > p.tiny { margin: 0 0 8px; }
+.hw-sub { margin: 12px 0 4px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.hw-change { display: grid; grid-template-columns: 160px minmax(0, 1fr) auto; gap: 12px; padding: 7px 0; border-bottom: 1px solid #f0ede8; font-size: 12px; align-items: baseline; }
+.hw-change:last-child { border-bottom: 0; }
+.hw-change-name { font-weight: 600; }
+.hw-change .tag { font-size: 10px; padding: 1px 6px; }
+.hw-before { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
+.hw-effect p { margin: 6px 0; font-size: 12px; }
+.hw-radio { display: flex; gap: 8px; align-items: center; margin: 4px 0 4px 14px; font-size: 12px; }
+.hw-radio input { accent-color: var(--accent); }
+.hw-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.hw-settings summary { cursor: pointer; font-size: 11px; color: var(--muted); }
+.hw-settings pre { margin: 8px 0 0; padding: 10px 12px; border-radius: 6px; background: #f6f3ee; font: 10.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-x: auto; }
+.hw-banner { margin: 0 0 14px; }
+.hw-banner.hw-ok { background: var(--green-pale); border-color: #d6e6db; color: #3d5f50; }
+.hw-dim { opacity: .55; }
+.hw-card-note { margin-left: 4px; }
+.hw-card-dim h2, .hw-card-dim dl { opacity: .5; }
+.hw-card-group { margin: 10px 0 4px !important; font-size: 10px !important; letter-spacing: .08em; text-transform: uppercase; color: #9b9388 !important; }
+.hw-event { margin: 0 0 22px 109px; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--green); }
+.hw-menu { position: absolute; z-index: 30; margin-top: 6px; min-width: 180px; padding: 6px; background: var(--paper); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); display: grid; }
+.hw-menu a { padding: 6px 10px; border-radius: 5px; font-size: 12px; color: var(--ink); }
+.hw-menu a.active { background: var(--accent-pale); color: var(--accent-dark); }
+.hw-menu-host { position: relative; display: inline-block; }
+@media (max-width: 760px) {
+  .hw-change { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .hw-event { margin-left: 0; }
+}
