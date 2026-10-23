@@ -304,7 +304,7 @@ fn ended(
         {
             continue;
         }
-        if wait.until == Some(Condition::Ended)
+        if (wait.until == Some(Condition::Ended) || wait.until == Some(Condition::Replied))
             && wait.name == b"task"
             && (why == Why::Unknown || why == Why::SubjectEnded)
         {
@@ -355,15 +355,19 @@ fn page(
     let printed = match page {
         Readout::Jig(c::ReadResult::Value(value)) if final_task(*expected, value).is_some() => {
             let (task, result) = final_task(*expected, value).expect("matching terminal task read");
-            let delivery = c::Delivery::Task(Box::new(task.clone()));
+            let latest = Latest::Jig(c::Delivery::Task(Box::new(task.clone())));
+            let me = live_me(client, runner.me());
+            let met = conditions::holds(&wait.until.expect("finishing condition"), &Facts { subject: &latest, me })
+                == Some(true);
+            let Latest::Jig(delivery) = latest else { unreachable!("jig task read") };
             render::waiting(
                 render::document::waiting::Waiting {
                     result,
                     delivery: Some(&delivery),
-                    me: live_me(client, runner.me()),
+                    me,
                     name: wait.name,
-                    met: true,
-                    why: b"",
+                    met,
+                    why: if met { b"" } else { b"ended" },
                     digest: None,
                 },
                 wait.called.json,
