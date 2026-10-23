@@ -1,6 +1,6 @@
 # temper's client
 
-Provisional, 2026-10-14, revised 2026-10-22. temper's client: temper's own
+Provisional, 2026-10-14, revised 2026-10-23. temper's client: temper's own
 presentation on jig's client, `jig-client`. Its crates; its client root,
 which holds `jig-client` and temper's pages, the LLM accounts' and the
 forges' among them; the forge's client family, its words, its one form
@@ -340,8 +340,14 @@ keeps (`../protocol/configuration.md`, section 2).
   the person signed in, who requested it; jig's word otherwise. While
   a question a delegate asked it waits in the person's inbox, jig's wait
   is on the person, before its delegates, and it says "Waiting for
-  you". A line of the chats page has no wake policy, so it keeps jig's
-  word for news.
+  you". A line of the chats page reads the same wake policy, from its
+  chip's (`OwnerChipDetails`' `wake`), and says "waiting on your words"
+  as the chatbar does: a chat at rest after its reply, which only its
+  person's words or Close move on (jig's `domain/tasks.md`, 5.8). A
+  chat whose host refuses its start says jig's "Cannot start yet", and
+  its composer's line says why (below); a line of the chats page holds
+  no run wait, so it is never refused, and says jig's word for its
+  stage (jig's `client/domain/client.md`, 19.1).
 - **A chat's conversation** is the chat's own, drawn from jig's thread
   (jig's `client/domain/objects.md`, section 10), never its runs'
   mechanics (`chat.html`, the mockups' first run):
@@ -383,9 +389,14 @@ keeps (`../protocol/configuration.md`, section 2).
   - *its end,* once the chat has ended, after the conversation: one
     line, "Ended" and the time it ended ("Ended 21:05", 5.12's
     clock), then, for a report, " · its report, “REPORT”", the
-    report's words whole; a failed or cancelled chat's line is its
-    phase's word, its time and its reason. The result is not drawn
-    again.
+    report's words whole; a failed chat's line is "Failed", its time
+    and its reason ("Failed 21:05 · REASON"); a chat cancelled by the
+    party that requested it was closed, and its line is "Closed" and its
+    time ("Closed 21:05"), with no reason; one cancelled by anyone else
+    is "Cancelled", its time and its reason ("Cancelled 21:05 ·
+    REASON"). Who closed it is the ending's `by` against the chat's
+    requester, both in its document, never the reason's words. The
+    result is not drawn again.
 - **The chats list** (`chats.html`), under the heading "Your chats",
   under the demo's start too (5.6), is one list: the live group's
   lines by last activity and the ended page's by when each ended,
@@ -396,7 +407,9 @@ keeps (`../protocol/configuration.md`, section 2).
   chats" reads it, in place of the last. With no line to show it says
   "No chats yet.", or under a filter "No live chats." or "No closed
   chats.". A line is the chat's number, "TN", a link to its page, then
-  its title, its status, its spend as its chatbar says it, and "1
+  its title, its status (the chatbar's, and "Closed" for a chat its
+  requester closed, "Ended" for any other ended chat, jig's word), its
+  spend as its chatbar says it, and "1
   delegate" or "N delegates" while it has live ones, and when it
   ended or was last active, as 5.12's ago ("1 h 28 min ago").
 - **The inbox** (`inbox.html`) shows what needs the person, then the
@@ -550,8 +563,20 @@ keeps (`../protocol/configuration.md`, section 2).
   "Reset choice", and, on a task's composer while the draft differs
   from its choice, "Next run if applied: MODEL" (or "…: engine
   default") and "Apply to next run". A request in flight and its
-  outcome, and a task's wait for its account, stay outside it, after
-  the line. The demo's model stays offered as configured once another
+  outcome, a task's wait for its account, and a refused next run stay
+  outside it, after the line. A refused next run says "Next run refused
+  · WHY", WHY the refusal's cause in the words of jig's reference view
+  (jig's `client/domain/client.md`, 19.1), each sentence ending with a
+  full stop: for the model, "This model runs through a program. A chat
+  can't stay open through a program yet. To chat now, choose a model
+  that doesn't run through a program."; for an account's source,
+  "Account A would use its program source S. A chat can't stay open
+  through a program yet. This chat does not switch to another source on
+  its own."; for a host's hello, "An engine host was refused at HH:MM"
+  or "A worker was refused at HH:MM" (5.12's clock), then its cause, in
+  the words jig's reference view gives a hello's refusal. A refusal is not a reply: the chat
+  starts nothing, and keeps its composer, so the person can choose
+  another model. The demo's model stays offered as configured once another
   account serves the work. Setting a goal names its planner's model and
   effort, the template's by default. A goal's page shows its model, effort and
   account, changed by amending the task, and an agent's task's page
@@ -581,7 +606,14 @@ keeps (`../protocol/configuration.md`, section 2).
   facts, as `jig-client`'s `facts` reads them): what accepting grants
   and costs and the pool after it, what cancelling ends, what releasing
   does (jig's `client/domain/objects.md`, section 1; jig's
-  `client/domain/contract.md`, 5.4). On a task's page, stopping is
+  `client/domain/contract.md`, 5.4). Closing a chat says what becomes
+  of each live delegate ("Delegate N will be cancelled" or "Delegate N
+  will be moved to you", with "Cancel delegate N" and "Take delegate N"
+  to choose), then how the chat ends: "Close chat: allow N seconds to
+  finish, then cancel", the template's grace, while a run of it is
+  live, and "Close chat now" while none is, since a chat at rest closes
+  at once (jig's `domain/tasks.md`, 5.8); then "A closed chat can't be
+  reopened.". On a task's page, stopping is
   confirmed too, since it holds the task until it is released (5.11);
   a chat's Stop is sent at once. Where the document offers an act
   as proposable (jig's `client/domain/contract.md`, 5.3), the card says
