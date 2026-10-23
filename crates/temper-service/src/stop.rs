@@ -7,9 +7,14 @@ pub(crate) struct Drain {
     pub(crate) closing: bool,
     stopped: Option<Stop>,
 }
+/// A second call aborts, ending at once with the reason a failure's drain
+/// carries (protocol/README.md, section 4).
 pub(crate) fn shutdown(engine: &mut Engine) {
-    if engine.drain.is_some() {
-        engine.end = Some(End::Aborted);
+    if let Some(drain) = &mut engine.drain {
+        engine.end = Some(match drain.stopped.take() {
+            Some(why) => End::Stopped(why),
+            None => End::Aborted,
+        });
         return;
     }
     engine.drain = Some(Drain { closing: false, stopped: None });

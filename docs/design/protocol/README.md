@@ -195,7 +195,8 @@ default; the document is `temper.json` in the configuration directory
   - A first termination signal drains it (jig's `protocol/service.md`,
     section 5), and a worker alone's runs its worker's ending (jig's
     `protocol/service.md`, section 6); a second turns either into an
-    abort.
+    abort, which keeps the reason of a failure that started the drain
+    (a lost webhooks listener's, forge.md, 2.3).
 - **`temper init`:** writes a deployment that starts, the default
   document among it, into the three directories, refusing when the
   configuration directory holds a document (setup.md, 8.2).

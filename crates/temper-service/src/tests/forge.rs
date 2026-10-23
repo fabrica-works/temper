@@ -273,6 +273,22 @@ fn a_lost_webhooks_listener_drains_the_service_and_stops_it() {
     }
     assert_eq!(service.end(), Some(&End::Stopped(Stop::Hooks)));
 }
+#[test]
+fn a_shutdown_during_a_lost_webhooks_listeners_drain_ends_at_once_with_its_reason() {
+    let mut service = fixtures::started();
+    service.engine.as_mut().expect("engine").forge.above.push(skein_forge_connection::Event::ListenerLost);
+    let mut forge = fixtures::ForgeFace::new();
+    for _ in 0_u32..64 {
+        if service.engine.as_ref().expect("engine").drain.is_some() {
+            break;
+        }
+        forge.turn(&mut service);
+    }
+    assert!(service.engine.as_ref().expect("engine").drain.is_some(), "the lost listener drains");
+    assert_eq!(service.end(), None, "the drain is under way");
+    service.shutdown();
+    assert_eq!(service.end(), Some(&End::Stopped(Stop::Hooks)));
+}
 
 #[test]
 fn a_bound_webhooks_listener_announces_its_address_once() {

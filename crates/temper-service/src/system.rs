@@ -335,7 +335,7 @@ impl Service {
                     None => false,
                 }
     }
-    /// A first call drains; another aborts.
+    /// A first call drains; another aborts, keeping a failure's reason.
     pub fn shutdown(&mut self) {
         if let Some(engine) = &mut self.engine {
             stop::shutdown(engine);
