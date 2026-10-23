@@ -1515,6 +1515,11 @@ impl LiveJudge<'_> {
             } else if now >= self.deadline {
                 self.fail("live story exceeded its budget", calls, None);
             } else if binary.exit_status().is_some() {
+                super::live::notice(&format!(
+                    "BOX exit={:?} stderr: {}",
+                    binary.exit_status(),
+                    String::from_utf8_lossy(binary.stderr())
+                ));
                 self.fail("live box stopped before its reads", calls, None);
             } else if self.active_until.is_some_and(|until| now >= until) {
                 self.fail("live ctl exceeded its per-call bound", calls, None);
