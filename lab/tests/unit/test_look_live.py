@@ -38,7 +38,7 @@ def template(path):
 
 class FilesTests(unittest.TestCase):
     def test_copies_and_only_two_charter_changes(self):
-        copies = ['agent.json', 'chat.txt', 'relink', 'w1.json', 'w1.digest', 'w1.secret',
+        copies = ['agent.json', 'chat.txt', 'coding.txt', 'relink', 'w1.json', 'w1.digest', 'w1.secret',
                   'w2.json', 'w2.digest', 'w2.secret', 'forge-1.api-token',
                   'forge-1.user', 'forge-1.git-token']
         for name in copies:

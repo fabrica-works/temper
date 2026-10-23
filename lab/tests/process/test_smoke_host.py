@@ -32,6 +32,12 @@ def synthetic_link():
 
 
 def emit(mode):
+    if mode.startswith('--stop-'):
+        def stopped(_sig, _frame):
+            if mode == '--stop-signal':
+                os.kill(os.getpid(), signal.SIGUSR2)
+            os._exit(9 if mode == '--stop-exit-nine' else 0)
+        signal.signal(signal.SIGTERM, stopped)
     if mode == '--consume':
         data = sys.stdin.buffer.read()
         if data != synthetic_link():
@@ -198,11 +204,34 @@ def worker(unit, root):
             assert not run.command('actions', definition('failing-canary', '--failure'))
             assert not run.host.children
             assert any(f['signature'] == 'action/failing-canary/exit:9' for f in run.failures)
-            print(json.dumps(dict(cgroup=str(run.host.root), canaries='pass')))
         finally:
             run.stop_all()
             os.close(run.wake_r)
             os.close(wake_w)
+        for mode, suffix in (('exit-zero', None), ('exit-nine', 'exit:9'), ('signal', 'signal:SIGUSR2')):
+            run, wake_w = canary_run(lab, unit, 'stop-' + mode, native_host)
+            try:
+                run.mkdir('scratch/stopping')
+                run.known['proc.stopping.dir'] = str(lab.root / run.base / 'scratch/stopping')
+                run.start_child('processes', definition('stopping', '--stop-' + mode, [
+                    dict(stream='stdout', prefix='canary-ready ', capture='ack')]), deadline=time.monotonic() + 120)
+                assert run.wait(lambda: run.startup_ready('stopping'), time.monotonic() + 120)
+                assert run.stop_all()
+                assert not run.host.children
+                assert run.items['proc-stopping']['empty']
+                assert run.records['stopping']['exit']['stopped']
+                assert not run.records['stopping']['exit']['killed']
+                for check in ('end-state', 'promises'):
+                    assert host.checks.command(check, 0, b'') == ([], [], [])
+                run.check_processes()
+                assert [f['signature'] for f in run.failures] == ([] if suffix is None else ['stop/stopping/' + suffix])
+                outcome = host.judge.outcome(run.failures, run.errors, run.undecided, None, driver_required=False)
+                assert outcome == ('pass' if suffix is None else 'fail')
+            finally:
+                run.stop_all()
+                os.close(run.wake_r)
+                os.close(wake_w)
+        print(json.dumps(dict(cgroup=str(run.host.root), canaries='pass', graceful_stop_cases=3)))
     return 0
 
 
@@ -246,6 +275,7 @@ class NativeCanaries(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', 'replace'))
                 summary = json.loads(result.stdout)
                 self.assertEqual(summary['canaries'], 'pass')
+                self.assertEqual(summary['graceful_stop_cases'], 3)
                 host.native.await_removed(summary['cgroup'], 20)
             finally:
                 # --wait normally observed completion; this also covers an
@@ -274,6 +304,6 @@ if __name__ == '__main__':
         sys.exit(bootstrap_canary())
     if len(sys.argv) == 4 and sys.argv[1] == '--worker':
         sys.exit(worker(sys.argv[2], sys.argv[3]))
-    if len(sys.argv) == 2 and (sys.argv[1].startswith('--emit-') or sys.argv[1] in ('--consume', '--idle', '--early-exit', '--failure')):
+    if len(sys.argv) == 2 and (sys.argv[1].startswith(('--emit-', '--stop-')) or sys.argv[1] in ('--consume', '--idle', '--early-exit', '--failure')):
         sys.exit(emit(sys.argv[1]))
     unittest.main()

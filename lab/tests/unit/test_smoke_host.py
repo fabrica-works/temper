@@ -367,6 +367,54 @@ class StoryOrigin(unittest.TestCase):
 
 
 class Records(unittest.TestCase):
+    def test_stop_checks_keep_existing_causes_and_memory_observations(self):
+        for stopped, killed, prior, expected in (
+            (False, False, [], ['stop/engine/exit:9']),
+            (True, False, [], ['stop/engine/exit:9']),
+            (True, True, ['bound/stop_seconds/engine'], ['bound/stop_seconds/engine']),
+            (True, True, ['survivor/engine'], ['survivor/engine']),
+            (True, False, ['panic/engine/source.rs:1:1'], ['panic/engine/source.rs:1:1']),
+            # A killed flag by itself must never hide an unsuccessful exit.
+            (True, True, [], ['stop/engine/exit:9']),
+        ):
+            with self.subTest(stopped=stopped, killed=killed, prior=prior):
+                run = host.Run.__new__(host.Run)
+                run.records = {'engine': dict(exit=dict(status=9, stopped=stopped, killed=killed),
+                    memory=dict(bound_bytes=10, peak_bytes=11))}
+                run.failures = [host.checks.failure(signature, signature.split('/')[0], 'observed') for signature in prior]
+                run.undecided = []
+                run.check_processes()
+                self.assertCountEqual([f['signature'] for f in run.failures], expected + ['memory/engine'])
+                self.assertEqual(run.undecided, [])
+
+    def test_requested_stop_must_exit_zero_even_with_empty_trees_and_passing_checks(self):
+        for ending, expected in ((dict(status=0), 'pass'), (dict(status=9), 'fail'),
+                                 (dict(signal='SIGUSR2'), 'fail')):
+            with self.subTest(ending=ending), tempfile.TemporaryDirectory() as directory, host.store.open_lab(directory + '/lab') as lab:
+                run = host.Run.__new__(host.Run)
+                run.lab, run.base = lab, 'stop-proof'
+                run.host = types.SimpleNamespace(children={})
+                run.records = {'engine': dict(name='engine', group='processes',
+                    exit=dict(ms=1, stopped=True, killed=False, **ending),
+                    memory=dict(bound_bytes=None, peak_bytes=1))}
+                run.failures, run.undecided, run.errors, run.bounds = [], [], [], []
+                run.commands = []
+                run.interrupted = None
+                run.exp = dict(name='smoke')
+                run.key_path = 'keys/smoke/key'
+                run.run_id, run.attempt, run.schedule, run.started = 'stop-proof', 1, {}, host.utc()
+                run.args = types.SimpleNamespace(seed='1', unit='canary-unit')
+                run.ms = lambda: 1
+                # Both real checker contracts report pass; only service exit can fail.
+                self.assertEqual(host.checks.command('end-state', 0, b''), ([], [], []))
+                self.assertEqual(host.checks.command('promises', 0, b''), ([], [], []))
+                with patch.object(host.evidence, 'publish'), patch.object(lab, 'remove_live'):
+                    record = run.finish()
+                self.assertEqual(record['outcome'], expected)
+                if expected == 'fail':
+                    reason = 'exit:9' if 'status' in ending else 'signal:SIGUSR2'
+                    self.assertEqual([f['signature'] for f in record['failures']], ['stop/engine/' + reason])
+
     def test_failed_admission_keeps_canonical_error_evidence_and_live_marker(self):
         with tempfile.TemporaryDirectory() as directory, host.store.open_lab(directory + '/lab') as lab, lab.lock():
             run = host.Run.__new__(host.Run)
