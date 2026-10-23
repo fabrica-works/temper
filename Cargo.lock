@@ -3032,6 +3032,7 @@ dependencies = [
  "skein-channel",
  "skein-codec",
  "skein-fake-forge-github",
+ "skein-fake-forge-protocol",
  "skein-forge",
  "skein-forge-client",
  "skein-forge-connection",
