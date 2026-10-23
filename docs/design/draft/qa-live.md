@@ -45,10 +45,11 @@ section 11.
 - **Caps learned, not guessed:** a rung's first runs are generous, its
   class then twice its largest pass, a pass far above the median a cost
   finding; a class's values are tuned without making new keys (6.4).
-- **Confined by the machine, not the prompt alone:** the driver's host
-  runs as a user of its own, which reaches none of the user's files,
-  temper's store or the held account; what it does is audited from its
-  events (section 7).
+- **Confined by the lab, on the fleet's servers:** one user; the
+  agent's commands in Codex's sandbox, temper reached through `ctl`
+  alone, every action audited from the host's events. The host's own
+  tools, which Codex cannot list, are the accepted risk, so the lab
+  never runs on a person's computer (section 7).
 - **Real runs find, fakes hold:** a failure's transcripts, the driver's
   and temper's model's, become a fake LLM's script; the fix lands with a
   test in the lowest world that reproduces it, and the real key is
@@ -191,7 +192,8 @@ The record of one signed-in ChatGPT account is a held file of the lab,
   `domain/providers.md`, 2.3). A move leaves one holder: the file, or
   one deployment.
 - **The driver never holds it:** its wrapper refuses area 5 (4.4), and
-  the held file is beyond its host's reach (section 7).
+  neither its sandbox nor its tools' views reach the lab's files
+  (section 7).
 - **One held account a lab,** since a lab runs one cluster at a time
   (`lab.md`, 3.2). A second machine's lab has a sign-in of its own.
 
@@ -326,34 +328,33 @@ cancelled first, since the stop ends every run.
 
 - **Why it matters more here:** on real backends, a driver that leaves
   its tools reaches more: a real account's record, a forge's admin
-  token, the user's files and other credentials on the machine. And a
-  driver that works around `ctl` makes a verdict say nothing of the
-  tools.
-- **The driver's host as a user of its own** (`lab.md`, 6.1). The
-  machine's owner makes the user once, with a private home and a Codex
-  login of its own: `codex login` as that user, a person's act, once a
-  machine; the same ChatGPT account, its tokens its own. The host runs
-  as that user, and the agent's commands run in Codex's sandbox beneath
-  it, as before. The user's home, the lab, the held account, temper's
-  store and Forgejo's files are the runner's and private, so that user
-  reaches none of them.
-- **The tools cross over, nothing else:** `lab tool` relays each call to
-  the runner, which runs it in its view; the source and the work
-  directory are the run's, given to the host's user.
-- **The inventory recorded, not required:** a Codex version whose
-  inventory cannot be enumerated (o/lab-driver's finding at 0.162.1)
-  runs separated; what can be observed is checked, the rest recorded as
-  unobserved (`lab.md`, 6.1). This holds on fakes too, so it unblocks
-  `../qa.md`'s paid runs as well.
+  token, the machine's other credentials. And a driver that works around
+  `ctl` makes a verdict say nothing of the tools.
+- **One user, on the fleet's servers.** The runner, the box and the
+  driver's host run as the lab's user, on servers kept for the fleet,
+  never a person's computer (`lab.md`, 6.1). The run's cgroups bound
+  what they use and end them whole (`lab.md`, 5.2); they confine no
+  file.
+- **What confines:** the agent's commands run in Codex's sandbox,
+  reading the source and writing their work directory, with no network
+  (`lab.md`, 6.2); each `ctl` call runs in a view of its own that writes
+  the client directory alone, and the wrapper refuses the sign-in,
+  accounts and forges (4.4). Neither reaches the lab, the held account,
+  temper's store or Forgejo's files.
+- **What does not:** the host's own process. A built-in tool of Codex's
+  that acts in it, rather than as a sandboxed command, reaches what the
+  lab's user reaches, the held account and temper's store among them.
+  Codex 0.162.1 cannot report which such tools its model is given
+  (o/lab-driver's closing note), so they are recorded as unobserved
+  rather than shown absent (`lab.md`, 6.1): the accepted risk, and why
+  the lab stays off a person's computer.
 - **Audited from its events:** an action of any kind but a sandboxed
   command or a `lab` tool call ends the run in error, its transcript
-  kept, and the director reads it as a boundary incident.
-- **What separation leaves open is loopback.** The host's user may
-  connect to the cluster's ports as any local user: temper's need a
-  client's credential, which is the runner's; the owned Forgejo
-  disables registration (`../protocol/setup.md`, 6.2), so an anonymous
-  request reads only what is public on it. Beyond loopback, the network
-  is the host's, as its model's transport needs.
+  kept, and the director reads it as a boundary incident. So a run in
+  which the driver went around `ctl` is never judged.
+- **M1 unblocked too:** the same admission holds on fakes, so
+  `../qa.md`'s paid driver runs, refused until now for want of that
+  list, can start.
 
 ## 8. Findings
 
@@ -382,8 +383,7 @@ cancelled first, since the stop ends every run.
 ## 9. Unattended
 
 - **The person:** the sign-in (section 5), once a lab and when it lapses
-  or is lost; the driver's Codex login, once a machine (section 7).
-  Nothing else waits on them.
+  or is lost. Nothing else waits on them.
 - **The director:** runs 0a and 0b on a new machine and after changes
   to the box, the set-up or the account's move; judges each open rung at
   a subject of main when a landed change touches its story; reruns a
@@ -412,12 +412,11 @@ cancelled first, since the stop ends every run.
   Later), and `ctl export` and `import`, now in area 5
   (`../client/tools.md`).
 - **The lab's amendments:** held files and the release (4.8), named
-  programs (2.3), the meter and the brake (6.5), the host's separation
-  (6.1), a class's values out of the key and superseded bounds (2.3,
-  section 8), the `words` class (9.3).
-- **The machine:** the driver's host's user and its Codex login; the
-  settings naming Forgejo's binaries; a port for the owned Forgejo
-  (section 13).
+  programs (2.3), the meter and the brake (6.5), the host's unobserved
+  items recorded (6.1), a class's values out of the key and superseded
+  bounds (2.3, section 8), the `words` class (9.3).
+- **The machine:** the settings naming Forgejo's binaries; a port for
+  the owned Forgejo (section 13).
 - **For B1,** failed CI's repair on real Actions, which the backends
   roadmap leaves out of B5; **for C,** a prepared state.
 
