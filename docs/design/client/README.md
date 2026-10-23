@@ -51,13 +51,15 @@ not contract. What is still open is listed in section 11.
   what it will do before it is sent, from the facts jig's documents
   give, and every deciding act names the revision the person was shown
   (3.6).
-- **LLM accounts, made from the client.** On the accounts page a person
-  signs in with an LLM provider, declares a program's login, or adds a
-  key, pasted once and never kept (3.5, 3.6); while no account their
-  work may use is usable, a banner on every page says so and offers the
-  three (5.5). A chat's composer and a task's page name the account and
-  model the work runs on. The terminal prints a sign-in's address and
-  opens no browser (6.5). The accounts are jig's, kept by its engine
+- **LLM accounts, made from the client.** On the accounts pages,
+  `Accounts` and its flow `ConnectModel`, a person signs in with an LLM
+  provider, declares a program's login, or adds a key, pasted once and
+  never kept (3.5, 3.6); while no account their work may use is usable,
+  a banner on every page says so and offers the three (5.5). A chat's
+  composer and a task's page name the account and model the work runs
+  on. A browser goes to a sign-in's address in its own tab and comes
+  back; the terminal prints the address and opens no browser (6.5).
+  The accounts are jig's, kept by its engine
   (`../protocol/credentials.md`, section 3).
 - **A first run's demo.** When the deployment runs the demo
   (`../protocol/setup.md`, 8.4), the client reads it from the engine
@@ -310,8 +312,9 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | the person's forges, each row folded until opened: its connection, its mode and access, on GitHub temper's App and its installations, a connect under way and how the last ended, its load; then the playground's forge, folded, while the demo's forge half holds; "+ Add a forge", to `ConnectForge` (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect a stopped forge; replace a key or tokens; install on another account; new repository; forget the admin's token; set up again (section 8) |
 | `ConnectForge` | `connect-forge.html` | connecting one more forge: Choose, Details, Setting up and Ready, which ends on the work it adopted (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect; connect as its admin; set up a Forgejo here (section 8) |
-| `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `Accounts`' acts |
-| `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's: each with its LLM provider and display name, its holder, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), the runs using it and the tasks waiting for it; the sign-ins and checks under way, and how the last ended; "Add an account", with the ways its providers offer (5.5, The ways) | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in with an LLM provider; sign a source out; add a key, to an account or as one of its own; replace a key; remove a source or an account; declare a program's login; check it again; move an account, or a source, up or down; resume a limited source |
+| `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `ConnectModel`'s acts |
+| `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's, each row folded until opened: its LLM provider and display name, its holder, its deciding source's state and its line (5.5, An account's line); opened, that state's words and acts, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), what it pays for, the runs using it, the tasks waiting for it and its acts; the checks under way, and how the last ended; then the playground's account, folded, while the demo's model half holds; "+ Connect a model", to `ConnectModel` | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in again or add a key from a state's acts, as `ConnectModel`'s ways; sign a source out; add a key to an account; replace a key; remove a source or an account; check a program's login again; move an account, or a source, up or down; resume a limited source |
+| `ConnectModel` | `connect-model.html` | connecting one more LLM account: Choose, a card for each way its providers offer (5.5, The ways); Signing in, at the provider, for a sign-in, or Details, a way's field, for a key or a program's login; and Ready, the account made, or how the sign-in ended (5.5, A sign-in) | `accounts`; `me`'s LLM providers | sign in with an LLM provider; add a key as an account of its own; declare a program's login |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
   `client/domain/client.md`, section 19), in jig's words, with temper's
@@ -492,39 +495,66 @@ keeps (`../protocol/configuration.md`, section 2).
   section 2).
 - **The accounts page** is jig's reference UI's accounts, on a page of
   temper's own (jig's `client/domain/pages.md`, sections 7 and 11),
-  with temper's words (5.5). It shows no value. Its acts are jig's
-  accounts' requests (jig's `client/domain/contract.md`, 3.2), each
-  sent as 3.6 says; a sign-in's answer is the address to open, shown
-  as an external link (6.5), and its end is read on the `accounts`
-  watch. Declaring a program's login asks its name, 1 to 32 of `a` to
-  `z`, `0` to `9` and `-`, `claude-` and the person's first name by
-  default (`claude-alice`), and shows the command to run
-  on each host, `temper program-login NAME`
-  (`../protocol/credentials.md`, section 3). Its parts, in order:
-  - *"Your LLM accounts",* level 2, then each of the person's accounts
-    as a card: a region named by the account's heading (5.5, An
-    account), the heading at level 3, then its sources, each with its
-    state in words (5.5, Each state);
+  with temper's words (5.5), in the forges' page's shape (with the
+  user, 2026-10-23). It shows no value. Its acts are jig's accounts'
+  requests (jig's `client/domain/contract.md`, 3.2), each sent as 3.6
+  says. Its parts, in order:
+  - *"Your accounts",* level 2, with their count and "+ Connect a
+    model", to `ConnectModel`; then each of the person's accounts as a
+    disclosure, folded, named by the account's heading (5.5, An
+    account), its summary its deciding source's state in words and the
+    account's line (5.5, An account's line). Opened: the state's words
+    and acts (5.5, Each state); its sources in order, each with its kind
+    and state in words; "Pays for", "Used by" and "Waiting for it"; and
+    the account's acts: sign a source out, add a key to the account,
+    replace or remove a key, remove the account, resume a source, move
+    the account or a source, check a program's login again;
   - *the deployment's accounts,* for an owner, the same way under
     "Deployment accounts";
-  - *"Add an account",* level 2, with one button for each way the
-    configured LLM providers offer (5.5, The ways), a way's own field
-    shown once it is chosen: a key's secret field and "Add key", a
-    program's name field and "Declare". A way adds a new account to the
-    person's own accounts, a key's to the deployment's when an owner
-    has chosen "Use deployment accounts"; a plan's sign-in and a
-    program's login are always the person's own, since only a person
-    holds a plan (jig's `domain/accounts.md`, 3.2), and their ways are
-    not offered while the deployment's are chosen;
-  - *the account form,* for the acts on an existing account or source
-    by its number: sign a source out, add a key to an account, replace
-    or remove a key, remove an account, resume a source, move an
-    account or a source. It starts no sign-in and adds no account of
-    its own: that is "Add an account"'s.
+  - *the playground's account,* in a section of its own, folded, while
+    the demo's model half holds (4.8).
 
-  The first run reaches the page by the demo's banner's "Connect a
-  model" (5.6), and its "Continue with ChatGPT" signs in with the
-  default document's OpenAI (`../protocol/setup.md`, 8.3).
+  A state's "Continue with ChatGPT" and "Use an API key" (5.5, Each
+  state) are `ConnectModel`'s ways, sent from the row, a sign-in coming
+  back to the page; the page adds no account of its own: that is
+  `ConnectModel`'s.
+- **`ConnectModel`** (`connect-model.html`) connects one more LLM
+  account, in `ConnectForge`'s shape: Choose; then Signing in, for a
+  sign-in, or Details, for a key or a program's login; then Ready.
+  - *Choose* is a card for each way the configured LLM providers offer
+    (5.5, The ways), each with its words and its button. A way adds a
+    new account to the person's own accounts, a key's to the
+    deployment's when an owner has chosen "Use deployment accounts"; a
+    plan's sign-in and a program's login are always the person's own,
+    since only a person holds a plan (jig's `domain/accounts.md`, 3.2),
+    and their ways are not offered while the deployment's are chosen.
+  - *Signing in* has no page of temper's: the way's button sends the
+    sign-in, whose answer is the address to open, and a browser goes to
+    it in the page's own tab. The provider sends the browser back to
+    the engine's listener, which sends it on to the page it left, and
+    the page shows the sign-in's end, read on the `accounts` watch:
+    Ready, or the ending's words and acts (5.5, A sign-in). The
+    terminal prints the address and opens no browser (6.5). It assumes
+    a browser on the engine's machine and detects none elsewhere
+    (section 11, A browser on another machine). Two parts are no one's
+    yet: skein-ui gives a view no way to send its tab to an external
+    address, only a link that opens a tab of its own (skein's `ui.md`,
+    6.2; skein's `ui-web.md`, its link), and jig's listener answers the
+    provider's redirect with nowhere to send the browser on (jig's
+    `protocol/llm.md`, 5.4). Until both are, the page shows the address
+    as an external link, a tab of its own, as the terminal prints it.
+  - *Details* is the way's field: a key's secret field and "Add key"; a
+    program's name field and "Declare". Declaring a program's login
+    asks its name, 1 to 32 of `a` to `z`, `0` to `9` and `-`, `claude-`
+    and the person's first name by default (`claude-alice`), and shows
+    the command to run on each host, `temper program-login NAME`
+    (`../protocol/credentials.md`, section 3).
+  - *Ready* says the account is made, in 5.5's words, with "Start a
+    chat", to the chats page, and a plan's "Manage usage".
+
+  The first run reaches it by the demo's banner's "Connect a model"
+  (5.6), and its "Continue with ChatGPT" signs in with the default
+  document's OpenAI (`../protocol/setup.md`, 8.3).
 - **The forges' page** is the forge's part of the deployment's
   connectors (jig's `client/domain/pages.md`, section 7), on a page of
   temper's own (`forge.md`, 5.4). It is read for a person whose role
@@ -570,11 +600,10 @@ keeps (`../protocol/configuration.md`, section 2).
     has not started.
     *"Set up temper"* opens its Forge step.
   - *Forge* is `ConnectForge`'s Choose and Details (`forge.md`, 5.4).
-    *Model* is the accounts page's "Add an account": its ways, a chosen
-    way's field, its act pending and how it ended, the accounts page's
-    own state and acts (above), so that an account added there is the
-    accounts page's too. *Ready* names the forge and the model as set
-    up or under way.
+    *Model* is `ConnectModel`'s Choose and Details, its state and acts
+    (above), so that an account added there is the accounts page's too;
+    a sign-in sends the browser back to the welcome at its Ready. *Ready*
+    names the forge and the model as set up or under way.
 - **A suggested request** (`chats.html`) starts a chat with the
   cue's words as its first message, as the composer's send does: one
   act, one request (3.6), the suggestions and the send disabled while
@@ -1161,12 +1190,13 @@ of each (`../draft/first-run.md`, 3.6).
   - *the accounts' banner,* while no account the person's work may use
     is usable (the `accounts` watch; jig's
     `client/domain/contract.md`, 7.1): its words and three buttons
-    (5.5), on every page but the accounts page and `Welcome`;
+    (5.5), on every page but the accounts page, `ConnectModel` and
+    `Welcome`;
   - *the demo's banner,* while either of the demo's halves holds
     (4.8): a region named "Playground", its words and its links (5.6), on
-    every page but `Welcome`, the accounts and the forges pages and
-    `ConnectForge`, a chat's page and the demo's start among them, above
-    their chatbars;
+    every page but `Welcome`, the accounts and the forges pages,
+    `ConnectModel` and `ConnectForge`, a chat's page and the demo's
+    start among them, above their chatbars;
   - *the setup strip,* in the demo's banner's place, while the demo has
     not started and the person has no usable account or no connected
     forge (`../draft/first-run.md`, 2.3): its words and links (5.6), on
@@ -1262,8 +1292,9 @@ the person is in, "Board" and "Changes"; and after them "Adopt a
 repository", to `Adopt { project }`; then "Forges", to `Forges`, with
 a dot, amber while a forge sets up or connects and red while one needs
 the person (`forge.md`, 5.4), its state also in words; and last,
-"Accounts",
-to `Accounts`, both whatever the project. With no project chosen, the
+"Accounts", to `Accounts`, with a dot, amber while an account is
+limited and red while one needs the person (5.5, Each state), its
+state also in words, both whatever the project. With no project chosen, the
 project's entries are not offered. The mockups' "Tasks", a list of a
 project's tasks, and "Workers", the deployment's hosts, are not in the
 client (section 11). "Adopt
@@ -1334,7 +1365,7 @@ The words for each offered source are:
   Any other provider's plan reads as its name. jig configures no plan's
   display name yet (jig's `protocol/configuration.md`, section 3), so
   the plan is branded by its provider until it does.
-- **The ways,** under "Add an account" (3.5) and in the banner, one for
+- **The ways,** on `ConnectModel`'s Choose (3.5) and in the banner, one for
   each source a configured provider offers, in provider number order,
   but the demo's provider (`Demo.provider`, 4.8), whose account is the
   deployment's: a sign-in to a plan, "Continue with PLAN" ("Continue
@@ -1344,7 +1375,14 @@ The words for each offered source are:
   API key") when more than one shown provider offers keys. Each way
   sends what the account form's act for it would: a sign-in is jig's
   `SignIn` for that provider, held by the person (`Own`); a key's,
-  `AddKey` joining no account; a program's, its declaration.
+  `AddKey` joining no account; a program's, its declaration. On
+  Choose, each way is a card: a plan's sign-in, the plan's name,
+  "Your ChatGPT plan. Sign in with your ChatGPT account, and temper’s
+  agents use your plan’s included usage." and "In a browser on the
+  engine’s machine · about a minute"; a key, "An OpenAI API key", "A
+  key from OpenAI’s platform. What temper’s agents use is billed to the
+  key’s organization." and "Pasted here · at once"; then the way's
+  button.
 
 - **The banner:** "Agents need an LLM account to run." and "Continue
   with ChatGPT", "Use your Claude subscription", "Use an API key", one
@@ -1361,6 +1399,12 @@ The words for each offered source are:
   named by that heading, so a person and a screen reader find an
   account by its name. Each source is its kind in words, "ChatGPT
   sign-in", "API key", "Claude Code login NAME", then its state.
+- **An account's line,** its folded row's summary: its models, what it
+  pays for, then "2 tasks waiting", "used by T4, T9" or "no task uses
+  it now", a waiting task never also a user. What it pays for, its
+  "Pays for": a plan's, "Your own work, and projects where you’re the
+  only member"; a key's or a program's login's with no uses given,
+  "Your own work" (jig's `domain/accounts.md`, 4.2).
 - **The composer's line** names the account and model the work's next
   run takes, one line above the chooser (3.5), from what jig gives
   every page: `me`, the accounts document and its readiness:
@@ -1423,8 +1467,8 @@ The words for each offered source are:
   | State | Words | Acts |
   |---|---|---|
   | usable | "Ready" | — |
-  | limited, a plan's | "temper reached its usage limit on your ChatGPT plan. Tasks on it wait." | "Manage usage", "Resume" |
-  | limited, with the reset the provider gave | "Limited by OpenAI until 14:00. Tasks on it wait." | "Resume" |
+  | limited, a plan's | "temper reached its usage limit on your ChatGPT plan. Tasks on it wait." | "Manage usage", "Resume", "Use the API key first" |
+  | limited, with the reset the provider gave | "Limited by OpenAI until 14:00. Tasks on it wait." | "Resume", "Use the API key first" |
   | refused: plan usage declined | "You signed in without plan usage." | "Continue with ChatGPT", "Use an API key" |
   | refused: not eligible | "This ChatGPT account can't be used for plan usage in temper. Plan usage needs an eligible ChatGPT plan." | "Use an API key", "Sign in to another account" |
   | needs sign-in | "Signed out of ChatGPT." | "Continue with ChatGPT" |
@@ -1436,15 +1480,33 @@ The words for each offered source are:
   empty" (jig's `domain/providers.md`, 2.5). A limit may be the
   person's own cap for temper, which "Manage usage" reaches. A limited
   account's tasks wait for it, and temper never moves them to another
-  account (jig's `domain/accounts.md`, 4.3).
-- **A sign-in:** "Open this address in a browser on the engine's
-  machine:" and the address, as an external link (6.5); then "Signed in
-  to ChatGPT as alice@example.com", or "Signed in to ChatGPT" while the
-  account has no display (jig carries none yet: its card's heading then
-  drops that part), or, for a subject the person
-  already has, "That's alice@example.com again. To add another account,
-  sign out of ChatGPT in your browser first, then Continue with
-  ChatGPT."; or why it was refused.
+  account (jig's `domain/accounts.md`, 4.3). "Use the API key first" is
+  offered where the account holds a key after the limited source: it
+  moves the key up, so that the account's waiting tasks go on on it,
+  and moves no task. A plan's row shows its limit's state and "Manage
+  usage" alone: its usage is ChatGPT's settings' to show (jig's
+  `domain/providers.md`, 2.6), and temper reads no plan's windows
+  (`../draft/temper-on-temper.md`, 6.3).
+- **A sign-in:** no words while it waits in a browser, which is at the
+  provider (3.5, `ConnectModel`); in the terminal, "Open this address in
+  a browser on the engine's machine:" and the address, as an external
+  link (6.5). Then "Signed in to ChatGPT as alice@example.com", or
+  "Signed in to ChatGPT" while the account has no display (jig carries
+  none yet: its card's heading then drops that part), "temper’s agents
+  now run on your ChatGPT plan.", its account, the model a new chat's
+  first run takes and what it pays for, then, while the demo's model
+  half held (5.6), "The playground’s scripted model stepped aside."; or,
+  for a subject the person already has, "That's alice@example.com
+  again. To add another account, sign out of ChatGPT in your browser
+  first, then Continue with ChatGPT."; for a subject another person
+  holds (jig's `domain/accounts.md`, 3.3), "Another person here holds
+  that ChatGPT account. To use one of yours, sign out of ChatGPT in
+  your browser first, then Continue with ChatGPT."; for a listener's
+  port another program holds, before the browser leaves, "temper can’t
+  listen on 127.0.0.1:1455: another program has it, such as Codex’s own
+  sign-in. Finish or close that sign-in, then Continue with ChatGPT.";
+  or why it was refused, in Each state's words. Each ending offers
+  "Continue with ChatGPT" again, and a refusal Each state's acts.
 - **A plan's first use:** a card in the conversation of the run that
   first used it, from the document's fact (jig's `domain/accounts.md`,
   section 5): "You're using your ChatGPT plan. Eligible requests from
@@ -1470,7 +1532,7 @@ the cues the demo's, copied in:
 - **The banner:** "This is the playground: a scripted model and a
   playground forge." while both halves hold, "This is the playground: a
   scripted model." or "This is the playground: a playground forge."
-  while one does; then "Connect a model", a link to `Accounts`, while the model's
+  while one does; then "Connect a model", a link to `ConnectModel`, while the model's
   half holds, and "Connect a forge", a link to `ConnectForge`, while the
   forge's half holds. Until the client has `ConnectForge`, "Connect a
   forge" is a disabled button.
@@ -1515,17 +1577,20 @@ the cues the demo's, copied in:
   scripted model and forge. Ask one of three requests and follow its
   change from a branch to main."; "Nothing leaves this machine, and
   nothing costs. · Ready at once") and "Set up temper" ("Your forge:
-  GitHub, or a Forgejo temper runs on this machine. Your model: an
-  OpenAI API key.", by the default document's forges and providers;
+  GitHub, or a Forgejo temper runs on this machine. Your model: your
+  ChatGPT plan, or an OpenAI API key.", by the default document's
+  forges and its providers' ways;
   "About five minutes"), each with its button; then
   "Started in the playground? Connect your own forge and model whenever
   you like; the playground then steps aside." Forge is `ConnectForge`'s
-  Choose and Details; Model is the accounts page's ways (5.5); Ready
-  names each as set up or under way, then "Open PROJECT" once the
-  forge's work is adopted. Forge's heading is "Connect a forge", then
+  Choose and Details; Model is `ConnectModel`'s Choose (5.5, The ways);
+  Ready names each as set up or under way, under "Almost ready", then
+  "Open PROJECT" under "OWNER/NAME is ready" once the forge's work is
+  adopted, whichever a sign-in comes back to. Forge's heading is
+  "Connect a forge", then
   "Where your repositories live: temper’s agents push branches and
   open pull requests there."; Model's "Connect a model", then "temper’s
-  agents run on it, and what they use is billed to its account.". Each
+  agents run on it: on a plan you sign in to, or on a key.". Each
   step after Welcome offers "‹ Back", to the step before, "Later", to
   the chats page, and "Try the playground instead" while the demo is
   answered (4.8), which it no longer is once a forge of the person's
@@ -2406,7 +2471,8 @@ command.
   no program. The person opens the address in a browser on the
   engine's machine, where the provider's redirect reaches the engine
   (`../protocol/credentials.md`, section 3); the page shows the sign-in's
-  end when the `accounts` watch tells it.
+  end when the `accounts` watch tells it. A browser goes to the address
+  in its own tab instead (3.5, `ConnectModel`).
 - **A forge's connect or install link** is printed the same way, as
   `TEXT <URL>` with no number, and never opened. A connect link's
   address is on the clients' listener (`forge.md`, 9.1), for example
@@ -2900,8 +2966,9 @@ own tests:
   task with its brief, run, conversation and result (5.9), the
   changes, the adoption form in each state of 4.4 and 4.7,
   its picker on a GitHub and on a Forgejo forge, a forge not connected
-  and "Not listed", signed out, the accounts' banner, the accounts page
-  with a sign-in's address, a key's field written, and an account in
+  and "Not listed", signed out, the accounts' banner, `ConnectModel`
+  with a sign-in's address, as the terminal shows it, a key's field
+  written, and an account in
   each state of 5.5, and the forges' page with a forge in each state of
   `forge.md`, 5.4, a connect's link, and a pasted value's field written
   (`(hidden)`).
@@ -3083,10 +3150,21 @@ own tests:
   zone, as the mockups' do; the browser's zone, an input of the shell's,
   is the candidate.
 - **A browser on another machine.** A sign-in's redirect reaches the
-  engine on loopback, so a person who reaches temper through a tunnel
-  opens the address on the engine's machine, or, later, moves an
-  account in (jig's `domain/accounts.md`, section 6), until a client
-  relays the redirect. Default: the engine's machine.
+  engine on loopback, so temper assumes the browser is on the engine's
+  machine, and detects none elsewhere (with the user, 2026-10-23):
+  there, the provider's redirect lands on the browser's own error page,
+  as one after the sign-in's deadline does, and the sign-in waits out
+  its deadline. A person who reaches temper through a tunnel forwards
+  the listener's port too (`../../guide/box.md`, step 4). Candidates:
+  before the browser leaves, the page asks the listener for a one-time
+  code the engine gave it for this sign-in, and only a browser that gets
+  it goes on to the provider, the others shown the fix first, while a
+  connection from an address not the engine's machine's skips the ask;
+  the fix a tunnel, or the failed redirect's address pasted into temper,
+  which checks it against the sign-in's redirect and state; later, an
+  account moved in (jig's `domain/accounts.md`, section 6), or a client
+  relaying the redirect (jig's `protocol/llm.md`, section 10). Default:
+  the engine's machine, undetected.
 - **The first use of a plan,** in the terminal: a card in the
   conversation, or a card that waits to be dismissed, which needs a
   dismissal kept by the engine, as jig's seen is. Default: a card in

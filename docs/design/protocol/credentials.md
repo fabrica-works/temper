@@ -284,8 +284,11 @@ sources in its holder's order. temper configures the LLM providers
     sign-in, on an ephemeral port unless the LLM provider's
     configuration fixes one (jig's `protocol/llm.md`, section 5; skein's
     `oauth.md`, 6.5), so the browser that approves must run on the
-    engine's machine. The client shows the address to open; the terminal
-    prints it and opens no browser (`../client/README.md`, 6.5).
+    engine's machine. A browser's page goes to the address in its own
+    tab, and the listener sends it back to that page; the terminal
+    prints the address and opens no browser (`../client/README.md`, 3.5
+    and 6.5). temper detects no browser on another machine
+    (`../client/README.md`, section 11).
     ChatGPT's registration fixes `127.0.0.1:1455` (setup.md, 8.1): a
     person whose browser is on another machine forwards that port to
     the engine's (`ssh -L 1455:127.0.0.1:1455 HOST`) for the sign-in. A

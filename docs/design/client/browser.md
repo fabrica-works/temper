@@ -408,8 +408,9 @@ panel (`README.md`, 5.10); the story reads its heading and its plan's
 agent, no more of it. The change's steps to landed, its gates, its
 bounds and its ended tasks hold nothing a browser alone shows: the
 client world's `change_panel.rs` reads them. A later page that has such
-behaviour brings its story with it: the accounts page's sign-in
-address, an external link that opens a tab of its own.
+behaviour brings its story with it: `ConnectModel`'s sign-in, its tab
+sent to the provider's address and back to the page it left
+(`README.md`, 3.5).
 
 ### 4.3 Its budget and the gate
 

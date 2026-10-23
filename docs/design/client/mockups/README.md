@@ -27,7 +27,7 @@ Each file also opens directly in a browser, with no build step; serving it keeps
 | Connecting a forge: choose, the details, setting up, ready (?forge=N) | `connect-forge.html` | `ConnectForge` |
 | The workers, their slots and health | `workers.html` | none: jig's `client/domain/pages.md`, 7 |
 | The person’s LLM accounts: each one’s sources in order, what it pays for, who uses it or waits for it, and its acts, each folded; the playground’s | `accounts.html` | `Accounts` |
-| Connecting a model: choose, ChatGPT’s sign-in in the same tab or a key’s details, ready (`?way=chatgpt\|key`) | `connect-model.html` | none yet: drawn ahead, as `ConnectForge` was |
+| Connecting a model: choose, ChatGPT’s sign-in in the same tab or a key’s details, ready (`?way=chatgpt\|key`) | `connect-model.html` | `ConnectModel` |
 | The welcome: try the playground, or set up temper | `welcome.html` | `Welcome`, drawn ahead (below) |
 | The first run, at its first step: the link `temper box` prints | `first-run.html` | opens `welcome.html` at step 0 in the first run |
 
@@ -62,7 +62,7 @@ Anything else on a page is the UI's own words, and those name no workflow: the d
 
 What temper does not have yet, drawn as temper-on-temper.md's section 6 wants it and marked with its gap while **Annotations** is on:
 
-- **6.3, plan usage:** a program's 5-hour and weekly windows on the accounts page, the week with its pace; the director's check reads them. A ChatGPT plan shows none: OpenAI reports no windows to temper, so its row shows its limit's state and "Manage usage ↗", which opens ChatGPT's settings.
+- **6.3, plan usage:** a program's 5-hour and weekly windows on the accounts page, the week with its pace; the director's check reads them. A ChatGPT plan shows none: its usage is ChatGPT's settings' to show (jig's `domain/providers.md`, 2.6), so its row shows its limit's state and "Manage usage ↗", which opens them.
 - **6.4, worker health:** the ops strip on the workers page, an ops application's report of load and disk.
 - **6.5, open findings:** a finding on a goal's page, the board and the changes page, where a failure that matches an open finding attaches to it and leaves the queue running.
 - **6.7, fleet occupancy:** a worker's free slots, and the director's read of them.
