@@ -5,27 +5,6 @@ use skein_lib::{List, bytes::copy_of};
 use skein_ui::phrases::{Form, Hole, HoleKind, HoleShape, Phrase, PhraseId, PhraseShape, PluralClass, Segment};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Word {
-    UnusableOn,
-    Models,
-    LimitedBy,
-    ResetUntil,
-    ProgramNeedsSignIn,
-    UsedBy,
-    WaitingFor,
-    NoUsers,
-    NoOwn,
-    Connect,
-    Playground,
-    PlaygroundAccount,
-    PlaygroundWords,
-    AddApiKey,
-    Replace,
-    Remove,
-    ProgramSignOut,
-    KeyFirst,
-    CheckAgain,
-    PlanLimited,
-    SignedOutPlan,
     Command,
     PlanRuns,
     KeyAdded,
@@ -206,25 +185,6 @@ pub(crate) enum Word {
     NavLimited,
 }
 const ROWS: &[(Word, &[u8])] = &[
-    (Word::UnusableOn, b"Can't be used on "),
-    (Word::Models, b"Models"),
-    (Word::LimitedBy, b"Limited by "),
-    (Word::UsedBy, b"Used by"),
-    (Word::WaitingFor, b"Waiting for it"),
-    (Word::NoUsers, b"no task uses it now"),
-    (Word::NoOwn, b"No model of yours yet."),
-    (Word::Connect, b"Connect a model"),
-    (Word::Playground, b"The playground"),
-    (Word::PlaygroundAccount, "Scripted model · the playground’s, until a model of yours connects · held by the deployment".as_bytes()),
-    (Word::PlaygroundWords, "It plays the playground’s scripts: it answers the suggested requests, and nothing else. It costs nothing, and nothing leaves this machine.".as_bytes()),
-    (Word::AddApiKey, b"Add an API key"),
-    (Word::Replace, b"Replace"),
-    (Word::Remove, b"Remove"),
-    (Word::ProgramSignOut, b"Sign out on every machine"),
-    (Word::KeyFirst, b"Use the API key first"),
-    (Word::CheckAgain, b"Check again"),
-    (Word::PlanLimited, b"temper reached its usage limit on your ChatGPT plan. Tasks on it wait."),
-    (Word::SignedOutPlan, b"Signed out of ChatGPT."),
     (Word::DeploymentPays, "Deployment work".as_bytes()),
     (Word::OwnPays, "Your own work".as_bytes()),
     (Word::PlanPays, "Your own work, and projects where you’re the only member".as_bytes()),
@@ -278,7 +238,7 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::Key, b"API key"),
     (Word::SignIn, b"Sign-in"),
     (Word::Program, b"Program login"),
-    (Word::None, b"none"),
+    (Word::None, b"No source kind"),
     (Word::Ready, b"Ready"),
     (Word::Granted, b"Granted"),
     (Word::Asking, b"Checking"),
@@ -334,7 +294,7 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::Saved, b"Key kept as source "),
     (Word::Changed, b"Account changed."),
     (Word::KeyEmpty, b"Enter a key."),
-    (Word::Selection, b"This account cannot receive that act."),
+    (Word::Selection, b"Choose the provider, account and source needed for this act."),
     (Word::Rank, b"Choose a positive position."),
     (Word::ValueAgain, b"Enter the key again for the same act, or Cancel."),
     (Word::ProviderField, b"Provider number"),
@@ -346,10 +306,10 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::SignInAction, b"Sign in with provider"),
     (Word::AddKey, b"Add key"),
     (Word::ReplaceKey, b"Replace key"),
-    (Word::SignOut, b"Sign out"),
+    (Word::SignOut, b"Sign source out"),
     (Word::RemoveKey, b"Remove key"),
     (Word::RemoveAccount, b"Remove account"),
-    (Word::Resume, b"Resume"),
+    (Word::Resume, b"Resume source"),
     (Word::UpAccount, b"Move account up"),
     (Word::DownAccount, b"Move account down"),
     (Word::UpSource, b"Move source up"),
@@ -403,7 +363,6 @@ pub(crate) fn join(parts: &[&[u8]]) -> Box<[u8]> {
     out.finish()
 }
 const NAMED: &[(Word, &[u8], &[u8])] = &[
-    (Word::ProgramNeedsSignIn, b"Claude Code isn't signed in for '", b"' on "),
     (Word::Continue, b"Continue with ", b""),
     (Word::SignInBrand, b"Sign in to ", b""),
     (Word::SubscriptionWay, b"Use your ", b" subscription"),
@@ -460,9 +419,7 @@ fn id(number: u16) -> PhraseId {
     PhraseId { owner: super::owner(), number }
 }
 pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
-    let number = if word == Word::ResetUntil {
-        228
-    } else if word == Word::Number {
+    let number = if word == Word::Number {
         200
     } else if word == Word::Until {
         201
@@ -493,7 +450,7 @@ pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
         for (index, (candidate, _, _)) in NAMED.iter().enumerate() {
             if *candidate == word {
                 number =
-                    Some(300_u16.checked_add(u16::try_from(index).expect("named words fit")).expect("phrase IDs fit"));
+                    Some(205_u16.checked_add(u16::try_from(index).expect("named words fit")).expect("phrase IDs fit"));
             }
         }
         match number {
@@ -519,7 +476,7 @@ pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>,
     }
     for (index, (_, prefix, suffix)) in NAMED.iter().enumerate() {
         let id =
-            id(300_u16.checked_add(u16::try_from(index).expect("named account words fit")).expect("phrase IDs fit"));
+            id(205_u16.checked_add(u16::try_from(index).expect("named account words fit")).expect("phrase IDs fit"));
         shapes
             .push(PhraseShape {
                 id,
@@ -561,7 +518,6 @@ pub(crate) fn extend(shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>,
             .expect("end phrases fit");
     }
     for (number, prefix, kind, suffix) in [
-        (228, b" until ".as_slice(), HoleKind::Moment, b". Tasks on it wait.".as_slice()),
         (200, b"".as_slice(), HoleKind::Number, b"".as_slice()),
         (201, b"Limited until ".as_slice(), HoleKind::Moment, b" UTC".as_slice()),
         (202, b"Try again after ".as_slice(), HoleKind::Span, b"".as_slice()),
@@ -597,11 +553,11 @@ pub(crate) fn capacity(words: &Words) -> Option<u32> {
     for number in 0..u16::try_from(ROWS.len()).ok()? {
         most = most.max(words.book.capacity(id(number))?);
     }
-    for number in [200, 201, 202, 203, 204, 220, 221, 222, 223, 224, 225, 226, 227, 228] {
+    for number in [200, 201, 202, 203, 204, 220, 221, 222, 223, 224, 225, 226, 227] {
         most = most.max(words.book.capacity(id(number))?);
     }
     for index in 0..NAMED.len() {
-        most = most.max(words.book.capacity(id(300_u16.checked_add(u16::try_from(index).ok()?)?))?);
+        most = most.max(words.book.capacity(id(205_u16.checked_add(u16::try_from(index).ok()?)?))?);
     }
     Some(most)
 }

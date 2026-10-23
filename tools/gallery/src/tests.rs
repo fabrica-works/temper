@@ -226,7 +226,7 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "accounts-first-run-1",
         heading: "Accounts",
-        parts: &[Part::Named { role: Role::Disclosure, name: "Scripted model · the playground’s" }],
+        parts: &[Part::Named { role: Role::Heading { level: 3 }, name: "Playground API key" }],
     },
     Holds {
         name: "signed-out",

@@ -253,7 +253,7 @@ fn a_limited_wait_links_to_resume() {
         fixtures::find(
             &wait(c::TaskWaitWhy::Source(c::TaskSourceState::Limited { until: None })),
             Role::Link,
-            b"Resume"
+            b"Resume source"
         )
         .is_some()
     );

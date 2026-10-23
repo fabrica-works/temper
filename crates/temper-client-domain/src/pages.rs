@@ -298,11 +298,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         Event::AccountKey { value } => {
             if let Some(page) = &mut pages.connect_model {
                 page.request.key(value);
-            } else if pages.accounts_open
-                && accounts::current_me(client).is_some()
-                && pages.accounts.key_for.is_some()
-                && !pages.accounts.request.busy(client)
-            {
+            } else if pages.accounts_open && accounts::current_me(client).is_some() {
                 pages.accounts.request.key(value);
             }
         }
@@ -564,13 +560,7 @@ fn open_result(pages: &mut Pages, task: u64, through: u64, out: &mut Queue<Reque
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
     if let Some(page) = &mut pages.connect_model {
         let claim = match &told {
-            Told::Kept { key, request: jig_client::Ask::Jig(ask) } => {
-                let row_request = match &pages.accounts.request.pending {
-                    Some(pending) => pending.key == *key,
-                    None => false,
-                };
-                !row_request && connect_model::creation(ask)
-            }
+            Told::Kept { request: jig_client::Ask::Jig(ask), .. } => connect_model::creation(ask),
             Told::Kept { .. } => false,
             Told::Answered { .. }
             | Told::Pending { .. }

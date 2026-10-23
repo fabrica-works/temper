@@ -52,7 +52,7 @@ pub fn program_fixture(seed: u64) -> (Joint, Root) {
 pub fn empty_fixture(seed: u64) -> (Joint, Root) {
     use temper_client_domain::pages::{
         Act as PageAct,
-        accounts::{Act, Operation, Row},
+        accounts::{Act, Operation, Selection},
     };
     let (mut front, mut root) = fixture(seed);
     let domain = root.person();
@@ -67,11 +67,14 @@ pub fn empty_fixture(seed: u64) -> (Joint, Root) {
         .expect("seeded deployment account")
         .number;
     for act in [
-        Act::Submit {
-            name: [67; 16],
-            row: Row { holder: jig_client::contract::AccountHolder::Deployment, account },
-            operation: Operation::RemoveAccount,
+        Act::Select {
+            selection: Selection {
+                holder: jig_client::contract::AccountHolder::Deployment,
+                account: Some(account),
+                ..Default::default()
+            },
         },
+        Act::Submit { name: [67; 16], operation: Operation::RemoveAccount },
         Act::Confirm,
     ] {
         event(
@@ -291,43 +294,4 @@ pub fn signing(front: &Joint) -> u32 {
 }
 pub fn assert_no_carried(front: &Joint) {
     assert!(front.transport.carried().is_empty(), "adopted and unused carriers were released");
-}
-
-/// A chat explicitly funded by the account whose row the story exercises.
-pub fn account_chat(front: &mut Joint, account: u32) -> u64 {
-    use jig_domain_people as people;
-    let mut ask = front.engine.chat_ask(1, b"Wait for my plan");
-    let people::Ask::Create { batch, .. } = &mut ask else { panic!("chat template") };
-    batch[0].llm = Some(people::LlmChoice {
-        account: Some(account),
-        main: people::ModelEffort { model: 0, effort: None },
-        subagents: Box::new([]),
-    });
-    front.engine.send(engine::Event::Party(engine::PartyInput::Ask {
-        models: Box::new([]),
-        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(1001)),
-        sign_in: front.transport.sign_in(CLIENT).expect("authenticated fixture client"),
-        key: [101; 16],
-        ask,
-    }));
-    // Waiting for this limited account deliberately keeps the fleet's deadline armed.
-    front.settles_with_a_deadline_armed = true;
-    front.settle();
-    front
-        .engine
-        .delivered
-        .iter()
-        .rev()
-        .find_map(|delivery| {
-            if let engine::Delivery::WebReply {
-                reply: people::Reply::Outcome(people::Outcome::Created { first, .. }),
-                ..
-            } = delivery
-            {
-                Some(*first)
-            } else {
-                None
-            }
-        })
-        .expect("created account-funded task")
 }

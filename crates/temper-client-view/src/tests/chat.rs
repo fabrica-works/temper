@@ -711,7 +711,21 @@ fn history() -> (temper_client_domain::Domain, skein_lib::Queue<temper_client_do
         },
         &mut out,
     );
-    let mut rows = List::with_capacity(1);
+    let mut rows = List::with_capacity(2);
+    rows.push(c::ActivityLine {
+        position: 3,
+        at: Wall::EPOCH,
+        event: c::Activity::Owner {
+            source: Box::new(c::OwnerActivityLine {
+                task: TASK,
+                position: 3,
+                at: Wall::EPOCH,
+                line: c::OwnerActivity::Turn { reply: 1, attempt: ATTEMPT, turn: TURN, read: None },
+            }),
+            decoded: None,
+        },
+    })
+    .expect("owner turn");
     rows.push(c::ActivityLine {
         position: 4,
         at: Wall::EPOCH,

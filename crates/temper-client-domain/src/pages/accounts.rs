@@ -1,4 +1,4 @@
-//! Borrowed account facts and row-bound operations (client/README.md, 3.5–3.6).
+//! Borrowed account facts and one bounded form (client/README.md, 3.5–3.6).
 use super::Request;
 use crate::owner::Owner;
 use jig_client::{Client, Handle, Latest, State, contract as c};
@@ -11,9 +11,16 @@ pub use ways::{Way, ways};
 /// The carried-value bound (client/README.md, 3.6); the engine catalogue is staged.
 pub const KEY_BYTES: usize = 4096;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Row {
+pub struct Selection {
     pub holder: c::AccountHolder,
-    pub account: u32,
+    pub provider: Option<u32>,
+    pub account: Option<u32>,
+    pub source: Option<u32>,
+}
+impl Default for Selection {
+    fn default() -> Self {
+        Self { holder: c::AccountHolder::Own, provider: None, account: None, source: None }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SignInState {
@@ -43,8 +50,7 @@ pub fn document(client: &Client) -> Option<&c::OwnerAccounts> {
 #[derive(Debug)]
 pub struct Accounts {
     pub deployment: Option<Handle>,
-    pub key_for: Option<(Row, Option<u32>)>,
-    pub request_row: Option<Row>,
+    pub selection: Selection,
     pub request: request::Request,
 }
 
@@ -57,18 +63,16 @@ impl Default for Accounts {
 impl Accounts {
     #[must_use]
     pub fn new() -> Self {
-        Self { deployment: None, key_for: None, request_row: None, request: request::Request::default() }
+        Self { deployment: None, selection: Selection::default(), request: request::Request::default() }
     }
 
     pub(crate) fn configure(&mut self, owner: bool, next: &mut u64, out: &mut Queue<Request>) {
-        let deployment_key = match self.key_for {
-            Some((row, _)) => row.holder == c::AccountHolder::Deployment,
-            None => false,
-        };
-        if !owner && self.deployment.is_some() && deployment_key {
+        if !owner && self.deployment.is_some() && self.selection.holder == c::AccountHolder::Deployment {
             self.request.clear_key();
             self.request.confirm = None;
-            self.key_for = None;
+            self.selection.provider = None;
+            self.selection.account = None;
+            self.selection.source = None;
         }
         if owner && self.deployment.is_none() {
             let handle = Handle { asker: Owner::Pages.asker(), number: *next };
@@ -86,7 +90,7 @@ impl Accounts {
     pub(crate) fn leave(&mut self, out: &mut Queue<Request>) {
         self.request.clear_key();
         self.request.confirm = None;
-        self.key_for = None;
+        self.selection = Selection::default();
         if let Some(handle) = self.deployment.take() {
             out.push(Request::Client(jig_client::Event::Unwatch { handle }));
         }

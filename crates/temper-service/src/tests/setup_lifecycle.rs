@@ -628,7 +628,13 @@ fn pending_reconcile_wakes_the_loop_only_when_a_run_slot_is_available() {
         .runs
         .insert(
             token,
-            Run { forge: 2, kind: Kind::Install, internal: false, previous: domain::Connection::NotConnected },
+            Run {
+                first: None,
+                forge: 2,
+                kind: Kind::Install,
+                internal: false,
+                previous: domain::Connection::NotConnected,
+            },
         )
         .unwrap();
     assert!(

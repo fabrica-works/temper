@@ -40,6 +40,33 @@ pub enum Connection {
     Connected { id: u64, login: Box<[u8]> },
     Stopped { reason: Box<[u8]> },
 }
+/// The project selected for the first repository (protocol/setup.md, 6.7).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SetUpProject {
+    Existing(u32),
+    New(Box<[u8]>),
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CreateStep {
+    Admin,
+    Org,
+    Repository,
+    File,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FirstState {
+    Making,
+    Made { id: u64 },
+    Failed { step: CreateStep },
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct First {
+    pub org: Box<[u8]>,
+    pub repository: Box<[u8]>,
+    pub project: SetUpProject,
+    pub state: FirstState,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
     pub number: u16,
@@ -47,6 +74,7 @@ pub struct Row {
     pub mode: Mode,
     pub connection: Connection,
     pub offer: Offer,
+    pub first: Option<First>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SetUpOutcome {
@@ -59,6 +87,8 @@ pub enum SetUpRefusal {
     NotOffered,
     NotUnderTheBox,
     Busy,
+    NewProject,
+    Invalid,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SetUpAnswer {
@@ -76,8 +106,17 @@ pub fn watch(limits: &super::Limits) -> Option<Watchable> {
     })
 }
 #[must_use]
-pub fn ask(forge: u16, limits: &super::Limits) -> Option<Ask> {
-    Some(Ask::Family { scope: c::Scope::Deployment, record: family::set_up(forge, &wire_limits(limits)?)? })
+pub fn ask(
+    forge: u16,
+    org: Box<[u8]>,
+    repository: Box<[u8]>,
+    project: SetUpProject,
+    limits: &super::Limits,
+) -> Option<Ask> {
+    Some(Ask::Family {
+        scope: c::Scope::Deployment,
+        record: family::set_up(forge, org, repository, project, &wire_limits(limits)?)?,
+    })
 }
 #[must_use]
 pub fn answer(answer: &Answered, limits: &super::Limits) -> Option<SetUpAnswer> {
@@ -154,7 +193,11 @@ pub(crate) fn set_up(
     {
         return;
     }
-    let Some(ask) = ask(forge, &limits) else { return };
+    let Some(ask) =
+        ask(forge, b"work".as_slice().into(), b"hello".as_slice().into(), SetUpProject::Existing(1), &limits)
+    else {
+        return;
+    };
     side.serial = side.serial.checked_add(1).expect("forge request serial fits");
     let request = skein_lib::Token::new(side.serial);
     side.set_up = Some(SetUp { forge, request, progress: Some(skein_lib::RequestProgress::Parked), answer: None });

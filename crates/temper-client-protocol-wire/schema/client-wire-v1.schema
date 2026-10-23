@@ -1,4 +1,4 @@
-family temper-client-wire 5
+family temper-client-wire 6
 
 # The role, as temper-engine-domain-forge's Role, in its order.
 enum Role { owned, adopted, fork, context }
@@ -9,10 +9,14 @@ enum Role { owned, adopted, fork, context }
 record Adopt { project: u32 home: bool forge: u16 owner: bytes 1024 name: bytes 1024 prefix: bytes 1024 role: Role landing: bytes 1024 ci: bool checks: list 64 u32 }
 
 # The family's keyed requests and setup outcome (client/README.md, 4.6).
-record SetUp { forge: u16 }
+# Enum payloads are records in the schema grammar.
+record ExistingProject { project: u32 }
+record NewProject { name: bytes 1024 }
+enum SetUpProject { existing: ExistingProject, new: NewProject }
+record SetUp { forge: u16 org: bytes 1024 repository: bytes 1024 project: SetUpProject }
 enum Request { adopt: Adopt, set_up: SetUp }
 versioned record Requesting { request: Request }
-enum SetUpRefusal { not_offered, not_under_the_box, busy }
+enum SetUpRefusal { not_offered, not_under_the_box, busy, new_project, invalid }
 record SetUpRefused { why: SetUpRefusal }
 
 # The deployment's forges, in number order (client/README.md, 4.6).
@@ -27,7 +31,12 @@ enum Connection { not_connected, not_set_up, setting_up: SettingUp, set_up_faile
 # Whether the deployment offers to set the forge up here (client/README.md, 4.6):
 # the forge domain's, from its configuration, the box and its state.
 enum Offer { not_offered, not_under_the_box, offered }
-record ForgeRow { number: u16 kind: Kind mode: Mode connection: Connection offer: Offer }
+enum CreateStep { admin, org, repository, file }
+record Made { id: u64 }
+record CreateFailed { step: CreateStep }
+enum FirstState { making, made: Made, failed: CreateFailed }
+record FirstRepository { org: bytes 1024 repository: bytes 1024 project: SetUpProject state: FirstState }
+record ForgeRow { number: u16 kind: Kind mode: Mode connection: Connection offer: Offer first: option FirstRepository }
 versioned record Forges { forges: list 16 ForgeRow }
 
 # The family's read name and its demo answer (client/README.md, 4.6).

@@ -1,8 +1,6 @@
 //! temper's style tokens and their names (client/browser.md, 2.5), as jig's `jig-client-shell-web` `look.rs`.
 use crate::frame::owner;
 use skein_ui::{Style, look::Names};
-/// A folded account.
-pub const ACCOUNT_ROW: Style = Style { owner: owner(), token: 123 };
 /// The frame's banner.
 pub const BANNER: Style = Style { owner: owner(), token: 0 };
 /// The frame's navigation.
@@ -377,7 +375,6 @@ pub const NAMES: Names<'static> = Names {
         b"temper-forges",
         b"temper-forge-row",
         b"temper-setup-strip",
-        b"temper-account-row",
     ],
     regions: &[b"temper-link"],
 };

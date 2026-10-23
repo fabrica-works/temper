@@ -3,13 +3,14 @@ use super::{Ended, Scratch, WITHIN, cluster, ctl};
 use serde_json::{Value, json};
 use skein_fake_llm_domain::api::{Finish, Line, Rule, Script};
 use skein_io::kernel::Exit;
-use skein_lib::{Time, base64};
+use skein_lib::{Duration, Time, base64};
 use skein_shell::{Clock, Host};
 use skein_world::{Referee, real};
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fs,
-    net::SocketAddr,
+    io::{Read, Write},
+    net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
 };
 use temper_real_loop_world::{
@@ -21,12 +22,16 @@ use temper_real_loop_world::{
     forge::Fixture,
 };
 
+// domain/testing.md, 2.6: pass at least every 20 ms while PLACED's release is due.
+const PLACED_RELEASE_INTERVAL: Duration = Duration::from_millis(20);
+
 pub struct Run {
     calls: Vec<Ended>,
     told: Vec<Told>,
     kit: Kit,
     workers: BTreeMap<u64, String>,
     steps: Vec<calls::Step>,
+    first_workers: BTreeMap<u64, String>,
 }
 impl Run {
     #[must_use]
@@ -48,7 +53,11 @@ impl Run {
         Observed { documents, told: self.told.clone(), commands: Vec::new(), kit: self.kit.clone() }
             .with_commands(&self.steps)
     }
-    /// Placement only where an act's document retains a live observation channel.
+    #[must_use]
+    pub fn first_placed(&self) -> &BTreeMap<u64, String> {
+        &self.first_workers
+    }
+    /// Placement only where a document retains a live observation channel.
     #[must_use]
     pub fn placed(&self) -> &BTreeMap<u64, String> {
         &self.workers
@@ -82,7 +91,10 @@ fn encode(scripts: &[Script], rules: &[Box<[Rule]>]) -> Value {
                                 "call": text(name),
                                 "arguments": serde_json::from_slice::<Value>(arguments).expect("arguments")
                             }),
-                            other @ (Line::Fail { .. } | Line::Pieces { .. } | Line::Opaque { .. }) => {
+                            Line::Pieces { pieces } => json!({"pieces":pieces.iter().map(|piece| json!({
+                                "text":text(&piece.text),"hold":piece.hold.as_deref().map(text)
+                            })).collect::<Vec<_>>()}),
+                            other @ (Line::Fail { .. } | Line::Opaque { .. }) => {
                                 panic!("case script line unsupported: {other:?}")
                             }
                         })
@@ -147,13 +159,15 @@ pub fn run(
     steps: Vec<calls::Step>,
     placed: &[u64],
 ) -> Run {
-    assert_eq!(workers, ["ws", "s1"], "opener's workers");
+    assert_eq!(workers, ["ws", "s1", "s2"], "case cast");
+    let late = steps.iter().any(|step| matches!(step, calls::Step::AddWorker { .. }));
     let clock = Clock::new();
     let began = clock.now().now;
     let scratch = Scratch::new(&format!("case_process_{}", std::process::id()));
     let mut description = cluster::Cluster::read(scratch.path());
     description.rename("w1", "ws");
     description.rename("w2", "s1");
+    description.copy("s1", "s2");
     description.record_llm();
     let [hosts] = super::free_addresses(&[]);
     description.bind("proc.engine.ready.workers", &hosts.to_string());
@@ -164,7 +178,8 @@ pub fn run(
         Some(skein_fake_forge_domain::api::Cue::File { path, green }) => {
             json!({"path":text(&path),"green":text(&green)})
         }
-        other => panic!("case CI cue: {other:?}"),
+        Some(skein_fake_forge_domain::api::Cue::Message { .. }) => panic!("case forge message cue unsupported"),
+        None => Value::Null,
     };
     document["owner"] = "acme".into();
     document["repositories"] = json!([
@@ -197,6 +212,16 @@ pub fn run(
         placed: placed.to_vec(),
         run: result.clone(),
         stopped: false,
+        late,
+        control: None,
+        placed_release: None,
+        assigned: BTreeSet::new(),
+        channels: BTreeMap::new(),
+        workers: BTreeMap::new(),
+        first_workers: BTreeMap::new(),
+        processed: 0,
+        stopped_links: None,
+        admin_token: Vec::new(),
     });
     for root in roots {
         world.spawn(|| root);
@@ -214,6 +239,13 @@ enum Stage {
     Engine,
     Ws,
     S1,
+    S2,
+    Added { target: usize },
+    Placed,
+    BeforeAdd,
+    Stopping,
+    Starting { target: usize },
+    BeforeStop,
     Acts,
     Provision,
     Live,
@@ -241,6 +273,16 @@ struct Judge {
     placed: Vec<u64>,
     run: std::rc::Rc<std::cell::RefCell<Option<Run>>>,
     stopped: bool,
+    late: bool,
+    control: Option<SocketAddr>,
+    placed_release: Option<Time>,
+    assigned: BTreeSet<String>,
+    channels: BTreeMap<u64, u64>,
+    workers: BTreeMap<u64, String>,
+    first_workers: BTreeMap<u64, String>,
+    processed: usize,
+    stopped_links: Option<usize>,
+    admin_token: Vec<u8>,
 }
 impl Judge {
     fn mark(&mut self, phase: &'static str, now: Time) {
@@ -261,22 +303,68 @@ impl Judge {
     fn configure(&mut self) {
         let engine_dir = self.members.prepare("engine");
         let ws_dir = self.members.prepare("ws");
-        let s1_dir = self.members.prepare("s1");
         let mut value = read(&engine_dir.join("config/temper.json"));
-        let mut ws = read(&ws_dir.join("config/temper.json"));
-        let mut s1 = read(&s1_dir.join("config/temper.json"));
+        let ws = read(&ws_dir.join("config/temper.json"));
         let mut agent = read(&ws_dir.join("config/agent.json"));
+        // With a control listener, the fake's ready line names provider then control.
+        let mut addresses = self.members.capture("llm", "address").expect("LLM addresses").split_whitespace();
+        let llm: SocketAddr = addresses.next().expect("LLM provider").parse().expect("provider socket");
+        let control = addresses.next().map(|address| address.parse::<SocketAddr>().expect("control socket"));
+        assert_eq!(control, self.control, "LLM control ready at its reserved address");
+        assert!(addresses.next().is_none(), "only provider and control addresses");
+        value["engine"]["llm"]["endpoints"][0]["address"] = json!({"socket":llm.to_string()});
+        agent["endpoints"][0]["address"] = llm.to_string().into();
         value["workers"] = ws["workers"].clone();
         value["application"]["workers"] = ws["application"]["workers"].clone();
         base(&mut value, &engine_dir.join("config/charters/chat.txt"));
         let forge = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
+        // The fake forge removes its token file when it ends, so the token is read while it runs.
+        let document = read(&self.members.dir("forge").join("forge.json"));
+        self.admin_token =
+            fs::read(document["admin_token"].as_str().expect("admin token file")).expect("fake admin token");
         (self.fixture.configure)(&mut value, &mut agent, forge);
+        // The forge's credential comes from its setup, so 4.6 adopts the fixture's repositories too.
         setup(&mut value, forge, &self.members.dir("forge").join("setup"), &self.git);
         super::configuration::turn_bounds::apply(&mut value, super::configuration::turn_bounds::turn_body(&agent));
         value["engine"]["hosts"]["listener"] = json!([{"socket":self.hosts.to_string()}]);
+        for key in ["fleet.workers", "fleet.attempts"] {
+            // tests/real-loop/src/cluster.rs: one admitted position/attempt per worker.
+            value["engine"]["limits"]["overrides"][key] = 3.into();
+        }
+        // accounts' program hosts hold documents.lines rows (jig documents/programs.rs `hosts`);
+        // the lab's 2 would cut s2 from the placement read.
+        value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
         value["engine"]["hosts"]["workers"][0]["name"] = "ws".into();
         value["engine"]["hosts"]["workers"][1]["name"] = "s1".into();
-        for (name, worker, dir) in [("ws", &mut ws, &ws_dir), ("s1", &mut s1, &s1_dir)] {
+        value["engine"]["hosts"]["workers"]
+            .as_array_mut()
+            .expect("hosts")
+            .push(json!({"name":"s2","digest":"secrets/s2.digest"}));
+        let secret = b"s2-case-fixture-secret";
+        let mut hash = skein_lib::sha256::Sha256::new();
+        hash.update(secret);
+        let digest = hash.finish().iter().fold(String::new(), |mut hex, byte| {
+            use std::fmt::Write as _;
+            write!(hex, "{byte:02x}").expect("hex");
+            hex
+        });
+        super::write_private(&engine_dir.join("data/secrets/s2.digest"), digest.as_bytes());
+        for name in ["ws", "s1", "s2"] {
+            let dir = if name == "ws" { ws_dir.clone() } else { self.members.prepare(name) };
+            let mut worker = read(&dir.join("config/temper.json"));
+            if name == "s2" {
+                // Copy keeps the source templates; give the new member its own paths and secret.
+                let source = self.members.dir("s1");
+                worker = serde_json::from_str(
+                    &serde_json::to_string(&worker)
+                        .expect("worker")
+                        .replace(source.to_str().expect("source path"), dir.to_str().expect("worker path")),
+                )
+                .expect("copied worker");
+                fs::remove_file(dir.join("data/secrets/w2.secret")).expect("remove copied secret");
+                worker["workers"][0]["secret"] = "secrets/s2.secret".into();
+                super::write_private(&dir.join("data/secrets/s2.secret"), secret);
+            }
             let mut shaped = value["workers"][0].clone();
             // Preserve this member's independent paths and secret, copying only fixture policy.
             shaped["name"] = name.into();
@@ -285,7 +373,7 @@ impl Judge {
             worker["workers"] = json!([shaped]);
             worker["application"]["limits"] = value["application"]["limits"].clone();
             worker["application"]["workers"][0]["git"] = self.git.to_str().expect("git path").into();
-            write(&dir.join("config/temper.json"), worker);
+            write(&dir.join("config/temper.json"), &worker);
             write(&dir.join("config/agent.json"), &agent);
         }
         value["workers"] = json!([]);
@@ -334,11 +422,10 @@ impl Judge {
             })
             .collect()
     }
-    fn advance(&mut self, now: Time, root: &mut cluster::Root) {
-        use calls::Step;
+    fn prepare_calls(&mut self, root: &mut cluster::Root) -> bool {
         let batch = Self::calls(root);
         if !batch.foreground_idle() {
-            return;
+            return false;
         }
         self.calls = self
             .slots
@@ -348,6 +435,16 @@ impl Judge {
                 Ended { exit: ended.exit, stdout: ended.stdout.clone(), stderr: ended.stderr.clone() }
             })
             .collect();
+        for ended in &batch.ends()[self.processed..] {
+            if ended.exit.is_none() {
+                continue;
+            }
+            success(ended);
+            if let Ok(document) = serde_json::from_slice::<Value>(&ended.stdout) {
+                live_channels(&document, &mut self.channels);
+            }
+        }
+        self.processed = batch.ends().len();
         if !self.provisioning && self.calls.len() == 1 {
             self.provisioning = true;
             let key = self.members.dir("llm").join("llm.key");
@@ -361,16 +458,22 @@ impl Judge {
             ])));
             batch.push(ctl::Step::Run(ctl::Call::new(&["wait", "accounts", "--until", "usable"])));
             self.stage = Stage::Provision;
-            return;
+            return false;
         }
-        if self.live.is_none()
-            && matches!(self.ran.last(), Some(Step::Call { argv, .. }) if self.arguments(argv)[0] == "chat")
+        if matches!(self.ran.last(), Some(calls::Step::Call { argv, .. }) if self.arguments(argv)[0] == "chat")
+            && !matches!(self.live.as_ref(), Some(value) if value["chat_act"] == self.ran.len())
         {
             // The harness's own read, as the provisioning is: the director's chat
             // can end before an act reads it live, and an ended document names no
             // worker, so read its running document once.
-            self.live = Some(Value::Null);
-            let director = temper_real_loop_world::case::DIRECTOR.to_string();
+            let director = text(&self.calls.last().expect("chat call").stdout)
+                .split("done: task ")
+                .nth(1)
+                .expect("chat task")
+                .split(|c: char| !c.is_ascii_digit())
+                .next()
+                .expect("task")
+                .to_owned();
             batch.push(ctl::Step::Run(ctl::Call::new(&[
                 "wait",
                 "task",
@@ -380,8 +483,16 @@ impl Judge {
                 "--json",
             ])));
             self.stage = Stage::Live;
+            return false;
+        }
+        true
+    }
+    fn advance(&mut self, now: Time, root: &mut cluster::Root) {
+        use calls::Step;
+        if !self.prepare_calls(root) {
             return;
         }
+        let batch = Self::calls(root);
         let Some(step) = self.steps.pop_front() else {
             self.mark("acts", now);
             batch.push(ctl::Step::Run(ctl::Call::new(&["accounts", "--json"])));
@@ -396,7 +507,10 @@ impl Judge {
             }
             Step::Call { at, argv } => {
                 assert_eq!(at.0, 1);
-                let args = self.arguments(argv);
+                let mut args = self.arguments(argv);
+                if args.first().is_some_and(|verb| verb == "wait") && !args.iter().any(|arg| arg == "--json") {
+                    args.push("--json".into());
+                }
                 self.slots.push(batch.ends().len());
                 batch.push(ctl::Step::Run(ctl::Call::new(&args.iter().map(String::as_str).collect::<Vec<_>>())));
             }
@@ -419,9 +533,25 @@ impl Judge {
                 assert!(*call < self.slots.len());
                 batch.push(ctl::Step::Join);
             }
-            Step::AddWorker { .. } => panic!("AddWorker unsupported"),
-            Step::StopWorker { .. } => panic!("StopWorker unsupported"),
-            Step::StartWorker { .. } => panic!("StartWorker unsupported"),
+            Step::AddWorker { name } => {
+                assert_eq!(*name, "s2");
+                batch.push(ctl::Step::Run(ctl::Call::new(&["accounts", "--json"])));
+                self.stage = Stage::BeforeAdd;
+            }
+            Step::StopWorker { name } => {
+                assert_eq!(*name, "ws");
+                batch.push(ctl::Step::Run(ctl::Call::new(&["accounts", "--json"])));
+                self.stage = Stage::BeforeStop;
+            }
+            Step::StartWorker { name } => {
+                assert_eq!(*name, "ws");
+                assert!(self.members.ended(name), "{name} stayed ended through the chat's ending");
+                assert_eq!(Some(self.members.linked(name)), self.stopped_links, "{name} stayed unlinked");
+                self.stopped_links = None;
+                let target = self.members.linked(name) + 1;
+                self.members.restart(name);
+                self.stage = Stage::Starting { target };
+            }
             Step::FixtureReady => panic!("FixtureReady unsupported"),
             Step::Advance => panic!("Advance unsupported"),
             Step::ReleaseHold { .. } => panic!("ReleaseHold unsupported"),
@@ -431,11 +561,88 @@ impl Judge {
             Step::SameParty { .. } => panic!("SameParty unsupported"),
             Step::Held { .. } => panic!("Held unsupported"),
             Step::Kill { .. } => panic!("Kill unsupported"),
-            Step::Watching { .. } => panic!("Watching unsupported"),
+            Step::Watching { call } => {
+                let slot = *self.slots.get(*call).expect("Watching names a started call");
+                assert!(batch.ends()[slot].exit.is_none(), "Watching call {call} already ended");
+                // No delivery barrier: ended documents are retained (domain/testing.md, 2.6).
+            }
             Step::Terminal(_) => panic!("Terminal unsupported"),
         }
         // The oracle's commands are the acts' verbs (Observed::with_commands).
         self.ran.push(step);
+    }
+}
+impl Judge {
+    fn release_placed(&mut self, now: Time) {
+        if matches!(self.stage, Stage::Accounts | Stage::Stop) {
+            self.placed_release = None;
+            return;
+        }
+        if let Some(control) = self.control {
+            // The placement read follows s2's start; all three are started by then.
+            // Cache the cumulative predicate instead of reading placement on each pass.
+            if self.placed_release.is_none() && !["ws", "s1", "s2"].iter().all(|name| self.assigned.contains(*name)) {
+                return;
+            }
+            release(control);
+            self.placed_release = Some(now.saturating_add(PLACED_RELEASE_INTERVAL));
+        }
+    }
+    fn start_llm(&mut self, now: Time) {
+        self.mark("forge ready", now);
+        let address = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
+        let directory = self.members.prepare("llm");
+        let path = directory.join("llm.json");
+        let mut document = read(&path);
+        document["models"] =
+            json!([{"name":"fake","window":1_048_576,"output":8192},{"name":"owner","window":1_048_576,"output":8192}]);
+        document["cued"] = encode(&(self.scripts)(address), &(self.rules)());
+        if has_holds(&document["cued"]) {
+            let [control] = super::free_addresses(&[address, self.hosts]);
+            self.control = Some(control);
+            document["control"] = json!({"socket":control.to_string()});
+        }
+        write(&path, &document);
+        self.members.up(&["llm"]);
+        self.stage = Stage::Llm;
+    }
+    fn add_worker(&mut self, root: &mut cluster::Root) {
+        let document = ctl::json(Self::calls(root).ends().last().expect("before add"));
+        self.map_channels(&document);
+        for name in ["ws", "s1"] {
+            assert!(self.assigned.contains(name), "{name} held a run before s2 started");
+        }
+        let target = self.members.linked("s2") + 1;
+        self.members.up(&["s2"]);
+        self.stage = Stage::Added { target };
+    }
+    fn record_placement(&mut self, root: &mut cluster::Root) {
+        let batch = Self::calls(root);
+        for call in &batch.ends()[self.processed..] {
+            success(call);
+            live_channels(&ctl::json(call), &mut self.channels);
+        }
+        self.processed = batch.ends().len();
+        let accounts = ctl::json(batch.ends().last().expect("placement hosts"));
+        self.map_channels(&accounts);
+        assert!(
+            ["ws", "s1", "s2"].iter().all(|name| self.assigned.contains(*name)),
+            "every started worker held a run: assigned {:?}; channels {:?}; placed {:?}; accounts {accounts}",
+            self.assigned,
+            self.channels,
+            self.workers
+        );
+        self.stage = Stage::Acts;
+    }
+    fn finish_acts(&mut self, now: Time, root: &mut cluster::Root) {
+        let accounts = Self::calls(root).ends().last().expect("post-act accounts");
+        success(accounts);
+        let accounts = ctl::json(accounts);
+        self.collect(&accounts);
+        self.mark("reads", now);
+        Self::calls(root).release();
+        self.members.stop();
+        self.stage = Stage::Stop;
     }
 }
 impl Referee<cluster::Root> for Judge {
@@ -443,22 +650,16 @@ impl Referee<cluster::Root> for Judge {
         self.members.act(now, roots);
         if self.members.failed() {
             self.stage = Stage::Stop;
+            self.placed_release = None;
             return;
+        }
+        if let Some(links) = self.stopped_links {
+            assert!(self.members.ended("ws"), "ws remains ended until StartWorker");
+            assert_eq!(self.members.linked("ws"), links, "ws did not relink before StartWorker");
         }
         let root = roots.last_mut().expect("client root");
         match self.stage {
-            Stage::Forge if self.members.is_up() => {
-                self.mark("forge ready", now);
-                let address = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
-                let directory = self.members.prepare("llm");
-                let path = directory.join("llm.json");
-                let mut document = read(&path);
-                document["models"] = json!([{"name":"fake","window":1_048_576,"output":8192},{"name":"owner","window":1_048_576,"output":8192}]);
-                document["cued"] = encode(&(self.scripts)(address), &(self.rules)());
-                write(&path, &document);
-                self.members.up(&["llm"]);
-                self.stage = Stage::Llm;
-            }
+            Stage::Forge if self.members.is_up() => self.start_llm(now),
             Stage::Llm if self.members.is_up() => {
                 self.mark("llm ready", now);
                 self.configure();
@@ -477,20 +678,41 @@ impl Referee<cluster::Root> for Judge {
             }
             Stage::S1 if self.members.is_up() => {
                 self.mark("s1 ready", now);
+                if self.late {
+                    self.queue(root);
+                    self.stage = Stage::Acts;
+                } else {
+                    self.members.up(&["s2"]);
+                    self.stage = Stage::S2;
+                }
+            }
+            Stage::S2 if self.members.is_up() => {
                 self.queue(root);
                 self.stage = Stage::Acts;
             }
-            Stage::Acts => self.advance(now, root),
-            Stage::Accounts if Self::calls(root).foreground_idle() => {
-                let accounts = Self::calls(root).ends().last().expect("post-act accounts");
-                success(accounts);
-                let accounts = ctl::json(accounts);
-                self.collect(&accounts);
-                self.mark("reads", now);
-                Self::calls(root).release();
-                self.members.stop();
-                self.stage = Stage::Stop;
+            Stage::BeforeAdd if Self::calls(root).foreground_idle() => self.add_worker(root),
+            Stage::Added { target } if self.members.linked("s2") == target => {
+                let task = temper_real_loop_world::case::BENCHMARK.to_string();
+                let batch = Self::calls(root);
+                batch.push(ctl::Step::Run(ctl::Call::new(&["wait", "task", &task, "--until", "replied", "--json"])));
+                batch.push(ctl::Step::Run(ctl::Call::new(&["accounts", "--json"])));
+                self.stage = Stage::Placed;
             }
+            Stage::Placed if Self::calls(root).foreground_idle() => self.record_placement(root),
+            Stage::BeforeStop if Self::calls(root).foreground_idle() => {
+                self.map_channels(&ctl::json(Self::calls(root).ends().last().expect("first life hosts")));
+                self.first_workers = std::mem::take(&mut self.workers);
+                self.channels.clear();
+                self.members.stop_one("ws");
+                self.stage = Stage::Stopping;
+            }
+            Stage::Stopping if self.members.ended("ws") && Self::calls(root).foreground_idle() => {
+                self.stopped_links = Some(self.members.linked("ws"));
+                self.stage = Stage::Acts;
+            }
+            Stage::Starting { target } if self.members.linked("ws") == target => self.stage = Stage::Acts,
+            Stage::Acts => self.advance(now, root),
+            Stage::Accounts if Self::calls(root).foreground_idle() => self.finish_acts(now, root),
             Stage::Provision if Self::calls(root).foreground_idle() => {
                 for call in Self::calls(root).ends() {
                     success(call);
@@ -500,7 +722,8 @@ impl Referee<cluster::Root> for Judge {
             Stage::Live if Self::calls(root).foreground_idle() => {
                 let read = Self::calls(root).ends().last().expect("director's running read");
                 success(read);
-                self.live = Some(ctl::json(read));
+                live_channels(&ctl::json(read), &mut self.channels);
+                self.live = Some(json!({"chat_act":self.ran.len()}));
                 self.stage = Stage::Acts;
             }
             Stage::Forge
@@ -508,27 +731,54 @@ impl Referee<cluster::Root> for Judge {
             | Stage::Engine
             | Stage::Ws
             | Stage::S1
+            | Stage::S2
+            | Stage::BeforeAdd
+            | Stage::Added { .. }
+            | Stage::Placed
+            | Stage::BeforeStop
+            | Stage::Stopping
+            | Stage::Starting { .. }
             | Stage::Provision
             | Stage::Live
             | Stage::Accounts
             | Stage::Stop => {}
         }
+        self.release_placed(now);
     }
     fn observe(&mut self, now: Time, roots: &[cluster::Root]) {
         self.members.observe(now, &roots[..roots.len() - 1]);
+        if self.members.failed() {
+            // Once drained, report the member's failure before checking the story's cast.
+            let _ = self.members.passed();
+            return;
+        }
         if let Some(stopped) = self.members.stopped() {
             assert_eq!(
                 stopped.iter().map(|member| member.name.as_str()).collect::<Vec<_>>(),
-                ["s1", "ws", "engine", "llm", "forge"]
+                if self.late {
+                    vec!["s2", "s1", "ws", "engine", "llm", "forge"]
+                } else {
+                    // ws's first life by its act, then the cast in reverse start order: ws's second life last started.
+                    vec!["ws", "ws", "s2", "s1", "engine", "llm", "forge"]
+                }
             );
-            for worker in ["ws", "s1"] {
+            for worker in ["ws", "s1", "s2"] {
                 assert_eq!(
                     self.members.linked(worker),
-                    1,
-                    "{worker} linked once: the act's channel still maps to this link"
+                    if !self.late && worker == "ws" { 2 } else { 1 },
+                    "{worker} linked once per life"
                 );
             }
             for member in stopped {
+                if ["ws", "s1", "s2"].contains(&member.name.as_str()) {
+                    assert_eq!(
+                        member.stderr.split(|byte| *byte == b'\n').filter(|line| line.starts_with(b"linked ")).count(),
+                        1,
+                        "{} life {} linked once",
+                        member.name,
+                        member.life
+                    );
+                }
                 assert_eq!(
                     member.exit,
                     Some(Exit::Code(0)),
@@ -548,7 +798,11 @@ impl Referee<cluster::Root> for Judge {
                         json!({"observations_lost":0})
                     );
                 }
-                self.check_workspaces();
+                if self.late {
+                    self.check_workspaces();
+                } else {
+                    self.check_tokens();
+                }
                 self.stopped = true;
                 self.mark("stop", now);
                 eprintln!("case processes: {:?}", self.phases);
@@ -556,7 +810,7 @@ impl Referee<cluster::Root> for Judge {
         }
     }
     fn next_deadline(&self) -> Option<Time> {
-        Some(self.members.next_deadline().map_or(self.deadline, |at| at.min(self.deadline)))
+        Some(self.members.next_deadline().into_iter().chain(self.placed_release).fold(self.deadline, Time::min))
     }
     fn overdue(&self, now: Time) -> Option<String> {
         (now >= self.deadline).then(|| {
@@ -658,48 +912,76 @@ impl Judge {
             .map(|line| serde_json::from_str(line).expect("forge JSON"))
             .collect();
         assert_eq!(rows.last().expect("forge checkpoint")["observations_lost"], 0);
-        let merged = rows
-            .iter()
-            .rev()
-            .find(|row| row["observation"] == "merged" && row["repository"] == "acme/app")
-            .expect("kit merged");
-        let head = merged["head"].as_u64().expect("merged head");
-        let merge = merged["commit"].as_u64().expect("merge commit");
-        let mut checks = BTreeMap::new();
-        for row in &rows {
-            if std::ptr::eq(row, merged) {
-                break;
+        let kit = if self.late {
+            let merged = rows
+                .iter()
+                .rev()
+                .find(|row| row["observation"] == "merged" && row["repository"] == "acme/app")
+                .expect("kit merged");
+            let head = merged["head"].as_u64().expect("merged head");
+            let merge = merged["commit"].as_u64().expect("merge commit");
+            let mut checks = BTreeMap::new();
+            for row in &rows {
+                if std::ptr::eq(row, merged) {
+                    break;
+                }
+                if row["observation"] == "reported" && row["repository"] == "acme/app" && row["commit"] == head {
+                    checks.insert(row["context"].as_str().expect("check context"), row["state"] == "passed");
+                }
             }
-            if row["observation"] == "reported" && row["repository"] == "acme/app" && row["commit"] == head {
-                checks.insert(row["context"].as_str().expect("check context"), row["state"] == "passed");
-            }
+            let green = !checks.is_empty() && checks.values().all(|passed| *passed);
+            let address = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
+            let objects = super::github::objects(address, merge);
+            let object = objects["objects"]
+                .as_array()
+                .expect("objects")
+                .iter()
+                .find(|object| object["commit"] == merge)
+                .expect("merge object");
+            let main = object["tree"]
+                .as_array()
+                .expect("main tree")
+                .iter()
+                .map(|file| (decode(&file["path"]), decode(&file["content"])))
+                .collect();
+            Kit { main, merged_green: green }
+        } else {
+            assert!(!rows.iter().any(|row| row["observation"] == "merged"), "restart story merges nothing");
+            Kit { main: BTreeMap::new(), merged_green: false }
+        };
+        for call in &self.calls {
+            success(call);
         }
-        let green = !checks.is_empty() && checks.values().all(|passed| *passed);
-        let address = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
-        let objects = super::github::objects(address, merge);
-        let object = objects["objects"]
-            .as_array()
-            .expect("objects")
-            .iter()
-            .find(|object| object["commit"] == merge)
-            .expect("merge object");
-        let main = object["tree"]
-            .as_array()
-            .expect("main tree")
-            .iter()
-            .map(|file| (decode(&file["path"]), decode(&file["content"])))
-            .collect();
-        let workers = self.placements(accounts);
+        self.map_channels(accounts);
+        let workers = std::mem::take(&mut self.workers);
         *self.run.borrow_mut() = Some(Run {
             calls: std::mem::take(&mut self.calls),
             told,
-            kit: Kit { main, merged_green: green },
+            kit,
             workers,
             steps: std::mem::take(&mut self.ran),
+            first_workers: std::mem::take(&mut self.first_workers),
         });
     }
 }
 impl Judge {
+    fn check_tokens(&self) {
+        let token = &self.admin_token;
+        assert!(!token.is_empty());
+        for name in ["ws", "s1", "s2"] {
+            let dir = self.members.dir(name);
+            let worker = read(&dir.join("config/temper.json"));
+            let secret = worker["workers"][0]["secret"].as_str().expect("link secret");
+            for path in [dir.join("config/temper.json"), dir.join("config/agent.json"), dir.join("data").join(secret)] {
+                let bytes = fs::read(&path).expect("worker input");
+                assert!(
+                    !bytes.windows(token.len()).any(|window| window == token),
+                    "{name}: forge admin token in {}",
+                    path.display()
+                );
+            }
+        }
+    }
     fn check_workspaces(&self) {
         use temper_real_loop_world::case;
         let workspaces = |worker| {
@@ -717,34 +999,25 @@ impl Judge {
             "s1's kit workspace holds the design"
         );
     }
-    fn placements(&self, accounts: &Value) -> BTreeMap<u64, String> {
-        // jig retains a task's channel only while claimed/running. Use only JSON
-        // stdout already read: the director's running read, the acts', and the
-        // post-act accounts read with the hosts. Each worker must link exactly
-        // once; ended tasks remain a named gap.
-        let mut workers = BTreeMap::new();
-        let mut pending = BTreeMap::new();
-        for call in &self.calls {
-            success(call);
-        }
-        let documents = self.calls.iter().filter_map(|call| serde_json::from_slice::<Value>(&call.stdout).ok());
-        for document in self.live.iter().cloned().chain(documents).chain(std::iter::once(accounts.clone())) {
-            live_channels(&document, &mut pending);
-            if let Some(hosts) = document.pointer("/accounts/deployment_facts/program_hosts").and_then(Value::as_array)
-            {
-                pending.retain(|task, channel| {
-                    let Some(host) = hosts.iter().find(|host| host["channel"] == *channel && host["connected"] == true)
-                    else {
-                        return true;
-                    };
-                    if self.placed.contains(task) {
-                        workers.insert(*task, host["name"].as_str().expect("worker name").into());
-                    }
-                    false
-                });
+    fn map_channels(&mut self, accounts: &Value) {
+        let deployment = accounts
+            .pointer("/accounts/deployment_facts/program_hosts")
+            .and_then(Value::as_array)
+            .expect("worker channels");
+        let party =
+            accounts.pointer("/accounts/program_hosts").and_then(Value::as_array).expect("party worker channels");
+        // Both lists are supplied host facts in this one read; rendering may cut the later list.
+        self.channels.retain(|task, channel| {
+            let Some(host) = deployment.iter().chain(party).find(|host| host["channel"] == *channel) else {
+                return true;
+            };
+            let name = host["name"].as_str().expect("worker name");
+            self.assigned.insert(name.into());
+            if self.placed.contains(task) {
+                self.workers.insert(*task, name.into());
             }
-        }
-        workers
+            false
+        });
     }
 }
 
@@ -769,4 +1042,29 @@ fn live_channels(value: &Value, channels: &mut BTreeMap<u64, u64>) {
     {
         live_channels(child, channels);
     }
+}
+
+fn has_holds(value: &Value) -> bool {
+    value.get("hold").is_some_and(|hold| !hold.is_null())
+        || value
+            .as_object()
+            .into_iter()
+            .flat_map(serde_json::Map::values)
+            .chain(value.as_array().into_iter().flatten())
+            .any(has_holds)
+}
+fn release(address: SocketAddr) {
+    let within = std::time::Duration::from_secs(10);
+    let mut socket = TcpStream::connect_timeout(&address, within).expect("PLACED control connect");
+    socket.set_read_timeout(Some(within)).expect("control read bound");
+    socket.set_write_timeout(Some(within)).expect("control write bound");
+    let name = text(temper_real_loop_world::cluster::PLACED);
+    write!(
+        socket,
+        "POST /release/{name} HTTP/1.1\r\nHost: {address}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    )
+    .expect("PLACED release");
+    let mut response = Vec::new();
+    socket.take(4096).read_to_end(&mut response).expect("PLACED response");
+    assert!(response.starts_with(b"HTTP/1.1 204 "), "PLACED release: {}", String::from_utf8_lossy(&response));
 }

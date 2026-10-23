@@ -485,10 +485,17 @@ and `connect-forge.html`.
     isolation." and "Forgejo stops when temper box stops. Its
     repositories are kept in temper’s data directory."; and "Set up a
     Forgejo here", which sends `SetUp` and, once accepted, shows
-    Setting up. Until the set up's fields are the page's (first-repo's
-    M2), it has none: the set up asks for `work/hello` in the project
-    the person is in, else project 1, and says "Its first repository is
-    work/hello, in PROJECT; choosing them here comes later." Not under
+    Setting up. The fields: "Organization", `work` until changed;
+    "Repository", `hello`; and "Project", a choice of "PROJECT, the
+    project you are in" (an existing project: the one the person is in,
+    else project 1), chosen until changed, or "A new project", with its
+    name, the repository's until changed. An organization, repository
+    or new project's name left empty is the page's refusal,
+    "Required.". The set up's refusals show under the button in its
+    words (`README.md`, 4.6): "a new project", until jig makes projects
+    at runtime, and `invalid`, which also marks the organization and
+    repository fields invalid, the fields kept for the person to fix.
+    "Set up again" sends the fields the last `SetUp` sent. Not under
     the box: "Set it up from a terminal", "temper was not started by
     temper box, so it does not start a Forgejo itself. Run these, keep
     the last two running (a service manager is best), then restart
@@ -534,7 +541,10 @@ and `connect-forge.html`.
   adopted by the client that asked the set up: once the row says the
   first repository made, the forge's side, which keeps the `SetUp` it
   sent, sends `Adopt` of it into its project, once, on whatever page
-  the person is (`../protocol/setup.md`, 6.7), and "Open PROJECT"
+  the person is (`../protocol/setup.md`, 6.7), as `temper ctl
+  forge-setup` does (`tools.md`, 5.5): keyed `first-repository-F`, F
+  the forge's number, as the project's home unless it has one, so that
+  the two never adopt it twice; and "Open PROJECT"
   waits for its outcome; refused, the adoption's outcome shows in its
   words (`README.md`, 4.7). A client that did not send it (another
   tab, or after a reload) shows Ready on the row's made alone. With

@@ -239,6 +239,7 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    first: None,
                     number: FORGE,
                     kind: w::Kind::Forgejo,
                     mode: w::Mode::Fake,
@@ -263,6 +264,7 @@ fn forges(world: World) -> Box<[u8]> {
                     mode: w::Mode::Managed,
                     connection: w::Connection::NotConnected,
                     offer: w::Offer::NotOffered,
+                    first: None,
                 },
             )
             .expect("GitHub choice"),
@@ -287,6 +289,7 @@ fn forges(world: World) -> Box<[u8]> {
                     mode: w::Mode::Owned,
                     connection,
                     offer: w::Offer::Offered,
+                    first: None,
                 },
             )
             .expect("owned Forgejo"),
@@ -1786,16 +1789,12 @@ fn accounts(w: World, then: Then) -> c::OwnerAccounts {
     }
     let mut hosts = List::with_capacity(2);
     if w == Reference || w == Solo {
-        let names: &[(&str, &str)] = if w == Reference {
-            &[("ws", "claude-pat"), ("s1", "claude-pat-2")]
-        } else {
-            &[("laptop", "claude-robin")]
-        };
-        for (i, (name, login)) in names.iter().enumerate() {
+        let names: &[&str] = if w == Reference { &["ws", "s1"] } else { &["laptop"] };
+        for (i, name) in names.iter().enumerate() {
             let mut programs = List::with_capacity(1);
             programs
                 .push(c::OwnerProgramLogin {
-                    name: Box::from(login.as_bytes()),
+                    name: Box::from(b"Claude Code".as_slice()),
                     state: Some(c::OwnerProgramState::Usable),
                     sign_out: None,
                     cleanup: false,
