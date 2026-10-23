@@ -133,6 +133,7 @@ a chat that names none, runs with no workspace (worker.md, 4.1).
 | Tool | Family | What it does | What it names, as the run saw it | What it answers |
 |---|---|---|---|---|
 | `delegate` | delegate | makes a batch of direct delegates, each with what a party's `Create` names (jig's `domain/tasks.md`, section 4), tracked as a goal at a priority (`tracked`, the lower first) or untracked | | their numbers, their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why |
+| `change` | delegate | one change to one of the project's repositories, landed (forge.md, section 8): the run gives the words and, where the project has more than one repository it may write, which as `owner/name`; the root fills in the rest, as 4.3.1 says, and decides it as a `delegate` | | its task's number, as `delegate`'s; refused, and why: naming the project's repositories where none fits |
 | `message` | message | words, a question, or the answer to one, to a task it references (jig's `domain/tasks.md`, 8.5) | the question, for an answer | sent, with the message's number; refused: no reference, the inbox full, too large for a run to read |
 | `introduce` | message | gives two tasks it references a reference to each other | | done; refused, and why |
 | `amend` | amend and cancel | changes a live delegate (jig's `domain/tasks.md`, section 7), naming only what changes: its tracking (a priority, or untracked), its spec, wake, dependencies (the whole list), authority (whole: a deadline is its budget's, the rest restated), instructions (whole; empty leaves none) or models; with a reason, which its live run hears unless new instructions replace it | its spec's revision, as the run last read it; a tracked delegate's priority alone needs no revision | done, with the spec's revision after the commit, the one its next amendment names, and what changed; refused, and why; moved, with what it is now |
@@ -193,6 +194,35 @@ permission on it.
   `temper-engine-smith`'s `turn` takes a turn request alone, and
   answers any other request, a job's included, as not a turn
   (`Problem::Type`).
+
+#### 4.3.1 A change, in the run's words
+
+A chat cannot know what a change's `delegate` needs: the procedure's
+numbers, the repository's resource, its landing branch, the contract's
+kind and the grants a change makes. `change` takes the words alone, and
+the root builds the one delegate from what it knows, then decides it as
+any `delegate` (jig's authority, named and decided once):
+
+- **the repository:** among the project's adopted repositories it may
+  write, on forges not ended, the one named, or with no name the only
+  one; with several and no name, or a name none has, refused, naming
+  them. Never the home by default: a project's home may be another
+  forge's (the demo's);
+- **the delegate:** the change procedure (forge.md, 8.1) with the words,
+  the repository's resource and its default branch as the landing
+  branch; a change's contract;
+- **its authority, the run's own narrowed:** the run's grants of the
+  kinds a change makes (forge.md, section 6: a push, open, merge, edit,
+  update, close or reopen a pull request); the forge's charter as the
+  only kind it may delegate, and a person's role where a landing rule
+  covering the branch names a person gate; at most 4 tasks, one fewer
+  than the run has left, and a depth of at most 2; no notes; half of
+  what the run's budget has left, so that it can still read the result
+  and answer, refused when that is no more than a run's minimum. That
+  half is a default, open to tuning.
+
+A `delegate` refused for an executor or a grant says, too, that a
+repository change is `change`'s.
 
 ### 4.4 Result contracts
 

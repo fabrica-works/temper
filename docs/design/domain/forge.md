@@ -782,6 +782,9 @@ branch. Its parameters:
 - **its bounds:** repairs, resolutions, updates, and the stall of each
   wait.
 
+A chat asks for one with `change`, giving the words alone, and the root
+fills in the rest from the project (`agent.md`, 4.3.1).
+
 A goal across repositories is several change tasks, ordered by their
 dependencies: skein's change lands before temper's that bumps its lock.
 
