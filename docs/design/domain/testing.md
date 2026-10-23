@@ -956,7 +956,12 @@ and 10).
     once every started worker has held a run, read from the tasks'
     documents and their channels' hosts, as the real loop's world
     releases it at each of its iterations; a release before the reply
-    is held changes nothing, so it is sent again until the acts end.
+    is held changes nothing, so it is sent again until the acts end,
+    and, since no process shows when the reply is held and the
+    referee's passes follow its processes' events, the referee passes
+    at least every 20 ms while the release is due: the release is
+    idempotent, and the cadence decides only how soon the held reply
+    goes on, never whether a wait is met.
   - **Its referee:** the step's oracle, unchanged (5.3), over one
     `Observed` filled from the processes: the documents, `temper
     ctl`'s JSON by the acts that read them; the commands, the acts'
