@@ -32,14 +32,17 @@ pub fn scripted_sized(scripts: Box<[api::Script]>, strings: u32) -> Recipe {
     const REQUEST: u32 = 65_536;
     // Larger wire chunks keep the zero-latency real-loop peer cheap.
     const WIRE_CHUNK: u32 = 4096;
-    // The fake also parses an opaque scripted item through its request document reader.
-    let request = REQUEST.max(strings);
+    // The fake also parses an opaque scripted item through its request document
+    // reader: a later request carries the prompt and finish call beside each
+    // scripted item the conversation sends back.
+    let request = REQUEST.checked_add(strings).expect("fake request admission");
     let mut config = skein_llm_world::fake::config();
     config.latency_min = Duration::ZERO;
     config.latency_max = Duration::ZERO;
     config.script_bytes = config.script_bytes.max(strings);
     config.answer_bytes = config.answer_bytes.max(strings);
-    config.query_bytes = config.query_bytes.max(strings);
+    // The domain admits the query that request carries: prompt, tools and items.
+    config.query_bytes = config.query_bytes.max(request);
     let mut protocol = skein_llm_world::fake::limits(&skein_llm_world::limits());
     protocol.http.read = WIRE_CHUNK;
     protocol.http.send = WIRE_CHUNK;
