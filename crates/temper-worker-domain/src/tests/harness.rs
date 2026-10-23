@@ -150,8 +150,14 @@ impl Harness {
 
     /// A run with no repository, started: smith admitted it.
     pub fn started(&mut self) {
-        let assign = host::LinkDown::Assign { assignment: fixtures::assignment(false, Box::new([])) };
-        self.run(Event::Link(assign));
+        self.started_asking(host::LiveAsk::NONE);
+    }
+
+    /// A run with no repository whose assignment asks `live` of it, started.
+    pub fn started_asking(&mut self, live: host::LiveAsk) {
+        let mut assignment = fixtures::assignment(false, Box::new([]));
+        assignment.assignment.live = live;
+        self.run(Event::Link(host::LinkDown::Assign { assignment }));
         self.say(agent::Up::Admitted);
     }
 

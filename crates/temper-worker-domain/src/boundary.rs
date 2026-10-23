@@ -24,7 +24,9 @@
 //!   facts are (`domain/worker.md`, section 7).
 //! - io's agent processes and their channels, as smith's host domain defines
 //!   them (`smith_host_domain::process`), carried whole: each of its requests
-//!   is ended by the terminal its documentation names.
+//!   is ended by the terminal its documentation names. A piece of a run's
+//!   live content on a channel comes on its own, as [`Event::Live`], best
+//!   effort (`domain/worker.md`, section 7).
 //! - io's git and file operations, as the checkout defines them
 //!   (`temper_worker_domain_checkout::git`): a [`Request::Io`] is ended by one
 //!   [`Event::Done`], with `Cancelled` if a [`Request::CancelIo`] won its
@@ -76,6 +78,10 @@ pub enum Event {
     RelayCancelled { run: Token, attempt: Token, call: Box<[u8]> },
     /// A terminal of one of smith's process requests.
     Process(Box<agent::process::Event>),
+    /// A piece of a run's live content from its agent's channel, named by
+    /// the agent's token: progress for its watchdog, and the hub's to send
+    /// up (jig's `domain/hosts.md`, 6.5).
+    Live { agent: Token, piece: host::Piece },
     /// Terminal for `Decode`: smith's start, typed, or what did not decode.
     Decoded { agent: Token, start: Result<Box<agent::Start>, Invalid> },
     /// Terminal for `Encode`.
