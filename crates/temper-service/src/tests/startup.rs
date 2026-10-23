@@ -1444,6 +1444,35 @@ fn a_worker_alones_complete_envelope_must_fit_its_own_memory() {
     assert_eq!(lines(&found).as_ref(), b"workers[0].memory_bytes: the worst case passes memory_bytes by 1 bytes\n");
 }
 
+#[test]
+fn a_worker_alone_with_the_owned_examples_worker_fits_one_ring() {
+    // Linux's IORING_MAX_ENTRIES, the largest submission ring.
+    const IORING_MAX_ENTRIES: u32 = 32_768;
+    let input = fixtures::owned_worker_alone_document();
+    let directories = config::Directories::working();
+    let agent = fixtures::owned_worker_agent();
+    let mut part = crate::startup::worker_part(&input, &directories).unwrap();
+    let required = crate::system::worker_alone_worst_case(&part.worker, &agent, &part.limits).unwrap();
+    // The separate payload-memory work owns the example's memory_bytes.
+    part.worker.jig.memory = required;
+    let operations = crate::system::worker_alone_operations(
+        &part.worker.jig.limits.io,
+        crate::worker_settings::operations(&part.limits.git_component).unwrap(),
+    )
+    .unwrap();
+    let mut files = settings::Files { entries: List::with_capacity(2) };
+    for file in &part.files {
+        files
+            .entries
+            .push((file.path.clone(), skein_lib::Secret::new(b"fixture-worker-secret".as_slice().into())))
+            .unwrap();
+    }
+    let service = crate::startup::worker_alone(part, &files, &agent, fixtures::worker_runtime(), 7).unwrap();
+    assert!(service.operations() <= IORING_MAX_ENTRIES);
+    assert_eq!(service.operations(), operations, "the start's check and the ring agree");
+    assert_eq!(service.worst_case(), required);
+}
+
 fn owned_start_document(asked: bool) -> Box<[u8]> {
     let setup = br#"[{"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.test"},
         "start":"asked","mode":{"owned":{"forgejo":"/opt/forgejo","runner":null,

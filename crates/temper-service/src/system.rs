@@ -226,7 +226,7 @@ impl Service {
         let queue = prepared.room;
         let worker_operations = crate::worker_settings::operations(&limits.git_component)
             .ok_or(crate::worker_settings::problem(b"limits", What::Bound))?;
-        let operations = startup_operations(&io_limits, queue, worker_operations)
+        let operations = worker_alone_operations(&io_limits, worker_operations)
             .ok_or(crate::worker_settings::problem(b"limits", What::Bound))?;
         let bytes = worker_alone_worst_case(settings, agent, limits)
             .ok_or(crate::worker_settings::problem(b"memory_bytes", What::Bound))?;
@@ -243,7 +243,7 @@ impl Service {
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: io_limits },
             completions: Queue::with_capacity(queue),
             submissions: Queue::with_capacity(queue),
-            raw_submissions: Queue::with_capacity(queue),
+            raw_submissions: Queue::with_capacity(operations),
             told: Queue::with_capacity(queue),
             kernel: accounts::Kernel::new(operations),
             box_pipe: None,
@@ -453,6 +453,9 @@ impl Service {
     /// Maximum simultaneous kernel operations, for the shell's ring.
     #[must_use]
     pub fn operations(&self) -> u32 {
+        if self.engine.is_none() {
+            return self.raw_submissions.capacity();
+        }
         io::operations(&self.io_env.limits)
             .expect("checked io operations")
             .checked_add(self.raw_submissions.capacity().checked_mul(4).expect("component operations"))
@@ -878,6 +881,13 @@ fn checked_setup_bytes(settings: &settings::Engine) -> Option<u64> {
     }
     Some(bytes)
 }
+/// Kernel work in a worker-only process, independent of its domain's room.
+pub(crate) fn worker_alone_operations(io: &io::Limits, worker_operations: u32) -> Option<u32> {
+    // Allow staged successors beside io's in-flight operations. Every io entry
+    // point emits at most MAX_OUT_DOWN.submissions; the worker adds git's
+    // operations and closes counted by worker_settings.
+    io::operations(io)?.checked_mul(io::MAX_OUT_DOWN.submissions)?.checked_add(worker_operations)
+}
 fn startup_operations(io: &io::Limits, queue: u32, worker_operations: u32) -> Option<u32> {
     io::operations(io)?.checked_add(queue.checked_mul(4)?)?.checked_add(worker_operations)
 }
@@ -1022,12 +1032,13 @@ pub(crate) fn worker_alone_worst_case(
 ) -> Option<u64> {
     let queue = crate::worker_settings::prepare(worker, agent, limits).ok()?.room;
     let operations =
-        startup_operations(&worker.jig.limits.io, queue, crate::worker_settings::operations(&limits.git_component)?)?;
+        worker_alone_operations(&worker.jig.limits.io, crate::worker_settings::operations(&limits.git_component)?)?;
     crate::worker_worst_case(worker, agent, limits)?
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
         .checked_add(io::worst_case(&worker.jig.limits.io)?)?
         .checked_add(Queue::<Complete>::worst_case(queue)?)?
-        .checked_add(Queue::<Submit>::worst_case(queue)?.checked_mul(2)?)?
+        .checked_add(Queue::<Submit>::worst_case(queue)?)?
+        .checked_add(Queue::<Submit>::worst_case(operations)?)?
         .checked_add(Queue::<io::Event>::worst_case(queue)?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
         .checked_add(u64::from(queue).checked_mul(u64::from(worker.jig.limits.io.output).checked_add(512)?)?)?

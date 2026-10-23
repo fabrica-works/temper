@@ -1638,6 +1638,136 @@ fn the_cluster_stops_in_reverse_each_exiting_0() {
     scratch.remove();
 }
 
+// The worker retains the owned example's limits; only its memory envelope
+// is raised to the worker-only requirement while the payload work is separate.
+fn prepare_owned_worker(members: &mut support::cluster::Members) {
+    let directory = members.prepare("w1");
+    let configuration = directory.join("config");
+    let agent_path = configuration.join("agent.json");
+    let mut agent: serde_json::Value =
+        serde_json::from_str(include_str!("../../../docs/examples/owned/agent.json")).expect("owned agent");
+    agent["programs"]["claude_code"]["directory"] = directory.join("programs").to_str().expect("programs").into();
+    support::write_private(&agent_path, &serde_json::to_vec(&agent).expect("agent JSON"));
+    let example: serde_json::Value =
+        serde_json::from_str(include_str!("../../../docs/examples/owned.json")).expect("owned example");
+    let mut document = serde_json::json!({
+        "workers": example["workers"],
+        "application": {"workers": example["application"]["workers"], "limits": example["application"]["limits"]}
+    });
+    let worker = &mut document["workers"][0];
+    worker["engine"] = serde_json::json!({"socket": members.capture("engine", "workers").expect("engine listener")});
+    worker["name"] = "w1".into();
+    worker["secret"] = "secrets/w1.secret".into();
+    worker["agent"] = serde_json::json!({
+        "program": env!("CARGO_BIN_EXE_temper"), "configuration": agent_path,
+        "arguments": ["agent", agent_path]
+    });
+    // Derive through the binary's actual agent reader and process preparation.
+    worker["memory_bytes"] = (1_u64 << 52).into();
+    let arguments = [
+        "--config".to_owned(),
+        configuration.to_str().expect("config path").to_owned(),
+        "--data".to_owned(),
+        directory.join("data").to_str().expect("data path").to_owned(),
+        "--cache".to_owned(),
+        directory.join("cache").to_str().expect("cache path").to_owned(),
+    ];
+    let arguments: Vec<Box<[u8]>> = arguments.iter().map(|s| s.as_bytes().into()).collect();
+    let (directories, _) = temper::directories::resolve(&arguments, &[], b"/").expect("worker directories");
+    let (bytes, operations) = temper::envelope_in(&directories, &serde_json::to_vec(&document).expect("worker JSON"))
+        .expect("owned worker envelope");
+    assert!(operations <= 32_768, "Linux IORING_MAX_ENTRIES");
+    document["workers"][0]["memory_bytes"] = bytes.into();
+    support::write_private(&configuration.join("temper.json"), &serde_json::to_vec(&document).expect("worker JSON"));
+}
+
+enum OwnedWorkerPhase {
+    Engine,
+    Worker,
+    Linked,
+    Stopping,
+}
+struct OwnedWorkerJudge {
+    members: support::cluster::Members,
+    deadline: skein_lib::Time,
+    phase: OwnedWorkerPhase,
+}
+impl skein_world::Referee<support::cluster::Root> for OwnedWorkerJudge {
+    fn act(&mut self, now: skein_lib::Time, hosts: &mut [support::cluster::Root]) {
+        if self.members.is_up() {
+            match self.phase {
+                OwnedWorkerPhase::Engine => {
+                    let directory = self.members.prepare("engine");
+                    let path = directory.join("config/temper.json");
+                    let mut engine: serde_json::Value =
+                        serde_json::from_slice(&std::fs::read(&path).expect("engine document")).expect("engine JSON");
+                    // Negotiate the owned worker's full terms, including its turn bounds.
+                    let example: serde_json::Value =
+                        serde_json::from_str(include_str!("../../../docs/examples/owned.json")).expect("owned example");
+                    engine["engine"]["limits"] = example["engine"]["limits"].clone();
+                    engine["application"]["limits"] = example["application"]["limits"].clone();
+                    // The example's 17 s worker stop bound must fit the engine's grace.
+                    engine["engine"]["limits"]["overrides"]["fleet.grace_ms"] = 30_000.into();
+                    support::write_private(&path, &serde_json::to_vec(&engine).expect("engine JSON"));
+                    self.members.up(&["engine"]);
+                    self.phase = OwnedWorkerPhase::Worker;
+                }
+                OwnedWorkerPhase::Worker => {
+                    prepare_owned_worker(&mut self.members);
+                    self.members.up(&["w1"]);
+                    self.phase = OwnedWorkerPhase::Linked;
+                }
+                OwnedWorkerPhase::Linked => {
+                    assert_eq!(self.members.capture("w1", "engine"), self.members.capture("engine", "workers"));
+                    assert_eq!(self.members.linked("w1"), 1, "the owned worker linked");
+                    self.members.stop();
+                    self.phase = OwnedWorkerPhase::Stopping;
+                }
+                OwnedWorkerPhase::Stopping => {}
+            }
+        }
+        self.members.act(now, hosts);
+    }
+    fn observe(&mut self, now: skein_lib::Time, hosts: &[support::cluster::Root]) {
+        self.members.observe(now, hosts);
+        if let Some(stopped) = self.members.stopped() {
+            assert_eq!(stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["w1", "engine", "llm", "forge"]);
+            for member in stopped {
+                clean_cluster_exit(member);
+            }
+        }
+    }
+    fn next_deadline(&self) -> Option<skein_lib::Time> {
+        Some(self.members.next_deadline().map_or(self.deadline, |at| at.min(self.deadline)))
+    }
+    fn overdue(&self, now: skein_lib::Time) -> Option<String> {
+        self.members.overdue(now).or_else(|| {
+            (now >= self.deadline && !self.members.passed()).then(|| "owned worker did not settle within WITHIN".into())
+        })
+    }
+    fn passed(&self) -> bool {
+        self.members.passed()
+    }
+}
+#[test]
+fn a_worker_alone_with_the_owned_examples_worker_links_and_drains_on_a_signal() {
+    let scratch = support::Scratch::new("owned_worker_alone_ring");
+    let (mut members, hosts) = support::cluster::Cluster::read(scratch.path()).members();
+    members.up(&["llm"]);
+    let clock = skein_shell::Clock::new();
+    let mut world = skein_world::real::World::new(OwnedWorkerJudge {
+        members,
+        deadline: clock.now().now.saturating_add(support::WITHIN),
+        phase: OwnedWorkerPhase::Engine,
+    });
+    for host in hosts {
+        world.spawn(|| host);
+    }
+    let outcome = world.run(&clock, support::WITHIN);
+    assert!(outcome.procs.iter().all(skein_shell::Host::is_empty), "every cluster root settled");
+    scratch.remove();
+}
+
 // Both the idle threshold and ordinary time allowance hold an open chat's slot.
 // Past the story's deadline, a run that parks has already failed it.
 const CHAT_HOLDS_ITS_SLOT: Duration = support::WITHIN.saturating_mul(2);

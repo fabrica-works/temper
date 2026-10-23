@@ -830,6 +830,10 @@ have one, an engine alone none. Each:
   how much. The owned example's `engine.limits`, worker `limits` and
   `memory_bytes`, and why each holds, are setup.md, 8.1's.
 
+- **A worker alone's ring** holds its io's and its worker's kernel
+  operations, staged and in flight, independently of its domain's room.
+  With the owned example's worker it fits the kernel's 32,768 entries.
+
 ## 8. First start and every start
 
 - **Every command that reads the document checks it,** once its three
