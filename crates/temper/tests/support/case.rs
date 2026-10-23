@@ -421,6 +421,7 @@ impl Judge {
             Step::Held { .. } => panic!("Held unsupported"),
             Step::Kill { .. } => panic!("Kill unsupported"),
             Step::Watching { .. } => panic!("Watching unsupported"),
+            Step::Terminal(_) => panic!("Terminal unsupported"),
         }
         // The oracle's commands are the acts' verbs (Observed::with_commands).
         self.ran.push(step);
