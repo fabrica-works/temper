@@ -132,11 +132,19 @@ fn serve_command(directory: &Path) -> Command {
 }
 #[must_use]
 pub fn fake_llm(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
+    fake_llm_at((std::net::Ipv4Addr::LOCALHOST, 34_443).into(), scripts)
+}
+#[must_use]
+/// The fake LLM on a given loopback address, so that two tiers on one machine never share its port.
+pub fn fake_llm_at(
+    address: SocketAddr,
+    scripts: Box<[skein_fake_llm_domain::api::Script]>,
+) -> skein_fake_peers::llm::Peer {
     // The account's API key routes to /v1/responses: the real loop's recipe, on the fixture endpoint's
     // TLS port. smith's configured peer keeps the Codex path, which refuses a key.
     let recipe = temper_real_loop_world::llm::scripted(scripts);
     skein_fake_peers::llm::Peer::new(
-        (std::net::Ipv4Addr::LOCALHOST, 34_443).into(),
+        address,
         skein_fake_peers::Transport::Tls,
         recipe.limits,
         recipe.config,
