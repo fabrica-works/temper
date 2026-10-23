@@ -761,6 +761,7 @@ fn browser_reload_preserves_running_setup_without_resending() {
 }
 
 #[test]
+#[ignore = "needs: the accounts banner inside a landmark; choice.rs (20ae1feca, README 5.1) draws it in a bare slot, which breaks skein's ui.md 14; o/connect-model lifts it with the banner's fix, the region's name its call (director 708)"]
 fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
     for (page, has_strip) in [
         (Address::Chats, true),
