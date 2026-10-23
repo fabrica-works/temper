@@ -246,6 +246,51 @@ fn a_refused_link_never_prints_its_secret() {
     assert_eq!(f.exit(), Some(Exit::Code(1)));
 }
 #[test]
+fn a_full_link_exits_one_without_writing_token_or_address() {
+    let mut f = fixtures::Disk::sign_in(fixtures::LINK);
+    f.full_link = Some((2, skein_lib::Wall::EPOCH, skein_lib::Wall::from_nanos(300_000_000_000)));
+    f.token = fixtures::TOKEN_BYTES;
+    f.answer_sign_in_then_me();
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert_eq!(f.stdout(), b"");
+    assert_eq!(f.stderr(), b"temper ctl: all 2 sign-ins are in use; the earliest ends at 1970-01-01T00:00:00Z; this link stays usable until 1970-01-01T00:05:00Z; after that, temper serve prints a fresh one when it is tried\n");
+    assert_eq!(f.stored(b"token"), None);
+    assert_eq!(f.stored(b"address"), None);
+}
+
+#[test]
+fn a_busy_link_retries_the_same_link_and_token_then_signs_in() {
+    let mut f = fixtures::Disk::act(&[b"sign-in", b"-"]);
+    f.input = fixtures::LINK;
+    f.busy_links = 1;
+    f.token = b"9876543210987654321098765432109876543210";
+    f.answer_sign_in_then_me();
+    assert_eq!(f.next_deadline(), Some(skein_lib::Time::ZERO.saturating_add(SIGN_IN_FIRST)));
+    assert_eq!(f.link_posts.len(), 1);
+    assert_eq!(f.stored(b"token"), None);
+    assert_eq!(f.stored(b"address"), None);
+    f.advance_past(SIGN_IN_FIRST);
+    assert_eq!(f.link_posts.len(), 2);
+    assert_eq!(f.link_posts[0], f.link_posts[1]);
+    assert_eq!(f.link_bearers[0].as_deref(), Some(f.token));
+    assert_eq!(f.link_bearers[0], f.link_bearers[1]);
+    assert_eq!(f.stored(b"token"), Some(fixtures::TOKEN_BYTES));
+    assert_eq!(f.stderr(), b"");
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+}
+
+#[test]
+fn a_busy_link_past_the_deadline_exits_one_and_keeps_its_files() {
+    let mut f = fixtures::Disk::sign_in(fixtures::LINK);
+    f.busy_links = u32::MAX;
+    f.drain();
+    f.advance_past(limits::DEADLINE);
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert_eq!(f.stderr(), b"temper ctl: temper is busy; this link stays usable until it expires\n");
+    assert_eq!(f.stored(b"token"), None);
+    assert_eq!(f.stored(b"address"), None);
+}
+#[test]
 fn sign_in_takes_the_lock() {
     let mut f = fixtures::Disk::sign_in(fixtures::LINK);
     f.lock_busy();

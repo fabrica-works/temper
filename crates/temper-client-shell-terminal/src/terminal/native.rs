@@ -27,8 +27,18 @@ pub(crate) fn signing(signing: &jig_client_protocol_link::Signing, out: bool) ->
     use jig_client_protocol_link::Signing;
     match signing {
         Signing::Again | Signing::Lost if !out => Some(Notice::SignInAgain),
+        Signing::Busy if !out => Some(Notice::SignInBusy),
+        Signing::Full { sign_ins, earliest, link_until } if !out => {
+            Some(Notice::SignInFull { sign_ins: *sign_ins, earliest: *earliest, link_until: *link_until })
+        }
         Signing::Refused if !out => Some(Notice::SignInRefused),
-        Signing::SignedIn { .. } | Signing::SignedOut | Signing::Again | Signing::Lost | Signing::Refused => None,
+        Signing::SignedIn { .. }
+        | Signing::SignedOut
+        | Signing::Again
+        | Signing::Busy
+        | Signing::Full { .. }
+        | Signing::Lost
+        | Signing::Refused => None,
     }
 }
 impl Client for NativeClient {

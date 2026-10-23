@@ -469,13 +469,13 @@ impl Person {
                     self.signing_retry = None;
                     self.signing_until = None;
                 }
-                Signing::Again => {
+                Signing::Again | Signing::Busy => {
                     let until = self.signing_until.expect("sign-in deadline");
                     assert!(now < until, "native signing failed: {signing:?}");
                     self.signing_retry = Some(now.saturating_add(self.signing_backoff).min(until));
                     self.signing_backoff = self.signing_backoff.saturating_mul(2).min(SIGN_IN_MOST);
                 }
-                other @ (Signing::Refused | Signing::Lost | Signing::SignedOut) => {
+                other @ (Signing::Refused | Signing::Lost | Signing::SignedOut | Signing::Full { .. }) => {
                     panic!("native signing failed: {other:?}");
                 }
             }

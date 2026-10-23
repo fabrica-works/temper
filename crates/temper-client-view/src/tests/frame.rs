@@ -146,6 +146,76 @@ fn signed_out_the_browser_main_says_how_to_sign_in() {
     );
 }
 #[test]
+fn a_full_link_says_the_pool_and_both_moments_in_either_shell() {
+    use jig_client_protocol_wire as w;
+    let answer = w::SignInAnswer::Full(
+        w::SignInsFull::new(
+            &w::CEILINGS,
+            w::SignInsFullParts { sign_ins: 2, earliest: 3_600_000_000_000, link_until: 300_000_000_000 },
+        )
+        .expect("full answer"),
+    );
+    assert_link_main(answer, b"All 2 sign-ins are in use; the earliest ends Jan 1, 01:00 UTC. This link stays usable until Jan 1, 00:05 UTC; after that, opening it has temper serve print a fresh one.");
+}
+
+#[test]
+fn a_busy_link_says_to_open_it_again_in_either_shell() {
+    assert_link_main(
+        jig_client_protocol_wire::SignInAnswer::Busy,
+        b"temper is busy. This link stays usable until it expires: open it again in a moment.",
+    );
+}
+
+#[test]
+fn a_not_ready_link_says_starting_or_stopping_in_either_shell() {
+    assert_link_main(
+        jig_client_protocol_wire::SignInAnswer::NotReady,
+        b"temper is starting or stopping. This link stays usable until it expires: open it again in a moment.",
+    );
+}
+
+fn assert_link_main(answer: jig_client_protocol_wire::SignInAnswer, expected: &[u8]) {
+    use skein_lib::{Env, List, Queue, Secret, Time, Writer};
+    use temper_client_domain::{Address, Event, Request};
+    let limits = fixtures::domain_limits();
+    let env = Env { now: Time::ZERO, wall: fixtures::NOW, limits };
+    let mut root = temper_client_domain::new(&limits, fixtures::SEED);
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    temper_client_domain::step(
+        &mut root,
+        &env,
+        Event::Start {
+            address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL },
+            kept: List::with_capacity(0),
+            with: Some(jig_client::With::Link { secret: Secret::new(Box::new([0; 32])), held: None }),
+        },
+        &mut out,
+    );
+    let mut exchange = None;
+    while let Some(request) = out.pop() {
+        if let Request::Client {
+            request: jig_client::Request::Exchange { exchange: token, message: jig_client::Message::SignInLink(_), .. },
+        } = request
+        {
+            assert!(exchange.replace(token).is_none());
+        }
+    }
+    let mut writer = Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+    answer.encode(&mut writer).expect("answer room");
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Reply { exchange: exchange.expect("link exchange"), message: writer.finish() },
+        },
+    );
+    assert_eq!(root.client().link().state, jig_client::Link::SignedOut);
+    assert!(root.client().link().not_signed_in.is_some());
+    for shell in [crate::words::Shell::Browser, crate::words::Shell::Terminal] {
+        let mut view = fixtures::view_of(crate::words::Words::english(fixtures::FORGE, 64, shell).expect("words"));
+        assert_eq!(&*fixtures::main_text(fixtures::build(&mut view, &root)), expected, "{shell:?}");
+    }
+}
+#[test]
 fn out_of_date_the_browser_main_keeps_its_words() {
     let view = fixtures::browser_page_view(&fixtures::out_of_date());
     assert_eq!(&*fixtures::main_text(view.tree()), b"This temper is out of date: run the temper the engine runs.");
@@ -457,7 +527,7 @@ fn the_offline_banner_menu_keeps_its_choices() {
 fn the_qa_controls_keep_their_accessible_names_with_the_menu_closed() {
     for (root, controls) in [
         (
-            fixtures::chats_root(),
+            Box::new(fixtures::chats_root()),
             &[
                 (Role::Button, b"Sign out".as_slice()),
                 (Role::Link, b"Chats"),
@@ -466,7 +536,7 @@ fn the_qa_controls_keep_their_accessible_names_with_the_menu_closed() {
             ][..],
         ),
         (
-            fixtures::chat::messaging_root(),
+            Box::new(fixtures::chat::messaging_root()),
             &[
                 (Role::Button, b"Sign out".as_slice()),
                 (Role::Link, b"Chats"),

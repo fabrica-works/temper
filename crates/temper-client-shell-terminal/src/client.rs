@@ -276,6 +276,12 @@ impl NativeClient {
                         }
                         Ok(w::SignInAnswer::Refused) => Signing::Refused,
                         Ok(w::SignInAnswer::NotReady) => Signing::Again,
+                        Ok(w::SignInAnswer::Busy) => Signing::Busy,
+                        Ok(w::SignInAnswer::Full(value)) => Signing::Full {
+                            sign_ins: value.sign_ins(),
+                            earliest: skein_lib::Wall::from_nanos(value.earliest()),
+                            link_until: skein_lib::Wall::from_nanos(value.link_until()),
+                        },
                         Ok(w::SignInAnswer::SignedIn(_)) | Err(_) => Signing::Lost,
                     }
                 }
@@ -326,7 +332,7 @@ impl NativeClient {
                 self.signing_out = false;
                 self.notices.push(Shown::Terminal(crate::terminal::Notice::SignedOut));
             }
-            Signing::Again | Signing::Lost | Signing::Refused => {
+            Signing::Again | Signing::Busy | Signing::Full { .. } | Signing::Lost | Signing::Refused => {
                 if self.signing_out {
                     self.signing_out = false;
                     self.event(domain::Event::Client { event: jig_client::Event::SignOutLost });

@@ -405,6 +405,9 @@ pub enum Word {
     SignedOut,
     OutOfDate,
     SignedOutMain,
+    SignInFull,
+    SignInBusy,
+    SignInNotReady,
     OutOfDateMain,
     InboxNeedsEmpty,
     InboxUpdatesEmpty,
@@ -534,8 +537,8 @@ pub enum Word {
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
-const PHRASES: u32 = 1019;
-const ALL: [Word; 486] = [
+const PHRASES: u32 = 1022;
+const ALL: [Word; 489] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -921,6 +924,9 @@ const ALL: [Word; 486] = [
     Word::SignedOut,
     Word::OutOfDate,
     Word::SignedOutMain,
+    Word::SignInFull,
+    Word::SignInBusy,
+    Word::SignInNotReady,
     Word::OutOfDateMain,
     Word::InboxNeedsEmpty,
     Word::InboxUpdatesEmpty,
@@ -1238,6 +1244,9 @@ impl Word {
             Self::SignedOut => 180,
             Self::OutOfDate => 181,
             Self::SignedOutMain => 182,
+            Self::SignInFull => 1907,
+            Self::SignInBusy => 1908,
+            Self::SignInNotReady => 1909,
             Self::OutOfDateMain => 183,
             Self::ChangeModel => 1067,
             Self::UsingModel => 1068,
@@ -1666,7 +1675,7 @@ impl Words {
             phrases: PHRASES,
             holes: 3,
             // Setup fields and first repository need 28 more segments; the demo's start 15.
-            segments: 1771,
+            segments: 1780,
             text_bytes: 32768,
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined
@@ -2157,6 +2166,9 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
             Shell::Terminal => (&[b"Signed out."], &[]),
             Shell::Browser => (&[b"Signed out. To sign in, open a sign-in link temper serve printed."], &[]),
         },
+        Word::SignInFull => (&[b"All ", b" sign-ins are in use; the earliest ends ", b" UTC. This link stays usable until ", b" UTC; after that, opening it has temper serve print a fresh one."], &[Number, HoleKind::Moment, HoleKind::Moment]),
+        Word::SignInBusy => (&[b"temper is busy. This link stays usable until it expires: open it again in a moment."], &[]),
+        Word::SignInNotReady => (&[b"temper is starting or stopping. This link stays usable until it expires: open it again in a moment."], &[]),
         Word::OutOfDateMain => (&[b"This temper is out of date: run the temper the engine runs."], &[]),
         Word::Connecting => (&[b"Connecting"], &[]),
         Word::Behind => (&[b"Behind"], &[]),

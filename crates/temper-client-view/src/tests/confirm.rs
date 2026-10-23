@@ -165,7 +165,7 @@ fn the_inbox_keeps_proposal_and_decision_facts_before_its_controls() {
 fn proposal_rows_and_task_release_keep_their_own_shapes() {
     for (root, expected) in [
         (
-            fixtures::chat::proposal_root(),
+            Box::new(fixtures::chat::proposal_root()),
             &[
                 Role::Paragraph,
                 Role::Text,
@@ -187,7 +187,10 @@ fn proposal_rows_and_task_release_keep_their_own_shapes() {
                 Role::Text,
             ][..],
         ),
-        (fixtures::task::held_root(), &[Role::Paragraph, Role::Text, Role::Paragraph, Role::Text, Role::Button][..]),
+        (
+            Box::new(fixtures::task::held_root()),
+            &[Role::Paragraph, Role::Text, Role::Paragraph, Role::Text, Role::Button][..],
+        ),
     ] {
         let mut loaded = None;
         for card in root.pages().cards().expect("cards") {

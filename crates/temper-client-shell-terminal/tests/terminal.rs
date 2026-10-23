@@ -63,6 +63,35 @@ fn a_refused_link_exits_one_with_its_line() {
     );
 }
 #[test]
+fn a_busy_engine_says_so_and_retries_after_the_same_backoff() {
+    let mut world = support::World::signing_in();
+    world.client.notice_at_once(Notice::SignInBusy);
+    world.terminal.iterate(Time::ZERO, &mut world.client);
+    world.run_until(Duration::from_millis(249));
+    assert!(world.client.sign_ins.is_empty());
+    assert_eq!(world.last_output(), b"temper: signing in: the engine is busy; trying again\n");
+    world.run_until(Duration::from_millis(250));
+    assert_eq!(world.client.sign_ins, [Time::ZERO.saturating_add(Duration::from_millis(250))]);
+    world.type_bytes(b"q\n");
+    world.stdout_takes();
+    assert_eq!(world.terminal.exit(), Some((0, None)));
+}
+
+#[test]
+fn a_full_pool_closes_with_its_times_and_exits_one() {
+    let mut world = support::World::signing_in();
+    world.client.notice_at_once(Notice::SignInFull {
+        sign_ins: 2,
+        earliest: skein_lib::Wall::EPOCH,
+        link_until: skein_lib::Wall::from_nanos(300_000_000_000),
+    });
+    world.terminal.iterate(Time::ZERO, &mut world.client);
+    world.stdout_takes();
+    assert!(world.client.closed);
+    assert!(world.client.sign_ins.is_empty());
+    assert_eq!(world.terminal.exit(), Some((1, Some(Box::from(b"temper open: all 2 sign-ins are in use; the earliest ends at 1970-01-01T00:00:00Z; this link stays usable until 1970-01-01T00:05:00Z; after that, temper serve prints a fresh one when it is tried\n".as_slice())))));
+}
+#[test]
 fn a_credential_and_store_notice_print_once_in_order() {
     let mut world = support::World::signed_in();
     world.client.notice_at_once(Notice::Credential { party: 7, token: skein_lib::Secret::new(Box::from(*b"abc")) });

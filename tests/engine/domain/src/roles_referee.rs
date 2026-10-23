@@ -380,7 +380,9 @@ impl Referee {
                     return Err("role entrance refusal changed durable key");
                 }
             }
-            people::Reply::SignedIn { .. } => return Err("role ask got a session terminal"),
+            people::Reply::SignedIn { .. } | people::Reply::Full { .. } => {
+                return Err("role ask got a session terminal");
+            }
         }
         self.asks.remove(&to);
         self.terminals.insert(to);

@@ -76,6 +76,7 @@ impl OneShot {
         {
             signing.link = None;
             signing.retry = None;
+            signing.last = None;
             if Some(credential) == signing.held.as_ref() {
                 signing.credential = Credential::Kept;
             } else {
@@ -99,14 +100,4 @@ impl OneShot {
             self.finish(0, false);
         }
     }
-}
-
-// Only a complete NotReady reply permits resending the same link.
-pub(super) fn not_ready(event: &jig_client::Event) -> bool {
-    let jig_client::Event::Reply { message, .. } = event else { return false };
-    let mut reader = skein_lib::Reader::new(message);
-    matches!(
-        jig_client_protocol_wire::SignInAnswer::decode(&jig_client_protocol_wire::CEILINGS, &mut reader),
-        Ok(jig_client_protocol_wire::SignInAnswer::NotReady)
-    ) && reader.is_empty()
 }

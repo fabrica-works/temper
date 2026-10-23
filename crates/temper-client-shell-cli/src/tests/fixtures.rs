@@ -43,6 +43,8 @@ pub struct Frame {
     pub keep_link: Option<()>,
     pub link_bearers: Vec<Option<Box<[u8]>>>,
     pub again_links: u32,
+    pub busy_links: u32,
+    pub full_link: Option<(u32, Wall, Wall)>,
     pub link_posts: Vec<Box<[u8]>>,
     hold_stores: Option<()>,
     store: Option<Box<[u8]>>,
@@ -121,6 +123,8 @@ impl Frame {
             keep_link: None,
             link_bearers: Vec::new(),
             again_links: 0,
+            busy_links: 0,
+            full_link: None,
             link_posts: Vec::new(),
             hold_stores: None,
             store: None,
@@ -473,6 +477,7 @@ struct Socket {
 pub type Engine = Frame;
 pub type Disk = Frame;
 impl Frame {
+    #[expect(clippy::too_many_lines, reason = "one HTTP fake keeps the native routes and their answers together")]
     fn http_request(&mut self, fd: Fd) {
         let socket = self.sockets.get_mut(&fd).expect("socket");
         if socket.answered {
@@ -505,6 +510,21 @@ impl Frame {
                 let answer = if self.again_links > 0 {
                     self.again_links -= 1;
                     w::SignInAnswer::NotReady
+                } else if self.busy_links > 0 {
+                    self.busy_links -= 1;
+                    w::SignInAnswer::Busy
+                } else if let Some((sign_ins, earliest, link_until)) = self.full_link {
+                    w::SignInAnswer::Full(
+                        w::SignInsFull::new(
+                            &w::CEILINGS,
+                            w::SignInsFullParts {
+                                sign_ins,
+                                earliest: earliest.as_nanos(),
+                                link_until: link_until.as_nanos(),
+                            },
+                        )
+                        .expect("full answer"),
+                    )
                 } else if self.refuse_link.is_some() {
                     w::SignInAnswer::Refused
                 } else {

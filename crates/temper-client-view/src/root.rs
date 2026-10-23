@@ -1,8 +1,5 @@
 //! Temper's frame, pages, bindings and checked phrasebook.
-use crate::{
-    Limits, forge,
-    words::{Word, Words},
-};
+use crate::{Limits, forge, words::Words};
 use alloc::boxed::Box;
 use skein_lib::{Queue, Wall};
 use skein_ui::{Act, Builder, NodeId, Patch, Role, Tree};
@@ -108,16 +105,12 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
             crate::frame::demo_banner(&mut builder, root, &view.forge_words, &mut view.pages);
         }
     }
-    if let Some(word) = crate::frame::unavailable(root) {
+    if crate::frame::unavailable(root).is_some() {
         builder.open(Role::Main);
         builder.style(crate::look::MAIN);
         builder.open(Role::Paragraph);
         builder.style(crate::look::UNAVAILABLE);
-        view.forge_words.text(
-            &mut builder,
-            if word == Word::SignedOut { Word::SignedOutMain } else { Word::OutOfDateMain },
-            &[],
-        );
+        crate::frame::unavailable_main(&mut builder, root, &view.forge_words);
         builder.close();
         builder.close();
     } else if let temper_client_domain::Address::Welcome { step } = root.pages().address() {
