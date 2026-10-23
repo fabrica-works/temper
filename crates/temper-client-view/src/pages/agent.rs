@@ -2,7 +2,7 @@
 use crate::{
     frame::Bindings,
     look,
-    words::{Word, Words},
+    words::{Times, Word, Words},
 };
 use alloc::boxed::Box;
 use jig_client::{Latest, contract as c};
@@ -19,7 +19,14 @@ fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.text(Run::Plain, value);
     b.close();
 }
-pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
+pub(crate) fn main(
+    b: &mut Builder,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+    times: &mut Times,
+) {
     b.open(Role::Main);
     b.style(look::MAIN);
     b.style(look::CHAT);
@@ -110,7 +117,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             }
         }
         b.close();
-        composer(b, root, page, task, words, bindings);
+        composer(b, root, page, task, words, bindings, times);
     }
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
@@ -173,9 +180,17 @@ fn run_heading(b: &mut Builder, run: task::Run, words: &Words) {
     b.close();
 }
 
-fn composer(b: &mut Builder, root: &Domain, page: &task::Task, task: &c::Task, words: &Words, bindings: &mut Bindings) {
+fn composer(
+    b: &mut Builder,
+    root: &Domain,
+    page: &task::Task,
+    task: &c::Task,
+    words: &Words,
+    bindings: &mut Bindings,
+    times: &mut Times,
+) {
     let Some(admission) = jig_client::facts::offer(task.acts.as_slice(), c::ActKind::Message) else {
-        crate::choice::composer(b, root, Some(task), words, bindings);
+        crate::choice::composer(b, root, Some(task), words, bindings, times);
         return;
     };
     b.open(Role::Slot);
@@ -186,7 +201,7 @@ fn composer(b: &mut Builder, root: &Domain, page: &task::Task, task: &c::Task, w
             b.style(look::AGENT_STEER);
             words.text(b, Word::SteerNote, &[]);
             b.close();
-            crate::choice::composer(b, root, Some(task), words, bindings);
+            crate::choice::composer(b, root, Some(task), words, bindings, times);
             b.open(Role::Slot);
             b.style(look::ENTRY);
             b.open(Role::TextArea);
@@ -217,11 +232,11 @@ fn composer(b: &mut Builder, root: &Domain, page: &task::Task, task: &c::Task, w
                 words.refusal(b, refusal, 0);
             }
             b.close();
-            crate::choice::composer(b, root, Some(task), words, bindings);
+            crate::choice::composer(b, root, Some(task), words, bindings, times);
         }
         c::Admission::Proposed { .. } => {
             super::task::act(b, task, c::ActKind::Message, Word::Message, Act::Send, words, bindings);
-            crate::choice::composer(b, root, Some(task), words, bindings);
+            crate::choice::composer(b, root, Some(task), words, bindings, times);
         }
     }
     b.close();

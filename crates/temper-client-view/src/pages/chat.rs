@@ -122,11 +122,11 @@ pub(crate) fn main(
         }
         if let Some(result) = &task.result {
             let clock = end_clock(task, result, words, times);
-            result_text(b, result, words, clock.as_deref());
+            result_text(b, result, task.requester, words, clock.as_deref());
         }
         act_status(b, root, chat, words);
         b.close();
-        composer(b, root, chat, task, words, bindings, temper_client_domain::pages::shown(root.pages()));
+        composer(b, root, chat, task, words, bindings, times);
     }
     crate::confirm::main(b, root, words, bindings, rows);
     b.close();
@@ -315,15 +315,35 @@ fn reason_bytes(reason: Option<&c::Text>) -> Option<&[u8]> {
     }
 }
 // A chat owns one end line; goal/result cards keep their independent drawing.
-fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words, clock: Option<&[u8]>) {
+fn result_text(
+    b: &mut Builder,
+    result: &c::TaskResult,
+    requester: c::OwnerRequester,
+    words: &Words,
+    clock: Option<&[u8]>,
+) {
     match result {
-        c::TaskResult::Ending(ending) => owner_end(b, ending, words, clock),
+        c::TaskResult::Ending(ending) => owner_end(b, ending, requester, words, clock),
         c::TaskResult::Document(result) => match &result.ending {
-            c::Ending::Task(ending) => owner_end(b, ending, words, clock),
+            c::Ending::Task(ending) => owner_end(b, ending, requester, words, clock),
             c::Ending::Failed { reason } => {
                 end_reason(b, Word::ChatFailed, reason_bytes(reason.as_ref()), words, clock);
             }
-            c::Ending::Cancelled { reason, .. } => {
+            c::Ending::Cancelled { reason, by, .. } => {
+                let by = match by {
+                    c::Actor::Party(number) => Some(c::OwnerRequester::Person(*number)),
+                    c::Actor::Task(number) => Some(c::OwnerRequester::Task(*number)),
+                    c::Actor::ProjectDeployment { project } => {
+                        Some(c::OwnerRequester::Deployment { project: *project })
+                    }
+                    c::Actor::Deployment => None,
+                };
+                if let Some(by) = by
+                    && closed_by_requester(requester, by)
+                {
+                    end_closed(b, words, clock);
+                    return;
+                }
                 end_reason(b, Word::ChatCancelled, reason_bytes(reason.as_ref()), words, clock);
             }
             c::Ending::Withdrawn { reason } => end_reason(b, Word::ChatCancelled, Some(reason.bytes()), words, clock),
@@ -333,16 +353,36 @@ fn result_text(b: &mut Builder, result: &c::TaskResult, words: &Words, clock: Op
         },
     }
 }
-fn owner_end(b: &mut Builder, ending: &c::OwnerChipEnding, words: &Words, clock: Option<&[u8]>) {
+fn owner_end(
+    b: &mut Builder,
+    ending: &c::OwnerChipEnding,
+    requester: c::OwnerRequester,
+    words: &Words,
+    clock: Option<&[u8]>,
+) {
     match ending {
         c::OwnerChipEnding::Done(value) => end_report(b, Some(value), words, clock),
         c::OwnerChipEnding::Failed(reason) => {
             end_reason(b, Word::ChatFailed, Some(reason.bytes()), words, clock);
         }
-        c::OwnerChipEnding::Cancelled { reason, .. } => {
-            end_reason(b, Word::ChatCancelled, Some(reason.bytes()), words, clock);
+        c::OwnerChipEnding::Cancelled { reason, by, .. } => {
+            if closed_by_requester(requester, *by) {
+                end_closed(b, words, clock);
+            } else {
+                end_reason(b, Word::ChatCancelled, Some(reason.bytes()), words, clock);
+            }
         }
     }
+}
+pub(crate) fn closed_by_requester(requester: c::OwnerRequester, by: c::OwnerRequester) -> bool {
+    requester == by
+}
+fn end_closed(b: &mut Builder, words: &Words, clock: Option<&[u8]>) {
+    let said = match clock {
+        Some(clock) => words.say(Word::TimeClosed, &[crate::cards::name(clock)]),
+        None => words.say(Word::ChatClosed, &[]),
+    };
+    end_line(b, &said);
 }
 fn end_reason(b: &mut Builder, word: Word, reason: Option<&[u8]>, words: &Words, clock: Option<&[u8]>) {
     let reason = match reason {
@@ -401,7 +441,7 @@ fn composer(
     task: &c::Task,
     words: &Words,
     bindings: &mut Bindings,
-    shown: u64,
+    times: &mut Times,
 ) {
     if task.result.is_some() {
         return;
@@ -412,7 +452,7 @@ fn composer(
     if temper_client_domain::pages::chat::allowed(task, c::ActKind::Message) {
         b.open(Role::Slot);
         b.style(look::COMPOSER_AREA);
-        crate::choice::composer(b, root, Some(task), words, bindings);
+        crate::choice::composer(b, root, Some(task), words, bindings, times);
         b.open(Role::Slot);
         b.style(look::ENTRY);
         b.open(Role::TextArea);
@@ -420,7 +460,7 @@ fn composer(
         b.placeholder(&words.say(Word::MessagePlaceholder, &[Hole::Number(task.chip.task)]));
         b.state(State::SubmitsOnEnter);
         b.style(look::COMPOSER);
-        b.value(&chat.words, shown);
+        b.value(&chat.words, temper_client_domain::pages::shown(root.pages()));
         b.bind(bindings.insert(Act::MessageWords { words: Box::default() }));
         b.close();
         b.open(Role::Paragraph);
@@ -437,7 +477,7 @@ fn composer(
         b.close();
         b.close();
     } else {
-        crate::choice::composer(b, root, Some(task), words, bindings);
+        crate::choice::composer(b, root, Some(task), words, bindings, times);
     }
 }
 /// The chat projects a request and assistant messages; an agent keeps every work line.

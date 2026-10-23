@@ -229,13 +229,43 @@ fn close(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings)
     {
         crate::cards::decision(b, words, Some(&ReadValue::Task(Box::new(task.clone()))), ActKind::Cancel);
     }
-    close_choices(b, chat.task, operations, words, bindings);
+    // jig's domain/tasks.md, 5.2: Preparing has no committed attempt;
+    // only Claimed and Running can use a cancel's grace (section 7).
+    let run_live = match chat.task(root.client()) {
+        Some(task) => run_live(task),
+        None => false,
+    };
+    close_choices(b, chat.task, operations, run_live, words, bindings);
     b.close();
+}
+fn run_live(task: &jig_client::contract::Task) -> bool {
+    use jig_client::contract::{ChipPhase, OwnerChipPhase, RunStage};
+    let stage = match task.chip.details.as_ref() {
+        ChipPhase::Owner { phase: OwnerChipPhase::Active(stage), .. } => Some(stage),
+        ChipPhase::Active(active) => Some(&active.stage),
+        ChipPhase::Running { .. } => return true,
+        ChipPhase::Owner { .. }
+        | ChipPhase::Waiting { .. }
+        | ChipPhase::Idle { .. }
+        | ChipPhase::Starting
+        | ChipPhase::WaitingForWords { .. }
+        | ChipPhase::BackingOff { .. }
+        | ChipPhase::Procedure { .. }
+        | ChipPhase::Person { .. }
+        | ChipPhase::Closing(_)
+        | ChipPhase::Held { .. }
+        | ChipPhase::Ended { .. } => None,
+    };
+    match stage {
+        Some(RunStage::Claimed { .. } | RunStage::Running { .. }) => true,
+        Some(RunStage::Idle | RunStage::Due | RunStage::Preparing | RunStage::BackingOff { .. }) | None => false,
+    }
 }
 pub(crate) fn close_choices(
     b: &mut Builder,
     chat: u64,
     operations: &skein_lib::List<jig_client::contract::Operation>,
+    run_live: bool,
     words: &Words,
     bindings: &mut Bindings,
 ) {
@@ -243,9 +273,9 @@ pub(crate) fn close_choices(
     use skein_ui::phrases::Hole;
     for operation in operations {
         match operation {
-            Operation::Cancel { task, grace, .. } if *task == chat => match grace {
+            Operation::Cancel { task, grace, .. } if *task == chat => match if run_live { *grace } else { None } {
                 Some(grace) if grace.as_nanos() % 1_000_000_000 == 0 => {
-                    words.text(b, Word::CloseGrace, &[Hole::Span(*grace)]);
+                    words.text(b, Word::CloseGrace, &[Hole::Span(grace)]);
                 }
                 Some(grace) => words.text(b, Word::CloseGraceNanos, &[Hole::Number(grace.as_nanos())]),
                 None => words.text(b, Word::CloseNow, &[]),
@@ -258,6 +288,7 @@ pub(crate) fn close_choices(
             | Operation::Stop { .. } => {}
         }
     }
+    words.text(b, Word::CloseCannotReopen, &[]);
     button(b, bindings, words, Word::Confirm, Act::Confirm);
     button(b, bindings, words, Word::Cancel, Act::Cancel);
 }

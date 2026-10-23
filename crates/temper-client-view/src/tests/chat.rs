@@ -139,10 +139,107 @@ fn the_close_confirmation_offers_each_live_delegates_choice() {
     assert!(fixtures::find(&tree, Role::Button, b"Take delegate 13").is_some());
 }
 #[test]
-fn the_close_confirmation_names_the_templates_grace() {
+fn the_close_confirmation_says_how_the_chat_ends() {
+    use c::RunStage as S;
+    use skein_lib::Duration;
+    let grace = Some(Duration::from_secs(30));
+    for (name, stage, delegate, grace, expected) in [
+        ("at rest", S::Idle, false, grace, "Close chat now"),
+        ("at rest with delegate", S::Idle, true, grace, "Close chat now"),
+        ("preparing", S::Preparing, false, grace, "Close chat now"),
+        (
+            "claimed",
+            S::Claimed { attempt: ATTEMPT },
+            false,
+            grace,
+            "Close chat: allow 30 seconds to finish, then cancel",
+        ),
+        (
+            "running",
+            S::Running { attempt: ATTEMPT },
+            false,
+            grace,
+            "Close chat: allow 30 seconds to finish, then cancel",
+        ),
+        ("running without grace", S::Running { attempt: ATTEMPT }, false, None, "Close chat now"),
+    ] {
+        let source = chat_root();
+        let mut me = source.pages().me(source.client()).unwrap().clone();
+        me.projects.get_mut(0).unwrap().templates.get_mut(0).unwrap().grace = grace;
+        let mut task = source.pages().chat().unwrap().task(source.client()).unwrap().clone();
+        let c::ChipPhase::Owner { phase, .. } = task.chip.details.as_mut() else { panic!("owner") };
+        *phase = c::OwnerChipPhase::Active(stage);
+        task.delegates = List::with_capacity(1);
+        if delegate {
+            let mut chip = task.chip.clone();
+            chip.task = 7;
+            task.delegates.push(c::LiveDelegate { chip, takeover_budget: 0 }).unwrap();
+        }
+        let (mut root, me_watch, watch) =
+            fixtures::root_at(temper_client_domain::Address::Chat { task: TASK }, &fixtures::domain_limits());
+        for (watch, delivery) in
+            [(me_watch, c::Delivery::Me(Box::new(me))), (watch.unwrap(), c::Delivery::Task(Box::new(task)))]
+        {
+            deliver_chat(&mut root, watch, delivery);
+        }
+        fixtures::root_event(
+            &mut root,
+            temper_client_domain::Event::Act {
+                action: temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Close),
+            },
+        );
+        let view = fixtures::page_view(&root);
+        let text = fixtures::text(view.tree());
+        if expected == "Close chat now" {
+            assert!(skein_lib::bytes::find(&text, b"Close chat: allow").is_none(), "{name}");
+        }
+        let mut expected_text = List::with_capacity(3);
+        if delegate {
+            expected_text.push(b"Delegate 7 will be cancelled".as_slice()).unwrap();
+        }
+        expected_text.push(expected.as_bytes()).unwrap();
+        expected_text.push(b"A closed chat can't be reopened.".as_slice()).unwrap();
+        let mut remaining = text.as_ref();
+        for line in &expected_text {
+            let Some(at) = skein_lib::bytes::find(remaining, line) else { panic!("{name}: missing {line:?}") };
+            remaining = &remaining[at.checked_add(line.len()).unwrap()..];
+        }
+    }
     for (grace, expected) in GRACES {
         assert!(skein_lib::bytes::find(&fixtures::text(&closing(grace)), expected).is_some(), "{grace:?}");
     }
+}
+fn deliver_chat(root: &mut temper_client_domain::Domain, watch: skein_lib::Token, delivery: c::Delivery) {
+    fixtures::root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(delivery) },
+            },
+        },
+    );
+}
+fn messaging_task(task: c::Task) -> temper_client_domain::Domain {
+    let (mut root, _, watch) =
+        fixtures::root_at(temper_client_domain::Address::Chat { task: TASK }, &fixtures::domain_limits());
+    deliver_chat(&mut root, watch.unwrap(), c::Delivery::Task(Box::new(task)));
+    root
+}
+#[test]
+fn an_open_chat_at_rest_says_waiting_on_your_words_and_keeps_its_composer() {
+    let source = messaging_root();
+    let mut task = source.pages().chat().unwrap().task(source.client()).unwrap().clone();
+    task.flags.ended_by = c::EndedBy::Requester;
+    task.waits_on = c::WaitsOn::News;
+    task.wake.words = c::WakeRule::Immediate;
+    task.requester = c::OwnerRequester::Person(PARTY);
+    let c::ChipPhase::Owner { phase, details } = task.chip.details.as_mut() else { panic!("owner") };
+    *phase = c::OwnerChipPhase::Active(c::RunStage::Idle);
+    details.live_delegates = 0;
+    let view = fixtures::page_view(&messaging_task(task));
+    assert!(fixtures::find(view.tree(), Role::Status, b"waiting on your words").is_some());
+    assert!(fixtures::find(view.tree(), Role::TextArea, b"Message").is_some());
+    assert!(fixtures::find(view.tree(), Role::Button, b"Send").is_some());
 }
 
 #[test]
@@ -1011,6 +1108,7 @@ fn result_view_at(result: c::TaskResult, at: Option<Wall>) -> crate::View {
     let live = messaging_root();
     let mut task = live.pages().chat().expect("chat").task(live.client()).expect("task").clone();
     // Keep Message offered: the same result which draws the end must suppress the whole foot.
+    task.requester = c::OwnerRequester::Person(PARTY);
     task.result = Some(result);
     if let c::ChipPhase::Owner { details, .. } = task.chip.details.as_mut() {
         details.ended_at = at;
@@ -1047,7 +1145,7 @@ fn every_chat_end_line_carries_ended_and_omits_the_whole_composer() {
     let cancelled = c::OwnerChipEnding::Cancelled {
         reason: c::DocumentText::complete(text(b"No longer needed")),
         result: None,
-        by: c::OwnerRequester::Person(PARTY),
+        by: c::OwnerRequester::Person(74),
         at: Wall::EPOCH,
     };
     for (result, expected) in [
@@ -1069,7 +1167,7 @@ fn every_chat_end_line_carries_ended_and_omits_the_whole_composer() {
         (
             result_document(c::Ending::Cancelled {
                 reason: Some(text(b"No longer needed")),
-                by: c::Actor::Party(PARTY),
+                by: c::Actor::Party(74),
                 at: None,
             }),
             "Cancelled · No longer needed",
@@ -1087,6 +1185,86 @@ fn every_chat_end_line_carries_ended_and_omits_the_whole_composer() {
             assert!(style_position(view.tree().nodes(), token).is_none(), "ended foot: {token:?}");
         }
         assert!(fixtures::find(view.tree(), Role::TextArea, b"Message").is_none());
+    }
+}
+
+fn cancelled_by(by: c::OwnerRequester) -> c::OwnerChipEnding {
+    c::OwnerChipEnding::Cancelled {
+        by,
+        reason: c::DocumentText::complete(fixtures::first_run::text(b"No longer needed")),
+        result: None,
+        at: Wall::EPOCH,
+    }
+}
+fn cancelled_document(by: c::Actor) -> c::TaskResult {
+    result_document(c::Ending::Cancelled { by, reason: Some(fixtures::first_run::text(b"No longer needed")), at: None })
+}
+#[test]
+fn a_chats_end_line_says_who_ended_it() {
+    use fixtures::first_run::text;
+    let report = c::ResultValue::Report(c::DocumentText::complete(text(b"A report")));
+    let mut reported = result_document(c::Ending::Done);
+    let c::TaskResult::Document(doc) = &mut reported else { panic!("document") };
+    doc.value = Some(report.clone());
+    for (name, owner, document, clock, expected) in [
+        (
+            "requester",
+            cancelled_by(c::OwnerRequester::Person(PARTY)),
+            cancelled_document(c::Actor::Party(PARTY)),
+            Some(fixtures::NOW),
+            "Closed 00:00",
+        ),
+        (
+            "requester without clock",
+            cancelled_by(c::OwnerRequester::Person(PARTY)),
+            cancelled_document(c::Actor::Party(PARTY)),
+            None,
+            "Closed",
+        ),
+        (
+            "another person",
+            cancelled_by(c::OwnerRequester::Person(74)),
+            cancelled_document(c::Actor::Party(74)),
+            Some(fixtures::NOW),
+            "Cancelled 00:00 · No longer needed",
+        ),
+        (
+            "a task",
+            cancelled_by(c::OwnerRequester::Task(7)),
+            cancelled_document(c::Actor::Task(7)),
+            Some(fixtures::NOW),
+            "Cancelled 00:00 · No longer needed",
+        ),
+        (
+            "report",
+            c::OwnerChipEnding::Done(report),
+            reported,
+            Some(fixtures::NOW),
+            "Ended 00:00 · its report, “A report”",
+        ),
+        (
+            "failure",
+            c::OwnerChipEnding::Failed(c::DocumentText::complete(text(b"Checks failed"))),
+            result_document(c::Ending::Failed { reason: Some(text(b"Checks failed")) }),
+            Some(fixtures::NOW),
+            "Failed 00:00 · Checks failed",
+        ),
+    ] {
+        for result in [
+            c::TaskResult::Ending(Box::new(owner.clone())),
+            result_document(c::Ending::Task(Box::new(owner))),
+            document,
+        ] {
+            let view = result_view_at(result, clock);
+            assert!(fixtures::find(view.tree(), Role::Paragraph, expected.as_bytes()).is_some(), "{name}");
+            for token in
+                [crate::look::COMPOSER_AREA, crate::look::CHOICE, crate::look::ACCOUNT_LINE, crate::look::COMPOSER]
+            {
+                assert!(style_position(view.tree().nodes(), token).is_none(), "{name}");
+            }
+            assert!(fixtures::find(view.tree(), Role::TextArea, b"Message").is_none());
+            assert!(fixtures::find(view.tree(), Role::Button, b"Send").is_none());
+        }
     }
 }
 
@@ -1111,7 +1289,7 @@ fn a_chats_end_and_its_phase_keep_the_supplied_clock() {
             c::OwnerChipEnding::Cancelled {
                 reason: c::DocumentText::complete(text(b"No longer needed")),
                 result: None,
-                by: c::OwnerRequester::Person(PARTY),
+                by: c::OwnerRequester::Person(74),
                 at: Wall::EPOCH,
             },
             "Cancelled 00:00 · No longer needed",
@@ -1365,7 +1543,7 @@ fn a_chat_rebuilds_its_day_at_midnight_and_keeps_the_turn_clock() {
 
 #[test]
 fn the_chatbar_and_chats_line_share_every_status_phrase() {
-    const STATES: u32 = 17;
+    const STATES: u32 = 18;
     let mut rows = List::with_capacity(STATES);
     for (line, _) in super::chats::status_rows() {
         rows.push(line).unwrap();
@@ -1385,6 +1563,17 @@ fn the_chatbar_and_chats_line_share_every_status_phrase() {
         details.wake.words = wake;
         rows.push(line).unwrap();
     }
+    let mut closed = super::chats::line();
+    let c::ChipPhase::Owner { phase, details } = closed.chip.details.as_mut() else { panic!("owner") };
+    *phase = c::OwnerChipPhase::Ended;
+    details.ended_at = Some(Wall::EPOCH);
+    details.ending = Some(c::OwnerChipEnding::Cancelled {
+        by: closed.requester,
+        reason: c::DocumentText::complete(fixtures::first_run::text(b"Any reason")),
+        result: None,
+        at: Wall::EPOCH,
+    });
+    rows.push(closed).unwrap();
     let expected = [
         b"waiting on an answer from you".as_slice(),
         b"Held",
@@ -1403,6 +1592,7 @@ fn the_chatbar_and_chats_line_share_every_status_phrase() {
         b"Parked",
         b"waiting on 2 delegates",
         b"waiting on your words",
+        b"Closed",
     ];
     for (line, expected) in rows.iter().zip(expected) {
         let (line_tree, _) = super::chats::tree(line);

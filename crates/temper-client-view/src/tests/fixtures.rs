@@ -756,6 +756,7 @@ pub mod chat {
             &mut b,
             TASK,
             &operations,
+            true,
             &fixtures::words(),
             &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         );

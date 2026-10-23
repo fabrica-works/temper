@@ -52,7 +52,7 @@ pub(crate) fn main(
             if demo.is_none() {
                 text(b, Role::Heading { level: 2 }, &words.say(Word::StartChat, &[]));
             }
-            crate::choice::composer(b, root, None, words, bindings);
+            crate::choice::composer(b, root, None, words, bindings, times);
             b.open(Role::Slot);
             b.style(crate::look::ENTRY);
             b.open(Role::TextArea);
@@ -368,6 +368,7 @@ pub(crate) fn status(
     b.style(token);
     let name = match status {
         jig_client::facts::ChatStatus::WaitingForYou { .. } => words.say(Word::WaitingForYou, &[]),
+        jig_client::facts::ChatStatus::Ended { .. } if closed(chip, requester) => words.say(Word::ChatClosed, &[]),
         jig_client::facts::ChatStatus::Starting
         | jig_client::facts::ChatStatus::Writing
         | jig_client::facts::ChatStatus::Tool { .. }
@@ -432,4 +433,26 @@ fn suggestions(
     b.close();
     text(b, Role::Paragraph, &words.say(Word::DemoScript, &[]));
     b.close();
+}
+
+fn closed(chip: &jig_client::contract::Chip, requester: jig_client::contract::OwnerRequester) -> bool {
+    use jig_client::contract::{ChipPhase, OwnerChipEnding};
+    match chip.details.as_ref() {
+        ChipPhase::Owner { details, .. } => match &details.ending {
+            Some(OwnerChipEnding::Cancelled { by, .. }) => super::chat::closed_by_requester(requester, *by),
+            Some(OwnerChipEnding::Done(_) | OwnerChipEnding::Failed(_)) | None => false,
+        },
+        ChipPhase::Active(_)
+        | ChipPhase::Waiting { .. }
+        | ChipPhase::Idle { .. }
+        | ChipPhase::Starting
+        | ChipPhase::Running { .. }
+        | ChipPhase::WaitingForWords { .. }
+        | ChipPhase::BackingOff { .. }
+        | ChipPhase::Procedure { .. }
+        | ChipPhase::Person { .. }
+        | ChipPhase::Closing(_)
+        | ChipPhase::Held { .. }
+        | ChipPhase::Ended { .. } => false,
+    }
 }
