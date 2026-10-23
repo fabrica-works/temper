@@ -12,6 +12,7 @@ use std::{cell::RefCell, collections::BTreeMap, net::SocketAddr, path::Path, rc:
 use temper_github_app::APP;
 
 pub const INSTALLATION: u64 = 1;
+pub const OLD_STRAY_AGE_MS: u64 = 2000;
 pub const REPOSITORY: u32 = 1;
 const ACME: u64 = 10;
 const UMBRA: u64 = 20;
@@ -35,12 +36,22 @@ pub(crate) fn protocol_limits() -> skein_fake_forge_protocol::Limits {
 pub struct Fixture {
     /// Seeded App records and acme installation; false exercises a person connecting.
     pub connected: bool,
+    /// Seed an unaccepted umbra installation before the person's paste.
+    pub old_stray: bool,
+    /// The person's App hook, which paste and reconcile may need to repair.
+    pub pasted_hook: &'static [u8],
     pub config: fn() -> layer::Config,
     pub configure: fn(&mut Value, &mut Value, SocketAddr),
 }
 #[must_use]
 pub fn fixture() -> Fixture {
-    Fixture { connected: true, config, configure: |_, _, _| {} }
+    Fixture {
+        connected: true,
+        old_stray: false,
+        pasted_hook: b"https://temper-test.invalid/",
+        config,
+        configure: |_, _, _| {},
+    }
 }
 fn config() -> layer::Config {
     let mut accounts = List::with_capacity(2);
@@ -154,6 +165,9 @@ pub struct Seen {
     /// Total successful mints; the pin exposes no per-installation mint counters.
     pub minted: u64,
     pub installations: Vec<(u64, u64, Vec<u8>)>,
+    /// App request methods and targets from the peer's redacted HTTP heads.
+    pub app_calls: Vec<(skein_http::Method, Vec<u8>)>,
+    pub installation_created: Vec<(u64, Wall)>,
     /// The git-call count when each recorded ctl call first completed.
     pub git_after_call: Vec<usize>,
     pub branches: BTreeMap<Vec<u8>, Branch>,
@@ -174,6 +188,16 @@ impl Seen {
         self.minted = layer.installations().minted();
         self.installations =
             layer.installations().iter().map(|row| (row.id, row.account, row.login.to_vec())).collect();
+        self.installation_created = layer.installations().iter().map(|row| (row.id, row.created)).collect();
+        self.app_calls = peer
+            .observations()
+            .iter()
+            .filter_map(|record| {
+                let skein_fake_peers::forge::Observation::Head { call, .. } = record else { return None };
+                (call.target.as_ref() == b"/app" || call.target.starts_with(b"/app/"))
+                    .then(|| (call.method, call.target.to_vec()))
+            })
+            .collect();
         let mut forge = handle.borrow_mut();
         while let Some(observation) = forge.domain.pop_observation() {
             if matches!(&observation,
@@ -278,7 +302,7 @@ impl State {
 }
 
 /// Stand in for the person's developer-settings work, before any ctl call.
-pub(crate) fn make_app(peer: &mut Peer, clients: SocketAddr, path: &Path) -> MadeApp {
+pub(crate) fn make_app(peer: &mut Peer, clients: SocketAddr, path: &Path, fixture: Fixture) -> MadeApp {
     use skein_forge::github::{pin, request::Method, setup};
     use skein_lib::{ReplyTo, Token};
     use std::fmt::Write as _;
@@ -289,7 +313,7 @@ pub(crate) fn make_app(peer: &mut Peer, clients: SocketAddr, path: &Path) -> Mad
         &setup::Values {
             name: b"temper-person",
             url: origin.as_bytes(),
-            hook_url: b"https://temper-test.invalid/",
+            hook_url: fixture.pasted_hook,
             redirect_url: redirect.as_bytes(),
             setup_url: setup_url.as_bytes(),
         },
@@ -334,5 +358,15 @@ pub(crate) fn make_app(peer: &mut Peer, clients: SocketAddr, path: &Path) -> Mad
         pem: Secret::new(value["pem"].as_str().expect("converted PEM").as_bytes().into()),
     };
     fixtures::private(&path.join("github-app.pem"), app.pem.expose()).expect("private downloaded key");
+    if fixture.old_stray {
+        let created = Wall::from_nanos(
+            now.as_nanos().checked_sub(Duration::from_millis(OLD_STRAY_AGE_MS).as_nanos()).expect("old stray time"),
+        );
+        let id = layer
+            .installations_mut()
+            .install(UMBRA, b"umbra", Kind::Organization, Reach::All, created)
+            .expect("old stray installed");
+        assert_eq!(id, INSTALLATION, "stray precedes the person's accepted installation");
+    }
     app
 }

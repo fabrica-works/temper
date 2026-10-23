@@ -63,6 +63,8 @@ pub struct Forge {
     /// The fake forge's resolved git program, in place of the worker's git.
     pub git_program: Option<Box<[u8]>>,
     pub web: Option<Box<[u8]>>,
+    /// The pasted GitHub App, its hook and installations belong to another owner.
+    pub app_read_only: bool,
     /// The API token, read from its private file: the forge component's alone.
     pub api_token: Option<Secret>,
     pub webhook_secret: Option<Secret>,

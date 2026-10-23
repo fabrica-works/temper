@@ -168,6 +168,64 @@ fn an_unvisited_install_link_does_not_authorize_adoption() {
 }
 
 #[test]
+fn a_read_only_app_keeps_its_hook_and_old_stray_through_paste_and_reconcile() {
+    // protocol/setup.md 17.7: another owner's App, hook and installations are read only.
+    const STATE_LIFE_MS: u64 = 1000;
+    // begin has sign-in, connect and wait; the reconcile wait precedes install.
+    const INSTALL: usize = 4;
+    const OTHER_HOOK: &[u8] = b"https://another-owner.invalid/hook";
+    // The old stray, kept, and the installation this run accepts.
+    const KEPT: usize = 2;
+    let fixture = github::Fixture {
+        old_stray: true,
+        pasted_hook: OTHER_HOOK,
+        configure: |value, _, _| {
+            value["application"]["forges"][0]["app_read_only"] = true.into();
+            value["application"]["limits"]["overrides"]["setup.state_life_ms"] = STATE_LIFE_MS.into();
+        },
+        ..fresh()
+    };
+    let ran = run_github(fixture, no_agents, || {
+        let mut steps = begin();
+        // Connected is published before reconcile completes; await its end before
+        // asking for an install link, since setup refuses overlapping plans as busy.
+        steps.extend([
+            call(&["wait", "forges", "--until", "settled", "--json"]),
+            call(&["forge-install", "1", "--key", "qa-read-only-install"]),
+            calls::browse(INSTALL),
+            call(&["wait", "forges", "--until", "settled", "--json"]),
+        ]);
+        steps
+    });
+    no_git_writes_or_key_leaks(&ran);
+    for at in 0..ran.calls().len() {
+        succeeded(&ran, at);
+    }
+    let seen = ran.github();
+    let reads = |target: &[u8]| {
+        seen.app_calls.iter().filter(|(method, path)| *method == skein_http::Method::Get && path == target).count()
+    };
+    assert!(reads(b"/app/hook/config") >= 2, "paste and reconcile both read the differing hook");
+    assert!(reads(b"/app/installations?per_page=100&page=2") > 0, "reconcile reached the terminal sweep page");
+    let mutations: Vec<_> = seen
+        .app_calls
+        .iter()
+        .filter(|(method, path)| {
+            *method == skein_http::Method::Patch && path == b"/app/hook/config"
+                || *method == skein_http::Method::Delete && path.starts_with(b"/app/installations/")
+        })
+        .map(|(method, path)| (method, String::from_utf8_lossy(path)))
+        .collect();
+    assert!(mutations.is_empty(), "neither paste nor reconcile mutates the hook or installations: {mutations:?}");
+    assert!(seen.installations.iter().any(|(id, _, login)| *id == github::INSTALLATION && login == b"umbra"));
+    let created = seen.installation_created.iter().find(|(id, _)| *id == github::INSTALLATION).expect("old stray").1;
+    let wall = skein_shell::Clock::new().now().wall;
+    assert!(wall.as_nanos() - created.as_nanos() > skein_lib::Duration::from_millis(STATE_LIFE_MS).as_nanos());
+    assert_eq!(seen.installations.len(), KEPT, "old stray and newly accepted installation both remain");
+    assert_eq!(ran.browsed()[0].hops, [302, 200], "read only preserves installation acceptance");
+}
+
+#[test]
 fn replaying_an_install_request_keeps_one_link_and_one_acceptance() {
     // client/README.md 8: the same live request key returns the same link.
     // client/forge.md 9.1: an installation state is usable once.

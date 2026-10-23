@@ -46,6 +46,8 @@ pub(super) fn fixed(
         let number = skein_lib::Decimal::of(u64::from(source.number));
         let given = github::given::Given {
             forge: source.number,
+            // Another owner's App: its hook and installations are read, never changed (setup.md 17.7).
+            read_only: source.app_read_only,
             word: Box::from(b"temper".as_slice()),
             web: match &source.web {
                 Some(web) => web.clone(),

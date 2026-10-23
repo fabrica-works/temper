@@ -176,8 +176,11 @@ impl ServiceHost {
         Self::with_shape(path, signals, None, false, None, Some(fixture))
     }
     pub(crate) fn make_github_app(&mut self, peer: &mut skein_fake_peers::forge::Peer) {
-        if self.github.is_some_and(|fixture| !fixture.connected) {
-            self.github_seen.app = Some(crate::github::make_app(peer, self.clients.expect("clients"), &self.path));
+        if let Some(fixture) = self.github
+            && !fixture.connected
+        {
+            self.github_seen.app =
+                Some(crate::github::make_app(peer, self.clients.expect("clients"), &self.path, fixture));
         }
     }
     fn github_documents(&self, forge: SocketAddr) {

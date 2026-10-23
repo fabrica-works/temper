@@ -928,6 +928,38 @@ fn load_refuses_log_limits_naming_both_bounds() {
     assert_eq!(loaded.forge_component.delivery_bytes, 12_345);
 }
 #[test]
+fn github_app_read_only_defaults_false_and_resolves_the_configured_boolean() {
+    let jig = fixtures::engine().jig;
+    for (member, expected) in [("", false), (",\"app_read_only\":false", false), (",\"app_read_only\":true", true)] {
+        let input = github_application().replace("\"web\":null", &["\"web\":null", member].concat());
+        let (members, problems) = application(input.as_bytes(), &jig);
+        assert_eq!(lines(&problems).as_ref(), b"");
+        let members = members.unwrap();
+        assert_eq!(members.forges[0].app_read_only, expected);
+        let mut problems = Problems::empty();
+        let resolved =
+            application::resolve(&members, &settings::Files { entries: List::with_capacity(0) }, &mut problems)
+                .unwrap();
+        assert_eq!(lines(&problems).as_ref(), b"");
+        assert_eq!(resolved.forges[0].app_read_only, expected);
+    }
+}
+#[test]
+fn github_app_read_only_refuses_non_booleans_at_its_path() {
+    let input = github_application().replace("\"web\":null", "\"web\":null,\"app_read_only\":\"true\"");
+    let (_, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+    assert_eq!(lines(&problems).as_ref(), b"application.forges[0].app_read_only: wrong value kind\n");
+}
+#[test]
+fn forgejo_refuses_app_read_only_even_when_false() {
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
+    for value in ["true", "false"] {
+        let input = input.replace("\"kind\":\"forgejo\"", &["\"kind\":\"forgejo\",\"app_read_only\":", value].concat());
+        let (_, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+        assert_eq!(lines(&problems).as_ref(), b"application.forges[0].app_read_only: invalid form\n");
+    }
+}
+#[test]
 fn github_defaults_and_the_identity_join_need_no_credential_files() {
     use crate::settings::Kind;
     let jig = fixtures::engine().jig;

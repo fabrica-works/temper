@@ -80,6 +80,7 @@ pub struct Forge {
     pub transport: Transport,
     pub git: Box<[u8]>,
     pub web: Option<Box<[u8]>>,
+    pub app_read_only: bool,
     pub api_token: Box<[u8]>,
     pub webhook_secret: Option<Box<[u8]>>,
     pub user: User,
@@ -321,6 +322,12 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         }
     };
     let github = kind == settings::Kind::GitHub;
+    let app_read_only = if object.member(document, b"app_read_only").is_some() {
+        read::form(github, path.member(b"app_read_only"), problems);
+        read::boolean(&mut object, document, b"app_read_only", path, problems)?
+    } else {
+        false
+    };
     let at = read::required(&mut object, document, b"api", path, problems);
     let mut found = config::Problems::empty();
     let api = match at {
@@ -410,6 +417,7 @@ fn forge(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         transport,
         git,
         web,
+        app_read_only,
         api_token: api_token?,
         webhook_secret,
         user: user?,
@@ -1073,6 +1081,7 @@ pub fn resolve(members: &Members, files: &settings::Files, problems: &mut Proble
                     git: forge.git.clone(),
                     git_program: None,
                     web: forge.web.clone(),
+                    app_read_only: forge.app_read_only,
                     api_token: token,
                     webhook_secret: if missing { None } else { webhook_secret },
                     user,
