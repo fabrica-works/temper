@@ -581,9 +581,10 @@ in the lower world that owns it, never here.
     agents, git and `ctl`), and the tier's sum within its 13 s (6.5 s before
     the user's doubling of 10-22, provisional) ceiling (6.1). Their cases
     are tested below: the records' and the identity's codecs in step tests,
-    the routing and GitHub's routes on the clients' listener in
-    `temper-service`'s own tests (../protocol/forge.md, section 10;
-    ../client/forge.md, 9.1), the connector's state, picker and queue in the
+    the routing, GitHub's routes and Google's sign-in on the clients'
+    listener in `temper-service`'s own tests (../protocol/forge.md,
+    section 10; ../client/forge.md, 9.1; ../protocol/sign-in.md, section
+    8), the connector's state, picker and queue in the
     system worlds (2.1).
 
 - **The cluster's services,** one story (../protocol/README.md, 15.6):

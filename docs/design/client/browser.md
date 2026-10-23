@@ -329,6 +329,11 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   "Signed out. To sign in, open a sign-in link `temper serve` printed."
   The view takes its shell's words at construction; the terminal's stay
   "Signed out." with its own line (`README.md`, 6.6).
+  With a way of signing in configured, the main is the sign-in page
+  instead: temper's mark, "Sign in" and "Continue with Google", the ways
+  read from the page's `temper-sign-in` meta at start
+  (`../protocol/sign-in.md`, section 7); the link leaves for Google's
+  sign-in and comes back to the page's address.
 - **A link's sign-in not taken,** answered full, busy or not ready: the
   link is not spent, and the main says why and that the link stays
   usable until it expires (`README.md`, 5.1), full with the deployment's

@@ -324,12 +324,45 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 |---|---|---|---|
 | `listener` | an address, jig's format | a socket address; on loopback (in `127.0.0.0/8`, or `::1`) in standalone, and wherever `engine.clients` enables the printed link (jig's `protocol/service.md`, section 3); a fixed port, never 0, when a forge of kind GitHub is configured | the listener on which jig's clients' component is mounted with jig's default HTTP mapping, under `/jig`; the mapping's Host allow-list; the address of the sign-in links `temper serve` prints (`../client/README.md`, section 7); and temper's forge routes beside it, whose addresses a GitHub App's redirect and setup URLs name (`../client/README.md`, the routes) |
 | `bundle` | an absolute directory, or `null` | a bundle of skein's bundler, built apart (`scripts/bundle.sh`): its page and its digest's directory; its files, and the binary's own, within `clients.bundle_files` and `clients.bundle_bytes` (section 7) | the browser's page and bundle, made at start and served on the clients' listener (`../client/browser.md`, 2.2): `null` serves the bundle the binary holds (2.6), or, from a binary built without one, the page for no bundle; a directory serves its bundle in place of the binary's. A document naming an old `share/temper/bundle` keeps serving that directory, older than the binary once it is rebuilt: set it to `null` |
+| `public` | an origin, or `null` | `https://HOST[:PORT]`: HOST a lower-case DNS name, the port not 443 when written, no user, path, query, fragment or final `/`; `http://` only to a loopback host, for a test; within 253 bytes | the address people's browsers use, behind a TLS proxy (`sign-in.md`, 2.2): the mapping's Host allow-list holds its host beside the listener's (jig's `Settings.public`, the host with its port where not 443), jig's cookie is `Secure` by it, and every address temper gives out is the origin's: Google's return, a GitHub App's redirect and setup URLs. `null`: the listener's address alone, `public: None` |
 
 - **A fixed port with a GitHub forge:** a GitHub App's `redirect_url`
   and `setup_url` name the clients' listener's address, and GitHub's API
   cannot change them once the App is made. A port of 0 with a GitHub
   forge configured refuses the start, naming
   `application.clients.listener`.
+
+**`sign_in`:** the people's sign-in with Google (`sign-in.md`), or
+`null` for none, never missing: with `null`, the browser's signed-out
+page keeps its printed link's line, and `/sign-in/google` and its return
+answer not found.
+
+```
+"sign_in": {
+  "google": {"provider": 2, "client": "1234-abc.apps.googleusercontent.com",
+             "secret": "google-client.secret", "endpoints": null},
+  "members": [{"address": "sam@example.com", "login": "sam"}]
+}
+```
+
+| Member | Type | Bounds | Feeds |
+|---|---|---|---|
+| `google.provider` | u16 | a provider of jig's `engine.providers` of kind application | the identity's provider, in `Mint` and in jig's `owners` (`sign-in.md`, section 3) |
+| `google.client` | a string | Google's client id: 1 to 256 bytes of visible ASCII | the client's `client_id` |
+| `google.secret` | a data path | a secrets' file (section 6), its bytes 1 to `sign_in.secret_bytes`, visible ASCII | the client secret, in the token request's body |
+| `google.endpoints` | an object, or `null` | `null` for Google's own (`sign-in.md`, 3.1); otherwise `{"issuer", "authorization", "token", "keys", "transport"}`, given only to point at an issuer standing in for Google: each an `https` URL, or `http` to a loopback host, within `sign_in.url_bytes`; `transport` as a forge's, `"plaintext"` to loopback alone or `{"tls": {"server_name", "trust"}}`. Each host resolved at start; one that does not resolve refuses the start, naming it | the registration's endpoints and the fetcher's origins (`sign-in.md`, 6.3) |
+| `members` | a list | 1 to `sign_in.members` | who may sign in, each `{"address", "login"}` |
+| `members[].address` | a string | 3 to 254 bytes of visible ASCII, one `@` with bytes on both sides; unique among members with ASCII letters folded to lower case | the identity's subject, exactly as written; compared with Google's verified `email`, folded |
+| `members[].login` | a string | 1 to 40 bytes of ASCII letters, digits, `-`, `_` and `.`, its first and last a letter or a digit; unique, folded | the login in `Mint`, and the name where Google gives none |
+
+- **jig's owners of Google's provider are members:** each of
+  `engine.owners` whose provider is `google.provider` has a member's
+  address as its subject, or the start is refused, naming the owner; and
+  one of them at least, the first, signs in by the printed link
+  (`sign-in.md`, 2.3).
+- **Google's provider is not the link's:** `google.provider` differs
+  from `engine.clients`' link provider, or the start is refused, naming
+  both.
 
 **`limits`:** temper's profile and overrides (section 7).
 
@@ -487,6 +520,7 @@ have one, an engine alone none. Each:
 |---|---|---|---|
 | an owned or fake forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at start or the box's `started` (setup.md, 6.5); a fake forge, before binding (setup.md, 8.4) |
 | a worker's secret, its digest | jig's parts, data paths: `worker.secret` and `worker.digest` in the data directory as `temper init` writes them (setup.md, 8.2) | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
+| Google's client secret | `application.sign_in.google.secret`, a data path | the secret's bytes | `temper serve`, once, at start, within `sign_in.secret_bytes` |
 | the demo model's key | `application.demo.llm.key`, a data path: `demo/llm.key` as `temper init` writes it (setup.md, 8.2) | the key's bytes | the fake LLM, at its start, and the seed (setup.md, 8.4); never `temper serve` |
 
 - **A secret file holds its bytes and nothing else** but a final
@@ -573,6 +607,7 @@ have one, an engine alone none. Each:
   | `box.` | `temper-box`'s `Limits`: the box's restarts and stop, and its pipe's lines (setup.md, 7.1 and 7.2) |
   | `clients.` | `temper-service`'s clients' server's `Limits`: the browser's bundle (`../client/browser.md`, 2.2) |
   | `routes.` | `temper-service`'s clients' listener's forge routes (`../client/README.md`, the routes) |
+  | `sign_in.` | `temper-service`'s Google sign-ins on the clients' listener (`sign-in.md`, section 6) |
   | `picker.` | the picker's reads of a forge's repositories (`../domain/forge.md`, section 4) |
 
   For example `forge.repositories`, `forge.client.calls`,
@@ -619,6 +654,13 @@ have one, an engine alone none. Each:
   | `box.tail_lines` | the lines of a step's log the box holds, and writes under a failure's terminal line (setup.md, 7.2) |
   | `clients.bundle_files` | the bundle's files, its page among them |
   | `clients.bundle_bytes` | the bundle's files' bytes in all, held in memory while `temper serve` runs |
+  | `sign_in.members` | the configured members, and the forge connector's bindings held (`forge.bindings`, the members' count) |
+  | `sign_in.pending` | the sign-ins under way at once; a start past them is answered the busy page |
+  | `sign_in.deadline_ms` | a sign-in's life, from its start to its return's answer; the binding cookie's `Max-Age` |
+  | `sign_in.fetches` | the fetcher's exchanges with Google at once |
+  | `sign_in.body_bytes` | an answer's body from Google: the key set or the token |
+  | `sign_in.url_bytes` | a configured endpoint, and the authorization URL given to the browser |
+  | `sign_in.secret_bytes` | the client secret |
 - **Limits checked against each other at start,** each failure naming
   both limits:
   - the forge component's: its connections equal the forge client's
@@ -652,6 +694,8 @@ have one, an engine alone none. Each:
     the box cuts to fit (setup.md, 7.1);
   - the bundle's: `clients.bundle_files` and `clients.bundle_bytes`
     above 0;
+  - the sign-ins': each above 0; `sign_in.body_bytes` within skein-oauth's response bound;
+    `sign_in.members` within the forge's bindings' bound;
   - the webhooks' listener's: each of its limits above 0;
     `hook_secret_bytes` at least 32; `hook_head_bytes` at most the
     HTTP server's largest read within io's intake; `hooks` within the
