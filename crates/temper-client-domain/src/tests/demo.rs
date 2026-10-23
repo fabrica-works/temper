@@ -354,7 +354,7 @@ fn demo_side(state: w::DemoState) -> forge::Side {
 fn started(side: &mut forge::Side, silent: bool) -> skein_lib::Token {
     let mut out = Queue::with_capacity(4);
     demo::start(side, f::limits().forge, silent, &mut out);
-    let Some(forge::Request::Send { request, ask: jig_client::Ask::Family { scope, record } }) = out.pop() else {
+    let Some(forge::Request::Send { request, ask: jig_client::Ask::Family { scope, record }, .. }) = out.pop() else {
         panic!("start sent")
     };
     assert_eq!(scope, c::Scope::Deployment);

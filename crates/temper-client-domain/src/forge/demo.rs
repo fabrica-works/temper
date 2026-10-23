@@ -267,6 +267,6 @@ pub(crate) fn start(side: &mut Side, limits: Limits, silent: bool, out: &mut Que
     side.demo.start = Some(Starting { request, silent });
     side.demo.failure = None;
     side.demo.sent = true;
-    out.push(Request::Send { request, ask });
+    out.push(Request::Send { request, name: None, ask });
     side.changed();
 }

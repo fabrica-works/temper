@@ -269,7 +269,7 @@ fn root_at_with_forges(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],
-    demo: Option<(u32, bool)>,
+    demo: Option<(u32, bool, w::DemoState)>,
     activity: Option<c::ActivityPage>,
     forge_rows: Option<List<w::ForgeRow>>,
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>, Option<Token>) {

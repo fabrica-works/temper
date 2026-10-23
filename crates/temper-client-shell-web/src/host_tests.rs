@@ -280,7 +280,7 @@ mod memory_literal;
 // The setup draft, retained intent and adoption, shared keys and Ready words add 70,031 B.
 // The demo start's retained state, words, failure text and retry nodes (2,509,493 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274390100134;
+const WEB_BYTES: u64 = 274392609627;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
