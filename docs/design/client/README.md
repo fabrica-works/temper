@@ -1477,11 +1477,13 @@ of each (`../draft/first-run.md`, 3.6).
     usable (jig's `client/domain/client.md`, section 12,
     `not_signed_in`), the paragraph says so in place of the shell's
     words: full, "All N sign-ins are in use; the earliest ends MOMENT
-    UTC. This link stays usable until it expires: open it again once one
-    ends." (N the deployment's room, MOMENT the earliest saved expiry,
-    its date always beside its clock, "Oct 24, 09:30", as the accounts
-    page says its moments, 5.5: a sign-in's life is a day or more, so a
-    bare clock would name tomorrow's as today's); busy, "temper is busy. This
+    UTC. This link stays usable until LINK UTC; after that, opening it
+    has `temper serve` print a fresh one." (N the deployment's room,
+    MOMENT the earliest saved expiry and LINK the link's own, each with
+    its date beside its clock, "Oct 24, 09:30", as the accounts page says
+    its moments, 5.5: a sign-in's life is a day or more, so a bare clock
+    would name tomorrow's as today's; the minute is the expiry's own, so
+    the link serves a little past what it says); busy, "temper is busy. This
     link stays usable until it expires: open it again in a moment."; not
     ready, "temper is starting or stopping. This link stays usable until
     it expires: open it again in a moment." A link opened again past its
@@ -2724,7 +2726,7 @@ Its rules:
   | DIRECTORY refused | `temper open: DIRECTORY: ` and what skein's io found unsafe or failed |
   | an address given and no token in DIRECTORY | `temper open: not signed in: give the link temper serve printed` |
   | the link refused by the engine | `temper open: the link was refused: use the fresh link temper serve printed` |
-  | the engine's sign-ins full (6.7) | `temper open: all N sign-ins are in use; the earliest ends at T; this link stays usable until it expires` |
+  | the engine's sign-ins full (6.7) | `temper open: all N sign-ins are in use; the earliest ends at T; this link stays usable until U; after that, temper serve prints a fresh one when it is tried` |
 
   A panic aborts the process (fail-stop); the small store and the keys
   make what was pending safe to send again at the next `temper open`.
@@ -2899,12 +2901,13 @@ command.
   `protocol/client.md`, section 8).
 - **The engine's sign-ins full** exits 1 with `temper open: all N
   sign-ins are in use; the earliest ends at T; this link stays usable
-  until it expires` (6.1), N the deployment's room and T the earliest
-  saved expiry among its sign-ins in universal time to the second,
+  until U; after that, temper serve prints a fresh one when it is tried`
+  (6.1), N the deployment's room, T the earliest saved expiry among its
+  sign-ins and U the link's own, in universal time to the second,
   `YYYY-MM-DDTHH:MM:SSZ`. Nothing is written to DIRECTORY, and the link
   is not spent: the same `temper open DIRECTORY LINK`, once a sign-in
-  has ended and before the link expires, signs in. Full waits for a
-  sign-in to end, hours away, so the terminal does not wait for it.
+  has ended and before U, signs in. Full waits for a sign-in to end,
+  hours away, so the terminal does not wait for it.
 - **Once signed in,** the link is `jig-client`'s to judge (jig's
   `client/domain/client.md`, 8.2). The first line says its state, and
   the page is printed again at each change. Requests made meanwhile are

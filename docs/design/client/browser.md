@@ -301,7 +301,7 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 - **A link's sign-in not taken,** answered full, busy or not ready: the
   link is not spent, and the main says why and that the link stays
   usable until it expires (`README.md`, 5.1), full with the deployment's
-  room and its earliest end. The retry is the person's: opening the
+  room, its earliest end and the link's own. The retry is the person's: opening the
   printed link again sends its secret again, as the first open did, and
   signs in once there is room; opened past its expiry, it is refused,
   and `temper serve` prints a fresh one. The page never retries by

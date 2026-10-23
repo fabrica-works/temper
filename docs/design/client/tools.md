@@ -990,10 +990,11 @@ temper ctl help [TOOL]
     sign-in link was refused`; `temper serve` prints a fresh link;
   - *full* (jig's `domain/people.md`, section 3): `temper ctl: all N
     sign-ins are in use; the earliest ends at T; this link stays usable
-    until it expires`, N the deployment's room and T the earliest saved
-    expiry among its sign-ins in universal time to the second,
+    until U; after that, temper serve prints a fresh one when it is
+    tried`, N the deployment's room, T the earliest saved expiry among
+    its sign-ins and U the link's own, in universal time to the second,
     `YYYY-MM-DDTHH:MM:SSZ`. The link is not spent: the same `sign-in`
-    signs in once a sign-in has ended, before the link expires;
+    signs in once a sign-in has ended, before U;
   - *not ready* and *busy* pass: the call sends the same link again,
     with the same token, after 100 ms, doubling to 2 s, within its
     deadline (8.2); past it, after busy, `temper ctl: temper is busy;
