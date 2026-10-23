@@ -79,18 +79,24 @@ pub fn to_root(
                 value @ (w::Request::Connect(_) | w::Request::Install(_)) => {
                     let request = match value {
                         w::Request::Connect(value) => {
-                            let app = match value.how() {
-                                w::How::GithubApp(app) => app.id(),
-                                w::How::GithubManifest(_) => {
-                                    return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable {
-                                        to: reply_to,
-                                    })));
+                            let value = value.into_parts();
+                            let how = match value.how {
+                                w::How::GithubApp(app) => forge::How::GitHubApp {
+                                    app: core::num::NonZeroU64::new(app.id()).expect("decoded nonzero App"),
+                                },
+                                w::How::GithubManifest(manifest) => {
+                                    let back = manifest.into_parts().back;
+                                    if let Some(back) = &back
+                                        && !return_path(back)
+                                    {
+                                        return Err(Box::new(kit::Event::Application(
+                                            kit::FromApplication::Undecodable { to: reply_to },
+                                        )));
+                                    }
+                                    forge::How::GitHubManifest { back }
                                 }
                             };
-                            forge::Ask::Connect {
-                                forge: value.forge(),
-                                app: core::num::NonZeroU64::new(app).expect("decoded nonzero App"),
-                            }
+                            forge::Ask::Connect { forge: value.forge, how }
                         }
                         w::Request::Install(value) => {
                             let value = value.into_parts();
@@ -495,9 +501,10 @@ pub fn answer(
             root::ApplicationAnswer::Connect(forge::ConnectAnswer::Connecting)
             | root::ApplicationAnswer::Install(forge::InstallAnswer::Connecting),
         ) => w::Outcome::Connecting,
-        Some(root::ApplicationAnswer::Install(forge::InstallAnswer::Link(address))) => {
-            w::Outcome::Link(w::Link::new(limits, w::LinkParts { address }).ok()?)
-        }
+        Some(
+            root::ApplicationAnswer::Install(forge::InstallAnswer::Link(address))
+            | root::ApplicationAnswer::Connect(forge::ConnectAnswer::Link(address)),
+        ) => w::Outcome::Link(w::Link::new(limits, w::LinkParts { address }).ok()?),
         Some(
             root::ApplicationAnswer::Connect(forge::ConnectAnswer::Refused(why))
             | root::ApplicationAnswer::Install(forge::InstallAnswer::Refused(why)),
@@ -626,7 +633,11 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                 w::ForgeRow::new(
                     limits,
                     w::ForgeRowParts {
-                        app: None,
+                        app: match row.app {
+                            Some(forge::AppWay::Manifest) => Some(w::AppWay::Manifest),
+                            Some(forge::AppWay::Pasted) => Some(w::AppWay::Pasted),
+                            None => None,
+                        },
                         installations,
                         ended,
                         number: row.number,

@@ -178,6 +178,6 @@ demo-start [--key NAME]
 forge-connect F github-app ID FILE --key NAME
 forge-connect F github --key NAME
 forge-connect F forgejo|forgejo-admin FILE --key NAME
-  Connect an existing GitHub App; other ways are not offered yet
+  Connect GitHub through a manifest or an existing App
 forge-install F [--key NAME]
   Print a fresh GitHub App installation link

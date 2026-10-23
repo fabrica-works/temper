@@ -2110,6 +2110,9 @@ pub(crate) fn outputs(
             forge::Request::Connect { forge, request, app, carried } => {
                 assert!(super::now(domain, Request::Connect { forge, request, app, carried }), "connect door");
             }
+            forge::Request::Manifest { forge, request, back } => {
+                assert!(super::now(domain, Request::Manifest { forge, request, back }), "manifest door");
+            }
             forge::Request::Install { forge, request, back } => {
                 assert!(super::now(domain, Request::Install { forge, request, back }), "install door");
             }

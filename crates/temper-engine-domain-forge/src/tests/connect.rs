@@ -19,7 +19,7 @@ fn github(kind: Kind, mode: Mode) -> Domain {
     .unwrap()
 }
 fn connect(forge: u16) -> Ask {
-    Ask::Connect { forge, app: NonZeroU64::new(7).unwrap() }
+    Ask::Connect { forge, how: How::GitHubApp { app: NonZeroU64::new(7).unwrap() } }
 }
 fn application(
     d: &mut Domain,
@@ -55,7 +55,9 @@ fn refused(d: &mut Domain, ask: Ask, role: Option<PartyRole>, carried: Option<Ca
             .count(),
         usize::from(carried.is_some())
     );
-    assert!(!out.iter().any(|r| if let Request::Connect { .. } | Request::Install { .. } = r { true } else { false }));
+    assert!(!out.iter().any(|r| {
+        if let Request::Connect { .. } | Request::Manifest { .. } | Request::Install { .. } = r { true } else { false }
+    }));
 }
 #[test]
 fn connect_requires_the_deployment_owner_and_a_configured_real_github_and_key() {
@@ -298,4 +300,109 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
     let out = outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: None });
     assert_eq!(out.as_ref(), [Request::MarkedForges]);
     assert_eq!(d.forges().rows[0].installations.as_ref(), [(22, info)]);
+}
+
+fn manifest_ask(forge: u16) -> Ask {
+    Ask::Connect { forge, how: How::GitHubManifest { back: Some(Box::from(b"/forges".as_slice())) } }
+}
+#[test]
+fn manifests_need_no_key_erase_carried_and_release_after_the_link() {
+    for carried in [None, Some(VALUE)] {
+        let mut d = github(Kind::GitHub, Mode::Connected);
+        let out = application(&mut d, 1, manifest_ask(1), Some(PartyRole::Owner), carried);
+        assert!(out.contains(&Request::Manifest {
+            forge: 1,
+            request: Token::new(1),
+            back: Some(Box::from(b"/forges".as_slice()))
+        }));
+        assert_eq!(out.contains(&Request::CarriedUnused { number: VALUE.number }), carried.is_some());
+        assert_eq!(d.connection(1), Connection::NotConnected);
+        let answer = ConnectAnswer::Link(Box::from(b"http://temper.test/forges/1/github/manifest?state=s".as_slice()));
+        outputs(&mut d, Event::ConnectAnswered { forge: 1, request: Token::new(1), answer: answer.clone() });
+        assert_eq!(d.application_answer(Token::new(1)), Some(Answered::Connect(answer)));
+        assert!(
+            application(&mut d, 2, manifest_ask(1), Some(PartyRole::Owner), None)
+                .iter()
+                .any(|r| if let Request::Manifest { .. } = r { true } else { false })
+        );
+    }
+}
+#[test]
+fn manifest_refusals_follow_admission_order_and_erase_carried() {
+    for (role, forge, kind, mode, held, connection, why) in [
+        (None, 2, Kind::Forgejo, Mode::Fake, false, Connection::NotConnected, ForgeRefusal::Role),
+        (
+            Some(PartyRole::Owner),
+            2,
+            Kind::Forgejo,
+            Mode::Fake,
+            false,
+            Connection::NotConnected,
+            ForgeRefusal::NoSuchForge,
+        ),
+        (
+            Some(PartyRole::Owner),
+            1,
+            Kind::Forgejo,
+            Mode::Connected,
+            false,
+            Connection::Connected { id: 9, login: Box::from(b"app[bot]".as_slice()) },
+            ForgeRefusal::NotTaken,
+        ),
+        (Some(PartyRole::Owner), 1, Kind::GitHub, Mode::Fake, false, Connection::NotConnected, ForgeRefusal::NotTaken),
+        (
+            Some(PartyRole::Owner),
+            1,
+            Kind::GitHub,
+            Mode::Connected,
+            true,
+            Connection::Connected { id: 9, login: Box::from(b"app[bot]".as_slice()) },
+            ForgeRefusal::Busy,
+        ),
+        (
+            Some(PartyRole::Owner),
+            1,
+            Kind::GitHub,
+            Mode::Connected,
+            false,
+            Connection::Connecting,
+            ForgeRefusal::Connected,
+        ),
+        (
+            Some(PartyRole::Owner),
+            1,
+            Kind::GitHub,
+            Mode::Connected,
+            false,
+            Connection::Connected { id: 9, login: Box::from(b"app[bot]".as_slice()) },
+            ForgeRefusal::Connected,
+        ),
+    ] {
+        for carried in [None, Some(VALUE)] {
+            let mut d = github(kind, mode);
+            if held {
+                application(&mut d, 2, manifest_ask(1), Some(PartyRole::Owner), None);
+            }
+            outputs(&mut d, Event::Connection { forge: 1, state: connection.clone() });
+            refused(&mut d, manifest_ask(forge), role, carried, why);
+        }
+    }
+}
+#[test]
+fn app_way_is_volatile_and_only_shown_for_connected_github() {
+    let connected = Connection::Connected { id: 9, login: Box::from(b"app[bot]".as_slice()) };
+    let mut d = github(Kind::GitHub, Mode::Connected);
+    outputs(&mut d, Event::Connection { forge: 1, state: connected.clone() });
+    assert_eq!(d.forges().rows[0].app, None);
+    let mut pasted = github(Kind::GitHub, Mode::Connected);
+    application(&mut pasted, 1, connect(1), Some(PartyRole::Owner), Some(VALUE));
+    outputs(&mut pasted, Event::ConnectEnded { forge: 1, request: Token::new(1), connected: true, why: None });
+    outputs(&mut pasted, Event::Connection { forge: 1, state: connected.clone() });
+    assert_eq!(pasted.forges().rows[0].app, Some(AppWay::Pasted));
+    let mut made = github(Kind::GitHub, Mode::Connected);
+    outputs(&mut made, Event::AppRecorded { forge: 1, app: AppWay::Manifest });
+    outputs(&mut made, Event::Connection { forge: 1, state: connected });
+    assert_eq!(made.forges().rows[0].app, Some(AppWay::Manifest));
+    outputs(&mut made, Event::Connection { forge: 1, state: Connection::NotConnected });
+    assert_eq!(made.forges().rows[0].app, None);
 }

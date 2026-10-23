@@ -302,6 +302,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::StopGroup { .. }
         | Request::SetUpGroup { .. }
         | Request::Connect { .. }
+        | Request::Manifest { .. }
         | Request::Install { .. }
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
@@ -362,6 +363,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::StopGroup { .. }
         | Request::SetUpGroup { .. }
         | Request::Connect { .. }
+        | Request::Manifest { .. }
         | Request::Install { .. }
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
@@ -422,6 +424,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::StopGroup { .. }
         | Request::SetUpGroup { .. }
         | Request::Connect { .. }
+        | Request::Manifest { .. }
         | Request::Install { .. }
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
@@ -1134,7 +1137,17 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
     .unwrap()
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
-    Row { installations: Box::new([]), ended: None, first: None, number, kind, mode: Mode::Owned, connection, offer }
+    Row {
+        app: None,
+        installations: Box::new([]),
+        ended: None,
+        first: None,
+        number,
+        kind,
+        mode: Mode::Owned,
+        connection,
+        offer,
+    }
 }
 #[test]
 fn setup_rows_and_answers_agree_in_every_connection_state() {

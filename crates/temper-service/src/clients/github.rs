@@ -1,5 +1,6 @@
 //! Deferred replies for the setup route (client/forge.md, 9.1).
 use super::Clients;
+use crate::setup::MANIFEST_SCRIPT_HASH;
 use alloc::boxed::Box;
 use skein_http::{Header, server as http};
 use skein_lib::{
@@ -17,7 +18,10 @@ pub(super) fn claims(target: &[u8]) -> bool {
         Some(at) => target.get(..at).expect("query"),
         None => target,
     };
-    path.starts_with(b"/forges/") && path.ends_with(b"/github/setup")
+    path.starts_with(b"/forges/")
+        && (path.ends_with(b"/github/setup")
+            || path.ends_with(b"/github/manifest")
+            || path.ends_with(b"/github/redirect"))
 }
 impl Clients {
     pub(super) fn github_call(&mut self, call: Token, head: http::Call) {
@@ -29,6 +33,22 @@ impl Clients {
         self.github_calls.push((call, head));
     }
     pub(crate) fn github_answer(&mut self, call: Token, status: u16, location: Option<&[u8]>, body: &[u8]) {
+        self.github_response(call, status, location, body, None);
+    }
+    pub(crate) fn github_manifest_answer(&mut self, call: Token, body: &[u8], web: &[u8]) {
+        let parts =
+            [b"default-src 'none'; form-action ".as_slice(), web, b"; script-src 'sha256-", MANIFEST_SCRIPT_HASH, b"'"];
+        let mut size = 0_usize;
+        for part in parts {
+            size = size.checked_add(part.len()).expect("bounded CSP");
+        }
+        let mut writer = skein_lib::Writer::new(size);
+        for part in parts {
+            writer.put(part).expect("measured CSP");
+        }
+        self.github_response(call, 200, None, body, Some(&writer.finish()));
+    }
+    fn github_response(&mut self, call: Token, status: u16, location: Option<&[u8]>, body: &[u8], csp: Option<&[u8]>) {
         let Some(reply) = self.github.get_mut(&call) else { return };
         reply.body = Some(bytes::copy_of(body));
         let mut headers = List::with_capacity(4);
@@ -43,6 +63,11 @@ impl Clients {
             headers
                 .push(Header { name: bytes::copy_of(b"Location"), value: bytes::copy_of(location) })
                 .expect("location header");
+        }
+        if let Some(csp) = csp {
+            headers
+                .push(Header { name: bytes::copy_of(b"Content-Security-Policy"), value: bytes::copy_of(csp) })
+                .expect("policy header");
         }
         self.server.answer(call, http::Request::Discard, &mut self.server_out);
         self.server.answer(

@@ -37,6 +37,9 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         root::Request::Connect { forge, request, app, carried } => {
             crate::setup::public::connect(engine, forge, request, app, carried);
         }
+        root::Request::Manifest { forge, request, back } => {
+            crate::setup::public::manifest(engine, forge, request, back);
+        }
         root::Request::Install { forge, request, back } => crate::setup::public::install(engine, forge, request, back),
         root::Request::EraseCarried { number } => crate::setup::public::erase(engine, number),
         root::Request::Setup { run } => crate::setup::request(engine, run),
@@ -77,7 +80,8 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 }
                 // skein's forge-connection.md, section 2: no returned-hint request; never offer it again.
                 // protocol/forge.md, 2: these views are not kept; restart publishes connections and skein's forge-connection.md, 4.4's baseline.
-                Event::Hint { .. }
+                Event::AppRecorded { .. }
+                | Event::Hint { .. }
                 | Event::Connection { .. }
                 | Event::Installation { .. }
                 | Event::BoxClosed

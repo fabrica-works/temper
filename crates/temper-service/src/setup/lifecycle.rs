@@ -429,6 +429,10 @@ fn finish(engine: &mut crate::engine::Engine, token: Token, end: root::SetupEnd)
         ended(engine, token, end);
     }
     if follow {
+        engine.events.push(root::Event::Forge(Box::new(domain::Event::AppRecorded {
+            forge: run.forge,
+            app: domain::AppWay::Manifest,
+        })));
         connect(engine, run.forge);
     }
 }

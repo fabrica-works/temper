@@ -525,6 +525,7 @@ impl World {
                 | engine::Request::StopGroup { .. }
                 | engine::Request::SetUpGroup { .. }
                 | engine::Request::Connect { .. }
+                | engine::Request::Manifest { .. }
                 | engine::Request::Install { .. }
                 | engine::Request::EraseCarried { .. }
                 | engine::Request::SetUp { .. }

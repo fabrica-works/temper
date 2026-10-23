@@ -510,6 +510,11 @@ pub enum Request {
         app: ::core::num::NonZeroU64,
         carried: jig_domain_core::Carried,
     },
+    Manifest {
+        forge: u16,
+        request: Token,
+        back: Option<Box<[u8]>>,
+    },
     Install {
         forge: u16,
         request: Token,

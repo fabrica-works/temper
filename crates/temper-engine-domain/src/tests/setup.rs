@@ -73,6 +73,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Request]> {
                 | Request::SetUp { .. }
                 | Request::Return { .. }
                 | Request::Connect { .. }
+                | Request::Manifest { .. }
                 | Request::Install { .. }
                 | Request::EraseCarried { .. }
                 | Request::Setup { .. }
@@ -186,6 +187,7 @@ fn the_deployment_owner_watches_forges_again_after_a_connection_changes() {
             watcher: WATCHER,
             forges: forge::Forges {
                 rows: Box::new([forge::Row {
+                    app: None,
                     installations: Box::new([]),
                     ended: None,
                     first: None,
@@ -217,6 +219,7 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
 
 fn row(connection: forge::Connection) -> forge::Row {
     forge::Row {
+        app: None,
         installations: Box::new([]),
         ended: None,
         first: None,
@@ -247,7 +250,13 @@ fn public_connect_preserves_the_admitted_owner_and_carry_then_root_orders_its_er
     crate::try_step(
         &mut domain,
         &env,
-        public_request(forge::Ask::Connect { forge: 1, app: core::num::NonZeroU64::new(7).unwrap() }, Some(carried)),
+        public_request(
+            forge::Ask::Connect {
+                forge: 1,
+                how: forge::How::GitHubApp { app: core::num::NonZeroU64::new(7).unwrap() },
+            },
+            Some(carried),
+        ),
     )
     .unwrap();
     let requests = settle(&mut domain, &env);
@@ -320,7 +329,10 @@ fn public_connect_refuses_other_deployment_roles_and_names_their_carry_unused_on
             &mut domain,
             &env,
             public_request(
-                forge::Ask::Connect { forge: 1, app: core::num::NonZeroU64::new(7).unwrap() },
+                forge::Ask::Connect {
+                    forge: 1,
+                    how: forge::How::GitHubApp { app: core::num::NonZeroU64::new(7).unwrap() },
+                },
                 Some(carried),
             ),
         )

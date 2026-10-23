@@ -4,6 +4,7 @@ use skein_lib::{Reader, RequestEnvelope, Secret};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 
 const CONNECT: &[&str] = &["forge-connect", "3", "github-app", "4242", "app.pem", "--key", "app"];
+const MANIFEST: &[&str] = &["forge-connect", "3", "github", "--key", "app"];
 const INSTALL: &[&str] = &["forge-install", "3"];
 // An opaque fake key; neither these step tests nor the shell tests contact a forge.
 const PEM: &[u8] = b"fake-app-pem";
@@ -103,8 +104,7 @@ fn install_sends_no_back_or_value_and_accepts_an_optional_key() {
 #[test]
 fn unoffered_ways_exit_two_without_reading_or_sending_a_value() {
     for words in [
-        &["forge-connect", "3", "github", "--key", "app"][..],
-        &["forge-connect", "3", "forgejo", "tokens", "--key", "app"],
+        &["forge-connect", "3", "forgejo", "tokens", "--key", "app"][..],
         &["forge-connect", "3", "forgejo-admin", "token", "--key", "app"],
     ] {
         let mut root = f::signed_in(f::PARTY);
@@ -120,7 +120,9 @@ fn connect_and_install_print_their_durable_outcomes() {
     for json in [false, true] {
         for (words, outcome, status, text, structured) in [
             (CONNECT, w::Outcome::Connecting, 0, b"connecting\ntemper ctl DIRECTORY wait forges --until connected:3\n".as_slice(), br#"{"connecting":{}}"#.as_slice()),
+            (MANIFEST, link(), 0, b"Open this address in a browser on the engine's machine:\nhttps://forge.invalid/install/app\ntemper ctl DIRECTORY wait forges --until settled\n".as_slice(), br#"{"link":{"address":"https://forge.invalid/install/app"}}"#.as_slice()),
             (INSTALL, link(), 0, b"Open this address in a browser on the engine's machine:\nhttps://forge.invalid/install/app\ntemper ctl DIRECTORY wait forges --until settled\n", br#"{"link":{"address":"https://forge.invalid/install/app"}}"#),
+            (MANIFEST, w::Outcome::Connecting, 1, b"connecting\n".as_slice(), br#"{"connecting":{}}"#.as_slice()),
             (INSTALL, w::Outcome::Connecting, 1, b"connecting\n", br#"{"connecting":{}}"#),
             (INSTALL, w::Outcome::Unknown, 1, b"unknown\n", br#"{"unknown":{}}"#),
         ] {
@@ -146,7 +148,7 @@ fn every_forge_refusal_prints_words_json_and_exit_two() {
         (w::ForgeRefusal::NoKey, "no_key", "no key"),
     ] {
         for json in [false, true] {
-            for words in [CONNECT, INSTALL] {
+            for words in [CONNECT, MANIFEST, INSTALL] {
                 let mut root = f::signed_in(f::PARTY);
                 let value = if words == CONNECT { Some(Secret::new(PEM.into())) } else { None };
                 let call = root.submit_prepared(f::call(words), json, value);
@@ -238,5 +240,21 @@ fn a_connect_refuses_an_install_link_and_both_refuse_unrelated_outcomes() {
         let call = root.submit_value(words, if words == CONNECT { Some(Secret::new(PEM.into())) } else { None });
         root.adoption_answer(call, outcome);
         assert_eq!(root.answer(call).expect("invalid answer").status, 1);
+    }
+}
+
+#[test]
+fn manifest_connect_sends_no_back_or_carried_value() {
+    let mut root = f::signed_in(f::PARTY);
+    let call = root.submit(MANIFEST);
+    let w::Request::Connect(connect) = request(&root, call) else { panic!("connect") };
+    assert_eq!(connect.forge(), 3);
+    let w::How::GithubManifest(manifest) = connect.how() else { panic!("manifest") };
+    assert_eq!(manifest.back(), &None);
+    assert!(root.carried.is_empty());
+    assert_eq!(root.sent_name(call), Some(f::named("app")));
+    assert!(root.saved.contains_key(&call));
+    for words in [&["forge-connect", "3", "github", "extra", "--key", "app"][..], &["forge-connect", "3", "github"]] {
+        f::parse(words).expect_err("invalid manifest call");
     }
 }

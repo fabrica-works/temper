@@ -43,9 +43,10 @@ pub(crate) fn start(
     carried: Option<Carried>,
     out: &mut Queue<Request>,
 ) {
-    let (forge, install) = match &ask {
-        Ask::Connect { forge, .. } => (*forge, false),
-        Ask::Install { forge, .. } => (*forge, true),
+    let (forge, install, manifest) = match &ask {
+        Ask::Connect { forge, how: crate::How::GitHubApp { .. } } => (*forge, false, false),
+        Ask::Connect { forge, how: crate::How::GitHubManifest { .. } } => (*forge, false, true),
+        Ask::Install { forge, .. } => (*forge, true, false),
         Ask::Adopt(_) | Ask::SetUp { .. } | Ask::StartDemo => unreachable!("connect admission"),
     };
     let (connected, connecting) = match d.connection(forge) {
@@ -74,7 +75,7 @@ pub(crate) fn start(
         Some(ForgeRefusal::NotConnected)
     } else if !install && (connected || connecting) {
         Some(ForgeRefusal::Connected)
-    } else if !install && carried.is_none() {
+    } else if !install && !manifest && carried.is_none() {
         Some(ForgeRefusal::NoKey)
     } else {
         None
@@ -96,7 +97,7 @@ pub(crate) fn start(
     }
     d.connect.pending.insert(request, token).expect("room checked");
     match ask {
-        Ask::Connect { app, .. } => {
+        Ask::Connect { how: crate::How::GitHubApp { app }, .. } => {
             let carried = carried.expect("admitted key");
             d.connect.running.insert(forge, (request, Some(carried))).expect("room checked");
             let kept = match d.connections.get(&forge) {
@@ -106,6 +107,13 @@ pub(crate) fn start(
             d.connections.insert(forge, (Connection::Connecting, kept)).expect("configured forge");
             out.push(Request::MarkedForges);
             out.push(Request::Connect { forge, request, app, carried });
+        }
+        Ask::Connect { how: crate::How::GitHubManifest { back }, .. } => {
+            if let Some(value) = carried {
+                out.push(Request::CarriedUnused { number: value.number });
+            }
+            d.connect.running.insert(forge, (request, None)).expect("room checked");
+            out.push(Request::Manifest { forge, request, back });
         }
         Ask::Install { back, .. } => {
             if let Some(value) = carried {
@@ -119,6 +127,12 @@ pub(crate) fn start(
 }
 pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: ConnectAnswer, out: &mut Queue<Request>) {
     if let Some(token) = d.connect.pending.remove(&request) {
+        if let ConnectAnswer::Link(_) = &answer
+            && let Some((held, _)) = d.connect.running.get(&forge)
+            && *held == request
+        {
+            d.connect.running.remove(&forge);
+        }
         if let ConnectAnswer::Refused(_) = answer
             && let Some((held, _)) = d.connect.running.get(&forge)
             && *held == request
@@ -169,6 +183,10 @@ pub(crate) fn ended(
     {
         if let Some((_, Some(carried))) = d.connect.running.remove(&forge) {
             out.push(Request::EraseCarried { number: carried.number });
+        }
+        if connected {
+            d.apps.insert(forge, crate::AppWay::Pasted).expect("configured forge App way");
+            out.push(Request::MarkedForges);
         }
         if !connected {
             if let Some(why) = why {

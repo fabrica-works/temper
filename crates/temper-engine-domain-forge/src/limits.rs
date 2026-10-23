@@ -105,6 +105,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
         .checked_add(Map::<u16, crate::Configured>::worst_case(l.client.repositories)?)?
         .checked_add(Map::<u16, crate::First>::worst_case(l.client.repositories)?)?
+        .checked_add(Map::<u16, crate::AppWay>::worst_case(l.client.repositories)?)?
         .checked_add(Map::<u16, Box<[u8]>>::worst_case(l.client.repositories)?)?
         .checked_add(u64::from(l.client.repositories).checked_mul(u64::try_from(CONNECT_WHY_BYTES).ok()?)?)?
         .checked_add(u64::from(l.client.repositories).checked_mul(u64::from(l.name_bytes).checked_mul(3)?)?)?
@@ -224,6 +225,7 @@ fn issue_payload(l: &Limits) -> Option<u64> {
 pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -> Option<u64> {
     let count = forges.checked_mul(installations)?;
     Map::<u16, crate::First>::worst_case(forges)?
+        .checked_add(Map::<u16, crate::AppWay>::worst_case(forges)?)?
         .checked_add(Map::<u16, Box<[u8]>>::worst_case(forges)?)?
         .checked_add(u64::from(forges).checked_mul(u64::try_from(CONNECT_WHY_BYTES).ok()?)?)?
         .checked_add(u64::from(forges).checked_mul(u64::from(name_bytes).checked_mul(3)?)?)?

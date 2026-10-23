@@ -3,6 +3,7 @@ pub(crate) mod diagnostics;
 pub(crate) mod lifecycle;
 pub(crate) mod public;
 mod routes;
+pub(crate) use routes::MANIFEST_SCRIPT_HASH;
 mod settings;
 use alloc::boxed::Box;
 use jig_protocol_store::Event as StoreEvent;
@@ -35,6 +36,7 @@ pub(crate) struct Layer {
     writes: Map<Token, Write>,
     next_write: u64,
     pages: Queue<Page>,
+    listener: Box<[u8]>,
     life: Duration,
     value_bytes: u32,
     #[cfg(test)]
@@ -71,7 +73,15 @@ pub(crate) fn worst_case(
             listener.set_port(u16::MAX);
         }
     }
-    let host = host::worst_case(&l, &settings)?; // Includes pending fixed Settings, moved into Host::new.
+    let mut listener_bytes = 0_u64;
+    let mut web_bytes = 0_u64;
+    for forge in &settings.forges {
+        if let host::Kind::GitHub(given) = &forge.kind {
+            listener_bytes = listener_bytes.max(u64::try_from(given.url.len()).ok()?);
+            web_bytes = web_bytes.max(u64::try_from(given.web.len()).ok()?);
+        }
+    }
+    let host = host::worst_case(&l, &settings)?.checked_add(listener_bytes)?; // Includes pending fixed Settings, moved into Host::new.
     let installations = config.limits.forge_component.installations;
     let count = l.forges.checked_mul(installations)?;
     let above = batch.checked_mul(host::MAX_OUT.above)?;
@@ -121,7 +131,16 @@ pub(crate) fn worst_case(
         }
     }
     // Retained strings, codec parts and their encoded copy can coexist.
-    host.checked_add(handovers)?
+    // Each HTTP call may retain its own served manifest page. The policy's
+    // measured buffer and header copy overlap; 256 covers its fixed words.
+    let responses = if listener_bytes == 0 {
+        0
+    } else {
+        u64::from(crate::limits::server(&config.jig.limits).connections)
+            .checked_mul(u64::from(l.body_bytes).checked_add(web_bytes.checked_add(256)?.checked_mul(2)?)?)?
+    };
+    host.checked_add(responses)?
+        .checked_add(handovers)?
         // Pending/active intent names and the Create plan clone coexist.
         .checked_add(u64::from(l.forges).checked_mul(name.checked_mul(4)?)?)?
         .checked_add(local_bytes.checked_mul(3)?)?
@@ -211,11 +230,16 @@ impl Layer {
         batch: u32,
         installations: u32,
     ) -> Self {
+        let mut listener: Box<[u8]> = Box::new([]);
         let mut served = Map::with_capacity(limits.forges);
         for forge in &settings.forges {
             served.insert(forge.number(), ()).expect("configured host forges");
+            if let host::Kind::GitHub(given) = &forge.kind {
+                listener.clone_from(&given.url);
+            }
         }
         Self {
+            listener,
             component: None,
             pending: Some((settings, crypto)),
             waiting_for_webhooks: false,
@@ -317,6 +341,21 @@ impl Layer {
             }
         }
         None
+    }
+    fn take_page(&mut self, forge: u16, state: &[u8], now: Time) -> bool {
+        let mut found = false;
+        for _ in 0..self.pages.len() {
+            let page = self.pages.pop().expect("page count");
+            if page.until <= now {
+                continue;
+            }
+            if page.forge == forge && page.state.as_ref() == state {
+                found = true;
+            } else {
+                self.pages.push(page);
+            }
+        }
+        found
     }
     fn hold(&mut self, forge: u16, state: Box<[u8]>, bytes: Box<[u8]>) {
         if self.pages.room() == 0 {
@@ -480,7 +519,13 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                         if item == skein_forge_setup::item::Item::Pasted {
                             let value = match engine.setup.public.get(&run) {
                                 Some(public::Caller::Connect { pem, .. }) => pem.clone(),
-                                Some(public::Caller::Install { .. } | public::Caller::Accept { .. }) | None => None,
+                                Some(
+                                    public::Caller::Install { .. }
+                                    | public::Caller::Accept { .. }
+                                    | public::Caller::Manifest { .. }
+                                    | public::Caller::Redirect { .. },
+                                )
+                                | None => None,
                             };
                             engine.setup.down(host::Request::Answer { run, answer: host::Answer::Read(value) });
                             continue;

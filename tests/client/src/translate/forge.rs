@@ -339,6 +339,7 @@ pub fn incoming(
         | engine::Request::Account(_)
         | engine::Request::SetUpGroup { .. }
         | engine::Request::Connect { .. }
+        | engine::Request::Manifest { .. }
         | engine::Request::Install { .. }
         | engine::Request::EraseCarried { .. }
         | engine::Request::StopGroup { .. }
