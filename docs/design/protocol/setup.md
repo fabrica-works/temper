@@ -1229,6 +1229,38 @@ runs it (section 7).
   bytes, where jig's small has 65,536. Its `application.limits` is
   `small` with `checkout.message_bytes` 4,098 so the checkout accepts
   the agent's largest call.
+- **Its turn's bounds derive from smith's largest turn,** T, the
+  agent's `turn_body`, which its configuration derives (configuration.md,
+  section 7, the turn's check). The model's reasoning allowance,
+  `reasoning_item`, is 65,536 bytes: a plan's model's reasoning items
+  stay within it in ordinary use, so a chat on a plan is not held for
+  its reasoning, and a person may lower it, with these bounds
+  (configuration.md, section 5). Each bound is the least the turn's
+  check takes, past jig's small profile's:
+  - both hubs, `engine.limits` and the worker's `limits`:
+    `hub.turn_bytes` T; `hub.transcript_bytes` four times the resume
+    window, the window and a box for each turn it can hold;
+    `hub.turn_queue_bytes` 8T, the agent's eight unacknowledged turns
+    (the worker's check, above);
+  - `engine.limits`: `core.resume_bytes` T + 4, one largest turn with
+    its length, so that a chat's window resumes whole up to that size;
+  - `application.limits`: `root.journal.transcript_bytes` T + 4, the
+    resume setting's bound; `root.loads.transcript_bytes` T;
+    `root.loads.bytes` and `root.loads.reply_bytes` T and a row's slot;
+    `root.loads.read_bytes` 2T, the turn and room as large again for
+    the evidence a read carries with it (configuration.md, section 11).
+
+  A test holds the example's and `temper init`'s figures to this
+  derivation from their agent, and its writer rewrites them, before the
+  memory's writer runs (below):
+
+  ```sh
+  SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(turn_bounds)'
+  ```
+
+  jig's store and its KV bounds and the worker wire's ceilings stay as
+  they are: a turn's body is a transcript file's, never a KV value, and
+  each figure is within its wire field's ceiling.
 - **Its `memory_bytes`** hold its worst cases wherever a person lays it
   and whatever its forge's records hold: each start passes with each
   string its service's worst case counts, and a person's copy changes,

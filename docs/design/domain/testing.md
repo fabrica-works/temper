@@ -120,6 +120,17 @@ holds and the bytes between the roots are jig's channel story's (jig's
 `protocol/channel.md`, section 12); the same reply in temper's client is
 6.3's and 2.4's.
 
+A chat's reply of text alone has its story there, with its Finite
+sibling. The chat, Open, is answered by skein's fake LLM with text and
+no `finish` call: one model call, one committed reply, the chat parked
+with no try spent, and past its idle wait no second call, assignment
+or reply (`agent.md`, 4.6). A task ended by its result, as
+every goal and delegation is, given the same text alone, is nudged
+toward `finish` by smith and finishes with its report on its next
+call, with no try spent. The parking and the nudge are smith's and
+jig's own worlds'; this story holds temper's choice of mode for each
+(`temper-engine-smith`'s start) to them.
+
 temper's client joined to the engine's root, `tests/client`
 (`temper-client-world`), is a system world too: temper's client root and
 view, skein's fake person reading the view's tree, jig's client worlds'
@@ -814,19 +825,37 @@ and 10).
   in jig's secrets' store, and the admin's token the preparation's
   handover, `admin_token`, which the setup host takes once
   (../protocol/setup.md, sections 3 and 9).
-- **ChatGPT's sign-in,** two tests of their own
+- **ChatGPT's sign-in,** three tests of their own
   (`crates/temper/tests/support/sign_in.rs`;
   ../protocol/credentials.md, section 3), on skein's fake issuer and the
   fake LLM peer, with the sign-in's terms as `temper init` writes them
   (../protocol/setup.md, 8.1), only its addresses swapped for the
-  fakes', plaintext, and the redirect's port the kernel's:
-  - *signed in:* `temper ctl connect 1` prints the sign-in's address and
-    the accounts page, a native person's view, shows the sign-in under
-    way; the test drives the redirect as a browser would; the page then
-    shows the person's account, "ChatGPT · DISPLAY · OpenAI", a plan,
-    its source ready; and a chat on gpt-6-luna is answered on it, the
-    fake LLM peer observing a bearer, the grant's scheme, never its
-    value;
+  fakes', plaintext, and the redirect's port the kernel's. The issuer's
+  access token is as long as a real plan's, 4,096 bytes shaped as a
+  JWT, so the bounds it crosses (the accounts' table, the grant, the
+  model's request head) are a real one's; the fake LLM peer's request
+  head takes it:
+  - *signed in, a chat that lasts:* `temper ctl connect 1` prints the
+    sign-in's address and the accounts page, a native person's view,
+    shows the sign-in under way; the test drives the redirect as a
+    browser would; the page then shows the person's account, "ChatGPT ·
+    DISPLAY · OpenAI", a plan, its source ready. A chat on gpt-6-luna
+    is answered on it by text alone, with no `finish` call, as a plan's
+    model answers a chat: the reply commits once and the chat parks
+    (`agent.md`, 4.6). The person's next words wake it, and the
+    peer's second answer carries a reasoning item at the model's
+    allowance, so its turn passes jig's small profile's 64 KiB and
+    stays within the bounds the document derives from smith's largest
+    turn (../protocol/configuration.md, section 7): it commits once and
+    the chat parks again. Close ends the chat. The peer has seen two
+    requests, one for each of the person's words, and the chat holds
+    two replies, each once: no retry and no second reply. The peer
+    observes a bearer, the grant's scheme, never its value;
+  - *past its allowance:* the peer's reasoning item one byte past the
+    model's allowance holds the chat at once, after one request, with
+    the reason the tools' JSON names, the bound and its configured
+    value (`worker.md`, 4.3); the person's release allows one
+    more request, whose answer holds the chat again;
   - *stopped while signing:* the binary, told to stop with a sign-in
     under way, ends at once with exit 0, well before the sign-in's
     deadline, its client answered (jig's `domain/accounts.md`, section

@@ -437,6 +437,16 @@ have one, an engine alone none. Each:
   reads it; and by each agent process as it starts.
 - **It holds no credential:** an agent's grants come over smith's
   channel (credentials.md, section 3).
+- **A model's reasoning allowance,** its `reasoning_item` (smith's
+  `protocol/agent.md`, section 4), bounds each reasoning item the model
+  sends; past it, with smith's default `oversized_reasoning` of `fail`,
+  the call fails and the run holds at once, naming the bound and its
+  value (`../domain/worker.md`, 4.3). smith derives its largest turn
+  from it, so the allowance and the hub's bounds go together: the start
+  refuses a document whose bounds do not hold that turn (section 7).
+  temper's documents give a plan's model an allowance its reasoning
+  does not reach in ordinary use (setup.md, 8.1), a default a person
+  may lower, with the bounds it derives.
 - **`programs`** (smith's `protocol/agent.md`, section 4): each program
   the agent may run as a backend, by its adapter, with the program's
   absolute path and its programs directory, which holds a configuration
@@ -663,17 +673,40 @@ have one, an engine alone none. Each:
     its largest event with smith's 2-byte separator within the agent's
     message, and the agent's message less that separator within the
     hub's event. So `hub.event_bytes` is the agent's `message_bytes` less
-    2, and no other value starts.
+    2, and no other value starts;
+  - the turn's, against the agent's configuration: smith's largest
+    turn, the `turn_body` its configuration derives (smith's
+    `smith-agent-service`, `profile`; its models' reasoning allowances
+    among what it derives from, section 5), is a whole conversation
+    turn's body as the hub measures it, and each bound on its way holds
+    it. Within each hub's `turn_bytes`, the engine's and the worker's,
+    since each side of the link takes a turn of its own hub's bound;
+    with its 4-byte length, within `core.resume_bytes`, so that a chat's
+    largest turn resumes rather than starting afresh, and so within
+    `root.journal.transcript_bytes`, a journal row's (the resume
+    setting's check below); within `root.loads.transcript_bytes`, a
+    loaded row's, and with a row's slot, within `root.loads.bytes`, a
+    loaded page's, so that the engine loads it back; and with a read's
+    row, within `root.loads.read_bytes`, so that a person's read
+    carries it whole. Then the engine's resume window, as each hub
+    counts it in an assignment's transcript (jig's `domain/hosts.md`):
+    `core.resume_bytes` and, for each turn it can hold, a box past the
+    4 bytes it already counts, within each hub's `transcript_bytes`.
+    Each failure names the bound, its bytes, and the figure it must
+    hold: `workers[0].limits.overrides.hub.turn_bytes: 65536 bytes,
+    short of the agent's largest turn, 1039544 bytes`.
 - **In the cluster's shapes** (README, 15.1), each process checks what
   its document holds: an engine alone, every check above but the
-  worker's; a worker alone, the worker's, the checkout's and the git
-  component's, and the channel's for what its side receives. What only
-  an engine's document and a worker's hold together, the engine's
-  largest part against the worker's `limits` among it, is held by the
-  cluster's description, whose one template writes the same
-  `application.limits` into every document (README, 15.5), and at the
-  link's opening by jig's hello and terms (jig's `protocol/channel.md`,
-  4.3).
+  worker's and those of the turn's that need the agent; a worker alone,
+  the worker's, the checkout's and the git component's, the channel's
+  for what its side receives, and the agent's largest turn within its
+  hub's `turn_bytes`. What only an engine's document and a worker's
+  hold together, the engine's largest part against the worker's
+  `limits` among it and the agent's largest turn against the engine's
+  bounds, is held by the cluster's description, whose one template
+  writes the same `application.limits` into every document (README,
+  15.5), and at the link's opening by jig's hello and terms (jig's
+  `protocol/channel.md`, 4.3).
 - **jig's limits stay in jig's parts:** `engine.limits` and each worker's
   `limits` (jig's `protocol/configuration.md`, section 6).
 - **What the root takes of `engine.limits`:** its core children's
@@ -683,9 +716,10 @@ have one, an engine alone none. Each:
   section 10): from its own `root.` limits, in place of `brief.`,
   `core.brief_parts`, `core.brief_core_budgets.`, `core.resume_bytes`,
   `core.run_bytes`, `core.policy_bytes`,
-  `core.escalation_reason_bytes`, `core.call_answer_bytes` and
-  `core.load_slots`; as constants, in place of `views.`,
-  `core.fill_mark`, `core.load_bytes` and `core.connectors`. An
+  `core.escalation_reason_bytes`, `core.call_answer_bytes`,
+  `core.load_slots` and `core.load_bytes`, a person's read of the store,
+  from `root.loads.read_bytes`; as constants, in place of `views.`,
+  `core.fill_mark` and `core.connectors`. An
   override of one of these changes nothing the root holds, but for
   `core.resume_bytes`: the core's resume setting is still taken from it,
   above 0 and within `root.journal.transcript_bytes`.
@@ -1046,6 +1080,23 @@ one owned forge, with its own values (setup.md, 8.1).
   standalone could derive them from its own binary and its
   configuration directory, as no check can tell temper's binary from
   another program today (section 2).
+- **The rest of an assignment's transcript and of a person's read.**
+  The turn's check (section 7) holds the resume window's share of each
+  hub's `transcript_bytes`, and the turn's share of
+  `root.loads.read_bytes`. The answered calls an assignment carries
+  beside its window (`core.call_records`, each within
+  `core.call_answer_bytes`), and the owner's task record and ancestors
+  a read carries with its row, have no bound the start can name: jig
+  gives neither's worst case. Default: the hub refuses an assignment
+  past its bound at run time, and the documents leave room beside the
+  turn for the read's evidence (setup.md, 8.1).
+- **A turn past what temper's client takes.** The engine carries a
+  turn of smith's largest size whole, but temper's clients take a
+  document within their own bound, jig-client's `document_bytes` as
+  each shell sets it (`../client/README.md`, section 2), which a turn
+  of the agent's largest size with its wrapper can pass. Default: such a
+  turn, which no plan's model reaches in ordinary use, shows as too
+  large to read (jig's `protocol/store.md`, 7.3).
 
 ## 12. The three directories
 
