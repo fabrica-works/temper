@@ -95,8 +95,8 @@ impl Domain {
     pub fn forges(&self) -> forge::Forges {
         self.forge.forges()
     }
-    #[must_use]
     /// The connector's durable demo end, shared with setup readiness scans.
+    #[must_use]
     pub fn forge_ended(&self, forge: u16) -> bool {
         self.forge.forge_ended(forge)
     }

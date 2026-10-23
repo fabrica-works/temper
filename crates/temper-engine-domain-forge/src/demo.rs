@@ -36,8 +36,8 @@ impl Domain {
     pub const fn demo_state(&self) -> Option<DemoState> {
         self.demo_state
     }
-    #[must_use]
     /// Ended state comes from the demo record, independently of routing events.
+    #[must_use]
     pub fn forge_ended(&self, forge: u16) -> bool {
         self.demo_state == Some(DemoState::Ended)
             && match &self.demo {
