@@ -2595,6 +2595,11 @@ Each is intended; what it needs is named with it.
   suggested requests started, or every open chat of its project); and
   the demo model's account removed by the engine at the end, when no
   client saw it, once jig carries a deployment owner's acts (above).
+  Until then such an end leaves the account: the demo model, its group
+  stopped, answers no run, yet its key is usable in jig's terms, so
+  while it is the person's only model the welcome lands on Chats and
+  the accounts' banner (`../client/README.md`, 5.1) stays hidden;
+  removing it from Accounts mends both.
 - **A lock and an exec in skein's shell,** onto which 6.4's module
   moves once skein's shell offers an exec and a lock held across it,
   which skein's `Lock` is not (skein's `io.md`, section 5). A second
