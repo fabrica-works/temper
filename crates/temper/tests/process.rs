@@ -15,7 +15,7 @@ fn a_temper_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
 }
 
 #[test]
-fn a_person_signs_in_with_chatgpt_and_a_chat_is_answered_on_the_plan() {
+fn a_person_signs_in_with_chatgpt_and_a_chat_on_the_plan_lasts() {
     let scratch = support::Scratch::new("sign_in_chat");
     let issuer = support::sign_in::configuration(scratch.path());
     support::sign_in::answered(scratch.path(), issuer);

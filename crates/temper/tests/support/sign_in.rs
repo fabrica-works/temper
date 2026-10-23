@@ -5,11 +5,29 @@ use skein_io::kernel::{Exit, Signal};
 use skein_lib::{Duration, Time};
 use skein_shell::{Clock, Host};
 use skein_world::{Referee, real};
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::LazyLock};
 
 const STOPS_WITHIN: Duration = Duration::from_secs(10);
 
-const ACCESS: &[u8] = b"process-sign-in-access";
+static ACCESS: LazyLock<Box<[u8]>> = LazyLock::new(|| {
+    use skein_lib::{Writer, base64};
+    let mut token = Vec::new();
+    for json in [br#"{"alg":"RS256","typ":"JWT"}"#.as_slice(), br#"{"sub":"process-person"}"#] {
+        let length = base64::encoded_len(base64::Alphabet::Url, u32::try_from(json.len()).expect("JWT part"))
+            .expect("encoded JWT part");
+        let mut part = Writer::new(usize::try_from(length).expect("JWT part length"));
+        base64::encode(base64::Alphabet::Url, json, &mut part).expect("JWT JSON as base64url");
+        token.extend_from_slice(&part.finish());
+        token.push(b'.');
+    }
+    // A fake signature, with a valid unpadded base64url length and zero tail bits.
+    assert_ne!((4096 - token.len()) % 4, 1);
+    token.resize(4096, b'A');
+    token.into_boxed_slice()
+});
+
+const SECOND_ANSWER: &[u8] = b"More words from the plan.";
+const CLOSING_ANSWER: &[u8] = b"The plan chat is now closed.";
 
 /// Initialize the shipped document once; only the issuer addresses and LLM endpoint move.
 #[must_use]
@@ -122,7 +140,7 @@ fn issuer(address: std::net::SocketAddr, registration: &serde_json::Value, redir
     peer.queue(skein_fake_oauth::Plan {
         status: 200,
         body: skein_fake_oauth::Body::Token(skein_oauth::TokenResponse {
-            access_token: ACCESS.into(),
+            access_token: ACCESS.as_ref().into(),
             refresh_token: Some(b"fake-refresh".as_slice().into()),
             expires_in: 300,
             scope: Some(scopes.into_bytes().into()),
@@ -283,6 +301,9 @@ enum PlanChat {
 }
 struct AnswerJudge {
     plan: PlanChat,
+    allowance: u64,
+    chat_pages: usize,
+    conversation_read: bool,
     observation: Observation,
     stopped: bool,
     settled: bool,
@@ -340,8 +361,8 @@ impl Referee<Process> for AnswerJudge {
                 String::from_utf8_lossy(&ended.stdout)
             );
         }
-        if self.plan == PlanChat::Exceeded && calls.ends().len() == ANSWER_CALLS {
-            let revision = exceeded_hold(&calls.ends()[8]);
+        if self.plan == PlanChat::Exceeded && calls.ends().len() == FIRST_REPLY_CALLS {
+            let revision = exceeded_hold(&calls.ends()[8], self.allowance);
             assert_eq!(model_requests(procs), 1, "one model request before release");
             let Process::Calls(calls) = &mut procs[1] else { panic!("ctl calls") };
             calls.push(ctl::Step::Run(ctl::Call::new(&["release", "1", "--hold", &revision.to_string(), "--json"])));
@@ -350,10 +371,33 @@ impl Referee<Process> for AnswerJudge {
             calls.release();
             self.plan = PlanChat::Released;
         }
+        let Process::Calls(calls) = &mut procs[1] else { panic!("ctl calls") };
+        if self.plan == PlanChat::Answered
+            && !self.conversation_read
+            && calls.ends().len() == CONVERSATION_CALL + self.chat_pages + 1
+        {
+            let chat = ctl::json(calls.ends().last().expect("conversation page"));
+            self.chat_pages += 1;
+            if chat["activity"]["before"].is_null() {
+                // ctl reads a chat through its watch, which an ended chat ends: read
+                // the whole conversation, then Close.
+                calls.push(ctl::Step::Run(ctl::Call::new(&["close", "1", "--key", "close-plan-chat", "--json"])));
+                calls.push(ctl::Step::Run(ctl::Call::new(&["wait", "task", "1", "--until", "ended", "--json"])));
+                calls.release();
+                self.conversation_read = true;
+            } else {
+                let before = chat["activity"]["before"]["value"].as_str().expect("older conversation cursor");
+                calls.push(ctl::Step::Run(ctl::Call::new(&["chat", "1", "--before", before, "--json"])));
+            }
+        }
         let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
         let Process::Person(person) = &procs[5] else { panic!("native observer") };
-        let expected = if self.plan == PlanChat::Answered { ANSWER_CALLS } else { ANSWER_CALLS + 3 };
-        if !self.stopped && calls.ends().len() == expected && person.finished {
+        let ready = if self.plan == PlanChat::Answered {
+            self.conversation_read && calls.ends().len() == CONVERSATION_CALL + self.chat_pages + 2
+        } else {
+            calls.ends().len() == FIRST_REPLY_CALLS + 3
+        };
+        if !self.stopped && ready && person.finished {
             let Process::Binary(binary) = &mut procs[0] else { panic!("temper") };
             binary.signal(Signal::Terminate);
             for proc in procs {
@@ -395,57 +439,61 @@ impl Referee<Process> for AnswerJudge {
         self.settled
     }
 }
-const ANSWER_CALLS: usize = 9;
+const FIRST_REPLY_CALLS: usize = 9;
+const CONVERSATION_CALL: usize = FIRST_REPLY_CALLS + 3;
 
-fn answer_peer(directory: &Path, exceeded: bool) -> skein_fake_peers::llm::Peer {
+fn reasoning_allowance(directory: &Path) -> u64 {
+    let agent: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.join("agent.json")).expect("initialized agent")).expect("JSON");
+    agent["endpoints"]
+        .as_array()
+        .expect("endpoints")
+        .iter()
+        .flat_map(|endpoint| endpoint["models"].as_array().expect("models"))
+        .find(|model| model["name"] == "gpt-6-luna")
+        .expect("plan model")["reasoning_item"]
+        .as_u64()
+        .expect("reasoning allowance")
+}
+
+fn answer_peer(allowance: u64, exceeded: bool) -> skein_fake_peers::llm::Peer {
     use skein_fake_llm_domain::api::{Finish, Line, Turn};
     // The chat is ended by its requester (domain/agent.md, 4.6): its answer is the
     // turn's text, and the finish only ends the turn.
-    // Pass the shipped per-item reasoning allowance, retaining valid native replay JSON.
-    let mut strings = 16_384_u32;
-    let lines = if exceeded {
-        let agent: serde_json::Value =
-            serde_json::from_slice(&fs::read(directory.join("agent.json")).expect("initialized agent")).expect("JSON");
-        let allowance = agent["endpoints"]
-            .as_array()
-            .expect("endpoints")
-            .iter()
-            .flat_map(|endpoint| endpoint["models"].as_array().expect("models"))
-            .find(|model| model["name"] == "gpt-6-luna")
-            .expect("plan model")["reasoning_item"]
-            .as_u64()
-            .expect("reasoning allowance");
-        let item = usize::try_from(allowance).expect("item length").checked_add(1).expect("allowance plus one");
-        let bytes = serde_json::to_vec(&serde_json::json!({
-            "type": "reasoning", "id": "reasoning-1", "summary": [],
-            "encrypted_content": "a".repeat(item)
-        }))
-        .expect("native reasoning item");
-        // Retain the ordinary peer's room for script slots and wire framing.
-        strings = strings.checked_add(u32::try_from(bytes.len()).expect("scripted item length")).expect("peer strings");
-        vec![Line::Opaque { bytes: bytes.into() }].into_boxed_slice()
+    let item = usize::try_from(allowance)
+        .expect("item length")
+        .checked_add(usize::from(exceeded))
+        .expect("allowance plus one");
+    let bytes = serde_json::to_vec(&serde_json::json!({
+        "type": "reasoning", "id": "reasoning-1", "summary": [],
+        "encrypted_content": "a".repeat(item)
+    }))
+    .expect("native reasoning item");
+    // Retain the ordinary peer's room for script slots and wire framing.
+    let strings =
+        16_384_u32.checked_add(u32::try_from(bytes.len()).expect("scripted item length")).expect("peer strings");
+    let reasoning = Line::Opaque { bytes: bytes.into() };
+    let turns = if exceeded {
+        vec![Turn { lines: Box::new([reasoning]), finish: Finish::Stop, tokens: 1 }]
     } else {
         vec![
-            Line::Text { text: super::ANSWER.into() },
-            Line::Call {
-                name: b"finish".as_slice().into(),
-                arguments: br#"{"form":"report","text":"Done.","fields":{}}"#.as_slice().into(),
+            Turn { lines: Box::new([Line::Text { text: super::ANSWER.into() }]), finish: Finish::Stop, tokens: 1 },
+            Turn {
+                lines: Box::new([reasoning, Line::Text { text: SECOND_ANSWER.into() }]),
+                finish: Finish::Stop,
+                tokens: 1,
             },
+            Turn { lines: Box::new([Line::Text { text: CLOSING_ANSWER.into() }]), finish: Finish::Stop, tokens: 1 },
         ]
-        .into_boxed_slice()
     };
     let mut recipe = temper_real_loop_world::llm::scripted_sized(
-        Box::new([skein_fake_llm_domain::api::Script {
-            cue: Box::default(),
-            turns: Box::new([Turn {
-                lines,
-                finish: if exceeded { Finish::Stop } else { Finish::ToolCalls },
-                tokens: 1,
-            }]),
-        }]),
+        Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: turns.into_boxed_slice() }]),
         strings,
     );
-    recipe.credential = skein_llm::Credential::bearer(ACCESS.into());
+    // The sign-in peer alone takes a real-length plan bearer: 4096 bytes plus
+    // the request line and headers exceed 4096; the next power of two is 8192.
+    recipe.protocol_limits.http.head = 8192;
+    recipe.credential = skein_llm::Credential::bearer(ACCESS.as_ref().into());
     skein_fake_peers::llm::Peer::new(
         "127.0.0.1:34443".parse().expect("fake LLM address"),
         Transport::Tls,
@@ -472,15 +520,26 @@ fn model_requests(procs: &[Process]) -> usize {
     peer.observations().iter().filter(|event| matches!(event, skein_fake_peers::llm::Observation::Query { .. })).count()
 }
 
-fn exceeded_hold(ended: &super::Ended) -> u64 {
+fn model_answers(procs: &[Process]) -> Vec<Result<(), skein_fake_llm_domain::api::Error>> {
+    let Process::Peer(peer) = &procs[4] else { panic!("LLM peer") };
+    peer.observations()
+        .iter()
+        .filter_map(|event| {
+            if let skein_fake_peers::llm::Observation::Answered { result, .. } = event { Some(*result) } else { None }
+        })
+        .collect()
+}
+
+fn exceeded_hold(ended: &super::Ended, allowance: u64) -> u64 {
     let task = ctl::json(ended);
     let held = &task["chip"]["details"]["owner"]["phase"]["held"];
-    assert_eq!(held["reason"], serde_json::json!({"exceeded":{"bound":"reasoning","value":65536}}), "{task}");
+    assert_eq!(held["reason"], serde_json::json!({"exceeded":{"bound":"reasoning","value":allowance}}), "{task}");
     held["revision"].as_u64().expect("hold revision")
 }
 
 fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
-    let peer = answer_peer(directory, exceeded);
+    let allowance = reasoning_allowance(directory);
+    let peer = answer_peer(allowance, exceeded);
     let clock = Clock::new();
     let mut binary = start(directory);
     let streams = binary.take_streams().expect("serve pipes");
@@ -489,6 +548,9 @@ fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
     fds.push(root);
     let mut world = real::World::new(AnswerJudge {
         plan: if exceeded { PlanChat::Exceeded } else { PlanChat::Answered },
+        allowance,
+        chat_pages: 0,
+        conversation_read: false,
         observation: Observation::Waiting,
         stopped: false,
         settled: false,
@@ -524,14 +586,22 @@ fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
                     if exceeded { "held" } else { "replied" },
                     "--json",
                 ])),
-                // The wait returns the task's status; read its committed conversation separately.
-                ctl::Step::Run(ctl::Call::new(&[if exceeded { "task" } else { "chat" }, "1", "--json"])),
+                ctl::Step::Run(ctl::Call::new(&["task", "1", "--json"])),
             ],
             Some(&streams),
             None,
         );
-        if exceeded {
-            calls.hold();
+        // The referee follows conversation cursors, or authorizes the held run's release.
+        calls.hold();
+        if !exceeded {
+            for arguments in [
+                &["message", "1", "More", "--key", "more-on-plan", "--json"][..],
+                &["wait", "task", "1", "--until", "replied", "--json"],
+                &["task", "1", "--json"],
+                &["chat", "1", "--json"],
+            ] {
+                calls.push(ctl::Step::Run(ctl::Call::new(arguments)));
+            }
         }
         Process::Calls(Box::new(calls))
     });
@@ -544,20 +614,19 @@ fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
     });
     let outcome = world.run(&clock, super::WITHIN);
     let Process::Calls(calls) = &outcome.procs[1] else { panic!("ctl calls") };
-    let [_, me, _, _, _, ready, _, _, conversation, ..] = calls.ends() else { panic!("signed-in chat calls") };
+    let [_, me, _, _, _, ready, _, _, first, ..] = calls.ends() else { panic!("signed-in chat calls") };
     assert_plan_account(me, ready);
     if exceeded {
-        let first = exceeded_hold(conversation);
-        let second = exceeded_hold(&calls.ends()[11]);
+        let first = exceeded_hold(first, allowance);
+        let second = exceeded_hold(&calls.ends()[11], allowance);
         assert!(second > first, "a fresh hold after the authorized release");
         assert_eq!(model_requests(&outcome.procs), 2, "one additional model request after release");
     } else {
-        assert_eq!(
-            String::from_utf8_lossy(&conversation.stdout).matches("Process answer").count(),
-            1,
-            "chat answered once: {}",
-            String::from_utf8_lossy(&conversation.stdout)
-        );
+        // Close cancels with the chat template's grace: one final model turn to finish.
+        // A provider's context-too-long rejection would start Smith's compaction
+        // (smith docs/design/domain/session.md, 8.2), a fourth request.
+        assert_eq!(model_requests(&outcome.procs), 3, "two replies and the closing grace turn, without retry");
+        assert_eq!(model_answers(&outcome.procs), [Ok(()); 3], "each request answered, the closing turn too");
     }
     let Process::Peer(peer) = &outcome.procs[4] else { panic!("LLM peer") };
     assert!(
@@ -570,6 +639,67 @@ fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
     let Process::Binary(binary) = &outcome.procs[0] else { panic!("temper") };
     assert_eq!(binary.exit_status(), Some(Exit::Code(0)));
     assert!(outcome.procs.iter().all(Host::is_empty), "all signed-in chat io settled");
+    if !exceeded {
+        assert_lasting_chat(calls.ends(), allowance);
+    }
+}
+
+fn assert_lasting_chat(ends: &[super::Ended], allowance: u64) {
+    for index in [8, 11] {
+        let task = ctl::json(&ends[index]);
+        // A parked hosted chat keeps its run; the host reports it waiting.
+        assert_eq!(task["chip"]["phase"], "running", "parked chat: {task}");
+        let owner = &task["chip"]["details"]["owner"];
+        assert!(owner["phase"]["active"]["running"].is_object(), "chat's run remains live");
+        assert_eq!(owner["details"]["observation"]["work"], "waiting", "chat parked after reply");
+        assert!(task["hold"].is_null(), "parked without a hold");
+    }
+    let ended = ctl::json(ends.last().expect("ended wait"));
+    assert_eq!(ended["met"], true, "ended condition met");
+    assert_eq!(ended["task"]["chip"]["phase"], "ended", "Close ended the parked chat: {ended}");
+    let cancelled = &ended["task"]["chip"]["details"]["owner"]["details"]["ending"]["cancelled"];
+    let person = ctl::json(&ends[1])["party"]["number"].as_u64().expect("signed-in person");
+    assert_eq!(cancelled["by"]["person"], person, "chat closed by its person: {ended}");
+    assert!(cancelled["result"].is_null(), "the closing turn's finish is no task result: {ended}");
+    let pages: Vec<_> = ends[CONVERSATION_CALL..ends.len() - 2].iter().map(ctl::json).collect();
+    let mut rows = Vec::new();
+    for page in &pages {
+        assert_eq!(page["activity"]["cut"], false, "whole conversation page");
+        rows.extend(page["activity"]["rows"].as_array().expect("conversation rows"));
+    }
+    assert!(pages.last().expect("conversation read")["activity"]["before"].is_null(), "all conversation rows read");
+    rows.sort_by_key(|row| row["position"].as_u64().expect("activity position"));
+    for pair in rows.windows(2) {
+        assert_ne!(pair[0]["position"], pair[1]["position"], "each conversation row read once");
+    }
+    // ctl reads a chat through its watch, which an ended chat ends: the person reads
+    // the conversation before Close, and the closing answer is the peer's to show.
+    let turns: Vec<_> = rows
+        .iter()
+        .filter(|row| row["event"]["owner"]["source"]["line"]["turn"].is_object())
+        .map(|row| {
+            let turn = &row["event"]["owner"]["decoded"]["turn"]["decoded"];
+            assert!(turn.is_object(), "turn loaded and decoded whole, without a too-large reference: {row}");
+            assert_eq!(turn["cut"], false, "whole committed turn");
+            turn
+        })
+        .collect();
+    assert_eq!(turns.len(), 2, "both replies committed");
+    let blocks: Vec<_> = turns
+        .iter()
+        .flat_map(|turn| turn["messages"].as_array().expect("turn messages"))
+        .filter(|message| message["speaker"] == "assistant")
+        .flat_map(|message| message["blocks"].as_array().expect("assistant blocks"))
+        .collect();
+    let replies: Vec<_> = blocks.iter().filter_map(|block| block["text"]["text"].as_str()).collect();
+    assert_eq!(replies.len(), 2, "both replies in the conversation");
+    for answer in [super::ANSWER, SECOND_ANSWER] {
+        let answer = std::str::from_utf8(answer).expect("answer text");
+        assert_eq!(replies.iter().filter(|text| **text == answer).count(), 1, "each answer exactly once");
+    }
+    let reasoning: Vec<_> = blocks.iter().filter_map(|block| block["opaque"]["size"].as_u64()).collect();
+    let [size] = reasoning.as_slice() else { panic!("one reasoning item in the committed conversation") };
+    assert!(*size >= allowance && *size > 65_536, "native item and its turn pass 64 KiB: {size}");
 }
 
 fn assert_plan_account(me: &super::Ended, ready: &super::Ended) {

@@ -854,9 +854,13 @@ and 10).
     allowance, so its turn passes jig's small profile's 64 KiB and
     stays within the bounds the document derives from smith's largest
     turn (../protocol/configuration.md, section 7): it commits once and
-    the chat parks again. Close ends the chat. The peer has seen two
-    requests, one for each of the person's words, and the chat holds
-    two replies, each once: no retry and no second reply. The peer
+    the chat parks again. The person reads the conversation page by
+    page, the long turn decoded whole. Close cancels the chat with the
+    chat template's grace (jig's `shapes::close_chat`): one closing
+    turn, and the task ends cancelled by its person, with no result.
+    The peer has seen three requests, one for each of the person's
+    words and the closing turn's, each answered, and the chat holds two
+    replies, each once: no retry and no second reply. The peer
     observes a bearer, the grant's scheme, never its value;
   - *past its allowance:* the peer's reasoning item one byte past the
     model's allowance holds the chat at once, after one request, with
