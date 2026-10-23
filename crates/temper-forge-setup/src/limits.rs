@@ -1,4 +1,4 @@
-//! Reconcile's bounded orgs, deadline and wait (protocol/configuration.md, 7).
+//! Managed orgs and reconcile's deadline and wait (protocol/configuration.md, 7).
 use skein_forge_setup::limits::Limits;
 
 /// A fetched binary's cap; largest pin: Forgejo 17.0.0 amd64, 122,053,192 bytes.

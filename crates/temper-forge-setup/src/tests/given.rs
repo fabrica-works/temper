@@ -81,27 +81,25 @@ fn a_fake_setup_maps_every_given_value() {
 
 #[test]
 fn an_owned_setup_maps_every_given_value() {
-    for (document, org) in [(super::fixtures::TWO, b"work".as_slice()), (&*super::fixtures::nested(), b"nested")] {
-        let setup = crate::setup::Setup::read(
-            &super::fixtures::document(document),
-            0,
-            &crate::limits::small(),
-            &jig_protocol_config::Directories::working(),
-            &mut problem::Problems::empty(),
-        )
-        .unwrap();
-        let listener = super::fixtures::listener();
-        let given = crate::given::values(setup.entry(2).unwrap(), Some(listener), &crate::limits::small());
-        let expected = skein_forge_setup::given::Given {
-            forge: 2,
-            orgs: Box::new([org.into()]),
-            org_owner: Some(b"ada".as_slice().into()),
-            listener: Some(listener),
-            ..expected_given()
-        };
-        assert_eq!(given, expected);
-        assert_eq!(skein_forge_setup::given::check(&given), Ok(()));
-    }
+    let setup = crate::setup::Setup::read(
+        &super::fixtures::document(super::fixtures::TWO),
+        0,
+        &crate::limits::small(),
+        &jig_protocol_config::Directories::working(),
+        &mut problem::Problems::empty(),
+    )
+    .unwrap();
+    let listener = super::fixtures::listener();
+    let given = crate::given::values(setup.entry(2).unwrap(), Some(listener), &crate::limits::small());
+    let expected = skein_forge_setup::given::Given {
+        forge: 2,
+        orgs: Box::new([]),
+        org_owner: Some(b"ada".as_slice().into()),
+        listener: Some(listener),
+        ..expected_given()
+    };
+    assert_eq!(given, expected);
+    assert_eq!(skein_forge_setup::given::check(&given), Ok(()));
 }
 
 #[test]

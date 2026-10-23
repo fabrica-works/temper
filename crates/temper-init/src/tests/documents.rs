@@ -184,7 +184,7 @@ fn the_default_is_the_owned_example_so_edited() {
                         "binary": "fetched", "labels": ["temper-host:host"], "capacity": 1_u32,
                         "path": "/usr/local/bin:/usr/bin:/bin"},
                         "listen": {"socket": format!("127.0.0.1:{}", facts.ports.owned)},
-                        "person": {"login": "ada", "email": "ada@localhost", "orgs": ["work"]}}}
+                        "person": {"login": "ada", "email": "ada@localhost"}}}
                 }]),
             ),
             ("/application/demo", demo(facts.ports.llm.get())),
@@ -481,7 +481,7 @@ fn the_person_keeps_a_forgejo_login_or_falls_back() {
         let document = parse(content(&answer, b"temper.json"));
         assert_eq!(
             document["application"]["setup"][1]["mode"]["owned"]["person"],
-            json!({"login": written, "email": format!("{written}@localhost"), "orgs": ["work"]}),
+            json!({"login": written, "email": format!("{written}@localhost")}),
             "{row}"
         );
     }

@@ -1022,12 +1022,8 @@ fn kept_local_records_wait_for_restore_done_and_origin_before_connecting_as_the_
 }
 
 #[test]
-fn local_given_uses_the_one_repository_capacity_nested_orgs_and_configured_listener() {
+fn local_given_uses_the_repository_capacity_no_orgs_and_configured_listener() {
     let mut config = local_config(true, false);
-    let temper_forge_setup::setup::Mode::Owned(owned) = &mut config.setup[0].entry.mode else {
-        panic!("owned");
-    };
-    owned.orgs = Box::new([b"nested".as_slice().into()]);
     config.webhooks =
         Some(skein_forge_connection::hooks::Webhooks { listener: skein_io::Addr::Ip(([127, 0, 0, 1], 7101).into()) });
     let (endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
@@ -1040,7 +1036,7 @@ fn local_given_uses_the_one_repository_capacity_nested_orgs_and_configured_liste
     };
     assert_eq!(given.limits.repositories, config.limits.forge.client.repositories);
     assert_eq!(given.limits.repositories, 3);
-    assert_eq!(given.orgs.as_ref(), &[Box::<[u8]>::from(b"nested".as_slice())]);
+    assert!(given.orgs.is_empty());
     assert_eq!(given.org_owner.as_deref(), Some(b"owner".as_slice()));
     assert_eq!(given.listener, Some(([127, 0, 0, 1], 7101).into()));
     assert_eq!(prepare(&config, &mut { endpoints }, &fixtures::seeds().crypto, 2, false).unwrap().served.len(), 1);

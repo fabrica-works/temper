@@ -244,7 +244,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 443415523272103,
+    "memory_bytes": 443415523271979,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -989,10 +989,7 @@
             },
             "person": {
               "login": "$login",
-              "email": "$email",
-              "orgs": [
-                "work"
-              ]
+              "email": "$email"
             }
           }
         }
