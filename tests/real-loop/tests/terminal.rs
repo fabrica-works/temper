@@ -10,6 +10,8 @@ use temper_real_loop_world::{
 static HEAP: Counting = Counting;
 // The production view's Provisional word (cards/words.rs).
 const PROVISIONAL: &[u8] = b"Writing...";
+// The ctl call that signs in and provisions the deployment's key.
+const SIGN_IN: usize = 0;
 
 #[test]
 fn a_person_at_the_terminal_reads_a_chats_committed_reply() {
@@ -27,7 +29,7 @@ fn a_person_at_the_terminal_reads_a_chats_committed_reply() {
             ]
         },
     );
-    assert_eq!(ran.calls()[0].exit, Some(Exit::Code(0)), "ctl signed in before provisioning the key");
+    assert_eq!(ran.calls()[SIGN_IN].exit, Some(Exit::Code(0)), "ctl signed in before provisioning the key");
     let read = ran.terminal();
     assert_eq!(read.opens, 2, "ctl spent the first link; the terminal used the fresh one");
     assert_eq!(read.exit, Some(Exit::Code(0)), "the terminal closed and drained");
