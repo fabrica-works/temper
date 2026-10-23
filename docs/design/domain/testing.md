@@ -904,17 +904,18 @@ and 10).
     project 1 asking for one README line, unique to the run. The
     chat's agent delegates the coding procedure on `work/hello`
     (forge.md, section 8); the coder edits on the plan's grant, its
-    pull's starter workflow passes on the owned runner, the review
-    approves, the change lands, and the chat's reply, its turn's text
-    with no `finish` (agent.md, 4.6), follows the procedure's result.
-    The peer observes a bearer on every request, the coder's and the
-    reviewer's too;
+    pull's starter workflow passes on the owned runner, the change
+    lands with no review, since init's landing rule names no gate, and
+    the chat's reply, its turn's text with no `finish` (agent.md, 4.6),
+    follows the procedure's result. The peer observes a bearer on every
+    request, the coder's too;
   - *the restart:* the box stops, exit 0, with nothing left, and a
     second box starts on the same directories. A fresh client root,
     signed in by the new printed link, reads the same chat and its
     reply, and the change's task ended landed with the same pull and
-    merge commit. Close ends the chat with its closing turn, and no
-    task of the project is left live;
+    merge commit, and no task beyond the chat, its change and its
+    producer. Close ends the chat with its closing turn, and no task of
+    the project is left live;
   - *its referee:* temper's reads, with no credential, give the
     landing, its pull, its merge commit and its checks at the pull's
     head, in both boxes alike, so nothing was pushed or merged twice;
