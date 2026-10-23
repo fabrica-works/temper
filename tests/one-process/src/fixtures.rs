@@ -31,6 +31,8 @@ pub(crate) const PROCEDURE_CODE: u16 = 2;
 pub(crate) const AGENT_KIND: u16 = 1;
 pub(crate) const CHARTER_NUMBER: u16 = 1;
 pub(crate) const REPOSITORY: u32 = 2;
+// A task names the repository by forge 1 and its id, packed (domain/forge.md, 4).
+pub(crate) const REPOSITORY_TAG: u64 = temper_engine_domain_forge::tag(1, REPOSITORY);
 pub(crate) const PARAMETER_NAMES: [u16; 3] = [1, 2, 3];
 pub(crate) const CHANGE_KIND: u16 = 1;
 pub(crate) const CHANGE_WORDS: u32 = 64;

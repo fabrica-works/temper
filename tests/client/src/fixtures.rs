@@ -823,7 +823,7 @@ pub fn adopt_change_repository(front: &mut Joint) {
     // forge_routes.rs's worker also receives the repository's application credential.
     front.engine.send(engine::Event::Credential { number: 1, generation: 1, valid: Duration::from_secs(3600) });
     front.engine.settle();
-    assert!(front.engine_adopted(ADOPT_FORGE, u32::try_from(GOAL_REPOSITORY).expect("repository id")));
+    assert!(front.engine_adopted(ADOPT_FORGE, GOAL_REPOSITORY_ID));
 }
 
 /// A tracked change on the landing joint, handed a branch already pushed on its stand.
@@ -880,7 +880,9 @@ const ADOPT_REPLY: Token = Token::new(1203);
 const ADOPT_KEY: [u8; 16] = [43; 16];
 const ADOPT_DIGEST: [u8; 32] = [43; 32];
 const REPOSITORY_PARAMETER: u32 = 1;
-const GOAL_REPOSITORY: u64 = 7;
+const GOAL_REPOSITORY_ID: u32 = 7;
+// A task names its repository by the forge and id, packed (domain/forge.md, 4).
+const GOAL_REPOSITORY: u64 = temper_engine_domain_forge::tag(ADOPT_FORGE, GOAL_REPOSITORY_ID);
 fn adopt_goal_repository(driver: &mut Driver) {
     let mut request = temper_engine_domain_world::fixtures::adoption(ADOPT_FORGE);
     request.owner = b"acme".as_slice().into();
