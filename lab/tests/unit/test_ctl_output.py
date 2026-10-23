@@ -157,15 +157,18 @@ class StoryDeadline(unittest.TestCase):
     def drive(self, *, failed=False):
         now = [100.0]
         calls = []
-        replies = iter([b'done: task 41, chat\n', *[json.dumps(d).encode() + b'\n' for d in evidence()]])
+        replies = iter([b'done: task 41, chat\n', *[json.dumps(d).encode() for d in evidence()]])
+        output = bytearray()
         def run(argv, **kwargs):
             calls.append((argv, kwargs['timeout']))
             now[0] += 20
             return types.SimpleNamespace(stdout=next(replies), returncode=3 if failed else 0)
-        with patch('sys.stdout', types.SimpleNamespace(buffer=types.SimpleNamespace(write=lambda b: None, flush=lambda: None))), \
+        with patch('sys.stdout', types.SimpleNamespace(buffer=types.SimpleNamespace(write=output.extend, flush=lambda: None))), \
                 patch('_story.time.monotonic', side_effect=lambda: now[0]), \
                 patch('_story.subprocess.run', side_effect=run):
             status = main(['/temper', '/client', 'http://127.0.0.1:7601/'])
+        if not failed:
+            self.assertEqual(proof(output.decode()), {'root': ROOT, 'child': CHILD, 'merge': MERGE})
         return status, calls
 
     def test_all_calls_and_waits_share_the_original_absolute_deadline(self):

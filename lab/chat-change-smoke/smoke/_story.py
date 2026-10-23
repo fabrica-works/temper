@@ -32,8 +32,11 @@ class Story:
             argv += ['--json']
         answer = subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                 timeout=self.remaining(), check=False)
-        # Retain original public ctl bytes for the host's independent recheck.
+        # Keep each public response intact and delimit responses for rechecking;
+        # ctl's JSON renderer does not append a newline.
         sys.stdout.buffer.write(answer.stdout)
+        if not answer.stdout.endswith(b'\n'):
+            sys.stdout.buffer.write(b'\n')
         sys.stdout.buffer.flush()
         self.remaining()
         if answer.returncode != 0:
