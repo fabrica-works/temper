@@ -1750,6 +1750,14 @@ pub(crate) fn chat_change(
         }
     }
     let repository = chosen.ok_or(tasks::Refusal::Unknown)?;
+    // The procedure takes a task and a level, and its producer another of each; with none at
+    // all, the delegation's own admission names the missing authority.
+    if context.tasks_left == 1 {
+        return Err(tasks::Refusal::Tree);
+    }
+    if context.authority.delegation.depth == 1 {
+        return Err(tasks::Refusal::Depth);
+    }
     let available = context
         .numbers
         .budget

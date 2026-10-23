@@ -199,6 +199,30 @@ fn change_without_task_capacity_gets_delegates_tasks_denial() {
 }
 
 #[test]
+fn change_with_one_task_left_is_refused_as_the_tree_limit() {
+    let (mut world, chat) =
+        configured_chat(100, Box::new([people::Executor::Charter(1), people::Executor::Procedure(2)]), 1);
+    assert!(
+        matches!(change(&mut world, &chat, 93, None, b"Small fix"), engine::CallAnswer::DelegationRefused(problem) if problem.why == tasks::Refusal::Tree)
+    );
+    assert_eq!(world.assigned.len(), 1);
+}
+
+#[test]
+fn change_with_one_level_left_is_refused_as_the_depth_limit() {
+    let mut world = World::configured(true, true);
+    world.adopt();
+    world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
+    let people::Ask::Create { project, mut batch } = adoption_chat(&world) else { panic!("create") };
+    batch[0].authority.delegation.depth = 1;
+    let chat = assigned_chat(&mut world, 92, people::Ask::Create { project, batch });
+    assert!(
+        matches!(change(&mut world, &chat, 93, None, b"Small fix"), engine::CallAnswer::DelegationRefused(problem) if problem.why == tasks::Refusal::Depth)
+    );
+    assert_eq!(world.assigned.len(), 1);
+}
+
+#[test]
 fn change_with_half_the_remainder_at_minimum_is_refused_as_funding() {
     let (mut world, chat) =
         configured_chat(62, Box::new([people::Executor::Charter(1), people::Executor::Procedure(2)]), 11);
