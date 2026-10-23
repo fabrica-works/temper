@@ -833,3 +833,16 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
   .temper-welcome-choices { grid-template-columns: minmax(0, 1fr); }
   .temper-welcome-foot > button { margin-left: 0; }
 }
+
+/* Shared connection flows (client/README.md, 5.2). */
+.temper-flow-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 20px; list-style: none; padding: 0; }
+.temper-flow-step { border-top: 2px solid var(--temper-line); padding-top: 8px; font-size: 10px; color: var(--temper-muted); }
+.temper-flow-step[aria-current] { border-color: var(--temper-ink); color: var(--temper-ink); font-weight: 700; }
+.temper-flow-done { border-color: var(--temper-green); color: var(--temper-green); }
+.temper-flow-card { border: 1px solid var(--temper-line); background: var(--temper-paper); padding: 20px; margin-bottom: 14px; }
+.temper-flow-card h2 { margin-top: 0; }
+.temper-flow-card p { font-size: 11px; line-height: 1.6; }
+.temper-flow-muted { color: var(--temper-muted); font-size: 10px; }
+.temper-flow-progress { padding-left: 20px; }
+.temper-flow-progress li { margin: 10px 0; }
+.temper-flow-progress [role="status"] { display: inline; margin-left: 8px; }

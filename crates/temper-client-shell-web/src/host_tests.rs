@@ -262,8 +262,9 @@ mod memory_literal;
 // A chat's composer placeholder adds one phrase (148 B).
 // Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
 // Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
+// The flow's three state words (444 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388743343;
+const WEB_BYTES: u64 = 274388743787;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
