@@ -20,7 +20,7 @@ enum Report {
     Due,
     Act(NodeId, Act),
     Fetch(fetch::Report),
-    Carried(Vec<transport::Carried>, bool),
+    Carried(Vec<transport::Carried>, u32),
     Place(Box<[u8]>),
 }
 struct Shell {
@@ -95,15 +95,20 @@ impl Shell {
                 Report::Act(node, act) => self.host.act(node, act),
                 Report::Place(path) => self.host.went(&path),
                 Report::Fetch(report) => self.host.heard(adapter::fetched(report)),
-                Report::Carried(reports, stored) => self.host.carried(reports, stored),
+                Report::Carried(reports, writes) => self.host.carried(reports, writes),
             }
-            let mut requests = adapter::requests(self.host.requests());
+            let (asked, writes) = self.host.duties();
+            let mut requests = adapter::requests(asked);
             requests.navigate = self.host.navigate.take();
-            let stored = !requests.writes.is_empty() || !requests.removes.is_empty();
+            if requests.navigate.is_some() {
+                // This acknowledged departure erases its finished request before
+                // navigating. The previous turn's close warning is already stale.
+                web_sys::window().expect("window").set_onbeforeunload(None);
+            }
             let mut carried = Vec::new();
             transport::carry(requests, &mut self.store, &mut self.platform, &mut carried);
-            if stored || !carried.is_empty() {
-                inbox.raise(Report::Carried(carried, stored));
+            if writes != 0 || !carried.is_empty() {
+                inbox.raise(Report::Carried(carried, writes));
             }
             if read_on {
                 self.platform.fetch.read_on();

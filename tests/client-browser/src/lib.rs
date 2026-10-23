@@ -15,6 +15,7 @@ use std::{
 };
 mod configuration;
 mod forgery;
+mod issuer;
 
 /// How long a story waits for what a page shows.
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(10);
@@ -142,21 +143,34 @@ impl Tier {
             format!("http://{socket}/bundle/{}/issuer.webmanifest", digest.file_name().to_str().expect("digest"));
         value["application"]["clients"]["bundle"] = serde_json::json!(private_bundle);
         value["engine"]["limits"]["overrides"]["accounts.sign_in_deadline_ms"] = 2000.into();
-        // Keep git concurrency at one so the small profile's 48 sockets hold the accounts' driver,
-        // which this provider's sign-in adds.
-        value["application"]["limits"]["overrides"]["git_component.operations"] = 1.into();
-        value["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
-        value["engine"]["llm"]["providers"] = serde_json::json!([{
-            "name":"Test provider", "number":17, "signed_in_plan":false, "models":["fake"],
-            "sources":{"keys":true,"sign_in":{
-                "issuer":"http://127.0.0.1:9", "client":"temper-test", "scopes":["openid","chat"],
-                "authorization":"http://127.0.0.1:9/authorize", "token":"http://127.0.0.1:9/token",
-                "keys":keys, "transport":"plaintext", "must_grant":["chat"],
-                "redirect_path":"callback"
-            }}
-        }]);
+        let sign_in = serde_json::json!({
+            "issuer":"http://127.0.0.1:9", "client":"temper-test", "scopes":["openid","chat"],
+            "authorization":"http://127.0.0.1:9/authorize", "token":"http://127.0.0.1:9/token",
+            "keys":keys, "transport":"plaintext", "must_grant":["chat"], "redirect_path":"callback"
+        });
+        account_provider(&mut value, &sign_in);
         configuration::private(&path, &serde_json::to_vec(&value).expect("accounts deployment JSON"));
         tier
+    }
+    /// A real loopback issuer for the tab's complete sign-in round trip.
+    #[must_use]
+    pub fn accounts_sign_in(name: &str) -> (Self, skein_fake_peers::oauth::Peer) {
+        let tier = Self::reserved(name);
+        let listener = TcpListener::bind("127.0.0.1:0").expect("reserve issuer port");
+        let address = listener.local_addr().expect("issuer address");
+        let origin = format!("http://{address}");
+        let path = tier.scratch.path().join("temper.json");
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
+        let sign_in = serde_json::json!({
+            "issuer":origin, "client":"temper-test", "scopes":["openid","chat"],
+            "authorization":format!("{origin}/authorize"), "token":format!("{origin}/token"),
+            "revocation":format!("{origin}/revoke"), "keys":format!("{origin}/keys"),
+            "transport":"plaintext", "must_grant":["chat"], "redirect_path":"callback"
+        });
+        account_provider(&mut value, &sign_in);
+        configuration::private(&path, &serde_json::to_vec(&value).expect("accounts deployment JSON"));
+        let peer = issuer::peer(address, &sign_in);
+        (tier, peer)
     }
     /// A tier whose server listens at a loopback port reserved beforehand, so that a restart opens the same
     /// address and a page reconnects to it. Jig's tier has the same hook.
@@ -209,6 +223,17 @@ impl Tier {
             done: Find::text(b"Forged"),
         }
     }
+}
+
+/// The two account stories share their provider and room for its driver.
+fn account_provider(value: &mut serde_json::Value, sign_in: &serde_json::Value) {
+    // One git operation leaves the small profile's sockets room for the accounts driver.
+    value["application"]["limits"]["overrides"]["git_component.operations"] = 1.into();
+    value["application"]["limits"]["overrides"]["checkout.workspaces"] = 1.into();
+    value["engine"]["llm"]["providers"] = serde_json::json!([{
+        "name":"Test provider", "number":17, "signed_in_plan":false, "models":["fake"],
+        "sources":{"keys":true,"sign_in":sign_in}
+    }]);
 }
 
 /// Keep the built bundle immutable while giving this one-serve story its static issuer document.

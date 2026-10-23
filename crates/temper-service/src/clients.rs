@@ -67,6 +67,10 @@ fn invalid(what: What) -> Problems {
     problems
 }
 impl Clients {
+    /// The live bound socket survives consumption of the listening notification.
+    pub(crate) fn bound_address(&self) -> Option<::core::net::SocketAddr> {
+        self.server.listening()
+    }
     pub fn new(
         config: &config::Engine,
         listener: &config::Address,
