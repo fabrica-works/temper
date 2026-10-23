@@ -1,29 +1,31 @@
-# dev.fabrig.ai: signing in with Google, and Forgejo through temper
+# Signing in with Google, and Forgejo through temper
 
-Draft, 2026-10-23. A temper deployment at `https://dev.fabrig.ai`,
-which will host temper's own development (`temper-on-temper.md`),
-where people sign in with their Google account, and whose Forgejo, at
-`https://git.fabrig.ai`, signs them in through temper: once signed in
-to temper, a person opens Forgejo signed in, with nothing more to do.
-It records a session with the user on 2026-10-23. It crosses skein,
-jig and temper on purpose; an owner splits it.
+Draft, 2026-10-23. A temper deployment that people reach at a name of
+its own, over HTTPS, where they sign in with their Google account, and
+whose Forgejo signs them in through temper: once signed in to temper, a
+person opens Forgejo signed in, with nothing more to do. The names here
+are examples: temper at `https://temper.example.com`, Forgejo at
+`https://git.example.com`. It records a session with the user on
+2026-10-23. It crosses skein, jig and temper on purpose; an owner
+splits it.
 
 The mockups draw its pages ahead of this draft: `sign-in.html`, in the
-world Dev site (`../client/mockups/README.md`).
+world Google sign-in (`../client/mockups/README.md`).
 
 ## 1. In one page
 
-- **One host, two sites, nginx in front** (section 2). `temper serve`
-  runs the engine and its worker, its clients' listener on loopback, and
-  nginx terminates TLS for `dev.fabrig.ai` in front of it. Forgejo runs
-  beside it, managed (`../protocol/setup.md`, section 5), behind nginx
-  as `git.fabrig.ai`. Not `temper box`: Forgejo is the person's, run as
-  a service of its own.
+- **One host, two sites, a TLS proxy in front** (section 2). `temper
+  serve` runs the engine and its worker, its clients' listener on
+  loopback, and a proxy (nginx, here) terminates TLS for temper's name
+  in front of it. Forgejo runs beside it, managed
+  (`../protocol/setup.md`, section 5), behind the proxy at a name of its
+  own. Not `temper box`: Forgejo is the owner's, run as a service of its
+  own.
 - **Two hops of OpenID Connect:**
 
   ```
-  Google ──▶ temper, at dev.fabrig.ai ──▶ Forgejo, at git.fabrig.ai
-       temper signs people in         temper signs Forgejo's users in
+  Google ──▶ temper.example.com ──▶ Forgejo, at git.example.com
+     temper signs people in     temper signs Forgejo's users in
   ```
 
 - **Google signs people in to temper** (section 4) through jig's
@@ -31,6 +33,10 @@ world Dev site (`../client/mockups/README.md`).
   OAuth client, and jig's `Mint` makes the sign-in (jig's
   `protocol/client.md`, section 8). Both are built; temper has never
   used them for people.
+- **The sign-in page is stock** (4.1): the same for every deployment,
+  "Sign in" and a button for each way of signing in, with nothing of
+  the deployment's own. A deployment's own name and words wait
+  (section 9).
 - **Only members sign in** (section 3): the configuration names each by
   their Google address. Google signs anyone in; temper mints for a
   member alone, and answers anyone else with a page that says so.
@@ -58,17 +64,17 @@ world Dev site (`../client/mockups/README.md`).
   the same host. Its clients' listener on loopback at a fixed port,
   `127.0.0.1:8367`; its webhooks' listener on loopback, which Forgejo
   reaches on the same host.
-- **Forgejo, managed** (`../protocol/setup.md`, section 5): run by the
-  person as a service, its runner beside it; temper sets itself up on
+- **Forgejo, managed** (`../protocol/setup.md`, section 5): run by its
+  owner as a service, its runner beside it; temper sets itself up on
   it with a site admin's token and makes its bot. Forgejo's `ROOT_URL`
-  is `https://git.fabrig.ai/`.
-- **nginx terminates TLS for both names,** a certificate each, and
-  proxies each to its loopback listener. For temper:
+  is `https://git.example.com/`.
+- **The proxy terminates TLS for both names,** a certificate each, and
+  passes each to its loopback listener. For temper:
   - the `Host` passed through as the person's browser sent it, which
     the Host allow-list then checks (2.2);
-  - jig's stream, `GET /jig/v1/stream`, unbuffered (`proxy_buffering
-    off`) and with a read timeout longer than the stream's heartbeat
-    (jig's `protocol/client.md`, 17.2);
+  - jig's stream, `GET /jig/v1/stream`, unbuffered (nginx's
+    `proxy_buffering off`) and with a read timeout longer than the
+    stream's heartbeat (jig's `protocol/client.md`, 17.2);
   - the printed link's route, `/jig/v1/sign-in/link`, denied from
     outside (2.3);
   - plain HTTP answered with a redirect to HTTPS, and nothing else.
@@ -76,8 +82,7 @@ world Dev site (`../client/mockups/README.md`).
 ### 2.2 The public address
 
 The configuration's new `application.clients.public`: the origin the
-people's browsers use, `https://dev.fabrig.ai`, and the deployment's
-name and one line about it, for its front page (4.1). It is where the
+people's browsers use, `https://temper.example.com`. It is where the
 listener's being on loopback stops telling temper what the browser
 sees:
 
@@ -85,9 +90,10 @@ sees:
   public name beside the listener's loopback address.
 - **The cookie is `Secure`** on an exchange that came by the public
   name. jig's mapping leaves `Secure` off on a loopback listener (jig's
-  `protocol/client.md`, 17.3); behind nginx the listener is loopback but
-  the browser's origin is not. The mapping decides by the exchange's
-  `Host`: the public name sets `Secure`, the loopback address does not.
+  `protocol/client.md`, 17.3); behind the proxy the listener is loopback
+  but the browser's origin is not. The mapping decides by the
+  exchange's `Host`: the public name sets `Secure`, the loopback address
+  does not.
 - **Every address temper gives out** is the public origin's: Google's
   return (4.2), the provider's issuer and endpoints (5.2), and a GitHub
   App's redirect and setup URLs, were a GitHub forge configured.
@@ -101,8 +107,8 @@ sees:
   signs in by a link, `../client/README.md`, section 7).
 - **On the host alone.** jig enables it only where its clients reach it
   on loopback (jig's `protocol/configuration.md`, section 3, `clients`);
-  the listener is, and nginx denies its route from outside. The owner
-  reaches it through an SSH tunnel to the listener.
+  the listener is, and the proxy denies its route from outside. The
+  owner reaches it through an SSH tunnel to the listener.
 - **It signs in the first owner** as jig's `owners` names them: the
   owner's Google identity (section 3), so the link and Google sign in
   the same person.
@@ -135,15 +141,20 @@ sees:
 
 ## 4. Signing in with Google
 
-### 4.1 The front page
+### 4.1 The sign-in page
 
 - **Signed out, every page of temper's is the sign-in page.** In the
   browser, the view's signed-out main (`../client/README.md`, 5.1)
-  becomes the deployment's name, one line about it, and a button for
-  each way of signing in the configuration gives: here one, "Continue
-  with Google". It replaces "Signed out. To sign in, open a sign-in link
-  `temper serve` printed." where a way is configured; a deployment
-  with none keeps that line.
+  becomes temper's mark, "Sign in", and a button for each way of
+  signing in the configuration gives: here one, "Continue with Google".
+  It replaces "Signed out. To sign in, open a sign-in link `temper
+  serve` printed." where a way is configured; a deployment with none
+  keeps that line.
+- **Stock:** nothing on it is the deployment's own: no name, no words
+  about it, no note on who may sign in. The same page serves every
+  deployment, and says only what temper itself knows: arriving from
+  Forgejo, "to continue to" the forge (5.3); signed out, that the forge
+  keeps its sign-in (section 6).
 - **The terminal is unchanged:** "Signed out." and its own line
   (`../client/README.md`, 6.6).
 - **Where the person was going is kept:** the page's address, carried
@@ -178,7 +189,7 @@ sees:
    `client/domain/client.md`, section 12).
 
 Google's registration is a web application's OAuth client in Google's
-console, its redirect URI `https://dev.fabrig.ai/sign-in/google/return`,
+console, its redirect URI the public origin's `/sign-in/google/return`,
 with the non-sensitive scopes alone. Its client id is in the
 configuration; its secret is a secrets' file
 (`../protocol/configuration.md`, section 6).
@@ -187,13 +198,14 @@ configuration; its secret is a secrets' file
 
 The return route answers each ending with a page of its own, as the
 GitHub routes do (`../client/forge.md`, 9.1), never a page of the
-client's: the person is not signed in.
+client's: the person is not signed in. Each is stock, as the sign-in
+page is.
 
 | Ending | Its page |
 |---|---|
 | a member | no page: `303` to `then` |
-| not a member | "ADDRESS isn't a member of NAME", with "Use another Google account", a fresh sign-in with Google's account chooser |
-| the address bound to another Google account | "ADDRESS is a member of NAME with another Google account", with "Use another Google account" |
+| not a member | "ADDRESS can't sign in here: Google signed you in, but no one here signs in with this address", with "Use another Google account", a fresh sign-in with Google's account chooser |
+| the address bound to another Google account | "ADDRESS signs in here with another Google account", with "Use another Google account" |
 | the address not verified by Google | "Google hasn't verified ADDRESS", with "Use another Google account" |
 | cancelled at Google, or Google's `error` | "The sign-in didn't finish", saying Google's word, with "Try again" |
 | the state unknown, used or past its deadline, or a restart since | "The sign-in didn't finish: it took too long, or temper restarted", with "Try again" |
@@ -204,13 +216,13 @@ client's: the person is not signed in.
 ### 5.1 What a person sees
 
 - **From temper:** "Open Forgejo ↗" goes to Forgejo's own route that
-  starts a sign-in with the temper source, `https://git.fabrig.ai/
-  user/oauth2/temper`; Forgejo sends the browser to temper, temper
-  answers at once, and Forgejo opens signed in. No click.
+  starts a sign-in with the temper source, `/user/oauth2/temper` on
+  Forgejo's origin; Forgejo sends the browser to temper, temper answers
+  at once, and Forgejo opens signed in. No click.
 - **At Forgejo first:** Forgejo's sign-in page offers "Sign in with
   temper". Signed in to temper, one click; signed out, temper's sign-in
-  page says "Sign in to continue to Forgejo", Google follows, then
-  Forgejo, signed in.
+  page says "to continue to" the forge, Google follows, then Forgejo,
+  signed in.
 - **The first time,** Forgejo makes the person's account, named by
   their login (5.4); an account already there is linked once, by its
   password (5.4).
@@ -227,10 +239,10 @@ On temper's clients' listener, its issuer the public origin:
 | `GET /oauth/userinfo` | the claims, for the access token |
 | `GET /oauth/keys` | the key set |
 
-- **One client, configured:** Forgejo's, `forgejo`, its redirect URI
-  exactly `https://git.fabrig.ai/user/oauth2/temper/callback`, its
-  secret a secrets' file. Several clients are a list; one is all this
-  deployment needs.
+- **One client, configured:** Forgejo's, `forgejo`, for the forge
+  temper knows it as, its redirect URI exactly Forgejo's origin's
+  `/user/oauth2/temper/callback`, its secret a secrets' file. Several
+  clients are a list; one is all a deployment with one Forgejo needs.
 - **Codes and access tokens are the engine's memory:** a code lives a
   minute and is spent once, bound to its client, its redirect URI, its
   sign-in, its nonce and, when Forgejo sends one, its PKCE challenge;
@@ -244,7 +256,7 @@ On temper's clients' listener, its issuer the public origin:
 jig's cookie is `SameSite=Strict` and its `Path` is jig's prefix
 (jig's `protocol/client.md`, 17.3), so a request to `/oauth/authorize`
 never carries it, and a navigation that started on another site (a
-link to `git.fabrig.ai` in a mail) would not carry it anywhere. So the
+link to Forgejo in a mail) would not carry it anywhere. So the
 authorization is decided by the client, not by the route:
 
 1. `GET /oauth/authorize?…` is answered with temper's page, as every
@@ -260,8 +272,9 @@ authorization is decided by the client, not by the route:
    state. The page replaces its address with it, so the back button
    never returns to the authorization. The person sees "Continuing to
    Forgejo…" for as long as that takes.
-4. **Signed out:** the sign-in page, saying "Sign in to continue to
-   Forgejo · git.fabrig.ai", its `then` the authorization's address,
+4. **Signed out:** the sign-in page, under its "Sign in", "to continue
+   to" the forge as the client names it, "Forgejo at HOST"
+   (`../client/forge.md`, 5.4), its `then` the authorization's address,
    so Google's return lands back at step 1.
 5. **Refused** (an unknown client, a redirect URI not registered): the
    page says so and goes nowhere: a redirect URI that does not match is
@@ -294,7 +307,7 @@ owners.
   route for authentication sources (Forgejo 17):
   `forgejo admin auth add-oauth --name temper --provider openidConnect
   --key forgejo --secret … --auto-discover-url
-  https://dev.fabrig.ai/.well-known/openid-configuration`. temper's
+  https://temper.example.com/.well-known/openid-configuration`. temper's
   setup for a managed Forgejo prints it with its values; for an owned
   Forgejo, temper's preparation runs it (`../protocol/setup.md`, 6.3).
   The name `temper` is the callback's path segment, so it is fixed.
@@ -302,9 +315,9 @@ owners.
 ## 6. Signing out
 
 - **Signing out of temper ends temper's sign-in only.** Forgejo keeps
-  its own session, and Google its own. temper's signed-out page says
-  so: "Signed out of NAME. Forgejo at git.fabrig.ai keeps its own
-  sign-in: sign out there too."
+  its own session, and Google its own. While a forge signs its people
+  in through temper, the signed-out page says so: "You signed out.
+  Forgejo at HOST keeps its own sign-in: sign out there too."
 - **Signing out of Forgejo** ends Forgejo's session; its next sign-in
   bounces through temper, and a person still signed in to temper is
   signed in again at once.
@@ -350,7 +363,7 @@ owners.
 - **Google's routes** (4.2), their endings' pages (4.3) and the
   member's binding record (section 3).
 - **The provider's routes** (5.2), handing each to jig.
-- **The client:** the browser's signed-out main with the configured
+- **The client:** the browser's stock sign-in page with the configured
   ways (4.1), the `Authorize` place (5.3), and "Open Forgejo ↗" to
   Forgejo's route for the temper source when the forge signs in through
   temper.
@@ -360,7 +373,7 @@ owners.
 ### 7.4 The stages
 
 1. **Google into temper:** 2.2, 2.3, section 3, section 4, and jig's
-   public address. dev.fabrig.ai is usable by its members; Forgejo
+   public address. The deployment is usable by its members; Forgejo
    signs them in by its own passwords meanwhile.
 2. **temper as Forgejo's provider:** section 5, skein's issuer and
    jig's provider. Forgejo's passwords are then retired by
@@ -384,6 +397,10 @@ owners.
 
 ## 9. Open questions
 
+- **A deployment's own sign-in page.** Default: stock (4.1). Later,
+  perhaps a name and a line in the configuration, or a template of the
+  owner's, as Forgejo takes its `APP_NAME` and `APP_SLOGAN` and
+  templates under its custom directory.
 - **The signing algorithm.** `ring`, which skein's TLS links, signs
   RS256 with a key it is given but cannot make one. Default: RS256 with
   a key made at the first start by the setup (`openssl genrsa`), kept
@@ -412,8 +429,9 @@ owners.
 
 ## 10. The mockups
 
-`../client/mockups/sign-in.html` in the world Dev site
-(`world-dev-site.js`): the front page signed out; arriving from Forgejo
-signed out; each of 4.3's endings; signed out. Behind it, the chats
-page and the Forges page, whose Forgejo at git.fabrig.ai opens signed
-in through temper. Each is marked "ahead" while this draft is one.
+`../client/mockups/sign-in.html` in the world Google sign-in
+(`world-google-sign-in.js`): the stock sign-in page signed out;
+arriving from Forgejo signed out; each of 4.3's endings; signed out.
+Behind it, the chats page and the Forges page, whose Forgejo at
+git.example.com opens signed in through temper. Each is marked "ahead"
+while this draft is one.
