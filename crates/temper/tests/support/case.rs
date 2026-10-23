@@ -111,6 +111,9 @@ fn base(value: &mut Value, charter: &Path) {
     // which must not collide with a charter added to the lab's base.
     let case: Value = serde_json::from_slice(&jig_channel_world::fixtures::engine_document()).expect("case base");
     value["engine"]["charters"] = case["engine"]["charters"].clone();
+    // Forge delegates use the case's charter 1, which their authority permits;
+    // charter 2 belongs to the director, not the lab's coding agents.
+    value["application"]["charter"] = 1.into();
     value["engine"]["charters"][0]["waiting_ms"] = 1.into();
     value["engine"]["templates"][0]["ended_by"] = "result".into();
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {
@@ -698,7 +701,12 @@ impl Judge {
 impl Judge {
     fn check_workspaces(&self) {
         use temper_real_loop_world::case;
-        let workspaces = |worker| self.members.dir(worker).join("data/worker-root/workspaces");
+        let workspaces = |worker| {
+            let directory = self.members.dir(worker);
+            let document = read(&directory.join("config/temper.json"));
+            let root = document["application"]["workers"][0]["root"].as_str().expect("worker root");
+            directory.join("data").join(root).join("workspaces")
+        };
         assert!(fs::read_dir(workspaces("ws")).expect("ws workspaces").next().is_none(), "ws holds no workspace");
         assert!(
             fs::read_dir(workspaces("s1")).expect("s1 workspaces").any(|entry| {
