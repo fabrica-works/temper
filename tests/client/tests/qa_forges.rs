@@ -613,10 +613,10 @@ fn welcome_accepted_setup_moves_to_model_and_follows_its_forge() {
         client,
         vec![
             PersonStep::Go { address: Address::Welcome { step: Step::Ready } },
-            see(Role::Link, b"Adopt a repository"),
+            see(Role::Heading { level: 2 }, b"Setting up Forgejo on this machine"),
         ],
     );
-    assert!(text(&world, client).contains("Forge: Forgejo on this machine, connected as qa-bot"));
+    assert!(text(&world, client).contains("work/hello, into Project 1"));
     assert_eq!(world.front().set_ups().len(), ONE_SETUP);
 }
 
@@ -652,7 +652,7 @@ fn setup_strip_tracks_progress_and_changes_its_continue_step() {
         client,
         vec![
             PersonStep::Press { find: Find::exactly_named(Role::Link, b"Continue setting up") },
-            see(Role::Heading { level: 1 }, b"Connect a model"),
+            see(Role::Heading { level: 1 }, b"Almost ready"),
         ],
     );
 }
