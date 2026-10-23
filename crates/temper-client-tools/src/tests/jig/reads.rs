@@ -222,16 +222,88 @@ fn a_circle_hold_keeps_its_json_category() {
     assert!(skein_lib::bytes::find(&printed.stdout, br#""reason":"circle""#).is_some());
 }
 #[test]
-fn a_refused_next_run_is_named_in_text_and_json() {
-    for (argv, expected) in
-        [(fixtures::TASK_CALL, b"next run: refused".as_slice()), (fixtures::TASK_JSON_CALL, br#""run_wait":"refused""#)]
-    {
-        let mut task = fixtures::goal(fixtures::TASK, jig_client::contract::WaitsOn::Nothing);
-        task.run_wait = Some(jig_client::contract::TaskRunWait::Refused(
-            jig_client::contract::TaskWaitRefused::Program(jig_client::contract::OpenProgram::Model),
-        ));
-        let printed = fixtures::read_answer(argv, fixtures::task_result(task));
-        assert!(skein_lib::bytes::find(&printed.stdout, expected).is_some());
+fn a_refused_next_run_names_its_cause_in_text_and_json() {
+    use jig_client::contract as c;
+    // One minute after the epoch exercises the document's wall formatting.
+    const AT: skein_lib::Wall = skein_lib::Wall::from_nanos(60_000_000_000);
+    let rows = [
+        (
+            "model program",
+            c::TaskWaitRefused::Program(c::OpenProgram::Model),
+            "next run: refused, model runs through a program",
+            r#"{"refused":{"program":"model"}}"#,
+        ),
+        (
+            "source program",
+            c::TaskWaitRefused::Program(c::OpenProgram::Source { account: 43, source: 17 }),
+            "next run: refused, source 17 of account 43 runs through a program",
+            r#"{"refused":{"program":{"source":{"account":43,"source":17}}}}"#,
+        ),
+        (
+            "reserved engine channel",
+            c::TaskWaitRefused::Hello {
+                kind: c::OwnerHostKind::Engine,
+                at: AT,
+                why: c::OwnerHelloRefusal::ReservedChannel,
+            },
+            "next run: refused, engine refused at 00:01: channel zero belongs to the engine's own host",
+            r#"{"refused":{"hello":{"kind":"engine","at":60000000000,"why":"reserved_channel"}}}"#,
+        ),
+        (
+            "worker capacity",
+            c::TaskWaitRefused::Hello {
+                kind: c::OwnerHostKind::Worker,
+                at: AT,
+                why: c::OwnerHelloRefusal::Workers { limit: 4 },
+            },
+            "next run: refused, worker refused at 00:01: no room for another worker, limit 4",
+            r#"{"refused":{"hello":{"kind":"worker","at":60000000000,"why":{"workers":{"limit":4}}}}}"#,
+        ),
+        (
+            "worker position",
+            c::TaskWaitRefused::Hello {
+                kind: c::OwnerHostKind::Worker,
+                at: AT,
+                why: c::OwnerHelloRefusal::Position { worker: 3 },
+            },
+            "next run: refused, worker refused at 00:01: unconfigured or occupied worker position 3",
+            r#"{"refused":{"hello":{"kind":"worker","at":60000000000,"why":{"position":{"worker":3}}}}}"#,
+        ),
+        (
+            "worker stop bound",
+            c::TaskWaitRefused::Hello {
+                kind: c::OwnerHostKind::Worker,
+                at: AT,
+                why: c::OwnerHelloRefusal::StopBound { grace: skein_lib::Duration::from_nanos(2000) },
+            },
+            "next run: refused, worker refused at 00:01: would not stop before the engine's grace ends, allowed grace 2000 ns",
+            r#"{"refused":{"hello":{"kind":"worker","at":60000000000,"why":{"stop_bound":{"grace":2000}}}}}"#,
+        ),
+        (
+            "worker agent window",
+            c::TaskWaitRefused::Hello {
+                kind: c::OwnerHostKind::Worker,
+                at: AT,
+                why: c::OwnerHelloRefusal::Agent { why: c::OwnerAgentShortfall::Window { charter: 2, model: 5 } },
+            },
+            "next run: refused, worker refused at 00:01: agent window too small for charter 2, model position 5",
+            r#"{"refused":{"hello":{"kind":"worker","at":60000000000,"why":{"agent":{"why":{"window":{"charter":2,"model":5}}}}}}}"#,
+        ),
+    ];
+    for (name, cause, expected_text, expected_json) in rows {
+        let mut task = fixtures::goal(fixtures::TASK, c::WaitsOn::Nothing);
+        task.run_wait = Some(c::TaskRunWait::Refused(cause));
+        let printed = fixtures::read_answer(fixtures::TASK_CALL, fixtures::task_result(task.clone()));
+        let start = skein_lib::bytes::find(&printed.stdout, b"next run: ").expect("next-run line");
+        let tail = printed.stdout.get(start..).expect("line within document");
+        let end = skein_lib::bytes::find(tail, b"\n").expect("line ends");
+        assert_eq!(tail.get(..end).expect("whole next-run line"), expected_text.as_bytes(), "{name}");
+        let printed = fixtures::read_answer(fixtures::TASK_JSON_CALL, fixtures::task_result(task));
+        let field = b"\"run_wait\":";
+        let start = skein_lib::bytes::find(&printed.stdout, field).expect("run_wait field");
+        let tail = printed.stdout.get(start.checked_add(field.len()).expect("field offset")..).expect("field value");
+        let end = skein_lib::bytes::find(tail, b",\"spec_revision\":").expect("following task field");
+        assert_eq!(tail.get(..end).expect("whole run_wait value"), expected_json.as_bytes(), "{name}");
     }
 }
 
