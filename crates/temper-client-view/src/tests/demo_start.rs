@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods, reason = "view assertions inspect semantic trees and rendered UTF-8")]
 use super::fixtures as f;
 use jig_client::contract as c;
 use skein_ui::Role;
@@ -232,4 +233,85 @@ fn the_invitation_is_a_named_region_with_its_parts_in_order() {
         child += usize::try_from(nodes[child].size).unwrap();
     }
     assert_eq!(child, end, "all four parts stay inside the region");
+}
+
+#[test]
+fn starting_waits_and_each_failure_explains_why_with_try_again() {
+    use temper_client_domain::forge::demo::DemoState;
+    use temper_client_protocol_wire::v1 as w;
+    for (why, expected) in [
+        (
+            w::StartFailure::Group(
+                w::GroupFailed::new(&w::CEILINGS, w::GroupFailedParts { why: b"fetch failed".as_slice().into() })
+                    .unwrap(),
+            ),
+            "The playground did not start: its fakes did not start (fetch failed).",
+        ),
+        (w::StartFailure::Account, "The playground did not start: the scripted model's account was refused."),
+        (w::StartFailure::Adoption, "The playground did not start: acme/shop was not adopted."),
+        (w::StartFailure::NotConnected, "The playground did not start: Playground forge did not connect."),
+    ] {
+        let mut root = f::demo_state_root(Address::Chats, w::DemoState::NotStarted);
+        assert_eq!(root.forge().demo().unwrap().state, DemoState::NotStarted);
+        let attempt = f::demo_start_attempt(&mut root);
+        let view = f::page_view(&root);
+        assert!(f::find(view.tree(), Role::Status, b"Starting").is_some());
+        let button = f::find(view.tree(), Role::Button, f::DEMO_CUE).unwrap();
+        assert!(
+            view.tree()
+                .nodes()
+                .iter()
+                .find(|node| node.id == button)
+                .unwrap()
+                .states
+                .as_slice()
+                .contains(&skein_ui::State::Disabled)
+        );
+        f::demo_start_answer(
+            &mut root,
+            attempt,
+            w::Outcome::StartFailed(w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why }).unwrap()),
+        );
+        let mut view = f::page_view(&root);
+        assert!(f::find(view.tree(), Role::Status, b"Not started").is_some());
+        assert!(f::find(view.tree(), Role::Alert, expected.as_bytes()).is_some(), "{expected}");
+        let again = f::find(view.tree(), Role::Button, b"Try again").unwrap();
+        assert_eq!(
+            crate::act(&mut view, again, skein_ui::Act::Press),
+            Some(temper_client_domain::Action::Pages(temper_client_domain::pages::Act::RetryDemo))
+        );
+    }
+}
+#[test]
+fn a_not_started_demo_has_the_setup_strip_and_no_context_or_demo_banner() {
+    use temper_client_protocol_wire::v1 as w;
+    for address in [Address::Chats, Address::Chat { task: 41 }] {
+        let root = f::demo_state_root(address, w::DemoState::NotStarted);
+        let view = f::page_view(&root);
+        assert!(f::find(view.tree(), Role::Region, b"Playground").is_none());
+        assert!(f::find(view.tree(), Role::Region, b"Setup").is_some());
+        assert!(view.tree().nodes().iter().all(|node| !node.styles.as_slice().contains(&crate::look::CONTEXT)));
+    }
+}
+
+#[test]
+fn a_full_group_failure_keeps_each_utf8_replacement_as_the_forge_failure_does() {
+    use temper_client_protocol_wire::v1 as w;
+    let mut root = f::demo_state_root(Address::Chats, w::DemoState::NotStarted);
+    let attempt = f::demo_start_attempt(&mut root);
+    let why = w::StartFailure::Group(
+        w::GroupFailed::new(&w::CEILINGS, w::GroupFailedParts { why: Box::from([255_u8; 256]) }).unwrap(),
+    );
+    f::demo_start_answer(
+        &mut root,
+        attempt,
+        w::Outcome::StartFailed(w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why }).unwrap()),
+    );
+    let domain = f::domain_limits();
+    let words = f::words();
+    let limits = crate::Limits::of(&domain, &words).unwrap();
+    let mut view = crate::View::new(&limits, &domain, words, f::FORGE);
+    crate::build(&mut view, &root, f::NOW, &mut skein_lib::Queue::with_capacity(limits.tree.patches));
+    let alert = view.tree().nodes().iter().find(|node| node.role == Role::Alert).unwrap();
+    assert_eq!(core::str::from_utf8(alert.name.as_deref().unwrap()).unwrap().matches('�').count(), 256);
 }

@@ -341,6 +341,7 @@ fn output_and_memory_bounds_cover_replacement_and_a_full_panel() {
         + u64::from(limits.forge.checks) * 4
         + w::DemoAnswer::worst_case_heap(&wire).unwrap()
         + w::Answer::worst_case_heap(&wire).unwrap()
+        + u64::from(wire.group_failed_why)
         + forge::forges::worst_case(&limits.forge).unwrap()
         + u64::try_from(size_of::<Handle>()).unwrap();
     assert_eq!(forge::worst_case(&limits.forge), Some(existing + u64::try_from(panel_heap).unwrap()));

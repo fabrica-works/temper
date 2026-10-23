@@ -27,12 +27,15 @@ pub fn decision(root: &Domain) -> Option<bool> {
     let model = model_usable(root)?;
     let demo = root.forge().demo();
     if me.deployment_role != Some(jig_client::contract::HeldRole::Owner) {
-        return Some(model);
+        return Some(model || root.forge().demo_running());
     }
     match root.forges() {
         Forges::Unknown => None,
-        Forges::Ended => Some(false),
+        Forges::Ended => Some(root.forge().demo_running()),
         Forges::Rows(rows) => {
+            if root.forge().demo_running() {
+                return Some(true);
+            }
             for row in rows {
                 let own = match demo {
                     Some(demo) => row.number != demo.forge,

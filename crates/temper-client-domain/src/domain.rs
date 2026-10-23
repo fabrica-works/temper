@@ -39,6 +39,9 @@ impl Domain {
     }
     #[must_use]
     pub fn demo(&self) -> Option<(&forge::Demo, forge::demo::Halves)> {
+        if !self.forge.demo_running() {
+            return None;
+        }
         let answer = self.forge.demo()?;
         let halves = forge::demo::halves(Some(answer), self.pages.accounts_document(&self.client), self.forges());
         if halves.model || halves.forge { Some((answer, halves)) } else { None }

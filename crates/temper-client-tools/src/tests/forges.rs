@@ -597,3 +597,96 @@ fn first_repository_text_and_json_name_every_state_and_creation_step() {
         assert!(f::json_has(&json, field));
     }
 }
+
+#[test]
+fn demo_start_answers_print_their_words_json_and_status() {
+    let l = &w::CEILINGS;
+    for (outcome, expected, json_expected, status) in [
+        (w::Outcome::Running, "running\n", r#"{"running":{}}"#, 0),
+        (
+            w::Outcome::StartRefused(
+                w::StartRefused::new(l, w::StartRefusedParts { why: w::StartRefusal::NotOffered }).unwrap(),
+            ),
+            "refused: not offered\n",
+            r#"{"start_refused":{"why":"not_offered"}}"#,
+            2,
+        ),
+        (
+            w::Outcome::StartFailed(
+                w::StartFailed::new(
+                    l,
+                    w::StartFailedParts {
+                        why: w::StartFailure::Group(
+                            w::GroupFailed::new(l, w::GroupFailedParts { why: b"fetch failed".as_slice().into() })
+                                .unwrap(),
+                        ),
+                    },
+                )
+                .unwrap(),
+            ),
+            "the fakes did not start (fetch failed)\n",
+            r#"{"start_failed":{"why":{"group":{"why":"fetch failed"}}}}"#,
+            1,
+        ),
+        (
+            w::Outcome::StartFailed(
+                w::StartFailed::new(l, w::StartFailedParts { why: w::StartFailure::Account }).unwrap(),
+            ),
+            "the account refused\n",
+            r#"{"start_failed":{"why":"account"}}"#,
+            1,
+        ),
+        (
+            w::Outcome::StartFailed(
+                w::StartFailed::new(l, w::StartFailedParts { why: w::StartFailure::Adoption }).unwrap(),
+            ),
+            "the adoption refused\n",
+            r#"{"start_failed":{"why":"adoption"}}"#,
+            1,
+        ),
+        (
+            w::Outcome::StartFailed(
+                w::StartFailed::new(l, w::StartFailedParts { why: w::StartFailure::NotConnected }).unwrap(),
+            ),
+            "the forge not connected in time\n",
+            r#"{"start_failed":{"why":"not_connected"}}"#,
+            1,
+        ),
+    ] {
+        for json in [false, true] {
+            let mut root = f::signed_in(f::PARTY);
+            let call = root.submit_prepared(f::call(&["demo-start", "--key", "playground"]), json, None);
+            let client::Ask::Family { scope, record } = root.adoption_bytes(call) else { panic!("family") };
+            assert_eq!(*scope, c::Scope::Deployment);
+            assert_eq!(wire::decode_requesting(&record.bytes, l).unwrap().request(), &w::Request::StartDemo);
+            root.adoption_answer(call, outcome.clone());
+            let printed = root.answer(call).unwrap();
+            assert_eq!(printed.status, status);
+            let bytes = if status == 0 { &printed.stdout } else { &printed.stderr };
+            assert_eq!(bytes.as_ref(), if json { json_expected.as_bytes() } else { expected.as_bytes() });
+        }
+    }
+}
+
+#[test]
+fn demo_start_keeps_drawn_keys_and_recovers_its_own_answer() {
+    for json in [false, true] {
+        let mut root = f::signed_in(f::PARTY);
+        let call = root.submit(&["demo-start"]);
+        assert!(root.saved.contains_key(&call), "a drawn demo start key is durable");
+        let key = root.sent_name(call).unwrap();
+        let mut records = f::restored_adoption(f::PARTY);
+        let record = records.get_mut(0).unwrap();
+        record.key = key;
+        record.request.request = root.adoption_bytes(call).clone();
+        let mut root = f::started_with(records, f::SEED, json);
+        root.deliver(c::Delivery::Me(Box::new(f::me(f::PARTY))));
+        root.adoption_answer(0, w::Outcome::Running);
+        let expected = if json {
+            b"{\"operation\":\"demo-start\",\"outcome\":{\"running\":{}}}\n".as_slice()
+        } else {
+            b"kept: demo-start running\n"
+        };
+        assert_eq!(root.kept_lines.as_slice(), &[Box::<[u8]>::from(expected)]);
+    }
+}

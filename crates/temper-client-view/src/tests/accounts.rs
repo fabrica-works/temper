@@ -690,6 +690,10 @@ mod memory_literal;
 // Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
 // The flow's three state words (444 B).
 // First-repository setup fields and Ready words add 2,076 B.
+// The Accounts navigation's two state words (296 B).
+// ConnectForge's and the welcome's forge words, and 128 more phrase segments (11,588 B).
+// The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
+// The demo start's words, full failure text and retry nodes (1,724,026 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 const ACCOUNT_BYTES: u64 = 10348345868;
 #[test]

@@ -36,6 +36,10 @@ disconnect, forget, rank and retry resolve a unique --source sign_in|key|program
 forget without --source removes the whole account; rank without it moves the account.
 connect prints a browser address and wait accounts --until settled, then exits once durable.
 
+Start the built-in playground, or finish a previous failed start:
+  temper ctl DIRECTORY demo-start --key playground
+It waits for running; not offered exits 2, a start failure exits 1 and names why.
+
 Choose a chat's main model from models --project P; --effort is required when that model declares efforts:
   temper ctl DIRECTORY chat --project shop --model chosen-model --effort chosen-effort hello --key model-chat
   temper ctl DIRECTORY amend 41 --rev 7 --model chosen-model --effort chosen-effort because --key model-amend

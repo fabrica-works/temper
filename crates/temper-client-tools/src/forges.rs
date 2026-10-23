@@ -25,6 +25,14 @@ pub const SET_UP: Tool = Tool {
     keyed: Keyed::Optional,
     area: 6,
 };
+pub const DEMO_START: Tool = Tool {
+    name: b"demo-start",
+    line: b"Start the playground; run again to finish what is not done",
+    result: b"demo-start",
+    forms: &[&[]],
+    keyed: Keyed::Optional,
+    area: 6,
+};
 pub const WAIT: Tool = Tool {
     name: b"wait",
     line: b"Wait for a subject's change or condition",
@@ -90,7 +98,7 @@ struct Intent {
 }
 #[derive(Debug)]
 struct SettingUp {
-    intent: Intent,
+    intent: Option<Intent>,
     called: Option<Called>,
 }
 #[derive(Debug)]
@@ -144,7 +152,7 @@ impl Forges {
 }
 pub(crate) fn owns(call: &jig::call::Call) -> bool {
     let name = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name;
-    name == READ.name || name == SET_UP.name || (name == WAIT.name && call.form == 1)
+    name == READ.name || name == SET_UP.name || name == DEMO_START.name || (name == WAIT.name && call.form == 1)
 }
 fn live(client: &Client) -> bool {
     let Some(doc) = client.document(Handle { asker: crate::root::RUNNER.asker(), number: 0 }) else { return false };
@@ -178,16 +186,25 @@ fn send(state: &mut Forges, client: &Client, env: &Env<Limits>, called: Called, 
         return;
     }
     let number = (u64::from(called.call_number) << 32u32) | 2;
-    if crate::table::TOOLS.get(usize::from(called.call.tool)).expect("parsed tool").name == SET_UP.name {
-        let forge = u16::try_from(number_arg(&called.call)).expect("checked forge number");
-        let intent = intent(forge, &called.call, client);
-        let Some(request) = domain::ask(
-            forge,
-            intent.org.clone(),
-            intent.repository.clone(),
-            intent.project.clone(),
-            &env.limits.domain.forge,
-        ) else {
+    let name = crate::table::TOOLS.get(usize::from(called.call.tool)).expect("parsed tool").name;
+    if name == SET_UP.name || name == DEMO_START.name {
+        let intent = if name == SET_UP.name {
+            let forge = u16::try_from(number_arg(&called.call)).expect("checked forge number");
+            Some(intent(forge, &called.call, client))
+        } else {
+            None
+        };
+        let request = match &intent {
+            Some(intent) => domain::ask(
+                intent.forge,
+                intent.org.clone(),
+                intent.repository.clone(),
+                intent.project.clone(),
+                &env.limits.domain.forge,
+            ),
+            None => temper_client_domain::forge::demo::ask(&env.limits.domain.forge),
+        };
+        let Some(request) = request else {
             let printed = render::failure(b"set up encoding failed", called.json, 1);
             finish(called, printed, out);
             return;
@@ -240,9 +257,10 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
             }
             let Some(limits) = temper_client_domain::forge::wire_limits(&env.limits.domain.forge) else { return };
             let Some(request) = temper_client_protocol_wire::decode_requesting(&record.bytes, &limits) else { return };
-            if let temper_client_protocol_wire::v1::Request::SetUp(request) = request.into_parts().request {
+            let intent = match request.into_parts().request {
+                temper_client_protocol_wire::v1::Request::SetUp(request) => {
                 let request = request.into_parts();
-                let intent = Intent {
+                Some(Intent {
                     forge: request.forge,
                     org: request.org,
                     repository: request.repository,
@@ -254,9 +272,12 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
                             SetUpProject::New(project.into_parts().name)
                         }
                     },
-                };
-                state.pending.insert(*key, SettingUp { intent, called: None });
-            }
+                })
+                }
+                temper_client_protocol_wire::v1::Request::StartDemo => None,
+                temper_client_protocol_wire::v1::Request::Adopt(_) => return,
+            };
+            state.pending.insert(*key, SettingUp { intent, called: None });
         }
         Told::Answered { key, outcome } => {
             if let Some(adopting) = state.adopting.remove(key) {
@@ -268,9 +289,12 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
                 Some(called) => called.json,
                 None => state.json,
             };
-            let printed = setup_print(pending.intent.forge, outcome, json, pending.called.is_none(), &env.limits);
+            let printed = match &pending.intent {
+                Some(intent) => setup_print(intent.forge, outcome, json, pending.called.is_none(), &env.limits),
+                None => crate::demo::print(outcome, json, pending.called.is_none(), &env.limits),
+            };
             match pending.called {
-                Some(called) if printed.status == 0 => {
+                Some(called) if printed.status == 0 && pending.intent.is_some() => {
                     out.push(Out::Progress {
                         line: if called.json { render::outcome::newline(&printed.stdout) } else { printed.stdout },
                     });
@@ -279,7 +303,7 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
                         handle,
                         Watching {
                             called,
-                            setup: Some(pending.intent),
+                            setup: pending.intent,
                             since: None,
                             first: None,
                             deadline: Some(

@@ -83,13 +83,14 @@ pub fn playground(root: &Domain) -> Option<(&Demo, &Row)> {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Setup {
+    pub playground: bool,
     pub forge: bool,
     pub model: bool,
     pub step: Step,
 }
 #[must_use]
 pub fn setup(root: &Domain) -> Option<Setup> {
-    if !root.demo_answered() || root.demo().is_some() || welcome::decision(root) != Some(false) {
+    if !root.demo_answered() || root.forge().demo_running() || welcome::decision(root) != Some(false) {
         return None;
     }
     let owner = accounts::current_me(root.client())?.deployment_role == Some(jig_client::contract::HeldRole::Owner);
@@ -110,5 +111,5 @@ pub fn setup(root: &Domain) -> Option<Setup> {
     } else {
         Step::Ready
     };
-    Some(Setup { forge: owner && !connected, model, step })
+    Some(Setup { playground: !connected && root.forge().demo().is_some(), forge: owner && !connected, model, step })
 }

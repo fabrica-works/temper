@@ -50,6 +50,7 @@ enum WelcomeForge {
     None,
     Connected,
     Owned,
+    Demo { running: bool },
 }
 #[must_use]
 pub fn program_fixture(seed: u64) -> (Joint, Root) {
@@ -100,7 +101,7 @@ fn fixture_root(
     program: bool,
 ) -> (Joint, Root) {
     let welcome = forge != WelcomeForge::None;
-    let forge_setup = forge == WelcomeForge::Owned;
+    let forge_setup = matches!(forge, WelcomeForge::Owned | WelcomeForge::Demo { .. });
     let mut limits = if tools { temper_client_tools::limits::client() } else { fixtures::domain_limits() };
     if let Some(rows) = rows {
         limits.client.domain.rows = rows;
@@ -171,6 +172,9 @@ fn fixture_root(
             state: temper_engine_domain_forge::Connection::NotSetUp,
         })));
         front.engine.settle();
+    }
+    if let WelcomeForge::Demo { running } = forge {
+        front.demo = Some(demo_answer(running));
     }
     front.bind(CLIENT, fixtures::PARTY);
     let mut root = if tools {
@@ -337,4 +341,37 @@ pub fn account_chat(front: &mut Joint, account: u32) -> u64 {
             }
         })
         .expect("created account-funded task")
+}
+
+/// A scripted demo read and start, beside the real root's account and forge facts.
+#[must_use]
+pub fn demo_fixture(seed: u64, state: &temper_client_protocol_wire::v1::DemoState) -> (Joint, Root) {
+    fixture_root(
+        seed,
+        false,
+        2,
+        None,
+        false,
+        WelcomeForge::Demo { running: *state == temper_client_protocol_wire::v1::DemoState::Running },
+        false,
+    )
+}
+
+fn demo_answer(running: bool) -> temper_client_protocol_wire::v1::DemoAnswer {
+    use temper_client_protocol_wire::v1 as w;
+    let mut cues = skein_lib::List::with_capacity(1);
+    cues.push(b"Change the title".as_slice().into()).expect("one cue");
+    w::DemoAnswer::new(
+        &w::CEILINGS,
+        w::DemoAnswerParts {
+            project: 1,
+            forge: 2,
+            provider: PROVIDER,
+            owner: b"acme".as_slice().into(),
+            name: b"shop".as_slice().into(),
+            state: if running { w::DemoState::Running } else { w::DemoState::NotStarted },
+            cues,
+        },
+    )
+    .expect("demo fixture")
 }

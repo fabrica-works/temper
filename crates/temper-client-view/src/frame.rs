@@ -338,6 +338,16 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
             false,
             bindings,
         );
+        if setup.playground {
+            action(
+                b,
+                Role::Button,
+                &words.say(crate::words::Word::WelcomePlayground, &[]),
+                Act::Playground,
+                false,
+                bindings,
+            );
+        }
         b.close();
         return;
     }

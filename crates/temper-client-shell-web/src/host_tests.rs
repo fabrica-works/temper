@@ -278,6 +278,7 @@ mod memory_literal;
 // The Forges page, the setup strip and the dot's words (2,664 B).
 // Wire 6's SetUp fields and the row's first repository, written by SKEIN_CODEGEN_WRITE=1 (+27,648 B).
 // The setup draft, retained intent and adoption, shared keys and Ready words add 70,031 B.
+// The demo start's retained state, words, failure text and retry nodes (2,509,493 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 const WEB_BYTES: u64 = 274390100134;
 #[test]

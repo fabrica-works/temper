@@ -118,6 +118,7 @@ pub enum Served {
 /// The deployment's demo, kept across link gaps (client/README.md, 4.6 and 4.8).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Demo {
+    pub state: super::demo::DemoState,
     pub project: u32,
     pub forge: u16,
     pub provider: u32,
@@ -134,3 +135,6 @@ pub const DEMO_FIELD_BYTES: u32 = {
         ceilings.demo_answer_name
     }
 };
+
+/// The group's reason rendered as text: each invalid byte may need a UTF-8 replacement.
+pub const DEMO_WHY_BYTES: u32 = temper_client_protocol_wire::SET_UP_WHY_BYTES.checked_mul(3).expect("reason text fits");

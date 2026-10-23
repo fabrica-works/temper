@@ -29,7 +29,13 @@ fn answer(root: &mut Domain, present: bool) {
         panic!("demo read")
     };
     let page = if present {
-        Readout::Family { family: wire::FORGE, record: Some(demo::answer(b"Change the title")) }
+        let mut parts =
+            wire::decode_demo_answer(&demo::answer(b"Change the title"), &w::CEILINGS).unwrap().into_parts();
+        parts.state = w::DemoState::NotStarted;
+        Readout::Family {
+            family: wire::FORGE,
+            record: Some(wire::demo_answer(&w::DemoAnswer::new(&w::CEILINGS, parts).unwrap())),
+        }
     } else {
         Readout::NotServed { family: Some(wire::FORGE), served: None }
     };
@@ -358,7 +364,7 @@ fn the_setup_strip_shows_while_there_is_no_demo_and_the_first_run_is_not_over() 
     answer(&mut root, false);
     assert!(listed::setup(&root).is_some());
     answer(&mut root, true);
-    assert!(listed::setup(&root).is_none());
+    assert!(listed::setup(&root).is_some());
 }
 #[test]
 fn the_strip_names_what_is_missing_and_a_non_owner_misses_the_model_alone() {
@@ -414,6 +420,7 @@ fn the_playground_forge_shows_while_the_forge_half_holds() {
     let (mut root, _, accounts, forges) = opened(true, Step::Model { way: None });
     let watch = forges.unwrap();
     answer(&mut root, true);
+    event(&mut root, Event::Act { action: Action::Pages(Act::Playground) });
     account(&mut root, accounts, 18, true);
     rows(&mut root, watch, wire::FORGE);
     assert_eq!(forge::listed::playground(&root).unwrap().1.number, wire::FORGE);

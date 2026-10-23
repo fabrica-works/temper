@@ -44,6 +44,7 @@ pub enum Act {
     SetUp { forge: u16 },
     SetupWrite { field: super::forges::SetupField, text: Box<[u8]> },
     SetupNew { new: bool },
+    StartDemo,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Typed {

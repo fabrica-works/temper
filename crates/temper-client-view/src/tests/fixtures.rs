@@ -227,19 +227,35 @@ pub(super) fn root_at_full(
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     root_at_with_demo(address, limits, project_name, None)
 }
+#[expect(clippy::manual_map, reason = "fixtures use the same closure-free steps as the client")]
 pub(super) fn root_at_with_demo(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],
     demo: Option<(u32, bool)>,
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
-    root_at_with_activity(address, limits, project_name, demo, None, None)
+    let state = if let temper_client_domain::Address::Welcome { .. } = address {
+        w::DemoState::NotStarted
+    } else {
+        w::DemoState::Running
+    };
+    root_at_with_activity(
+        address,
+        limits,
+        project_name,
+        match demo {
+            Some((project, model)) => Some((project, model, state)),
+            None => None,
+        },
+        None,
+        None,
+    )
 }
 fn root_at_with_activity(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],
-    demo: Option<(u32, bool)>,
+    demo: Option<(u32, bool, w::DemoState)>,
     activity: Option<c::ActivityPage>,
     forge_rows: Option<List<w::ForgeRow>>,
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
@@ -394,13 +410,14 @@ fn root_at_with_forges(
                 read = Some(token);
             }
         }
-        if let Some((project, model)) = demo {
+        if let Some((project, model, state)) = demo {
             deliver_demo(
                 &mut root,
                 read.expect("live link reads demo"),
                 account_watch.expect("accounts watch"),
                 project,
                 model,
+                state,
             );
         } else {
             deliver_no_demo(&mut root, read.expect("demo read"), account_watch.expect("accounts watch"));
@@ -1385,14 +1402,21 @@ fn demo_accounts(model: bool) -> c::OwnerAccounts {
     }
 }
 
-fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Token, project: u32, model: bool) {
+fn deliver_demo(
+    root: &mut temper_client_domain::Domain,
+    read: Token,
+    watch: Token,
+    project: u32,
+    model: bool,
+    state: w::DemoState,
+) {
     let mut cues = List::with_capacity(2);
     cues.push(Box::from(DEMO_CUE)).expect("first cue");
     cues.push(Box::from(DEMO_OTHER_CUE)).expect("second cue");
     let answer = w::DemoAnswer::new(
         &w::CEILINGS,
         w::DemoAnswerParts {
-            state: w::DemoState::Running,
+            state,
             project,
             forge: wire::FORGE,
             provider: 17,
@@ -1469,7 +1493,63 @@ pub fn demo_forges_root(
     address: temper_client_domain::Address,
     rows: List<w::ForgeRow>,
 ) -> temper_client_domain::Domain {
-    root_at_with_activity(address, &domain_limits(), b"Shop", Some((PROJECT, true)), None, Some(rows)).0
+    root_at_with_activity(
+        address,
+        &domain_limits(),
+        b"Shop",
+        Some((PROJECT, true, w::DemoState::Running)),
+        None,
+        Some(rows),
+    )
+    .0
+}
+
+pub fn demo_state_root(address: temper_client_domain::Address, state: w::DemoState) -> temper_client_domain::Domain {
+    root_at_with_activity(address, &domain_limits(), b"Shop", Some((PROJECT, true, state)), None, None).0
+}
+pub fn demo_start_attempt(root: &mut temper_client_domain::Domain) -> Token {
+    let limits = domain_limits();
+    let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
+    temper_client_domain::step(
+        root,
+        &Env { now: Time::ZERO, wall: NOW, limits },
+        temper_client_domain::Event::Act {
+            action: temper_client_domain::Action::Pages(temper_client_domain::pages::Act::Playground),
+        },
+        &mut out,
+    );
+    while let Some(request) = out.pop() {
+        if let temper_client_domain::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family { record, .. }, .. },
+                },
+        } = request
+            && *wire::decode_requesting(&record.bytes, &w::CEILINGS).unwrap().request() == w::Request::StartDemo
+        {
+            return attempt;
+        }
+    }
+    panic!("demo start sent");
+}
+pub fn demo_start_answer(root: &mut temper_client_domain::Domain, attempt: Token, outcome: w::Outcome) {
+    root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    why: None,
+                    answer: Some(jig_client::Answered::Family(jig_client::Family {
+                        family: wire::FORGE,
+                        version: wire::CLIENT_VERSION,
+                        bytes: wire::answer(&w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).unwrap()),
+                    })),
+                },
+            },
+        },
+    );
 }
 
 /// A forge flow that can receive subsequent watch deliveries.

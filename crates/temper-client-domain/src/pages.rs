@@ -50,6 +50,7 @@ pub enum Act {
     Choice(choice::Act),
     SignOut,
     Playground,
+    RetryDemo,
     Accounts(accounts::Act),
     ConnectModel(connect_model::Act),
     ChatWords {
@@ -336,7 +337,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
         Event::Act { act: Act::StartChat } => start_chat(pages, env, client, out),
-        Event::Act { act: Act::Suggest { .. } | Act::Playground } => {
+        Event::Act { act: Act::Suggest { .. } | Act::Playground | Act::RetryDemo } => {
             unreachable!("suggestions are resolved by the root")
         }
         Event::Act { act: Act::ClosedChats } => closed_chats(pages, out),
@@ -710,6 +711,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::ChatWords { .. }
         | Act::StartChat
         | Act::Playground
+        | Act::RetryDemo
         | Act::Suggest { .. }
         | Act::MessageWords { .. }
         | Act::Send

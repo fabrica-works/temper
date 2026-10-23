@@ -216,7 +216,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
         }
     }
     assert!(out.is_empty(), "world fixture settles");
-    if matches!(w, FirstRun { step: 0..=4 }) {
+    if matches!(w, FirstRun { step: 1..=4 }) {
         assert!(root.demo().expect("answered demo").1.model);
     }
     root
@@ -390,7 +390,11 @@ fn demo(root: &mut Domain, w: World, read: Token, out: &mut Queue<Request>) {
         let value = v1::DemoAnswer::new(
             &v1::CEILINGS,
             v1::DemoAnswerParts {
-                state: v1::DemoState::Running,
+                state: if matches!(w, FirstRun { step: 0 }) {
+                    v1::DemoState::NotStarted
+                } else {
+                    v1::DemoState::Running
+                },
                 project: PROJECT,
                 forge: 1,
                 provider: 17,

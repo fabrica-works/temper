@@ -187,6 +187,9 @@ pub(crate) fn speakers(task: &c::Task, me: Option<&c::Me>) -> Speakers {
 }
 
 pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Words) {
+    if !root.forge().demo_running() {
+        return;
+    }
     let Some(demo) = root.forge().demo() else { return };
     if project != demo.project {
         return;

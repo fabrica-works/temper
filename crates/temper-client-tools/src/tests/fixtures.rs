@@ -92,6 +92,7 @@ pub(crate) const EVERY_TOOL: &[&[&str]] = &[
     &["verify", "43"],
     &["forges"],
     &["forge-setup", "3"],
+    &["demo-start"],
     &["wait", "forges"],
 ];
 
@@ -601,11 +602,11 @@ pub(crate) const UNKNOWN_ASKER: client::Asker = client::Asker(999);
 /// A stable stored request's engine key, unrelated to its client call prefix.
 const KEPT_KEY: skein_lib::RequestKey = [9; 16];
 /// One slot for each guide call, including the model-choice seam.
-pub(super) const GUIDE_CALLS: u32 = 16;
+pub(super) const GUIDE_CALLS: u32 = 17;
 /// One slot per guide line, including the final line; fewer loses that line.
-const GUIDE_LINES: u32 = 86;
+const GUIDE_LINES: u32 = 90;
 /// One slot per row and form; fewer omits decide's second form.
-pub(super) const TOOL_FORMS: u32 = 38;
+pub(super) const TOOL_FORMS: u32 = 39;
 /// Exactly one example exercises each row and form; zero misses it entirely.
 pub(super) const EXAMPLES_PER_FORM: u32 = 1;
 /// One missing byte exercises the first refused destination; zero would fit.

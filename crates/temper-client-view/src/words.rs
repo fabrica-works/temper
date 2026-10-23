@@ -327,6 +327,14 @@ pub enum Word {
     DemoModel,
     ConnectModel,
     DemoHeading,
+    DemoStarting,
+    DemoNotStarted,
+    DemoGroupFailed,
+    DemoAccountFailed,
+    DemoAdoptionFailed,
+    DemoNotConnected,
+    DemoTryAgain,
+
     DemoRequest,
     SuggestedRequests,
     DemoScript,
@@ -515,8 +523,9 @@ pub enum Word {
 // Thirty-one model-flow phrases (client/README.md, 5.5).
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
-const PHRASES: u32 = 1002;
-const ALL: [Word; 469] = [
+// Seven demo start status, failure and retry phrases (5.6).
+const PHRASES: u32 = 1009;
+const ALL: [Word; 476] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -827,6 +836,13 @@ const ALL: [Word; 469] = [
     Word::DemoModel,
     Word::ConnectModel,
     Word::DemoHeading,
+    Word::DemoStarting,
+    Word::DemoNotStarted,
+    Word::DemoGroupFailed,
+    Word::DemoAccountFailed,
+    Word::DemoAdoptionFailed,
+    Word::DemoNotConnected,
+    Word::DemoTryAgain,
     Word::DemoRequest,
     Word::SuggestedRequests,
     Word::DemoScript,
@@ -1310,6 +1326,14 @@ impl Word {
             Self::DemoModel => 188,
             Self::ConnectModel => 189,
             Self::DemoHeading => 190,
+            Self::DemoStarting => 1900,
+            Self::DemoNotStarted => 1901,
+            Self::DemoGroupFailed => 1902,
+            Self::DemoAccountFailed => 1903,
+            Self::DemoAdoptionFailed => 1904,
+            Self::DemoNotConnected => 1905,
+            Self::DemoTryAgain => 1906,
+
             Self::DemoRequest => 191,
             Self::SuggestedRequests => 192,
             Self::DemoScript => 193,
@@ -1493,10 +1517,17 @@ pub struct Words {
 // clock: 256 bytes holds its longest three-sentence explanation whole.
 const REFUSAL_BYTES: u32 = 256;
 fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32, Invalid> {
+    if word == Word::DemoGroupFailed {
+        return Ok(temper_client_domain::forge::DEMO_WHY_BYTES);
+    }
     if kind == HoleKind::Name && (word == Word::RefusalSentences || word == Word::WaitRefused) {
         return Ok(REFUSAL_BYTES);
     }
-    if word == Word::DemoRequest || word == Word::DemoRepository || word == Word::ForgePlaygroundSummary {
+    if word == Word::DemoRequest
+        || word == Word::DemoRepository
+        || word == Word::ForgePlaygroundSummary
+        || word == Word::DemoAdoptionFailed
+    {
         return Ok(temper_client_domain::forge::DEMO_FIELD_BYTES);
     }
     let model_name = joined.min(crate::choice::MODEL_SHOWN);
@@ -1603,11 +1634,13 @@ impl Words {
             languages: 1,
             phrases: PHRASES,
             holes: 3,
-            // Setup fields and first repository need 28 more segments.
-            segments: 1756,
+            // Setup fields and first repository need 28 more segments; the demo's start 15.
+            segments: 1771,
             text_bytes: 32768,
             // Whole demo requests keep their supplied bound.
-            hole_bytes: joined.max(temper_client_domain::forge::DEMO_FIELD_BYTES),
+            hole_bytes: joined
+                .max(temper_client_domain::forge::DEMO_FIELD_BYTES)
+                .max(temper_client_domain::forge::DEMO_WHY_BYTES),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { book, language: 0, connector, name_bytes: joined })
@@ -2010,6 +2043,13 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Demo => (&[b"Playground"], &[]),
         Word::DemoModel => (&[b"This is the playground: a scripted model."], &[]),
         Word::ConnectModel => (&[b"Connect a model"], &[]),
+        Word::DemoStarting => (&[b"Starting"], &[]),
+        Word::DemoNotStarted => (&[b"Not started"], &[]),
+        Word::DemoGroupFailed => (&[b"The playground did not start: its fakes did not start (", b")."], &[Name]),
+        Word::DemoAccountFailed => (&[b"The playground did not start: the scripted model's account was refused."], &[]),
+        Word::DemoAdoptionFailed => (&[b"The playground did not start: ", b"/", b" was not adopted."], &[Name, Name]),
+        Word::DemoNotConnected => (&[b"The playground did not start: Playground forge did not connect."], &[]),
+        Word::DemoTryAgain => (&[b"Try again"], &[]),
         Word::DemoHeading => (&[b"What shall we change?"], &[]),
         Word::DemoRequest => (DEMO_REQUEST, &[Name, Name]),
         Word::SuggestedRequests => (&[b"Suggested requests"], &[]),

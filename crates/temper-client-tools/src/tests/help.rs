@@ -72,6 +72,7 @@ const USAGES: &[&[u8]] = &[
     b"verify ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
     b"forges\n",
     b"forge-setup F [--org O] [--repository R] [--project P] [--key NAME]\n",
+    b"demo-start [--key NAME]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

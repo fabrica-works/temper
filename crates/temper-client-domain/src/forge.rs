@@ -95,6 +95,26 @@ impl Side {
         self.demo.answer.as_ref()
     }
     #[must_use]
+    pub fn demo_running(&self) -> bool {
+        match &self.demo.answer {
+            Some(demo) => {
+                demo.state == demo::DemoState::Running || self.demo.start.is_some() || self.demo.failure.is_some()
+            }
+            None => false,
+        }
+    }
+    #[must_use]
+    pub const fn demo_starting(&self) -> bool {
+        match &self.demo.start {
+            Some(start) => !start.silent,
+            None => false,
+        }
+    }
+    #[must_use]
+    pub const fn demo_failure(&self) -> Option<&demo::StartFailure> {
+        self.demo.failure.as_ref()
+    }
+    #[must_use]
     pub const fn panel(&self) -> Option<&panel::Panel> {
         self.panel.as_ref()
     }
@@ -187,6 +207,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
 fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::Go { address } => out.push(Request::Show { address }),
+        Act::StartDemo => demo::start(side, limits, false, out),
         Act::SetUp { forge } => forges::set_up(side, limits, forge, out),
         Act::SetupWrite { field, text } => forges::write(side, limits, field, text),
         Act::SetupNew { new } => {
@@ -280,6 +301,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(forges::worst_case(limits)?)?
         .checked_add(temper_client_protocol_wire::v1::Answer::worst_case_heap(&wire)?)?
         .checked_add(temper_client_protocol_wire::v1::DemoAnswer::worst_case_heap(&wire)?)?
+        .checked_add(u64::from(wire.group_failed_why))?
         .checked_add(u64::try_from(size_of::<jig_client::Handle>()).ok()?)?
         .checked_add(u64::try_from(size_of::<temper_client_protocol_wire::v1::ChangePanel>()).ok()?)?
         .checked_add(temper_client_protocol_wire::v1::ChangePanel::worst_case_heap(&wire)?)

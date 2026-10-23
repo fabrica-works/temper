@@ -155,6 +155,10 @@ const fn role_from(role: &w::Role) -> forge::Role {
 pub fn demo(record: &[u8], limits: &w::Limits) -> Option<forge::Demo> {
     let answer = wire::decode_demo_answer(record, limits)?.into_parts();
     Some(forge::Demo {
+        state: match answer.state {
+            w::DemoState::NotStarted => forge::demo::DemoState::NotStarted,
+            w::DemoState::Running => forge::demo::DemoState::Running,
+        },
         project: answer.project,
         forge: answer.forge,
         provider: answer.provider,

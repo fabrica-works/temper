@@ -23,6 +23,9 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         }
         Event::Went { place } => went(root, env, place, out),
         Event::Act { action } => match action {
+            Action::Pages(crate::pages::Act::RetryDemo) => {
+                forge(root, env, forge::Event::Act { act: forge::Act::StartDemo }, out);
+            }
             Action::Pages(crate::pages::Act::Playground) => playground(root, env, out),
             Action::Pages(crate::pages::Act::Suggest { cue }) => suggest(root, env, cue, out),
             Action::Pages(act) => pages(root, env, crate::pages::Event::Act { act }, out),
@@ -182,12 +185,28 @@ fn forge_me(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: 
     if consumed {
         forge::forges::configure(&mut root.forge, env.limits.forge, &mut child);
     }
+    forge::demo::configure(&mut root.forge, env.limits.forge, &mut child);
     route_forge(root, env, &mut child, out);
     consumed
 }
 
 fn forge_demo(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
+    let unknown = if let jig_client::Told::Pending { key } = told {
+        match root.client.pending(*key) {
+            Some(pending) => pending.progress == jig_client::Progress::Unknown,
+            None => false,
+        }
+    } else {
+        false
+    };
+    let value;
+    let told = if unknown && let jig_client::Told::Pending { key } = told {
+        value = jig_client::Told::Answered { key: *key, outcome: jig_client::Outcome::Unknown };
+        &value
+    } else {
+        told
+    };
     let consumed = forge::demo::told(&mut root.forge, told, env.limits.forge, &mut child);
     route_forge(root, env, &mut child, out);
     // A demo answer can arrive after the page and account watch. Way resolution
@@ -196,6 +215,9 @@ fn forge_demo(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out
     consumed
 }
 fn suggest(root: &mut Domain, env: &Env<Limits>, cue: u8, out: &mut Queue<Request>) {
+    if root.forge.demo_starting() || root.forge.demo_failure().is_some() {
+        return;
+    }
     let Some((demo, halves)) = root.demo() else { return };
     if !halves.model || root.pages.project() != Some(demo.project) {
         return;
@@ -218,6 +240,8 @@ fn playground(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         return;
     }
     let project = demo.project;
+    forge(root, env, forge::Event::Act { act: forge::Act::StartDemo }, out);
+    demo_facts(root);
     pages(root, env, crate::pages::Event::Act { act: crate::pages::Act::Project { project } }, out);
     out.push(Request::Show { address: Address::Chats, replace: false });
 }

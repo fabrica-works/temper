@@ -22,6 +22,9 @@ pub struct Joint {
     pub engine: Driver,
     pub sign_ins: u32,
     set_ups: Vec<(u16, Token)>,
+    pub demo: Option<temper_client_protocol_wire::v1::DemoAnswer>,
+    pub demo_starts: Vec<skein_lib::RequestKey>,
+    pub demo_outcomes: VecDeque<temper_client_protocol_wire::v1::Outcome>,
     pub answer_runs: bool,
     pub reply_runs: bool,
     pub runs_answered: u32,
@@ -546,6 +549,9 @@ impl Joint {
             engine,
             sign_ins: 0,
             set_ups: Vec::new(),
+            demo: None,
+            demo_starts: Vec::new(),
+            demo_outcomes: VecDeque::new(),
             answer_runs: false,
             reply_runs: false,
             runs_answered: 0,
@@ -622,6 +628,55 @@ impl Joint {
         }
         self.engine.send(event);
     }
+    fn start_demo(&mut self, who: ClientId, request: &Request) -> bool {
+        // StartDemo is scripted here until the parallel engine task lands.
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Send { attempt, key, request: jig_client::Ask::Family { record, .. }, .. },
+                },
+        } = request
+        {
+            use temper_client_protocol_wire::{self as wire, v1 as w};
+            if record.family == wire::FORGE
+                && wire::decode_requesting(&record.bytes, &w::CEILINGS)
+                    .is_some_and(|request| *request.request() == w::Request::StartDemo)
+            {
+                self.demo_starts.push(*key);
+                let outcome = self.demo_outcomes.pop_front().unwrap_or(w::Outcome::Running);
+                if outcome == w::Outcome::Running
+                    && let Some(demo) = self.demo.take()
+                {
+                    let mut parts = demo.into_parts();
+                    parts.state = w::DemoState::Running;
+                    self.demo = Some(w::DemoAnswer::new(&w::CEILINGS, parts).expect("demo fixture"));
+                }
+                self.callbacks.push((
+                    who,
+                    RootEvent::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::Answer {
+                                attempt: *attempt,
+                                envelope: RequestEnvelope::Final,
+                                why: None,
+                                answer: Some(jig_client::Answered::Family(jig_client::Family {
+                                    family: wire::FORGE,
+                                    version: wire::CLIENT_VERSION,
+                                    bytes: wire::answer(
+                                        &w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome })
+                                            .expect("scripted start answer"),
+                                    ),
+                                })),
+                            },
+                        },
+                    }
+                    .into(),
+                ));
+                return true;
+            }
+        }
+        false
+    }
     fn request(&mut self, who: ClientId, mut request: Request) {
         if self.offline_until.is_some() || self.transport.sign_in(who).is_none() {
             if let Request::Client {
@@ -670,6 +725,9 @@ impl Joint {
             ));
             return;
         }
+        if self.start_demo(who, &request) {
+            return;
+        }
         if let Request::Client {
             request:
                 jig_client::Request::Down {
@@ -677,14 +735,17 @@ impl Joint {
                 },
         } = &request
         {
-            // The service answers every family read with none (temper-service's family.rs).
+            // This front supplies the demo read independently of the engine.
             self.callbacks.push((
                 who,
                 RootEvent::Client {
                     event: jig_client::Event::Up {
                         up: jig_client::Up::ReadDone {
                             read: *read,
-                            result: jig_client::Readout::Family { family: record.family, record: None },
+                            result: jig_client::Readout::Family {
+                                family: record.family,
+                                record: self.demo.as_ref().map(temper_client_protocol_wire::demo_answer),
+                            },
                         },
                     },
                 }

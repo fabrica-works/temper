@@ -395,6 +395,7 @@ impl Task {
             | Act::ConnectModel(_)
             | Act::ChatWords { .. }
             | Act::StartChat
+            | Act::RetryDemo
             | Act::Playground
             | Act::Suggest { .. }
             | Act::Stop
@@ -490,6 +491,7 @@ impl Task {
             | Act::ConnectModel(_)
             | Act::ChatWords { .. }
             | Act::StartChat
+            | Act::RetryDemo
             | Act::Playground
             | Act::Suggest { .. }
             | Act::MessageWords { .. }

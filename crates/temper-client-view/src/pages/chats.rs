@@ -71,7 +71,7 @@ pub(crate) fn main(
             {
                 b.open(Role::Button);
                 b.name(&words.say(Word::Start, &[]));
-                if chats.start.is_some() {
+                if chats.start.is_some() || root.forge().demo_starting() || root.forge().demo_failure().is_some() {
                     b.state(State::Disabled);
                 }
                 b.bind(bindings.insert(Act::StartChat));
@@ -187,7 +187,14 @@ fn start(
     text(b, Role::Paragraph, &words.say(Word::NewChat, &[]));
     b.open(Role::Status);
     b.style(crate::look::STATUS_QUIET);
-    let ready = words.say(Word::Ready, &[]);
+    let status = if root.forge().demo_starting() {
+        Word::DemoStarting
+    } else if root.forge().demo_failure().is_some() {
+        Word::DemoNotStarted
+    } else {
+        Word::Ready
+    };
+    let ready = words.say(status, &[]);
     b.name(&ready);
     b.text(Run::Plain, &ready);
     b.close();
@@ -412,13 +419,31 @@ fn suggestions(
         Role::Paragraph,
         &words.say(Word::DemoRequest, &[Hole::Name(demo.owner.clone()), Hole::Name(demo.name.clone())]),
     );
+    if let Some(failure) = root.forge().demo_failure() {
+        use temper_client_domain::forge::demo::StartFailure;
+        let message = match failure {
+            StartFailure::Group(why) => {
+                words.say(Word::DemoGroupFailed, &[Hole::Name(temper_client_domain::forge::words::lossy(why))])
+            }
+            StartFailure::Account => words.say(Word::DemoAccountFailed, &[]),
+            StartFailure::Adoption => {
+                words.say(Word::DemoAdoptionFailed, &[Hole::Name(demo.owner.clone()), Hole::Name(demo.name.clone())])
+            }
+            StartFailure::NotConnected => words.say(Word::DemoNotConnected, &[]),
+        };
+        text(b, Role::Alert, &message);
+        b.open(Role::Button);
+        b.name(&words.say(Word::DemoTryAgain, &[]));
+        b.bind(bindings.insert(Act::RetryDemo));
+        b.close();
+    }
     b.open(Role::List);
     b.name(&words.say(Word::SuggestedRequests, &[]));
     for (cue, value) in demo.cues.iter().enumerate() {
         b.open(Role::Item);
         b.open(Role::Button);
         b.name(value);
-        if chats.start.is_some() {
+        if chats.start.is_some() || root.forge().demo_starting() || root.forge().demo_failure().is_some() {
             b.state(State::Disabled);
         }
         b.bind(bindings.insert(Act::Suggest { cue: u8::try_from(cue).expect("eight cue indices fit") }));

@@ -312,3 +312,148 @@ fn the_first_demo_read_answer_counts_even_when_it_has_no_record() {
         assert!(side.demo_answered());
     }
 }
+
+fn demo_side(state: w::DemoState) -> forge::Side {
+    let mut side = forge::Side::new(&f::limits().forge, f::SEED);
+    let mut parts = wire::decode_demo_answer(&answer(CUE), &w::CEILINGS).unwrap().into_parts();
+    parts.state = state;
+    let handle = read(&mut side);
+    demo::told(
+        &mut side,
+        &Told::Page {
+            handle,
+            page: Readout::Family {
+                family: wire::FORGE,
+                record: Some(wire::demo_answer(&w::DemoAnswer::new(&w::CEILINGS, parts).unwrap())),
+            },
+        },
+        f::limits().forge,
+        &mut Queue::with_capacity(4),
+    );
+    let mut root = crate::unlinked(&f::limits(), f::SEED);
+    let (me, _) = f::start_accounts(&mut root, List::with_capacity(0));
+    event(
+        &mut root,
+        crate::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: me,
+                    event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(f::chats::me()))),
+                },
+            },
+        },
+    );
+    forge::me::told(
+        &mut side,
+        root.client(),
+        &Told::Changed { handle: forge::me::handle() },
+        &mut Queue::with_capacity(4),
+    );
+    side
+}
+fn started(side: &mut forge::Side, silent: bool) -> skein_lib::Token {
+    let mut out = Queue::with_capacity(4);
+    demo::start(side, f::limits().forge, silent, &mut out);
+    let Some(forge::Request::Send { request, ask: jig_client::Ask::Family { scope, record } }) = out.pop() else {
+        panic!("start sent")
+    };
+    assert_eq!(scope, c::Scope::Deployment);
+    assert_eq!(wire::decode_requesting(&record.bytes, &w::CEILINGS).unwrap().request(), &w::Request::StartDemo);
+    assert!(out.is_empty());
+    request
+}
+fn answered(side: &mut forge::Side, request: skein_lib::Token, outcome: w::Outcome) {
+    let value = w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).unwrap();
+    let mut out = Queue::with_capacity(4);
+    demo::told(
+        side,
+        &Told::Answered {
+            key: jig_client::Key { asker: crate::owner::Owner::Forge.asker(), number: request.raw() },
+            outcome: jig_client::Outcome::Answered(jig_client::Answered::Family(jig_client::Family {
+                family: wire::FORGE,
+                version: wire::CLIENT_VERSION,
+                bytes: wire::answer(&value),
+            })),
+        },
+        f::limits().forge,
+        &mut out,
+    );
+    let Some(forge::Request::Client { asked: jig_client::Event::Read { .. } }) = out.pop() else {
+        panic!("start answer rereads the demo")
+    };
+    assert!(out.is_empty());
+}
+#[test]
+fn demo_state_decodes_and_start_is_single_across_pages_with_a_new_retry_key() {
+    let mut side = demo_side(w::DemoState::NotStarted);
+    assert_eq!(side.demo().unwrap().state, demo::DemoState::NotStarted);
+    assert!(!side.demo_running());
+    let first = started(&mut side, false);
+    assert!(side.demo_running());
+    assert!(side.demo_starting());
+    let mut out = Queue::with_capacity(4);
+    forge::step(
+        &mut side,
+        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: f::limits().forge },
+        forge::Event::Left,
+        &mut out,
+    );
+    demo::start(&mut side, f::limits().forge, false, &mut out);
+    assert!(out.is_empty());
+    answered(
+        &mut side,
+        first,
+        w::Outcome::StartFailed(
+            w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::Account }).unwrap(),
+        ),
+    );
+    assert_eq!(side.demo_failure(), Some(&demo::StartFailure::Account));
+    assert!(side.demo_running());
+    assert!(!side.demo_starting());
+    let retry = started(&mut side, false);
+    assert_ne!(first, retry);
+    assert!(side.demo_failure().is_none());
+}
+#[test]
+fn once_per_session_running_start_is_silent_and_its_failure_is_shown() {
+    let mut side = demo_side(w::DemoState::Running);
+    let mut out = Queue::with_capacity(4);
+    demo::configure(&mut side, f::limits().forge, &mut out);
+    let Some(forge::Request::Send { request, .. }) = out.pop() else { panic!("silent start") };
+    assert!(!side.demo_starting());
+    answered(
+        &mut side,
+        request,
+        w::Outcome::StartFailed(
+            w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::NotConnected }).unwrap(),
+        ),
+    );
+    demo::configure(&mut side, f::limits().forge, &mut out);
+    assert!(out.is_empty());
+    assert_eq!(side.demo_failure(), Some(&demo::StartFailure::NotConnected));
+}
+#[test]
+fn running_unknown_and_not_offered_each_read_the_demo_again() {
+    for outcome in [
+        w::Outcome::Running,
+        w::Outcome::Unknown,
+        w::Outcome::StartRefused(
+            w::StartRefused::new(&w::CEILINGS, w::StartRefusedParts { why: w::StartRefusal::NotOffered }).unwrap(),
+        ),
+    ] {
+        let mut side = demo_side(w::DemoState::NotStarted);
+        let request = started(&mut side, false);
+        answered(&mut side, request, outcome);
+        assert!(!side.demo_starting());
+        assert!(side.demo_failure().is_none());
+    }
+}
+#[test]
+fn another_operations_outcome_is_not_a_start_answer() {
+    let value = jig_client::Answered::Family(jig_client::Family {
+        family: wire::FORGE,
+        version: wire::CLIENT_VERSION,
+        bytes: wire::answer(&w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome: w::Outcome::SettingUp }).unwrap()),
+    });
+    assert!(demo::answer(&value, &f::limits().forge).is_none());
+}
