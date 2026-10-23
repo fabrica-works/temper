@@ -157,6 +157,30 @@ pub(crate) fn admit(value: &Value) {
 
 #[must_use]
 pub fn scripts(forge: SocketAddr, repository: u64, readme: &[u8]) -> Box<[skein_fake_llm_domain::api::Script]> {
+    let repository = u32::try_from(repository).expect("forge-local repository id fits u32");
+    change_scripts(
+        forge,
+        temper_engine_domain_forge::tag(1, repository),
+        readme,
+        EDIT,
+        "acme",
+        b"@forge_chat",
+        "@coding Fix",
+    )
+}
+
+/// The landing exchange with a caller's cues, grant scope and README addition;
+/// `repository` is the resource's packed tag (forge and repository).
+#[must_use]
+pub fn change_scripts(
+    forge: SocketAddr,
+    repository: u64,
+    readme: &[u8],
+    edit: &[u8],
+    org: &str,
+    chat_cue: &[u8],
+    coding_words: &str,
+) -> Box<[skein_fake_llm_domain::api::Script]> {
     use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
     let call = |name: &[u8], value: Value| Turn {
         lines: Box::new([Line::Call {
@@ -166,14 +190,14 @@ pub fn scripts(forge: SocketAddr, repository: u64, readme: &[u8]) -> Box<[skein_
         finish: Finish::ToolCalls,
         tokens: 20,
     };
-    let grant = |kind| json!({"connector":1,"kind":kind,"segments":["forge",forge.to_string()],"terminal":"open","last":"acme"});
-    let repository = u32::try_from(repository).expect("forge-local repository id fits u32");
-    let delegate = json!({"batch":[{"executor":{"kind":"procedure","connector":1,"code":2},"spec":{"words":"@coding Fix","parameters":[{"name":1,"kind":"resource","connector":1,"resource":temper_engine_domain_forge::tag(1, repository)},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":1,"change_kind":1,"words":128},"authority":{"tools":1,"grants":[grant(2),grant(3),grant(4),grant(10),grant(11),grant(12)],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":4,"depth":2},"budget":{"spend":10},"notes":0}}]});
+    let grant =
+        |kind| json!({"connector":1,"kind":kind,"segments":["forge",forge.to_string()],"terminal":"open","last":org});
+    let delegate = json!({"batch":[{"executor":{"kind":"procedure","connector":1,"code":2},"spec":{"words":coding_words,"parameters":[{"name":1,"kind":"resource","connector":1,"resource":repository},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":1,"change_kind":1,"words":128},"authority":{"tools":1,"grants":[grant(2),grant(3),grant(4),grant(10),grant(11),grant(12)],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":4,"depth":2},"budget":{"spend":10},"notes":0}}]});
     let original = std::str::from_utf8(readme).expect("README UTF-8");
-    let changed = format!("{original}{}", std::str::from_utf8(EDIT).expect("edit UTF-8"));
+    let changed = format!("{original}{}", std::str::from_utf8(edit).expect("edit UTF-8"));
     Box::new([
         Script {
-            cue: b"@forge_chat".as_slice().into(),
+            cue: chat_cue.into(),
             turns: Box::new([
                 call(b"delegate", delegate),
                 Turn {
@@ -188,7 +212,7 @@ pub fn scripts(forge: SocketAddr, repository: u64, readme: &[u8]) -> Box<[skein_
             ]),
         },
         Script {
-            cue: b"@coding Fix".as_slice().into(),
+            cue: coding_words.as_bytes().into(),
             turns: Box::new([
                 call(b"read", json!({"path":"README.md"})),
                 call(b"edit", json!({"path":"README.md","edits":[{"old":original,"new":changed}]})),

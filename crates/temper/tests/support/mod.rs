@@ -11,6 +11,7 @@ pub mod owned;
 pub mod terminal;
 pub mod webhooks;
 pub const WITHIN: skein_lib::Duration = skein_lib::Duration::from_secs(60);
+pub mod forge_land;
 pub mod forgejo;
 pub mod live;
 pub mod person;

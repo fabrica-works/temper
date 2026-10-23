@@ -41,6 +41,12 @@ pub fn configuration(directory: &Path) -> oauth::Peer {
         .output()
         .expect("initialize a fresh deployment");
     assert!(initialized.status.success(), "{}", String::from_utf8_lossy(&initialized.stderr));
+    patch_configuration(directory)
+}
+
+/// Point an initialized config directory at the issuer and the existing TLS fake.
+#[must_use]
+pub(super) fn patch_configuration(directory: &Path) -> oauth::Peer {
     let [address] = super::free_addresses(&["127.0.0.1:34443".parse().expect("LLM address")]);
     let origin = format!("http://{address}");
     let path = directory.join("temper.json");
@@ -469,9 +475,6 @@ fn answer_peer(allowance: u64, exceeded: bool) -> skein_fake_peers::llm::Peer {
         "encrypted_content": "a".repeat(item)
     }))
     .expect("native reasoning item");
-    // Retain the ordinary peer's room for script slots and wire framing.
-    let strings =
-        16_384_u32.checked_add(u32::try_from(bytes.len()).expect("scripted item length")).expect("peer strings");
     let reasoning = Line::Opaque { bytes: bytes.into() };
     let turns = if exceeded {
         vec![Turn { lines: Box::new([reasoning]), finish: Finish::Stop, tokens: 1 }]
@@ -486,10 +489,29 @@ fn answer_peer(allowance: u64, exceeded: bool) -> skein_fake_peers::llm::Peer {
             Turn { lines: Box::new([Line::Text { text: CLOSING_ANSWER.into() }]), finish: Finish::Stop, tokens: 1 },
         ]
     };
-    let mut recipe = temper_real_loop_world::llm::scripted_sized(
-        Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: turns.into_boxed_slice() }]),
-        strings,
-    );
+    plan_peer(Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: turns.into_boxed_slice() }]))
+}
+
+/// The existing TLS peer, with the plan bearer and room for the largest scripted item.
+#[must_use]
+pub(super) fn plan_peer(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
+    use skein_fake_llm_domain::api::Line;
+    let largest = scripts
+        .iter()
+        .flat_map(|script| &script.turns)
+        .flat_map(|turn| &turn.lines)
+        .map(|line| match line {
+            Line::Opaque { bytes } => bytes.len(),
+            Line::Text { text } => text.len(),
+            Line::Call { name, arguments } => name.len().checked_add(arguments.len()).expect("call bytes"),
+            Line::Pieces { pieces } => pieces.iter().map(|piece| piece.text.len()).max().unwrap_or(0),
+            Line::Fail { report, .. } => report.code.len().max(report.request.len()).max(report.field.len()),
+        })
+        .max()
+        .unwrap_or(0);
+    // Retain the ordinary peer's room for script slots and wire framing.
+    let strings = 16_384_u32.checked_add(u32::try_from(largest).expect("scripted item length")).expect("peer strings");
+    let mut recipe = temper_real_loop_world::llm::scripted_sized(scripts, strings);
     // The sign-in peer alone takes a real-length plan bearer: 4096 bytes plus
     // the request line and headers exceed 4096; the next power of two is 8192.
     recipe.protocol_limits.http.head = 8192;
@@ -516,18 +538,11 @@ pub fn exceeded(directory: &Path, issuer: oauth::Peer) {
 }
 
 fn model_requests(procs: &[Process]) -> usize {
-    let Process::Peer(peer) = &procs[4] else { panic!("LLM peer") };
-    peer.observations().iter().filter(|event| matches!(event, skein_fake_peers::llm::Observation::Query { .. })).count()
+    super::forge_land::peer_seen(procs, 4).requests.len()
 }
 
 fn model_answers(procs: &[Process]) -> Vec<Result<(), skein_fake_llm_domain::api::Error>> {
-    let Process::Peer(peer) = &procs[4] else { panic!("LLM peer") };
-    peer.observations()
-        .iter()
-        .filter_map(|event| {
-            if let skein_fake_peers::llm::Observation::Answered { result, .. } = event { Some(*result) } else { None }
-        })
-        .collect()
+    super::forge_land::peer_seen(procs, 4).answers
 }
 
 fn exceeded_hold(ended: &super::Ended, allowance: u64) -> u64 {
@@ -605,9 +620,8 @@ fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
         }
         Process::Calls(Box::new(calls))
     });
-    world.spawn(|| Process::Issuer(Box::new(issuer)));
-    world.spawn(|| Process::Visitor(Box::default()));
-    world.spawn(|| Process::Peer(Box::new(peer)));
+    let face = super::forge_land::Face::Fake { issuer, peer }.spawn(&mut world);
+    assert_eq!((face.issuer, face.visitor, face.peer), (2, 3, 4));
     let observer_root = skein_shell::open_root(directory).expect("observer's scratch root");
     world.spawn_with_fds(vec![observer_root], || {
         Process::Person(Box::new(super::person::Person::waiting_for_observation(observer_root)))
@@ -628,14 +642,8 @@ fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
         assert_eq!(model_requests(&outcome.procs), 3, "two replies and the closing grace turn, without retry");
         assert_eq!(model_answers(&outcome.procs), [Ok(()); 3], "each request answered, the closing turn too");
     }
-    let Process::Peer(peer) = &outcome.procs[4] else { panic!("LLM peer") };
-    assert!(
-        peer.observations().iter().any(|event| matches!(
-            event,
-            skein_fake_peers::llm::Observation::Credential { scheme: Some(skein_llm::Scheme::Bearer), .. }
-        )),
-        "the peer observed a bearer scheme"
-    );
+    let seen = super::forge_land::seen(&outcome.procs, &face);
+    assert!(seen.schemes.contains(&Some(skein_llm::Scheme::Bearer)), "the peer observed a bearer scheme");
     let Process::Binary(binary) = &outcome.procs[0] else { panic!("temper") };
     assert_eq!(binary.exit_status(), Some(Exit::Code(0)));
     assert!(outcome.procs.iter().all(Host::is_empty), "all signed-in chat io settled");
@@ -702,7 +710,7 @@ fn assert_lasting_chat(ends: &[super::Ended], allowance: u64) {
     assert!(*size >= allowance && *size > 65_536, "native item and its turn pass 64 KiB: {size}");
 }
 
-fn assert_plan_account(me: &super::Ended, ready: &super::Ended) {
+pub(super) fn assert_plan_account(me: &super::Ended, ready: &super::Ended) {
     let person = ctl::json(me)["party"]["number"].as_u64().expect("person number");
     let ready = ctl::json(ready);
     let account = ready["accounts"]["party"]
