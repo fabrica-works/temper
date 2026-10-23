@@ -10,6 +10,10 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    FlowDone,
+    FlowUnderWay,
+    FlowFailed,
+
     WelcomeStep,
     WelcomeForgeStep,
     WelcomeModelStep,
@@ -378,8 +382,11 @@ pub enum Word {
 // Three empty and partial ended-children phrases (5.10).
 // A chat's numbered composer placeholder (3.5).
 // Twelve inbox count, filter, empty and update-line phrases (3.5).
-const PHRASES: u32 = 814;
-const ALL: [Word; 344] = [
+const PHRASES: u32 = 817;
+const ALL: [Word; 347] = [
+    Word::FlowDone,
+    Word::FlowUnderWay,
+    Word::FlowFailed,
     Word::WelcomeStep,
     Word::WelcomeForgeStep,
     Word::WelcomeModelStep,
@@ -729,6 +736,10 @@ impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::FlowDone => 1324,
+            Self::FlowUnderWay => 1325,
+            Self::FlowFailed => 1326,
+
             Self::WelcomeStep => 1300,
             Self::WelcomeForgeStep => 1301,
             Self::WelcomeModelStep => 1302,
@@ -1270,6 +1281,9 @@ const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::FlowDone => (&[b"done"], &[]),
+        Word::FlowUnderWay => (&[b"under way"], &[]),
+        Word::FlowFailed => (&[b"failed"], &[]),
         Word::WelcomeStep => (&[b"Welcome"], &[]),
         Word::WelcomeForgeStep => (&[b"Forge"], &[]),
         Word::WelcomeModelStep => (&[b"Model"], &[]),

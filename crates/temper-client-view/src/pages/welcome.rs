@@ -4,7 +4,7 @@ use crate::{
     look,
     words::{Word, Words},
 };
-use skein_ui::{Builder, Role, Run, State};
+use skein_ui::{Builder, Role, Run};
 use temper_client_domain::{Address, Domain, Step, pages::Act};
 
 fn text(b: &mut Builder, w: &Words, role: Role, word: Word) {
@@ -34,24 +34,17 @@ fn go(b: &mut Builder, w: &Words, bindings: &mut Bindings, word: Word, step: Ste
     control(b, w, bindings, word, Act::Go { address: Address::Welcome { step } });
 }
 fn steps(b: &mut Builder, w: &Words, current: Step) {
-    b.open(Role::List);
-    b.name(&w.say(Word::WelcomeSteps, &[]));
-    b.style(look::WELCOME_STEPS);
-    for (step, word) in [
-        (Step::Welcome, Word::WelcomeStep),
-        (Step::Forge, Word::WelcomeForgeStep),
-        (Step::Model, Word::WelcomeModelStep),
-        (Step::Ready, Word::WelcomeReadyStep),
-    ] {
-        b.open(Role::Item);
-        b.style(look::WELCOME_STEP);
-        if step == current {
-            b.state(State::Current);
-        }
-        w.text(b, word, &[]);
-        b.close();
-    }
-    b.close();
+    let welcome = w.say(Word::WelcomeStep, &[]);
+    let forge = w.say(Word::WelcomeForgeStep, &[]);
+    let model = w.say(Word::WelcomeModelStep, &[]);
+    let ready = w.say(Word::WelcomeReadyStep, &[]);
+    let current = match current {
+        Step::Welcome => 0,
+        Step::Forge => 1,
+        Step::Model => 2,
+        Step::Ready => 3,
+    };
+    crate::flow::steps(b, w, &[&welcome, &forge, &model, &ready], current);
 }
 fn card(b: &mut Builder, w: &Words, title: Word, description: Word, time: Word) {
     b.open(Role::Region);
