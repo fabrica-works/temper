@@ -53,6 +53,8 @@ pub enum Read {
     RulesEnded,
     /// The director's whole activity once ended: its runs' endings.
     RulesActivity,
+    /// The first fresh director brief after Release, read from the scripted model's received system text.
+    RulesFreshBrief,
     /// A's whole activity once ended: its runs' endings.
     ScopeActivity,
     ShapeEnded,

@@ -735,7 +735,7 @@ impl World {
                     self.pages += 1;
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
                     self.queue(
-                        engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }),
+                        engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next, texts: None }),
                         self.settings.page_delay,
                     );
                 }

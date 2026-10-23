@@ -19,7 +19,7 @@ fn forge_row(commit: u8) -> store::Row {
 }
 fn page(out: &mut Queue<Up>) -> (Token, Box<[engine::Record]>, Option<engine::Key>) {
     let Some(Up::Root(event)) = out.pop() else { panic!("one root event") };
-    let engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }) = *event else { panic!("loaded") };
+    let engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next, .. }) = *event else { panic!("loaded") };
     (owner, rows, next)
 }
 
@@ -459,4 +459,117 @@ fn stored_live(row: Option<jig_domain_tasks::TaskRecord>) -> Option<store::Row> 
 }
 fn stored_history(row: Option<core::Record>) -> Option<store::Row> {
     Some(store::Row::Jig(row?))
+}
+
+fn assistant_turn(words: &[u8]) -> Box<[u8]> {
+    use smith_transcript::v6 as wire;
+    let limits = &wire::CEILINGS;
+    let mut blocks = skein_lib::List::with_capacity(1);
+    blocks
+        .push(wire::Block::Text(wire::Text::new(limits, wire::TextParts { text: words.into(), replay: None }).unwrap()))
+        .unwrap();
+    let mut messages = skein_lib::List::with_capacity(1);
+    messages
+        .push(wire::Message::new(limits, wire::MessageParts { role: wire::Role::Assistant, blocks }).unwrap())
+        .unwrap();
+    let usage = wire::Usage::new(
+        limits,
+        wire::UsageParts { input: None, output: None, cache_read: None, cache_write: None, reasoning: None },
+    )
+    .unwrap();
+    let turn = wire::Turn::new(
+        limits,
+        wire::TurnParts {
+            kind: wire::TurnKind::Ordinary,
+            opening: None,
+            endpoint: b"fake".as_slice().into(),
+            model: b"small".as_slice().into(),
+            effort: None,
+            dialect: fixtures::DIALECT,
+            place: 1,
+            usage,
+            spent: 0,
+            jobs: 0,
+            messages,
+        },
+    )
+    .unwrap();
+    let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).unwrap());
+    turn.encode(&mut writer).unwrap();
+    writer.finish()
+}
+
+fn loaded_tail(transcript: Box<[u8]>) -> Box<[u8]> {
+    let mut routes = fixtures::routes();
+    let request = route::down(
+        &mut routes,
+        load(engine::Range::Core(engine::CoreRange::TaskTranscript { task: 7, from: (1, 1) }), None, 4, 4096),
+    )
+    .unwrap();
+    let store::Request::Transcript { owner, .. } = request else { panic!("window load") };
+    let mut out = Queue::with_capacity(1);
+    route::up(
+        &mut routes,
+        store::Event::Turns {
+            owner,
+            turns: Box::new([core::TurnRecord {
+                task: 7,
+                attempt: 1,
+                turn: 1,
+                spent: 0,
+                read: None,
+                opens_window: true,
+                at: skein_lib::Wall::EPOCH,
+                transcript,
+            }]),
+            next: None,
+        },
+        &mut out,
+    );
+    let Some(Up::Root(event)) = out.pop() else { panic!("loaded window") };
+    let engine::Event::Store(engine::StoreInput::Loaded { rows, texts: Some(texts), next: None, .. }) = *event else {
+        panic!("transcript loads carry protocol renderings")
+    };
+    assert_eq!(rows.len(), texts.len(), "one rendering per stored turn");
+    let settings = fixtures::engine();
+    let mut config = jig_protocol_config::core(&settings.jig, [7; 16], 7);
+    config.settings.charters.get_mut(0).unwrap().policy.resume = false;
+    let mut core = core::Core::new(config, &settings.jig.limits.core).unwrap();
+    core.begin_transcript(7, 1);
+    core.transcripts.get_mut(&7).unwrap().window = Some((1, 1));
+    for (row, text) in rows.into_iter().zip(texts) {
+        let engine::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = row else { panic!("turn row") };
+        assert!(core.append_transcript(7, turn, text));
+    }
+    core::read_brief_part(
+        &core,
+        core::BriefTextLimits { parts: 1, read_bytes: 2048, brief_bytes: 4096 },
+        7,
+        core::BriefPart::TranscriptTail,
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_loaded_smith_turn_reaches_the_fresh_tail_as_assistant_text() {
+    assert_eq!(
+        loaded_tail(assistant_turn(b"words from the earlier attempt")).as_ref(),
+        b"assistant: words from the earlier attempt\n"
+    );
+}
+
+#[test]
+fn a_broken_loaded_turn_reaches_the_fresh_tail_as_an_unreadable_line() {
+    assert_eq!(loaded_tail(Box::new([0xff, 0x80])).as_ref(), b"[a turn not readable as text]\n");
+}
+
+#[test]
+fn a_loaded_turn_larger_than_the_tail_budget_is_refused_as_text() {
+    let words = [b'a'; 2048];
+    let turn = assistant_turn(&words);
+    assert!(
+        turn.len() > usize::try_from(engine::TRANSCRIPT_TAIL_BYTES).unwrap(),
+        "the encoded turn exceeds the tail budget"
+    );
+    assert_eq!(loaded_tail(turn).as_ref(), b"[a turn not readable as text]\n");
 }

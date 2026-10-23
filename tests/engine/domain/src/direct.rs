@@ -149,7 +149,12 @@ impl Driver {
                         self.fail_archive_once = false;
                         self.events.push_back(engine::Event::Store(engine::StoreInput::Unloaded { owner }));
                     } else {
-                        self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
+                        self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded {
+                            owner,
+                            rows,
+                            next,
+                            texts: None,
+                        }));
                     }
                 }
                 engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
