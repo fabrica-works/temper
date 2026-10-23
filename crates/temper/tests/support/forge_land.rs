@@ -68,7 +68,13 @@ pub const RESTARTED: &str = "The change is still on main.";
 #[must_use]
 pub fn plan_scripts(plan: &Plan<'_>) -> Box<[Script]> {
     let line = std::str::from_utf8(plan.line).expect("README line UTF-8");
-    let coding = format!("@coding Append this README line: {line}");
+    // Past the 128 bytes a brief's task section once held: the coder's script is
+    // cued by its whole spec, so it runs only when the brief carries all of it.
+    let coding = format!(
+        "@coding Append this README line: {line} Keep every existing line as it is, add the new line last with a \
+         newline after it, and change nothing else."
+    );
+    assert!(coding.len() > 128, "coder words past the old task section");
     assert!(!plan.words.is_empty(), "nonempty chat cue");
     assert!(!plan.line.is_empty() && !plan.line.contains(&b'\n'), "one nonempty README line");
     assert!(plan.words.windows(plan.line.len()).any(|part| part == plan.line), "request carries the line");
