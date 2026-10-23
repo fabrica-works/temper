@@ -25,16 +25,12 @@ fn held_listener_stops_serve(listener: &str, expected: &str) {
     use skein_world::end_to_end::Command;
     let scratch = support::Scratch::new(&format!("held_{listener}_listener_stop"));
     support::configuration(scratch.path(), &support::Forge::Unreached);
-    let held = (7950..8000)
-        .find_map(|port| std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).ok())
-        .expect("a test port is free");
+    // The kernel draws both ports; the held one stays bound until serve has stopped.
+    let held = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("held port");
     let path = scratch.path().join("temper.json");
     let mut document: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&path).expect("fixture document")).expect("fixture JSON");
-    // All sockets this case can listen on stay in the implementer's reserved range.
-    let free = (7950..8000)
-        .find_map(|port| std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).ok())
-        .expect("a second test port is free");
+    let free = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("free port");
     document["application"]["clients"]["listener"]["socket"] =
         free.local_addr().expect("free address").to_string().into();
     let address = serde_json::json!({"socket": held.local_addr().expect("held address").to_string()});
