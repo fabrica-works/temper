@@ -198,6 +198,7 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   | `Welcome { step }` | `/welcome`, and its step's query |
   | `Forges` | `/forges` |
   | `ConnectForge { forge }` | `/forges/connect`, and its choice's query |
+  | `ConnectModel { way }` | `/accounts/connect`, and its way's query |
 
   `<task>` and `<project>` are the task's and the project's numbers in
   decimal. A later page's path comes with it, in this shape
@@ -217,8 +218,8 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   address is replaced with the printed one. It reads numbers, not the
   person's projects: a project the person isn't in shows an empty
   inbox, which "All projects" undoes. The inbox's filter, the
-  welcome's step and `ConnectForge`'s choice (below) alone are in an
-  address: the chats list's
+  welcome's step, `ConnectForge`'s choice and `ConnectModel`'s way
+  (below) alone are in an address: the chats list's
   and a goal's plan's are the page's, "All" at each open (section 5),
   and another page's query is dropped,
   `/chats/7?x=1` replaced with `/chats/7`.
@@ -229,7 +230,8 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   of another name, is dropped, and the address replaced with the
   printed one: `/welcome?at=done` opens the welcome at `/welcome`.
   Its Forge step adds its choice, as `ConnectForge`'s (below):
-  `/welcome?at=forge&forge=3`.
+  `/welcome?at=forge&forge=3`; its Model step its way, as
+  `ConnectModel`'s: `/welcome?at=model&provider=1&way=key`.
 - **`ConnectForge`'s choice is its query:** none at Choose, so that
   `/forges/connect` is the flow's first step; `?forge=N`, N a forge's
   number in decimal, or `?forge=elsewhere`, for a Forgejo elsewhere
@@ -237,6 +239,15 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   another name, is dropped, and the address replaced with the printed
   one. It reads a number, not the deployment's forges: a number that
   names no forge shows Choose.
+- **`ConnectModel`'s way is its query:** none at Choose, so that
+  `/accounts/connect` is the flow's first step; `?provider=N&way=W`,
+  N an LLM provider's number in decimal and W `sign-in`, `program` or
+  `key`, in that order, for the way of that kind its provider offers
+  (`README.md`, 3.5, `ConnectModel`). The two go together: one without
+  the other, a value that doesn't read as its field's, or a field of
+  another name, is dropped, and the address replaced with the printed
+  one. It reads a number and a kind, not the configured providers: a
+  way they do not offer shows Choose.
 - **A filter chosen is a move** (below), with its history entry: a
   link's, at the page's top with the focus on its heading, and back
   returns to the filter before. Like any move it folds the open
