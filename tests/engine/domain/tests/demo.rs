@@ -136,7 +136,7 @@ fn demo_start_names_the_groups_failure_and_truncates_its_reason() {
     let (mut d, sign_in) = driver(false, true);
     start(&mut d, sign_in, 81, true);
     assert!(answers(&d).is_empty());
-    assert!(d.immediate.iter().any(|request| matches!(request, engine::Request::SetUp { forge: 1, .. })));
+    assert!(d.immediate.iter().any(|request| matches!(request, engine::Request::SetUpGroup { forge: 1, .. })));
     connection(&mut d, forge::Connection::SetUpFailed { why: vec![b'x'; 300].into_boxed_slice() });
     assert_eq!(
         answers(&d),
@@ -170,7 +170,7 @@ fn demo_restart_asks_the_group_makes_no_act_and_forgets_the_start_answer() {
     d.delivered.clear();
     d.send(engine::Event::Restart);
     d.settle();
-    assert!(d.immediate.iter().any(|request| matches!(request, engine::Request::SetUp { forge: 1, .. })));
+    assert!(d.immediate.iter().any(|request| matches!(request, engine::Request::SetUpGroup { forge: 1, .. })));
     assert_eq!((keeps(&d), d.forge.as_ref().expect("fake forge").calls), (old_keeps, old_calls));
     d.sign_in();
     d.settle();
@@ -236,7 +236,9 @@ fn a_busy_box_link_fails_the_demo_start_with_the_groups_reason() {
     let request = d
         .immediate
         .iter()
-        .find_map(|request| if let engine::Request::SetUp { request, .. } = request { Some(*request) } else { None })
+        .find_map(
+            |request| if let engine::Request::SetUpGroup { request, .. } = request { Some(*request) } else { None },
+        )
         .expect("demo group ask");
     d.send(engine::Event::Forge(Box::new(forge::Event::SetUpAnswered {
         forge: 1,

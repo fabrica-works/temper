@@ -97,7 +97,7 @@ pub(crate) fn start(d: &mut Domain, request: Token, token: Token, out: &mut Queu
         });
     }
     if needs_group(d) {
-        out.push(Request::SetUp { forge: d.demo.as_ref().expect("offered demo").adoption.forge, request });
+        out.push(Request::SetUpGroup { forge: d.demo.as_ref().expect("offered demo").adoption.forge, request });
     }
     out.push(Request::DemoStart { request });
 }
@@ -115,7 +115,7 @@ pub(crate) fn answered(d: &mut Domain, answer: StartAnswer, out: &mut Queue<Requ
 /// The account and the adoption are jig's records and stay; no act is made again.
 pub(crate) fn restart(d: &Domain, out: &mut Queue<Request>) {
     if d.demo_state == Some(DemoState::Running) && needs_group(d) {
-        out.push(Request::SetUp {
+        out.push(Request::SetUpGroup {
             forge: d.demo.as_ref().expect("configured demo").adoption.forge,
             request: Token::new(u64::MAX),
         });

@@ -774,6 +774,7 @@ fn a_change_produced_opened_checked_queued_and_landed() {
                     panic!("unexpected delegate")
                 }
                 top::Request::DemoStart { .. }
+                | top::Request::SetUpGroup { .. }
                 | top::Request::SetUp { .. }
                 | top::Request::ChangeDecision { .. }
                 | top::Request::Resource { .. }

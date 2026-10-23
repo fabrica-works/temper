@@ -291,6 +291,7 @@ impl Protocol {
             | engine::Request::Worker(_)
             | engine::Request::Party(_)
             | engine::Request::Forge { .. }
+            | engine::Request::SetUpGroup { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)

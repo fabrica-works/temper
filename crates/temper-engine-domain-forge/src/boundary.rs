@@ -945,6 +945,11 @@ pub enum Event {
 /// The connector's output to the root, including child API calls.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Start the demo's box group without creating a first repository.
+    SetUpGroup {
+        forge: u16,
+        request: Token,
+    },
     DemoStart {
         request: Token,
     },

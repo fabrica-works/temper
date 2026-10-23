@@ -313,6 +313,7 @@ pub fn incoming(
         | engine::Request::Worker(_)
         | engine::Request::Forge { .. }
         | engine::Request::Account(_)
+        | engine::Request::SetUpGroup { .. }
         | engine::Request::SetUp { .. }
         | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)

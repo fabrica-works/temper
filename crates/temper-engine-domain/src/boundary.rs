@@ -463,6 +463,11 @@ pub enum PartyInput {
 /// and 4). Every output crosses the journal door in its peer's vocabulary.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Start the demo's box group without creating a first repository.
+    SetUpGroup {
+        forge: u16,
+        request: Token,
+    },
     /// Routed to the protocol layer's box link; nothing committed (domain/root.md, 5.1).
     SetUp {
         forge: u16,

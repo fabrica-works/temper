@@ -427,28 +427,7 @@ pub fn answer(
             )
             .ok()?,
         ),
-        Some(forge::Answered::StartDemo(answer)) => match answer {
-            forge::StartAnswer::Running => w::Outcome::Running,
-            forge::StartAnswer::NotOffered => w::Outcome::StartRefused(
-                w::StartRefused::new(limits, w::StartRefusedParts { why: w::StartRefusal::NotOffered }).ok()?,
-            ),
-            forge::StartAnswer::Failed(why) => w::Outcome::StartFailed(
-                w::StartFailed::new(
-                    limits,
-                    w::StartFailedParts {
-                        why: match why {
-                            forge::StartFailure::Group { why } => {
-                                w::StartFailure::Group(w::GroupFailed::new(limits, w::GroupFailedParts { why }).ok()?)
-                            }
-                            forge::StartFailure::Account => w::StartFailure::Account,
-                            forge::StartFailure::Adoption => w::StartFailure::Adoption,
-                            forge::StartFailure::NotConnected => w::StartFailure::NotConnected,
-                        },
-                    },
-                )
-                .ok()?,
-            ),
-        },
+        Some(forge::Answered::StartDemo(answer)) => start_answer(answer, limits)?,
         Some(forge::Answered::SetUp(forge::SetUpAnswer::SettingUp)) => w::Outcome::SettingUp,
         Some(forge::Answered::SetUp(forge::SetUpAnswer::Refused(why))) => w::Outcome::SetUpRefused(
             w::SetUpRefused::new(
@@ -469,6 +448,30 @@ pub fn answer(
     };
     let answer = w::Answer::new(limits, w::AnswerParts { outcome }).ok()?;
     Some(wire::answer(&answer))
+}
+fn start_answer(answer: forge::StartAnswer, limits: &w::Limits) -> Option<w::Outcome> {
+    Some(match answer {
+        forge::StartAnswer::Running => w::Outcome::Running,
+        forge::StartAnswer::NotOffered => w::Outcome::StartRefused(
+            w::StartRefused::new(limits, w::StartRefusedParts { why: w::StartRefusal::NotOffered }).ok()?,
+        ),
+        forge::StartAnswer::Failed(why) => w::Outcome::StartFailed(
+            w::StartFailed::new(
+                limits,
+                w::StartFailedParts {
+                    why: match why {
+                        forge::StartFailure::Group { why } => {
+                            w::StartFailure::Group(w::GroupFailed::new(limits, w::GroupFailedParts { why }).ok()?)
+                        }
+                        forge::StartFailure::Account => w::StartFailure::Account,
+                        forge::StartFailure::Adoption => w::StartFailure::Adoption,
+                        forge::StartFailure::NotConnected => w::StartFailure::NotConnected,
+                    },
+                },
+            )
+            .ok()?,
+        ),
+    })
 }
 fn protection(value: forge::Protection, limits: &w::Limits) -> Option<w::Protection> {
     Some(match value {

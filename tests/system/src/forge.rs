@@ -392,6 +392,7 @@ impl World {
                     _ => {}
                 },
                 engine::Request::Account(_)
+                | engine::Request::SetUpGroup { .. }
                 | engine::Request::SetUp { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Party(_)

@@ -298,6 +298,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
+        | Request::SetUpGroup { .. }
         | Request::SetUp { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
@@ -352,6 +353,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
+        | Request::SetUpGroup { .. }
         | Request::SetUp { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
@@ -406,6 +408,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationDone { .. }
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
+        | Request::SetUpGroup { .. }
         | Request::SetUp { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),

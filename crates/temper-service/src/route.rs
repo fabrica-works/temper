@@ -10,6 +10,11 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         demo.state = engine.domain.demo_state();
     }
     match request {
+        root::Request::SetUpGroup { forge, request } => {
+            let mut out = skein_lib::Queue::with_capacity(3);
+            engine.box_link.ask(forge, request, &mut out);
+            box_link::drain(engine, &mut out);
+        }
         root::Request::SetUp { forge, request, org, repository } => {
             crate::setup::lifecycle::first(engine, forge, org, repository);
             let mut out = skein_lib::Queue::with_capacity(3);

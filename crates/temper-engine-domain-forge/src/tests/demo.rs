@@ -114,7 +114,7 @@ fn demo_restore_asks_only_for_a_running_dormant_group_and_makes_no_act() {
 fn group_asks(sent: &[Request]) -> usize {
     let mut count = 0_usize;
     for request in sent {
-        if let Request::SetUp { .. } = request {
+        if let Request::SetUpGroup { .. } = request {
             count = count.checked_add(1).unwrap();
         }
     }

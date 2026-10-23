@@ -573,6 +573,7 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             request @ (Request::Worker(_)
             | Request::Party(_)
             | Request::Setup { .. }
+            | Request::SetUpGroup { .. }
             | Request::SetUp { .. }
             | Request::Forge { .. }
             | Request::Store(crate::StoreRequest::Load { .. } | crate::StoreRequest::Read { .. })

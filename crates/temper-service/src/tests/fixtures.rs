@@ -676,6 +676,7 @@ pub fn settle_root(
                     crate::route::request(engine, request);
                 }
                 root::Request::Setup { .. }
+                | root::Request::SetUpGroup { .. }
                 | root::Request::SetUp { .. }
                 | root::Request::Forge { .. }
                 | root::Request::Busy(_)

@@ -713,6 +713,7 @@ impl World {
                 engine::PartyRequest::SignInRefused { .. } | engine::PartyRequest::WatchRefused { .. },
             )
             | engine::Request::Account(_)
+            | engine::Request::SetUpGroup { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Setup { .. }
             | engine::Request::Busy(_)
@@ -746,6 +747,7 @@ impl World {
             | engine::Request::Party(_)
             | engine::Request::Forge { .. }
             | engine::Request::Account(_)
+            | engine::Request::SetUpGroup { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)

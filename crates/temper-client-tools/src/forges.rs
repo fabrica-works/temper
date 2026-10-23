@@ -259,20 +259,20 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
             let Some(request) = temper_client_protocol_wire::decode_requesting(&record.bytes, &limits) else { return };
             let intent = match request.into_parts().request {
                 temper_client_protocol_wire::v1::Request::SetUp(request) => {
-                let request = request.into_parts();
-                Some(Intent {
-                    forge: request.forge,
-                    org: request.org,
-                    repository: request.repository,
-                    project: match request.project {
-                        temper_client_protocol_wire::v1::SetUpProject::Existing(project) => {
-                            SetUpProject::Existing(project.project())
-                        }
-                        temper_client_protocol_wire::v1::SetUpProject::New(project) => {
-                            SetUpProject::New(project.into_parts().name)
-                        }
-                    },
-                })
+                    let request = request.into_parts();
+                    Some(Intent {
+                        forge: request.forge,
+                        org: request.org,
+                        repository: request.repository,
+                        project: match request.project {
+                            temper_client_protocol_wire::v1::SetUpProject::Existing(project) => {
+                                SetUpProject::Existing(project.project())
+                            }
+                            temper_client_protocol_wire::v1::SetUpProject::New(project) => {
+                                SetUpProject::New(project.into_parts().name)
+                            }
+                        },
+                    })
                 }
                 temper_client_protocol_wire::v1::Request::StartDemo => None,
                 temper_client_protocol_wire::v1::Request::Adopt(_) => return,

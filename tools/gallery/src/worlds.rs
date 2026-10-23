@@ -1852,7 +1852,7 @@ fn accounts(w: World, then: Then) -> c::OwnerAccounts {
             .push(c::PayerReadiness {
                 provider: provider.provider,
                 payer: c::OwnerAccountUse::Party(73),
-                readiness: if matches_demo(w) && provider.provider == 18 {
+                readiness: if w == World::Bare || matches_demo(w) && provider.provider == 18 {
                     c::Readiness::Unavailable
                 } else {
                     c::Readiness::Usable
@@ -1891,7 +1891,7 @@ fn accounts(w: World, then: Then) -> c::OwnerAccounts {
             | Then::AccountRefused
             | Then::KeyReady => None,
         },
-        usable: true,
+        usable: w != World::Bare,
         settled: true,
         cut: false,
         readiness,
