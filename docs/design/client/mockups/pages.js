@@ -1492,7 +1492,13 @@
       const details = which === 'elsewhere' ? `${elsewhereHow(next)}<p class="muted">After the restart, the link opens this wizard where you left it.</p>` : chosen?.kind === 'GitHub' ? flowCard(chosen, 'welcome') : chosen ? ownedForm(chosen, 'welcome.html?at=model&world=first-run-real&step=2') : '';
       content = `${heading('Connect a forge')}<p class="muted welcome-lead">Where your repositories live: temper’s agents push branches and open pull requests there.</p>${which ? flowWrap(details) : forgeChoices('welcome.html?at=forge&forge=')}${foot}`;
     } else if (current === 'model') {
-      const status = f?.state === 'setting up' ? `<div class="welcome-status">${fact('temper: the forge’s name and set-up state', esc(`${forgeName(f)} · ${f.state}`))}${eachStep()}</div>` : '';
+      // The forge's line: under way, with its steps, or done, ticked, with
+      // its first repository and project, so Model says what Forge did.
+      const adopted = f?.kind === 'GitHub' ? githubAdopted(f) : null;
+      const done = startedForge && f.state === 'connected' && (f.kind !== 'GitHub' || adopted);
+      const into = f?.setup ? `${f.setup.org}/${f.setup.repo}, ${done ? 'in' : 'into'} ${f.setup.newProject ? `the new project ${f.setup.project}` : f.setup.project}` : '';
+      const words = [forgeName(f), done ? '' : f?.kind === 'GitHub' && f.state === 'connected' ? 'no repository chosen yet' : f?.state, f?.kind === 'GitHub' && !done ? '' : into].filter(Boolean).join(' · ');
+      const status = startedForge ? `<div class="welcome-status">${fact('temper: the forge, its state, and its first repository and project', `${done ? '<span class="ok">✓</span> ' : ''}${esc(words)}`)}${done ? '' : eachStep()}</div>` : '';
       // Connect a model's Choose, or a key's Details, within the wizard;
       // ChatGPT's sign-in returns to the wizard's Almost ready.
       const signedIn = worldKey === GH_WORLD ? 'welcome.html?at=ready&step=6' : 'welcome.html?at=ready&world=first-run-real&step=3';

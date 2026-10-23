@@ -726,9 +726,14 @@ keeps (`../protocol/configuration.md`, section 2).
     the step's body draws the sign-in as `ConnectModel`'s does, its
     address and then its end, and an account made there `ConnectModel`'s
     Ready. Above
-    them, while a forge sets up or connects, the set up's line,
-    "FORGE · CONNECTION", and a disclosure, "Each step", holding
-    `ConnectForge`'s Setting up steps. *The seam:* the Model step's
+    them, once a forge is acted on, the forge's line, so that Model
+    says what Forge did: while it sets up or connects, "FORGE ·
+    CONNECTION · ORG/NAME, into PROJECT", and a disclosure, "Each
+    step", holding `ConnectForge`'s Setting up steps; once connected
+    with its first repository adopted, ticked, "FORGE · ORG/NAME, in
+    PROJECT", on GitHub the repository Ready adopted; PROJECT reads
+    "the new project NAME" for a new one. A GitHub forge with none
+    adopted yet reads "GitHub · no repository chosen yet". *The seam:* the Model step's
     body is `ConnectModel`'s, the step's frame, heading, lead, set up
     line and foot the welcome's.
     *Ready* names the forge and the model as set up or under way, under
