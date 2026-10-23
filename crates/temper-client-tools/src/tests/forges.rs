@@ -464,8 +464,14 @@ fn made_sends_the_home_adoption_with_its_stable_key_and_prints_its_answer() {
             call,
             if home_taken { f::forge_refused(w::ForgeReason::Refused) } else { f::adopted_with_unknown_protection() },
         );
-        assert_eq!(root.answer(call).unwrap().status, if home_taken { 2 } else { 0 });
-        assert!(root.answer(call).is_none(), "one terminal answer; a refused home is not retried");
+        if home_taken {
+            assert!(root.answer(call).is_none());
+            assert!(!root.sent_adoption(call).home);
+            assert_eq!(root.sent_name(call), Some(crate::key::engine(&f::name(b"first-repository-additional-3"))));
+            root.adoption_answer(call, f::adopted_with_unknown_protection());
+        }
+        assert_eq!(root.answer(call).unwrap().status, 0);
+        assert!(root.answer(call).is_none(), "one terminal answer");
     }
 }
 #[test]

@@ -60,6 +60,9 @@ temper-worker-protocol-git.workspace = true
 jig-protocol-worker-link.workspace = true
 
 [dev-dependencies]
+skein-fake-forge-domain.workspace = true
+skein-fake-forge-protocol.workspace = true
+skein-forge-machine-world.workspace = true
 skein-fake-forge-github.workspace = true
 jig-domain-views.workspace = true
 skein-world.workspace = true

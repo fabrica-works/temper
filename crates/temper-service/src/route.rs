@@ -7,7 +7,8 @@ pub(crate) mod box_link;
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher routes root outputs to their components")]
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
-        root::Request::SetUp { forge, request } => {
+        root::Request::SetUp { forge, request, org, repository } => {
+            crate::setup::lifecycle::first(engine, forge, org, repository);
             let mut out = skein_lib::Queue::with_capacity(3);
             engine.box_link.ask(forge, request, &mut out);
             box_link::drain(engine, &mut out);
@@ -42,7 +43,9 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 | Event::Connection { .. }
                 | Event::Installation { .. }
                 | Event::BoxClosed
-                | Event::SetUpAnswered { .. } => {}
+                | Event::SetUpAnswered { .. }
+                | Event::FirstMade { .. }
+                | Event::FirstFailed { .. } => {}
                 other => unreachable!("only forge, setup and box link routing produce root forge inputs: {other:?}"),
             }
         }

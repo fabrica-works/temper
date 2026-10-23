@@ -640,8 +640,13 @@ fn asked_prepare_failure_is_visible_and_can_be_asked_again() {
         support::WITHIN,
         || directory(scratch.path(), "--data").join("box/started/1").exists(),
     );
-    for call in &outcome.calls {
-        assert!(call.exit == Some(Exit::Code(0)), "retry after failed prepare was refused");
+    for (index, call) in outcome.calls.iter().enumerate() {
+        if [1, 4].contains(&index) {
+            assert_eq!(call.exit, Some(Exit::Code(1)), "forge-setup waits for the prepare failure");
+            assert!(String::from_utf8_lossy(&call.stderr).contains("prepare"), "the failed step is named");
+        } else {
+            assert_eq!(call.exit, Some(Exit::Code(0)), "retry after failed prepare was refused");
+        }
     }
     assert_eq!(outcome.calls.len(), 7, "retry did not finish");
     assert!(outcome.exit == Some(Exit::Code(0)), "box failed beside its dormant forge");

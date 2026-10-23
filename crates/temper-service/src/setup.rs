@@ -113,6 +113,8 @@ pub(crate) fn worst_case(
     }
     // Retained strings, codec parts and their encoded copy can coexist.
     host.checked_add(handovers)?
+        // Pending/active intent names and the Create plan clone coexist.
+        .checked_add(u64::from(l.forges).checked_mul(name.checked_mul(4)?)?)?
         .checked_add(local_bytes.checked_mul(3)?)?
         // Token, encoded identity, and copied parts overlap during the records handoff.
         .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(4)?)?
@@ -309,6 +311,7 @@ fn forge(plan: &host::Plan) -> u16 {
         | host::Plan::Accept { forge, .. }
         | host::Plan::Reconcile { forge, .. }
         | host::Plan::Adopt { forge, .. }
+        | host::Plan::Create { forge, .. }
         | host::Plan::Paste { forge, .. }
         | host::Plan::Check { forge }
         | host::Plan::TakeOver { forge, .. }
@@ -352,7 +355,16 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
         engine
             .setup
             .runs
-            .insert(run, Run { forge: number, kind, internal: false, previous: engine.domain.forge_connection(number) })
+            .insert(
+                run,
+                Run {
+                    first: None,
+                    forge: number,
+                    kind,
+                    internal: false,
+                    previous: engine.domain.forge_connection(number),
+                },
+            )
             .expect("admitted host run");
         if kind == Kind::Convert {
             lifecycle::state(engine, number, temper_engine_domain_forge::Connection::Connecting);
@@ -370,6 +382,7 @@ fn matches_app_plan(plan: &host::Plan) -> bool {
         | host::Plan::Check { .. }
         | host::Plan::TakeOver { .. }
         | host::Plan::Adopt { .. }
+        | host::Plan::Create { .. }
         | host::Plan::Reachable { .. } => false,
     }
 }

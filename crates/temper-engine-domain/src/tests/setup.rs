@@ -105,7 +105,10 @@ fn a_keyed_setup_answers_the_client_and_the_same_key_replays_without_asking_the_
     connection(&mut domain, &env, forge::Connection::NotSetUp);
     crate::try_step(&mut domain, &env, setup(1)).unwrap();
     let requests = settle(&mut domain, &env);
-    let [Request::SetUp { forge: 1, request }] = requests.as_ref() else { panic!("one setup ask: {requests:?}") };
+    let [Request::SetUp { forge: 1, request, org, repository }] = requests.as_ref() else {
+        panic!("one setup ask: {requests:?}")
+    };
+    assert_eq!((org.as_ref(), repository.as_ref()), (b"work".as_slice(), b"hello".as_slice()));
     crate::try_step(
         &mut domain,
         &env,

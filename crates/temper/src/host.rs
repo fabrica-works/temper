@@ -227,6 +227,7 @@ fn note_line(note: temper_service::Note) -> String {
                         SetupPlan::Reconcile => "reconciling",
                         SetupPlan::TakeOver => "taking the handover",
                         SetupPlan::Adopt => "adopting",
+                        SetupPlan::Create => "making",
                     };
                     format!("{action} stopped at {:?}: {reason}", step.stage)
                 }

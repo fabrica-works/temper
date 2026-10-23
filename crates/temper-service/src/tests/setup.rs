@@ -1140,6 +1140,7 @@ fn local_stops_missing_busy_and_origin_mismatch_leave_the_other_forge_served() {
                 .insert(
                     Token::new(76),
                     Run {
+                        first: None,
                         forge: 1,
                         kind: Kind::Adopt,
                         internal: true,
@@ -1440,6 +1441,7 @@ fn takeover_stops_missing_and_busy_keep_the_handover_and_isolate_the_forge() {
                 .insert(
                     Token::new(76),
                     Run {
+                        first: None,
                         forge: 1,
                         kind: Kind::Adopt,
                         internal: true,
@@ -1615,3 +1617,6 @@ fn a_missing_file_at_started_reconciles_the_kept_token_and_names_a_stop() {
 
 #[path = "setup_bound_webhook.rs"]
 mod bound_webhook;
+
+#[path = "setup_create.rs"]
+mod create_tests;

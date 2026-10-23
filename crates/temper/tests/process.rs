@@ -627,6 +627,8 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         // take seconds; allow three minutes, plus ten seconds to stop and reap.
         steps.extend([
             Step::Run(Call::new(&["wait", "forges", "--until", "settled", "--timeout", "180s"])),
+            Step::Run(Call::new(&["forges", "--json"])),
+            Step::Run(Call::new(&["repositories", "3", "--json"])),
             Step::Run(Call::new(&["forges"])),
         ]);
         let clock = skein_shell::Clock::new();
@@ -697,7 +699,7 @@ fn assert_forgejo_setup(
             String::from_utf8_lossy(&call.stderr)
         );
     }
-    assert_eq!(calls.len(), if run == "first" { 6 } else { 3 }, "all ctl calls ran: {stderr}");
+    assert_eq!(calls.len(), if run == "first" { 8 } else { 5 }, "all ctl calls ran: {stderr}");
     if run == "first" {
         assert!(
             String::from_utf8_lossy(&calls[1].stdout)
@@ -714,6 +716,16 @@ fn assert_forgejo_setup(
         assert_eq!(forge["offer"], "offered");
         assert_eq!(forge["state"], "not_set_up");
         assert!(calls[3].stdout.starts_with(b"setting up\n"));
+        let adoption = String::from_utf8_lossy(&calls[3].stdout);
+        assert!(adoption.contains("work/hello"), "ctl printed the first adoption: {adoption}");
+        let made = support::ctl::json(&calls[5]);
+        let row = made["forges"].as_array().unwrap().iter().find(|row| row["number"] == 3).unwrap();
+        assert_eq!(row["first"]["state"], "made");
+        assert_eq!(row["first"]["project"]["existing"], 1);
+        assert_eq!(row["first"]["org"], "work");
+        assert_eq!(row["first"]["repository"], "hello");
+        let repositories = support::ctl::json(&calls[6]);
+        assert!(repositories.to_string().contains("hello"), "temper reads the first repository: {repositories}");
         // Preparation is silent on success; Forgejo's startup
         // and the runner's lines reach the box with their step prefixes.
         for step in ["forgejo 3: ", "runner 3: "] {

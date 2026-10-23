@@ -75,6 +75,7 @@ pub enum SetupStopped {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SetupPlan {
+    Create,
     Reconcile,
     TakeOver,
     Adopt,

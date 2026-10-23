@@ -164,6 +164,22 @@ impl Domain {
             None => crate::Connection::NotConnected,
         }
     }
+    /// Create's service tell; a forge without a setup intent ignores it.
+    pub fn first_made(&mut self, forge: u16, id: u64) -> bool {
+        if let Some(first) = self.first.get_mut(&forge) {
+            first.state = crate::FirstState::Made { id };
+            return true;
+        }
+        false
+    }
+    /// Create's stopped step is volatile, like its setup intent.
+    pub fn first_failed(&mut self, forge: u16, step: crate::CreateStep) -> bool {
+        if let Some(first) = self.first.get_mut(&forge) {
+            first.state = crate::FirstState::Failed { step };
+            return true;
+        }
+        false
+    }
     #[must_use]
     pub fn forges(&self) -> crate::Forges {
         let mut rows = List::with_capacity(self.configured.len());
@@ -873,6 +889,16 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             out.push(Request::MarkedForges);
         }
         Event::SetUpAnswered { forge, request, answer } => d.setup_answer(forge, request, answer, out),
+        Event::FirstMade { forge, id } => {
+            if d.first_made(forge, id) {
+                out.push(Request::MarkedForges);
+            }
+        }
+        Event::FirstFailed { forge, step } => {
+            if d.first_failed(forge, step) {
+                out.push(Request::MarkedForges);
+            }
+        }
         Event::Connection { forge, state } => {
             match &state {
                 crate::Connection::Connected { id, .. } => {
@@ -911,8 +937,8 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 } else {
                     let refusal = if let crate::SetUpProject::New(_) = project {
                         Some(crate::SetUpRefusal::NewProject)
-                    } else if org.is_empty()
-                        || repository.is_empty()
+                    } else if !setup_login(&org)
+                        || !setup_repository(&repository)
                         || org.len() > usize::try_from(env.limits.name_bytes).expect("name bound fits")
                         || repository.len() > usize::try_from(env.limits.name_bytes).expect("name bound fits")
                     {
@@ -938,11 +964,16 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                             d.first
                                 .insert(
                                     forge,
-                                    crate::First { org, repository, project, state: crate::FirstState::Making },
+                                    crate::First {
+                                        org: org.clone(),
+                                        repository: repository.clone(),
+                                        project,
+                                        state: crate::FirstState::Making,
+                                    },
                                 )
                                 .expect("configured forges bound first repositories");
                             out.push(Request::MarkedForges);
-                            out.push(Request::SetUp { forge, request });
+                            out.push(Request::SetUp { forge, request, org, repository });
                         }
                     }
                 }
@@ -4064,4 +4095,24 @@ pub(crate) fn keep_panel_ci(d: &mut Domain, task: u64, read: change::Ci, out: &m
         d.panel_ci.insert(task, read).expect("one CI verdict per held change");
         emit(out, Request::Marked { tasks: Box::new([task]) });
     }
+}
+
+// Admission mirrors skein's Create grammar without an io dependency in this domain.
+// The tests pin both grammars to the same boundary cases (protocol/setup.md, 6.7).
+fn setup_login(name: &[u8]) -> bool {
+    !name.is_empty()
+        && name.len() <= 40
+        && name.first().expect("nonempty login").is_ascii_alphanumeric()
+        && setup_characters(name)
+}
+fn setup_repository(name: &[u8]) -> bool {
+    !name.is_empty() && name.len() <= 100 && name != b"." && name != b".." && setup_characters(name)
+}
+fn setup_characters(name: &[u8]) -> bool {
+    for byte in name {
+        if !byte.is_ascii_alphanumeric() && !b"._-".contains(byte) {
+            return false;
+        }
+    }
+    true
 }

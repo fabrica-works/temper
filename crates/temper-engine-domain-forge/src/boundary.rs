@@ -651,6 +651,14 @@ pub enum Event {
         request: Token,
         answer: SetUpAnswer,
     },
+    FirstMade {
+        forge: u16,
+        id: u64,
+    },
+    FirstFailed {
+        forge: u16,
+        step: CreateStep,
+    },
     Connection {
         forge: u16,
         state: Connection,
@@ -904,6 +912,8 @@ pub enum Request {
     SetUp {
         forge: u16,
         request: Token,
+        org: Box<[u8]>,
+        repository: Box<[u8]>,
     },
     /// The deployment's forges document changed.
     MarkedForges,
