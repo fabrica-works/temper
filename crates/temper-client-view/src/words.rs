@@ -408,7 +408,8 @@ pub enum Word {
 // A chat's numbered composer placeholder (3.5).
 // Twelve inbox count, filter, empty and update-line phrases (3.5).
 // Twenty-nine closed-chat, confirmation and refusal phrases (3.5 and 3.6).
-const PHRASES: u32 = 843;
+// Nine of jig's phrases for a hold on a configured bound.
+const PHRASES: u32 = 852;
 const ALL: [Word; 373] = [
     Word::WelcomeStep,
     Word::WelcomeForgeStep,

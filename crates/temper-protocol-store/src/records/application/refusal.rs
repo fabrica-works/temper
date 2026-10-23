@@ -1,6 +1,6 @@
 //! Jig's complete refusal facts at its pinned people-store version.
 use jig_domain_people as p;
-use jig_protocol_store::people_v7 as w;
+use jig_protocol_store::people_v8 as w;
 use skein_lib::Wall;
 pub(super) fn encode_failure_class(value: p::FailureClass, _l: &w::Limits) -> w::FailureClass {
     match value {
@@ -24,6 +24,10 @@ pub(super) fn decode_failure_class(value: w::FailureClass) -> p::FailureClass {
 }
 pub(super) fn encode_hold_reason(value: &p::HoldReason, l: &w::Limits) -> Result<w::HoldReason, w::Problem> {
     Ok(match value {
+        p::HoldReason::Exceeded(value) => w::HoldReason::Exceeded(w::Exceeded::new(
+            l,
+            w::ExceededParts { bound: encode_bound(value.bound), value: value.value },
+        )?),
         p::HoldReason::Failures { class } => w::HoldReason::Failures(w::HoldReasonFailures::new(
             l,
             w::HoldReasonFailuresParts { class: encode_failure_class(*class, l) },
@@ -56,6 +60,9 @@ pub(super) fn encode_hold_reason(value: &p::HoldReason, l: &w::Limits) -> Result
 }
 pub(super) fn decode_hold_reason(value: w::HoldReason) -> p::HoldReason {
     match value {
+        w::HoldReason::Exceeded(value) => {
+            p::HoldReason::Exceeded(p::Exceeded { bound: decode_bound(value.bound().clone()), value: value.value() })
+        }
         w::HoldReason::Failures(value) => {
             p::HoldReason::Failures { class: decode_failure_class(value.class().clone()) }
         }
@@ -565,4 +572,32 @@ fn numbers(values: &[u64], limit: u32, path: w::Path) -> Result<skein_lib::List<
         rows.push(*value).expect("checked refusal list length");
     }
     Ok(rows)
+}
+
+const fn encode_bound(value: p::Bound) -> w::Bound {
+    match value {
+        p::Bound::Reasoning => w::Bound::Reasoning,
+        p::Bound::Metadata => w::Bound::Metadata,
+        p::Bound::Items => w::Bound::Items,
+        p::Bound::Answer => w::Bound::Answer,
+        p::Bound::Tools => w::Bound::Tools,
+        p::Bound::HistoryItems => w::Bound::HistoryItems,
+        p::Bound::History => w::Bound::History,
+        p::Bound::Window => w::Bound::Window,
+        p::Bound::Output => w::Bound::Output,
+    }
+}
+
+const fn decode_bound(value: w::Bound) -> p::Bound {
+    match value {
+        w::Bound::Reasoning => p::Bound::Reasoning,
+        w::Bound::Metadata => p::Bound::Metadata,
+        w::Bound::Items => p::Bound::Items,
+        w::Bound::Answer => p::Bound::Answer,
+        w::Bound::Tools => p::Bound::Tools,
+        w::Bound::HistoryItems => p::Bound::HistoryItems,
+        w::Bound::History => p::Bound::History,
+        w::Bound::Window => p::Bound::Window,
+        w::Bound::Output => p::Bound::Output,
+    }
 }

@@ -814,6 +814,7 @@ fn hold_reason(reason: &jig_domain_people::HoldReason) -> &'static [u8] {
             FailureClass::Lost => b"for lost runs",
             FailureClass::Invalid => b"for invalid results",
         },
+        HoldReason::Exceeded(_) => b"for its configured model allowance",
         HoldReason::Circle => b"for a circle of waits",
         HoldReason::Stalled => b"because it stalled",
         HoldReason::Dependency { .. } => b"for its dependency",

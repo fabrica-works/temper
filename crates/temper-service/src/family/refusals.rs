@@ -1,6 +1,6 @@
 //! Sparse entrance facts without invented names, words or bounds (jig's
 //! client/domain/contract.md, 4).
-use jig_client_protocol_wire::v12 as w;
+use jig_client_protocol_wire::v13 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
@@ -215,6 +215,20 @@ fn moved(value: p::Moved, limits: &w::Limits) -> Result<w::Refusal, w::Problem> 
 }
 fn hold(value: p::HoldReason, limits: &w::Limits) -> Result<w::HoldCategory, w::Problem> {
     Ok(match value {
+        p::HoldReason::Exceeded(value) => {
+            let bound = match value.bound {
+                p::Bound::Reasoning => w::Bound::Reasoning,
+                p::Bound::Metadata => w::Bound::Metadata,
+                p::Bound::Items => w::Bound::Items,
+                p::Bound::Answer => w::Bound::Answer,
+                p::Bound::Tools => w::Bound::Tools,
+                p::Bound::HistoryItems => w::Bound::HistoryItems,
+                p::Bound::History => w::Bound::History,
+                p::Bound::Window => w::Bound::Window,
+                p::Bound::Output => w::Bound::Output,
+            };
+            w::HoldCategory::Exceeded(w::Exceeded::new(limits, w::ExceededParts { bound, value: value.value })?)
+        }
         p::HoldReason::Stalled => w::HoldCategory::Stalled,
         p::HoldReason::Stopped => w::HoldCategory::Stopped,
         p::HoldReason::Drift => w::HoldCategory::Drift,

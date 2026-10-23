@@ -261,8 +261,9 @@ mod memory_literal;
 // The page reserves its patch queue once, at four patches a node.
 // A chat's composer placeholder adds one phrase (148 B).
 // Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
+// Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388742011;
+const WEB_BYTES: u64 = 274388743343;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
@@ -286,12 +287,12 @@ fn encoded(size: u32, write: impl FnOnce(&mut skein_lib::Writer) -> Result<(), s
     write(&mut writer).expect("measured fixture");
     writer.finish()
 }
-fn owned(record: Box<[u8]>) -> jig_client_protocol_wire::v12::Owned {
-    use jig_client_protocol_wire::{VERSION, v12 as w};
+fn owned(record: Box<[u8]>) -> jig_client_protocol_wire::v13::Owned {
+    use jig_client_protocol_wire::{VERSION, v13 as w};
     w::Owned::new(&w::CEILINGS, w::OwnedParts { owner: w::Owner::Jig, version: VERSION, record })
         .expect("fixture envelope")
 }
-fn streamed(host: &mut Host, event: &jig_client_protocol_wire::v12::StreamEvent) {
+fn streamed(host: &mut Host, event: &jig_client_protocol_wire::v13::StreamEvent) {
     use skein_lib::base64::{self, Alphabet};
     let bytes = encoded(event.measure(), |writer| event.encode(writer));
     let size = base64::encoded_len(Alphabet::Standard, u32::try_from(bytes.len()).expect("fixture fits"))
@@ -305,7 +306,7 @@ fn streamed(host: &mut Host, event: &jig_client_protocol_wire::v12::StreamEvent)
 }
 #[test]
 fn the_first_task_activity_answer_survives_transport_sign_in() {
-    use jig_client_protocol_wire::{VERSION, v12 as w};
+    use jig_client_protocol_wire::{VERSION, v13 as w};
     use skein_lib::{Duration, Reader};
     // task_record's chip is task 9; the answer carries one committed run marker.
     const TASK_PATH: &[u8] = b"/tasks/9";

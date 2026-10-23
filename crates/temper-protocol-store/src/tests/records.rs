@@ -1,5 +1,5 @@
 use super::fixtures;
-use crate::{records, v4};
+use crate::{records, v5};
 use temper_engine_domain_forge as forge;
 
 #[test]
@@ -54,7 +54,7 @@ fn bounds_take_each_limit_from_its_source() {
 #[test]
 fn bounds_refuse_sources_past_schema_ceilings() {
     let mut larger = fixtures::LIMITS;
-    larger.name_bytes = v4::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
+    larger.name_bytes = v5::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
     assert_eq!(crate::bounds(&larger), None);
 }
 
@@ -508,8 +508,8 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
 fn application_refusal_lists(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
     use jig_domain_people as p;
     for (count, circle) in [
-        (jig_protocol_store::people_v7::CEILINGS.refusal_circle_tasks, true),
-        (jig_protocol_store::people_v7::CEILINGS.refusal_kept_pending, false),
+        (jig_protocol_store::people_v8::CEILINGS.refusal_circle_tasks, true),
+        (jig_protocol_store::people_v8::CEILINGS.refusal_kept_pending, false),
     ] {
         let mut tasks = skein_lib::List::with_capacity(count);
         for task in 0..count {
@@ -525,6 +525,27 @@ fn application_refusal_lists(rows: &mut skein_lib::List<jig_domain_people::Refus
 }
 fn application_moved_and_ended(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
     use jig_domain_people as p;
+    for bound in [
+        p::Bound::Reasoning,
+        p::Bound::Metadata,
+        p::Bound::Items,
+        p::Bound::Answer,
+        p::Bound::Tools,
+        p::Bound::HistoryItems,
+        p::Bound::History,
+        p::Bound::Window,
+        p::Bound::Output,
+    ] {
+        for value in [0, u64::MAX] {
+            rows.push(p::Refusal::Moved {
+                now: p::Moved::Hold {
+                    revision: u64::MAX,
+                    reason: p::HoldReason::Exceeded(p::Exceeded { bound, value }),
+                },
+            })
+            .expect("bounded application cases");
+        }
+    }
     for reason in [
         p::HoldReason::Circle,
         p::HoldReason::Failures { class: p::FailureClass::Invalid },
@@ -636,23 +657,23 @@ fn every_application_outcome_preserves_its_complete_record() {
         assert_eq!(bytes[2], 15, "the Application family tag");
     }
     assert!(
-        jig_protocol_store::people_v7::Refusal::worst_case_bytes(&jig_protocol_store::people_v7::CEILINGS)
+        jig_protocol_store::people_v8::Refusal::worst_case_bytes(&jig_protocol_store::people_v8::CEILINGS)
             .expect("bounded facts")
-            <= u64::from(v4::CEILINGS.core_refused_refusal)
+            <= u64::from(v5::CEILINGS.core_refused_refusal)
     );
 }
 #[test]
 fn application_decoding_refuses_malformed_refusal_facts() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for refusal in [Box::from([255]), Box::from([2]), Box::from([9, 0])] {
-        let value = v4::CoreRefused::new(&v4::CEILINGS, v4::CoreRefusedParts { refusal }).expect("small piece");
-        let application = v4::Application::new(
-            &v4::CEILINGS,
-            v4::ApplicationParts { token: 9, until: 10, outcome: v4::ApplicationOutcome::CoreRefused(value) },
+        let value = v5::CoreRefused::new(&v5::CEILINGS, v5::CoreRefusedParts { refusal }).expect("small piece");
+        let application = v5::Application::new(
+            &v5::CEILINGS,
+            v5::ApplicationParts { token: 9, until: 10, outcome: v5::ApplicationOutcome::CoreRefused(value) },
         )
         .expect("application");
         let row =
-            v4::Row::new(&v4::CEILINGS, v4::RowParts { value: v4::Value::Application(application) }).expect("row");
+            v5::Row::new(&v5::CEILINGS, v5::RowParts { value: v5::Value::Application(application) }).expect("row");
         assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable));
     }
 }
@@ -691,14 +712,14 @@ fn a_job_steps_name_past_its_limit_fails_to_decode() {
 }
 
 #[test]
-fn forge_writers_round_trip_with_the_v3_golden_bytes() {
+fn forge_writers_round_trip_with_the_v5_golden_bytes() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for (forge, author) in [(0, 1), (1, 42), (u16::MAX, u64::MAX)] {
         let row = forge::Stored::Writer(skein_forge_client::Writer { forge, author });
         let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).expect("writer key");
         let bytes = records::encode(&row);
         assert_eq!(bytes.len(), 13); // Row version, family, forge, author.
-        assert_eq!(&bytes[..3], &[0, 4, 16]);
+        assert_eq!(&bytes[..3], &[0, 5, 16]);
         assert_eq!(records::row(&key, &bytes, &bounds), Ok(row));
         if forge == u16::MAX {
             let mut golden = [255; 11];

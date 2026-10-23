@@ -310,6 +310,17 @@ pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words
 
 pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {
     let number = match value {
+        c::HoldCategory::Exceeded(value) => match value.bound {
+            c::Bound::History => None,
+            c::Bound::Reasoning
+            | c::Bound::Metadata
+            | c::Bound::Items
+            | c::Bound::Answer
+            | c::Bound::Tools
+            | c::Bound::HistoryItems
+            | c::Bound::Window
+            | c::Bound::Output => Some(Hole::Number(value.value)),
+        },
         c::HoldCategory::Dependency { task } => Some(Hole::Number(*task)),
         c::HoldCategory::Uncertain { entry } => Some(Hole::Number(*entry)),
         c::HoldCategory::PoolLost { pool } => Some(Hole::Number(*pool)),
