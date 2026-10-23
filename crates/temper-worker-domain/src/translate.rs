@@ -190,9 +190,10 @@ pub(crate) const fn operation(operation: agent::Operation) -> host::Operation {
     }
 }
 
-/// Why a run failed: configured model-call bounds hold at once. A limited
-/// or refused account stays a failure of its own (`domain/worker.md`, 4.3; jig's `domain/hosts.md`, 6.3),
-/// for the engine to retry the run once the account has room.
+/// Why a run failed, as it reports it. A configured bound on the model call
+/// is `Exceeded`, which jig holds at once; a limited or refused account stays
+/// a failure of its own, for the engine to retry the run once the account has
+/// room (`domain/worker.md`, 4.3; jig's `domain/hosts.md`, 6.3).
 pub(crate) const fn run_failure(failure: &agent::RunFailure) -> host::RunFailure {
     match failure {
         agent::RunFailure::Model(agent::ModelFault::Limited { account, reset }) => {
