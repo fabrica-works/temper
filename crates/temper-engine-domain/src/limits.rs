@@ -22,6 +22,9 @@ use temper_engine_domain_forge_change as forge_change;
 /// How many of the root's own facts wait to be drained.
 pub const FACTS: u32 = 32;
 
+/// A fresh run's transcript tail, in bytes: jig's small-profile figure.
+const TRANSCRIPT_TAIL: u32 = 2048;
+
 /// Root startup bounds, supplied by configuration and immutable at every step
 /// (domain/root.md, 10). `worst_case` checks the cross-child route, page,
 /// journal and payload capacities before `Domain::new` allocates fixed room.
@@ -134,6 +137,7 @@ pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
         brief: brief_limits(&limits.brief),
         brief_parts: limits.brief.parts,
         brief_core_budgets: jig_domain_core::CoreBriefBudgets {
+            tail: TRANSCRIPT_TAIL,
             task: limits.brief.budgets.task,
             dependencies: limits.brief.budgets.dependencies,
             attempts: limits.brief.budgets.attempts,
