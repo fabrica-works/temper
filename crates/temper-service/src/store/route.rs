@@ -276,7 +276,7 @@ fn page(
             },
             None => None,
         };
-        root(into, engine::StoreInput::Loaded { owner: flight.root, rows: decoded.into_boxed(), next });
+        root(into, engine::StoreInput::Loaded { texts: None, owner: flight.root, rows: decoded.into_boxed(), next });
         return;
     }
     if decoded.is_empty() && !cutting && more {
@@ -298,6 +298,7 @@ fn page(
         return;
     }
     let next = if cutting || more { last } else { None };
+    let texts = ranges::texts(&flight.range, decoded.as_slice());
     // For a cut transcript page restart from its beginning and filter by key;
     // the component's offset names the end of the whole incoming page.
     if offset.is_some() && !cutting {
@@ -306,9 +307,9 @@ fn page(
         flight.waiting = false;
         routes.pending.insert(owner, flight).expect("removed slot");
         let root_owner = routes.pending.get(&owner).expect("kept continuation").root;
-        root(into, engine::StoreInput::Loaded { owner: root_owner, rows: decoded.into_boxed(), next });
+        root(into, engine::StoreInput::Loaded { texts, owner: root_owner, rows: decoded.into_boxed(), next });
     } else {
-        root(into, engine::StoreInput::Loaded { owner: flight.root, rows: decoded.into_boxed(), next });
+        root(into, engine::StoreInput::Loaded { texts, owner: flight.root, rows: decoded.into_boxed(), next });
     }
 }
 

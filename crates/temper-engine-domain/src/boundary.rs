@@ -252,6 +252,9 @@ pub enum Event {
     /// The service begins its drain (jig's `domain/engine.md`, 6.1).
     Stop,
 }
+/// Optional protocol renderings in the same order as a transcript load's rows.
+pub type TranscriptTexts = Box<[Option<Box<[u8]>>]>;
+
 #[derive(Debug)]
 pub enum StoreInput {
     Committed {
@@ -267,6 +270,9 @@ pub enum StoreInput {
         number: u64,
     },
     Loaded {
+        /// Protocol-rendered text in row order, only for transcript window loads.
+        /// Each text is at most the core tail budget; None marks an unreadable turn.
+        texts: Option<TranscriptTexts>,
         /// Echoed generational load token, fenced after its one terminal and reclaim.
         owner: Token,
         /// Owned decoded rows, at most `loads::Limits::rows` and `loads::Limits::reply_bytes`

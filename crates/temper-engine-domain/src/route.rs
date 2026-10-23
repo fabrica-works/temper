@@ -151,11 +151,11 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
             journal_outputs(&mut journal_out, out);
             return;
         }
-        Event::Store(crate::StoreInput::Loaded { owner, rows, next }) => {
+        Event::Store(crate::StoreInput::Loaded { owner, rows, next, texts }) => {
             let mut decision = Some(load_decision(domain, &env.limits).expect("load terminal route room"));
             let mut load_out = Queue::with_capacity(1);
             loads::loaded(&mut domain.loads, owner, rows, next, &mut load_out);
-            load_outputs(domain, env, &mut load_out, &mut decision, out);
+            load_outputs(domain, env, &mut load_out, texts, &mut decision, out);
             accept_load(domain, env, decision);
             return;
         }
@@ -163,7 +163,7 @@ pub(crate) fn step_routed(domain: &mut Domain, env: &Env<Limits>, event: Event, 
             let mut decision = Some(load_decision(domain, &env.limits).expect("load terminal route room"));
             let mut load_out = Queue::with_capacity(1);
             loads::unloaded(&mut domain.loads, owner, &mut load_out);
-            load_outputs(domain, env, &mut load_out, &mut decision, out);
+            load_outputs(domain, env, &mut load_out, None, &mut decision, out);
             accept_load(domain, env, decision);
             return;
         }
@@ -445,7 +445,7 @@ pub(crate) fn delegate_call(
 
 pub(crate) fn discard_after_stop(domain: &mut Domain, event: Event) {
     match event {
-        Event::Store(crate::StoreInput::Loaded { owner, rows, next }) => {
+        Event::Store(crate::StoreInput::Loaded { owner, rows, next, .. }) => {
             loads::abandon(&mut domain.loads, owner);
             let mut out = Queue::with_capacity(1);
             loads::loaded(&mut domain.loads, owner, rows, next, &mut out);
