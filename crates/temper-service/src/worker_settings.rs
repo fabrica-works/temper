@@ -101,6 +101,7 @@ pub fn link_limits(worker: &config::Worker, payload: &v1::Limits) -> Option<link
     let largest = payload::largest(payload)?;
     let sizes = jig_protocol_worker_wire::sizes::Sizes {
         program_sources: core.fleet.program_sources,
+        piece: hub.piece_bytes,
         charter: u32::try_from(hub.charter_bytes).ok()?,
         transcript: u32::try_from(hub.transcript_bytes).ok()?,
         turn: u32::try_from(hub.turn_bytes).ok()?,
