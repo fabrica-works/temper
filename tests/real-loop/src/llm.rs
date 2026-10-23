@@ -67,6 +67,21 @@ pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
     }
 }
 
+/// The scripted peer with opt-in fresh-input turn selection (skein's fake-llm.md, 2.4).
+#[must_use]
+pub fn played_by_input(scripts: Box<[api::Script]>, rules: Box<[Box<[api::Rule]>]>) -> Recipe {
+    let mut recipe = scripted(Box::new([]));
+    recipe.domain = domain::Domain::played_by_input(
+        &recipe.domain_limits,
+        17,
+        api::Scripts { cued: scripts, asked: Box::new([]), otherwise: Box::new([]) },
+        api::Menu { arguments: Box::new([]), invalid: Box::new([]) },
+        api::Rules { cued: rules, asked: Box::new([]) },
+    )
+    .expect("bounded real-loop scripts and rules");
+    recipe
+}
+
 pub fn peer(recipe: Recipe) -> Result<Peer, skein_fake_peers::Error> {
     let mut peer = Peer::new(
         (Ipv4Addr::LOCALHOST, 0).into(),

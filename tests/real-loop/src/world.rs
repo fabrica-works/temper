@@ -128,6 +128,7 @@ pub(crate) fn run(
         Proc::Llm(Box::new(Llm {
             peer: llm::peer(recipe()).expect("independent LLM peer"),
             scripts: None,
+            rules: None,
             cue: false,
             release: None,
             released: None,
@@ -138,10 +139,12 @@ pub(crate) fn run(
     host(&mut world, scratch.path(), steps, direct_key, 1);
     world.run(&skein_shell::Clock::new(), crate::PATIENCE)
 }
+type Rules = fn() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]>;
 type Scripts = fn(std::net::SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]>;
 pub(crate) struct Llm {
     pub(crate) peer: skein_fake_peers::llm::Peer,
     scripts: Option<Scripts>,
+    rules: Option<Rules>,
     cue: bool,
     release: Option<&'static [u8]>,
     released: Option<&'static [u8]>,
@@ -192,6 +195,7 @@ pub(crate) fn run_forge(
         Proc::Llm(Box::new(Llm {
             peer: llm::peer(llm::scripted(Box::new([]))).expect("deferred peer"),
             scripts: Some(scripts),
+            rules: None,
             cue: false,
             release: None,
             released: None,
@@ -227,6 +231,7 @@ pub(crate) fn run_github(
         Proc::Llm(Box::new(Llm {
             peer: llm::peer(llm::scripted(Box::new([]))).expect("deferred peer"),
             scripts: Some(scripts),
+            rules: None,
             cue: false,
             release: None,
             released: None,
@@ -399,7 +404,11 @@ impl Referee<Proc> for Judge {
             if let Some(address) = forge.address()
                 && let Some(scripts) = peer.scripts.take()
             {
-                peer.peer = llm::peer(llm::scripted(scripts(address))).expect("bound forge scripts");
+                let recipe = match peer.rules.take() {
+                    Some(rules) => llm::played_by_input(scripts(address), rules()),
+                    None => llm::scripted(scripts(address)),
+                };
+                peer.peer = llm::peer(recipe).expect("bound forge scripts");
             }
             if let Some(hooks) = service.hooks
                 && !state.hooked
@@ -592,11 +601,20 @@ pub(crate) fn run_cluster_forge(
     scratch: &[skein_scratch::Scratch],
     fixture: forge::Fixture,
     scripts: Scripts,
+    rules: Rules,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
 ) -> skein_world::real::Outcome<Proc> {
     let state = std::rc::Rc::new(std::cell::RefCell::new(None));
     let mut world = World::new_controlled(|controls| cluster_judge(controls, workers, Some(state.clone())));
-    cluster_roots(&mut world, workers, late, scratch, || llm::scripted(Box::new([])), Some((fixture, scripts)), steps);
+    cluster_roots(
+        &mut world,
+        workers,
+        late,
+        scratch,
+        || llm::scripted(Box::new([])),
+        Some((fixture, scripts, rules)),
+        steps,
+    );
     world.spawn(|| {
         let (forge, peer) = forge::State::new(fixture);
         *state.borrow_mut() = Some(forge);
@@ -630,14 +648,15 @@ fn cluster_roots<R: Referee<Proc>>(
     late: &[&str],
     scratch: &[skein_scratch::Scratch],
     recipe: impl FnOnce() -> llm::Recipe,
-    forge: Option<(forge::Fixture, Scripts)>,
+    forge: Option<(forge::Fixture, Scripts, Rules)>,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
 ) {
     let (engine, worker_scratch) = scratch.split_first().expect("engine scratch");
     world.spawn(|| {
         Proc::Llm(Box::new(Llm {
             peer: llm::peer(recipe()).expect("cluster LLM"),
-            scripts: forge.map(|(_, scripts)| scripts),
+            scripts: forge.map(|(_, scripts, _)| scripts),
+            rules: forge.map(|(_, _, rules)| rules),
             cue: false,
             release: None,
             released: None,
@@ -648,7 +667,7 @@ fn cluster_roots<R: Referee<Proc>>(
             engine.path(),
             signals,
             crate::cluster::Shape::Engine(workers.to_vec()),
-            forge.map(|(fixture, _)| fixture),
+            forge.map(|(fixture, _, _)| fixture),
         )))
     });
     host(world, &engine.path().join("data"), steps, false, u32::try_from(workers.len()).expect("worker count"));
@@ -658,7 +677,7 @@ fn cluster_roots<R: Referee<Proc>>(
                 scratch.path(),
                 signals,
                 crate::cluster::Shape::Worker { name, engine: None, started: !late.contains(name) },
-                forge.map(|(fixture, _)| fixture),
+                forge.map(|(fixture, _, _)| fixture),
             )))
         });
     }
