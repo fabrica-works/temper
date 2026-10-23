@@ -1,7 +1,7 @@
 //! Both roots and Smith's domain share every durable and process crossing.
 use jig_domain_tasks as tasks;
 use temper_engine_domain::{Key, Record};
-use temper_system_world::composed::{World, crossed_script, report_script};
+use temper_system_world::composed::{World, crossed_script, report_script, text_script};
 
 #[test]
 fn a_committed_chat_runs_through_the_worker_and_smith_and_returns_a_report() {
@@ -23,21 +23,10 @@ fn a_committed_chat_runs_through_the_worker_and_smith_and_returns_a_report() {
 #[test]
 fn an_open_chats_text_reply_ends_its_turn_after_one_call() {
     use jig_domain_core::{CoreRecord, Record as CoreRecordRow};
-    use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
     use skein_lib::Duration;
 
     let reply = b"Hello there.";
-    let mut world = World::open_chat(
-        917,
-        Script {
-            cue: Box::from(&b"@system"[..]),
-            turns: Box::new([Turn {
-                lines: Box::new([Line::Text { text: reply.as_slice().into() }]),
-                finish: Finish::Stop,
-                tokens: 20,
-            }]),
-        },
-    );
+    let mut world = World::open_chat(917, text_script(reply));
     world.run();
     let task = world.assignment().task;
     let attempt = world.assignment().attempt;
@@ -57,6 +46,7 @@ fn an_open_chats_text_reply_ends_its_turn_after_one_call() {
                 Record::Core(CoreRecordRow::Core(CoreRecord::Terminal(terminal))) if terminal.task == task => {
                     assert_eq!(terminal.attempt, attempt);
                     assert!(!matches!(terminal.end, tasks::End::Failed(_)), "no failed run");
+                    assert_eq!(terminal.end, tasks::End::Parked, "the Open reply parks its run");
                     terminals += 1;
                 }
                 Record::Core(_) | Record::Forge { .. } => {}
@@ -70,10 +60,71 @@ fn an_open_chats_text_reply_ends_its_turn_after_one_call() {
             panic!("the chat remains live");
         };
         assert_eq!(live.tries, tasks::Tries::NONE);
+        assert_eq!(live.phase, tasks::Phase::Active(tasks::Active::Idle), "the chat waits for words");
         assert_eq!(live.attempt, attempt);
         assert_eq!(live.last_answer, Some(attempt));
         assert!(!world.store.rows.contains_key(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task)))));
     }
+}
+
+#[test]
+fn a_finite_chats_text_reply_is_nudged_and_finishes_with_its_report() {
+    use jig_domain_core::{CoreRecord, Record as CoreRecordRow};
+    use skein_fake_llm_domain::api::Part;
+
+    let reply = b"Hello there.";
+    let mut script = text_script(reply);
+    let mut turns = script.turns.to_vec();
+    turns.extend(report_script(false).turns);
+    script.turns = turns.into_boxed_slice();
+    let mut world = World::chat(919, script);
+    world.run();
+
+    let prompts = world.agent().prompts();
+    assert_eq!(prompts.len(), 2, "a Finite reply is followed by one nudged call");
+    // smith's prompt::render_nudge, Mode::Finite and Stop::EndTurn.
+    let nudge = b"You stopped without calling `finish`, so the work is not done. Carry on with the work, and call `finish` when it is done. This is reminder ";
+    assert!(
+        prompts[1].messages.iter().any(|message| message.parts.iter().any(|part| {
+            matches!(part, Part::Text { text } if text.windows(nudge.len()).any(|bytes| bytes == nudge))
+        })),
+        "the second prompt carries smith's Finite nudge"
+    );
+    assert_eq!(world.observed.assignments, 1);
+    assert_eq!(world.observed.spawns, 1);
+    assert_eq!(world.observed.answers, 1);
+
+    let task = world.assignment().task;
+    let attempt = world.assignment().attempt;
+    let Some(Record::Core(CoreRecordRow::Tasks(tasks::Stored::Ended(ended)))) =
+        world.store.rows.get(&Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task))))
+    else {
+        panic!("the Finite task ended");
+    };
+    assert_eq!(
+        ended.phase,
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report {
+            words: Box::from(&b"The composed run answered."[..]),
+        }))
+    );
+    assert_eq!(ended.tries, tasks::Tries::NONE, "the nudge spends no try");
+    let mut replies = 0;
+    let mut terminals = 0;
+    for row in world.store.rows.values() {
+        match row {
+            Record::Core(CoreRecordRow::Core(CoreRecord::Turn(turn))) if turn.task == task => {
+                replies += turn.transcript.windows(reply.len()).filter(|bytes| *bytes == reply).count();
+            }
+            Record::Core(CoreRecordRow::Core(CoreRecord::Terminal(terminal))) if terminal.task == task => {
+                assert_eq!(terminal.attempt, attempt);
+                assert!(!matches!(terminal.end, tasks::End::Failed(_)), "no failed run");
+                terminals += 1;
+            }
+            Record::Core(_) | Record::Forge { .. } => {}
+        }
+    }
+    assert_eq!(terminals, 1, "one committed activation terminal");
+    assert_eq!(replies, 1, "the text reply is committed once in this chat's conversation");
 }
 
 #[test]

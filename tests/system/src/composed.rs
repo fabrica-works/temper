@@ -112,6 +112,19 @@ pub struct World {
     pub run_watch: Option<RunWatch>,
 }
 
+/// One text-only reply, with no finish call.
+#[must_use]
+pub fn text_script(reply: &[u8]) -> Script {
+    Script {
+        cue: Box::from(&b"@system"[..]),
+        turns: Box::new([Turn {
+            lines: Box::new([Line::Text { text: reply.into() }]),
+            finish: Finish::Stop,
+            tokens: 20,
+        }]),
+    }
+}
+
 /// A two-completion report script; optional host write precedes the report.
 #[must_use]
 pub fn report_script(host_call: bool) -> Script {
