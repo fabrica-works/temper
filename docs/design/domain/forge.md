@@ -325,12 +325,38 @@ temper-engine-domain-forge              the connector's top: resources and holds
   it no longer holds.
 - **The deployment's forges,** the subject `forges`
   (`../client/forge.md`, 5.4): the connector makes its document, one
-  row per configured forge in number order, each its number, kind,
-  mode, connection as the routing last told it, and offer, all its own
+  row per configured forge in number order, but an ended one (below),
+  each its number, kind, mode, connection as the routing last told it,
+  and offer, all its own
   (nothing is added where it is encoded), and
   marks the subject at each connection it is told and at `BoxClosed`, so that a watch
   follows a set up through its steps and a connect to its end. Nothing
   of it is kept.
+- **The demo's forge, ended** (`../protocol/setup.md`, 8.4): the
+  connector's own state, not the routing's. It holds the demo's `Demo`
+  record as it restores it and writes it, and the demo's forge is ended
+  from a start whose record reads ended, as from the end's decision
+  on. The end is decided here, in the step that takes a connection: the
+  first time the routing tells a configured forge other than the
+  demo's connected, while the record is none or running, the connector
+  saves ended, ends the demo's forge, asks the box link for `stop
+  FORGE` when the demo ran and the pipe is open (`../protocol/forge.md`,
+  2.8), and answers a start held for its acts *not offered*. An ended
+  forge is in no list: no row of `forges`, so that `temper ctl wait
+  forges` names it no more, no offer, so that `SetUp` is refused "not
+  offered", nothing in the picker (4.3), and nothing in the setup host's
+  scans, which read the same state; the routing's events for it change
+  nothing (`../protocol/forge.md`, 8.1). Its writer stays the forge
+  client's record, and its rows stay, so that what it did reads as
+  before.
+- **A repository ended** is one adopted from an ended forge. Nothing
+  is stored for it: it ends with its forge. It leaves every list of a
+  project's repositories: the project's home, so that the project's
+  next adoption may name a home, the one-home check skipping it; the
+  context repositories a workspace is given (`items`); and the adopted
+  ids the setup host reconciles. Its row stays, and a lookup by its
+  name or tag answers it, so that its tasks, chats and landings read as
+  before.
 - **An adoption on a forge not connected** is refused as such, before
   any read, and the client offers Connect; the picker offers none of
   that forge's repositories (4.3).

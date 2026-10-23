@@ -895,8 +895,10 @@ temper box
   so a box started again runs it only when `temper serve` asks, which
   serve does at the person's choice and at each of its starts while the
   demo runs. Its `started` follows its long steps' start, as the steps'
-  order takes them (7.2). A fake forge other than the demo's runs in its
-  place, unasked.
+  order takes them (7.2). At the demo's end serve sends `stop FORGE`,
+  and the box stops the group (below, 7.2): a box started after the end
+  runs none of it, since serve never asks again (8.4). A fake forge
+  other than the demo's runs in its place, unasked.
 - **The pipe,** two of them, made again at each spawn of `temper
   serve`: its fd 3, serve to box, and its fd 4, box to serve. `--box`
   tells `temper serve` to adopt them, and a serve given `--box` whose
@@ -911,13 +913,21 @@ temper box
   | `step FORGE STEP` | the box | the group's step `fetch`, `prepare` or `run` is starting, for the client's row (`../client/forge.md`, 5.4) |
   | `started FORGE` | the box | the group's long steps are started, Forgejo answers, and its record is written, the demo's group writing none; the engine then takes the handover and reconciles (6.5) |
   | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step by its name, as the box's stderr prefixes it (7.2), such as `prepare 3 exited 1`: `<step> exited <code>`, `<step> killed by signal <n>`, `<step> did not start`, or `record not written`, cut to fit the line's bound, and holds no secret; a step's own lines are on the box's stderr (7.2) |
+  | `stop FORGE` | serve, the demo's, at the demo's end (8.4) | stop the forge's group |
+  | `stopped FORGE` | the box | the group's steps are closed, as the box's own stop closes them (7.2), and the group is dormant again; a record it wrote stays |
 
   One ask at a time: a `start` for another forge while a group starts,
   or while a failed group's steps close, is answered `failed FORGE busy`;
   one for the forge whose group is starting, by that group's own lines;
   one for a forge with no group, `failed FORGE not asked`; one for a
   started group, `started FORGE`; one while the box stops,
-  `failed FORGE stopping`. An
+  `failed FORGE stopping`. A `stop` is an ask as a `start` is, one at a
+  time: for a started group, the box closes its steps, then answers
+  `stopped FORGE`; for a dormant one, `stopped FORGE` at once; for a
+  group starting, or whose failed steps close, `failed FORGE busy`; for
+  a forge with no group, `failed FORGE not asked`; and while the box
+  stops, `failed FORGE stopping`. While a group's steps close, a `start`
+  or a `stop` for any forge is answered `failed FORGE busy`. An
   answer to a `temper serve` that has exited is dropped: its restart
   finds the handover at its start (6.5). Each line is at most
   `box.line_bytes` (configuration.md, section 7), which both sides
@@ -970,6 +980,13 @@ temper box
   running, is sent both; a dormant group's steps run nothing, and are
   sent nothing. A second termination
   signal closes them all. It exits 0 after a stop it was asked for.
+- **Stops a group** at `stop FORGE` (7.1): the group's running steps
+  alone, as the box's stop does, in reverse order, each by a signal,
+  `box.grace_ms`, a second signal, `box.grace_ms` again, then a close;
+  a step that exits during it is not restarted, and a once step still
+  running is closed with them. Once they are all closed the box answers
+  `stopped FORGE`, the group dormant, and runs on; a termination signal
+  during it stops the box as above, which closes them too.
 - **Its streams:** `temper serve`'s stdout, the sign-in links, is the
   box's stdout, as is, but for its first line when a link step follows
   it, which is that step's (8.4). Every other line a step writes, to its stdout or
@@ -996,7 +1013,8 @@ temper box
   the index in `always` it runs just before (its length puts it last).
   Each step carries its `Stage`, whose word its `step` lines carry. The
   machine's step tests drive a group from dormant to `started`, and to
-  `failed`, by lines and exits alone (13.1).
+  `failed`, and a started one to `stopped`, by lines and exits alone
+  (13.1).
 - **The binary hands it the steps.** `temper box` resolves its three
   directories, runs `temper init` when the configuration directory is
   empty (7.1), checks the document as section 8 says, asks `temper-fake`
@@ -1888,8 +1906,8 @@ them as it does any Forgejo.
   `Demo`, keyed by the demo's forge (`store.md`, section 2): none, *not
   started*; *running*, from the person's choice of the playground; and
   *ended*, for good, once real backends replace the demo
-  (`../draft/first-run.md`, 2.3), written by the demo's end, which is
-  not yet built. Nothing else holds it: the box keeps no record of the
+  (`../draft/first-run.md`, 2.3), written by the demo's end (below).
+  Nothing else holds it: the box keeps no record of the
   demo's group (7.1), and the client reads it with the demo
   (`../client/README.md`, 4.8). Each start of the engine reads it, so a
   restart and the moment of the choice look alike: running, the box
@@ -1947,6 +1965,37 @@ them as it does any Forgejo.
   of one still matches it; a branch an agent pushed is lost with the
   fake's state, and the engine's records of it outlive it, until the
   fake keeps its state across starts (below).
+- **The demo's end,** for good (`../draft/first-run.md`, 2.3), the
+  forge connector's, in one decision: the first time it is told a
+  configured forge other than the demo's connected (`forge`; never
+  every fake), while the record is none or running, it
+  1. writes *ended*: a demo never started is ended the same way, and
+     never starts;
+  2. ends the demo's forge in its domain (`../domain/forge.md`, 4.1):
+     no list shows it, the routing serves it no call and drops its
+     hints (`forge.md`, 8.1), and the setup host sets it up no more;
+     and with it `fake.repositories`' repository, which leaves the
+     project's repositories while its tasks, chats and landings stay
+     readable;
+  3. under the box, when the demo ran, asks the box link for `stop
+     FORGE` (7.1), which the link holds while another group starts and
+     sends once that one answers, as it does a start; the box closes
+     the group's steps, the fake LLM's with them, and answers `stopped
+     FORGE`, and a `failed` is named in the log alone. Without a pipe
+     it asks nothing: the fakes are the runner's (7.4), and stopping
+     them is the service manager's;
+  4. answers a start under way *not offered*, as it answers every
+     start after.
+
+  Each start of the engine reads the record: ended, the demo's forge
+  is ended from the start and its group never asked, so a restart and
+  the moment of the end look alike. The client's read answers none
+  (`../client/README.md`, 4.8), so no page shows the playground, and
+  the client removes the demo model's account (4.8). Two parts wait
+  (section 15): the demo's open chats stay open, a person's next words
+  in one run on its charter's models, the demo's no longer served; and
+  the demo model's account outlives an end no client saw, until the
+  person removes it from Accounts.
 - **`temper fake forge check DIRS N OBSERVATIONS STORE`,** no step: the
   QA loop's check of the fake forge's promises (`../qa.md`, 8.3),
   skein's judge (skein's `fake-forge.md`, 2.5) over forge N's
@@ -2480,6 +2529,14 @@ it checks of this document:
   directories finds the demo running, starts its fakes at serve's ask
   with no act made again, and its clone holds the seeded head, since
   the fake keeps no state across its starts.
+- **The playground's end,** a test of its own: a first run's box, the
+  demo started and connected, then a second box on the same
+  directories, its document given a second fake forge, which runs in
+  its place, unasked, and connects at serve's start: the demo ends
+  (8.4), the box's stderr names the demo's group closed and `stopped`,
+  `wait forges` lists the second forge alone, and `temper ctl
+  demo-start` is answered not offered. A third box starts nothing of
+  the demo's group, and answers the same.
 - **A first run set up for real,** a test of its own: `temper box` on
   three empty scratch directories, with the binaries `TEMPER_FORGEJO`
   and `TEMPER_FORGEJO_RUNNER` name placed where the fetch looks,
@@ -2528,6 +2585,12 @@ Each is intended; what it needs is named with it.
   `domain/core.md`, 6.1), so adoption goes to an existing project, the
   template's project 1, "Default". The set up's intent is kept in
   memory alone; keeping it across a restart is open (section 16).
+- **The rest of the demo's end** (8.4): its open chats ended, "ended
+  with the playground", which needs jig to take a deployment's close of
+  a person's open chat, and a definition of the demo's chats (those its
+  suggested requests started, or every open chat of its project); and
+  the demo model's account removed by the engine at the end, when no
+  client saw it, once jig carries a deployment owner's acts (above).
 - **A lock and an exec in skein's shell,** onto which 6.4's module
   moves once skein's shell offers an exec and a lock held across it,
   which skein's `Lock` is not (skein's `io.md`, section 5). A second

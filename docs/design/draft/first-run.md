@@ -116,18 +116,13 @@ Forgejo and model).
   client's start in `../client/README.md`, 3.5, 4.6, 4.8 and section 8.
   The seed (3.6) and its link step go: serve's first link is the
   person's.
-- **The demo ends for good.** The person's first usable model ends the
-  demo model's account. Their first connected forge, other than the
-  demo's (`application.demo.forge`, never every fake), ends the demo:
-  the engine records it, asks the box to stop the fake forge (a pipe
-  line, `stop FORGE`), and leaves the forge in its domain as ended, so
-  that nothing that lists forges shows it. The demo's open chats end;
-  `playground/widget` leaves the project's repositories; its tasks, chats and
-  landings stay readable. A start reads the same record, so a restart
-  and the moment of the end look alike. A demo never started is ended
-  the same way, and never starts.
-- **Without the box** there is no pipe: the engine ends the demo and
-  ignores the fake; stopping it is the service manager's.
+- **The demo ends for good:** adopted (first-run-ux's M4). The end,
+  its record and a restart after it in `../protocol/setup.md`, 8.4,
+  the box's `stop` and `stopped` in 7.1 and 7.2; the forge and its
+  repository ended in `../domain/forge.md`, 4.1, and
+  `../protocol/forge.md`, 2.8 and 8.1; the client's re-read and the
+  demo model's account in `../client/README.md`, 4.8. The demo's open
+  chats' end waits on jig (setup.md, section 15).
 - **The person meets the demo as the playground.** "Demo" undersells
   it and "fake" is harsh; the design keeps the demo as its concept's
   name (`application.demo`, the `fake` mode, the demo's halves). The
@@ -316,11 +311,13 @@ experience; good defaults for a person's real work are open (section 8).
 4. **Going real from the client:** fetch, the dormant owned forge, the
    box's pipe, the handover at runtime, and the client's banner and
    wording.
-5. **The welcome and the demo's end** (2.3): the demo's state in the
-   engine, the fakes asked and the seed's acts in the engine (designed:
-   setup.md, 7.1 and 8.4), `stop` on the pipe, the welcome and its wizard in the client, and the
+5. **The welcome and the demo's end** (2.3): adopted, closed here.
+   The demo's state, the fakes asked, the seed's acts and the end in
+   the engine, `stop` on the pipe (setup.md, 7.1, 7.2 and 8.4;
+   `../domain/forge.md`, 4.1), the welcome, its wizard and the halves
+   in the client (`../client/README.md`, 3.5 and 4.8), and the
    playground's words in the fake's scripts, `temper init`'s document
-   and the client.
+   and the client; what is built is `STATUS.md`'s.
 
 ## 6. Testing
 
