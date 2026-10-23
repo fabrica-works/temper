@@ -9,8 +9,8 @@ work best, without it unless it helps them (section 4). It answers
 `client/browser.md`'s open question "The bundle in the binary" (section
 5), whose default this draft replaces. A spike, a throwaway crate in a
 worktree, never landed, built the dev bundle inside `cargo build` as
-section 2 says; section 6 holds its numbers. Section 8 holds what is
-still open, each with a default.
+section 2 says; section 6 holds its numbers. Section 8 holds what the
+user decided on 2026-10-23; the release pipeline is later (section 7).
 
 ## 1. In one page
 
@@ -316,17 +316,18 @@ and 1.0 s with the bundler built so.
   where they are published. This draft makes the binary whole; it does
   not ship it.
 
-## 8. Open questions
+## 8. Decided
 
-1. **The embed without the wasm32 target:** the build fails, naming the
-   two ways out (2.4), or it warns and makes a binary without the
-   browser. Default: it fails. A silent binary without its browser is
-   what this draft removes, and the machine's builds, which set `none`,
-   never meet it.
-2. **A `rust-toolchain.toml` naming the target,** so that rustup adds it
-   by itself on a first build. It also sets the channel for every
-   rustup user, which temper does not set today (`rust-version` alone).
-   Default: none; the failure's message names the command.
-3. **A switch to serve no browser** from a binary that has one, such as
-   `clients.bundle` `false`. Default: none, until a deployment asks; the
-   browser is reached only by a printed link, as the terminal is.
+The user's, on 2026-10-23, each as this draft proposed.
+
+1. **The embed without the wasm32 target fails the build,** naming the
+   two ways out (2.4), rather than warning and making a binary without
+   the browser. A silent binary without its browser is what this draft
+   removes, and the machine's builds, which set `none`, never meet it.
+2. **No `rust-toolchain.toml`:** one naming the target would let rustup
+   add it on a first build, but would also set the channel for every
+   rustup user, which temper does not set (`rust-version` alone). The
+   failure's message names the command.
+3. **No switch to serve no browser** from a binary that has one, such as
+   `clients.bundle` `false`, until a deployment asks: the browser is
+   reached only by a printed link, as the terminal is.
