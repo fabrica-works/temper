@@ -48,13 +48,13 @@ fn init_wires_forge_three_as_an_asked_owned_forge() {
     assert_eq!(forge["transport"], "plaintext");
     assert_eq!(forge["api"], setup["mode"]["owned"]["listen"]);
     assert_eq!(forge["git"], format!("http://{}", forge["api"]["socket"].as_str().expect("socket")));
-    assert_eq!(forge["api_token"], "forge-3/api_token");
-    assert_eq!(forge["user"]["file"], "forge-3/user");
-    assert_eq!(forge["webhook_secret"], "forge-3/webhook_secret");
+    // M4: the owned forge starts from its handover and records, naming no credential file.
+    for member in ["api_token", "user", "webhook_secret"] {
+        assert!(forge.get(member).is_none(), "the owned forge names no {member}");
+    }
     let identity = entry(&value, "identities", "forge", 3);
     assert_eq!(identity["login"], "temper");
-    let text = serde_json::to_string(identity).expect("identity JSON");
-    assert!(text.contains("forge-3/git_token"), "the owned identity names its token file");
+    assert!(identity.get("token").is_none(), "the owned identity names no token file");
     assert_eq!(setup["directory"], "forge-3");
     assert_eq!(setup["start"], "asked");
     assert_eq!(setup["bot"]["login"], "temper");
@@ -166,6 +166,7 @@ fn a_box_on_inits_document_leaves_the_asked_forge_and_cache_absent() {
 }
 
 #[test]
+#[ignore = "superseded: M4 starts an owned forge from its handover and records and reads none of these files (setup.md 6.5); the old form goes with temper-15"]
 fn asked_forge_accepts_every_subset_of_missing_files() {
     let scratch = support::Scratch::startup("qa-setup-subsets");
     init(scratch.path());
@@ -200,6 +201,7 @@ fn asked_forge_accepts_every_subset_of_missing_files() {
 }
 
 #[test]
+#[ignore = "superseded: M4 starts an owned forge from its handover and records and reads none of these files (setup.md 6.5); the old form goes with temper-15"]
 fn an_unasked_owned_forge_refuses_each_missing_file() {
     let scratch = support::Scratch::startup("qa-setup-unasked");
     let (mut value, _) = init(scratch.path());

@@ -663,10 +663,12 @@ files: at a first preparation, and for a runner older than its pin
   that fails leaves the forge not connected, named by the plan's step or file
   operation, never a secret; at `started`, it is set up failed. A
   `TakeOver` stop leaves the file; a failed removal blocks reconcile.
-  The row names the file as "forge N's admin_token" with the step and
-  a short reason, within the wire's 256 bytes for `SetUpFailed`'s
-  `why`; the operator's note names the file's full path, never its
-  bytes. The next start or ask takes that handover over again. The
+  The row says not connected after a start; at `started`, set up
+  failed with its `why`, the step and a short reason within the wire's
+  256 bytes, a file operation naming the file as "forge N's
+  admin_token". The operator's note names the plan's step and its
+  reason, and for a file operation the file's full path; never the
+  file's bytes. The next start or ask takes that handover over again. The
   engine and every other forge run on. "Set up again"
   asks the box, which answers a started group `started` at once (7.1),
   and the engine runs the same sequence again.
