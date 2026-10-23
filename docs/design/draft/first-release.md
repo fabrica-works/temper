@@ -25,10 +25,11 @@ them. Nothing here is adopted.
   workers under systemd, where temper's own development moves lane by
   lane. Anyone may read it without signing in, as an anonymous party
   whose load is capped and who sees nothing an agent wrote (section 5).
-- **Upgrades are offline,** from a frozen v0.1.0 baseline: stop,
-  translate the store, start. Workers may keep their runs while the
-  engine alone restarts. Until the baseline, dev.fabrig.ai's history
-  resets when a format changes (section 6).
+- **Upgrades are offline,** from a frozen baseline expected at v0.1.0:
+  stop, translate the store, start, as `upgrades.md` designs. Workers
+  may keep their runs while the engine alone restarts. Until the
+  baseline, dev.fabrig.ai's history resets when a format changes
+  (section 6).
 - **A person configures temper by talking to it:** they describe their
   workflow, as skein's `owners.md` and `director.md` describe ours, and
   an agent configures temper. Templates, charters and policies become
@@ -183,100 +184,30 @@ keeps the lasting record (code, changes, releases) throughout.
 
 ## 6. Upgrades
 
-An investigation of 2026-10-23 (Codex, read-only;
-`~/src/rust/tmp/roadmap-3/store-upgrades.md`).
+Designed in `upgrades.md`, from an investigation of 2026-10-23 (Codex,
+read-only; `~/src/rust/tmp/roadmap-3/store-upgrades.md`). In short:
 
-### 6.1 Today
-
-- **No upgrade in place:** each encoding has one current version, and a
-  store written by another refuses to open (jig's `protocol/README.md`,
-  sections 7 and 14). temper's own documents move an old store aside and
-  start again (`../protocol/store.md`).
-- **What an upgrade carries:** skein-kv's two maps (the records and the
-  secrets), the transcript files whose offsets the map holds, the
-  configuration, the deployment's and installation's identities, and each
-  worker host's program directory. A worker holds no authoritative state
-  of its own.
-- **Churn:** in the four weeks to 2026-10-23, 26 bumps of the engine's
-  stored families (20 jig's, 6 temper's): 21 mostly additive, 2
-  repackings, 3 that reshape concepts. The wire moved as much: jig's
-  client to version 13 and worker channel to 9, temper's client payload
-  to 10 and worker payload to 4.
-- **A version number does not yet name one layout:** plans may share a
-  version and change its schema under it (`../protocol/README.md`). No
-  translator can tell such stores apart, so no promise covers stores from
-  before a frozen baseline.
-
-### 6.2 Offline, from a v0.1.0 baseline
-
-The user's choice: offline upgrades.
-
-- **Stop, translate, start.** A tool translates a copy of the store into
-  a new generation, through frozen translators per family chained N to
-  N+1, rebuilds its indexes and transcript offsets, checks every join,
-  and then switches the active generation atomically. The old generation
-  is untouched, and a refused translation leaves it in place.
-- **The promise starts at v0.1.0:** formats frozen there, every later
-  store translatable from it.
-- **Paused work survives; agents' context may not.** Tasks and goals keep
-  their definitions. An agent whose run ended at the upgrade resumes from
-  a fresh brief, its old turns readable through frozen readers of smith's
-  formats.
-- **Rolling upgrades,** an engine and workers of mixed versions, are a
-  much larger project, and out.
-- **Its size:** 16 milestones of 2 to 3 hours (32 to 48 hours) across
-  skein (import at a kept commit position), jig (its families, the
-  transcripts, the chain), smith (frozen readers), temper (its records,
-  the configuration, the switch) and the proofs: golden stores per
-  version, an upgrade in the middle of a story, power loss during
-  translation.
-
-### 6.3 Workers keep their runs
-
-The user's point: with the engine and workers deployed apart, agents may
-go on while the engine restarts. jig designed for it. Runs and attempts
-are named durably, a worker that reconnects after the engine restarted
-names its runs in its hello, and the engine's restart adopts them as
-workers say hello (jig's `protocol/channel.md`, sections 7 and 10.2). A
-worker that lost its engine redials within its grace, and cancels its
-runs only past it (section 10.1 there); the engine restarting while
-workers keep runs is among jig's channel stories (section 12 there).
-So:
-
-- **A restart of the engine alone** keeps the workers' runs, if it fits
-  within their grace.
-- **An upgrade of the engine alone** keeps them too, when it leaves the
-  worker channel's and temper's worker payload's versions unchanged, its
-  translation keeps live claims and attempts as well as history, and the
-  stop, translation and start fit within the grace. External effects
-  still pending are settled before it starts.
-- **An upgrade that changes the worker wire** upgrades the workers with
-  the engine: their runs end, and section 6.2's fresh brief applies. At
-  today's churn most upgrades are of this kind; the share falls as the
-  wire settles.
-
-### 6.4 The policy from the baseline
-
-- **Every change to what is stored,** bytes, keys, nested payloads or the
-  meaning of a value, declares a new version and brings its translator,
-  additive changes included.
-- **The gate holds it:** fingerprints of every frozen schema, key and
-  codec; a changed fingerprint under an old version, or a missing link in
-  the chain, fails; the oldest and the previous golden stores are
-  upgraded into the candidate on every gate.
-- **It costs every owner,** about 1 to 2 milestones for an additive
-  change and 2 to 4 for a change of meaning (the investigation's guess,
-  likely high once the machinery exists). When it starts is the user's
-  call.
-
-### 6.5 Retention
-
-A long-lived deployment keeps history on purpose. Tasks forgotten once
-read and transcripts past their horizon are erased (jig's
-`protocol/store.md`), and temper's table of landings is bounded
-(`../protocol/store.md`). Its retention policy is roadmap 1's gap 8
-(a retention policy), designed before dev.fabrig.ai opens; an upgrade
-cannot bring back what retention erased.
+- **Offline, from a baseline:** stop, translate the store into a new
+  generation, switch, start. Versions freeze at cuts, which are
+  releases; the first cut is the baseline, expected at v0.1.0, and when
+  it comes is unknown. Until then development proceeds unchanged, and a
+  store whose format changes is made again (section 5.4).
+- **What survives:** every record, live and ended. An agent resumes its
+  conversation, or starts from a fresh brief when smith's turns changed
+  their version, its old turns readable.
+- **dev.fabrig.ai's workers may keep their runs** while the engine alone
+  is upgraded, when their wire is unchanged and the window fits their
+  grace (`upgrades.md`, section 9). An upgrade that changes the workers'
+  wire upgrades them too, and their runs end.
+- **The policy from the baseline** costs every owner a translator step
+  per stored change, shared by every change in a cut, and the gate holds
+  it (`upgrades.md`, section 12).
+- **Retention.** A long-lived deployment keeps history on purpose. Tasks
+  forgotten once read and transcripts past their horizon are erased
+  (jig's `protocol/store.md`), and temper's table of landings is bounded
+  (`../protocol/store.md`). Its retention policy is roadmap 1's gap 8 (a
+  retention policy), designed before dev.fabrig.ai opens; an upgrade
+  cannot bring back what retention erased.
 
 ## 7. Configuring temper by talking to it
 
@@ -443,8 +374,9 @@ broken into missions as it starts:
 6. **Runtime records,** after projects at runtime; then documentation in
    the binary and the configuring agent.
 7. **The download,** from roadmap 2's usable point.
-8. **Upgrades,** designed now, built at the v0.1.0 freeze, with the
-   policy turned on by the user. Retention before dev.fabrig.ai opens.
+8. **Upgrades,** designed in `upgrades.md`, built as the baseline
+   approaches, with the policy turned on by the user at its first cut.
+   Retention before dev.fabrig.ai opens.
 
 ## 12. Open questions
 
@@ -462,5 +394,6 @@ broken into missions as it starts:
 - **People's names on public pages.** Default: hidden.
 - **Claude for temper-on-temper's first lane,** or ChatGPT alone.
   Default: ChatGPT, roadmap 2's first backend.
-- **When the upgrade policy starts.** Default: at the v0.1.0 freeze.
+- **When the upgrade policy starts.** Default: at the first cut, the
+  baseline, expected at v0.1.0; its timeline is unknown.
 - **The playground's memory bar.** Default: a phone's browser.
