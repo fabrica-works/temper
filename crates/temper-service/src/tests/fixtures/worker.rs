@@ -27,6 +27,7 @@ pub fn assignment() -> jig_domain_host::Assignment {
     use skein_lib::Token;
     host::Assignment {
         assignment: host::RunAssignment {
+            live: host::LiveAsk::NONE,
             identity: [7; 16],
             run: Token::new(1),
             attempt: Token::new(2),
@@ -147,6 +148,7 @@ pub fn worker_settings() -> crate::settings::Worker {
         detail_bytes: 64,
         held: 2,
         inbox: 2,
+        piece_bytes: 4096,
         event_bytes: 512,
         run_calls: 1,
         facts: 4,

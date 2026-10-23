@@ -408,6 +408,7 @@ pub fn parts(up: &host::LinkUp, parts: &[Part], limits: &wire::Limits) -> Option
         },
         host::LinkUp::Logins { .. }
         | host::LinkUp::SignedOut { .. }
+        | host::LinkUp::Piece { .. }
         | host::LinkUp::Activity { .. }
         | host::LinkUp::Unauthorized { .. }
         | host::LinkUp::Limited { .. }

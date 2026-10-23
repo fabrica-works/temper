@@ -1,7 +1,8 @@
-//! Worker channels in the hub's link vocabulary (jig's `domain/hosts.md`, 2
-//! and 6.4; `testing/jig-test-domain/src/link.rs`). Payloads stay owned here
-//! until the fleet asks for or drops them. The protocol layer alone reads an
-//! ended answer's outcome and encodes typed assignments.
+//! Worker channels in the hub's link vocabulary (jig's `domain/hosts.md`, 2,
+//! 6.4 and 6.5; `domain/engine.md`, 11; `testing/jig-test-domain/src/link.rs`).
+//! Payloads stay owned here until the fleet asks for or drops them. The
+//! protocol layer alone reads an ended answer's outcome and encodes typed
+//! assignments.
 use crate::boundary::{Link, Parts, Payload, Request, Work, WorkerRequest};
 use crate::domain::Domain;
 use alloc::boxed::Box;
@@ -36,12 +37,30 @@ pub(crate) fn settled_resource(heads: &[(forge::Name, skein_forge::api::Commit)]
     Some(u64::from(name.repository))
 }
 
-/// Translate one channel input into the core's fleet vocabulary; `None`
-/// when the root has no room to keep a record's bytes, which admission
-/// ([`crate::try_step`]) hands back first, and its host sends again.
+/// Translate one channel input into the core's vocabulary. Unkept live pieces
+/// are dropped and counted (jig's `domain/engine.md`, 11). Other records return
+/// `None` when the root has no room for their bytes, which admission
+/// ([`crate::try_step`]) hands back first, and their host sends again.
 pub(crate) fn receive(domain: &mut Domain, channel: Token, link: Link) -> Option<core::Event> {
     Some(core::Event::Fleet(match link {
         Link::Hello { worker, hello } => fleet::Event::Hello { channel, worker, hello: self::hello(hello) },
+        Link::Up { up: host::LinkUp::Piece { run, attempt, piece }, .. } => {
+            if piece.kind == host::LiveKind::Text
+                && let Ok(offset) = u32::try_from(piece.offset)
+            {
+                return Some(core::Event::RunText {
+                    run,
+                    attempt,
+                    turn: piece.turn,
+                    retry: piece.retry,
+                    offset,
+                    text: piece.bytes,
+                    call: None,
+                });
+            }
+            domain.pieces_dropped = domain.pieces_dropped.saturating_add(1);
+            return None;
+        }
         Link::Up { up, parts } => self::up(domain, channel, up, parts)?,
         Link::Lost => fleet::Event::Lost { channel },
     }))
@@ -115,6 +134,7 @@ fn phase(phase: host::Phase) -> fleet::Phase {
 /// Retain a worker's bytes and temper's parts; translate only their metadata.
 fn up(domain: &mut Domain, channel: Token, up: host::LinkUp, parts: Parts) -> Option<fleet::Event> {
     Some(match up {
+        host::LinkUp::Piece { .. } => unreachable!("live pieces route directly to the core in receive"),
         host::LinkUp::Logins { logins } => {
             let mut rows = List::with_capacity(u32::try_from(logins.len()).expect("bounded source rows"));
             for login in logins {
@@ -504,6 +524,102 @@ const fn source_failure(reason: host::SourceFailure) -> fleet::SourceFailure {
 mod tests {
     use super::*;
     use skein_lib::Duration;
+
+    #[test]
+    fn text_pieces_reach_the_core_with_their_identity_and_offsets() {
+        let (mut domain, _) = crate::tests::resume_fixture::root();
+        let run = Token::new(31);
+        let attempt = Token::new(932);
+        for offset in [0, u32::MAX] {
+            let event = receive(
+                &mut domain,
+                Token::new(7),
+                Link::Up {
+                    up: host::LinkUp::Piece {
+                        run,
+                        attempt,
+                        piece: host::Piece {
+                            turn: 3,
+                            retry: 2,
+                            kind: host::LiveKind::Text,
+                            offset: u64::from(offset),
+                            bytes: Box::from(&b"words"[..]),
+                        },
+                    },
+                    parts: Parts::none(),
+                },
+            );
+            let Some(core::Event::RunText {
+                run: actual_run,
+                attempt: actual_attempt,
+                turn,
+                retry,
+                offset: actual_offset,
+                text,
+                call,
+            }) = event
+            else {
+                panic!("text reaches core")
+            };
+            assert_eq!((actual_run, actual_attempt, turn, retry, actual_offset), (run, attempt, 3, 2, offset));
+            assert_eq!(text.as_ref(), b"words");
+            assert_eq!(call, None);
+        }
+        assert_eq!(domain.pieces_dropped(), 0);
+    }
+
+    #[test]
+    fn unkept_piece_kinds_and_offsets_are_dropped_and_counted() {
+        let (mut domain, _) = crate::tests::resume_fixture::root();
+        for (index, (kind, offset)) in [
+            (host::LiveKind::Reasoning, 0),
+            (host::LiveKind::Input { call: Box::from(&b"call"[..]), tool: Box::from(&b"tool"[..]) }, 0),
+            (host::LiveKind::Text, u64::from(u32::MAX) + 1),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert!(
+                receive(
+                    &mut domain,
+                    Token::new(7),
+                    Link::Up {
+                        up: host::LinkUp::Piece {
+                            run: Token::new(31),
+                            attempt: Token::new(932),
+                            piece: host::Piece { turn: 3, retry: 2, kind, offset, bytes: Box::from(&b"words"[..]) }
+                        },
+                        parts: Parts::none(),
+                    }
+                )
+                .is_none()
+            );
+            assert_eq!(domain.pieces_dropped(), u64::try_from(index + 1).expect("three cases"));
+        }
+        domain.pieces_dropped = u64::MAX;
+        assert!(
+            receive(
+                &mut domain,
+                Token::new(7),
+                Link::Up {
+                    up: host::LinkUp::Piece {
+                        run: Token::new(31),
+                        attempt: Token::new(932),
+                        piece: host::Piece {
+                            turn: 3,
+                            retry: 2,
+                            kind: host::LiveKind::Reasoning,
+                            offset: 0,
+                            bytes: Box::new([]),
+                        }
+                    },
+                    parts: Parts::none(),
+                }
+            )
+            .is_none()
+        );
+        assert_eq!(domain.pieces_dropped(), u64::MAX);
+    }
 
     #[test]
     fn met_notices_name_the_dependency_and_preserve_any_words() {

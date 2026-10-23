@@ -62,6 +62,7 @@ fn decoded_chat_start(agent: &crate::settings::Agent) -> Box<smith_host_domain::
     crate::worker_route::decode(
         source.run,
         hub::Start {
+            live: hub::LiveAsk::NONE,
             workspace: Some(Token::new(3)),
             charter: source.charter,
             activation: 1,
@@ -1001,6 +1002,7 @@ fn multiple_models_and_providers_preserve_the_supplied_grant_list() {
     let start = crate::worker_route::decode(
         Token::new(31),
         hub::Start {
+            live: hub::LiveAsk::NONE,
             workspace: None,
             charter,
             activation: 2,

@@ -26,6 +26,8 @@ pub struct Assignment {
     pub attempt: u64,
     /// The conversation's first attempt, shared by its resumes.
     pub conversation: u64,
+    /// The core's ask for live content (jig's `domain/engine.md`, 7.1).
+    pub live: host::LiveAsk,
     /// Configured charter, never selected by the worker.
     pub charter: u32,
     /// Root-owned charter policy and task result contract for this activation.

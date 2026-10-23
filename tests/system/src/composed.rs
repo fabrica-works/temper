@@ -815,6 +815,7 @@ impl World {
                     host::LinkUp::Call { .. } => self.observed.relays += 1,
                     host::LinkUp::Logins { .. }
                     | host::LinkUp::SignedOut { .. }
+                    | host::LinkUp::Piece { .. }
                     | host::LinkUp::Activity { .. }
                     | host::LinkUp::Unauthorized { .. }
                     | host::LinkUp::Limited { .. }

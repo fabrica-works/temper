@@ -23,6 +23,7 @@ fn assignment() -> engine::Assignment {
         task: 23,
         attempt: 7,
         conversation: 7,
+        live: jig_domain_host::LiveAsk::NONE,
         charter: 1,
         run: Box::new(engine::RunCharter {
             ended_by: jig_domain_tasks::EndedBy::Result,

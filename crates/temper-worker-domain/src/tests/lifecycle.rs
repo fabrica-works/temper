@@ -256,6 +256,7 @@ fn no_notices(rows: &[Request]) {
             | host::LinkUp::SignedOut { .. }
             | host::LinkUp::Turn { .. }
             | host::LinkUp::Call { .. }
+            | host::LinkUp::Piece { .. }
             | host::LinkUp::Activity { .. }
             | host::LinkUp::Answer { .. } => {}
         }

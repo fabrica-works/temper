@@ -56,6 +56,7 @@ pub fn limits() -> Limits {
             detail_bytes: 32,
             held: 2,
             inbox: 2,
+            piece_bytes: 4096,
             event_bytes: 96,
             run_calls: 2,
             facts: 256,
