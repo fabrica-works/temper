@@ -25,8 +25,9 @@ them. Nothing here is adopted.
   workers under systemd, where temper's own development moves lane by
   lane. Anyone may read it without signing in, as an anonymous party
   whose load is capped and who sees nothing an agent wrote (section 5).
-- **Upgrades are offline,** from a frozen baseline expected at v0.1.0:
-  stop, translate the store, start, as `upgrades.md` designs. Workers
+- **Upgrades are patches,** landed with each stored change from a
+  baseline expected at v0.1.0 and applied at start, as `upgrades.md`
+  designs. Workers
   may keep their runs while the engine alone restarts. Until the
   baseline, dev.fabrig.ai's history resets when a format changes
   (section 6).
@@ -187,21 +188,25 @@ keeps the lasting record (code, changes, releases) throughout.
 Designed in `upgrades.md`, from an investigation of 2026-10-23 (Codex,
 read-only; `~/src/rust/tmp/roadmap-3/store-upgrades.md`). In short:
 
-- **Offline, from a baseline:** stop, translate the store into a new
-  generation, switch, start. Versions freeze at cuts, which are
-  releases; the first cut is the baseline, expected at v0.1.0, and when
-  it comes is unknown. Until then development proceeds unchanged, and a
-  store whose format changes is made again (section 5.4).
+- **Patches, from a baseline,** as an application migrates its
+  database: every landing that changes what is stored brings a patch,
+  and a start applies the pending ones to a copy of the store and
+  switches to it. Any store from the baseline on upgrades to any later
+  `main`, so dev.fabrig.ai may follow `main`. The baseline is expected
+  at v0.1.0, and when it comes is unknown. Until then development
+  proceeds unchanged, and a store whose format changes is made again
+  (section 5.4).
 - **What survives:** every record, live and ended. An agent resumes its
-  conversation, or starts from a fresh brief when smith's turns changed
-  their version, its old turns readable.
+  conversation, its old turns patched as they are read, unless a patch
+  says its window starts fresh.
 - **dev.fabrig.ai's workers may keep their runs** while the engine alone
   is upgraded, when their wire is unchanged and the window fits their
   grace (`upgrades.md`, section 9). An upgrade that changes the workers'
   wire upgrades them too, and their runs end.
-- **The policy from the baseline** costs every owner a translator step
-  per stored change, shared by every change in a cut, and the gate holds
-  it (`upgrades.md`, section 12).
+- **The policy from the baseline** costs a patch per stored change,
+  most of them derived by a tool from two schemas that skein-codec reads
+  at run time, and the gate holds it (`upgrades.md`, sections 4, 5 and
+  12).
 - **Retention.** A long-lived deployment keeps history on purpose. Tasks
   forgotten once read and transcripts past their horizon are erased
   (jig's `protocol/store.md`), and temper's table of landings is bounded
@@ -375,7 +380,7 @@ broken into missions as it starts:
    the binary and the configuring agent.
 7. **The download,** from roadmap 2's usable point.
 8. **Upgrades,** designed in `upgrades.md`, built as the baseline
-   approaches, with the policy turned on by the user at its first cut.
+   approaches, with the policy turned on by the user at the baseline.
    Retention before dev.fabrig.ai opens.
 
 ## 12. Open questions
@@ -394,6 +399,6 @@ broken into missions as it starts:
 - **People's names on public pages.** Default: hidden.
 - **Claude for temper-on-temper's first lane,** or ChatGPT alone.
   Default: ChatGPT, roadmap 2's first backend.
-- **When the upgrade policy starts.** Default: at the first cut, the
-  baseline, expected at v0.1.0; its timeline is unknown.
+- **When the upgrade policy starts.** Default: at the baseline,
+  expected at v0.1.0; when is unknown.
 - **The playground's memory bar.** Default: a phone's browser.
