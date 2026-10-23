@@ -92,7 +92,10 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
     skein's `panic` story (4.1);
   - `host`: the client host: temper's client root and view, and the
     view's patch queue, reserved at start at the view's limit on
-    patches and drained each turn (skein's `ui-web.md`, 5.2); jig's
+    patches and drained each turn (skein's `ui-web.md`, 5.2); the root's
+    `Leave`, a sign-in's departure (`README.md`, 3.5, The tab's
+    departure), as skein's transport's navigation away, in the turn
+    that asked it (skein's `ui-web.md`, section 10); jig's
     mapping under `/jig` and its stream; the root's requests to jig's
     adapter (`jig-client-shell-web`'s `adapter`) and skein's transport,
     and their reports back to the root; and the wake, skein's timer
@@ -247,7 +250,12 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   the other, a value that doesn't read as its field's, or a field of
   another name, is dropped, and the address replaced with the printed
   one. It reads a number and a kind, not the configured providers: a
-  way they do not offer shows Choose.
+  way they do not offer shows Choose. A sign-in's way may add its
+  sign-in's source, `&source=S`, S a source's number in decimal, the
+  address a sign-in returns to (`README.md`, 3.5, The tab's departure):
+  `/accounts/connect?provider=1&way=sign-in&source=7`. A source on
+  another way, or one that doesn't read as a number, is dropped as
+  above.
 - **A filter chosen is a move** (below), with its history entry: a
   link's, at the page's top with the focus on its heading, and back
   returns to the filter before. Like any move it folds the open
@@ -371,7 +379,8 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   process tier has them (`../domain/testing.md`, 2.6), join with the
   second milestone's first story that needs them (4.2). The one
   exception is 4.4's test, for which the forge peer joins earlier
-  serving only the fake's GitHub `web`.
+  serving only the fake's GitHub `web`. skein's fake issuer joins for
+  `ConnectModel`'s round trip alone (4.2).
 - **Only what a browser alone shows.** temper's stories (what a page
   shows, what an act sends, a chat answered, a proposal accepted, a
   repository adopted, a run's live text) are the joint world's
@@ -436,6 +445,29 @@ behaviour brings its story with it: `ConnectModel`'s sign-in, its tab
 sent to the provider's address and back to the page it left
 (`README.md`, 3.5).
 
+**`ConnectModel`'s sign-in, the round trip.** What only a browser
+shows: the page's own tab leaving for the provider's address, the
+provider's redirect followed to the engine's listener, its `303` back
+to the page, and the page come back, a new client, drawing the end.
+- **Against:** `temper serve` with its OpenAI provider's issuer, its
+  authorization, token and key addresses, skein's fake issuer
+  (`skein_fake_peers::oauth::Peer`), hosted on loopback in the
+  harness's loop, its one grant a success for a synthetic subject, and
+  the provider's redirect port the kernel's (the listener's port
+  varies). The fake has no TLS, so the tier's bundle is built with
+  skein-ui-web's `loopback-navigation` (4.3).
+- **The story:** a person on `ConnectModel`'s Choose presses "Continue
+  with ChatGPT"; the browser follows the issuer's redirect and the
+  listener's `303` alone, and the address reads
+  `/accounts/connect?provider=1&way=sign-in&source=S`; the page shows
+  Ready ("Signed in to ChatGPT"); the fake has taken one authorization
+  and one code exchange. A reload then shows Ready again and the issuer
+  has taken no second authorization: the departure is once.
+- **Not here:** the departure's order, `Return` before `Leave`, its
+  refusal and the terminal's root without one are the client world's
+  (`tests/client`); the path's check, the engine's; the `303`, its
+  absence and a return for no sign-in, skein's listener tier.
+
 ### 4.3 Its budget and the gate
 
 - **A suite of its own,** outside the focused and fuzzy suites
@@ -443,6 +475,11 @@ sent to the provider's address and back to the page it left
   (`tests/client-browser`, `temper-client-browser-world`), run by
   temper's gate with a nextest profile `browser`, one test at a time,
   on the bundle the gate builds once, with the dev profile.
+- **The bundle the gate builds** turns on skein-ui-web's
+  `loopback-navigation` (`scripts/bundle.sh --loopback`), so that the
+  round trip (4.2) can send its tab to the fake issuer on plaintext
+  loopback; `scripts/install.sh`'s bundle never does (skein's
+  `ui-web.md`, section 10).
 - **A guide: at most 12 tests, and about 120 seconds** (60 seconds before
   the user's doubling of 10-22, provisional) on the slowest of the machines
   that run temper's gate. Past it, a story moves to a world or goes, and the

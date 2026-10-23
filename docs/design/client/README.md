@@ -590,13 +590,37 @@ keeps (`../protocol/configuration.md`, section 2).
     Ready, or the ending's words and acts (5.5, A sign-in). The
     terminal prints the address and opens no browser (6.5). It assumes
     a browser on the engine's machine and detects none elsewhere
-    (section 11, A browser on another machine). Two parts are no one's
-    yet: skein-ui gives a view no way to send its tab to an external
-    address, only a link that opens a tab of its own (skein's `ui.md`,
-    6.2; skein's `ui-web.md`, its link), and jig's listener answers the
-    provider's redirect with nowhere to send the browser on (jig's
-    `protocol/llm.md`, 5.4). Until both are, the page shows the address
-    as an external link, a tab of its own, as the terminal prints it.
+    (section 11, A browser on another machine).
+  - *The tab's departure,* in a browser, in this order. The sign-in's
+    answer, `AccountSignInStarted`, names its source S and the address.
+    The page then sends `Return { source: S, path }` (4.6), `path` the
+    address it returns to: `ConnectModel`'s at the way with the source,
+    `/accounts/connect?provider=N&way=sign-in&source=S` (`browser.md`,
+    2.3), or the welcome's Ready, `/welcome?at=ready`, from the
+    welcome's Model step. Once `Return` is answered done, the root asks
+    its shell to leave for the address (`Request::Leave`), once, from
+    that answer: never from its state, so that no build, reload or
+    return asks again, and a page come back knows no departure of its
+    own. A `Return` refused, failed or lost leaves the page where it is.
+    Signing in shows the address as an external link throughout, a tab
+    of its own, so that a page that stays, a shell that cannot leave
+    (the terminal's root is made with no departure: it sends no
+    `Return`) and a browser that refuses the target (skein's `ui-web.md`,
+    section 10) still offer it. The engine keeps a return as long as
+    the sign-in, and never across a restart: after one, its listener
+    answers with its fixed page, "Sign-in received. You may close this
+    page.", and the person goes back to the page by hand (skein's
+    `oauth.md`, 6.5).
+  - *Come back,* the page is a new client at `ConnectModel`'s address
+    with the source (`browser.md`, 2.3): it takes the source's sign-in
+    as its own and draws it as Signing in did, while the `accounts`
+    watch lists it under way, then its end: Ready, or the ending's words
+    and acts, when the document's last ending is the source's. Until
+    the watch has delivered, Signing in's card alone; a source the watch
+    shows neither under way nor ended (another's, or one whose end a
+    later ending has replaced) is no sign-in of the page's: Signing in
+    shows the way's card again, with its button, and the address drops
+    the source.
   - *Details* is the way's field: a key's secret field and "Add key"; a
     program's name field and "Declare". Declaring a program's login
     asks its name, 1 to 32 of `a` to `z`, `0` to `9` and `-`, `claude-`
@@ -619,8 +643,8 @@ keeps (`../protocol/configuration.md`, section 2).
   - *At a sign-in's address with none under way,* as a link to it, a
     reload or the banner's way opens it, Signing in shows the way's
     card again, with its button, which sends the sign-in. A sign-in
-    started from another client is not this page's: its end is the
-    accounts page's.
+    started from another client is not this page's, unless its address
+    names it by its source (above): its end is the accounts page's.
   - *Its state and acts* are a page of the domain's own, its way, its
     key's value, its program's name and its request, built from the
     accounts' requests (jig's `client/domain/contract.md`, 3.2); the
@@ -683,7 +707,8 @@ keeps (`../protocol/configuration.md`, section 2).
     (above), its way in the welcome's address (`browser.md`, 2.3), "‹
     All ways" back to its Choose, so that an account added there is the
     accounts page's too; a sign-in sends the browser back to the
-    welcome at its Ready. Until it does (`ConnectModel`, Signing in),
+    welcome at its Ready, `/welcome?at=ready` (`ConnectModel`, The
+    tab's departure). Until it does (`ConnectModel`, Signing in),
     the step's body draws the sign-in as `ConnectModel`'s does, its
     address and then its end, and an account made there `ConnectModel`'s
     Ready. Above
@@ -1088,7 +1113,8 @@ for its kind, its user's login and its installations. Its nodes:
   set up and the deployment's forges, 5 since jig's client wire 13
   carried in its refusals, 6 since the first repository (`SetUp`'s
   fields and the row's `first`), 7 since the demo's state (the demo's
-  read's `state` and `StartDemo`), moved as
+  read's `state` and `StartDemo`), 8 since a sign-in's return
+  (`Return`, section 8), moved as
   `../protocol/README.md`, section 9 says: at most once in a plan, at
   its first landing that changes one of these records, and shared by
   plans that run at once. A request, an outcome, a read, a subject or a
@@ -1101,7 +1127,7 @@ for its kind, its user's login and its installations. Its nodes:
   as kept work at start (6.6; jig's `protocol/client.md`, section 10).
 - **The request, `Requesting`:** which of the family's requests it is,
   `Request`, as `Reading` names a read: `adopt`, `Adopt`, `set_up`,
-  `SetUp`, or `start_demo`, `StartDemo` (below). Each is answered by the family's one record,
+  `SetUp`, `start_demo`, `StartDemo` (below), or `return`, `Return`, answered `returning` (section 8). Each is answered by the family's one record,
   `Answer`, whose outcome is one of either request's (below); the client
   refuses as undecodable an outcome that does not fit the request it
   sent.
@@ -3000,8 +3026,30 @@ does for the client:
   core leaves unused, its request refused, replayed, joined to another
   or cut by a stop, is named in one output of the core's, which temper's
   root forwards to jig's clients' component to erase.
+- **`Return { source, path }`,** a sign-in's return (3.5,
+  `ConnectModel`, The tab's departure), is no forge's: the family
+  carries it as temper's one request of the client's own. `source` is
+  jig's source of the sign-in (`AccountSignInStarted`), `path` the
+  page's address to come back to. The service checks `path` at decode,
+  before the root: one leading `/`, not `//`, no `\`, no scheme, of
+  visible ASCII, at most 512 bytes; one that is not is answered
+  undecodable. Any signed-in person may send it, in their own scope,
+  with no role: jig admits it by key, and the root answers it
+  `returning` and asks the routing to give the return. The routing
+  composes the clients' listener's own address, as the printed link
+  names it (`http://HOST:PORT`, the bound socket, never a request's
+  Host), with `path`, and gives it to skein's accounts component for
+  that source (skein's `oauth.md`, 6.5: `Request::Return`), which
+  drops it when no sign-in of that source is under way. The root
+  checks no holder: the return only ever sends a browser to a page of
+  this engine's own clients' listener, so a source of another
+  person's, given a path, sends that person to one of temper's pages,
+  where the cookie decides what they see. A return lives as long as
+  its sign-in, in skein's component alone: never kept, so a restart
+  loses it and the listener answers its fixed page.
 - **Who may:** a person whose role on project 0 is `Owner`; in
-  standalone, the deployment's owner. jig admits each by key and
+  standalone, the deployment's owner, for every request above but
+  `Return`. jig admits each by key and
   refuses at admission as for any request, in jig's words; the root
   refuses any other party's, before a forge is called or a run starts,
   as the outcome refused (role).
@@ -3318,7 +3366,12 @@ own tests:
   the small store; a key's request lost and sent again by the person,
   making one account; a person on `ConnectModel`'s Choose pressing
   "Continue with ChatGPT", Signing in showing its address, the
-  watched sign-in made, and Ready; a program's login declared from
+  watched sign-in made, and Ready; in a browser's root, the answer's
+  source followed by one `Return` with the way's address and the
+  source, then one `Leave` for the address once `Return` is answered,
+  none when it is refused, none from the terminal's root, and none
+  again on a rebuild or from a root made at the returned address,
+  which draws the source's sign-in, then its end; a program's login declared from
   Details and its command shown on Ready; the accounts page's rows
   folded, one opened and a key added to its account from the row; a
   limited account's words, "Use the API key first" moving its key
@@ -3648,7 +3701,9 @@ own tests:
   page opened at a sign-in's way, by a reload or a link, knows no
   sign-in of its own, and offers the way's button again; the accounts
   document lists the sign-ins under way, but not which client started
-  each. Candidates: the page shows the person's sign-in under way for
-  that provider, with its end; or the return (`ConnectModel`, Signing
-  in) carries the sign-in's source in the page's address. Default: the
-  way's button again.
+  each. The return names its sign-in by its source in the page's
+  address (`ConnectModel`, Come back), so a page come back, or a link
+  copied from it, shows that sign-in; one opened at the way without a
+  source does not. Candidate: the page shows the person's sign-in under
+  way for that provider, with its end. Default: the way's button
+  again.
