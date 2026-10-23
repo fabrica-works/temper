@@ -79,6 +79,7 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
             host_step(domain, env, host::Event::RelayCancelled { run, attempt, call });
         }
         Event::Process(event) => agent_step(domain, env, agent::Input::Process(*event)),
+        Event::Live { agent, piece } => live(domain, env, agent, piece),
         Event::Decoded { agent, start } => agents::decoded(domain, env, agent, start),
         Event::Encoded { owner, encoded } => agents::encoded(domain, env, owner, encoded),
         Event::Activity { owner, activity } => {
@@ -89,6 +90,22 @@ pub(crate) fn event(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &
         }
         Event::Done { owner, done } => checkout_step(domain, env, checkout::Event::Done { owner, done }),
     }
+}
+
+/// A piece of a run's live content: progress for the agent's watchdog, and
+/// the hub's to send up or drop. An agent the root does not know gives
+/// nothing.
+fn live(domain: &mut Domain, env: &Env<Limits>, source: Token, piece: host::Piece) {
+    let mut owner = None;
+    for (client, bound) in &domain.agents {
+        if bound.agent == source {
+            owner = Some(*client);
+            break;
+        }
+    }
+    let Some(owner) = owner else { return };
+    agent_step(domain, env, agent::Input::Process(agent::process::Event::Progress { owner: source }));
+    host_step(domain, env, host::Event::Piece { owner, piece });
 }
 
 /// An assignment from the engine. One the hub hosts already, or whose answer
