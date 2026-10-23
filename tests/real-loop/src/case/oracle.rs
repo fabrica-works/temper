@@ -2789,7 +2789,7 @@ pub fn step_5_5(observed: &Observed) -> Vec<Miss> {
         "5.5",
         plan_attempts(observed, &[Read::PlannerEnded, Read::PlannerEarlier, Read::PlannerFirst], PLANNER, 2),
         PLAN_ATTEMPTS,
-        "A's complete ordered activity must end each attempt before the next begins",
+        "A's complete ordered activity must end each attempt before the next begins, and none may fail",
     );
     misses
 }
@@ -2978,6 +2978,8 @@ fn plan_attempts(observed: &Observed, reads: &[Read], task: u64, minimum: usize)
         }
         if let Some(ended) = row["line"].get("run_ended") {
             valid &= open.is_some() && open.take() == number(ended, "/attempt");
+            // A failed start's retry would hide it: no attempt may fail.
+            valid &= ended["end"].get("failed").is_none();
         }
     }
     valid && open.is_none() && attempts.len() >= minimum
@@ -3241,7 +3243,17 @@ mod plan_tests {
         let mut unended = met();
         unended.documents.get_mut(&Read::PlannerEnded).expect("A")["activity"]["rows"][0]["event"]["owner"]["source"]
             ["line"] = json!({});
-        for observed in [early, overlap, unordered, unended] {
+        let mut failed = met();
+        let rows = failed.documents.get_mut(&Read::PlannerEnded).expect("A")["activity"]["rows"]
+            .as_array_mut()
+            .expect("A's rows");
+        let ending = rows
+            .iter_mut()
+            .map(|row| &mut row["event"]["owner"]["source"]["line"])
+            .find(|line| line.get("run_ended").is_some())
+            .expect("an ending");
+        ending["run_ended"]["end"] = json!({"failed":{"class":"invalid"}});
+        for observed in [early, overlap, unordered, unended, failed] {
             assert!(!step_5_5(&observed).is_empty());
         }
     }
