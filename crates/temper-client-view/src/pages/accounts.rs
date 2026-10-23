@@ -102,7 +102,7 @@ fn heading(
     w: &Words,
     number_value: u32,
     provider: Option<u32>,
-    name: Option<&c::DocumentText>,
+    name: Option<&[u8]>,
     display: &c::DocumentText,
     held: c::OwnerAccountHolder,
     plan: bool,
@@ -110,7 +110,7 @@ fn heading(
     me: Option<&c::Me>,
 ) -> Box<[u8]> {
     let separator = words::say(w, W::Separator, &[]);
-    let Some(name) = provider_name(name) else {
+    let Some(name) = name else {
         let account = words::say(w, W::Account, &[]);
         let number = words::say(w, W::Number, &[Hole::Number(u64::from(number_value))]);
         let provider_label = words::say(w, W::Provider, &[]);
@@ -231,6 +231,7 @@ fn state(b: &mut Builder, w: &Words, source: &c::OwnerAccountSource) {
 )]
 fn account(
     b: &mut Builder,
+    root: &Domain,
     w: &Words,
     number_value: u32,
     place: u32,
@@ -243,9 +244,16 @@ fn account(
     sources: &skein_lib::List<c::OwnerAccountSource>,
     cut: bool,
     counts: temper_client_domain::limits::AccountLimits,
-    me: Option<&c::Me>,
 ) {
-    let heading = heading(w, number_value, provider, provider_name_value, display, held, plan, sources, me);
+    let supplied_name = provider_name(provider_name_value).unwrap_or(b"");
+    let playground = match root.forge().demo() {
+        Some(demo) => provider == Some(demo.provider),
+        None => false,
+    };
+    let shown_name = crate::choice::provider_shown(root, provider, supplied_name, w);
+    let name = if playground || !supplied_name.is_empty() { Some(shown_name.as_ref()) } else { None };
+    let heading =
+        heading(w, number_value, provider, name, display, held, plan, sources, accounts::current_me(root.client()));
     b.open(Role::Region);
     b.name(&heading);
     crate::cards::text(b, Role::Heading { level: 3 }, &heading);
@@ -311,7 +319,7 @@ fn account(
     for source in sources.iter().take(usize::try_from(counts.sources).expect("u32 fits")) {
         b.open(Role::Item);
         b.open(Role::Text);
-        match (source.kind, provider_name(provider_name_value)) {
+        match (source.kind, name) {
             (c::OwnerAccountKind::SignIn, Some(name)) => {
                 b.run(Run::Plain, &named(w, W::PlanSignIn, words::provider_words(name).1));
             }
@@ -453,6 +461,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
         for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
             account(
                 b,
+                root,
                 w,
                 row.number,
                 row.place,
@@ -465,7 +474,6 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 &row.sources,
                 row.cut,
                 counts,
-                accounts::current_me(root.client()),
             );
         }
         omitted(b, w, W::AccountsOmitted, doc.accounts.len(), counts.accounts);
@@ -507,6 +515,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
                     account(
                         b,
+                        root,
                         w,
                         row.number,
                         row.place,
@@ -519,7 +528,6 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                         &row.sources,
                         row.cut,
                         counts,
-                        accounts::current_me(root.client()),
                     );
                 }
                 omitted(b, w, W::AccountsOmitted, doc.accounts.len(), counts.accounts);

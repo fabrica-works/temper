@@ -23,7 +23,7 @@ pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
     let hole = match value {
         c::Refusal::Account { account, .. } => Some(Hole::Number(u64::from(*account))),
         c::Refusal::Taken { by } => Some(Hole::Number(*by)),
-        c::Refusal::Llm { model, .. } => Some(name(model.bytes())),
+        c::Refusal::Llm { model, .. } => Some(Hole::Name(words.model_name(model.bytes()))),
         c::Refusal::NoEscalationHolder
         | c::Refusal::Malformed { .. }
         | c::Refusal::Role { .. }

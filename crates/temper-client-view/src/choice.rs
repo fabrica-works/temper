@@ -91,7 +91,7 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
                 b,
                 bindings,
                 Role::Button,
-                &shown(model.name.bytes(), w),
+                &model_shown(model.name.bytes(), w),
                 Act::Choice(C::Model { index }),
                 selected,
             );
@@ -117,7 +117,7 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
         control(b, bindings, Role::Button, &w.say(W::ChoiceReset, &[]), Act::Choice(C::Default), false);
         if task.is_some() && draft.requested != draft.original {
             match &draft.requested {
-                Some(choice) => line(b, w, W::ChoiceDraft, &[Hole::Name(shown(choice.main.model.bytes(), w))]),
+                Some(choice) => line(b, w, W::ChoiceDraft, &[Hole::Name(model_shown(choice.main.model.bytes(), w))]),
                 None => line(b, w, W::ChoiceDraftDefault, &[]),
             }
             if draft.valid(me) {
@@ -136,6 +136,21 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
         waiting(b, root, task.run_wait, w, bindings);
     }
     b.close();
+}
+
+/// Display names keep the catalogue's bounded presentation.
+fn model_shown(name: &[u8], w: &Words) -> Box<[u8]> {
+    shown(&w.model_name(name), w)
+}
+
+pub(crate) fn provider_shown(root: &Domain, number: Option<u32>, name: &[u8], w: &Words) -> Box<[u8]> {
+    if let Some(demo) = root.forge().demo()
+        && number == Some(demo.provider)
+    {
+        w.say(W::Demo, &[])
+    } else {
+        skein_lib::bytes::copy_of(name)
+    }
 }
 
 /// Includes the UTF-8 ellipsis; smaller phrasebooks retain their joined Name bound.
@@ -343,7 +358,7 @@ fn using(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w: &Words) {
             }
         },
     };
-    let mut name = shown(name, w);
+    let mut name = model_shown(name, w);
     if let Some(choice) = choice
         && let Some(effort) = &choice.main.effort
     {
@@ -456,7 +471,7 @@ fn using_account(
     if let Some(me) = temper_client_domain::pages::accounts::current_me(root.client()) {
         for offer in &me.providers {
             if Some(offer.provider) == account.provider {
-                provider_name = Some(skein_lib::bytes::copy_of(offer.name.bytes()));
+                provider_name = Some(provider_shown(root, account.provider, offer.name.bytes(), w));
                 break;
             }
         }
@@ -505,7 +520,13 @@ fn account_row(root: &Domain, account: u32) -> Option<&c::OwnerAccountLine> {
 }
 fn account_line(b: &mut Builder, root: &Domain, w: &Words, account: u32, labels: (W, W)) {
     match account_row(root, account) {
-        Some(row) => line(b, w, labels.1, &[Hole::Name(skein_lib::bytes::copy_of(row.display.bytes()))]),
+        Some(row) => {
+            let name = match root.forge().demo() {
+                Some(demo) if row.provider == Some(demo.provider) => w.say(W::DemoModelName, &[]),
+                Some(_) | None => skein_lib::bytes::copy_of(row.display.bytes()),
+            };
+            line(b, w, labels.1, &[Hole::Name(name)]);
+        }
         None => line(b, w, labels.0, &[Hole::Number(u64::from(account))]),
     }
 }
@@ -515,7 +536,7 @@ fn provider(b: &mut Builder, root: &Domain, task: Option<&c::Task>, number: Opti
     let Some(me) = temper_client_domain::pages::accounts::current_me(root.client()) else { return };
     for offer in &me.providers {
         if offer.provider == number {
-            line(b, w, W::ChoiceProvider, &[Hole::Name(skein_lib::bytes::copy_of(offer.name.bytes()))]);
+            line(b, w, W::ChoiceProvider, &[Hole::Name(provider_shown(root, Some(number), offer.name.bytes(), w))]);
             break;
         }
     }

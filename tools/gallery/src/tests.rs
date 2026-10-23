@@ -175,7 +175,7 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "chat-first-run-4-T4",
         heading: "T4 · Add a dark theme to widget",
-        parts: &[Part::Named { role: Role::Paragraph, name: "I’d give widget" }],
+        parts: &[Part::Named { role: Role::Paragraph, name: "I would give widget" }],
     },
     Holds { name: "inbox-reference", heading: "Inbox", parts: &[Part::Named { role: Role::Link, name: "Task 1" }] },
     Holds {
@@ -186,7 +186,7 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "accounts-first-run-1",
         heading: "Accounts",
-        parts: &[Part::Named { role: Role::Heading { level: 3 }, name: "Demo API key" }],
+        parts: &[Part::Named { role: Role::Heading { level: 3 }, name: "Playground API key" }],
     },
     Holds {
         name: "signed-out",

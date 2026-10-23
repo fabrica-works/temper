@@ -44,7 +44,7 @@ fn model(w: World) -> c::LlmChoice {
     c::LlmChoice {
         account: Some(1),
         main: c::ModelEffort {
-            model: text(if matches_demo(w) { "Demo model" } else { "Opus" }),
+            model: text(if matches_demo(w) { "Scripted model" } else { "Opus" }),
             effort: match w {
                 Reference => Some(text("xhigh")),
                 Solo | World::Bare => Some(text("high")),
@@ -93,7 +93,7 @@ fn providers(w: World) -> List<c::ProviderOffer> {
         Reference => &[(17, "Anthropic"), (18, "OpenAI")],
         Solo => &[(17, "Anthropic")],
         World::Bare => &[(18, "OpenAI")],
-        FirstRun { .. } => &[(17, "Demo"), (18, "OpenAI")],
+        FirstRun { .. } => &[(17, "Playground"), (18, "OpenAI")],
     };
     for (number, name) in names {
         let mut programs = List::with_capacity(1);
@@ -109,7 +109,7 @@ fn providers(w: World) -> List<c::ProviderOffer> {
             programs,
             programs_cut: false,
             none: false,
-            signed_in_plan: *name != "Demo",
+            signed_in_plan: *name != "Playground",
             manage_usage: None,
         })
         .expect("provider");
@@ -315,7 +315,7 @@ fn demo(root: &mut Domain, w: World, read: Token, out: &mut Queue<Request>) {
                 project: PROJECT,
                 forge: 1,
                 provider: 17,
-                owner: Box::from(b"demo".as_slice()),
+                owner: Box::from(b"playground".as_slice()),
                 name: Box::from(b"widget".as_slice()),
                 cues,
             },
@@ -1368,7 +1368,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
             change: false,
             result: None,
             merge: false,
-            model: "Demo model",
+            model: "Scripted model",
             effort: None,
             account: 1,
             children: &[2],
@@ -1388,7 +1388,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
             change: true,
             result: None,
             merge: false,
-            model: "Demo model",
+            model: "Scripted model",
             effort: None,
             account: 1,
             children: &[3],
@@ -1408,7 +1408,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
             change: false,
             result: None,
             merge: false,
-            model: "Demo model",
+            model: "Scripted model",
             effort: None,
             account: 1,
             children: &[],
@@ -1428,7 +1428,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
             change: false,
             result: None,
             merge: false,
-            model: "Demo model",
+            model: "Scripted model",
             effort: None,
             account: 1,
             children: &[2],
@@ -1448,7 +1448,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
             change: true,
             result: Some("e3b8d4192c0f5a7e"),
             merge: true,
-            model: "Demo model",
+            model: "Scripted model",
             effort: None,
             account: 1,
             children: &[3],
@@ -1470,7 +1470,7 @@ fn facts(w: World, number: u64) -> TaskFacts {
                 "**Add CSV export to widget**\n\n`widget --csv` prints the table as CSV: a header line, `name,count`, then a line for each row.",
             ),
             merge: false,
-            model: "Demo model",
+            model: "Scripted model",
             effort: None,
             account: 1,
             children: &[],
@@ -1488,9 +1488,9 @@ fn facts(w: World, number: u64) -> TaskFacts {
             budget: 0,
             priority: None,
             change: false,
-            result: Some("The demo changes nothing."),
+            result: Some("The playground changes nothing."),
             merge: false,
-            model: "Demo model",
+            model: "Scripted model",
             effort: None,
             account: 1,
             children: &[],
@@ -1535,19 +1535,19 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
             events.push(tools_line(&[("read", 2), ("propose", 1)], &[], true, 3)).expect("world activity");
         }
         (FirstRun { step: 2 }, 1) => {
-            events.push(agent_line("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.", 2, Some(1))).expect("world activity");
+            events.push(agent_line("I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("delegate", 1)], &[2], false, 3)).expect("world activity");
             events.push(tools_line(&[("wait", 1)], &[], false, 4)).expect("world activity");
         }
         (FirstRun { step: 3 | 4 }, 1) => {
-            events.push(agent_line("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.", 2, Some(1))).expect("world activity");
+            events.push(agent_line("I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("delegate", 1)], &[2], false, 3)).expect("world activity");
             events.push(tools_line(&[("wait", 1)], &[], false, 4)).expect("world activity");
-            events.push(agent_line("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.", 5, Some(1))).expect("world activity");
+            events.push(agent_line("CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.", 5, Some(1))).expect("world activity");
             events.push(tools_line(&[("wait", 1)], &[], false, 6)).expect("world activity");
         }
         (FirstRun { step: 4 }, 4) => {
-            events.push(agent_line("I’d give widget’s table a second set of colours, chosen when your system prefers a dark theme, so that widget follows your system. The demo plays only the CSV export as a change: connect a model to make this one.", 2, Some(1))).expect("world activity");
+            events.push(agent_line("I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.", 2, Some(1))).expect("world activity");
             events.push(tools_line(&[("finish", 1)], &[], false, 3)).expect("world activity");
         }
         _ => {}
@@ -1695,7 +1695,7 @@ fn accounts(w: World) -> c::OwnerAccounts {
             let mut sources = List::with_capacity(2);
             sources
                 .push(c::OwnerAccountSource {
-                    name: Some(Box::from("demo".as_bytes())),
+                    name: Some(Box::from("playground".as_bytes())),
                     place: 1,
                     number: 1,
                     kind: c::OwnerAccountKind::Key,
@@ -1712,9 +1712,9 @@ fn accounts(w: World) -> c::OwnerAccounts {
                 uses: None,
                 plan: false,
                 provider: Some(17),
-                provider_name: Some(doc("Demo")),
+                provider_name: Some(doc("Playground")),
                 manage_usage: None,
-                display: doc("Demo model"),
+                display: doc("Scripted model"),
                 holder: c::OwnerAccountHolder::Party(73),
                 sources,
                 cut: false,

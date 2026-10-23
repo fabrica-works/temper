@@ -11,12 +11,12 @@ Menu:
   [6] Sign out
 New chat
 * Ready
-Demo model
-Demo:
-  This is a demo, running on a demo model and a demo forge.
+Scripted model
+Playground:
+  This is the playground: a scripted model and a playground forge.
   [7] Connect a model
   [-] Connect a forge (disabled)
-demo · playground/widget on Demo forge
+demo · playground/widget on Playground forge
 Signed in as the deployment’s owner
 What shall we change?
   Try a request in playground/widget. Follow the task from its branch to a landed change.
@@ -24,10 +24,10 @@ What shall we change?
     - [8] Add CSV export to widget
     - [9] Add a dark theme to widget
     - [10] Fix widget’s empty search state
-  The demo model plays these requests from a script.
-Using Demo model · Default
+  The scripted model plays these requests from its script.
+Using Scripted model · Default
 Change model:
-  - [11] demo
+  - [11] Scripted model
   [12] Reset choice
 [13] Start a chat: (empty) (enter sends)
 temper · Enter to start · Shift+Enter for newline

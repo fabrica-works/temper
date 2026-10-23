@@ -1118,6 +1118,11 @@ fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32
     Ok(if kind == HoleKind::Name { joined } else { 0 })
 }
 impl Words {
+    /// The configured playground model's identifier has its own display name (client/README.md, 5.6).
+    pub(crate) fn model_name(&self, name: &[u8]) -> Box<[u8]> {
+        if name == b"demo" { self.say(Word::DemoModelName, &[]) } else { copy_of(name) }
+    }
+
     pub fn english(connector: u16, text: u32, shell: Shell) -> Result<Words, Invalid> {
         let joined = match text.checked_mul(2) {
             Some(bytes) => match bytes.checked_add(1) {
@@ -1467,29 +1472,29 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ChatDelegates => (&[b"", b" delegates"], &[Number]),
         Word::ChoiceProvider | Word::ChatTime => (&[b"", b""], &[Name]),
         Word::ChatSendHint => (&[b"Enter to send \xc2\xb7 Shift+Enter for newline"], &[]),
-        Word::DemoBoth => (&[b"This is a demo, running on a demo model and a demo forge."], &[]),
-        Word::DemoForge => (&[b"This is a demo, running on a demo forge."], &[]),
+        Word::DemoBoth => (&[b"This is the playground: a scripted model and a playground forge."], &[]),
+        Word::DemoForge => (&[b"This is the playground: a playground forge."], &[]),
         Word::ConnectForge => (&[b"Connect a forge"], &[]),
         Word::ChatTitle => (&[b"T", b" \xc2\xb7 ", b""], &[Number, Name]),
-        Word::DemoModelName => (&[b"Demo model"], &[]),
-        Word::DemoUsing => (&[b"Using Demo model \xc2\xb7 ", b""], &[Name]),
+        Word::DemoModelName => (&[b"Scripted model"], &[]),
+        Word::DemoUsing => (&[b"Using Scripted model \xc2\xb7 ", b""], &[Name]),
         Word::Default => (&[b"Default"], &[]),
         Word::DemoContextProject => (&[b"", b" \xc2\xb7 "], &[Name]),
         Word::DemoRepository => (&[b"", b"/", b""], &[Name, Name]),
-        Word::DemoRepositoryForge => (&[b" on Demo forge"], &[]),
+        Word::DemoRepositoryForge => (&[b" on Playground forge"], &[]),
         Word::WaitingForYourWords => (&[b"waiting on your words"], &[]),
         Word::SignedDeploymentOwner => (&[b"Signed in as the deployment\xe2\x80\x99s owner"], &[]),
         Word::SignedProjectOwner => (&[b"Signed in as the project\xe2\x80\x99s owner"], &[]),
         Word::SignedName => (&[b"Signed in as ", b""], &[Name]),
         Word::NewChat => (&[b"New chat"], &[]),
         Word::Ready => (&[b"Ready"], &[]),
-        Word::Demo => (&[b"Demo"], &[]),
-        Word::DemoModel => (&[b"This is a demo, running on a demo model."], &[]),
+        Word::Demo => (&[b"Playground"], &[]),
+        Word::DemoModel => (&[b"This is the playground: a scripted model."], &[]),
         Word::ConnectModel => (&[b"Connect a model"], &[]),
         Word::DemoHeading => (&[b"What shall we change?"], &[]),
         Word::DemoRequest => (DEMO_REQUEST, &[Name, Name]),
         Word::SuggestedRequests => (&[b"Suggested requests"], &[]),
-        Word::DemoScript => (&[b"The demo model plays these requests from a script."], &[]),
+        Word::DemoScript => (&[b"The scripted model plays these requests from its script."], &[]),
         Word::ChatHint => (&[b"temper \xc2\xb7 Enter to start \xc2\xb7 Shift+Enter for newline"], &[]),
         Word::Accept => (&[b"Accept"], &[]),
         Word::RejectProposal => (&[b"Reject"], &[]),

@@ -11,13 +11,13 @@ Menu:
   [6] Sign out
 T1 · Add CSV export to widget:
   * waiting on your words
-  Demo model
+  Scripted model
   0 spent · of 1 · delegates spent 0
-Demo:
-  This is a demo, running on a demo model and a demo forge.
+Playground:
+  This is the playground: a scripted model and a playground forge.
   [7] Connect a model
   [-] Connect a forge (disabled)
-demo · playground/widget on Demo forge
+demo · playground/widget on Playground forge
 Signed in as the deployment’s owner
 Conversation:
   Today · Thursday 1 January
@@ -45,7 +45,7 @@ Conversation:
   CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.
   1 tool call · wait:
     wait
-Using Demo model · Default
+Using Scripted model · Default
 [9] Message: (empty) (enter sends)
 Enter to send · Shift+Enter for newline
 [10] Send

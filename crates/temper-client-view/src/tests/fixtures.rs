@@ -227,7 +227,7 @@ pub(super) fn root_at_full(
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     root_at_with_demo(address, limits, project_name, None)
 }
-fn root_at_with_demo(
+pub(super) fn root_at_with_demo(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],
@@ -1049,6 +1049,10 @@ pub fn demo_frame_root(
         Some(me) => me,
         None => template.pages().me(template.client()).expect("chat template").clone(),
     };
+    if me.providers.is_empty() {
+        me.providers = List::with_capacity(1);
+        me.providers.push(demo_provider()).unwrap();
+    }
     let mut models = List::with_capacity(2);
     for name in [b"demo".as_slice(), b"selected"] {
         models
@@ -1221,6 +1225,21 @@ pub fn hidden_demo_root(ready: Option<c::Readiness>, payer: u64) -> temper_clien
         );
     }
     root
+}
+
+fn demo_provider() -> c::ProviderOffer {
+    c::ProviderOffer {
+        provider: 17,
+        name: c::DocumentText::complete(c::Text::new(Box::from(b"demo".as_slice()), 32).unwrap()),
+        key_bytes: 4096,
+        sign_in: false,
+        key: true,
+        programs: List::with_capacity(0),
+        programs_cut: false,
+        none: false,
+        signed_in_plan: false,
+        manage_usage: None,
+    }
 }
 
 fn demo_accounts(model: bool) -> c::OwnerAccounts {

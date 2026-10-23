@@ -129,7 +129,7 @@ pub fn demo_chat(task: u64, cue: &[u8], text: &[u8], report: &[u8]) -> Script {
         steps: Box::new([
             Step::Go { address: Address::Chats },
             Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: START_WITHIN },
-            Step::Press { find: Find::exactly_named(Role::Button, b"demo") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Scripted model") },
             Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: cue.into() },
             Step::Press { find: Find::named(Role::Button, b"Start") },
             Step::See {
@@ -177,7 +177,7 @@ pub fn demo_change() -> Script {
         begin: Begin::Link,
         steps: Box::new([
             Step::Go { address: Address::Chats },
-            Step::See { find: Find::exactly_named(Role::Paragraph, "Using Demo model · Default".as_bytes()), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Paragraph, "Using Scripted model · Default".as_bytes()), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Disclosure, b"Change model"), within: START_WITHIN },
             // client/README.md, 4.8: a suggested request starts and opens its chat.
             Step::See { find: Find::named(Role::Button, b"Add CSV export to widget"), within: START_WITHIN },

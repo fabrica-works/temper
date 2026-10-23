@@ -548,7 +548,7 @@ pub(crate) fn budget(b: &mut Builder, task: &c::Task, me: Option<&c::Me>, words:
             }
             c::AuthorityModels::Named(names) => {
                 for name in names {
-                    text(b, Role::Description, name);
+                    text(b, Role::Description, &words.model_name(name));
                 }
             }
         }

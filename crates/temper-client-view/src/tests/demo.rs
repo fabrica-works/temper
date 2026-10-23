@@ -12,11 +12,15 @@ fn the_demo_banner_follows_the_frame_on_work_pages() {
     ] {
         let root = if demo { f::demo_root(address, f::SECOND_PROJECT, true) } else { f::chats_root() };
         let mut view = f::page_view(&root);
-        assert_eq!(f::find(view.tree(), Role::Region, b"Demo").is_some(), shown, "{row}");
+        assert_eq!(f::find(view.tree(), Role::Region, b"Playground").is_some(), shown, "{row}");
         if shown {
             assert!(
-                f::find(view.tree(), Role::Paragraph, b"This is a demo, running on a demo model and a demo forge.")
-                    .is_some(),
+                f::find(
+                    view.tree(),
+                    Role::Paragraph,
+                    b"This is the playground: a scripted model and a playground forge."
+                )
+                .is_some(),
                 "{row}"
             );
             let link = f::find(view.tree(), Role::Link, b"Connect a model").expect("model link");
@@ -29,11 +33,11 @@ fn the_demo_banner_follows_the_frame_on_work_pages() {
             for node in view.tree().nodes() {
                 if node.role == Role::Banner
                     || node.role == Role::Main
-                    || (node.role == Role::Region && node.name.as_deref() == Some(b"Demo"))
+                    || (node.role == Role::Region && node.name.as_deref() == Some(b"Playground"))
                 {
                     roles.push(node.role).expect("frame, demo, main");
                 }
-                if node.role == Role::Region && node.name.as_deref() == Some(b"Demo") {
+                if node.role == Role::Region && node.name.as_deref() == Some(b"Playground") {
                     assert_eq!(node.styles.as_slice(), [crate::look::ACCOUNTS], "{row}: the mockup's banner");
                 }
             }
@@ -69,7 +73,8 @@ fn suggestions_show_only_in_the_demo_project_with_the_model_half() {
                 "{row}"
             );
             assert!(
-                f::find(view.tree(), Role::Paragraph, b"The demo model plays these requests from a script.").is_some(),
+                f::find(view.tree(), Role::Paragraph, b"The scripted model plays these requests from its script.")
+                    .is_some(),
                 "{row}"
             );
             let mut heading = None;
@@ -137,7 +142,7 @@ fn the_demo_banner_is_absent_when_the_link_is_unavailable() {
         let mut root = f::demo_root(Address::Chats, f::PROJECT, true);
         f::root_event(&mut root, Event::Client { event: jig_client::Event::Up { up } });
         let view = f::page_view(&root);
-        assert!(f::find(view.tree(), Role::Region, b"Demo").is_none(), "{row}");
+        assert!(f::find(view.tree(), Role::Region, b"Playground").is_none(), "{row}");
         assert!(f::find(view.tree(), Role::List, b"Suggested requests").is_none(), "{row}");
     }
 }
@@ -146,7 +151,7 @@ fn the_demo_banner_is_absent_when_the_link_is_unavailable() {
 fn a_forge_only_banner_keeps_its_disabled_connect_without_a_model_link() {
     let root = f::demo_root(Address::Chats, f::PROJECT, false);
     let mut view = f::page_view(&root);
-    assert!(f::find(view.tree(), Role::Paragraph, b"This is a demo, running on a demo forge.").is_some());
+    assert!(f::find(view.tree(), Role::Paragraph, b"This is the playground: a playground forge.").is_some());
     assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
     let button = f::find(view.tree(), Role::Button, b"Connect a forge").unwrap();
     for node in view.tree().nodes() {
@@ -181,7 +186,7 @@ fn a_chats_banner_follows_its_chatbar_in_every_project() {
             if node.styles.as_slice().contains(&crate::look::THREAD) {
                 thread = Some(index);
             }
-            if node.role == Role::Region && node.name.as_deref() == Some(b"Demo") {
+            if node.role == Role::Region && node.name.as_deref() == Some(b"Playground") {
                 demo = Some(index);
             }
         }
@@ -190,17 +195,17 @@ fn a_chats_banner_follows_its_chatbar_in_every_project() {
         assert_eq!(demo.unwrap(), chatbar.unwrap() + usize::try_from(nodes[chatbar.unwrap()].size).unwrap(), "{row}");
         assert!(demo.unwrap() < thread.unwrap(), "{row}");
         assert!(f::find(view.tree(), Role::Heading { level: 1 }, "T1 · Ship the update".as_bytes()).is_some(), "{row}");
-        assert_eq!(f::find(view.tree(), Role::Paragraph, b"Demo model").is_some(), label, "{row}");
+        assert_eq!(f::find(view.tree(), Role::Paragraph, b"Scripted model").is_some(), label, "{row}");
     }
 }
 #[test]
 fn the_demo_account_always_names_default_whatever_the_model_or_project() {
     use jig_client::contract as c;
     for (row, project, model, requested, expected) in [
-        ("default", f::PROJECT, true, false, "Using Demo model · Default"),
-        ("requested", f::PROJECT, true, true, "Using Demo model · Default"),
-        ("another project", f::SECOND_PROJECT, true, false, "Using Demo model · Default"),
-        ("forge alone", f::PROJECT, false, false, "Using Demo model · Default"),
+        ("default", f::PROJECT, true, false, "Using Scripted model · Default"),
+        ("requested", f::PROJECT, true, true, "Using Scripted model · Default"),
+        ("another project", f::SECOND_PROJECT, true, false, "Using Scripted model · Default"),
+        ("forge alone", f::PROJECT, false, false, "Using Scripted model · Default"),
     ] {
         let choice = if requested {
             Some(c::LlmChoice {
@@ -216,7 +221,9 @@ fn the_demo_account_always_names_default_whatever_the_model_or_project() {
         assert!(f::find(view.tree(), Role::Paragraph, expected.as_bytes()).is_some(), "{row}");
     }
     let root = f::demo_root(Address::Chats, f::PROJECT, true);
-    assert!(f::find(f::page_view(&root).tree(), Role::Paragraph, "Using Demo model · Default".as_bytes()).is_some());
+    assert!(
+        f::find(f::page_view(&root).tree(), Role::Paragraph, "Using Scripted model · Default".as_bytes()).is_some()
+    );
 }
 
 #[test]
@@ -286,21 +293,46 @@ fn t1_keeps_the_demo_line_after_another_providers_key() {
     let root = f::demo_kept_root();
     assert!(!root.demo().unwrap().1.model);
     let view = f::page_view(&root);
-    assert!(f::find(view.tree(), Role::Paragraph, "Using Demo model · Default".as_bytes()).is_some());
+    assert!(f::find(view.tree(), Role::Paragraph, "Using Scripted model · Default".as_bytes()).is_some());
 }
 
 #[test]
 fn the_hidden_deployment_demo_account_needs_only_its_public_provider() {
     use jig_client::contract::Readiness;
     for (ready, payer, expected) in [
-        (Some(Readiness::Usable), 73, "Using Demo model · Default"),
-        (Some(Readiness::Unknown), 73, "Using Demo model · Default"),
-        (None, 73, "Using Demo model · Default"),
-        (Some(Readiness::Unavailable), 73, "demo · needs an account"),
-        (Some(Readiness::Usable), 74, "Using Demo model · Default"),
+        (Some(Readiness::Usable), 73, "Using Scripted model · Default"),
+        (Some(Readiness::Unknown), 73, "Using Scripted model · Default"),
+        (None, 73, "Using Scripted model · Default"),
+        (Some(Readiness::Unavailable), 73, "Scripted model · needs an account"),
+        (Some(Readiness::Usable), 74, "Using Scripted model · Default"),
     ] {
         let root = f::hidden_demo_root(ready, payer);
         let view = f::page_view(&root);
         assert!(f::find(view.tree(), Role::Paragraph, expected.as_bytes()).is_some());
     }
+}
+
+#[test]
+fn the_playground_chooser_names_the_provider_and_model_but_keeps_the_configured_choice() {
+    let mut root = f::demo_root(Address::Chats, f::PROJECT, true);
+    let mut view = f::page_view(&root);
+    assert!(f::find(view.tree(), Role::Paragraph, b"Playground").is_some());
+    assert!(f::find(view.tree(), Role::Button, b"demo").is_none());
+    let model = f::find(view.tree(), Role::Button, b"Scripted model").expect("scripted model");
+    let action = crate::act(&mut view, model, skein_ui::Act::Press).expect("model choice");
+    assert_eq!(action, Action::Pages(Act::Choice(temper_client_domain::pages::choice::Act::Model { index: 0 })));
+    f::root_event(&mut root, Event::Act { action });
+    assert_eq!(root.pages().choice().requested.as_ref().unwrap().main.model.bytes(), b"demo");
+}
+
+#[test]
+fn the_playground_account_heading_uses_its_delivered_provider_number() {
+    // The fixture supplies no provider name and an old display name: the demo's
+    // public provider number alone identifies the playground's account.
+    let root = f::demo_root(Address::Accounts, f::PROJECT, true);
+    let view = f::page_view(&root);
+    assert!(
+        f::find(view.tree(), Role::Heading { level: 3 }, b"Playground API key \xc2\xb7 held by the deployment")
+            .is_some()
+    );
 }

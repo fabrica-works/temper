@@ -1114,12 +1114,12 @@ fn the_budget_card_names_each_funder() {
 #[test]
 fn the_budget_card_names_its_models() {
     let mut names = List::with_capacity(2);
-    for name in [b"first".as_slice(), b"second"] {
+    for name in [b"demo".as_slice(), b"second"] {
         names.push(Box::from(name)).expect("two model names");
     }
     for (models, expected) in [
         (Some(c::AuthorityModels::All), [b"All".as_slice()].as_slice()),
-        (Some(c::AuthorityModels::Named(names)), [b"first".as_slice(), b"second"].as_slice()),
+        (Some(c::AuthorityModels::Named(names)), [b"Scripted model".as_slice(), b"second"].as_slice()),
         (Some(c::AuthorityModels::Named(List::with_capacity(0))), [b"None".as_slice()].as_slice()),
         (None, [].as_slice()),
     ] {

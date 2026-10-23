@@ -37,15 +37,15 @@ fn the_start_draws_its_chatbar_banner_context_and_invitation_before_the_composer
     for (role, name) in [
         (Role::Paragraph, b"New chat".as_slice()),
         (Role::Status, b"Ready"),
-        (Role::Paragraph, b"Demo model"),
-        (Role::Region, b"Demo"),
-        (Role::Paragraph, "Shop · acme/shop on Demo forge".as_bytes()),
+        (Role::Paragraph, b"Scripted model"),
+        (Role::Region, b"Playground"),
+        (Role::Paragraph, "Shop · acme/shop on Playground forge".as_bytes()),
         (Role::Paragraph, b"Signed in as Pat"),
         (Role::Heading { level: 1 }, b"What shall we change?"),
         (Role::Paragraph, b"Try a request in acme/shop. Follow the task from its branch to a landed change."),
         (Role::List, b"Suggested requests"),
-        (Role::Paragraph, b"The demo model plays these requests from a script."),
-        (Role::Paragraph, "Using Demo model · Default".as_bytes()),
+        (Role::Paragraph, b"The scripted model plays these requests from its script."),
+        (Role::Paragraph, "Using Scripted model · Default".as_bytes()),
         (Role::TextArea, b"Start a chat"),
         (Role::Heading { level: 2 }, b"Your chats"),
         (Role::Paragraph, b"No chats yet."),
@@ -103,7 +103,7 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
             c::HeldRole::Owner,
             true,
             "Signed in as the deployment’s owner".as_bytes(),
-            "Shop · acme/shop on Demo forge",
+            "Shop · acme/shop on Playground forge",
         ),
         (
             "project owner",
@@ -111,7 +111,7 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
             c::HeldRole::Owner,
             true,
             "Signed in as the project’s owner".as_bytes(),
-            "Shop · acme/shop on Demo forge",
+            "Shop · acme/shop on Playground forge",
         ),
         (
             "another role",
@@ -119,7 +119,7 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
             c::HeldRole::Policy { role: 1 },
             true,
             b"Signed in as Pat",
-            "Shop · acme/shop on Demo forge",
+            "Shop · acme/shop on Playground forge",
         ),
         (
             "project fallback",
@@ -127,7 +127,7 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
             c::HeldRole::Policy { role: 1 },
             false,
             b"Signed in as Pat",
-            "Project 1 · acme/shop on Demo forge",
+            "Project 1 · acme/shop on Playground forge",
         ),
     ] {
         let mut me = template.pages().me(template.client()).unwrap().clone();
@@ -162,7 +162,7 @@ fn a_chats_context_follows_the_banner_only_in_the_demo_project_even_without_its_
         let mut banner = None;
         let mut context = None;
         for (index, node) in view.tree().nodes().iter().enumerate() {
-            if node.role == Role::Region && node.name.as_deref() == Some(b"Demo") {
+            if node.role == Role::Region && node.name.as_deref() == Some(b"Playground") {
                 banner = Some(index);
             }
             if node.styles.as_slice().contains(&crate::look::CONTEXT) {
@@ -216,7 +216,7 @@ fn the_invitation_is_a_named_region_with_its_parts_in_order() {
         (Role::Heading { level: 1 }, b"What shall we change?".as_slice()),
         (Role::Paragraph, b"Try a request in acme/shop. Follow the task from its branch to a landed change."),
         (Role::List, b"Suggested requests"),
-        (Role::Paragraph, b"The demo model plays these requests from a script."),
+        (Role::Paragraph, b"The scripted model plays these requests from its script."),
     ] {
         assert!(child < end, "part belongs to invitation");
         assert_eq!(nodes[child].role, role);
