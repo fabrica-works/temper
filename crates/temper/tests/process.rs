@@ -1998,20 +1998,19 @@ fn a_worker_pushes_to_github_by_its_installations_token() {
     support::github::push();
 }
 
-// Leaves out what testing.md 5.3's 4.1 row names, s2's part included, and
-// A's and the reviewer's placement: an ended task's documents name no
-// worker, so only the coder's change is placed, by s1's workspace after the
-// stop.
+// Shows the opener and timer cancellation on three processes. Leaves out pools,
+// lending, host moves and the other omissions in domain/testing.md, 5.3's 4.1/4.3 rows;
+// A and the reviewer leave no placement evidence in an ended document or workspace.
 #[test]
-fn the_opener_runs_on_ws_and_s1_as_processes() {
+fn the_opener_and_the_two_hour_check_run_on_three_workers_as_processes_without_pools_lending_or_host_moves() {
     use temper_real_loop_world::case::{self, acts, oracle};
     let run = support::case::run(
-        &["ws", "s1"],
-        case::fixture_placed(),
-        case::scripts::step_4_1,
-        case::scripts::step_4_1_rules,
-        acts::step_4_1(),
-        &[case::DIRECTOR, case::A, case::CODER, case::REVIEW],
+        &["ws", "s1", "s2"],
+        case::fixture_check(),
+        case::scripts::step_4_1_4_3,
+        case::scripts::step_4_1_4_3_rules,
+        acts::step_4_1_4_3(),
+        &[case::DIRECTOR, case::CHECK, case::B, case::BENCHMARK],
     );
     for (at, call) in run.calls().iter().enumerate() {
         assert_eq!(
@@ -2021,7 +2020,45 @@ fn the_opener_runs_on_ws_and_s1_as_processes() {
             String::from_utf8_lossy(&call.stderr)
         );
     }
-    let observed = run.observed(acts::READS_4_1);
-    oracle::assert_met(&oracle::step_4_1(&observed));
-    assert_eq!(run.placed().get(&case::DIRECTOR).map(String::as_str), Some("ws"));
+    let observed = run.observed(&acts::reads_4_1_4_3());
+    let mut misses = oracle::step_4_1(&observed);
+    misses.extend(oracle::step_4_3(&observed));
+    oracle::assert_met(&misses);
+    assert_eq!(
+        observed.documents[&acts::Read::BenchmarkWaiting]
+            .pointer("/task/chip/phase")
+            .and_then(serde_json::Value::as_str),
+        Some("due")
+    );
+    for (task, worker) in [(case::DIRECTOR, "ws"), (case::CHECK, "ws"), (case::B, "s1"), (case::BENCHMARK, "s2")] {
+        assert_eq!(run.placed().get(&task).map(String::as_str), Some(worker), "task {task}");
+    }
+}
+
+// Shows the retained question and one answer across ws's two lives. Leaves out
+// the hang past grace, three questions and the other limits of testing.md, 5.3's 4.6 row.
+// The retry runs on s1 or s2 by that row's act order: ws stays ended and unlinked
+// until after the ended chat's watch joins; the oracle checks both attempts.
+#[test]
+fn a_restarted_workstation_keeps_the_directors_question_and_answers_it_once_as_processes_without_a_hang_past_the_grace()
+{
+    use temper_real_loop_world::case::{self, acts, oracle};
+    let run = support::case::run(
+        &["ws", "s1", "s2"],
+        case::fixture_4_6(),
+        case::scripts::step_4_6,
+        case::scripts::step_4_6_rules,
+        acts::step_4_6(0),
+        &[case::HANG],
+    );
+    for (at, call) in run.calls().iter().enumerate() {
+        assert_eq!(
+            call.exit,
+            Some(skein_io::kernel::Exit::Code(0)),
+            "call {at}: {}",
+            String::from_utf8_lossy(&call.stderr)
+        );
+    }
+    oracle::assert_met(&oracle::step_4_6(&run.observed(acts::READS_4_6)));
+    assert_eq!(run.first_placed().get(&case::HANG).map(String::as_str), Some("ws"));
 }
