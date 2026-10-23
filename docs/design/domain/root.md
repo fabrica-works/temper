@@ -413,7 +413,10 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   translates nothing of it (jig's `domain/engine.md`, section 10).
 - **The hub's link vocabulary** to the fleet's and back: a hello with its
   bounds, the worker's stop bound among them (worker.md, section 2), a
-  run's phases, activity and counts. A message relayed to a run
+  run's phases, activity and counts. A run's live piece goes to the
+  core as the run's text instead (jig's `domain/engine.md`, section 11):
+  one of a kind other than text, or past the offsets the core keeps, is
+  dropped and counted. A message relayed to a run
   keeps its kind in its words: a result, a proposal decided, a person
   task stalled and an effect not made each lead with what it is and its
   source's number.
@@ -422,12 +425,12 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
 
 ### 7.1 An assignment
 
-The core's part (the run, its attempt and conversation, its charter, its
-brief's core sections, its start's messages, its transcript's current
-window, the calls committed since its last turn; jig's
-`domain/engine.md`, 7.1) and the forge's (the workspace, the brief's
-forge sections), put together while the task is preparing, held until
-its claim commits:
+The core's part (the run, its attempt and conversation, its ask for the
+run's live content, its charter, its brief's core sections, its start's
+messages, its transcript's current window, the calls committed since its
+last turn; jig's `domain/engine.md`, 7.1) and the forge's (the
+workspace, the brief's forge sections), put together while the task is
+preparing, held until its claim commits:
 
 - **The repositories:** for a change's delegate, the change's
   repository; otherwise the project's home repository, those its spec

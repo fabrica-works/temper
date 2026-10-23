@@ -104,6 +104,22 @@ GitHub forge on the fake's GitHub layer, it checks the forge connector's
 connected state, the picker and GitHub's merge queue as the branch's
 landing queue (`forge.md`).
 
+A run's live text has its story there: a chat's reply reaches the
+party's run watch before its turn commits. The core asks for the chat's
+text, and smith's start carries the ask. smith's agent domain gives its
+reply; the world, playing smith's process protocol as it plays every
+record of the agent's channel, sends that reply up the channel in three
+pieces ahead of its turn, and holds the second piece, the third and then
+the turn itself until the watch has read all the text before it. The
+worker's root hands each piece to its hub, and feeds the agent's
+watchdog with it; the engine's root keeps it as the run's text and
+streams it to the watch, which the world opens and acknowledges as
+temper's client does. Once the turn goes, it commits, and its text is
+the text the watch read. smith's own producer, the fake LLM's named
+holds and the bytes between the roots are jig's channel story's (jig's
+`protocol/channel.md`, section 12); the same reply in temper's client is
+6.3's and 2.4's.
+
 temper's client joined to the engine's root, `tests/client`
 (`temper-client-world`), is a system world too: temper's client root and
 view, skein's fake person reading the view's tree, jig's client worlds'

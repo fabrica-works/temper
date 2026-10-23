@@ -376,8 +376,11 @@ process has exited and its tree is empty. temper's choices:
 
 - **A run's facts** go up to the engine as jig's activity, through the
   hub (jig's `domain/hosts.md`, 6.5): smith's channel facts, decoded by
-  hand-out, which also feed the watchdog. An agent process tells no run's
-  text.
+  hand-out, which also feed the watchdog. A run's live text goes up
+  beside them when its assignment asks for it: smith's pieces, handed
+  from its channel to the hub as jig's pieces (jig's `domain/hosts.md`,
+  6.5), each also progress for the watchdog, and best effort as facts
+  are.
 - **The worker's own facts:** each child domain's, content-free (tokens,
   kinds and counts, never a name, a branch or a message), gathered after
   every entry point into one bounded queue the loop drains, for
