@@ -145,6 +145,7 @@ impl Server {
             }
             io::Event::Closed { owner } => {
                 if owner == LISTENER {
+                    self.listening = false;
                     self.listener = None;
                 }
                 if let Some(connection) = self.connections.remove(&owner)

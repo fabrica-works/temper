@@ -7,6 +7,68 @@ use skein_lib::Duration;
 const BOX_DEADLINE: Duration = Duration::from_secs(240);
 
 #[test]
+fn a_held_clients_listener_stops_serve() {
+    held_listener_stops_serve("clients", "temper serve: client listener failed\n");
+}
+
+#[test]
+fn a_held_webhooks_listener_stops_serve() {
+    held_listener_stops_serve("webhooks", "temper serve: webhooks listener failed\n");
+}
+
+#[test]
+fn a_held_workers_listener_stops_serve() {
+    held_listener_stops_serve("workers", "temper serve: client listener failed\n");
+}
+
+fn held_listener_stops_serve(listener: &str, expected: &str) {
+    use skein_world::end_to_end::Command;
+    let scratch = support::Scratch::new(&format!("held_{listener}_listener_stop"));
+    support::configuration(scratch.path(), &support::Forge::Unreached);
+    let held = (7950..8000)
+        .find_map(|port| std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).ok())
+        .expect("a test port is free");
+    let path = scratch.path().join("temper.json");
+    let mut document: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).expect("fixture document")).expect("fixture JSON");
+    // All sockets this case can listen on stay in the implementer's reserved range.
+    let free = (7950..8000)
+        .find_map(|port| std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).ok())
+        .expect("a second test port is free");
+    document["application"]["clients"]["listener"]["socket"] =
+        free.local_addr().expect("free address").to_string().into();
+    let address = serde_json::json!({"socket": held.local_addr().expect("held address").to_string()});
+    match listener {
+        "clients" => document["application"]["clients"]["listener"] = address,
+        "webhooks" => document["application"]["webhooks"] = serde_json::json!({"listener": address}),
+        "workers" => {
+            document["engine"]["hosts"]["listener"] = serde_json::json!([address]);
+            document["workers"] = serde_json::json!([]);
+            document["application"]["workers"] = serde_json::json!([]);
+        }
+        _ => unreachable!(),
+    }
+    drop(free);
+    std::fs::write(path, serde_json::to_vec(&document).expect("held-listener JSON")).expect("held-listener fixture");
+    let ended = support::boxed::run_command(
+        Command {
+            program: env!("CARGO_BIN_EXE_temper").into(),
+            arguments: std::iter::once("serve".into()).chain(support::configuration::flags(scratch.path())).collect(),
+            directory: scratch.path().into(),
+            environment: Vec::new(),
+        },
+        None,
+        support::boxed::Plan::Stop,
+        Duration::from_secs(5),
+    );
+    let diagnostic = String::from_utf8_lossy(&ended.stderr);
+    assert_eq!(ended.exit, Some(Exit::Code(1)), "{diagnostic}");
+    assert!(diagnostic.contains(expected), "{diagnostic}");
+    assert_eq!(ended.left, Some(Vec::new()), "no surviving child: {diagnostic}");
+    scratch.remove();
+}
+
+#[test]
 fn a_temper_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
     let scratch = support::Scratch::new("sign_in_stop");
     let issuer = support::sign_in::configuration(scratch.path());

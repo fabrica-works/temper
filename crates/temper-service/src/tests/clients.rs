@@ -265,6 +265,45 @@ fn a_clients_listener_failure_stops_the_engine() {
 }
 
 #[test]
+fn a_failed_clients_bind_leaves_the_service_quiet() {
+    failed_clients_bind(true, false);
+}
+
+#[test]
+fn a_failed_clients_bind_before_store_open_leaves_the_service_quiet() {
+    failed_clients_bind(false, false);
+}
+
+#[test]
+fn a_closed_clients_bind_leaves_the_service_quiet() {
+    failed_clients_bind(true, true);
+}
+
+fn failed_clients_bind(opened: bool, closed: bool) {
+    use skein_lib::{Time, Wall};
+    let mut service = super::fixtures::started();
+    let engine = service.engine.as_mut().expect("engine");
+    engine.store.opened = opened;
+    engine.clients.iterate(Time::ZERO, Wall::EPOCH, &mut engine.events, &[], None);
+    let Some(skein_io::Request::Listen { owner, .. }) = engine.clients.io.pop() else { panic!("clients listen") };
+    service.told.push(if closed {
+        skein_io::Event::Closed { owner }
+    } else {
+        skein_io::Event::Failed { owner, error: skein_io::Error::Refused }
+    });
+    for _ in 0_u32..64 {
+        super::fixtures::turn(&mut service);
+        if service.is_empty() {
+            break;
+        }
+    }
+    assert_eq!(service.end(), Some(&crate::End::Stopped(crate::Stop::Listener)));
+    assert!(service.is_empty(), "every child and kernel route closes");
+    assert!(!service.work_pending(Time::from_nanos(1)), "the loop needs no further turn");
+    assert_eq!(service.next_deadline(), None, "no timer remains armed");
+}
+
+#[test]
 fn original_model_names_reach_the_root() {
     let mut ask = super::fixtures::chat(1, b"question");
     let people::Ask::Create { batch, .. } = &mut ask else { panic!("fixture creates a chat") };

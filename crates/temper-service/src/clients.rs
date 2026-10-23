@@ -307,12 +307,15 @@ impl Clients {
     }
     pub fn up(&mut self, event: io::Event) -> bool {
         let event = untag(event);
+        let mut failed = false;
         if let io::Event::Failed { owner, .. } | io::Event::Closed { owner } = &event
             && *owner == Token::new(0)
             && self.stopping.is_none()
         {
-            return false;
+            failed = true;
         }
+        // The server must observe the terminal bind event before the engine
+        // aborts, or it waits forever for the listener to finish opening.
         if let io::Event::Listening { addr, .. } = &event
             && let Some(address) = addr.socket()
         {
@@ -327,7 +330,7 @@ impl Clients {
         }
         self.print_link();
         self.pending = true;
-        true
+        !failed
     }
     fn server_requests(&mut self) {
         for _ in 0..self.server_out.len() {
