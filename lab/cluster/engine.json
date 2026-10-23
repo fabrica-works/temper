@@ -3,38 +3,38 @@
     "limits": {{
       "profile": "small",
       "overrides": {{
-        "tasks.result_bytes": 32,
-        "people.amendment_bytes": 64,
-        "core.policy_bytes": 256,
-        "tasks.spec_bytes": 128,
-        "tasks.message_bytes": 512,
+        "tasks.result_bytes": 128,
+        "people.amendment_bytes": 2048,
+        "core.policy_bytes": 4096,
+        "tasks.spec_bytes": 512,
+        "tasks.message_bytes": 4094,
         "tasks.hold_bytes": 64,
-        "tasks.authority_bytes": 64,
+        "tasks.authority_bytes": 512,
         "people.words": 512,
         "core.call_answer_bytes": 2048,
         "notes.recalled": 1,
-        "people.operations": 2,
-        "tasks.tasks": 2,
+        "people.operations": 5,
+        "tasks.tasks": 8,
         "tasks.funders": 4,
-        "tasks.project_tasks": 2,
-        "tasks.tree_tasks": 1,
+        "tasks.project_tasks": 8,
+        "tasks.tree_tasks": 8,
         "tasks.project_goals": 1,
         "tasks.batch": 1,
         "tasks.dependencies": 1,
-        "tasks.delegates": 1,
-        "tasks.charters": 1,
+        "tasks.delegates": 4,
+        "tasks.charters": 2,
         "people.people": 1,
         "people.projects": 2,
         "people.sign_ins": 2,
         "people.holdings": 1,
-        "people.inbox_tasks": 4,
-        "people.pending": 1,
-        "people.waiters": 1,
+        "people.inbox_tasks": 16,
+        "people.pending": 4,
+        "people.waiters": 4,
         "fleet.attempts": 2,
         "fleet.calls": 1,
         "fleet.turns": 8,
-        "brief.briefs": 1,
-        "brief.sections": 1,
+        "brief.briefs": 2,
+        "brief.sections": 4,
         "notes.entries_per_scope": 1,
         "views.runs": 1,
         "views.watchers": 16,
@@ -45,30 +45,57 @@
         "core.run_bytes": 4096,
         "views.text_bytes": 1024,
         "core.templates": 2,
-        "documents.rows": 2,
+        "documents.rows": 32,
         "documents.lines": 2,
-        "documents.chips": 1,
+        "documents.chips": 2,
         "documents.text_bytes": 128,
         "authority.projects": 2,
         "fleet.grace_ms": 3000,
         "hub.turns": 1,
         "link.ping_ms": 100,
-        "link.silence_ms": 1000
+        "link.silence_ms": 1000,
+        "tasks.parameters": 5,
+        "tasks.contract_choices": 2,
+        "tasks.authority_grants": 12,
+        "tasks.authority_segments": 9,
+        "tasks.hold_segments": 9,
+        "tasks.saved_resources": 4,
+        "authority.grants": 12,
+        "authority.segments": 9,
+        "authority.roles": 1,
+        "authority.requirements": 3,
+        "notes.scopes": 15,
+        "fleet.engine_slots": 0
       }}
     }},
     "llm": {{
-      "providers": [{{"name": "fake-provider", "number": 1, "models": ["fake"], "sources": {{"keys": true}}}}],
+      "providers": [
+        {{
+          "name": "fake-provider",
+          "number": 1,
+          "models": [
+            "fake"
+          ],
+          "sources": {{
+            "keys": true
+          }}
+        }}
+      ],
       "endpoints": [
         {{
           "name": "fake",
           "number": 1,
           "dialect": 3,
           "provider": "fake-provider",
-          "address": {{"socket": "{proc.llm.ready.address}"}},
-          "transport": "plaintext",
+          "address": {{
+            "socket": "{proc.llm.ready.address}"
+          }},
+          "transport": "tls",
           "headers": [],
           "connect_ms": 10000,
-          "handshake_ms": 10000
+          "handshake_ms": 10000,
+          "server_name": "skein.test",
+          "trust": "{proc.llm.dir}/root.der"
         }}
       ],
       "models": [
@@ -76,14 +103,32 @@
           "name": "fake",
           "endpoint": "fake",
           "window": 1048576,
-          "output": 512,
-          "prices": {{"input": 1, "cached": 1, "output": 1, "unit": 1000000}}
+          "output": 8192,
+          "prices": {{
+            "input": 1,
+            "cached": 1,
+            "output": 1,
+            "unit": 1000000
+          }}
         }}
       ]
     }},
     "hosts": {{
-      "listener": [{{"socket": "127.0.0.1:0"}}],
-      "workers": [{{"name": "w1", "digest": "secrets/w1.digest"}}, {{"name": "w2", "digest": "secrets/w2.digest"}}]
+      "listener": [
+        {{
+          "socket": "127.0.0.1:0"
+        }}
+      ],
+      "workers": [
+        {{
+          "name": "w1",
+          "digest": "secrets/w1.digest"
+        }},
+        {{
+          "name": "w2",
+          "digest": "secrets/w2.digest"
+        }}
+      ]
     }},
     "charters": [
       {{
@@ -94,15 +139,34 @@
         "hosts": "workers",
         "waiting_ms": 120000,
         "resume": true,
-        "turns": 4,
+        "turns": 8,
         "time_ms": 130000,
         "reserve_turns": 1,
         "reserve_time_ms": 10000,
         "spend": 20,
-        "inspect": false,
-        "modify": false,
+        "inspect": true,
+        "modify": true,
         "shell": false,
-        "agents": false,
+        "agents": true,
+        "call_timeout_ms": 10000
+      }},
+      {{
+        "number": 2,
+        "instructions": "charters/coding.txt",
+        "model": "fake",
+        "alternatives": [],
+        "hosts": "workers",
+        "waiting_ms": 10000,
+        "resume": true,
+        "turns": 8,
+        "time_ms": 120000,
+        "reserve_turns": 1,
+        "reserve_time_ms": 60000,
+        "spend": 20,
+        "inspect": true,
+        "modify": true,
+        "shell": true,
+        "agents": true,
         "call_timeout_ms": 10000
       }}
     ],
@@ -110,10 +174,18 @@
       {{
         "number": 1,
         "name": "chat",
-        "executor": {{"charter": 1}},
-        "contract": {{"report": {{"words": 32}}}},
+        "executor": {{
+          "charter": 1
+        }},
+        "contract": {{
+          "report": {{
+            "words": 32
+          }}
+        }},
         "shallower": 1,
-        "budget": {{"as_allowed": 50}},
+        "budget": {{
+          "as_allowed": 50
+        }},
         "deadline": "none",
         "tracked": null,
         "conversation": true,
@@ -128,11 +200,17 @@
         "number": 2,
         "name": "goal",
         "executor": "chosen",
-        "contract": {{"report": {{"words": 32}}}},
+        "contract": {{
+          "report": {{
+            "words": 32
+          }}
+        }},
         "shallower": 1,
         "budget": "given",
         "deadline": "given",
-        "tracked": {{"priority": 1}},
+        "tracked": {{
+          "priority": 1
+        }},
         "conversation": false,
         "listed": true,
         "retention": "kept",
@@ -141,42 +219,473 @@
         "llm": null
       }}
     ],
-    "clients": {{"heartbeat_ms": 10000, "link": true}},
-    "deployment": {{"directory": "state", "seed": 7}},
-    "owners": [{{"provider": 1, "subject": "owner-a"}}],
-    "providers": [{{"number": 1, "kind": "link"}}, {{"number": 2, "kind": "deployment"}}],
-    "connectors": [1],
+    "clients": {{
+      "heartbeat_ms": 10000,
+      "link": true
+    }},
+    "deployment": {{
+      "directory": "state",
+      "seed": 7
+    }},
+    "owners": [
+      {{
+        "provider": 1,
+        "subject": "owner-a"
+      }}
+    ],
+    "providers": [
+      {{
+        "number": 1,
+        "kind": "link"
+      }},
+      {{
+        "number": 2,
+        "kind": "deployment"
+      }}
+    ],
+    "connectors": [
+      1
+    ],
     "memory_bytes": 4503599627370496,
     "rules": {{
       "ceiling": {{
-        "tools": 0,
-        "grants": [],
-        "delegation": {{"kinds": [{{"kind": "charter", "number": 1}}], "tasks": 8, "depth": 8}},
-        "budget": {{"spend": 100, "deadline_unix_seconds": null}},
+        "tools": 1,
+        "grants": [
+          {{
+            "connector": 1,
+            "kind": 1,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 2,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 3,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 4,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 7,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 8,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 10,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 11,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 12,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }},
+          {{
+            "connector": 1,
+            "kind": 13,
+            "pattern": {{
+              "segments": [
+                "forge",
+                "{proc.forge.ready.address}"
+              ],
+              "last": "open",
+              "value": "fake"
+            }}
+          }}
+        ],
+        "delegation": {{
+          "kinds": [
+            {{
+              "kind": "charter",
+              "number": 1
+            }},
+            {{
+              "kind": "charter",
+              "number": 2
+            }},
+            {{
+              "kind": "procedure",
+              "number": 2
+            }}
+          ],
+          "tasks": 8,
+          "depth": 4
+        }},
+        "budget": {{
+          "spend": 100,
+          "deadline_unix_seconds": null
+        }},
         "notes": 0,
         "note_resources": []
       }},
       "period_spend": 100,
       "minimum_run_spend": 1,
-      "maximum_run_spend": 100,
+      "maximum_run_spend": 10,
       "implies": [],
       "requirements": []
     }},
     "projects": [
       {{
         "number": 1,
-        "roles": [{{"connector": 1, "permission": 1, "role": 0}}],
+        "roles": [
+          {{
+            "connector": 1,
+            "permission": 1,
+            "role": 0
+          }}
+        ],
         "policy": {{
           "templates": [],
           "escalation_role": 0,
           "period_spend": 100,
-          "projections": [],
+          "projections": [
+            {{
+              "connector": 1,
+              "kind": 1,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 2,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 3,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 4,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 7,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 8,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 10,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 11,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 12,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }},
+            {{
+              "connector": 1,
+              "kind": 13,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}"
+                ],
+                "last": "open",
+                "value": "fake"
+              }}
+            }}
+          ],
           "requirements": [],
           "ceiling": {{
-            "tools": 0,
-            "grants": [],
-            "delegation": {{"kinds": [{{"kind": "charter", "number": 1}}], "tasks": 8, "depth": 8}},
-            "budget": {{"spend": 100, "deadline_unix_seconds": null}},
+            "tools": 1,
+            "grants": [
+              {{
+                "connector": 1,
+                "kind": 1,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 2,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 3,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 4,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 7,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 8,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 10,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 11,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 12,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }},
+              {{
+                "connector": 1,
+                "kind": 13,
+                "pattern": {{
+                  "segments": [
+                    "forge",
+                    "{proc.forge.ready.address}"
+                  ],
+                  "last": "open",
+                  "value": "fake"
+                }}
+              }}
+            ],
+            "delegation": {{
+              "kinds": [
+                {{
+                  "kind": "charter",
+                  "number": 1
+                }},
+                {{
+                  "kind": "charter",
+                  "number": 2
+                }},
+                {{
+                  "kind": "procedure",
+                  "number": 2
+                }}
+              ],
+              "tasks": 8,
+              "depth": 4
+            }},
+            "budget": {{
+              "spend": 100,
+              "deadline_unix_seconds": null
+            }},
             "notes": 0,
             "note_resources": []
           }},
@@ -187,10 +696,151 @@
               "requests": 511,
               "decides": 31,
               "authority": {{
-                "tools": 0,
-                "grants": [],
-                "delegation": {{"kinds": [{{"kind": "charter", "number": 1}}], "tasks": 8, "depth": 8}},
-                "budget": {{"spend": 100, "deadline_unix_seconds": null}},
+                "tools": 1,
+                "grants": [
+                  {{
+                    "connector": 1,
+                    "kind": 1,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 2,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 3,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 4,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 7,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 8,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 10,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 11,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 12,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }},
+                  {{
+                    "connector": 1,
+                    "kind": 13,
+                    "pattern": {{
+                      "segments": [
+                        "forge",
+                        "{proc.forge.ready.address}"
+                      ],
+                      "last": "open",
+                      "value": "fake"
+                    }}
+                  }}
+                ],
+                "delegation": {{
+                  "kinds": [
+                    {{
+                      "kind": "charter",
+                      "number": 1
+                    }},
+                    {{
+                      "kind": "charter",
+                      "number": 2
+                    }},
+                    {{
+                      "kind": "procedure",
+                      "number": 2
+                    }}
+                  ],
+                  "tasks": 8,
+                  "depth": 4
+                }},
+                "budget": {{
+                  "spend": 40,
+                  "deadline_unix_seconds": null
+                }},
                 "notes": 0,
                 "note_resources": []
               }}
@@ -203,17 +853,26 @@
   "workers": [],
   "application": {{
     "webhooks": null,
-    "clients": {{"listener": {{"socket": "127.0.0.1:0"}}, "bundle": null}},
+    "clients": {{
+      "listener": {{
+        "socket": "127.0.0.1:0"
+      }},
+      "bundle": null
+    }},
     "forges": [
       {{
         "number": 1,
         "kind": "forgejo",
-        "api": {{"socket": "127.0.0.1:9"}},
+        "api": {{
+          "socket": "127.0.0.1:9"
+        }},
         "transport": "plaintext",
         "git": "http://127.0.0.1:9",
         "webhook_secret": null,
         "api_token": "secrets/forge-1.api-token",
-        "user": {{"file": "secrets/forge-1.user"}},
+        "user": {{
+          "file": "secrets/forge-1.user"
+        }},
         "identity": 1
       }}
     ],
@@ -222,13 +881,51 @@
         "number": 1,
         "token": "secrets/forge-1.git-token",
         "login": "temper",
-        "author": {{"name": "Temper", "email": "temper@example.test"}}
+        "author": {{
+          "name": "Temper",
+          "email": "temper@example.test"
+        }}
       }}
     ],
     "setup": [],
     "demo": null,
-    "landing": {{"deployment": [], "projects": []}},
-    "charter": 1,
+    "landing": {{
+      "deployment": [],
+      "projects": [
+        {{
+          "project": 1,
+          "rules": [
+            {{
+              "connector": 1,
+              "kind": 4,
+              "pattern": {{
+                "segments": [
+                  "forge",
+                  "{proc.forge.ready.address}",
+                  "fake",
+                  "widget",
+                  "branch"
+                ],
+                "last": "exact",
+                "value": "main"
+              }},
+              "enforce": true,
+              "ci": true,
+              "up_to_date": true,
+              "gates": [
+                {{
+                  "number": 1,
+                  "blocking": true,
+                  "freshness": "exact"
+                }}
+              ],
+              "approvals": []
+            }}
+          ]
+        }}
+      ]
+    }},
+    "charter": 2,
     "limits": {{
       "profile": "small",
       "overrides": {{
@@ -237,7 +934,10 @@
         "checkout.message_bytes": 4096,
         "forge.name_bytes": 64,
         "forge.resources_per_task": 2,
-        "git_component.stdout_bytes": 2048
+        "git_component.stdout_bytes": 2048,
+        "forge.client.pending": 8,
+        "forge.client.calls": 4,
+        "forge_component.connections": 4
       }}
     }},
     "workers": []

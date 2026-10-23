@@ -1,27 +1,39 @@
 {{
   "workers": [
     {{
-      "engine": {{"socket": "{proc.engine.ready.workers}"}},
+      "engine": {{
+        "socket": "{proc.engine.ready.workers}"
+      }},
       "name": "w2",
       "secret": "secrets/w2.secret",
       "slots": 1,
-      "programs": {{"check_interval_ms": 60000}},
-      "graces": {{"grace_ms": 1000, "agent_stop_ms": 100, "delivery_ms": 100, "save_ms": 100}},
+      "programs": {{
+        "check_interval_ms": 60000
+      }},
+      "graces": {{
+        "grace_ms": 1000,
+        "agent_stop_ms": 100,
+        "delivery_ms": 100,
+        "save_ms": 100
+      }},
       "agent": {{
         "program": "{artifact.temper}",
         "configuration": "{proc.w2.dir}/config/agent.json",
-        "arguments": ["agent", "{proc.w2.dir}/config/agent.json"]
+        "arguments": [
+          "agent",
+          "{proc.w2.dir}/config/agent.json"
+        ]
       }},
       "limits": {{
         "profile": "small",
         "overrides": {{
           "hub.slots": 1,
           "hub.run_calls": 1,
-          "tasks.message_bytes": 512,
+          "tasks.message_bytes": 4096,
           "people.words": 512,
           "core.call_answer_bytes": 2048,
           "hub.accounts": 4,
-          "hub.event_bytes": 598,
+          "hub.event_bytes": 4094,
           "hub.turns": 1,
           "hub.held": 1,
           "hub.program_sources": 0,
@@ -33,7 +45,12 @@
     }}
   ],
   "application": {{
-    "workers": [{{"root": "worker-root", "git": "/usr/bin/git"}}],
+    "workers": [
+      {{
+        "root": "worker-root",
+        "git": "/usr/bin/git"
+      }}
+    ],
     "limits": {{
       "profile": "small",
       "overrides": {{
