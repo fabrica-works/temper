@@ -11,7 +11,12 @@ use std::{
     path::Path,
 };
 
-const PAGE: &[u8] = b"<!doctype html><title>qa</title><div id=\"app\"></div>\n";
+const PAGE: &[u8] = b"<!doctype html><head><title>qa</title></head><div id=\"app\"></div>\n";
+// The page as served: the sign-in ways before its `</head>`, none configured (protocol/sign-in.md, 7).
+const SERVED: &[u8] =
+    b"<!doctype html><head><title>qa</title><meta name=\"temper-sign-in\" content=\"\"></head><div id=\"app\"></div>\n";
+// A page with no `</head>` for the sign-in ways to go before.
+const HEADLESS: &[u8] = b"<!doctype html><title>qa</title><div id=\"app\"></div>\n";
 // A digest directory's name: 16 hex digits (ui-web.md, 4.2).
 const DIGEST: &str = "0123456789abcdef";
 const OTHER_DIGEST: &str = "fedcba9876543210";
@@ -72,6 +77,7 @@ impl Reply {
 #[derive(Clone, Copy)]
 enum Layout {
     Whole,
+    Headless,
     NoPage,
     NoDigest,
     Empty,
@@ -79,14 +85,15 @@ enum Layout {
 }
 fn lay(root: &Path, layout: Layout) {
     let (page, digest) = match layout {
-        Layout::Whole => (true, true),
+        Layout::Whole | Layout::Headless => (true, true),
         Layout::NoPage => (false, true),
         Layout::NoDigest => (true, false),
         Layout::Empty | Layout::Missing => (false, false),
     };
     fs::create_dir_all(root).expect("bundle directory");
     if page {
-        fs::write(root.join("index.html"), PAGE).expect("page");
+        let bytes = if matches!(layout, Layout::Headless) { HEADLESS } else { PAGE };
+        fs::write(root.join("index.html"), bytes).expect("page");
     }
     for (path, bytes, _) in FILES.iter().filter(|_| digest) {
         let file = root.join(DIGEST).join(path);
@@ -211,7 +218,7 @@ fn every_get_the_routes_leave_over_is_the_page_with_its_etag_under_no_cache() {
         assert_eq!(reply.status, 200, "{path}");
         assert_eq!(reply.header("content-type"), Some("text/html; charset=utf-8"), "{path}");
         assert_eq!(reply.header("cache-control"), Some("no-cache"), "{path}");
-        assert_eq!(reply.body, PAGE, "{path}");
+        assert_eq!(reply.body, SERVED, "{path}");
         let held = reply.header("etag").expect("an ETag");
         assert_eq!(*etag.get_or_insert(held.to_owned()), held, "one ETag for one page, at {path}");
         reply.policy(path);
@@ -224,7 +231,7 @@ fn the_printed_links_route_answers_the_page_each_time_it_is_read() {
     let served = Served::start("link", true);
     for read in 1..=2 {
         let reply = served.get(&served.route);
-        assert_eq!((reply.status, reply.body.as_slice()), (200, PAGE), "read {read} of {}", served.route);
+        assert_eq!((reply.status, reply.body.as_slice()), (200, SERVED), "read {read} of {}", served.route);
         assert_eq!(reply.header("cache-control"), Some("no-cache"), "read {read}");
         assert!(reply.header("etag").is_some(), "read {read}");
         reply.policy(&served.route);
@@ -299,7 +306,7 @@ fn jigs_mapping_claims_every_path_under_jig_before_the_405_or_the_page() {
     for (method, path) in rows {
         let reply = served.send(method, path, &[OCTETS, FOREIGN]);
         assert_ne!(reply.status, 405, "{method} {path} is the mapping's, not the 405");
-        assert_ne!(reply.body, PAGE, "{method} {path} is the mapping's, not the page");
+        assert_ne!(reply.body, SERVED, "{method} {path} is the mapping's, not the page");
         assert_eq!(reply.header("cache-control"), Some("no-store"), "the mapping's answer: {method} {path}");
         assert!(reply.headers.iter().all(|(name, _)| !name.starts_with("access-control-")), "{method} {path}");
         reply.policy(path);
@@ -384,7 +391,7 @@ fn a_path_under_bundle_that_is_no_file_of_the_digest_directory_is_not_found() {
     for path in paths {
         let reply = served.get(&path);
         assert_eq!(reply.status, 404, "{path}");
-        assert_ne!(reply.body, PAGE, "{path}");
+        assert_ne!(reply.body, SERVED, "{path}");
         reply.policy(&path);
     }
     served.stop();
@@ -489,6 +496,7 @@ fn the_start_refuses_a_directory_without_a_bundle_or_a_bundle_past_its_limits() 
     // Each row: the directory's layout, the limits it sets, whether the start refuses (configuration.md, 3 and 7).
     let rows = [
         (Layout::Whole, None, None, false),
+        (Layout::Headless, None, None, true),
         (Layout::NoPage, None, None, true),
         (Layout::NoDigest, None, None, true),
         (Layout::Empty, None, None, true),
