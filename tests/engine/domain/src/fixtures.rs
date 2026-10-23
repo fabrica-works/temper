@@ -97,17 +97,11 @@ pub fn revision_delegate() -> (Driver, engine::Assignment, u64) {
         let mut configuration = config(92);
         let mut rules = configuration.core.authority.rules().clone();
         rules.ceiling.delegation.depth = 2;
-        let mut policy = configuration.core.authority.policy(1).expect("fixture project").clone();
+        let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
         policy.ceiling.delegation.depth = 2;
         policy.roles[0].authority.delegation.depth = 2;
-        let mut authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("fixture authority");
-        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-        jig_domain_authority::step(
-            &mut authority,
-            jig_domain_authority::Event::Policy { project: 1, policy },
-            &mut out,
-        );
-        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
+        let authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("fixture authority");
+        configuration.core.seed_projects[0].policy.policy = policy;
         configuration.core.authority = authority;
         configuration
     });

@@ -45,7 +45,7 @@ fn configuration() -> engine::Config {
     rules.maximum_run_spend = 5;
     rules.ceiling.delegation.tasks = TASKS;
     rules.ceiling.delegation.depth = 3;
-    let mut policy = config.core.authority.policy(1).expect("fixture project").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.delegation.tasks = TASKS;
     policy.ceiling.delegation.depth = 3;
     policy.roles[0].authority.delegation.tasks = TASKS;
@@ -55,7 +55,9 @@ fn configuration() -> engine::Config {
     let mut authority = jig_domain_authority::Domain::new(rules, limits().authority).expect("fixture authority");
     let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
     jig_domain_authority::step(&mut authority, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
-    config.core.authority = authority;
+    config.core.seed_projects[0].policy.policy = authority.policy(1).expect("configured seed policy").clone();
+    config.core.authority = jig_domain_authority::Domain::new(authority.rules().clone(), *authority.limits())
+        .expect("configured authority");
     config
 }
 

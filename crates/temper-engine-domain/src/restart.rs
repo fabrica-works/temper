@@ -436,8 +436,8 @@ pub(crate) fn restore_page_row(domain: &mut Domain, env: &Env<Limits>, row: Reco
                 let _refused = domain.core.restart_refuse();
             }
         }
-        Record::Core(jig_domain_core::Record::People(people::Stored::Policy { project, value })) => {
-            if !domain.core.restore_policy(&core_limits(&domain.limits), project, value) {
+        Record::Core(jig_domain_core::Record::People(people::Stored::Policy { project, name, value })) => {
+            if !domain.core.restore_policy(&core_limits(&domain.limits), project, name, value) {
                 let _refused = domain.core.restart_refuse();
             }
         }

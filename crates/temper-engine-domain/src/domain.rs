@@ -170,10 +170,11 @@ impl Domain {
             );
         }
         assert!(
-            config.core.permission_roles.capacity() == limits.authority.projects,
+            config.core.seed_projects.len() <= usize::try_from(limits.authority.projects).expect("project bound"),
             "permission policy project bound"
         );
-        for (_, mappings) in &config.core.permission_roles {
+        for project in &config.core.seed_projects {
+            let mappings = &project.policy.permissions;
             let count = u64::try_from(mappings.len()).expect("usize fits u64");
             let unit = u64::try_from(size_of::<people::PermissionRole>()).expect("type size fits u64");
             assert!(
@@ -185,9 +186,12 @@ impl Domain {
             );
         }
         for owner in &config.core.owners {
-            assert!(config.core.authority.policy(owner.project).is_some(), "bootstrap owner names configured policy");
             assert!(
-                match config.core.authority.policy(owner.project).expect("known policy").escalation_role {
+                seed_policy(&config.core.seed_projects, owner.project).is_some(),
+                "bootstrap owner names configured policy"
+            );
+            assert!(
+                match seed_policy(&config.core.seed_projects, owner.project).expect("known policy").escalation_role {
                     Some(role) => role <= 3,
                     None => false,
                 },
@@ -224,12 +228,13 @@ impl Domain {
         for (&project, rules) in &config.landing.projects {
             let built = policy_translate::build_landing(rules, true, limits.authority.requirements, forge_connector)
                 .expect("project landing requirements bounded");
-            let mut policy = config.core.authority.policy(project).expect("landing project has a policy").clone();
+            let policy =
+                seed_policy_mut(&mut config.core.seed_projects, project).expect("landing project has a policy");
             assert!(
-                policy_translate::landing_roles(&policy, &config.landing.deployment),
+                policy_translate::landing_roles(policy, &config.landing.deployment),
                 "deployment landing roles configured"
             );
-            assert!(policy_translate::landing_roles(&policy, rules), "project landing roles configured");
+            assert!(policy_translate::landing_roles(policy, rules), "project landing roles configured");
             let combined = policy_translate::combine_requirements(
                 &policy.requirements,
                 &built.requirements,
@@ -237,9 +242,6 @@ impl Domain {
             )
             .expect("project landing requirements fit authority policy");
             policy.requirements = combined;
-            let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-            authority::step(&mut config.core.authority, authority::Event::Policy { project, policy }, &mut facts);
-            assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project }), "landing policy configured");
             assert!(forge.project_judges(project, built.criteria), "project judge table bounded");
         }
         let gate_policy = policy_translate::gate_policy(
@@ -914,7 +916,7 @@ pub enum Refused {
 pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
     let room = u32::try_from(config.core.settings.charters.len().saturating_add(config.core.owners.len()))
         .expect("bounded configuration")
-        .saturating_add(config.core.permission_roles.len())
+        .saturating_add(u32::try_from(config.core.seed_projects.len()).expect("bounded projects"))
         .saturating_add(config.landing.projects.len())
         .saturating_add(7);
     let mut refused = List::with_capacity(room);
@@ -949,7 +951,9 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
     if limits.forge.judge_criteria < limits.authority.requirements {
         refused.push(Refused::JudgeCriteria).expect("counted refusals");
     }
-    for (&project, mappings) in &config.core.permission_roles {
+    for seed in &config.core.seed_projects {
+        let project = seed.number;
+        let mappings = &seed.policy.permissions;
         let bytes = u64::try_from(mappings.len())
             .expect("usize fits u64")
             .checked_mul(u64::try_from(size_of::<people::PermissionRole>()).expect("type size fits u64"));
@@ -966,7 +970,7 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
         for earlier in config.core.owners.iter().take(index) {
             named |= earlier.project == owner.project;
         }
-        let escalates = match config.core.authority.policy(owner.project) {
+        let escalates = match seed_policy(&config.core.seed_projects, owner.project) {
             Some(policy) => match policy.escalation_role {
                 Some(role) => role <= 3,
                 None => false,
@@ -1020,7 +1024,7 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
     }
     for (&project, rules) in &config.landing.projects {
         let joined = landing_project(
-            &mut config.core.authority,
+            &mut config.core.seed_projects,
             &mut forge,
             (project, rules, &config.landing.deployment),
             connector,
@@ -1046,7 +1050,7 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
 
 /// One project's landing rules joined to its policy, as `Domain::new` joins them.
 fn landing_project(
-    policies: &mut authority::Domain,
+    policies: &mut [jig_domain_core::SeedProject],
     forge: &mut forge::Domain,
     (project, rules, deployment): (u32, &[LandingRule], &[LandingRule]),
     connector: u16,
@@ -1058,9 +1062,8 @@ fn landing_project(
     let Some(built) = policy_translate::build_landing(rules, true, limits.authority.requirements, connector) else {
         return false;
     };
-    let Some(policy) = policies.policy(project) else { return false };
-    let mut policy = policy.clone();
-    if !policy_translate::landing_roles(&policy, deployment) || !policy_translate::landing_roles(&policy, rules) {
+    let Some(policy) = seed_policy_mut(policies, project) else { return false };
+    if !policy_translate::landing_roles(policy, deployment) || !policy_translate::landing_roles(policy, rules) {
         return false;
     }
     let Some(combined) = policy_translate::combine_requirements(
@@ -1071,11 +1074,7 @@ fn landing_project(
         return false;
     };
     policy.requirements = combined;
-    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(policies, authority::Event::Policy { project, policy }, &mut facts);
-    facts.pop() == Some(authority::PolicyFact::Changed { project })
-        && forge.project_judges(project, built.criteria)
-        && gates_fit(forge, rules, true, limits)
+    forge.project_judges(project, built.criteria) && gates_fit(forge, rules, true, limits)
 }
 
 /// One set of rules' gate templates within the forge's, alone.
@@ -1097,4 +1096,22 @@ fn landing_within(rules: &[LandingRule], bytes: u32) -> bool {
         Some(held) => held <= u64::from(bytes),
         None => false,
     }
+}
+
+fn seed_policy(seeds: &[jig_domain_core::SeedProject], project: u32) -> Option<&authority::Policy> {
+    for seed in seeds {
+        if seed.number == project {
+            return Some(&seed.policy.policy);
+        }
+    }
+    None
+}
+
+fn seed_policy_mut(seeds: &mut [jig_domain_core::SeedProject], project: u32) -> Option<&mut authority::Policy> {
+    for seed in seeds {
+        if seed.number == project {
+            return Some(&mut seed.policy.policy);
+        }
+    }
+    None
 }

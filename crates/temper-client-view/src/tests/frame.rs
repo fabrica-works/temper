@@ -459,7 +459,15 @@ fn projects_me_leaves_unnamed_take_their_numbers_in_the_banner() {
     let (mut root, watch) = fixtures::root_with_watch(Some(fixtures::PROJECT));
     let mut me = root.pages().me(root.client()).expect("me").clone();
     for index in 0..me.projects.len() {
-        me.projects.get_mut(index).expect("project").name = None;
+        let row = me.projects.get_mut(index).expect("project");
+        row.name = jig_client::contract::DocumentText::complete(
+            jig_client::contract::Text::new(
+                fixtures::words()
+                    .say(crate::words::Word::Project, &[skein_ui::phrases::Hole::Number(u64::from(row.project))]),
+                64,
+            )
+            .expect("project name"),
+        );
     }
     fixtures::root_event(
         &mut root,

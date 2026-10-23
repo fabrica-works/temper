@@ -127,9 +127,7 @@ pub(crate) fn project(call: &Call, me: &c::Me) -> Option<u32> {
         Some(Value::Project(Project::Number(number))) => Some(*number),
         Some(Value::Project(Project::Name(name))) => {
             for project in &me.projects {
-                if let Some(text) = &project.name
-                    && text.bytes() == name.as_ref()
-                {
+                if project.name.bytes() == name.as_ref() {
                     return Some(project.project);
                 }
             }

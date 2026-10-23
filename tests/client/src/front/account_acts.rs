@@ -183,11 +183,7 @@ fn fixture_root(
         engine_limits.journal.writes =
             engine_limits.journal.writes.checked_add((engine_limits.fleet.grants - 2) * 4).expect("grant cohorts fit");
         let rules = config.core.authority.rules().clone();
-        let policy = config.core.authority.policy(1).expect("fixture project").clone();
-        let mut authority = auth::Domain::new(rules, engine_limits.authority).expect("account authority bounds");
-        let mut out = Queue::with_capacity(auth::POLICY_MAX_OUT);
-        auth::step(&mut authority, auth::Event::Policy { project: 1, policy }, &mut out);
-        config.core.authority = authority;
+        config.core.authority = auth::Domain::new(rules, engine_limits.authority).expect("account authority bounds");
         (config, engine_limits)
     });
     let mut front = Joint::with_engine(seed, &limits, Store::new(), [bootstrap, config], &engine_limits, 1);

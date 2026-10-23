@@ -9,14 +9,14 @@ fn config() -> engine::Config {
     use jig_domain_authority as a;
     let mut config = temper_engine_domain_world::walking::config(71);
     config.core.connectors = Box::new([1]);
-    for role in config.core.permission_roles.get_mut(&1).expect("project permissions").iter_mut() {
+    for role in &mut config.core.seed_projects[0].policy.permissions {
         role.connector = 1;
     }
     let mut rules = config.core.authority.rules().clone();
     for grant in &mut rules.ceiling.grants {
         grant.connector = 1;
     }
-    let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     for grant in &mut policy.ceiling.grants {
         grant.connector = 1;
     }
@@ -32,7 +32,9 @@ fn config() -> engine::Config {
     let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
     a::step(&mut authority, a::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: 1 }));
-    config.core.authority = authority;
+    config.core.seed_projects[0].policy.policy = authority.policy(1).expect("configured seed policy").clone();
+    config.core.authority = jig_domain_authority::Domain::new(authority.rules().clone(), *authority.limits())
+        .expect("configured authority");
     config
 }
 

@@ -95,6 +95,7 @@ pub fn party(event: core::Event) -> engine::Event {
         core::Event::Account(..) => panic!("the client kit does not make Account"),
         core::Event::View(..) => panic!("the client kit does not make View"),
         core::Event::Notes(..) => panic!("the client kit does not make Notes"),
+        core::Event::Act { .. } => panic!("the client kit does not make deployment acts"),
     })
 }
 fn unsupported_people(event: &people::Event) -> PartyInput {
@@ -114,6 +115,7 @@ fn unsupported_people(event: &people::Event) -> PartyInput {
         people::Event::Decided { .. } => panic!("the client kit does not make People::Decided"),
         people::Event::Restore { .. } => panic!("the client kit does not make People::Restore"),
         people::Event::Restored => panic!("the client kit does not make People::Restored"),
+        people::Event::Act { .. } => panic!("the client kit does not make People::Act"),
     }
 }
 /// Retain native shell tokens, then make the real engine's party input.

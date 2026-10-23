@@ -1036,7 +1036,7 @@ fn grant_read(config: &mut engine::Config, limits: &mut engine::Limits) {
     let mut authority_rules = config.core.authority.rules().clone();
     authority_rules.ceiling.grants = Box::new([grant.clone()]);
     authority_rules.ceiling.tools = authority::Tools(1);
-    let mut policy = config.core.authority.policy(1).expect("configured policy").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.grants = Box::new([grant.clone()]);
     policy.ceiling.tools = authority::Tools(1);
     policy.projections = Box::new([grant.clone()]);
@@ -1054,7 +1054,9 @@ fn grant_read(config: &mut engine::Config, limits: &mut engine::Limits) {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    config.core.authority = domain;
+    config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+    config.core.authority =
+        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("configured authority");
 }
 
 fn say(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> people::Ask {

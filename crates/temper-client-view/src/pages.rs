@@ -17,10 +17,7 @@ pub(crate) fn project_name<'a>(
 ) -> Option<&'a [u8]> {
     for row in &pages.me(client)?.projects {
         if row.project == project {
-            return match &row.name {
-                Some(name) => Some(name.bytes()),
-                None => None,
-            };
+            return Some(row.name.bytes());
         }
     }
     None

@@ -17,6 +17,7 @@ pub const LIMITS: JournalLimits = JournalLimits {
     run_bytes: 1,
 };
 pub const HEADER: Deployment = Deployment {
+    projects: 1,
     id: [31; 16],
     tasks: 0,
     people: 0,

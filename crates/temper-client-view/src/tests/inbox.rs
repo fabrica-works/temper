@@ -293,7 +293,9 @@ fn an_unknown_project_name_keeps_the_numbered_fallback() {
     let limits = fixtures::domain_limits();
     let (mut root, me_watch, inbox_watch) = fixtures::root_at(Address::Inbox { filter: Filter::ALL }, &limits);
     let mut me = root.pages().me(root.client()).expect("me").clone();
-    me.projects.get_mut(0).expect("project").name = None;
+    me.projects.get_mut(0).expect("project").name = jig_client::contract::DocumentText::complete(
+        jig_client::contract::Text::new(b"Project 1".as_slice().into(), 64).expect("project name"),
+    );
     fixtures::root_event(
         &mut root,
         Event::Client {
