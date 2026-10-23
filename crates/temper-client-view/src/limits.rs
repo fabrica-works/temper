@@ -129,7 +129,7 @@ impl Limits {
             .max(account_nodes.checked_add(64)?)
             // Choice cards: region, heading, body, note and link with text;
             // the fixed step card also holds fields, snippets or progress.
-            .max(temper_client_domain::forge::forges::ROWS.checked_mul(10)?.checked_add(128)?)
+            .max(temper_client_domain::forge::forges::ROWS.checked_mul(16)?.checked_add(152)?)
             .checked_add(choices)?
             // The context line splits the repository from its forge suffix.
             .checked_add(1)?

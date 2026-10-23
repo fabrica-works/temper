@@ -263,6 +263,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
             bindings,
         );
     }
+    forges_entry(builder, root, words, bindings);
     let name = crate::accounts::words::say(words, crate::accounts::words::Word::Accounts, &[]);
     crate::link(builder, &name, bindings.insert(Act::Go { address: Address::Accounts }));
     builder.text(Run::Plain, &name);
@@ -299,6 +300,30 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
         | Address::Inbox { .. }
         | Address::Adopt { .. } => {}
     }
+    if let Some(setup) = temper_client_domain::forge::listed::setup(root) {
+        b.open(Role::Region);
+        b.style(crate::look::SETUP_STRIP);
+        b.name(&words.say(crate::words::Word::Setup, &[]));
+        let word = if setup.forge && setup.model {
+            crate::words::Word::SetupBoth
+        } else if setup.forge {
+            crate::words::Word::SetupForge
+        } else {
+            crate::words::Word::SetupModel
+        };
+        text(b, Role::Paragraph, &words.say(word, &[]), None);
+        setup_underway(b, root, words, bindings);
+        action(
+            b,
+            Role::Link,
+            &words.say(crate::words::Word::SetupContinue, &[]),
+            Act::Go { address: Address::Welcome { step: setup.step } },
+            false,
+            bindings,
+        );
+        b.close();
+        return;
+    }
     let Some((_, halves)) = root.demo() else { return };
     b.open(Role::Region);
     b.style(crate::look::ACCOUNTS);
@@ -321,11 +346,68 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
             bindings,
         );
     }
-    if halves.forge {
-        b.open(Role::Button);
-        b.name(&words.say(crate::words::Word::ConnectForge, &[]));
-        b.state(skein_ui::State::Disabled);
-        b.close();
+    if halves.forge && !setup_underway(b, root, words, bindings) {
+        action(
+            b,
+            Role::Link,
+            &words.say(crate::words::Word::ConnectForge, &[]),
+            Act::Go { address: Address::ConnectForge { forge: None } },
+            false,
+            bindings,
+        );
     }
     b.close();
+}
+
+fn setup_underway(b: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) -> bool {
+    let Some(row) = temper_client_domain::forge::connect::underway_forge(root.forges(), root.forge().demo()) else {
+        return false;
+    };
+    crate::forge::connect::status(b, root, words, row, false);
+    crate::forge::connect::link(
+        b,
+        words,
+        bindings,
+        crate::words::Word::ForgeView,
+        Address::ConnectForge { forge: Some(temper_client_domain::Choice::Forge(row.number)) },
+    );
+    true
+}
+
+fn forges_entry(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
+    use temper_client_domain::forge::listed::{self, Dot};
+    crate::link(
+        builder,
+        &words.say(crate::words::Word::ForgesTitle, &[]),
+        bindings.insert(Act::Go { address: Address::Forges }),
+    );
+    let current = match root.pages().address() {
+        Address::Forges | Address::ConnectForge { .. } => true,
+        Address::Accounts
+        | Address::Welcome { .. }
+        | Address::Chats
+        | Address::Chat { .. }
+        | Address::Task { .. }
+        | Address::Inbox { .. }
+        | Address::Adopt { .. } => false,
+    };
+    if current {
+        builder.state(skein_ui::State::Current);
+    }
+    builder.text(Run::Plain, &words.say(crate::words::Word::ForgesTitle, &[]));
+    let dot = match listed::dot(root.forges(), root.forge().demo()) {
+        Dot::None => None,
+        Dot::Amber => Some((crate::look::NAV_LIMITED, crate::words::Word::ForgeDotAmber)),
+        Dot::Red => Some((crate::look::NAV_NEEDS, crate::words::Word::ForgeDotRed)),
+    };
+    // Drawn as the Accounts entry's dot: its state in words names the node.
+    if let Some((style, word)) = dot {
+        let said = words.say(word, &[]);
+        builder.open(Role::Text);
+        builder.style(style);
+        builder.name(&said);
+        builder.run(Run::Plain, &said);
+        builder.close();
+    }
+    builder.close();
 }

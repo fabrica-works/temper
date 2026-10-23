@@ -119,6 +119,12 @@ fn setting_up_forgejo_here_from_the_welcome() {
     let model = view(&root);
     node(&model, Role::Paragraph, "Forgejo on this machine · Setting up: preparing".as_bytes());
     node(&model, Role::Disclosure, b"Each step");
+    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    let strip = view(&root);
+    node(&strip, Role::Region, b"Setup");
+    node(&strip, Role::Link, b"View");
+    node(&strip, Role::Paragraph, "Forgejo on this machine · Setting up: preparing".as_bytes());
+    assert!(strip.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&temper_client_view::look::NAV_LIMITED)));
     connection(&mut front, Connection::Connected { id: 1, login: b"temper".as_slice().into() });
     pump(
         &mut front,
@@ -130,4 +136,41 @@ fn setting_up_forgejo_here_from_the_welcome() {
     node(&ready, Role::Heading { level: 2 }, b"Forgejo on this machine is connected");
     node(&ready, Role::Paragraph, b"Connected as temper.");
     node(&ready, Role::Link, b"Adopt a repository");
+}
+
+#[test]
+fn a_connected_forge_and_usable_model_remove_the_setup_strip_and_dot() {
+    use d::pages::accounts::{Act as A, Operation, Way};
+    let (mut front, mut root) = accounts::forge_fixture(fixtures::SEED);
+    let mut now = Time::ZERO.saturating_add(Duration::from_secs(1));
+    connection(&mut front, Connection::Connecting);
+    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    let strip = view(&root);
+    node(&strip, Role::Region, b"Setup");
+    node(&strip, Role::Link, b"View");
+    for event in [
+        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model }) },
+        d::Event::Act {
+            action: d::Action::Pages(d::pages::Act::Accounts(A::Choose {
+                name: [41; 16],
+                way: Way::Key { provider: accounts::PROVIDER },
+            })),
+        },
+        d::Event::AccountKey { value: skein_lib::Secret::new(b"test-private-key".as_slice().into()) },
+        d::Event::Act {
+            action: d::Action::Pages(d::pages::Act::Accounts(A::Submit {
+                name: [41; 16],
+                operation: Operation::AddAccountKey,
+            })),
+        },
+    ] {
+        pump(&mut front, &mut root, &mut now, event);
+    }
+    accounts::kept(&mut front);
+    connection(&mut front, Connection::Connected { id: 1, login: b"temper".as_slice().into() });
+    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    let ready = view(&root);
+    assert!(!ready.tree().nodes().iter().any(|n| n.role == Role::Region && n.name.as_deref() == Some(b"Setup")));
+    assert!(!ready.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&temper_client_view::look::NAV_LIMITED)
+        || n.styles.as_slice().contains(&temper_client_view::look::NAV_NEEDS)));
 }

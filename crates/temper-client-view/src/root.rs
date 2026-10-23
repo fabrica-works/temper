@@ -68,7 +68,6 @@ impl View {
         &self.limits
     }
 }
-#[expect(clippy::too_many_lines, reason = "one ordered tree build dispatches every page")]
 pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>) {
     let shown = temper_client_domain::shown(root).checked_add(view.accounts.revision()).expect("view revisions fit");
     let shown = shown.checked_add(view.clock_revision).expect("view clock revisions fit");
@@ -164,10 +163,7 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
     } else if let temper_client_domain::Address::ConnectForge { forge } = root.pages().address() {
         forge::connect::main(&mut builder, root, &view.forge_words, &mut view.pages, &mut view.forge, *forge);
     } else if *root.pages().address() == temper_client_domain::Address::Forges {
-        builder.open(Role::Main);
-        builder.style(crate::look::MAIN);
-        crate::cards::text(&mut builder, Role::Heading { level: 1 }, &view.forge_words.say(Word::ForgesTitle, &[]));
-        builder.close();
+        forge::forges::main(&mut builder, root, &view.forge_words, &mut view.pages, &mut view.forge);
     } else if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
         view.adoption_main(&mut builder, root);
     }

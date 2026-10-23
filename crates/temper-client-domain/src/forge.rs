@@ -6,6 +6,7 @@ pub mod demo;
 pub mod family;
 pub mod forges;
 mod form;
+pub mod listed;
 pub(crate) mod me;
 pub mod panel;
 mod vocabulary;

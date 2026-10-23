@@ -55,6 +55,45 @@ enum Part {
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
+        name: "connect-forge-first-run-6",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::Heading { level: 2 }, name: "Setting up Forgejo on this machine" },
+            Part::Named { role: Role::Status, name: "under way" },
+        ],
+    },
+    Holds {
+        name: "forges-first-run-7",
+        heading: "Forges",
+        parts: &[
+            Part::Named { role: Role::Heading { level: 2 }, name: "Your forges 1" },
+            Part::Described {
+                role: Role::Disclosure,
+                name: "Forgejo on this machine",
+                description: "forge 3 · Forgejo · Connected as temper",
+            },
+            Part::Absent { role: Role::Heading { level: 2 }, name: "The playground" },
+        ],
+    },
+    Holds {
+        name: "connect-forge-choose",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::Region, name: "GitHub" },
+            Part::Named { role: Role::Region, name: "Forgejo on this machine" },
+            Part::Named { role: Role::Region, name: "A Forgejo elsewhere" },
+        ],
+    },
+    Holds {
+        name: "chats-setup-strip",
+        heading: "Chats",
+        parts: &[
+            Part::Named { role: Role::Region, name: "Setup" },
+            Part::Named { role: Role::Paragraph, name: "temper has no forge and no model yet." },
+            Part::Named { role: Role::Link, name: "Continue setting up" },
+        ],
+    },
+    Holds {
         name: "welcome-first-run-0",
         heading: "Welcome to temper",
         parts: &[

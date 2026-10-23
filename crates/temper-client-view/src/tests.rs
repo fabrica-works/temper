@@ -6,6 +6,7 @@ mod demo;
 mod demo_start;
 mod fixtures;
 mod forge_page;
+mod forges;
 mod frame;
 mod inbox;
 mod look;

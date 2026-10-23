@@ -13,7 +13,13 @@ fn the_navigation_ends_with_accounts() {
     let view = fixtures::signed_in_with_project();
     assert_eq!(
         fixtures::link_names(&view).as_ref(),
-        [Box::from(*b"Inbox"), Box::from(*b"Chats"), Box::from(*b"Adopt a repository"), Box::from(*b"Accounts")]
+        [
+            Box::from(*b"Inbox"),
+            Box::from(*b"Chats"),
+            Box::from(*b"Adopt a repository"),
+            Box::from(*b"Forges"),
+            Box::from(*b"Accounts")
+        ]
     );
 }
 #[test]
@@ -200,7 +206,7 @@ fn each_link_shows_its_name_as_its_text() {
             links += 1;
         }
     }
-    assert_eq!(links, 4);
+    assert_eq!(links, 5);
 }
 
 #[test]

@@ -246,6 +246,7 @@ fn root_at_with_activity(
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     use jig_client::contract::{Delivery, Subject, WatchEvent};
     use temper_client_domain::{Event, Request};
+    let forge_rows_answered = forge_rows.is_some();
     let env = Env { now: Time::ZERO, wall: NOW, limits: *limits };
     let mut root = temper_client_domain::unlinked(limits, SEED);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(limits));
@@ -307,6 +308,10 @@ fn root_at_with_activity(
             }
         }
     }
+    let mut frame = fixture_me(project_name);
+    if forge_rows_answered {
+        frame.deployment_role = Some(c::HeldRole::Owner);
+    }
     temper_client_domain::step(
         &mut root,
         &env,
@@ -314,7 +319,7 @@ fn root_at_with_activity(
             event: jig_client::Event::Up {
                 up: jig_client::Up::Watched {
                     watch: watch.expect("frame opened"),
-                    event: WatchEvent::Delivered(Delivery::Me(Box::new(fixture_me(project_name)))),
+                    event: WatchEvent::Delivered(Delivery::Me(Box::new(frame))),
                 },
             },
         },
@@ -362,7 +367,7 @@ fn root_at_with_activity(
         );
     }
 
-    if demo.is_some() || welcome {
+    if demo.is_some() || welcome || forge_rows_answered {
         let mut read = None;
         while let Some(request) = out.pop() {
             if let Request::Client {
@@ -1433,4 +1438,12 @@ pub fn welcome_account(root: &mut temper_client_domain::Domain, watch: Token) {
             },
         },
     );
+}
+
+/// A demo and explicit forge rows share the session watch.
+pub fn demo_forges_root(
+    address: temper_client_domain::Address,
+    rows: List<w::ForgeRow>,
+) -> temper_client_domain::Domain {
+    root_at_with_activity(address, &domain_limits(), b"Shop", Some((PROJECT, true)), None, Some(rows)).0
 }

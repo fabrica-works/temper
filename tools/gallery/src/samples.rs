@@ -32,7 +32,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 33;
+pub const N: usize = 37;
 #[must_use]
 pub fn samples() -> [Sample; N] {
     use Then::{
@@ -52,6 +52,20 @@ pub fn samples() -> [Sample; N] {
             then: Shown,
         },
         Sample { name: "chats-first-run-1", world: FirstRun { step: 1 }, address: Address::Chats, then: Shown },
+        Sample {
+            name: "connect-forge-first-run-6",
+            world: FirstRun { step: 6 },
+            address: Address::ConnectForge { forge: Some(temper_client_domain::Choice::Forge(3)) },
+            then: Shown,
+        },
+        Sample { name: "forges-first-run-7", world: FirstRun { step: 7 }, address: Address::Forges, then: Shown },
+        Sample {
+            name: "connect-forge-choose",
+            world: FirstRun { step: 0 },
+            address: Address::ConnectForge { forge: None },
+            then: Shown,
+        },
+        Sample { name: "chats-setup-strip", world: Bare, address: Address::Chats, then: Shown },
         Sample { name: "adoption", world: Reference, address: Address::Adopt { project: 1 }, then: Shown },
         Sample { name: "adoption-filled", world: Reference, address: Address::Adopt { project: 1 }, then: Filled },
         Sample { name: "adoption-refused", world: Reference, address: Address::Adopt { project: 1 }, then: Refused },
@@ -118,13 +132,29 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         Address::Accounts => ("accounts", None),
         Address::Welcome { .. } => ("welcome", None),
         Address::Task { task } => ("task", Some(task)),
-        Address::Adopt { .. } | Address::ConnectForge { .. } | Address::Forges => return None,
+        Address::ConnectForge { .. } => ("connect-forge", None),
+        Address::Forges => ("forges", None),
+        Address::Adopt { .. } => return None,
     };
     let task = match task {
         Some(task) => format!("&task=T{task}"),
         None => String::new(),
     };
-    Some(format!("{page}.html?world={world}{task}&bare"))
+    let forge = match sample.address {
+        Address::ConnectForge { forge: Some(temper_client_domain::Choice::Forge(number)) } => {
+            format!("&forge={number}")
+        }
+        Address::Inbox { .. }
+        | Address::Chats
+        | Address::Accounts
+        | Address::Forges
+        | Address::ConnectForge { forge: None | Some(temper_client_domain::Choice::Elsewhere) }
+        | Address::Welcome { .. }
+        | Address::Chat { .. }
+        | Address::Task { .. }
+        | Address::Adopt { .. } => String::new(),
+    };
+    Some(format!("{page}.html?world={world}{task}{forge}&bare"))
 }
 #[must_use]
 pub fn domain(sample: &Sample) -> Domain {

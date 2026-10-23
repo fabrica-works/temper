@@ -948,7 +948,9 @@ pub const fn forge_set_up_action(row: &super::forges::Row) -> Option<&'static [u
 
 // Keep owned byte strings under the domain's subset while showing invalid UTF-8
 // with the same replacement character as the clients' text shells.
-fn lossy(bytes: &[u8]) -> Box<[u8]> {
+/// Forge byte fields rendered as UTF-8, with one replacement character per invalid chunk.
+#[must_use]
+pub fn lossy(bytes: &[u8]) -> Box<[u8]> {
     let mut size = 0usize;
     for chunk in bytes.utf8_chunks() {
         size = size.checked_add(chunk.valid().len()).expect("bounded forge words");
