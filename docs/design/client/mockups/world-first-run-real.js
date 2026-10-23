@@ -17,10 +17,10 @@
     },
     {
       id: '2', label: '2', hour: 1 / 60, act: 1, title: 'Setting up a Forgejo',
-      summary: 'temper box fetches Forgejo and its runner. The wizard moves on to the model while it does: Sam chooses ChatGPT, and reads what a plan’s sign-in means before going on.',
+      summary: 'temper box fetches Forgejo and its runner. The wizard moves on to the model while it does: Sam chooses ChatGPT.',
       look: [
         ['welcome.html?at=model', 'Connect a model, while Forgejo sets up: ChatGPT, or an API key'],
-        ['welcome.html?at=model&way=chatgpt', 'ChatGPT: what plan usage means, and where to sign in'],
+        ['welcome.html?at=model&way=chatgpt', 'ChatGPT: where to sign in'],
         ['welcome.html?at=model#other-states', 'Other ways, where the configuration offers them'],
         ['forges.html', 'Forges: forge 3, setting up; no playground'],
         ['chats.html', 'Chats: the setup strip’s status'],

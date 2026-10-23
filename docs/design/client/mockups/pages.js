@@ -1227,12 +1227,6 @@
     return `<div class="forge-setup">
         <h3>ChatGPT</h3>
         <p>Sign in with your ChatGPT account. temper’s agents then run on your plan.</p>
-        <ul class="forge-facts">
-          <li>Plan usage needs an eligible ChatGPT plan, such as Plus or Pro.</li>
-          <li>temper’s use counts toward your plan’s limits, which ChatGPT and your other apps, such as Codex, share. In ChatGPT’s settings you can see it, and set a weekly cap for temper.</li>
-          <li>It pays for your own work, and for projects where you’re the only member.</li>
-          <li>When your plan reaches its limit, its tasks wait for it: temper never moves them to another account.</li>
-        </ul>
         <p>Sign in from a browser on the engine’s machine: ChatGPT sends you back to it, where temper listens while you sign in.</p>
         ${portFold()}
         <a class="button primary" href="${esc(next)}">${wayLabel('Continue with ChatGPT')}</a>

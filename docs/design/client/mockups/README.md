@@ -93,7 +93,7 @@ Not drawn: two ideas that would change temper's engine, not only its pages. A ch
 `world-first-run-real.js` reuses the first-run world’s fresh `initial`:
 
 1. **The link opened:** Sam chooses Set up temper, then Forgejo on this machine, with its defaults.
-2. **Setting up a Forgejo:** the box fetches Forgejo and its runner; Model opens while that proceeds, with an Each step disclosure: ChatGPT or an OpenAI API key, as the default document offers them. Sam chooses ChatGPT, whose details say what plan usage means and where to sign in. The gallery sketches Claude's subscription, where a configuration offers it.
+2. **Setting up a Forgejo:** the box fetches Forgejo and its runner; Model opens while that proceeds, with an Each step disclosure: ChatGPT or an OpenAI API key, as the default document offers them. Sam chooses ChatGPT, whose details say where to sign in. The gallery sketches Claude's subscription, where a configuration offers it.
 3. **Signing in to ChatGPT:** the sign-in's address, to open in a browser on the engine's machine, and its deadline; Cancel. Accounts shows the sign-in under way, with the nav's amber mark; the setup strip shows its status beside the forge's.
 4. **Signed in:** ChatGPT · sam@example.com is the only account, and Almost ready waits while the forge starts. Open hello is disabled.
 5. **Ready:** the forge is connected as temper; work/hello is adopted into hello with its first CI passed. Open hello opens that project with no chat yet. The demo, never started, is retired and nothing of it shows.
