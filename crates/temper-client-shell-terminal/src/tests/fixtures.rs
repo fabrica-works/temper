@@ -322,6 +322,11 @@ fn populate_page(
     }
 }
 
+/// A chat's spend as its chatbar and its chats row say it, at a fixture's budget.
+pub fn spend(spent: u64, budget: u64, below: u64) -> Box<[u8]> {
+    use skein_ui::phrases::Hole::Number;
+    page_words().say(temper_client_view::words::Word::ChatbarSpend, &[Number(spent), Number(budget), Number(below)])
+}
 pub fn page_words() -> temper_client_view::words::Words {
     static WORDS: std::sync::OnceLock<temper_client_view::words::Words> = std::sync::OnceLock::new();
     WORDS
@@ -798,22 +803,22 @@ pub fn chats_page() -> skein_ui::Tree {
     }
     b.open(Role::List);
     b.name(b"Your chats");
-    for (number, title, status, spend, delegates) in [
+    for (number, title, status, spent, delegates) in [
         (
             b"T9".as_slice(),
             b"Hello".as_slice(),
             b"Writing".as_slice(),
-            b"Spent 7; delegates spent 2".as_slice(),
+            spend(7, 100, 2),
             Some(b"1 delegate".as_slice()),
         ),
-        (b"T8".as_slice(), b"Earlier".as_slice(), b"Ended".as_slice(), b"Spent 4; delegates spent 0".as_slice(), None),
+        (b"T8".as_slice(), b"Earlier".as_slice(), b"Ended".as_slice(), spend(4, 50, 0), None),
     ] {
         b.open(Role::Item);
         b.open(Role::Link);
         b.name(number);
         b.bind(binding());
         b.close();
-        for (role, value) in [(Role::Paragraph, title), (Role::Status, status), (Role::Paragraph, spend)] {
+        for (role, value) in [(Role::Paragraph, title), (Role::Status, status), (Role::Paragraph, &*spent)] {
             b.open(role);
             b.text(Run::Plain, value);
             b.close();

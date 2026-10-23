@@ -14,7 +14,7 @@ pub fn page() -> skein_ui::Tree {
     b.open(Role::Main);
     text(&mut b, Role::Heading { level: 1 }, "T9 · Hello".as_bytes());
     text(&mut b, Role::Status, b"Writing");
-    text(&mut b, Role::Paragraph, b"Spent 7; delegates spent 2");
+    text(&mut b, Role::Paragraph, &spend(7, 100, 2));
     b.open(Role::Log);
     b.name(b"Conversation");
     text(&mut b, Role::Paragraph, b"You");
