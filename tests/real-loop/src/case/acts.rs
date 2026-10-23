@@ -53,6 +53,13 @@ pub enum Read {
     RulesEnded,
     ShapeEnded,
     MoverEnded,
+    PlanAnswerPending,
+    PlannerParked,
+    PlannerEnded,
+    PlannerEarlier,
+    PlannerFirst,
+    PlanEnded,
+    SubownerEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -475,5 +482,42 @@ pub fn step_5_2() -> Vec<calls::Step> {
             b"\"phase\":\"ended\"",
             b"\"task\"",
         ),
+    ]
+}
+
+// Act 2, step 5.5 (domain/testing.md, 5.3)
+const PLAN_ENDED: usize = 2;
+pub const READS_5_5: &[(Read, usize)] = &[
+    (Read::PlanEnded, PLAN_ENDED),
+    (Read::PlannerParked, 3),
+    (Read::PlanAnswerPending, 4),
+    (Read::PlannerEnded, 5),
+    (Read::PlannerEarlier, 6),
+    (Read::PlannerFirst, 7),
+    (Read::SubownerEnded, 8),
+];
+
+#[must_use]
+pub fn step_5_5() -> Vec<calls::Step> {
+    use super::{PLAN_ANSWER_HOLD, PLAN_ANSWER_PENDING, PLAN_DIRECTOR, PLAN_PERSON, PLANNER, SUBOWNER};
+    vec![
+        sign_in(D1),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "plan", PLAN_PERSON]),
+        start(D1, argv!["wait", "task", number(PLAN_DIRECTOR), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(PLANNER), "--until", "phase:idle", "--json"]),
+        // Step::Held gates ctl writes. The LLM's emitted piece, read through
+        // the live run document, proves its answer is at the fake hold.
+        calls::until(
+            D1,
+            argv!["run", number(PLAN_DIRECTOR), "--json"],
+            PLAN_ANSWER_PENDING.as_bytes(),
+            b"\"writing\":",
+        ),
+        calls::release_hold(PLAN_ANSWER_HOLD),
+        join(PLAN_ENDED),
+        call(D1, argv!["task", number(PLANNER), "--activity", "32", "--json"]),
+        call(D1, argv!["activity", number(PLANNER), "--before", calls::activity_before(5), "--json"]),
+        call(D1, argv!["activity", number(PLANNER), "--before", calls::activity_before(6), "--json"]),
+        call(D1, argv!["task", number(SUBOWNER), "--json"]),
     ]
 }
