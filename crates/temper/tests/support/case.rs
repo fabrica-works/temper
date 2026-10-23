@@ -175,6 +175,7 @@ pub fn run(
         Some(skein_fake_forge_domain::api::Cue::File { path, green }) => {
             json!({"path":text(&path),"green":text(&green)})
         }
+        Some(skein_fake_forge_domain::api::Cue::Message { .. }) => panic!("case forge message cue unsupported"),
         None => Value::Null,
     };
     document["owner"] = "acme".into();
