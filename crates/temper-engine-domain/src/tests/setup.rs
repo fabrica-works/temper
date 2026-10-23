@@ -88,7 +88,12 @@ fn setup(key: u8) -> Event {
         key: [key; 16],
         digest: [key; 32],
         carried: None,
-        request: forge::Ask::SetUp { forge: 1 },
+        request: forge::Ask::SetUp {
+            forge: 1,
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+            project: forge::SetUpProject::Existing(1),
+        },
     })
 }
 fn connection(domain: &mut Domain, env: &Env<Limits>, state: forge::Connection) {
@@ -168,6 +173,7 @@ fn the_deployment_owner_watches_forges_again_after_a_connection_changes() {
             watcher: WATCHER,
             forges: forge::Forges {
                 rows: Box::new([forge::Row {
+                    first: None,
                     number: 1,
                     kind: forge::Kind::Forgejo,
                     mode: forge::Mode::Owned,
@@ -196,6 +202,7 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
 
 fn row(connection: forge::Connection) -> forge::Row {
     forge::Row {
+        first: None,
         number: 1,
         kind: forge::Kind::Forgejo,
         mode: forge::Mode::Owned,

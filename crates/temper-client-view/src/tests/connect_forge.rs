@@ -7,7 +7,7 @@ use temper_client_protocol_wire::v1 as w;
 const HERE: u16 = 3;
 const GITHUB: u16 = 2;
 fn row(number: u16, kind: w::Kind, mode: w::Mode, connection: w::Connection, offer: w::Offer) -> w::ForgeRow {
-    w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap()
+    w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { first: None, number, kind, mode, connection, offer }).unwrap()
 }
 fn rows(connection: w::Connection, offer: w::Offer) -> List<w::ForgeRow> {
     let mut rows = List::with_capacity(2);

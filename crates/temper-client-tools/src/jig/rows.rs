@@ -17,7 +17,7 @@ pub const INBOX: Tool = Tool {
     line: b"Read what needs the party and its updates",
     result: b"inbox",
     forms: &[&[
-        flag(b"project", b"P", Kind::Project, Optional, b"Project name or number"),
+        flag(b"project", b"P", Kind::Project { empty: false }, Optional, b"Project name or number"),
         flag(b"kind", b"K", Kind::Group, Optional, b"Inbox group"),
         flag(b"root", b"N", Kind::Number, Optional, b"Root task"),
         flag(b"after", b"C", Kind::Cursor, Optional, b"Continue after this cursor"),
@@ -30,7 +30,7 @@ pub const TASKS: Tool = Tool {
     line: b"Read task lines",
     result: b"tasks",
     forms: &[&[
-        flag(b"project", b"P", Kind::Project, Required, b"Project name or number"),
+        flag(b"project", b"P", Kind::Project { empty: false }, Required, b"Project name or number"),
         flag(b"label", b"L", Kind::Word { set: &[b"chat", b"goal"] }, Optional, b"Task label"),
         switch(b"tracked", b"Only tracked tasks"),
         switch(b"mine", b"Only my tasks"),
@@ -136,7 +136,7 @@ pub const CHAT_CREATE: Tool = Tool {
     line: b"Start a chat",
     result: b"chat_create",
     forms: &[&[
-        flag(b"project", b"P", Kind::Project, Required, b"Project name or number"),
+        flag(b"project", b"P", Kind::Project { empty: false }, Required, b"Project name or number"),
         positional(b"text", b"TEXT", Kind::Text, Required, b"Opening words"),
         MODEL,
         EFFORT,
@@ -270,7 +270,7 @@ pub const MODELS: Tool = Tool {
     name: b"models",
     line: b"Read authorized models grouped by provider",
     result: b"models",
-    forms: &[&[flag(b"project", b"P", Kind::Project, Optional, b"Project name or number")]],
+    forms: &[&[flag(b"project", b"P", Kind::Project { empty: false }, Optional, b"Project name or number")]],
     keyed: Keyed::Never,
     area: 5,
 };

@@ -987,7 +987,7 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
     .unwrap()
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
-    Row { number, kind, mode: Mode::Owned, connection, offer }
+    Row { first: None, number, kind, mode: Mode::Owned, connection, offer }
 }
 #[test]
 fn setup_rows_and_answers_agree_in_every_connection_state() {
@@ -1017,7 +1017,7 @@ fn setup_rows_and_answers_agree_in_every_connection_state() {
             let emitted = outputs(&mut d, setup_application(1, request, token));
             match refusal {
                 None => {
-                    assert_eq!(emitted.as_ref(), [Request::SetUp { forge: 1, request }]);
+                    assert_eq!(emitted.as_ref(), [Request::MarkedForges, Request::SetUp { forge: 1, request }]);
                     outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer: SetUpAnswer::SettingUp });
                     assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::SettingUp)));
                 }
@@ -1152,7 +1152,17 @@ fn routing_tables_take_every_installation_with_the_connection_components_bounds(
 }
 
 fn setup_application(forge: u16, request: Token, token: Token) -> Event {
-    Event::Application { request, token, retention: Duration::from_secs(60), ask: Ask::SetUp { forge } }
+    Event::Application {
+        request,
+        token,
+        retention: Duration::from_secs(60),
+        ask: Ask::SetUp {
+            forge,
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+            project: SetUpProject::Existing(1),
+        },
+    }
 }
 
 #[test]
@@ -1208,7 +1218,7 @@ fn setup_flights_refuse_busy_at_the_bound_and_an_answer_frees_room() {
     );
     assert_eq!(
         outputs(&mut d, setup_application(1, request, request)).as_ref(),
-        [Request::SetUp { forge: 1, request }]
+        [Request::MarkedForges, Request::SetUp { forge: 1, request }]
     );
 }
 
@@ -1286,4 +1296,96 @@ fn the_forges_document_orders_connections_and_every_connection_marks_it() {
 fn a_configured_forge_without_routing_input_reads_not_connected() {
     let d = setup_domain(&CONFIGURED[..1], true);
     assert_eq!(d.forges().rows.as_ref(), [setup_row(1, Kind::Forgejo, Connection::NotConnected, Offer::NotOffered)]);
+}
+
+#[test]
+fn a_new_project_is_refused_before_any_box_effect_or_first_repository() {
+    for name in [b"Next".as_slice(), b"", &[b'x'; 129]] {
+        let mut d = setup_domain(&CONFIGURED, true);
+        let request = Token::new(91);
+        let token = Token::new(92);
+        let event = Event::Application {
+            request,
+            token,
+            retention: Duration::from_secs(60),
+            ask: Ask::SetUp {
+                forge: 1,
+                org: Box::default(),
+                repository: Box::default(),
+                project: SetUpProject::New(name.into()),
+            },
+        };
+        assert_eq!(outputs(&mut d, event).as_ref(), [Request::ApplicationDone { request, token }]);
+        assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::NewProject))));
+        for row in &d.forges().rows {
+            assert!(row.first.is_none());
+        }
+    }
+}
+#[test]
+fn setup_names_are_validated_at_admission_on_both_sides_of_the_name_bound() {
+    for length in [0, LIMITS.name_bytes, LIMITS.name_bytes + 1] {
+        for org in [true, false] {
+            let mut d = setup_domain(&CONFIGURED, true);
+            outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
+            let request = Token::new(91);
+            let token = Token::new(92);
+            let mut name = skein_lib::List::with_capacity(length);
+            for _ in 0..length {
+                name.push(b'x').unwrap();
+            }
+            let name = name.into_boxed();
+            let ask = Ask::SetUp {
+                forge: 1,
+                org: if org { name.clone() } else { b"o".as_slice().into() },
+                repository: if org { b"r".as_slice().into() } else { name },
+                project: SetUpProject::Existing(1),
+            };
+            let emitted =
+                outputs(&mut d, Event::Application { request, token, retention: Duration::from_secs(60), ask });
+            if length == LIMITS.name_bytes {
+                assert_eq!(emitted.as_ref(), [Request::MarkedForges, Request::SetUp { forge: 1, request }]);
+                assert_eq!(d.forges().rows[0].first.as_ref().unwrap().state, FirstState::Making);
+            } else {
+                assert_eq!(emitted.as_ref(), [Request::ApplicationDone { request, token }]);
+                assert_eq!(
+                    d.application_answer(token),
+                    Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::Invalid)))
+                );
+                assert!(d.forges().rows[0].first.is_none());
+            }
+        }
+    }
+}
+#[test]
+fn admitted_setup_projects_its_fields_as_making_and_the_next_admission_replaces_them() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    for (number, org, repository, project) in
+        [(91, b"work".as_slice(), b"hello".as_slice(), 1), (93, b"team", b"widget", 2)]
+    {
+        outputs(
+            &mut d,
+            Event::Connection { forge: 1, state: Connection::SetUpFailed { why: b"retry".as_slice().into() } },
+        );
+        let request = Token::new(number);
+        let token = Token::new(number + 1);
+        let first = First {
+            org: org.into(),
+            repository: repository.into(),
+            project: SetUpProject::Existing(project),
+            state: FirstState::Making,
+        };
+        let ask = Ask::SetUp {
+            forge: 1,
+            org: first.org.clone(),
+            repository: first.repository.clone(),
+            project: first.project.clone(),
+        };
+        assert_eq!(
+            outputs(&mut d, Event::Application { request, token, retention: Duration::from_secs(60), ask }).as_ref(),
+            [Request::MarkedForges, Request::SetUp { forge: 1, request }]
+        );
+        assert_eq!(d.forges().rows[0].first, Some(first));
+        outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer: SetUpAnswer::SettingUp });
+    }
 }

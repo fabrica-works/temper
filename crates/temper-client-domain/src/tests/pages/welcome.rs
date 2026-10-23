@@ -96,6 +96,7 @@ fn rows(root: &mut Domain, watch: Token, number: u16) -> Queue<Request> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    first: None,
                     number,
                     kind: w::Kind::Forgejo,
                     mode: w::Mode::Connected,
