@@ -56,6 +56,7 @@ enum Begin {
     LinkWithOpenAiKey,
     Token,
     Link,
+    Welcome,
     Playground,
 }
 /// The script is separate from the client's production composition.
@@ -87,6 +88,43 @@ pub fn deployment_account() -> Script {
             Step::See { find: Find::exactly_named(Role::Heading { level: 1 }, b"Accounts"), within: START_WITHIN },
             Step::See {
                 find: Find::exactly_named(Role::Disclosure, b"OpenAI API key \xc2\xb7 held by the deployment"),
+                within: START_WITHIN,
+            },
+        ]),
+    }
+}
+/// The terminal stays on Model to read the sign-in's end, then opens Ready by hand.
+#[must_use]
+pub fn welcome_sign_in() -> Script {
+    use skein_ui::Role;
+    Script {
+        begin: Begin::Welcome,
+        steps: Box::new([
+            Step::Go { address: Address::Welcome { step: temper_client_domain::Step::Model { way: None } } },
+            Step::See { find: Find::exactly_named(Role::Button, b"Continue with ChatGPT"), within: START_WITHIN },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Continue with ChatGPT") },
+            Step::See {
+                find: Find::exactly_named(Role::Paragraph, b"Open this address in a browser on the engine's machine:"),
+                within: START_WITHIN,
+            },
+            Step::See { find: Find::exactly_named(Role::Status, b"Signed in to ChatGPT"), within: START_WITHIN },
+            Step::Go { address: Address::Welcome { step: temper_client_domain::Step::Ready } },
+            Step::See { find: Find::named(Role::Paragraph, b"Model: ChatGPT"), within: START_WITHIN },
+        ]),
+    }
+}
+/// The same account's source is still signed in after a healthy service restart.
+#[must_use]
+pub fn kept_chatgpt_account(heading: &[u8]) -> Script {
+    use skein_ui::Role;
+    Script {
+        begin: Begin::Token,
+        steps: Box::new([
+            Step::Go { address: Address::Accounts },
+            Step::See { find: Find::exactly_named(Role::Disclosure, heading), within: START_WITHIN },
+            Step::See {
+                find: Find::text("ChatGPT sign-in · Ready".as_bytes())
+                    .within(Box::new([Target::Role { role: Role::Disclosure, name: heading.into() }])),
                 within: START_WITHIN,
             },
         ]),
@@ -343,7 +381,8 @@ impl Person {
             signing_retry: None,
             signing_backoff: SIGN_IN_FIRST,
             finished: false,
-            project: if script.begin == Begin::Playground {
+            // Welcome needs no project selection; the playground chooses its own.
+            project: if matches!(script.begin, Begin::Playground | Begin::Welcome) {
                 ProjectSelection::Selected
             } else {
                 ProjectSelection::Pending
@@ -353,7 +392,7 @@ impl Person {
             directory: b"private".as_slice().into(),
             // Fresh demo clients must not reuse the same request names when
             // signing the same owner in again on the same deployment.
-            seed: if matches!(script.begin, Begin::Link | Begin::Playground) {
+            seed: if matches!(script.begin, Begin::Link | Begin::Welcome | Begin::Playground) {
                 let seed = skein_shell::crypto_seed().expect("demo client's fresh seed");
                 u64::from_le_bytes(seed.expose()[..8].try_into().expect("eight seed bytes"))
             } else {

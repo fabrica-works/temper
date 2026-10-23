@@ -39,6 +39,7 @@ pub struct Visitor {
     handed: bool,
     status: Option<u16>,
     account_redirect: Option<Box<[u8]>>,
+    last_response: Option<(u16, Option<Box<[u8]>>)>,
 }
 impl std::fmt::Debug for Visitor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -66,6 +67,7 @@ impl Visitor {
             handed: false,
             status: None,
             account_redirect: None,
+            last_response: None,
         }
     }
     /// Hands over `url` to visit, once: a plain `http://` URL with a
@@ -95,21 +97,28 @@ impl Visitor {
     pub fn status(&self) -> Option<u16> {
         self.status
     }
+    /// The last response's status and Location, retained after following redirects.
+    #[must_use]
+    pub fn last_response(&self) -> Option<(u16, Option<&[u8]>)> {
+        self.last_response.as_ref().map(|(status, location)| (*status, location.as_deref()))
+    }
     fn progress(&mut self, now: Time, wall: Wall) {
         let env = Env { now, wall, limits: limits().http };
         let Some(socket) = self.socket.filter(|_| self.connected) else { return };
         while let Some(event) = self.answers.pop() {
             match event {
                 http::Event::Response(response) => {
+                    let location = response
+                        .headers
+                        .iter()
+                        .find(|header| header.name.eq_ignore_ascii_case(b"location"))
+                        .map(|header| header.value.clone());
+                    self.last_response = Some((response.status, location.clone()));
                     if self.status.is_none() {
                         self.status = Some(response.status);
                     }
                     if matches!(response.status, 302 | 303) {
-                        self.account_redirect = response
-                            .headers
-                            .iter()
-                            .find(|header| header.name.eq_ignore_ascii_case(b"location"))
-                            .map(|header| header.value.clone());
+                        self.account_redirect = location;
                         assert!(self.account_redirect.is_some(), "account sign-in redirect");
                     }
                     self.calls.push(http::Request::Body(Down::Demand { read: Read::Arrived { max: BODY }, room: 0 }));

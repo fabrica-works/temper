@@ -18,6 +18,7 @@ pub mod person;
 pub mod program_login;
 pub mod sign_in;
 pub mod sign_in_browser;
+pub mod sign_in_welcome;
 use std::{fs, net::SocketAddr, os::unix::fs::PermissionsExt, path::Path};
 
 /// `N` distinct loopback addresses that no listener holds now, none of

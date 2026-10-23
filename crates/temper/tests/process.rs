@@ -81,6 +81,17 @@ fn a_person_signs_in_with_chatgpt_and_a_chat_on_the_plan_lasts() {
 }
 
 #[test]
+fn a_welcome_sign_in_with_chatgpt_ends_at_ready_and_its_account_survives_a_restart() {
+    let scratch = support::Scratch::new("welcome_sign_in");
+    let issuer = support::sign_in::configuration(scratch.path());
+    let clock = skein_shell::Clock::new();
+    let started = clock.now().now;
+    support::sign_in_welcome::run(scratch.path(), issuer);
+    eprintln!("welcome sign-in and restart: {:?}", clock.now().now.saturating_since(started));
+    scratch.remove();
+}
+
+#[test]
 fn a_plan_chat_whose_reasoning_passes_its_allowance_is_held_with_its_reason() {
     let scratch = support::Scratch::new("plan_chat_reasoning_bound");
     let issuer = support::sign_in::configuration(scratch.path());
