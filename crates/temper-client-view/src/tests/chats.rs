@@ -99,6 +99,38 @@ fn a_chats_row_says_its_status_from_jigs_facts() {
     let (tree, _) = tree(&line());
     assert!(fixtures::find(&tree, Role::Status, b"Parked").is_some());
 }
+pub(super) const HELD_STATUSES: [(HoldCategory, &[u8]); 3] = [
+    (
+        HoldCategory::Exceeded(Exceeded { bound: Bound::Reasoning, value: 2048 }),
+        b"Held: the model's reasoning went past its configured allowance of 2048 bytes",
+    ),
+    (
+        HoldCategory::Exceeded(Exceeded { bound: Bound::History, value: 2048 }),
+        b"Held: the run's history no longer fits its configured allowance, even compacted",
+    ),
+    (HoldCategory::Failures { class: HoldFailure::Run }, b"Held"),
+];
+
+#[test]
+fn a_held_chats_row_names_only_its_exceeded_bound() {
+    for (reason, expected) in HELD_STATUSES {
+        let mut line = line();
+        let ChipPhase::Owner { phase, .. } = line.chip.details.as_mut() else { panic!("owner") };
+        *phase = OwnerChipPhase::Held { reason, revision: 1 };
+        let (tree, _) = tree(&line);
+        let mut status = None;
+        for node in tree.nodes() {
+            if node.role == Role::Status && node.name.as_deref() == Some(expected) {
+                status = Some(node);
+                break;
+            }
+        }
+        let status = status.expect("held status");
+        assert_eq!(status.styles.as_slice(), [crate::look::STATUS_HELD]);
+        assert!(skein_lib::bytes::find(&fixtures::text(&tree), expected).is_some());
+    }
+}
+
 #[test]
 fn a_chats_row_says_its_spend_and_delegates() {
     let (tree, _) = tree(&line());

@@ -287,7 +287,8 @@ pub(crate) fn status(
     me: &jig_client::contract::Me,
     words: &Words,
 ) {
-    use jig_client::contract::{ChipPhase, OwnerRequester, WaitsOn, WakeRule};
+    use jig_client::contract::{ChipPhase, HoldCategory, OwnerRequester, WaitsOn, WakeRule};
+    use jig_client::facts::ChatStatus;
     let live = delegates.unwrap_or(if let ChipPhase::Owner { details, .. } = chip.details.as_ref() {
         details.live_delegates
     } else {
@@ -336,52 +337,46 @@ pub(crate) fn status(
     }
     let status = jig_client::facts::chat_status(chip, waits_on, run_wait, project, me);
     let holes = match &status {
-        jig_client::facts::ChatStatus::Tool { tool, .. } => Some(Hole::Name(tool.clone())),
-        jig_client::facts::ChatStatus::Starting
-        | jig_client::facts::ChatStatus::Writing
-        | jig_client::facts::ChatStatus::Working { .. }
-        | jig_client::facts::ChatStatus::WaitingForYou { .. }
-        | jig_client::facts::ChatStatus::WaitingFor(_)
-        | jig_client::facts::ChatStatus::Parked
-        | jig_client::facts::ChatStatus::Retrying { .. }
-        | jig_client::facts::ChatStatus::HostRefused(_)
-        | jig_client::facts::ChatStatus::Held(_)
-        | jig_client::facts::ChatStatus::Closing
-        | jig_client::facts::ChatStatus::Ended { .. } => None,
+        ChatStatus::Tool { tool, .. } => Some(Hole::Name(tool.clone())),
+        ChatStatus::Starting
+        | ChatStatus::Writing
+        | ChatStatus::Working { .. }
+        | ChatStatus::WaitingForYou { .. }
+        | ChatStatus::WaitingFor(_)
+        | ChatStatus::Parked
+        | ChatStatus::Retrying { .. }
+        | ChatStatus::HostRefused(_)
+        | ChatStatus::Held(_)
+        | ChatStatus::Closing
+        | ChatStatus::Ended { .. } => None,
     };
     let token = match status {
-        jig_client::facts::ChatStatus::WaitingForYou { .. } => crate::look::STATUS_YOURS,
-        jig_client::facts::ChatStatus::HostRefused(_) | jig_client::facts::ChatStatus::Held(_) => {
-            crate::look::STATUS_HELD
+        ChatStatus::WaitingForYou { .. } => crate::look::STATUS_YOURS,
+        ChatStatus::HostRefused(_) | ChatStatus::Held(_) => crate::look::STATUS_HELD,
+        ChatStatus::Retrying { .. } => crate::look::STATUS_RETRYING,
+        ChatStatus::Starting | ChatStatus::Writing | ChatStatus::Tool { .. } | ChatStatus::Working { .. } => {
+            crate::look::STATUS_ACTIVE
         }
-        jig_client::facts::ChatStatus::Retrying { .. } => crate::look::STATUS_RETRYING,
-        jig_client::facts::ChatStatus::Starting
-        | jig_client::facts::ChatStatus::Writing
-        | jig_client::facts::ChatStatus::Tool { .. }
-        | jig_client::facts::ChatStatus::Working { .. } => crate::look::STATUS_ACTIVE,
-        jig_client::facts::ChatStatus::WaitingFor(_) => crate::look::STATUS_WAITING,
-        jig_client::facts::ChatStatus::Parked
-        | jig_client::facts::ChatStatus::Closing
-        | jig_client::facts::ChatStatus::Ended { .. } => crate::look::STATUS_QUIET,
+        ChatStatus::WaitingFor(_) => crate::look::STATUS_WAITING,
+        ChatStatus::Parked | ChatStatus::Closing | ChatStatus::Ended { .. } => crate::look::STATUS_QUIET,
     };
     b.open(Role::Status);
     b.style(token);
     let name = match status {
-        jig_client::facts::ChatStatus::WaitingForYou { .. } => words.say(Word::WaitingForYou, &[]),
-        jig_client::facts::ChatStatus::Ended { .. } if closed(chip, requester) => words.say(Word::ChatClosed, &[]),
-        jig_client::facts::ChatStatus::Starting
-        | jig_client::facts::ChatStatus::Writing
-        | jig_client::facts::ChatStatus::Tool { .. }
-        | jig_client::facts::ChatStatus::Working { .. }
-        | jig_client::facts::ChatStatus::WaitingFor(_)
-        | jig_client::facts::ChatStatus::Parked
-        | jig_client::facts::ChatStatus::Retrying { .. }
-        | jig_client::facts::ChatStatus::HostRefused(_)
-        | jig_client::facts::ChatStatus::Held(_)
-        | jig_client::facts::ChatStatus::Closing
-        | jig_client::facts::ChatStatus::Ended { .. } => {
-            words.say_word(jig_client::words::Word::status(&status), holes.as_slice())
-        }
+        ChatStatus::Held(ref reason @ HoldCategory::Exceeded(_)) => crate::cards::hold_phrase(reason, words),
+        ChatStatus::WaitingForYou { .. } => words.say(Word::WaitingForYou, &[]),
+        ChatStatus::Ended { .. } if closed(chip, requester) => words.say(Word::ChatClosed, &[]),
+        ChatStatus::Starting
+        | ChatStatus::Writing
+        | ChatStatus::Tool { .. }
+        | ChatStatus::Working { .. }
+        | ChatStatus::WaitingFor(_)
+        | ChatStatus::Parked
+        | ChatStatus::Retrying { .. }
+        | ChatStatus::HostRefused(_)
+        | ChatStatus::Held(_)
+        | ChatStatus::Closing
+        | ChatStatus::Ended { .. } => words.say_word(jig_client::words::Word::status(&status), holes.as_slice()),
     };
     b.name(&name);
     b.text(Run::Plain, &name);

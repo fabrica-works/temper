@@ -309,6 +309,10 @@ pub(crate) fn proposal_facts(b: &mut Builder, page: &c::ReadValue, words: &Words
 }
 
 pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {
+    text(b, Role::Paragraph, &hold_phrase(value, words));
+}
+
+pub(crate) fn hold_phrase(value: &c::HoldCategory, words: &Words) -> Box<[u8]> {
     let number = match value {
         c::HoldCategory::Exceeded(value) => match value.bound {
             c::Bound::History => None,
@@ -339,7 +343,7 @@ pub fn hold(b: &mut Builder, value: &c::HoldCategory, words: &Words) {
         | c::HoldCategory::Circle
         | c::HoldCategory::Procedure => None,
     };
-    text(b, Role::Paragraph, &words.say_word(jig_client::words::Word::hold(value), number.as_slice()));
+    words.say_word(jig_client::words::Word::hold(value), number.as_slice())
 }
 
 pub(crate) fn proposal_has_rows(page: &c::ReadValue) -> bool {

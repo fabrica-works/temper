@@ -42,6 +42,40 @@ fn a_chats_header_says_its_status_and_spend() {
     assert!(fixtures::find(&tree, Role::Status, b"Parked").is_some());
 }
 #[test]
+fn a_held_chatbar_names_only_its_exceeded_bound() {
+    use temper_client_domain::{Address, Event};
+    for (reason, expected) in super::chats::HELD_STATUSES {
+        let (mut root, _, watch) = fixtures::root_at(Address::Chat { task: TASK }, &fixtures::domain_limits());
+        let mut task = fixtures::task::document();
+        task.chip.task = TASK;
+        let c::ChipPhase::Owner { phase, .. } = task.chip.details.as_mut() else { panic!("owner") };
+        *phase = c::OwnerChipPhase::Held { reason, revision: 1 };
+        fixtures::root_event(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch: watch.expect("task watch"),
+                        event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                    },
+                },
+            },
+        );
+        let view = fixtures::page_view(&root);
+        let mut status = None;
+        for node in view.tree().nodes() {
+            if node.role == Role::Status && node.name.as_deref() == Some(expected) {
+                status = Some(node);
+                break;
+            }
+        }
+        let status = status.expect("held status");
+        assert_eq!(status.styles.as_slice(), [crate::look::STATUS_HELD]);
+        assert!(skein_lib::bytes::find(&fixtures::text(view.tree()), expected).is_some());
+    }
+}
+
+#[test]
 fn a_chats_header_says_its_spend_including_delegates() {
     let tree = chat_header();
     assert!(fixtures::find(&tree, Role::Paragraph, "7 spent · of 7 · delegates spent 2".as_bytes()).is_some());
