@@ -529,17 +529,16 @@ and `connect-forge.html`.
     Forgejo and its runner, starts them, and makes your first
     repository, with a README and a CI workflow. No restart."; the set
     up's fields, its organization (default `work`), its repository
-    (default `hello`) and its project, new (named as the repository)
-    or existing; "Its CI jobs run on this machine, as you, with no
+    (default `hello`) and its project, a new one named as the
+    repository; "Its CI jobs run on this machine, as you, with no
     isolation." and "Forgejo stops when temper box stops. Its
     repositories are kept in temper’s data directory."; and "Set up a
     Forgejo here", which sends `SetUp` and, once accepted, shows
     Setting up. The fields: "Organization", `work` until changed;
-    "Repository", `hello`; and "Project", a choice of "PROJECT, the
-    project you are in" (an existing project: the one the person is in,
-    else project 1), chosen until changed, or "A new project", with its
-    name, the repository's until changed. An organization, repository
-    or new project's name left empty is the page's refusal,
+    "Repository", `hello`; and "Into a new project, named", the
+    repository's name until changed: the first run offers no existing
+    project (`../draft/first-run.md`, 2.4). An organization, repository
+    or project's name left empty is the page's refusal,
     "Required.". The set up's refusals show under the button in its
     words (`README.md`, 4.6): "a new project", until jig makes projects
     at runtime, and `invalid`, which also marks the organization and
@@ -638,8 +637,8 @@ and `connect-forge.html`.
   "private" where it is, the first chosen (`Reachable`, each
   installation's, as the picker reads them, 4.3); "Into a new project,
   named", a field, the chosen repository's name until changed;
-  "Adopt OWNER/NAME", which sends `Adopt` of it into that new project,
-  as its home (`README.md`, 4.7), and refused "a new project" until
+  "Adopt OWNER/NAME", which sends jig's `MakeProject` of that name,
+  then `Adopt` of it into that new project, as its home (`README.md`, 4.7), and refused "a new project" until
   jig makes projects at runtime, as Set up's is; and "Not listed?
   Choose its repositories on GitHub, and GitHub sends you back here.",
   whose link sends `Install` and takes the tab to GitHub's install
@@ -766,9 +765,9 @@ admin", with its forge number and bot (`../protocol/setup.md`, section
 | Connect | Forgejo not owned, not connecting, with a managed setup entry | "Connect as its admin": a site admin's token pasted; temper makes its bot (or takes over the connected one, 5.5) and the forge becomes managed |
 | Replace | GitHub, connected or stopped; a Forgejo of the connected mode, connected or stopped | a new App key, or a new API token, git token or both, pasted, which must answer as the forge's user (on GitHub, the same App); the old is erased once the new is kept |
 | Install the App; Install on another account | GitHub, connected: "Install on GitHub" before any accepted installation (Connecting), "Install on another account" after one, and Ready's "Choose its repositories on GitHub" | a fresh link to temper's App's install page, with `back`, where the browser goes in its own tab; the person picks the account and its repositories on GitHub, keeping GitHub's default, all of them, or choosing some, and the setup route sends the tab back to `back` |
-| New repository | Forgejo owned or managed, connected | the set up's same fields: organization (default `work`), repository (default `hello`) and an existing project; the general form of the first repository (`../protocol/setup.md`, section 15) |
+| New repository | Forgejo owned or managed, connected | the set up's same fields: organization (default `work`), repository (default `hello`) and a project, one of the person's or a new one; the general form of the first repository (`../protocol/setup.md`, section 15) |
 | Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
-| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | its organization (default `work`), its repository (default `hello`) and its project: a new one, named as the repository, or an existing one (`../protocol/setup.md`, section 15; a new project waits on jig's projects at runtime); then the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled, the repository made with the starter workflow (`../protocol/setup.md`, 6.7), and, once the row says it made, the client's `Adopt` into the project; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
+| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | its organization (default `work`), its repository (default `hello`) and its project, a new one named as the repository (`../draft/first-run.md`, 2.4; a new project waits on jig's projects at runtime); then the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled, the repository made with the starter workflow (`../protocol/setup.md`, 6.7), and, once the row says it made, the client's `MakeProject` and `Adopt` into it; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
 | Set up again | the row's offer offered, set up failed | the same ask again: what the last one left is kept, a fetched binary hashed and not fetched again |
 
 Connect, but on a stopped forge or one whose records say why it is not

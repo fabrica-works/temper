@@ -781,10 +781,12 @@ its own for any other host.
 ### 6.7 The first repository
 
 - **Asked with the set up.** `SetUp` carries an organization (default
-  `work`), a repository (default `hello`) and a project: an existing
-  project's number (default 1, "Default", the template's), or a new
-  project's name, refused "a new project" until jig makes projects at
-  runtime (jig's MakeProject, `domain/core.md`). The forge domain keeps
+  `work`), a repository (default `hello`) and a project: a new
+  project's name, the repository's until the person changes it, or an
+  existing project's number, which the first run never offers
+  (`../draft/first-run.md`, 2.4). A new one is refused "a new project"
+  until jig makes projects at runtime (jig's `MakeProject`, its
+  `domain/core.md`, 6.1). The forge domain keeps
   them with the forge, the set up's intent: one per forge, in memory
   alone, replaced by the next `SetUp` it admits, and kept until the
   repository is made or the set up has failed.
@@ -828,7 +830,9 @@ its own for any other host.
   failed, its `why` naming the step, and "Set up again" asks with the
   same fields. A restart drops the row's first repository to none.
 - **Adopted by the client, for now.** Once the row says made, the
-  client sends `Adopt` under the same party: the project, the forge,
+  client sends, under the same party, jig's `MakeProject` for a new
+  project, its name and policy 1, the default document's (8.3), then
+  `Adopt`: the project, the forge,
   `ORG`, `NAME`, landing on `main`, owned, the project's home, with CI.
   `temper ctl forge-setup` does it (`../client/tools.md`, 5.5), and so
   does the set up flow's Ready step (`../client/forge.md`, 5.4). It is
@@ -1501,14 +1505,20 @@ defaults for a person's real work are open (section 16).
   the owned message bound, 4,098 bytes, and a request at the threshold
   stays within the fake's request bound; its source a key. The agent's
   configuration declares it too (8.2).
-- **One project,** number 1, adopting nothing until the person adopts
-  a repository from the client. Its landing rule covers every
-  repository of every forge, the pattern `{"segments": ["forge"],
-  "last": "open", "value": ""}`, `enforce`d, with `ci`
-  and `up_to_date`, and no gate or approval: a change lands on green CI
-  with no person in between. Its owner's grants, the rules' ceiling and
-  its projections are the owned example's, on that pattern in place of
-  the org's.
+- **No project** (`../draft/first-run.md`, 2.4): the playground's
+  start makes the playground's (8.4), and the person's first repository
+  theirs (6.7). One policy, `engine.policies` 1 (jig's
+  `protocol/configuration.md`, section 3), which each project made
+  starts from: its owner's grants, the rules' ceiling and its
+  projections the owned example's, on the pattern below in place of
+  the org's. The deployment's landing rule, `landing.deployment`,
+  covers every repository of every forge, the pattern `{"segments":
+  ["forge"], "last": "open", "value": ""}`, `enforce`d, with `ci` and
+  `up_to_date`, and no gate or approval: a change lands on green CI
+  with no person in between, in every project, seeded or made
+  (configuration.md, section 8). Until jig makes projects at runtime,
+  the document seeds project 1 with that policy, and both adopt into it
+  (section 15).
 - **Its charters and templates,** the owned example's, but both
   charters' models end with `demo`: chat, 1, and coding, 2, the one the
   forge's procedures start agents' work under (`application.charter`);
@@ -1549,8 +1559,9 @@ defaults for a person's real work are open (section 16).
 A person's first run is a demo (`../draft/first-run.md`, 3.5, 3.6 and
 5, step 3): once the person chooses the playground, the box runs a
 fake LLM and a fake Forgejo from temper's own binary, the engine sets
-itself up on the fake as on an owned one, and adds the demo model's
-key and adopts the demo's repository itself (the demo's start, below).
+itself up on the fake as on an owned one, and makes the playground's
+project, adds the demo model's key and adopts the demo's repository
+itself (the demo's start, below).
 Its bar: one suggested request landed
 end to end on the demo model, by the engine's own loop with nothing
 staged. The chat delegates a change on `playground/widget`; its coding agent
@@ -1572,7 +1583,8 @@ them as it does any Forgejo.
             "cued": [{"cue": "Export widget's table as CSV",
                       "turns": ["..."]}],
             "otherwise": ["..."]},
-    "forge": 1, "project": 1, "client": "demo/client"}
+    "forge": 1, "project": {"name": "Playground", "policy": 1},
+    "client": "demo/client"}
   ```
 
   | Member | Type | Bounds |
@@ -1584,7 +1596,7 @@ them as it does any Forgejo.
   | `llm.cued` | a list of `{"cue", "turns"}`, optional, none when absent | as `asked`'s; the scripts the fake plays and the client never suggests, an agent's, cued by its brief |
   | `llm.otherwise` | a list of turns | 1 to 8 |
   | `forge` | u16 | the `forge` of one fake `setup` entry (section 8) |
-  | `project` | u32 | the number of one of `engine.projects` (configuration.md, section 2) |
+  | `project` | `{"name", "policy"}` | the project the demo's start makes (below): `name` a project's name in jig's shape (jig's `domain/core.md`, 6.1), `Playground` as `temper init` writes it; `policy` the number of one of `engine.policies` (jig's `protocol/configuration.md`, section 3) |
   | `client` | a data path | a private directory (section 3), unique among the document's directories; read and unused since the seed went (the demo's start, below), until the document's next change removes it |
 
   The scripts, `asked`, `cued` and `otherwise` together, fit skein's fake LLM's
@@ -1925,14 +1937,20 @@ them as it does any Forgejo.
   nothing, the fakes being the runner's (7.4). Then it
   makes the seed's acts itself, each reading first and done when it
   finds itself done:
-  1. the demo model's key, `llm.key`'s bytes less a final newline, as
+  1. the demo's project: the `Demo` row's, once a start has made it
+     (`store.md`, section 2); else a project named `project.name`,
+     which a start cut short after making it leaves; else made, by
+     jig's `MakeProject` of that name and `project.policy`, the person
+     its owner and only party (`../draft/first-run.md`, 2.4). Its
+     number is then written to the row;
+  2. the demo model's key, `llm.key`'s bytes less a final newline, as
      the deployment's account of `llm.provider`, unless the deployment
      holds an account of that provider. The service reads the file at
      each start and carries its bytes as a pasted value's
      (`../client/README.md`, section 8); a start that adds no account
      leaves the value unused, erased before the answer;
-  2. once the demo's forge is connected, `fake.repositories`' first
-     adopted into `project`, from `forge`, the fake's `owner`, on its
+  3. once the demo's forge is connected, `fake.repositories`' first
+     adopted into the demo's project, from `forge`, the fake's `owner`, on its
      `landing`, with the adoption form's defaults
      (`../client/README.md`, 4.4), unless the project has it.
 
@@ -1940,9 +1958,10 @@ them as it does any Forgejo.
   admitted by the root under their sign-in and a key derived from the
   start's: transitional, as the first repository's adoption is (6.7),
   until jig carries a deployment owner's acts (section 15). The start
-  is answered once both are done, *running*, or at the first that
+  is answered once all three are done, *running*, or at the first that
   fails, *start failed*, naming why: the group's `failed` with its
-  `WHY`, the account's refusal, the adoption's refusal, or the forge
+  `WHY`, the project's refusal, the account's refusal, the adoption's
+  refusal, or the forge
   not connected within `setup.deadline_ms` of the start. A start while
   the demo runs makes what is not done, and is answered the same: a
   second start, or a start that failed, sent again, adds and adopts
@@ -2390,8 +2409,10 @@ relies on.
   asking for the demo's group in one decision, the box link holding it
   while another group starts; the account added unless the deployment
   holds one of the provider, the value left unused otherwise; the
+  demo's project made once, found again by the row and, after a start
+  cut short, by its name; the
   adoption once the forge connects, unless the project has it; the
-  answer, running, once both are done, and start failed at the first
+  answer, running, once all three are done, and start failed at the first
   that fails, the forge not connected by `setup.deadline_ms` among them;
   a second start while running answered the same, adding and adopting
   nothing twice; the same key answered from memory, and unknown after a
@@ -2513,7 +2534,8 @@ it checks of this document:
   2.6), and prints one sign-in link, which signs the owner in, the demo's fakes
   dormant; the owner starts the demo with `temper ctl demo-start`
   (`../client/tools.md`, 5.5), answered once the demo forge is
-  connected and `playground/widget` adopted into project 1. The owner sends
+  connected and `playground/widget` adopted into Playground, project 1,
+  which the start made. The owner sends
   "Add CSV export to widget" to the project's chat, which runs on the
   demo model with no pick (8.3); the chat's last message says the
   change landed, its delegated task ended landed, and the landed
@@ -2550,7 +2572,8 @@ it checks of this document:
   3`, answered setting up; forge 3's row, followed by `wait forges
   --until settled`, goes through "Setting up" and "Connecting" to
   "Connected as temper", with no restart, and its first repository made,
-  `work/hello`; the call adopts it into project 1, "Default" (6.7). The
+  `work/hello`; the call adopts it into the new project `hello`,
+  project 1 (6.7). The
   workflow's push has run on the owned runner: before the owner's first
   task, the runner's output, which the box gives on its stderr as
   `runner 3: ` lines, says it took a task on `work/hello`, main's
@@ -2586,9 +2609,11 @@ Each is intended; what it needs is named with it.
   on `SetUp`'s admission), adoption is the client's, and the demo's
   start makes its acts in the name of the person who chose the
   playground (8.4). Projects are
-  seeded at the first start only (configuration.md, section 3; jig's
-  `domain/core.md`, 6.1), so adoption goes to an existing project, the
-  template's project 1, "Default". The set up's intent is kept in
+  seeded at the first start only (jig's `domain/core.md`, 6.1) until
+  jig makes them at runtime: until then the default document seeds
+  project 1, and the playground's start and the first repository adopt
+  into it in place of the projects they make (`../draft/first-run.md`,
+  2.4; 8.3, 8.4). The set up's intent is kept in
   memory alone; keeping it across a restart is open (section 16).
 - **The rest of the demo's end** (8.4): its open chats ended, "ended
   with the playground", which needs jig to take a deployment's close of

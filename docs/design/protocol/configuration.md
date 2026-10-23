@@ -306,7 +306,8 @@ A rule is a `LandingRule`, member for member:
   requirements; a project appears in `projects` at most once, and must
   be one of `engine.projects`; each approval's `role` must be a role of
   its project's policy, and, for a deployment rule, of every configured
-  project's policy.
+  project's policy and every configured policy a project is made from
+  (jig's `engine.policies`).
 - **Feeds** `Config.landing`: `deployment` and `projects` as they are.
 
 **`charter`:** u32, the charter the forge's procedures start agent work
@@ -364,9 +365,10 @@ for the worker to spawn (channel.md, section 4).
 
 **`demo`:** a first run's demo, or `null` for none, never missing
 (section 10): the fake LLM the box runs, its address, its LLM provider,
-its key's file and its scripts, and the seed's forge, project and client
-directory. Its members, their bounds and their checks against the
-document's LLM providers, `setup` and projects are setup.md, 8.4's,
+its key's file and its scripts, and the seed's forge, the project its
+start makes and the client directory. Its members, their bounds and
+their checks against the document's LLM providers, `setup` and
+policies are setup.md, 8.4's,
 `temper-fake`'s. `temper serve` checks it whole and reads none of its
 files; the engine takes nothing of it.
 
@@ -801,7 +803,13 @@ have one, an engine alone none. Each:
     core admits a party's request, the engine's routing gives the root
     one period for each configured project, its budget the project's
     spend per period, with no next start;
-  - **each project's landing rules** join its policy as it is seeded.
+  - **each project's landing rules** join its policy as it is seeded;
+  - **a project made after the first start** (jig's `MakeProject`, its
+    `domain/core.md`, 6.1) has the deployment's landing rules, which
+    every start applies (`../domain/root.md`, section 6), and none of
+    `landing.projects`, which names seeded projects alone; its first
+    period is made with it (jig's `domain/people.md`, 5.2). The default
+    document seeds no project (setup.md, 8.3).
 - **Every start:**
   - jig's parts apply as jig says (jig's `protocol/configuration.md`,
     section 8);
@@ -1047,6 +1055,11 @@ one owned forge, with its own values (setup.md, 8.1).
   budget is not renewed. Default: the smallest source; a calendar child
   of temper's root, as `ops`'s (jig's `protocol/configuration.md`,
   section 5; jig's `examples.md`, section 4), would renew it.
+- **A made project's own landing rules.** `landing.projects` names
+  seeded projects, so a project made after the first start has the
+  deployment's rules alone. Default: the deployment's; rules per
+  configured policy, joined to a project made from it, once a document
+  needs them.
 - **A forge removed while the store holds its repositories.** Default:
   the start is refused at the forge's restart step, naming the forge
   number (jig's `protocol/configuration.md`, section 9, removed parts).

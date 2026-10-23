@@ -338,7 +338,12 @@
   const shownProject = () => params.get('project') || world.project;
   const inProject = t => (t.project || world.project) === shownProject();
   const projectTasks = () => Object.keys(world.tasks).filter(k => inProject(T(k)));
-  const project = () => fact('jig: the project', esc(params.get('project') || world.project));
+  const project = () => fact('jig: the project', esc(params.get('project') || world.project || 'No project yet'));
+  // A first run has no project until the playground's start or the first
+  // repository makes one (draft first-run.md, 2.4).
+  const noProject = () => !(params.get('project') || world.project);
+  const PROJECT_NAV = ['board', 'changes', 'tasks', 'adopt'];
+  const navShown = () => NAV.filter(e => !noProject() || !PROJECT_NAV.includes(e[0]));
 
   // ---- The step bar ---------------------------------------------------
 
@@ -496,14 +501,14 @@
     : `<a href="#" data-later="${esc(later)}">${label}</a>`;
 
   function topbar(active, { bare = false } = {}) {
-    const links = NAV.map(e => navLink(e, active, e[0] === 'inbox' ? ` <span class="terminal-count">${world.inbox.length || ''}</span>` : '')).join('');
+    const links = navShown().map(e => navLink(e, active, e[0] === 'inbox' ? ` <span class="terminal-count">${world.inbox.length || ''}</span>` : '')).join('');
     return `<header class="terminal-topbar${bare ? ' terminal-topbar-bare' : ''}">
       <a class="terminal-brand" href="${u('chats.html')}" aria-label="temper chats"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.5c1.5 5.6 2.9 7 8.5 8.5-5.6 1.5-7 2.9-8.5 8.5C10.5 12.9 9.1 11.5 3.5 10 9.1 8.5 10.5 7.1 12 1.5Z"/><circle cx="18.5" cy="18.5" r="2" fill="currentColor"/></svg><span>temper</span></a>
       ${bare ? '' : `<span class="terminal-divider" aria-hidden="true"></span>
       <span class="terminal-project">${project()} <span aria-hidden="true">⌄</span></span>
       <nav class="terminal-nav" aria-label="Main navigation">${links}</nav>`}
       <div class="terminal-top-right">${bare ? '' : `<span class="terminal-live"><i class="status-dot"></i> ${fact('jig-client: the link’s state', 'Live')}</span>`}<span class="terminal-user">${fact('jig: the party signed in', esc(world.person))}</span><a class="terminal-user" href="#" data-later="Mockup: signing out is not drawn.">Sign out</a></div>
-      ${bare ? '' : `<details class="terminal-mobile-menu"><summary aria-label="Open navigation">☰</summary><nav aria-label="Mobile navigation">${NAV.map(e => navLink(e, active)).join('')}</nav></details>`}
+      ${bare ? '' : `<details class="terminal-mobile-menu"><summary aria-label="Open navigation">☰</summary><nav aria-label="Mobile navigation">${navShown().map(e => navLink(e, active)).join('')}</nav></details>`}
     </header>`;
   }
 
@@ -764,7 +769,18 @@
     </div><aside><div class="section-heading" style="margin-top:0"><h2>Updates <span class="subtle-count">${unread ? `${unread} new` : ups.length}</span></h2></div><div class="updates-list">${ups.map(x => x.html).join('') || '<div class="empty-state">No updates.</div>'}</div></aside></div>`);
   };
 
+  // No project yet: the composer and the list give way (client README,
+  // 3.5); the frame keeps the setup strip.
+  function noProjectChats() {
+    const act = ownForge()
+      ? `<a class="button primary" href="#" data-later="Mockup: the adoption form into a new project, named after the repository chosen (client README, 4.4).">Adopt a repository</a>${ahead('jig', 'a project made after the first start: jig’s MakeProject, designed, not built')}`
+      : `<a class="button primary" href="${esc(u('welcome.html?at=forge'))}">Set up temper</a>`;
+    const playground = demo?.state === 'not started' ? tryDemo() : '';
+    return `<section class="first-run-empty no-project"><h1>No project yet</h1><p>${fact('jig: the person’s projects, none', 'A project starts with its first repository.')}</p><div class="button-row">${act}${playground}</div></section>`;
+  }
+
   pages.chats = () => {
+    if (noProject()) return listPage('chats', [['Chats']], noProjectChats());
     const live = projectTasks().filter(k => isChat(T(k)) && requesterOf(T(k)) === world.person && isLive(k));
     const rows = live.map(id => {
       const t = T(id);
@@ -1318,7 +1334,7 @@
     const first = repos[0][0];
     return `<div class="forge-setup"><h3>Choose a repository to start in</h3><p>${fact('temper: the App’s installation, its account and its repositories', esc(`${f.app.slug} is installed on ${install.account}, with ${install.all ? `all its repositories, ${install.names.length}` : `${plural(install.names.length, 'repository', 'repositories')} you chose`}.`))}</p>
         <div class="pick-list" data-pick="${esc(u(target, '5'))}" data-owner="${esc(install.account)}">${repos.map(([n, priv], i) => `<label class="pick-row"><input type="radio" name="pick" value="${esc(n)}"${i ? '' : ' checked'}><span>${fact('temper: a repository the installation reaches', esc(`${install.account}/${n}`))}</span>${priv ? '<span class="tag">private</span>' : ''}</label>`).join('')}</div>
-        <label class="forge-field"><span>Into a new project, named ${ahead('jig', 'a project made after the first start: jig makes projects only at a deployment’s first start yet')}</span><input type="text" value="${esc(first)}" data-pick-project></label>
+        <label class="forge-field"><span>Into a new project, named ${ahead('jig', 'a project made after the first start: jig’s MakeProject, designed, not built')}</span><input type="text" value="${esc(first)}" data-pick-project></label>
         <div class="button-row"><a class="button primary" data-pick-go href="${esc(u(`${target}&pick=${encodeURIComponent(first)}`, '5'))}">Adopt ${esc(`${install.account}/${first}`)}</a></div>
         <p class="muted tiny">Not listed? <a class="text-link" href="${esc(toGithub('install', from, '4'))}">Choose its repositories on GitHub</a>, and GitHub sends you back here.</p></div>`;
   }
@@ -1344,8 +1360,8 @@
         <h3>Forgejo on this machine ${ahead('B4 M4', 'the first repository, made and adopted at set-up: B4’s M4, once temper-15 moves the admin token into the engine')}</h3>
         <p>temper box downloads Forgejo ${conf('the owned forge’s pinned version', esc(f.versions.forgejo))} and its runner, starts them, and makes your first repository, with a README and a CI workflow. No restart.</p>
         <div class="forge-fields"><label class="forge-field"><span>Organization</span>${conf('the set-up’s organization', `<input type="text" value="${esc(setup.org)}">`)}</label><label class="forge-field"><span>Repository</span>${conf('the set-up’s repository', `<input type="text" value="${esc(setup.repo)}">`)}</label></div>
-        <div class="forge-fields"><label class="forge-field"><span>Project</span>${conf('the set-up’s choice of project', `<select><option${setup.newProject ? ' selected' : ''}>A new project</option><option${setup.newProject ? '' : ' selected'}>${esc(world.project)}</option></select>`)}</label><label class="forge-field"><span>New project’s name</span>${conf('the set-up’s project name, following the repository’s', `<input type="text" value="${esc(setup.project)}">`)}</label></div>
-        ${ahead('jig', 'a project made after the first start: jig makes projects only at a deployment’s first start yet')}
+        <div class="forge-fields"><label class="forge-field"><span>Into a new project, named</span>${conf('the set-up’s project name, following the repository’s', `<input type="text" value="${esc(setup.project)}">`)}</label></div>
+        ${ahead('jig', 'a project made after the first start: jig’s MakeProject, designed, not built')}
         <ul class="forge-facts"><li>Its CI jobs run on this machine, as you, with no isolation.</li><li>Forgejo stops when temper box stops. Its repositories are kept in temper’s data directory.</li></ul>
         <a class="button primary" href="${esc(u(target, at))}">Set up a Forgejo here</a>
       </div>`;

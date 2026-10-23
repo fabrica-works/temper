@@ -15,7 +15,9 @@
     return {
       now: 0,
       person: 'Sam',
-      project: 'Default',
+      // No project until the playground's start or the first repository
+      // makes one (draft first-run.md, 2.4).
+      project: null,
 
       config: {
         templates: { chat: 'chat', goal: 'goal' },
@@ -77,13 +79,13 @@
       summary: 'temper box started temper serve alone: the playground is configured but not started, and no forge or model is Sam’s. The link opens the welcome: try the playground, or set temper up.',
       look: [
         ['welcome.html', 'The welcome: the playground, or set up'],
-        ['chats.html', 'Chats behind it: the setup strip'],
+        ['chats.html', 'Chats behind it: no project yet, the setup strip'],
       ],
       apply() {},
     },
     {
       id: '1', label: '1', hour: 0, act: 1, title: 'The playground chosen',
-      summary: 'Sam chooses Try the playground. The engine asks temper box for the playground’s fakes, adds the scripted model’s account and adopts playground/widget into Default itself, and the link’s page is the playground’s start.',
+      summary: 'Sam chooses Try the playground. The engine asks temper box for the playground’s fakes, makes the project Playground, adds the scripted model’s account and adopts playground/widget into it itself, and the link’s page is the playground’s start.',
       look: [
         ['chats.html', 'Chats: the playground’s start'],
         ['accounts.html', 'Accounts: none of Sam’s yet; the scripted model, the playground’s'],
@@ -92,6 +94,7 @@
         ['changes.html', 'Changes: playground/widget on Playground forge, nothing in flight'],
       ],
       apply(w) {
+        w.project = 'Playground';
         w.demo.state = 'running';
         w.accounts.push({ name: 'Playground', display: 'Scripted model', provider: 'Playground', holder: 'the deployment',
           sources: [{ name: 'playground', kind: 'key', use: 'Idle', usage: null }] });
@@ -236,14 +239,14 @@
     },
     {
       id: '7', label: '7', hour: 19 / 60, act: 2, title: 'A Forgejo connected',
-      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the playground’s banner is gone. Sam’s first forge is connected, so the playground ends: its forge stops and leaves the Forges page, its open chats end, and playground/widget leaves Default; what the playground did stays readable.',
+      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the playground’s banner is gone. Sam’s first forge is connected, so the playground ends: its forge stops and leaves the Forges page, its open chats end, and playground/widget leaves Playground; what the playground did stays readable there.',
       look: [
         ['connect-forge.html?forge=3', 'Connect a forge: ready, and Open hello'],
         ['chats.html?project=hello', 'Chats in hello: no chat yet, no banner'],
         ['forges.html', 'Forges: forge 3 alone'],
-        ['chats.html', 'Chats in Default: the playground’s chats, ended'],
+        ['chats.html', 'Chats in Playground: the playground’s chats, ended'],
         ['chat.html?task=T1', 'T1: ended with the playground'],
-        ['changes.html', 'Changes in Default: the playground’s landing kept'],
+        ['changes.html', 'Changes in Playground: the playground’s landing kept'],
         ['changes.html?project=hello', 'Changes in hello: work/hello, CI passing'],
         ['connect-forge.html', 'Connect a forge: GitHub and a Forgejo elsewhere left'],
         ['connect-forge.html#other-states', 'Connect a forge, below: its other paths'],

@@ -49,6 +49,7 @@
     const name = `${install.account}/${pick}`;
     w.repos[name] = Object.assign(repo, { name, project: pick });
     Object.assign(f.setup, { org: install.account, repo: pick, project: pick });
+    w.project = pick;
   }
 
   const steps = [
@@ -58,6 +59,7 @@
       look: [
         ['welcome.html', 'The welcome: the playground, or set up'],
         ['welcome.html?at=forge', 'Connect a forge, in the wizard: Connect GitHub'],
+        ['chats.html', 'Chats behind it: no project yet, the setup strip'],
         ['connect-forge.html', 'Connect a forge, from Forges: the same choice'],
         ['connect-forge.html?forge=2', 'An App of your own: its details, behind its link'],
       ],
@@ -117,6 +119,7 @@
       apply(w) {
         const f = w.forges.find(f => f.n === 2);
         f.setup = { org: 'sam', repo: 'widget', project: 'widget', newProject: true };
+        w.project = 'widget';
         w.repos['sam/widget'] = { name: 'sam/widget', forge: 2, branch: 'main', tip: '5d0e9b1', ci: { state: 'passing', at: 4 }, after: null, queue: [], project: 'widget' };
       },
     },

@@ -22,10 +22,13 @@ arranges them. Nothing here shapes a piece for the first run's sake.
   configuration directory it writes a default document there, starts
   what that document names, and prints one link (section 2).
 - **The link signs the person in** and opens a welcome: try the demo,
-  or set temper up (2.3). The demo is the default project's chat, on a
-  demo repository, with a demo model and a demo forge: temper's fakes,
-  which start only when the person chooses the demo (sections 3.5,
-  3.6, 2.3).
+  or set temper up (2.3). The demo is a chat in a project of its own,
+  Playground, on a demo repository, with a demo model and a demo forge:
+  temper's fakes, which start only when the person chooses the demo
+  (sections 3.5, 3.6, 2.3).
+- **No project until the person makes one** (2.4): the playground's is
+  made when it is chosen, and the first real one with its first
+  repository, named after it until the person changes it.
 - **Real backends replace the demo** (2.3, amending 2.2): the person's
   first usable model ends the demo model, and their first connected
   forge ends the demo forge, its open chats and its repository's place
@@ -84,12 +87,13 @@ below that keep it are superseded.*
   GitHub (managed, by the manifest flow, or connected, an App pasted),
   Set up a Forgejo here (owned, 3.8), or a Forgejo elsewhere (managed
   or connected, section 4). A forge connected, the person adopts a
-  repository into a new project, or into the default one. A new
+  repository into a new project, or, past the first, into one of
+  theirs (2.4). A new
   project's form suggests the repository's name as the project's,
   made unique ("tally 2" beside a "tally"), for the person to change;
   the name is then the project's own, not the repository's (jig's
   `domain/core.md`, 6.1). jig makes no project after a first start
-  yet.
+  yet (2.4).
 - **The demo** can be hidden; its forge and model stay in the document,
   so a demo is always there to show someone.
 
@@ -136,6 +140,43 @@ Forgejo and model).
   README, its pages (3.5: `Welcome`, `ConnectForge`), the setup strip
   (5.1, 5.6) and the demo's halves ending for good (4.8); its
   `forge.md`, 5.4, the Forges page and the flow.
+
+### 2.4 Projects, made as the person goes
+
+With the user, 2026-10-23. Amends 1, 2.2, 2.3 and 3.4. Mockups:
+`../client/mockups/welcome.html`, in the three first-run worlds.
+
+- **Why there was a default project.** jig made projects only at a
+  deployment's first start, from its configuration, so the default
+  document seeded project 1, "Default", for the playground's repository
+  and the owned forge's first one to go into. Nothing of the person's
+  was in it, and the set up's form offered it beside "A new project", a
+  choice a newcomer cannot make sense of.
+- **No project at the first start.** The welcome opens on a deployment
+  with none. The default document configures one policy instead, jig's
+  `engine.policies` 1, which each project made starts from, and its
+  landing rule among the deployment's, so that every project takes it
+  (`../protocol/setup.md`, 8.3).
+- **The playground's project, "Playground",** is made by the demo's
+  start, when the person chooses "Try the playground"
+  (`../protocol/setup.md`, 8.4). It keeps the playground's chats, and
+  what they did, once the demo ends.
+- **The person's first project** is made with their first repository,
+  named after it (`hello`, `widget`) until they change it: in the set
+  up's form of a Forgejo here, in GitHub's Ready
+  (`../client/forge.md`, 5.4), and in the adoption form for a forge
+  connected with no repository (`../client/README.md`, 4.4). The first
+  run offers no existing project; a later repository, from Forges, goes
+  into one of the person's projects or a new one.
+- **The playground tried first, then set up:** two projects,
+  Playground, its chats ended and readable, and the person's beside it.
+- **Waits on jig:** its projects made at runtime (jig's `MakeProject`,
+  its `domain/core.md`, 6.1, and its `STATUS.md`, jig-projects,
+  designed 2026-10-23) and projects' names (its `STATUS.md`, "A
+  project's name"). Until both land, the default document seeds project
+  1 as before, the playground's start and the first repository adopt
+  into it, and the client shows it as "Project 1"; the mockups draw the
+  target, marked "ahead · jig".
 
 ## 3. The pieces
 
@@ -210,8 +251,9 @@ experience; good defaults for a person's real work are open (section 8).
 - **Forges,** each by its stable number: 1 the demo forge, 2 GitHub, 3
   an owned Forgejo, dormant (3.8). GitHub's addresses are its defaults;
   it starts not connected (`draft/github.md`, section 4).
-- **A project,** number 1, with landing rules that land on green CI
-  with no human approval, and one chat charter.
+- **No project** (2.4): one policy, which each project made starts
+  from, and the deployment's landing rule, which lands on green CI with
+  no human approval in every project; and one chat charter.
 - **The box's steps:** the demo model and the demo forge, `temper
   serve`, and the owned forge's steps, dormant.
 

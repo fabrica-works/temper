@@ -11,7 +11,7 @@
         ['welcome.html', 'The welcome: the playground, or set up'],
         ['welcome.html?at=forge', 'Connect a forge'],
         ['welcome.html?at=forge&forge=3', 'Forgejo on this machine: its defaults'],
-        ['chats.html', 'Chats behind it: the setup strip, no model'],
+        ['chats.html', 'Chats behind it: no project yet, the setup strip'],
       ],
       apply() {},
     },
@@ -22,7 +22,7 @@
         ['welcome.html?at=model', 'Connect a model, while Forgejo sets up: ChatGPT, or an API key'],
         ['welcome.html?at=model#other-states', 'Other ways, where the configuration offers them'],
         ['forges.html', 'Forges: forge 3, setting up; no playground'],
-        ['chats.html', 'Chats: the setup strip’s status'],
+        ['chats.html', 'Chats: no project yet, the setup strip’s status'],
       ],
       apply(w) {
         const f = w.forges.find(f => f.n === 3);
@@ -36,7 +36,7 @@
       look: [
         ['welcome.html?at=ready', 'Almost ready: the model, ChatGPT; waiting for Forgejo'],
         ['accounts.html', 'Accounts: ChatGPT · sam@example.com'],
-        ['chats.html', 'Chats: the composer’s line, Using ChatGPT plan; the strip, no forge yet'],
+        ['chats.html', 'Chats: no project yet; the strip, no forge yet'],
         ['connect-model.html?world=first-run&step=5#other-states', 'The sign-in’s other endings, drawn in the first run'],
       ],
       apply(w, id) {
@@ -54,13 +54,13 @@
         ['chats.html?project=hello', 'Chats in hello: no chat yet, no strip'],
         ['forges.html', 'Forges: forge 3 alone'],
         ['accounts.html', 'Accounts: ChatGPT alone'],
-        ['chats.html', 'Chats in Default: empty'],
       ],
       apply(w) {
         const f = w.forges.find(f => f.n === 3);
         Object.assign(f, { state: 'connected', login: 'temper', id: 2,
           load: { used: 14, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 8], ['writes', 3], ['keeping up', 3], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['work/hello', 18]] } });
         delete f.setup.step;
+        w.project = 'hello';
         w.repos.hello = { name: 'work/hello', forge: 3, branch: 'main', tip: 'a41c9e2', ci: { state: 'passing', at: 18 }, after: null, queue: [], project: 'hello' };
         w.demo.state = 'retired';
         w.forges[0].state = 'retired';

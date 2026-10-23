@@ -84,7 +84,7 @@ section 7).
 | 14 | `Release` | `Release(u64)`: the task | a closing task's release | `tasks` |
 | 15 | `Application` | `Application(u64)`: the people child's token for the request | a keyed adoption's outcome, or a keyed outcome of the FORGE family, kept until its retention ends (jig's `domain/connectors.md`, 5.5: a connector keeps its keyed requests' outcomes durably); an outcome carrying a link is kept in memory alone, until its state's life ends (`setup.state_life_ms` after `Done`; `../client/README.md`, section 8) | `applications` |
 | 16 | `Writer` | `Writer(forge)`: the forge's number | the forge's writer, given at runtime from its connect's user (skein's `forge-client.md`, 7.1; credentials.md, section 5), restored at start so that restored effects never meet `Forbidden` | the configured `forges` |
-| 17 | `Demo` | `Demo(forge)`: the demo's forge, `application.demo.forge` | the demo's state: running, from the person's choice of the playground, or ended, for good; no row is not started (setup.md, 8.4). Written at the demo's start and at its end, never erased | one row: the configured demo's |
+| 17 | `Demo` | `Demo(forge)`: the demo's forge, `application.demo.forge` | the demo's state: running, from the person's choice of the playground, or ended, for good; no row is not started (setup.md, 8.4); and the demo's project's number, once its start has made it (designed, below). Written at the demo's start and at its end, never erased | one row: the configured demo's |
 
 - **Loaded:** every family at the forge's restart step, and never
   otherwise. No party reads them: the engine serves none of the forge's
@@ -153,6 +153,11 @@ section 7).
   move from 6 to 7 breaks the stored format as each move does: a store
   written at 6 refuses to open, saying so, rather than resolving its
   tags to no repository later.
+- **The demo's project,** its number in the `Demo` row, written by the
+  demo's start once it has made the project (setup.md, 8.4;
+  `../draft/first-run.md`, 2.4): designed, and waiting on jig's
+  projects made at runtime. Its code takes the next `STORE_VERSION` at
+  landing; none is reserved.
 - **`STORE_VERSION` 6** came with the `Demo` family, tag 17,
   `Key::Demo(forge)` (section 2), its row `{ forge, state }`, the
   state running or ended: the demo's state, the engine's alone

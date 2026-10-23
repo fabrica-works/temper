@@ -309,7 +309,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree of its delegates, live and ended, with their counts and its filter, each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a goal's or a procedure's ended delegates, a page read once and again on a change | a goal's plan's filter (5.8); as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
-| `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
+| `Adopt { project }` | none: 4.4 | the adoption form, into `project`, or, with none, into a new project (4.4), with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | the person's forges, each row folded until opened: its connection, its mode and access, on GitHub temper's App and its installations, a connect under way and how the last ended, its load; then the playground's forge, folded, while the demo's forge half holds; "+ Add a forge", to `ConnectForge` (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect a stopped forge; replace a key or tokens; install on another account; new repository; forget the admin's token; set up again (section 8) |
 | `ConnectForge { forge }` | `connect-forge.html` | connecting one more forge, `forge` the choice it is at: Choose, Details, Setting up and Ready, which ends on the work it adopted (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect; connect as its admin; set up a Forgejo here (section 8) |
 | `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `ConnectModel`'s acts |
@@ -702,9 +702,11 @@ keeps (`../protocol/configuration.md`, section 2).
     (4.8) is the person's choice made, and the page moves on the same
     way. Otherwise it shows its step, and until its facts are in,
     its heading alone. Its other steps never move on of their own.
-  - *"Try the playground"* opens the chats page in the demo's project,
-    as choosing that project does, after sending `StartDemo` while the
-    demo has not started (4.8).
+  - *"Try the playground"* sends `StartDemo` while the demo has not
+    started (4.8) and opens the chats page, in the demo's project once
+    the demo's read names it, which the start's first act makes
+    (`../draft/first-run.md`, 2.4); until then the chats page shows the
+    demo's start under way, as in that project.
     *"Set up temper"* opens its Forge step.
   - *Forge* is `ConnectForge`'s Choose and Details (`forge.md`, 5.4),
     its choice in the welcome's address (`browser.md`, 2.3), "‹ All
@@ -755,9 +757,21 @@ keeps (`../protocol/configuration.md`, section 2).
     row. Once that repository is adopted (`forge.md`, 5.4, Ready), its
     heading is "ORG/NAME is ready", with "Open PROJECT", to the chats
     page in that project; while the forge is connected with no first
-    repository, "Adopt a repository", to `Adopt { project }`. Ready is
+    repository, "Adopt a repository", to `Adopt` into a new project
+    (4.4). Ready is
     done, not current, along the top once its forge and model both
     are.
+- **With no project yet** (`../draft/first-run.md`, 2.4): until the
+  playground's start or the person's first repository makes one, the
+  chats page's composer and "Your chats" give way to the level-1
+  heading "No project yet" and "A project starts with its first
+  repository.", with "Set up temper", to the welcome's Forge step,
+  while no forge of the person's is connected, else "Adopt a
+  repository", to `Adopt` into a new project (4.4); and, while the
+  demo is offered and not started, "Try the playground". The frame
+  keeps the setup strip (5.1); the navigation offers no project's
+  entries (5.3), and the project's place in it reads "No project
+  yet".
 - **A suggested request** (`chats.html`) starts a chat with the
   cue's words as its first message, as the composer's send does: one
   act, one request (3.6), the suggestions and the send disabled while
@@ -1029,6 +1043,17 @@ picker, below). In order:
 
 Then a button "Adopt", and below it the request's state or outcome.
 
+**Into a new project** (`../draft/first-run.md`, 2.4): `Adopt` with
+no project, from the welcome's Ready and the chats page with no
+project yet (3.5), is titled "Adopt a repository into a new project",
+and adds a last field, "Into a new project, named", the name's field
+following the picker's chosen repository until the person changes it,
+required. "Adopt" sends jig's `MakeProject` of that name and policy 1
+(`../protocol/setup.md`, 8.3), then `Adopt` into it, as its home; a
+name taken is jig's refusal, shown under the field. Until jig makes
+projects at runtime, the form is refused "a new project", as `SetUp`'s
+is (4.6).
+
 **The picker,** between "Forge number" and "Owner": the repositories
 temper can reach on that forge (`forge.md`, 5.1), the project's own
 among them (section 11), a page at a time by number, each page the
@@ -1251,7 +1276,8 @@ for its kind, its user's login and its installations. Its nodes:
   configuration, at a restart, and with the demo's state, which moves
   to running only by a start (4.8). Its answer is none, for a
   deployment without the demo or whose demo ended, or the demo: its
-  project (u32); its forge's number (u16); its model's LLM provider
+  project (u32), once its start has made it, else none
+  (`../protocol/setup.md`, 8.4); its forge's number (u16); its model's LLM provider
   (u32); its repository's owner and name (byte strings, bounded as
   `Adopt`'s); its state, `DemoState`, not started or running
   (`../protocol/setup.md`, 8.4); and its cues, at most 8, each 1 to
@@ -1418,7 +1444,8 @@ of each (`../draft/first-run.md`, 3.6).
   longer answers.
 - **What shows:** the demo's banner, while either half holds (5.1); the
   demo's start, on the chats page, while the model's half holds and
-  the person is in the demo's project (3.5); the context line, on the
+  the person is in the demo's project, or in none while its start is
+  out (3.5); the context line, on the
   demo's start and on a chat's page in the demo's project, while the
   demo is running. Each is worded in 5.6. Nothing hides them but
   their halves (section 11).
@@ -1911,8 +1938,9 @@ the cues the demo's, copied in:
   and its suggestions disabled; once the start failed, the status "Not
   started", and under its lead "The playground did not start: WHY."
   with "Try again", WHY "its fakes did not start (BOX'S WHY)", "the
-  scripted model's account was refused", "OWNER/NAME was not adopted"
-  or "Playground forge did not connect"; the context line; the level-1 heading "What shall we change?"; "Try a request in
+  scripted model's account was refused", "OWNER/NAME was not adopted",
+  "the playground's project was not made" or "Playground forge did not
+  connect"; the context line; the level-1 heading "What shall we change?"; "Try a request in
   OWNER/NAME. Follow the task from its branch to a landed change."; a
   list named "Suggested requests" of one button per suggested request,
   the demo's `llm.asked` cues in order and never its `llm.cued`
@@ -1937,7 +1965,9 @@ the cues the demo's, copied in:
   records the model at Create (`../protocol/setup.md`, 8.3).
 - **Its names:** the configuration names the demo's provider, model
   and forge by identifiers ("demo"), so the phrasebook names them
-  "Scripted model" and "Playground forge", as the demo's scripted words
+  "Scripted model" and "Playground forge", and its project by its name,
+  "Playground" as `temper init` writes it (`../protocol/setup.md`,
+  8.4), as the demo's scripted words
   do once `../protocol/setup.md` 8.4 takes the playground's words
   (`../draft/first-run.md`, 2.3).
 - **The welcome** (`welcome.html`; `../draft/first-run.md`, 2.3): the
