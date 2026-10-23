@@ -8,13 +8,14 @@
 
 use std::collections::VecDeque;
 
+use jig_domain_host as host;
 use skein_fake_checkout::Checkout as Disk;
 use skein_fake_llm_domain::api::Script;
 use skein_lib::{ReplyTo, Time, Token};
 use smith_agent_world::{Job, Settings, World as Agent};
 use smith_domain as smith;
 use smith_domain_run as run;
-use smith_domain_session::record;
+use smith_domain_session::{llm, record};
 use temper_engine_domain as engine;
 use temper_engine_domain::Record;
 use temper_engine_domain_world::store::Store;
@@ -47,6 +48,16 @@ pub(crate) struct Process {
     sent_turns: usize,
     sent_waits: usize,
     sent_calls: Vec<Token>,
+    owner: Option<Token>,
+    producer: Option<Producer>,
+}
+
+/// The process service's live producer, played here because smith's domain
+/// world emits only whole turns (domain/testing.md, 2.1).
+struct Producer {
+    count: usize,
+    pieces: VecDeque<host::Piece>,
+    holding: bool,
 }
 
 /// What a process request needs of the world around it.
@@ -80,6 +91,28 @@ impl Process {
             sent_turns: 0,
             sent_waits: 0,
             sent_calls: Vec::new(),
+            owner: None,
+            producer: None,
+        }
+    }
+
+    pub(crate) fn in_pieces(&mut self, count: usize) {
+        assert!(count > 0, "a reply has at least one piece");
+        self.producer = Some(Producer { count, pieces: VecDeque::new(), holding: false });
+    }
+
+    /// Release the next piece, or the turn and its following channel records
+    /// after the last piece has been observed.
+    pub(crate) fn release_reply(&mut self, events: &mut VecDeque<worker::Event>) {
+        let producer = self.producer.as_mut().expect("a reply in pieces");
+        assert!(producer.holding, "a held reply");
+        if let Some(piece) = producer.pieces.pop_front() {
+            // A live channel record consumes a read just like a whole turn;
+            // the worker's Progress terminal grants the following read.
+            assert_eq!(self.reading.take(), self.owner, "a granted read for the live piece");
+            events.push_back(worker::Event::Live { agent: self.owner.expect("spawned agent"), piece });
+        } else {
+            producer.holding = false;
         }
     }
 
@@ -110,6 +143,7 @@ impl Process {
     pub(crate) fn request(&mut self, request: agent::process::Request, around: &mut Around<'_>) {
         let event = match request {
             agent::process::Request::Spawn { owner, workspace, .. } => {
+                assert!(self.owner.replace(owner).is_none(), "one spawned agent");
                 assert_eq!(workspace.is_some(), around.repository);
                 around.observed.spawns += 1;
                 agent::process::Event::Spawned { owner, process: PROCESS }
@@ -185,6 +219,13 @@ impl Process {
     fn start(&mut self, start: agent::Start, window: agent::Window, around: &Around<'_>) {
         assert!(self.agent.is_none());
         let assignment = around.assignment.expect("committed assignment");
+        assert_eq!(assignment.live, host::LiveAsk { text: true, reasoning: false, input: false });
+        let asked = assignment.live;
+        assert_eq!(
+            start.live,
+            Some(agent::channel::LiveAsk { text: asked.text, reasoning: asked.reasoning, input: asked.input }),
+            "smith receives the assignment's live ask"
+        );
         assert_eq!((start.logical_run.raw(), start.activation), (assignment.task, assignment.attempt));
         assert_eq!(start.directories.len(), usize::from(around.repository));
         assert_eq!(start.workspace.is_some(), around.repository);
@@ -229,8 +270,10 @@ impl Process {
     /// One iteration of smith's world, then what it said, in order, onto the
     /// channel; and one record for a waiting read.
     pub(crate) fn tick(&mut self, now: Time, around: &mut Around<'_>) {
-        self.drive(now);
-        if let Some(owner) = self.reading.take() {
+        self.drive(now, around);
+        let held_turn = self.producer.as_ref().is_some_and(|producer| producer.holding)
+            && matches!(self.up.front(), Some(agent::Up::Turn { .. }));
+        if !held_turn && let Some(owner) = self.reading.take() {
             match self.up.pop_front() {
                 Some(message) => {
                     let event = agent::process::Event::Received { owner, message };
@@ -260,9 +303,9 @@ impl Process {
         }
     }
 
-    fn drive(&mut self, now: Time) {
+    fn drive(&mut self, now: Time, around: &mut Around<'_>) {
         let Some(agent) = self.agent.as_mut() else { return };
-        if self.settled {
+        if self.settled || self.producer.as_ref().is_some_and(|producer| producer.holding) {
             return;
         }
         self.settled = agent.drive(1);
@@ -298,6 +341,35 @@ impl Process {
         for (number, read, spent) in &agent.turn_metadata()[self.sent_turns..] {
             let index = usize::try_from(*number - 1).expect("positive turn");
             let record = agent.turns()[index].clone();
+            if let Some(producer) = &mut self.producer {
+                let mut text = Vec::new();
+                for message in &record.messages {
+                    if message.role == llm::Role::Assistant {
+                        for block in &message.content {
+                            if let llm::Block::Text { text: bytes, .. } = block {
+                                text.extend_from_slice(bytes);
+                            }
+                        }
+                    }
+                }
+                assert!(text.len() >= producer.count, "one nonempty text slice per piece");
+                assert!(!producer.holding, "one held reply turn");
+                for part in 0..producer.count {
+                    let from = text.len() * part / producer.count;
+                    let to = text.len() * (part + 1) / producer.count;
+                    producer.pieces.push_back(host::Piece {
+                        turn: *number,
+                        retry: 0,
+                        kind: host::LiveKind::Text,
+                        offset: u64::try_from(from).expect("bounded reply offset"),
+                        bytes: text[from..to].into(),
+                    });
+                }
+                let piece = producer.pieces.pop_front().expect("the first reply piece");
+                assert_eq!(self.reading.take(), self.owner, "a granted read for the live piece");
+                around.events.push_back(worker::Event::Live { agent: self.owner.expect("spawned agent"), piece });
+                producer.holding = true;
+            }
             self.up.push_back(agent::Up::Turn {
                 turn: agent::Turn {
                     opens_window: matches!(record.kind, record::Kind::First(_)),
