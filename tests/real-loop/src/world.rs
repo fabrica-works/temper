@@ -146,6 +146,18 @@ pub(crate) struct Llm {
     release: Option<&'static [u8]>,
     released: Option<&'static [u8]>,
 }
+impl Llm {
+    fn release_hold(&mut self, caller: &Caller) {
+        if let Some(name) = caller.releasing_hold() {
+            if self.released == Some(name) {
+                self.released = None;
+                caller.hold_released.set(true);
+            } else if !caller.hold_released.get() {
+                self.release = Some(name);
+            }
+        }
+    }
+}
 impl std::ops::Deref for Llm {
     type Target = skein_fake_peers::llm::Peer;
     fn deref(&self) -> &Self::Target {
@@ -353,14 +365,7 @@ impl Referee<Proc> for Judge {
             }
         }
         self.worker_actions(caller_end, caller, workers);
-        if let Some(name) = caller.releasing_hold() {
-            if peer.released == Some(name) {
-                peer.released = None;
-                caller.hold_released.set(true);
-            } else if !caller.hold_released.get() {
-                peer.release = Some(name);
-            }
-        }
+        peer.release_hold(caller);
         if placed(workers) && !self.finished {
             peer.cue = true;
         }
