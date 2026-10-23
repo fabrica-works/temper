@@ -694,7 +694,9 @@ keeps (`../protocol/configuration.md`, section 2).
     person's role holds the forges, the `forges` watch has delivered
     its rows. A read refused, failed, ended or not served is in, with
     nothing in it: no demo, no account, no forge, so that the page
-    never waits on a read that will not answer.
+    never waits on a read that will not answer. A demo ended reads
+    none, as no demo does (4.8): its end was a forge of the person's
+    connected, so the page moves on once a model is usable.
     Over, the page moves on to the chats page, its address replacing
     the welcome's, so that back does not return to it; a running demo
     (4.8) is the person's choice made, and the page moves on the same
@@ -1338,7 +1340,9 @@ of each (`../draft/first-run.md`, 3.6).
 
 - **Read once a link is live.** The forge's side reads `Demo` (4.6)
   when the link first becomes live, again each time it becomes live
-  after it was not, and again once a start it sent is answered. It
+  after it was not, again once a start it sent is answered, and again
+  when the forge's half ends (below), so that the end's none replaces
+  a running answer within the session. It
   keeps the last answer, and drops the answer of a read it has
   replaced. None, and no answer yet, both mean no demo is shown.
 - **Started when chosen** (`../protocol/setup.md`, 8.4): the demo's
@@ -1370,7 +1374,16 @@ of each (`../draft/first-run.md`, 3.6).
   its step 5): the model's half ends when an account of another LLM
   provider is first usable, and does not hold again; the demo ends
   when a forge of the person's first connects, and the read then
-  answers none.
+  answers none (`../protocol/setup.md`, 8.4). At the first of the two
+  ends the side sees while its last answer is running, it removes the
+  demo model's account: the `accounts` document's account of the
+  demo's provider, held by the deployment, by jig's `Remove` (jig's
+  `client/domain/contract.md`), as the accounts page's "Remove
+  account" sends it, unconfirmed (3.5, `Accounts`), once a session.
+  Its answer shows nowhere: refused, as for a person who is no first
+  owner, the account stays, and Accounts offers its Remove. Gone, it
+  supplies no run: the model's half has ended, and at the demo's end
+  the demo model, its group stopped, no longer answers.
 - **What shows:** the demo's banner, while either half holds (5.1); the
   demo's start, on the chats page, while the model's half holds and
   the person is in the demo's project (3.5); the context line, on the
@@ -1378,8 +1391,9 @@ of each (`../draft/first-run.md`, 3.6).
   demo is running. Each is worded in 5.6. Nothing hides them but
   their halves (section 11).
 - **State:** the last answer, the pending read's key, at most one, the
-  start's key while it is out, at most one, and its failure, and
-  whether the link was live at the last pass. Bounded by the record's
+  start's key while it is out, at most one, and its failure, whether
+  the link was live at the last pass, and whether the demo model's
+  account's removal was sent this session. Bounded by the record's
   bounds (4.6).
 
 ## 5. The view

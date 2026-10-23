@@ -575,6 +575,13 @@ service's io.
   - `failed FORGE WHY`: the ask ends, and the forge's set up failed,
     with `WHY` as the box wrote it, which holds no secret (setup.md,
     7.1).
+- **A stop** is the forge domain's too, at the demo's end (setup.md,
+  8.4), which no request waits on: the link writes `stop FORGE`,
+  holding it while another ask is out and sending it once that one is
+  answered, as it holds a start. `stopped FORGE` ends it, telling the
+  root nothing, since the forge is already ended (8.1); `failed FORGE
+  WHY` ends it too, named in the log. The pipe closed during it ends it
+  with the link.
 - **Named and dropped,** each in one line of the log and changing no
   state: a line for a forge other than the one asked, or while none is;
   a line whose word, forge number or step the link does not know; and a
@@ -862,13 +869,17 @@ Held by skein's `forge-connection.md`, section 8: a forge connection
 | connecting | a run that connects begins (2.6) | `NotConnected` |
 | connected | `Event::Connected` (2.2) | served |
 | stopped | `Event::Stopped` (2.3) | `NotConnected` |
+| ended | the demo's end, or a start whose `Demo` record reads ended: the demo's forge alone (setup.md, 8.4) | `NotConnected`, by the routing, which passes none on to the connection component |
 
 A connecting forge goes back to what it was when its run stops; a
 stopped one is connected again by its next `Connected`, after a Replace.
 A setting up forge, at the box's `started`, connects as 2.2 says; set up
 failed, it is asked again from the client, as not set up is. Only an
 owned forge whose setup says `"start": "asked"` is ever not set up,
-setting up or set up failed.
+setting up or set up failed. An ended forge stays ended: the routing's
+events for it change nothing, the setup host runs nothing for it, a
+webhook's hint for it is dropped, and no list shows it
+(`../domain/forge.md`, 4.1).
 The state is the routing's and the root's, in memory, and is rebuilt at
 each start from the records and the events (`../domain/forge.md`,
 4.1).
