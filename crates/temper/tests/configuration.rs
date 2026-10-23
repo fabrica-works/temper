@@ -129,11 +129,7 @@ fn the_clusters_description_is_the_labs_canonical_form() {
 fn cluster_documents(scratch: &std::path::Path) -> support::cluster::Cluster {
     support::cluster::Cluster::documents(
         scratch,
-        &[
-            ("forge", "address", "127.0.0.1:3"),
-            ("llm", "address", "127.0.0.1:1"),
-            ("engine", "workers", "127.0.0.1:2"),
-        ],
+        &[("forge", "address", "127.0.0.1:3"), ("llm", "address", "127.0.0.1:1"), ("engine", "workers", "127.0.0.1:2")],
     )
 }
 

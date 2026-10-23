@@ -1024,11 +1024,7 @@ fn a_mixed_document_exits_1_naming_its_path() {
     let scratch = support::Scratch::new("cluster_mixed_document");
     let cluster = support::cluster::Cluster::documents(
         scratch.path(),
-        &[
-            ("forge", "address", "127.0.0.1:3"),
-            ("llm", "address", "127.0.0.1:1"),
-            ("engine", "workers", "127.0.0.1:2"),
-        ],
+        &[("forge", "address", "127.0.0.1:3"), ("llm", "address", "127.0.0.1:1"), ("engine", "workers", "127.0.0.1:2")],
     );
     let path = cluster.dir("engine").join("config/temper.json");
     let mut engine: serde_json::Value =
