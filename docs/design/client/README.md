@@ -1594,6 +1594,14 @@ of each (`../draft/first-run.md`, 3.6).
     construction, "Continue with Google" to `/sign-in/google?then=PATH`,
     `PATH` the page's printed address (`../protocol/sign-in.md`,
     section 7);
+  - *signed out by Sign out, with a forge that signs in through
+    temper:* the sign-in page, under its heading, for each such forge,
+    "You signed out. FORGE keeps its own sign-in: sign out there too.",
+    FORGE the forge's name (`forge.md`, 5.4), read from the page's facts
+    (`../protocol/sign-in.md`, 9.3 and 9.6);
+  - *signed out at the authorization:* the `Authorize` place's sign-in
+    page, "to continue to FORGE" under its heading, its link's `then`
+    the authorization's address (`../protocol/sign-in.md`, 9.3);
   - *signed out, the link's sign-in not taken:* while the link's view
     says why its last sign-in installed nothing and the link stays
     usable (jig's `client/domain/client.md`, section 12,

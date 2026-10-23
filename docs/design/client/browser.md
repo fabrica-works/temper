@@ -218,6 +218,7 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   | `Forges` | `/forges` |
   | `ConnectForge { forge }` | `/forges/connect`, and its choice's query |
   | `ConnectModel { way }` | `/accounts/connect`, and its way's query |
+  | `Authorize { query }` | `/oauth/authorize`, and the query as the address carried it, within jig's bound on an authorization's query (`../protocol/sign-in.md`, 9.3) |
 
   `<task>` and `<project>` are the task's and the project's numbers in
   decimal. A later page's path comes with it, in this shape
@@ -238,8 +239,9 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   person's projects: a project the person isn't in shows an empty
   inbox, which "All projects" undoes. The inbox's filter, the chats
   list's and a goal's plan's (below), the welcome's step,
-  `ConnectForge`'s choice and `ConnectModel`'s way (below) alone are in
-  an address, and another page's query is dropped, `/chats/7?x=1`
+  `ConnectForge`'s choice, `ConnectModel`'s way (below) and
+  `Authorize`'s query, kept as it came and never printed again, alone
+  are in an address, and another page's query is dropped, `/chats/7?x=1`
   replaced with `/chats/7`.
 - **The chats list's and a goal's plan's filters are their queries,**
   as the inbox's (the user's pick, 10-23): none for "All", so that
@@ -740,6 +742,26 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
 - **No github.com:** `web` is the fake's, and the page's policy lets
   its form post nowhere else. No test of the tier holds a real
   credential.
+
+### 4.5 Forgejo's authorization
+
+One test, the provider's (`../protocol/sign-in.md`, 9.8).
+
+- **What only a browser shows:** jig's strict cookie, absent from a
+  navigation that started on another site and present on the page's own
+  exchanges, so that the `Authorize` place answers *go* for a person
+  signed in.
+- **What it runs against:** `temper serve` with jig's provider, its key
+  and its client's secret made in the test's scratch directory, and one
+  client whose redirect URI is a page of the harness's on the other
+  loopback site (`localhost` against `127.0.0.1`), hosted in the
+  harness's loop: a link to temper's `/oauth/authorize` with that
+  client, and the callback, which records its query. No Forgejo: the
+  process tier's story has the real one (`../domain/testing.md`, 2.6).
+- **The test:** signed in by the printed link, the browser opens the
+  harness's page and follows its link; temper's page sends `Authorize`,
+  and the browser's address becomes the callback's, its `code` and the
+  link's `state` there. Nothing of the token's is the browser's.
 
 ## 5. Open questions
 

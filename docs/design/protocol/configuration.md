@@ -363,6 +363,7 @@ answer not found.
 | `members` | a list | 1 to `sign_in.members` | who may sign in, each `{"address", "login"}` |
 | `members[].address` | a string | 3 to 254 bytes of visible ASCII, one `@` with bytes on both sides; unique among members with ASCII letters folded to lower case | the identity's subject, exactly as written; compared with Google's verified `email`, folded |
 | `members[].login` | a string | 1 to 40 bytes of ASCII letters, digits, `-`, `_` and `.`, its first and last a letter or a digit; unique, folded | the login in `Mint`, and the name where Google gives none |
+| `forges` | a list, or absent for none | each `{"forge", "client"}`: `forge` the number of a Forgejo of `forges`, `client` the id of one of jig's `engine.clients.provider.clients`, whose `redirect_uri` is exactly the forge's `git` URL's `/user/oauth2/temper/callback`; each forge and each client at most once; with no provider, refused naming `engine.clients.provider` | the forges that sign their people in through temper (`sign-in.md`, section 9): the page's `temper-forge-sign-in` metas, "Open Forgejo ↗", an owned Forgejo's `app.ini` (setup.md, 6.2) and `temper forge sign-in` (setup.md, 6.8) |
 
 - **jig's owners of Google's provider are members:** each of
   `engine.owners` whose provider is `google.provider` has a member's
@@ -530,6 +531,7 @@ have one, an engine alone none. Each:
 | an owned or fake forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at start or the box's `started` (setup.md, 6.5); a fake forge, before binding (setup.md, 8.4) |
 | a worker's secret, its digest | jig's parts, data paths: `worker.secret` and `worker.digest` in the data directory as `temper init` writes them (setup.md, 8.2) | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
 | Google's client secret | `application.sign_in.google.secret`, a data path | the secret's bytes | `temper serve`, once, at start, within `sign_in.secret_bytes` |
+| the OpenID provider's signing key, and each of its clients' secrets | jig's `engine.clients.provider` (jig's `protocol/configuration.md`, section 3) | jig's formats: the key PKCS#8 PEM, made by `temper forge sign-in` (setup.md, 6.8) | `temper serve`, once, at start, for jig's helper that builds the issuer (`sign-in.md`, 9.2) |
 | the demo model's key | `application.demo.llm.key`, a data path: `demo/llm.key` as `temper init` writes it (setup.md, 8.2) | the key's bytes | the fake LLM, at its start, and the seed (setup.md, 8.4); never `temper serve` |
 
 - **A secret file holds its bytes and nothing else** but a final

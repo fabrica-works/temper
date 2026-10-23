@@ -409,6 +409,13 @@ and `connect-forge.html`.
   setting up, its set up's first repository, "ORG/NAME, into PROJECT";
   set up failed or stopped, why. Opened, it holds the rest of the row's
   parts below and its actions. Every row starts folded.
+- **"Open Forgejo ↗"** on a connected Forgejo that signs its people in
+  through temper (`../protocol/sign-in.md`, section 9): a link to the
+  forge's `ROOT/user/oauth2/temper`, `ROOT` its `git` URL, in a new tab,
+  and under the actions the line "Open Forgejo signs you in as LOGIN,
+  through temper: Forgejo’s sign-in is temper’s.", LOGIN the member's
+  login. Forgejo starts its sign-in with the temper source, temper
+  answers at once, and Forgejo opens signed in.
 - **A forge's name:** "Forgejo on this machine" for an owned Forgejo,
   "GitHub" for GitHub, "Forgejo at HOST" for another Forgejo, HOST its
   `web` address's host, and "Playground forge" for the demo's
