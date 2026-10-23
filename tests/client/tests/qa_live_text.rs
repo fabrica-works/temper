@@ -49,35 +49,6 @@ fn full_live_text_stays_provisional_until_the_turn_commits() {
 }
 
 #[test]
-#[ignore = "needs: Joint reply API with turn retry and offset controls"]
-fn a_retried_turn_replaces_the_previous_retrys_text() {
-    // jig's domain/hosts.md, 6.5: each retry's content starts again at offset zero.
-    let mut world = fixtures::open_world(fixtures::SEED);
-    world.front().reply_in_pieces(PARTS);
-    let task = fixtures::chat(world.front(), b"QA retried live text");
-    let client = world.client(fixtures::PARTY, fixtures::chat_page(task));
-    world.person(client, vec![Step::See { find: Find::text(PARTS[0]), within: fixtures::WITHIN }]);
-    world.run(Until::Done);
-    // The public reply API can only release the next contiguous piece of this retry.
-    // It cannot fail this completion and start a new retry at offset zero.
-    panic!("needs: send a different prefix at retry + 1, offset 0, then assert old text gone");
-}
-
-#[test]
-#[ignore = "needs: Joint reply API that sends chosen piece offsets"]
-fn a_gap_marks_live_text_as_cut() {
-    // jig's domain/hosts.md, 6.5: a dropped piece leaves a gap marked as cut.
-    let mut world = fixtures::open_world(fixtures::SEED);
-    world.front().reply_in_pieces(PARTS);
-    let task = fixtures::chat(world.front(), b"QA live text gap");
-    let client = world.client(fixtures::PARTY, fixtures::chat_page(task));
-    world.person(client, vec![Step::See { find: Find::text(PARTS[0]), within: fixtures::WITHIN }]);
-    world.run(Until::Done);
-    // release_reply always supplies the next contiguous offset; no gap can be injected.
-    panic!("needs: send a piece beyond the preceding end, then assert the cut indication");
-}
-
-#[test]
 fn returning_to_the_chat_reads_the_held_prefix_and_its_commit() {
     // client/README.md, 3.5: leaving closes handles; the page watches what it shows.
     // The real-loop typist cannot follow a numbered task link inside a list row.

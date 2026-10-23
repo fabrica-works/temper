@@ -399,7 +399,8 @@ fn contains(bytes: &[u8], needle: &[u8]) -> bool {
 }
 fn control<'a>(page: &'a [u8], label: &[u8]) -> Option<&'a [u8]> {
     page.split(|byte| *byte == b'\n').rev().find_map(|line| {
-        let line = line.trim_ascii_start().strip_prefix(b"[")?;
+        let line = line.trim_ascii_start();
+        let line = line.strip_prefix(b"- ").unwrap_or(line).strip_prefix(b"[")?;
         let end = line.iter().position(|byte| *byte == b']')?;
         let number = &line[..end];
         if number.is_empty() || !number.iter().all(u8::is_ascii_digit) {
@@ -418,10 +419,11 @@ mod tests {
 
     #[test]
     fn controls_use_the_last_matching_label_and_ignore_disabled_numbers() {
-        let page = b"== Chats == Live\n  [1] Chats\n[2] Chats (current)\n[3] Chats elsewhere\n[-] Chats\n[4] Start a chat: (empty) (enter sends)\n";
+        let page = b"== Chats == Live\n  [1] Chats\n[2] Chats (current)\n[3] Chats elsewhere\n[-] Chats\n[4] Start a chat: (empty) (enter sends)\n  - [14] T1\n  - [15] T12\n";
         assert_eq!(control(page, b"Chats"), Some(b"2".as_slice()));
         assert_eq!(control(page, b"Start a chat"), Some(b"4".as_slice()));
         assert_eq!(control(page, b"Chat"), None);
+        assert_eq!(control(page, b"T1"), Some(b"14".as_slice()));
     }
 
     #[test]
