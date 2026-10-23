@@ -2814,6 +2814,8 @@ listener's (`../client/forge.md`, the browser's steps).
   reconcile checks them. It writes `AppId`, `AppSlug`, `AppKey` and
   `User`, the records the manifest flow writes, and ends done, or
   `Lacking` with each permission or event named, never refused for it.
+  A forge whose `app_read_only` is true has its hook read and left
+  (17.7).
 - **A restart during the paste check** drops its run: the carried key
   is erased at start, and the forge reads as its records say
   (`credentials.md`, 2.2; a stored connect, which would say
@@ -2844,7 +2846,8 @@ listener's (`../client/forge.md`, the browser's steps).
 
 - **`Reconcile { forge }`** (skein's `forge-setup.md`, 5.6) runs after
   each `Connected`: the App's key, permissions, events and installations
-  checked. It repairs only its hook's address.
+  checked. It repairs only its hook's address, and with `app_read_only`
+  (17.7) nothing: the hook is left and a stray is never uninstalled.
 - **A key GitHub refuses** stops the forge: the forge component, which
   signs with the same key, stops it (forge.md, 2.3), named, with
   Replace (17.3); the reconcile's own `Stop` is named to the root and
@@ -2864,3 +2867,20 @@ listener's (`../client/forge.md`, the browser's steps).
 - **The delivery log** is read by the forge component every
   `log_poll`, and its deliveries become hints as Forgejo's webhooks do
   (forge.md, a GitHub App's delivery log).
+
+### 17.7 A pasted App another owns: read-only
+
+- **A forge's `app_read_only`** (configuration.md, section 3) says the
+  pasted App (17.3), its hook and its installations are another's to
+  change: a probe App shared with skein's conformance, whose hook stays
+  where its owner put it, as the live tier's (`../domain/testing.md`,
+  2.7). The setup host gives it to skein's GitHub plans as their given
+  `read_only` (skein's `forge-setup.md`, GitHub's plans).
+- **What changes:** the paste check (17.3) and reconcile (17.5) read
+  the App's hook and leave it; reconcile lists the installations and
+  keeps `Accepted` as it says, and a stray (17.4) is shown and never
+  uninstalled.
+- **What doesn't:** the App's key, id, permissions and events are read
+  and checked, a lacking one named; `Install`'s link and the setup
+  route's `Accept` (17.4), which read; and the forge component's
+  connection, its mints and its delivery log (17.6).

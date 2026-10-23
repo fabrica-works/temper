@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-14, revised 2026-10-22. What temper's processes
+Provisional, 2026-10-14, revised 2026-10-23. What temper's processes
 are told when they start: the one JSON document `temper serve` reads,
 and the forge's setup's commands with it, with jig's parts as jig
 defines them and temper's own members beside them; the private files it
@@ -233,6 +233,7 @@ which bounds its writers. Each:
 | `git` | string, or `null` | an `http` or `https` URL: a host, an optional port and an optional path; no user, query, fragment or final `/`; `http` only to a loopback host. `null` on GitHub alone, for `https://github.com` | the base of each repository's remote, `<git>/<owner>/<name>.git`, which the engine's routing makes (channel.md, section 4); and the host segment of the forge's resource paths: `git`'s host, with `:port` when it names a port |
 | `web` | string, or `null` | on GitHub, a URL by `git`'s rule, `null` for `https://github.com`; on Forgejo, `null` | GitHub's browser pages: the manifest's form, the install link and an installation's pages (setup.md, connecting GitHub; `../client/forge.md`) |
 | `log_origins` | list of strings, or `null` | each an origin: `"https://<host>[:<port>]"`, TLS with `transport`'s trust (the machine's roots when it names none), or `"http://<host>[:<port>]"` to a loopback host alone, as skein's fake serves its logs; no path, user, query, fragment or final `/`; the port 443 or 80 when absent. Each host is resolved at start, and one that does not resolve refuses the start, naming the forge and the host; at most `forges.log_origins` (section 7). `null` is the kind's default: GitHub's `["https://productionresultssa1.blob.core.windows.net"]`, Forgejo's none | the origins to which a job log's redirect is followed (forge.md, GitHub's API as temper uses it); `[]` fetches no job log |
+| `app_read_only` | boolean, or absent | on GitHub alone, refused on Forgejo naming its path; absent is `false` | `true`: the pasted App (setup.md, 17.3), its hook and its installations are another's, and the engine's setup host changes none of them (setup.md, 17.7): the paste check and reconcile leave the App's hook as they read it, and a stray installation is shown and never uninstalled; installing, accepting and the forge component's reads and mints are unchanged |
 
 - **A forge's number is its stable id,** never its place in the list:
   its records in jig's secrets' store and its repositories in the main
@@ -242,7 +243,8 @@ which bounds its writers. Each:
   whose old number's rows are left (credentials.md, 2.1).
 - **A GitHub forge's addresses** (`api`, `transport`, `git`, `web`) are
   `null` in a deployment: a value is given only to point at a fake, as
-  temper's tests do (`../domain/testing.md`). A Forgejo forge gives
+  temper's tests do, or at the live tier's relay to github.com
+  (`../domain/testing.md`, 2.7). A Forgejo forge gives
   `api`, `transport` and `git`.
 - **No credential is configured:** a forge's API token, git token,
   webhooks' secret, App's key and user are records, kept from the

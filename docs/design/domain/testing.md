@@ -1270,10 +1270,11 @@ section 8; testing-strategy.md, 2.9).
   `~/.codex`), no record or key is in a file the configuration names,
   and the script copies no credential; an account added for a run is in
   its deployment's store, removed with its scratch directory.
-- **No GitHub:** its forge is the owned Forgejo alone. The tier never
-  calls github.com; live calls to GitHub are only skein's opt-in
-  conformance (skein's `fake-forge.md`, section 11), run by hand
-  (section 2).
+- **GitHub, by its own test:** the stories above have the owned
+  Forgejo alone and never call github.com. github.com is reached only
+  by the GitHub story below and by skein's opt-in conformance (skein's
+  `fake-forge.md`, section 11), each run by hand by the developer who
+  holds the probe App's fixtures (section 2), never by an implementer.
 - **The stories:** the process tier's chat, answered by the real model; and
   one small change, made by the model in a repository of the owned Forgejo,
   adopted as in 2.6, and pushed by real git. The story ends once the
@@ -1301,8 +1302,87 @@ section 8; testing-strategy.md, 2.9).
   fails when the transcripts count more than 25. Each run's summary, a
   failed run's included, records its completions and its wall time, which a
   plan totals (skein's `development.md`, 5.5).
+- **A chat's change lands on github.com, through a restart,** a test
+  of its own, `crates/temper/tests/live_github.rs`, run by
+  `scripts/proof-live-github.sh OWNER`, `OWNER` `freeekanayaka` or
+  `fabrig-ai`, one repository a run: the process tier's story of 2.6
+  ("a chat's change on connected GitHub, through a restart") on the
+  real service, on the probe App of skein's conformance fixtures and
+  its installation on `OWNER/temper-probe`, whose `ci` workflow is a
+  real Actions run of about 45 s.
+  - **What runs:** the engine alone and one worker, as in 2.6, the fake
+    LLM (the model is not what it tests), the machine's git, and the
+    test's relay. The forge is `kind: "github"` with `app_read_only`
+    (../protocol/configuration.md, section 3), its `api` and `git` the relay's two
+    loopback listeners, `web` null, and the forge component's and the
+    resources' polling their defaults but `log_poll`, 15 s.
+  - **The relay,** the test's, between temper and github.com: plaintext
+    HTTP/1.1 from the engine and the worker's git on loopback, verified
+    TLS to `api.github.com` and `github.com` by skein's TLS client on the
+    machine's roots, as skein's conformance reaches GitHub, the
+    Host rewritten, every request and answer framed and passed whole.
+    It counts each HTTP request, the test's own included, across both
+    lives, taking the slot before it forwards: past 380 it answers
+    `429` and the test fails naming the cap; the last 20 are the
+    teardown's, 400 in all. It forwards only the App's routes
+    (`GET /app`, its hook's config, its delivery log, its installations,
+    a mint for the run's installation alone), `POST /graphql`,
+    `DELETE /installation/token`, the probe repository's API paths but
+    a `PATCH` or `DELETE` of the repository itself, and git's three
+    smart-HTTP paths of that repository; any other request is answered
+    `403` and fails the test, naming it. Its journal holds each
+    request's method, path and status, never a header or a body.
+  - **The story:** the person signs in and adds the fake LLM's key;
+    `forge-connect 1 github-app ID FILE` with the fixtures' App and key
+    file, and `wait forges --until connected:1`; `forge-install 1`
+    issues a state, and the test brings it to the engine's setup route
+    with the installation's id, as GitHub's redirect would
+    (`/forges/1/github/setup?installation_id=I&setup_action=install&state=S`),
+    which accepts it; `adopt` of `OWNER/temper-probe` with the prefix
+    `temper/live-<run>/`, `<run>` unique to the run; a chat asks for a
+    change whose coder writes one new file, `probe/<run>.md`, and
+    finishes; the story waits until the change task has ended landed
+    and the chat has replied and closed; then the worker and the engine
+    are restarted as in 2.6.
+  - **Its Musts,** after the restart: the change task ended landed, its
+    result the same pull request and merge commit as in the first life,
+    and no task made after it; GitHub agrees, read in the person's
+    role: the pull merged, its merge commit temper's and its head the
+    change's head, and main's tree holds `probe/<run>.md` with the
+    run's bytes; the head's `ci` check run, of `github-actions`,
+    completed with success before the pull's `merged_at`; the relay saw
+    one pull opened and one merge, and refused nothing; the forge
+    reconnects as the App's `SLUG[bot]` and id, the installation
+    accepted; and no process's output, ctl's or the test's, nor any
+    file under the processes' directories but jig's secrets store,
+    holds the App's key (PEM, DER, DER as base64), a token the relay
+    saw minted, or the person's token.
+  - **Its teardown,** whatever the story's end, through the relay: each
+    branch under the run's prefix deleted (temper deletes its own at a
+    task's release; one left is named), a pull of the run still open
+    closed, and each token the relay saw minted revoked. The landed
+    file stays on main, one a run. When the teardown did not finish,
+    the script does the same with the person's token, within what is
+    left of the 400.
+  - **Credentials:** the fixtures' directory is the script's argument
+    or its default; the App's key file goes to `forge-connect` by path,
+    and the person's token is read by the test and the script into
+    memory alone, never printed, copied or written.
+  - **Its budget:** at most 400 requests to github.com and 20 minutes
+    a run; the summary records the requests, the wall time and the
+    run's id.
+  - **What it does not cover,** for the relay's sake: the engine's own
+    TLS to github.com (temper speaks plaintext to the relay; skein's
+    TLS client is live in skein's conformance), and authorities and
+    landing rules on github.com's host, since the repository's
+    resources are named by the relay's git host (../protocol/channel.md, section
+    4). The model is the fake LLM's, the browser's visits to GitHub
+    (making the App, installing it) are the fixtures', made once by
+    hand, and a failing or stalled check is the process tier's on
+    fakes.
 - **Outside the suites:** nextest profile `live`, run only by
-  `scripts/proof-live.sh`, one at a time, never at the gate.
+  `scripts/proof-live.sh` and `scripts/proof-live-github.sh`, one at a
+  time, never at the gate.
 
 ## 3. Neighbours and their faces
 
