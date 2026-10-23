@@ -636,29 +636,16 @@ to the page, and the page come back, a new client, drawing the end.
   (`tests/client`); the path's check, the engine's; the `303`, its
   absence and a return for no sign-in, skein's listener tier.
 
-**`ConnectForge`'s App of your own, the pasted key.** What only a
-browser shows: a PEM pasted into the page's key field reaching temper
-whole, its line feeds kept, which a browser's one-line field would
-strip, and the field emptied in the page once it is sent (`forge.md`,
-5.4).
-- **Against:** `temper serve` with a second forge, GitHub, its API at
-  the tier's unreached address and no records, beside the tier's
-  Forgejo; the key, the fake GitHub layer's first fixed key
-  (`testing/temper-github-app`), never a real one.
-- **The story:** a person on `ConnectForge`'s GitHub Details enters an
-  App id and pastes the key, several lines, and presses "Connect the
-  App"; the key's field reads empty; the run stops past the key's
-  parse, at its first call to the unreached API, and the page shows
-  "The last connect stopped: WHY", WHY the setup host's stop at the
-  App's read (its step `id`), never at the key's (`key`, its form), so
-  that the key arrived with its lines.
-- **Not here:** the page's refusals, the row's installations and the
-  install's link are the client's domain and view tests and the client
-  world's (`tests/client`); the connect's run, the process tier's
-  GitHub story (`../domain/testing.md`, 2.6).
-- **Its cost:** one test past the guide's twelve (4.3), measured
-  through the gate's profile; the guide's count goes to the user with
-  it, as no other story here proves a pasted value's lines.
+**`ConnectForge`'s App of your own, the pasted key,** has no story
+here: what a browser alone would show, a PEM's line feeds reaching
+temper from the key's field, is a text area's, and the composer's
+story (4.1, 3) shows a text area's line feed reaching temper. The key's
+field is that text area with a secret entry kind, which skein's page
+maps to a `type` attribute alone, never read from a text area
+(skein's `ui-web.md`), so its value takes the composer's path. The
+view's tests hold that the field is a text area of the secret kind;
+the client domain's, that its text is sent whole as the `Pasted` item,
+one final line feed off, and emptied (`forge.md`, 5.4).
 
 ### 4.3 Its budget and the gate
 

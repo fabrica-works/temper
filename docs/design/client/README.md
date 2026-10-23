@@ -3175,14 +3175,15 @@ does for the client:
   refuses any other party's, before a forge is called or a run starts,
   as the outcome refused (role).
 - **The root runs it** (`../domain/root.md`; `../protocol/forge.md`,
-  the setup's host): it keeps a connect's or a replacement's number and
+  the setup's host): it keeps, in memory, a connect's or a replacement's number and
   digest in the connect's own record, refuses it or asks the routing to
   run its plan, and answers. A connect's end, connected or why not, is
   the forges' page's to read (`forge.md`, 5.4), never the answer's: a
   run's failure, "the pasted value changed", a GitHub App lacking
   permissions or events, each named (the setup's host's `Lacking`;
-  `forge.md`, 5.5), and after a restart "interrupted; paste again" are
-  said there. The outcomes:
+  `forge.md`, 5.5), are said there; a connect a restart cut is said
+  nowhere until a connect is kept (`../protocol/credentials.md`, 2.2 and
+  section 8). The outcomes:
   - *connecting:* the run started; a `Manifest` or an `Install` that
     stops, other than busy, answers it too, and its failure is said on
     the forge's row as the last connect's end, never in the answer;

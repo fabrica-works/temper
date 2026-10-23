@@ -2781,6 +2781,10 @@ listener's (`../client/forge.md`, the browser's steps).
   reconcile checks them. It writes `AppId`, `AppSlug`, `AppKey` and
   `User`, the records the manifest flow writes, and ends done, or
   `Lacking` with each permission or event named, never refused for it.
+- **A restart during the paste check** drops its run: the carried key
+  is erased at start, and the forge reads as its records say
+  (`credentials.md`, 2.2; a stored connect, which would say
+  "interrupted; paste again", is an open question there).
 - **Installing** is 17.4's.
 - **Replace,** a new key: the paste check with the kept id, so a key of
   another App stops it `OtherApp` and the forge stays as it was.

@@ -251,8 +251,10 @@ setup.md's (section 9). What is open is listed in section 8.
   writes.
 - **A restart** drops runs, whose states are in memory: the core decides
   the erase of each carried row under temper's tag found at start
-  (loaded from 2^63), and a connect the
-  root holds as running ends "interrupted; paste again".
+  (loaded from 2^63), and the forge of a connect that was running reads
+  as its records say: not connected when its paste wrote nothing, and
+  nothing tells the person the connect was cut. Saying "interrupted;
+  paste again" waits for a stored connect (section 8).
 
 ## 3. LLM accounts
 
@@ -647,6 +649,13 @@ sources in its holder's order. temper configures the LLM providers
   Default: the login; keeping the owner's id at adoption (the store's
   `Adopted`, from the forge's read) would let the routing match the
   entry's `account` directly.
+- **A connect cut by a restart.** Default: nothing kept; the carried
+  row is erased at start and the forge reads as its records say, so a
+  person whose connect a restart cut sees the forge not connected, with
+  no line, and pastes again. Saying "interrupted; paste again" would
+  take the connect's own record (its forge, number and digest) in the
+  small store, a stored format (the store's version), read at start
+  and erased once said; a carried row alone names no forge.
 - **Rows of a forge not configured.** Default: left as they are and
   named once in the log at start; erasing them waits for a request that
   disconnects a forge.
