@@ -794,6 +794,14 @@ fn assert_forgejo_setup(
         for step in ["forgejo 3: ", "runner 3: "] {
             assert!(stderr.lines().any(|line| line.starts_with(step)), "group step {step}: {stderr}");
         }
+        // The box harness has no mid-story stderr gate. CreateFile's main push
+        // precedes the pull whose Passed check assert_task reads (setup.md, 13.4).
+        let tasks: std::collections::BTreeSet<u64> = stderr
+            .lines()
+            .filter(|line| line.starts_with("runner 3: "))
+            .filter_map(|line| line.split_once("msg=\"task ")?.1.split_once(" repo is work/hello ")?.0.parse().ok())
+            .collect();
+        assert!(tasks.len() >= 2, "the runner took main's push and the pull on work/hello: {stderr}");
     } else {
         assert!(
             !stderr.lines().any(|line| line.starts_with("fetch ") || line.contains("download")),
