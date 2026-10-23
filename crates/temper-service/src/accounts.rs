@@ -224,7 +224,7 @@ impl Accounts {
             closed: false,
         })
     }
-    fn down(&mut self, request: driver::Request) {
+    pub(crate) fn down(&mut self, request: driver::Request) {
         if let Some(component) = &mut self.component {
             component.down(&self.env, request, &mut self.above, &mut self.io, &mut self.files);
         }

@@ -8,6 +8,9 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+loopback-navigation = ["skein-ui-web/loopback-navigation"]
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 jig-client.workspace = true
 jig-client-protocol-http.workspace = true

@@ -118,6 +118,10 @@ impl Clients {
         self.demo_ready.push(event);
     }
 
+    /// The live bound socket survives consumption of the listening notification.
+    pub(crate) fn bound_address(&self) -> Option<::core::net::SocketAddr> {
+        self.server.listening()
+    }
     pub fn new(
         config: &config::Engine,
         listener: &config::Address,
