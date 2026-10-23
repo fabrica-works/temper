@@ -419,6 +419,7 @@ impl Service {
                             pipe::step(asked.forge, asked.stage)
                         }
                         Said::Started { forge } => pipe::started(forge),
+                        Said::Stopped { forge } => pipe::stopped(forge),
                         Said::Failed { forge, why } => {
                             let why = match why {
                                 Why::Busy => skein_lib::bytes::copy_of(b"busy"),
@@ -623,6 +624,7 @@ impl Service {
         match line {
             Line::Whole(line) => match pipe::command(&line) {
                 Command::Start(forge) => self.input(Input::Ask { forge }),
+                Command::Stop(forge) => self.input(Input::Stop { forge }),
                 Command::Unknown => {
                     self.sinks
                         .get_mut(1)

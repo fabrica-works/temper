@@ -6,6 +6,7 @@ use skein_lib::{Queue, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools, reason = "independent session lifecycle facts (client/README.md, 4.8)")]
 pub(super) struct State {
     pub answer: Option<Demo>,
     pub pending: Option<Handle>,
@@ -14,6 +15,9 @@ pub(super) struct State {
     pub start: Option<Starting>,
     pub failure: Option<StartFailure>,
     pub sent: bool,
+    pub removed: bool,
+    pub model_ended: bool,
+    pub forge_ended: bool,
 }
 #[derive(Debug)]
 pub(super) struct Starting {
@@ -22,7 +26,18 @@ pub(super) struct Starting {
 }
 impl State {
     pub const fn new() -> Self {
-        Self { answer: None, pending: None, live: false, answered: false, start: None, failure: None, sent: false }
+        Self {
+            answer: None,
+            pending: None,
+            live: false,
+            answered: false,
+            start: None,
+            failure: None,
+            sent: false,
+            removed: false,
+            model_ended: false,
+            forge_ended: false,
+        }
     }
 }
 /// A link tell remains available to the other children; every forge read page is consumed.
@@ -129,6 +144,13 @@ pub fn halves(answer: Option<&Demo>, accounts: Option<&c::OwnerAccounts>, forges
     halves
 }
 
+pub(crate) fn current(side: &Side, accounts: Option<&c::OwnerAccounts>) -> Halves {
+    let mut halves = halves(side.demo.answer.as_ref(), accounts, &side.forges);
+    halves.model &= !side.demo.model_ended;
+    halves.forge &= !side.demo.forge_ended;
+    halves
+}
+
 /// A usable source of a provider other than the demo's, or any provider without a demo.
 #[must_use]
 pub fn usable_account(line: &c::OwnerAccountLine, demo_provider: Option<u32>) -> bool {
@@ -141,6 +163,65 @@ pub fn usable_account(line: &c::OwnerAccountLine, demo_provider: Option<u32>) ->
         }
     }
     false
+}
+
+/// Observe positive evidence of an end; unavailable or cut documents are not ends.
+/// Session latches keep a lost credential from bringing the model half back.
+pub(crate) fn progress(side: &mut Side, accounts: Option<&c::OwnerAccounts>, out: &mut Queue<Request>) {
+    let Some(demo) = side.demo.answer.as_ref() else { return };
+    if demo.state != DemoState::Running {
+        return;
+    }
+    let mut model_ended = false;
+    if let Some(accounts) = accounts {
+        for line in &accounts.accounts {
+            model_ended |= usable_account(line, Some(demo.provider));
+        }
+    }
+    let mut forge_ended = false;
+    if let super::forges::State::Rows(rows) = &side.forges {
+        for row in rows {
+            if row.number != demo.forge
+                && let super::forges::Connection::Connected { .. } = row.connection
+            {
+                forge_ended = true;
+                break;
+            }
+        }
+    }
+    let reread = forge_ended && !side.demo.forge_ended;
+    let changed = (model_ended && !side.demo.model_ended) || reread;
+    side.demo.model_ended |= model_ended;
+    side.demo.forge_ended |= forge_ended;
+    if !side.demo.removed
+        && (side.demo.model_ended || side.demo.forge_ended)
+        && let Some(accounts) = accounts
+    {
+        for line in &accounts.accounts {
+            if line.provider == Some(demo.provider) && line.holder == c::OwnerAccountHolder::Deployment {
+                side.serial = side.serial.checked_add(1).expect("forge request serial fits");
+                side.demo.removed = true;
+                // No pending page operation owns this key: every outcome is dropped.
+                out.push(Request::Client {
+                    asked: jig_client::Event::Send {
+                        key: jig_client::Key { asker: crate::owner::Owner::Forge.asker(), number: side.serial },
+                        name: None,
+                        request: jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
+                            holder: c::AccountHolder::Deployment,
+                            change: c::AccountChange::Remove { account: line.number },
+                        })),
+                    },
+                });
+                break;
+            }
+        }
+    }
+    if reread {
+        read(side, out);
+    }
+    if changed {
+        side.changed();
+    }
 }
 
 fn read(side: &mut Side, out: &mut Queue<Request>) {

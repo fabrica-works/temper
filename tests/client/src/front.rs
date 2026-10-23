@@ -24,6 +24,9 @@ pub struct Joint {
     set_ups: Vec<(u16, Token)>,
     pub demo: Option<temper_client_protocol_wire::v1::DemoAnswer>,
     pub demo_starts: Vec<skein_lib::RequestKey>,
+    pub demo_removals: Vec<skein_lib::RequestKey>,
+    pub demo_reads: usize,
+    demo_accounts: Option<(ClientId, Token, Box<jig_client::contract::OwnerAccounts>)>,
     pub demo_outcomes: VecDeque<temper_client_protocol_wire::v1::Outcome>,
     pub answer_runs: bool,
     pub reply_runs: bool,
@@ -551,6 +554,9 @@ impl Joint {
             set_ups: Vec::new(),
             demo: None,
             demo_starts: Vec::new(),
+            demo_removals: Vec::new(),
+            demo_reads: 0,
+            demo_accounts: None,
             demo_outcomes: VecDeque::new(),
             answer_runs: false,
             reply_runs: false,
@@ -725,6 +731,20 @@ impl Joint {
             ));
             return;
         }
+        if let Request::Client {
+            request:
+                jig_client::Request::Down { down: jig_client::Down::Send { key, request: jig_client::Ask::Jig(ask), .. } },
+        } = &request
+            && matches!(
+                ask.as_ref(),
+                jig_client::contract::Ask::AccountChange {
+                    holder: jig_client::contract::AccountHolder::Deployment,
+                    change: jig_client::contract::AccountChange::Remove { .. },
+                }
+            )
+        {
+            self.demo_removals.push(*key);
+        }
         if self.start_demo(who, &request) {
             return;
         }
@@ -736,6 +756,7 @@ impl Joint {
         } = &request
         {
             // This front supplies the demo read independently of the engine.
+            self.demo_reads += 1;
             self.callbacks.push((
                 who,
                 RootEvent::Client {
@@ -762,7 +783,143 @@ impl Joint {
             self.send(event);
         }
     }
+    fn demo_account_facts(&mut self, client: ClientId, event: &mut RootEvent) {
+        use jig_client::contract as c;
+        // The pinned jig Accounts document contains party accounts alone. Join the
+        // scripted demo's deployment account here until that upstream join lands.
+        if let RootEvent::Client {
+            event:
+                jig_client::Event::Up {
+                    up:
+                        jig_client::Up::Watched {
+                            watch,
+                            event: c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(accounts)),
+                        },
+                },
+        } = event
+        {
+            if let Some(demo) = &self.demo
+                && self.demo_removals.is_empty()
+            {
+                let mut sources = skein_lib::List::with_capacity(1);
+                sources
+                    .push(c::OwnerAccountSource {
+                        number: 1,
+                        place: 0,
+                        name: None,
+                        kind: c::OwnerAccountKind::Key,
+                        state: c::OwnerAccountState::Granted,
+                        usable: true,
+                        expiring: false,
+                        attention: false,
+                        spent_until: None,
+                    })
+                    .expect("scripted model source");
+                let mut rows = skein_lib::List::with_capacity(accounts.accounts.len() + 1);
+                rows.push(c::OwnerAccountLine {
+                    number: 0,
+                    place: 0,
+                    provider: Some(demo.provider()),
+                    provider_name: None,
+                    display: c::DocumentText::complete(
+                        c::Text::new(b"Scripted".as_slice().into(), 32).expect("scripted name"),
+                    ),
+                    manage_usage: None,
+                    holder: c::OwnerAccountHolder::Deployment,
+                    uses: None,
+                    plan: false,
+                    sources,
+                    cut: false,
+                })
+                .expect("scripted model account");
+                for line in &accounts.accounts {
+                    rows.push(line.clone()).expect("party accounts");
+                }
+                accounts.accounts = rows;
+            }
+            if self.demo.is_some() || self.demo_accounts.is_some() {
+                self.demo_accounts = Some((client, *watch, accounts.clone()));
+            }
+        }
+        if let RootEvent::Client {
+            event:
+                jig_client::Event::Up {
+                    up:
+                        jig_client::Up::Answer {
+                            answer:
+                                Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                                    c::OwnerOutcome::AccountRemoved { .. },
+                                )))),
+                            ..
+                        },
+                },
+        } = event
+            && !self.demo_removals.is_empty()
+            && let Some((who, watch, mut accounts)) = self.demo_accounts.take()
+        {
+            let mut rows = skein_lib::List::with_capacity(accounts.accounts.len());
+            for line in &accounts.accounts {
+                if line.holder != c::OwnerAccountHolder::Deployment || line.number != 0 {
+                    rows.push(line.clone()).expect("remaining party accounts");
+                }
+            }
+            accounts.accounts = rows;
+            self.callbacks.push((
+                who,
+                RootEvent::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Watched {
+                            watch,
+                            event: c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(accounts)),
+                        },
+                    },
+                }
+                .into(),
+            ));
+        }
+    }
+    fn demo_forges(&self, event: &mut RootEvent) {
+        use temper_client_protocol_wire::{self as wire, v1 as w};
+        let Some(demo) = &self.demo else { return };
+        let RootEvent::Client { event: jig_client::Event::Up { up: jig_client::Up::FamilyDelivered { record, .. } } } =
+            event
+        else {
+            return;
+        };
+        let Some(rows) = wire::decode_forges(&record.bytes, &w::CEILINGS) else { return };
+        let mut forges = skein_lib::List::with_capacity(wire::FORGES);
+        for row in rows.into_parts().forges.into_boxed() {
+            forges.push(row).expect("scripted deployment row");
+        }
+        let connection = if *demo.state() == w::DemoState::Running {
+            w::Connection::Connected(
+                w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 2, login: b"playground".as_slice().into() })
+                    .expect("fake connection"),
+            )
+        } else {
+            w::Connection::NotConnected
+        };
+        forges
+            .push(
+                w::ForgeRow::new(
+                    &w::CEILINGS,
+                    w::ForgeRowParts {
+                        first: None,
+                        number: demo.forge(),
+                        kind: w::Kind::Forgejo,
+                        mode: w::Mode::Fake,
+                        connection,
+                        offer: w::Offer::NotOffered,
+                    },
+                )
+                .expect("scripted demo forge"),
+            )
+            .expect("demo row fits");
+        record.bytes = wire::forges(&w::Forges::new(&w::CEILINGS, w::ForgesParts { forges }).expect("scripted forges"));
+    }
     fn callback(&mut self, client: ClientId, mut event: RootEvent) {
+        self.demo_forges(&mut event);
+        self.demo_account_facts(client, &mut event);
         if let RootEvent::Client {
             event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope, answer, why } },
         } = &mut event

@@ -328,7 +328,7 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
         &[
             (I(Exited { step: 1, exit: Exit::Code(7) }), &[Close { step: 1 }]),
             (I(Ask { forge: 4 }), &[failed(4, Why::Busy)]),
-            (I(Ask { forge: 3 }), &[]),
+            (I(Ask { forge: 3 }), &[failed(3, Why::Busy)]),
             (I(Closed { step: 1 }), &[failed(3, Why::Exited { step: 1, exit: Exit::Code(7) })]),
             (I(Ask { forge: 3 }), &[Spawn { step: 1 }, progress(1)]),
         ],
@@ -922,4 +922,164 @@ fn an_unrecorded_group_runs_only_when_asked_even_with_a_stale_record() {
         assert_eq!(out.pop(), Some(Order::Say { said: Said::Started { forge: 1 } }));
         assert!(out.is_empty());
     }
+}
+
+// A running serve outside the asked group makes an accidental whole-box stop visible.
+fn stoppable_group(recorded: bool) -> Rig {
+    use crate::layout;
+    use temper_forge_setup::{Group, Stage, Steps};
+    let limits = limits::small();
+    let machine = crate::machine::Machine::new(
+        &limits,
+        &layout::flatten(Steps {
+            always: Box::new([super::fixtures::step(b"serve", Kind::Long)]),
+            asked: Box::new([Group {
+                forge: 1,
+                recorded,
+                before: 0,
+                steps: Box::new([
+                    (Stage::Run, super::fixtures::step(b"fake llm", Kind::Long)),
+                    (Stage::Prepare, super::fixtures::step(b"prepare", Kind::Once)),
+                    (Stage::Run, super::fixtures::step(b"fake forge", Kind::Long)),
+                ]),
+            }]),
+        }),
+    )
+    .unwrap();
+    let out = skein_lib::Queue::with_capacity(machine.max_out());
+    let mut rig = Rig { machine, out, now: skein_lib::Time::ZERO };
+    rig.machine.start(rig.now, &[], &mut rig.out);
+    assert_eq!(&*rig.orders(), &[Order::Spawn { step: 3 }]);
+    rig.started(3);
+    rig
+}
+fn start_stoppable(rig: &mut Rig, recorded: bool) {
+    use crate::machine::Said;
+    rig.input(Input::Ask { forge: 1 });
+    for step in 0..3 {
+        assert_eq!(&*rig.orders(), &[Order::Spawn { step }, Order::Say { said: Said::Step { step } }]);
+        rig.started(step);
+        if step == 1 {
+            rig.exited(step, Exit::Code(0));
+            assert_eq!(&*rig.orders(), &[Order::Close { step }]);
+            rig.closed(step);
+        }
+    }
+    if recorded {
+        assert_eq!(&*rig.orders(), &[Order::Record { forge: 1 }]);
+        rig.input(Input::Written { forge: 1 });
+    }
+    assert_eq!(&*rig.orders(), &[Order::Say { said: Said::Started { forge: 1 } }]);
+}
+#[test]
+fn a_group_stop_signals_in_reverse_and_answers_only_after_all_closes_then_can_start_again() {
+    use crate::machine::Said;
+    for recorded in [false, true] {
+        let mut rig = stoppable_group(recorded);
+        start_stoppable(&mut rig, recorded);
+        rig.input(Input::Stop { forge: 1 });
+        for step in [2, 0] {
+            assert_eq!(&*rig.orders(), &[Order::Signal { step }]);
+            rig.advance(limits::small().grace);
+            assert_eq!(&*rig.orders(), &[Order::Signal { step }]);
+            rig.advance(limits::small().grace);
+            assert_eq!(&*rig.orders(), &[Order::Close { step }]);
+            rig.closed(step);
+        }
+        assert_eq!(&*rig.orders(), &[Order::Say { said: Said::Stopped { forge: 1 } }]);
+        assert_eq!(rig.machine.outcome(), None, "serve keeps running");
+        rig.advance(Duration::from_secs(100));
+        assert!(rig.orders().is_empty(), "nothing restarts");
+        start_stoppable(&mut rig, recorded);
+    }
+}
+#[test]
+fn group_stop_refusals_cover_dormant_starting_failing_closing_unknown_and_box_stopping() {
+    use crate::machine::{Said, Why};
+    fn failed(rig: &mut Rig, input: Input, forge: u16, why: Why) {
+        rig.input(input);
+        assert_eq!(&*rig.orders(), &[Order::Say { said: Said::Failed { forge, why } }]);
+    }
+    let mut rig = stoppable_group(false);
+    rig.input(Input::Stop { forge: 1 });
+    assert_eq!(&*rig.orders(), &[Order::Say { said: Said::Stopped { forge: 1 } }]);
+    failed(&mut rig, Input::Stop { forge: 99 }, 99, Why::NotAsked);
+    rig.input(Input::Ask { forge: 1 });
+    rig.orders();
+    failed(&mut rig, Input::Stop { forge: 1 }, 1, Why::Busy);
+    rig.started(0);
+    rig.orders();
+    rig.input(Input::NotStarted { step: 1 });
+    assert_eq!(&*rig.orders(), &[Order::Close { step: 0 }]);
+    failed(&mut rig, Input::Stop { forge: 1 }, 1, Why::Busy);
+    failed(&mut rig, Input::Ask { forge: 1 }, 1, Why::Busy);
+    rig.closed(0);
+    rig.orders();
+    start_stoppable(&mut rig, false);
+    rig.input(Input::Stop { forge: 1 });
+    assert_eq!(&*rig.orders(), &[Order::Signal { step: 2 }]);
+    for forge in [1, 99] {
+        failed(&mut rig, Input::Ask { forge }, forge, Why::Busy);
+        failed(&mut rig, Input::Stop { forge }, forge, Why::Busy);
+    }
+    rig.terminate();
+    rig.orders();
+    for forge in [1, 99] {
+        failed(&mut rig, Input::Ask { forge }, forge, Why::Stopping);
+        failed(&mut rig, Input::Stop { forge }, forge, Why::Stopping);
+    }
+}
+#[test]
+fn a_group_stop_disarms_backoff_and_closes_a_live_or_starting_restart_preparation() {
+    use crate::machine::Said;
+    for preparation in ["backoff", "starting", "live", "not started"] {
+        let mut rig = stoppable_group(false);
+        start_stoppable(&mut rig, false);
+        rig.failed_long(2);
+        if preparation != "backoff" {
+            rig.advance(limits::small().backoff);
+            assert_eq!(&*rig.orders(), &[Order::Spawn { step: 1 }]);
+            if preparation == "live" {
+                rig.started(1);
+            }
+        }
+        rig.input(Input::Stop { forge: 1 });
+        if preparation == "starting" {
+            assert!(rig.orders().is_empty());
+            rig.started(1);
+        } else if preparation == "not started" {
+            assert!(rig.orders().is_empty());
+            rig.input(Input::NotStarted { step: 1 });
+        }
+        if preparation == "starting" || preparation == "live" {
+            assert_eq!(&*rig.orders(), &[Order::Signal { step: 1 }]);
+            rig.exited(1, Exit::Code(1));
+            assert_eq!(&*rig.orders(), &[Order::Close { step: 1 }]);
+            rig.closed(1);
+        }
+        assert_eq!(&*rig.orders(), &[Order::Signal { step: 0 }]);
+        rig.exited(0, Exit::Code(1));
+        assert_eq!(&*rig.orders(), &[Order::Close { step: 0 }]);
+        rig.closed(0);
+        assert_eq!(&*rig.orders(), &[Order::Say { said: Said::Stopped { forge: 1 } }]);
+        rig.advance(Duration::from_secs(100));
+        assert!(rig.orders().is_empty(), "{preparation}: no restart or continuation");
+    }
+}
+#[test]
+fn box_termination_during_a_group_stop_closes_everything_without_a_stopped_reply() {
+    let mut rig = stoppable_group(false);
+    start_stoppable(&mut rig, false);
+    rig.input(Input::Stop { forge: 1 });
+    assert_eq!(&*rig.orders(), &[Order::Signal { step: 2 }]);
+    rig.terminate();
+    assert_eq!(&*rig.orders(), &[Order::Signal { step: 3 }]);
+    rig.terminate();
+    assert_eq!(&*rig.orders(), &[Order::Close { step: 0 }, Order::Close { step: 2 }, Order::Close { step: 3 }]);
+    for step in [0, 2, 3] {
+        rig.closed(step);
+    }
+    assert!(rig.orders().is_empty());
+    assert!(rig.machine.is_idle());
+    assert_eq!(rig.machine.outcome(), Some(Outcome::Stopped));
 }
