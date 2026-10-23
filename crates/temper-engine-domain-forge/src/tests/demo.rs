@@ -1,5 +1,139 @@
 use super::*;
 
+#[test]
+fn only_the_durable_demo_end_retires_restart_observations() {
+    let mut failures = skein_lib::List::with_capacity(6);
+    for (case, end_before, restored_ended, end_during, live) in [
+        ("end during fresh", false, false, true, false),
+        ("end before fresh", true, false, false, false),
+        ("already ended at restore", false, true, false, false),
+        ("another live forge owes a read", false, false, true, true),
+        ("ordinary disconnection", false, false, false, false),
+    ] {
+        let mut d = restart_observations(restored_ended, live);
+        if end_before {
+            connected(&mut d, 2);
+        }
+        let mut done = fresh_done(&outputs(&mut d, Event::ReadAfresh));
+        if end_during {
+            assert!(!d.goal_file_reads.is_empty(), "file read owed before the end");
+            done |= fresh_done(&connected(&mut d, 2));
+            assert!(d.goal_file_reads.is_empty(), "the end retires file reads");
+            assert_eq!(done, !live, "only the live forge can still hold the fresh pass");
+        }
+        for _ in 0_u32..20 {
+            for request in ready(&mut d) {
+                if let Request::Call { call, .. } = request {
+                    done |= fresh_done(&fixtures::answer(&mut d, call, Err(skein_forge::api::Error::NotConnected)));
+                }
+            }
+            d.reclaim();
+        }
+        let ended = end_before || restored_ended || end_during;
+        let expected = ended && !live;
+        if done != expected {
+            failures.push((case, done, expected)).expect("one mismatch per case");
+        }
+        if ended && !live {
+            // Complete replacement sets must never revive historical watches.
+            outputs(&mut d, Event::Names { task: 8, resources: Box::new([run_branch(b"7")]) });
+            outputs(&mut d, Event::Unnamed { task: 8 });
+            let released =
+                outputs(&mut d, Event::Release { task: 7, root: 7, ending: ReleaseEnding::Cancelled, entry: 20 });
+            assert!(released.contains(&Request::Released { task: 7 }), "{case}: local release: {released:?}");
+            assert!(d.hold(&run_branch(b"7")).is_none(), "{case}: hold erased");
+            for request in ready(&mut d) {
+                if let Request::Call { repository, .. } = request {
+                    assert_ne!(repository.forge, 1, "{case}: retired watches stay retired");
+                }
+            }
+        }
+        if live {
+            assert!(!done, "the live forge still owes its observation");
+            connected(&mut d, 2);
+            for _ in 0_u32..20 {
+                for request in ready(&mut d) {
+                    if let Request::Call { call, repository, .. } = request {
+                        let result = if repository.forge == 2 {
+                            Err(skein_forge::api::Error::Missing)
+                        } else {
+                            Err(skein_forge::api::Error::NotConnected)
+                        };
+                        done |= fresh_done(&fixtures::answer(&mut d, call, result));
+                    }
+                }
+                d.reclaim();
+            }
+            if !done {
+                failures.push(("live forge answered", done, true)).expect("one live completion mismatch");
+            }
+        }
+    }
+    assert!(failures.is_empty(), "restart table: {failures:?}");
+}
+
+fn restart_observations(restored_ended: bool, live: bool) -> Domain {
+    let mut d = configured(true);
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(&mut d, Event::Names { task: 7, resources: Box::new([run_branch(b"7")]) });
+    outputs(
+        &mut d,
+        Event::Restore {
+            record: Stored::Demo(Demo {
+                forge: 1,
+                state: if restored_ended { DemoState::Ended } else { DemoState::Running },
+            }),
+        },
+    );
+    for forge in 1..=if live { 2 } else { 1 } {
+        let mut name = run_branch(b"7");
+        name.forge = forge;
+        outputs(
+            &mut d,
+            Event::Restore {
+                record: Stored::Hold(Hold {
+                    name,
+                    task: 7,
+                    writer: Some(Writer::Lost { task: 7, attempt: 1 }),
+                    drift: None,
+                }),
+            },
+        );
+    }
+    let mut change = fixtures::opening_row();
+    change.pull = Some(1);
+    outputs(&mut d, Event::Restore { record: Stored::Change(change) });
+    for topic in [
+        Topic::Ci { repository: REPO, head: fixtures::HEAD },
+        Topic::Landings { repository: REPO, branch: b"main".as_slice().into() },
+    ] {
+        outputs(
+            &mut d,
+            Event::Restore {
+                record: Stored::Subscription(Subscriber {
+                    task: 8,
+                    number: 1,
+                    topic,
+                    own_change: None,
+                    goal_tasks: Some(Box::new([fixtures::CHANGE])),
+                    paths: Box::new([]),
+                }),
+            },
+        );
+    }
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    d
+}
+
+fn fresh_done(sent: &[Request]) -> bool {
+    for request in sent {
+        if let Request::RestartDone { stage: RestartStage::ReadAfresh } = request {
+            return true;
+        }
+    }
+    false
+}
+
 fn configured(under_box: bool) -> Domain {
     let mut d = domain();
     d.under_box = under_box;
