@@ -197,6 +197,16 @@ mod tests {
         after.extend(deliver(&mut root, tree_watch, tree(&document)));
         (root, task_watch, tree_watch, after)
     }
+    // A signed-in client also watches the deployment's forges (client/forge.md); the
+    // change panel's watch is the family open whose record is a change watch.
+    fn change_open(request: &jig_client::Down) -> Option<Token> {
+        let jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { record, .. } } = request else {
+            return None;
+        };
+        let watching = wire::decode_watching(&record.bytes, &w::CEILINGS)?;
+        let w::Watch::Change(_) = watching.watch() else { return None };
+        Some(*watch)
+    }
     fn tree(document: &c::Task) -> c::Delivery {
         c::Delivery::OwnerTree(Box::new(c::OwnerTree {
             root: document.chip.clone(),
@@ -544,9 +554,10 @@ mod tests {
             if let jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { scope, record, .. } } =
                 request
             {
-                assert_eq!(*scope, c::Scope::Project(1), "watch is admitted in this task's project");
                 let watching = wire::decode_watching(&record.bytes, &w::CEILINGS).expect("watch record");
-                let w::Watch::Change(subject) = watching.watch() else { panic!("change watch") };
+                // The deployment's forges watch opens beside the panel's.
+                let w::Watch::Change(subject) = watching.watch() else { continue };
+                assert_eq!(*scope, c::Scope::Project(1), "watch is admitted in this task's project");
                 assert_eq!(subject.task(), TASK, "watch names the page's task");
                 assert_eq!(record.family, FORGE, "forge owns the watch");
                 panel_watch = Some(*watch);
@@ -586,13 +597,7 @@ mod tests {
     #[test]
     fn leaving_a_delivered_panel_releases_its_native_watch() {
         let (mut root, _, _, requests) = opened(document());
-        let watch = requests
-            .iter()
-            .find_map(|request| match request {
-                jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } } => Some(*watch),
-                _ => None,
-            })
-            .expect("panel watch");
+        let watch = requests.iter().find_map(change_open).expect("panel watch");
         let panel = w::ChangePanel::new(&w::CEILINGS, panel_parts(w::Step::Gating)).expect("panel");
         drop(up(
             &mut root,
@@ -623,13 +628,7 @@ mod tests {
     #[test]
     fn a_late_open_acknowledgement_closes_an_abandoned_panel_watch() {
         let (mut root, _, _, requests) = opened(document());
-        let watch = requests
-            .iter()
-            .find_map(|request| match request {
-                jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } } => Some(*watch),
-                _ => None,
-            })
-            .expect("panel watch");
+        let watch = requests.iter().find_map(change_open).expect("panel watch");
         drop(root_event(
             &mut root,
             Event::Went {

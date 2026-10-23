@@ -202,6 +202,16 @@ mod tests {
         }
         (root, task_watch, tree_watch, after)
     }
+    // A signed-in client also watches the deployment's forges (client/forge.md); the
+    // change panel's watch is the family open whose record is a change watch.
+    fn change_open(request: &jig_client::Down) -> Option<Token> {
+        let jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { record, .. } } = request else {
+            return None;
+        };
+        let watching = wire::decode_watching(&record.bytes, &w::CEILINGS)?;
+        let w::Watch::Change(_) = watching.watch() else { return None };
+        Some(*watch)
+    }
     fn tree(document: &c::Task) -> c::Delivery {
         c::Delivery::OwnerTree(Box::new(c::OwnerTree {
             root: document.chip.clone(),
@@ -275,13 +285,7 @@ mod tests {
 
     fn show(parts: w::ChangePanelParts) -> (Domain, Token) {
         let (mut root, _, _, requests) = opened(document());
-        let watch = requests
-            .iter()
-            .find_map(|request| match request {
-                jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } } => Some(*watch),
-                _ => None,
-            })
-            .expect("forge panel watch");
+        let watch = requests.iter().find_map(change_open).expect("forge panel watch");
         let panel = w::ChangePanel::new(&w::CEILINGS, parts).expect("valid panel");
         drop(up(
             &mut root,
@@ -921,13 +925,7 @@ mod tests {
             let mut task = document();
             task.goal = goal;
             let (mut root, _, _, requests) = opened(task);
-            let watch = requests
-                .iter()
-                .find_map(|request| match request {
-                    jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } } => Some(*watch),
-                    _ => None,
-                })
-                .expect("panel watch");
+            let watch = requests.iter().find_map(change_open).expect("panel watch");
             let panel = w::ChangePanel::new(&w::CEILINGS, panel_parts(w::Step::Opening)).expect("panel");
             drop(up(
                 &mut root,
@@ -1031,13 +1029,7 @@ mod tests {
         let mut task = document();
         end(&mut task);
         let (mut root, _, _, requests) = opened_with_tree(task, false);
-        let watch = requests
-            .iter()
-            .find_map(|request| match request {
-                jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } } => Some(*watch),
-                _ => None,
-            })
-            .expect("panel watch");
+        let watch = requests.iter().find_map(change_open).expect("panel watch");
         let panel = w::ChangePanel::new(&w::CEILINGS, panel_parts(landed())).expect("panel");
         drop(up(
             &mut root,

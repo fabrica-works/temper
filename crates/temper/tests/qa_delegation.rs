@@ -34,12 +34,15 @@ fn running_card_names_the_change_and_exposes_its_steps() {
     let link = terminal::link(&mut boxed, WITHIN);
     let opened = terminal::open(scratch.path(), &scratch.path().join("client"), link.as_ref());
     let mut person = terminal::Typist::new(opened, boxed, link);
-    person.wait_for(b"Chats", WITHIN);
+    // The first run offers the playground (client/README.md); its scripted
+    // model is then the chat's default.
+    person.wait_for(b"Try the playground", WITHIN);
+    person.type_on(b"Try the playground", b"");
+    person.wait_for("Using Scripted model · Default".as_bytes(), WITHIN);
     person.type_on(b"Chats", b"");
     person.wait_for(b"Start a chat: (empty) (enter sends)", WITHIN);
-    person.type_on(b"demo", b"");
+    // The chat box's Enter starts the chat (client/README.md).
     person.type_on(b"Start a chat: (empty) (enter sends)", b"Add CSV export to widget");
-    person.type_on(b"Start", b"");
     person.wait_for("T2 · CHANGE".as_bytes(), WITHIN);
     person.wait_for(b"Running", WITHIN);
     person.wait_for(b"Export widget's table as CSV", WITHIN);
@@ -74,12 +77,15 @@ fn result_anchor_preserves_the_landed_words_and_task_link() {
     let link = terminal::link(&mut boxed, WITHIN);
     let opened = terminal::open(scratch.path(), &scratch.path().join("client"), link.as_ref());
     let mut person = terminal::Typist::new(opened, boxed, link);
-    person.wait_for(b"Chats", WITHIN);
+    // The first run offers the playground (client/README.md); its scripted
+    // model is then the chat's default.
+    person.wait_for(b"Try the playground", WITHIN);
+    person.type_on(b"Try the playground", b"");
+    person.wait_for("Using Scripted model · Default".as_bytes(), WITHIN);
     person.type_on(b"Chats", b"");
     person.wait_for(b"Start a chat: (empty) (enter sends)", WITHIN);
-    person.type_on(b"demo", b"");
+    // The chat box's Enter starts the chat (client/README.md).
     person.type_on(b"Start a chat: (empty) (enter sends)", b"Add CSV export to widget");
-    person.type_on(b"Start", b"");
     person.wait_for("CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.".as_bytes(), WITHIN);
     // This contiguous block checks the title and the first seven characters
     // of the result's merge commit, and keeps the four stand-in steps in
@@ -114,12 +120,15 @@ fn original_delegate_call_uses_the_ended_task_document() {
     let link = terminal::link(&mut boxed, WITHIN);
     let opened = terminal::open(scratch.path(), &scratch.path().join("client"), link.as_ref());
     let mut person = terminal::Typist::new(opened, boxed, link);
-    person.wait_for(b"Chats", WITHIN);
+    // The first run offers the playground (client/README.md); its scripted
+    // model is then the chat's default.
+    person.wait_for(b"Try the playground", WITHIN);
+    person.type_on(b"Try the playground", b"");
+    person.wait_for("Using Scripted model · Default".as_bytes(), WITHIN);
     person.type_on(b"Chats", b"");
     person.wait_for(b"Start a chat: (empty) (enter sends)", WITHIN);
-    person.type_on(b"demo", b"");
+    // The chat box's Enter starts the chat (client/README.md).
     person.type_on(b"Start a chat: (empty) (enter sends)", b"Add CSV export to widget");
-    person.type_on(b"Start", b"");
     person.wait_for("CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.".as_bytes(), WITHIN);
     // The small conversation is whole (client/README.md, 5.4), its first turn
     // within the committed turn's own text budget: the original delegate call
