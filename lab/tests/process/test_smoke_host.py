@@ -2,7 +2,10 @@
 
 No temper binary, subject, experiment, network or model is used.
 """
+import argparse
+from contextlib import redirect_stdout
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -142,6 +145,26 @@ def worker(unit, root):
 
 
 class NativeCanaries(unittest.TestCase):
+    def test_actual_bootstrap_acknowledges_and_records_unit_completion(self):
+        try:
+            host.native.manager('/usr/bin/systemctl', ['show', '--property=Version', '--value'], 240)
+        except (OSError, subprocess.SubprocessError, host.native.CapabilityError):
+            self.skipTest('delegated systemd user manager unavailable')
+        with tempfile.TemporaryDirectory() as directory:
+            args = types.SimpleNamespace(host_file=SCRIPT, skein=Path('/home/free/src/rust/skein'),
+                lab=Path(directory) / 'lab', experiment=Path(directory), subject='native-canary', seed='1')
+            output = io.StringIO()
+            with redirect_stdout(output):
+                status = host.launch(args, host.native, host.store, host.host_digest(), host.cli._runner_digest())
+            self.assertEqual(status, 0)
+            self.assertEqual(output.getvalue(), 'native-bootstrap-canary pass\n')
+            result, = args.lab.glob('transport/*/result')
+            self.assertEqual(result.stat().st_mode & 0o777, 0o400)
+            self.assertIn('cleanup_confirmed=True', result.read_text())
+            stdout = result.with_name('stdout').read_bytes()
+            self.assertTrue(stdout.startswith(b'admitted\n'))
+            self.assertNotIn(synthetic_link().strip(), stdout)
+
     def test_containment_filter_private_pipe_reverse_stop_and_early_exit(self):
         try:
             host.native.manager('/usr/bin/systemctl', ['show', '--property=Version', '--value'], 240)
@@ -172,7 +195,21 @@ class NativeCanaries(unittest.TestCase):
                     pass
 
 
+def bootstrap_canary():
+    # Exercise the actual outer transport, with no subject or experiment.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--unit', required=True)
+    args, _unused = parser.parse_known_args()
+    native = host.native.Host(args.unit, '/usr/bin/systemctl',
+                              dict(command_seconds=240, ready_seconds=120, stop_seconds=20))
+    print('admitted', flush=True)
+    print(json.dumps(dict(run='native-bootstrap-canary', outcome='pass', cgroup=str(native.root))))
+    return 0
+
+
 if __name__ == '__main__':
+    if '--unit' in sys.argv:
+        sys.exit(bootstrap_canary())
     if len(sys.argv) == 4 and sys.argv[1] == '--worker':
         sys.exit(worker(sys.argv[2], sys.argv[3]))
     if len(sys.argv) == 2 and sys.argv[1] in ('--emit', '--consume', '--idle', '--early-exit', '--failure'):
