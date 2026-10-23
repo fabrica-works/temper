@@ -1050,8 +1050,8 @@ skein's (skein's `fake-llm.md`):
   written as the fake forge's is, created new at 0o600, a checkpoint
   first and at each pass that observed or lost, and one more at its
   stop, under the same write-failure rule, and each query the peer
-  observed is one JSON line, in order: `{"query": {"credential", "model",
-  "system", "messages"}}`, `credential` the index of the account's
+  observed is one JSON line, in order: `{"observation": "query",
+  "credential", "model", "system", "messages"}`, `credential` the index of the account's
   credential that the call presented, or null for none it holds, never
   a value; `model` and `system` the call's; `messages` its history, each
   `{"role", "parts"}`, `role` `user` or `assistant`, each part one of
@@ -1063,7 +1063,7 @@ skein's (skein's `fake-llm.md`):
   records for its life, with no drain, so the process holds them under
   the caps the real loop's hosted peer runs the whole case under,
   smith's, 256 records and 4 MiB: at the count's cap the stream ends
-  with a record-full checkpoint and the fake exits non-zero before a
+  with `{"observation": "records_full", "capacity"}` and the fake exits non-zero before a
   record is lost, as the GitHub layer's git records do (4.2), and a
   record past the bytes' cap stops it non-zero. Without the flag the
   peer records nothing.
