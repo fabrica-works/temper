@@ -293,9 +293,11 @@ their charter is retired.
 - **Must:**
   - Stop, which is the person's (exact);
   - the director parking on the person's word (design, 6.2);
-  - delegates and queued changes going on under a stopped goal (to
-    check, 6.8);
-  - retiring a charter that still has tasks (to check, 6.8).
+  - delegates and queued changes going on under a stopped goal
+    (exact, checked 10-23: jig's tasks/run.rs:585 and
+    change/domain.rs:447);
+  - retiring a charter that still has tasks (design, 6.8: jig refuses
+    the restore, tasks/stored.rs:656).
 - **Adds:** a stopped goal's news waits for its release, so nothing is
   relayed by hand. Its reaching a successor instead is 7.1's.
 
@@ -312,7 +314,10 @@ A prunes its notes into an archive.
   - instructions amended (exact);
   - a deadline on x3 whose hold goes to the person, as the holder of
     its escalations (exact);
-  - the charter's new run policy reaching a live goal (to check, 6.8).
+  - the charter's new run policy reaching a live goal (design, 6.8: a
+    run reads its charter's policy at each run, jig's charters.rs:157,
+    but a charter changes only in the configuration, across a
+    restart).
 - **Adds:** the amendment is in A's history, with what it replaced.
 
 ### 5.4 The person changes direction (T 342, 343)
