@@ -564,8 +564,8 @@ adds:
 - **the forge's events** go back to their owner undecided
   (`Request::Busy`), and no change steps;
 - **a relayed call** is answered busy;
-- **a committed forge entry** is not made: its release goes back, and the
-  next start's settlement makes it;
+- **a committed forge entry** is not made: its notification is retired,
+  its outbox row stays durable, and the next start's settlement makes it;
 - **`Drained`** once nothing waits for a commit.
 
 ## 10. Limits and worst cases

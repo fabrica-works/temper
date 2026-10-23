@@ -3172,7 +3172,7 @@ fn issue_count(world: &mut World) -> usize {
 // committed forge effect stays with the connector (jig's `domain/engine.md`, 6.1).
 #[test]
 fn a_stop_with_a_committed_forge_effect_makes_no_commit_and_no_write() {
-    let (mut world, _) = pending_issue_effect();
+    let (mut world, assignment) = pending_issue_effect();
     let calls = world.forge_calls;
     world.send(engine::Event::Stop);
     let number = world.store.apply();
@@ -3184,6 +3184,18 @@ fn a_stop_with_a_committed_forge_effect_makes_no_commit_and_no_write() {
     assert_eq!(world.store.header().commits, commits);
     assert!(world.store.pending.is_empty());
     assert_eq!(world.forge_calls, calls, "no forge call after the stop");
+    assert!(world.events.is_empty() && world.immediate.is_empty(), "the drain leaves no continuation to retry");
+    assert_eq!(issue_count(&mut world), 0);
+    world.restart(true, false);
+    for _ in 0..40 {
+        world.tick();
+    }
+    let event = issue_effect_call(&mut world, &assignment);
+    world.send(event);
+    for _ in 0..40 {
+        world.tick();
+    }
+    assert_eq!(issue_count(&mut world), 1, "the retried call settles its durable outbox entry once");
 }
 
 #[test]

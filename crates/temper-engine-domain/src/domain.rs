@@ -786,12 +786,11 @@ pub(crate) fn forge_release_ending(ending: tasks::Ending) -> forge::ReleaseEndin
 /// When the route is full the journal returns it to iterate without changing a child.
 pub(crate) fn step_released(domain: &mut Domain, env: &Env<Limits>, released: Released, out: &mut Queue<Request>) {
     domain.settled = None;
-    // A committed forge entry is not made while the engine stops; it stays
-    // durable and the next start's outbox settlement makes it.
+    // Retire the notification while stopping. The entry stays durable for
+    // the next start's outbox settlement; returning it would retry forever.
     if let Delivery::ForgeCommitted { .. } = released.0
         && domain.core.stopping()
     {
-        out.push(Request::ToChild(released));
         return;
     }
     let Some(mut decision) = route_decision(domain, &env.limits) else {
