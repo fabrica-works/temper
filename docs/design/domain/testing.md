@@ -886,6 +886,41 @@ and 10).
     under way, ends at once with exit 0, well before the sign-in's
     deadline, its client answered (jig's `domain/accounts.md`, section
     5: the accounts' close cancels each sign-in under way).
+- **A person's change on the owned forge, signed in with ChatGPT,** a
+  test of its own (`crates/temper/tests/support/forge_land.rs`): "A
+  Forgejo set up from the client" (above), its set-up, first repository
+  and landing reused, carried on with ChatGPT's sign-in as above, a
+  chat on the plan, and a restart from a fresh client. The module writes
+  the story once, its model side a face: the fake issuer and the fake
+  LLM peer here, ChatGPT itself in the live tier (2.7), which reuses
+  every step and check but the face's:
+  - *the box and its forge:* `temper init` into three empty private
+    directories, the sign-in's and the LLM endpoint's addresses swapped
+    for the fakes', then `temper box` on them, which reads that
+    document; forge 3 set up from the client and `work/hello` made and
+    adopted into project 1, by that story's steps;
+  - *the change:* the owner connects ChatGPT (`connect 1`, `wait
+    accounts --until settled`) and opens a chat on gpt-6-luna in
+    project 1 asking for one README line, unique to the run. The
+    chat's agent delegates the coding procedure on `work/hello`
+    (forge.md, section 8); the coder edits on the plan's grant, its
+    pull's starter workflow passes on the owned runner, the review
+    approves, the change lands, and the chat's reply, its turn's text
+    with no `finish` (agent.md, 4.6), follows the procedure's result.
+    The peer observes a bearer on every request, the coder's and the
+    reviewer's too;
+  - *the restart:* the box stops, exit 0, with nothing left, and a
+    second box starts on the same directories. A fresh client root,
+    signed in by the new printed link, reads the same chat and its
+    reply, and the change's task ended landed with the same pull and
+    merge commit. Close ends the chat with its closing turn, and no
+    task of the project is left live;
+  - *its referee:* temper's reads, with no credential, give the
+    landing, its pull, its merge commit and its checks at the pull's
+    head, in both boxes alike, so nothing was pushed or merged twice;
+    the forge's own state is checked as that story checks it. The
+    peer's requests number the script's, each answered, the closing
+    turn's included.
 - **`temper program-login`,** in two stories of their own, each within ten
   seconds (five seconds before the user's doubling of 10-22, provisional)
   and with no engine, service or deployment secret: it execs smith's fake
