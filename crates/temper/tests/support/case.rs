@@ -119,10 +119,10 @@ fn base(value: &mut Value, charter: &Path) {
         }
     }
 }
-/// Departures from the description's documents: the case uses its own forge
-/// and records-only setup until the lab describes one; the inert spare at id 1
-/// goes when start-time adoption uses the forge's own ids instead of 1..=len.
-fn setup(value: &mut Value, forge: SocketAddr, directory: &Path, git: &Path, engine: &Path) {
+/// Departures from the description's documents: the case's forge owner and
+/// repositories in place of the lab's; the inert spare at id 1 goes when
+/// start-time adoption uses the forge's own ids instead of 1..=len.
+fn setup(value: &mut Value, forge: SocketAddr, directory: &Path, git: &Path) {
     let d = directory.to_str().expect("setup directory");
     value["application"]["webhooks"] = json!({"listener":{"socket":"127.0.0.1:0"}});
     value["application"]["forges"] = json!([{
@@ -132,9 +132,6 @@ fn setup(value: &mut Value, forge: SocketAddr, directory: &Path, git: &Path, eng
     value["application"]["identities"] = json!([{
         "number":1,"forge":1,"login":"temper","author":{"name":"Temper","email":"temper@example.test"}
     }]);
-    for file in ["forge-1.api-token", "forge-1.user", "forge-1.git-token"] {
-        fs::remove_file(engine.join("data/secrets").join(file)).expect("remove lab's file-backed fixture");
-    }
     // Adoption walks ids 1..=len; the setup names are not consulted.
     value["application"]["setup"] = json!([{"forge":1,"directory":d,"bot":{"login":"temper","email":"temper@example.test"},"mode":{"fake":{"listen":{"socket":forge.to_string()},"git":git,"owner":"acme","repositories":[{"name":"spare","landing":"main"},{"name":"app","landing":"main"}]}}}]);
 }
@@ -271,7 +268,7 @@ impl Judge {
         base(&mut value, &engine_dir.join("config/charters/chat.txt"));
         let forge = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
         (self.fixture.configure)(&mut value, &mut agent, forge);
-        setup(&mut value, forge, &self.members.dir("forge").join("setup"), &self.git, &engine_dir);
+        setup(&mut value, forge, &self.members.dir("forge").join("setup"), &self.git);
         value["engine"]["hosts"]["listener"] = json!([{"socket":self.hosts.to_string()}]);
         value["engine"]["hosts"]["workers"][0]["name"] = "ws".into();
         value["engine"]["hosts"]["workers"][1]["name"] = "s1".into();
