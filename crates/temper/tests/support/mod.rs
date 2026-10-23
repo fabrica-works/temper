@@ -664,3 +664,9 @@ pub fn read_line(output: Fd, within: Duration) -> Vec<u8> {
         }
     }
 }
+
+/// Read the fake's credential-free git objects through the existing bounded HTTP helper.
+#[must_use]
+pub fn fake_objects(address: std::net::SocketAddr, commit: u64) -> serde_json::Value {
+    github::objects(address, commit)
+}
