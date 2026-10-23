@@ -54,6 +54,7 @@ impl Call {
     }
 }
 pub enum Step {
+    Mark(&'static str),
     Run(Call),
     Start(Call),
     Join,
@@ -260,6 +261,7 @@ pub struct Calls {
     cancelling: bool,
     admission: Admission,
     retry: Option<Time>,
+    phase: Option<Time>,
     forgejo: Option<u32>,
     ends: Vec<Ended>,
     complete: Queue<Complete>,
@@ -342,6 +344,7 @@ impl Calls {
             cancelling: false,
             admission: Admission::Batch,
             retry: None,
+            phase: None,
             forgejo,
             ends: Vec::new(),
             complete: Queue::with_capacity(32),
@@ -440,6 +443,13 @@ impl Calls {
         }
     }
     fn advance(&mut self, now: Time) {
+        // A box that exits before printing its link must be diagnosed by
+        // its referee, rather than panicking while constructing sign-in stdin.
+        if matches!(self.steps.front(), Some(Step::Run(Call { stdin: Stdin::Link, .. })))
+            && super::printed_link(&self.link).is_none()
+        {
+            return;
+        }
         if self.cancelling
             || self.child.is_some()
             || self.awaiting_started
@@ -453,6 +463,12 @@ impl Calls {
             return;
         }
         match self.steps.pop_front() {
+            Some(Step::Mark(name)) => {
+                if let Some(began) = self.phase.replace(now) {
+                    eprintln!("{name}: {} ms", now.saturating_since(began).as_nanos() / 1_000_000);
+                }
+                self.advance(now);
+            }
             Some(Step::Run(call)) => {
                 self.action = Some(Action::Run);
                 self.start(call, false);

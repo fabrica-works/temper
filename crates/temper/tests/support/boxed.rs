@@ -346,6 +346,7 @@ pub struct CtlOutcome<T> {
 }
 struct CtlJudge<'a, F, T> {
     expected_exits: Vec<(usize, u8)>,
+    on_link: Option<Box<dyn FnOnce()>>,
     check: Option<F>,
     checked: &'a Cell<Option<T>>,
     stopping: bool,
@@ -355,7 +356,13 @@ struct CtlJudge<'a, F, T> {
 }
 impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
     fn act(&mut self, now: Time, procs: &mut [Process]) {
-        let [Process::Binary(binary), Process::Calls(calls)] = procs else { panic!("box and ctl") };
+        let (drivers, peers) = procs.split_at_mut(2);
+        let [Process::Binary(binary), Process::Calls(calls)] = drivers else { panic!("box and ctl") };
+        if printed_link(calls.stdout()).is_some()
+            && let Some(on_link) = self.on_link.take()
+        {
+            on_link();
+        }
         let failed = calls.ends().iter().enumerate().any(|(index, call)| {
             let expected = self.expected_exits.iter().find(|(at, _)| *at == index).map_or(0, |(_, code)| *code);
             call.exit != Some(Exit::Code(expected))
@@ -366,7 +373,14 @@ impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
                 self.checked.set(Some(self.check.take().expect("one live check")()));
             }
             calls.cancel();
-            binary.signal(Signal::Terminate);
+            for proc in peers {
+                if let Process::Peer(peer) = proc {
+                    peer.shutdown();
+                }
+            }
+            if binary.exit_status().is_none() {
+                binary.signal(Signal::Terminate);
+            }
             self.stopping = true;
         }
         let left = binary.tree_status().live_at_leader_exit.as_ref().is_some_and(|pids| !pids.is_empty());
@@ -412,13 +426,67 @@ pub fn run_ctl_with_exits<T>(
     check: impl FnOnce() -> T,
     expected_exits: &[(usize, u8)],
 ) -> CtlOutcome<T> {
+    run_ctl_peers(
+        directory,
+        flags,
+        client_root,
+        steps,
+        deadline,
+        check,
+        CtlPeers { expected_exits: expected_exits.to_vec(), llm: None },
+    )
+}
+/// An independent fake and a fixture hook after the box has written its files.
+pub struct CtlLlm {
+    pub peer: skein_fake_peers::llm::Peer,
+    pub on_link: Box<dyn FnOnce()>,
+}
+struct CtlPeers {
+    expected_exits: Vec<(usize, u8)>,
+    llm: Option<CtlLlm>,
+}
+/// Drive the first task without changing the box's template or demo.
+#[must_use]
+pub fn run_ctl_with_llm<T>(
+    directory: &Path,
+    flags: Vec<String>,
+    client_root: &Path,
+    steps: Vec<super::ctl::Step>,
+    deadline: Duration,
+    check: impl FnOnce() -> T,
+    llm: CtlLlm,
+) -> CtlOutcome<T> {
+    run_ctl_peers(
+        directory,
+        flags,
+        client_root,
+        steps,
+        deadline,
+        check,
+        CtlPeers { expected_exits: Vec::new(), llm: Some(llm) },
+    )
+}
+fn run_ctl_peers<T>(
+    directory: &Path,
+    flags: Vec<String>,
+    client_root: &Path,
+    steps: Vec<super::ctl::Step>,
+    deadline: Duration,
+    check: impl FnOnce() -> T,
+    peers: CtlPeers,
+) -> CtlOutcome<T> {
+    let (peer, on_link) = match peers.llm {
+        Some(llm) => (Some(llm.peer), Some(llm.on_link)),
+        None => (None, None),
+    };
     let clock = Clock::new();
     let mut binary = Binary::start_with_tree(
         Command {
             program: env!("CARGO_BIN_EXE_temper").into(),
             arguments: std::iter::once("box".into()).chain(flags.into_iter().map(Into::into)).collect(),
             directory: directory.into(),
-            environment: Vec::new(),
+            // The real repository story needs init to discover system git.
+            environment: if on_link.is_some() { vec![("PATH".into(), "/usr/bin:/bin".into())] } else { Vec::new() },
         },
         Mode::Pipes,
         262_144,
@@ -432,7 +500,8 @@ pub fn run_ctl_with_exits<T>(
     fds.push(root);
     let checked = Cell::new(None);
     let mut world = real::World::new(CtlJudge {
-        expected_exits: expected_exits.to_vec(),
+        expected_exits: peers.expected_exits,
+        on_link,
         check: Some(check),
         checked: &checked,
         stopping: false,
@@ -445,9 +514,12 @@ pub fn run_ctl_with_exits<T>(
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || Process::Calls(Box::new(super::ctl::Calls::new(root, steps, Some(&streams), None))));
+    if let Some(peer) = peer {
+        world.spawn(|| Process::Peer(Box::new(peer)));
+    }
     let ended = world.run(&clock, deadline);
-    assert!(ended.procs.iter().all(Host::is_empty), "box and ctl io settles");
-    let [Process::Binary(binary), Process::Calls(calls)] = ended.procs.as_slice() else { panic!("box and ctl") };
+    assert!(ended.procs.iter().all(Host::is_empty), "box, ctl and peer io settles");
+    let [Process::Binary(binary), Process::Calls(calls), ..] = ended.procs.as_slice() else { panic!("box and ctl") };
     CtlOutcome {
         exit: binary.exit_status(),
         stdout: calls.stdout().to_vec(),

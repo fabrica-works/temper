@@ -578,10 +578,7 @@ fn a_first_run_answers_on_the_demo() {
 #[test]
 fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
     use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
-    use std::{
-        fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt},
-    };
+    use std::{fs, os::unix::fs::PermissionsExt};
     use support::ctl::{Call, Step};
 
     let (forgejo, runner) = support::owned::binaries();
@@ -601,13 +598,7 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         paths[2].join(format!("forgejo-runner/{RUNNER_VERSION}/forgejo-runner")),
     ];
     for (source, target) in [forgejo, runner].iter().zip(&cached) {
-        fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(target.parent().expect("cache parent"))
-            .expect("private binary cache");
-        fs::copy(source, target).expect("copy pinned executable, never link it");
-        fs::set_permissions(target, fs::Permissions::from_mode(0o700)).expect("private executable");
+        cache_binary(source, target);
     }
     let before = cached.each_ref().map(|path| cached_binary_fingerprint(path));
     let mut bot = None;
@@ -615,7 +606,7 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         let client_root = scratch.path().join(run);
         fs::create_dir(&client_root).expect("fresh client root");
         fs::set_permissions(&client_root, fs::Permissions::from_mode(0o700)).expect("private client root");
-        let mut steps = vec![Step::Run(Call::sign_in())];
+        let mut steps = vec![Step::Mark("start"), Step::Run(Call::sign_in())];
         if run == "first" {
             steps.extend([
                 Step::Run(Call::new(&["forges"])),
@@ -632,36 +623,39 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         ]);
         let clock = skein_shell::Clock::new();
         let began = clock.now().now;
-        let ended = support::boxed::run_ctl(
+        steps.push(Step::Mark("first repository ready"));
+        if run == "first" {
+            steps.extend(support::first_repository::task_steps(&client_root));
+        } else {
+            steps.extend(support::first_repository::found_steps());
+        }
+        let ended = support::boxed::run_ctl_with_llm(
             scratch.path(),
             flags.clone(),
             &client_root,
             steps,
             Duration::from_secs(190),
-            || {
-                let document: serde_json::Value =
-                    serde_json::from_slice(&fs::read(paths[0].join("temper.json")).expect("first-run configuration"))
-                        .expect("configuration JSON");
-                let forge = document["application"]["forges"]
-                    .as_array()
-                    .expect("forges")
-                    .iter()
-                    .find(|forge| forge["number"] == 3)
-                    .expect("forge 3");
-                let address: std::net::SocketAddr =
-                    forge["api"]["socket"].as_str().expect("forge 3 address").parse().expect("socket");
-                let record = fs::metadata(paths[1].join("box/started/3")).expect("started group record");
-                assert!(record.is_file(), "the box kept forge 3's started record");
-                assert_eq!(record.permissions().mode() & 0o777, 0o600, "private started record");
-                (address, support::owned::answer(address.port(), "/api/v1/version", None))
-            },
+            || support::first_repository::live(&paths[0], &paths[1], &client_root),
+            support::first_repository::llm(&paths[0]),
         );
         eprintln!("{run} Forgejo setup run: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
         let stderr = String::from_utf8_lossy(&ended.stderr);
         assert_eq!(ended.exit, Some(Exit::Code(0)), "{run}: {stderr}");
         assert_eq!(ended.left, Some(Vec::new()), "{run}: no process outlived the box: {stderr}");
-        bot = Some(assert_forgejo_setup(run, &ended.calls, &stderr, bot, &paths[1]));
-        let (address, version) = ended.checked.expect("the live forge check ran");
+        let setup_calls = if run == "first" { 7 } else { 4 };
+        bot = Some(assert_forgejo_setup(run, &ended.calls[..setup_calls], &stderr, bot, &paths[1]));
+        for call in &ended.calls[setup_calls..] {
+            assert_eq!(
+                call.exit,
+                Some(Exit::Code(0)),
+                "stdout {}; stderr {}; box {stderr}",
+                String::from_utf8_lossy(&call.stdout),
+                String::from_utf8_lossy(&call.stderr)
+            );
+        }
+        let evidence = ended.checked.expect("the live forge and task reads ran");
+        support::first_repository::assert_task(run, &ended.calls[setup_calls..], &stderr, &evidence);
+        let support::first_repository::Evidence { address, version, .. } = evidence;
         let version = version.unwrap_or_else(|why| panic!("{run}: live Forgejo version: {why:?}; box: {stderr}"));
         assert_eq!(version["version"].as_str().expect("version").split('+').next(), Some(VERSION));
         let link = support::printed_link(&ended.stdout).expect("box sign-in link");
@@ -682,6 +676,20 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
     scratch.remove();
 }
 
+fn cache_binary(source: &std::path::Path, target: &std::path::Path) {
+    use std::{
+        fs,
+        os::unix::fs::{DirBuilderExt, PermissionsExt},
+    };
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(target.parent().expect("cache parent"))
+        .expect("private binary cache");
+    fs::copy(source, target).expect("copy pinned executable, never link it");
+    fs::set_permissions(target, fs::Permissions::from_mode(0o700)).expect("private executable");
+}
+
 fn assert_forgejo_setup(
     run: &str,
     calls: &[support::Ended],
@@ -698,7 +706,7 @@ fn assert_forgejo_setup(
             String::from_utf8_lossy(&call.stderr)
         );
     }
-    assert_eq!(calls.len(), if run == "first" { 7 } else { 4 }, "all ctl calls ran: {stderr}");
+    assert_eq!(calls.len(), if run == "first" { 7 } else { 4 }, "all setup calls ran: {stderr}");
     if run == "first" {
         assert!(
             String::from_utf8_lossy(&calls[1].stdout)
@@ -716,15 +724,20 @@ fn assert_forgejo_setup(
         assert_eq!(forge["state"], "not_set_up");
         assert!(calls[3].stdout.starts_with(b"setting up\n"));
         let adoption = String::from_utf8_lossy(&calls[3].stdout);
-        assert!(adoption.contains("work/hello"), "ctl printed the first adoption: {adoption}");
+        assert!(
+            adoption.contains("Adopted work/hello on forge 3 as owned."),
+            "ctl printed the first adoption: {adoption}"
+        );
+        eprintln!("{run} first repository adoption: {adoption}");
         let made = support::ctl::json(&calls[5]);
         let row =
             made["forges"].as_array().expect("forges rows").iter().find(|row| row["number"] == 3).expect("forge 3");
+        eprintln!("{run} first repository read: {}", row["first"]);
         assert_eq!(row["first"]["state"], "made");
         assert_eq!(row["first"]["project"]["existing"], 1);
         assert_eq!(row["first"]["org"], "work");
         assert_eq!(row["first"]["repository"], "hello");
-        assert!(row["first"]["id"].as_u64().is_some_and(|id| id > 0));
+        assert_eq!(row["first"]["id"], 1, "the script tags forge 3, repository 1");
         assert_eq!(row["state"], "connected");
         // Preparation is silent on success; Forgejo's startup
         // and the runner's lines reach the box with their step prefixes.

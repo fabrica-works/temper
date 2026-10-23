@@ -5,6 +5,7 @@ pub mod cluster;
 pub mod configuration;
 pub mod ctl;
 pub mod fetch;
+pub mod first_repository;
 pub mod github;
 pub mod owned;
 pub mod terminal;
