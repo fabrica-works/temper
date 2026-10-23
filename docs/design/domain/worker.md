@@ -224,6 +224,49 @@ jig's types (jig's `domain/hosts.md`, 6.3), with temper's detail:
   **cancelled,** as jig's say, each with bounded detail for operators
   that no LLM is shown.
 
+**A configured model-call bound** is reported as jig's
+`RunFailure::Exceeded(Exceeded { bound, value })`. Smith's
+`CompletionFailure::Limit { which, bound }` supplies `value` unchanged:
+the configured value in the bound's own unit, never a measured size.
+The worker classifies both `Limit` and `Limit::Path(Cap)` exhaustively,
+without a wildcard, so an added smith cap requires a classification.
+
+| Smith limit | Jig bound | Unit |
+|---|---|---|
+| `Limit::Path(Cap::Reasoning)` | `Reasoning` | bytes, per item or in all |
+| `Limit::Path(Cap::Metadata)` | `Metadata` | bytes |
+| `Limit::Path(Cap::OutputItems)` | `Items` | answer items |
+| `Limit::Path(Cap::Answer)` | `Answer` | bytes |
+| `Limit::Path(Cap::Tools)` | `Tools` | tools |
+| `Limit::Path(Cap::HistoryItems)` | `HistoryItems` | request messages and blocks, counted together |
+| `Limit::History` | `History` | a retained-history ceiling on messages, blocks or bytes; the tag does not identify which |
+| `Limit::Window` | `Window` | tokens |
+| `Limit::Path(Cap::Output)` | `Output` | declared output-ceiling tokens |
+
+For `History`, the value is the ceiling that compaction could not bring
+the retained history under. It is carried unchanged, without assigning
+it a unit the tag does not identify.
+
+- **The included bounds name the call's allowance.** The answer's
+  reasoning, metadata, items and bytes, and the request's tools, history,
+  window and declared output ceiling become `Exceeded`. The tasks child
+  holds the run at once without counting a try (jig's `domain/tasks.md`,
+  5.5). The classification does not infer a measured size from the
+  failure or require proof that every provider response will repeat.
+- **Other limits stay `Model`.** `Cap::Request` stays `Model` rather than
+  being identified with a retained-history or model-window bound.
+  `Cap::RequestHead` depends on the credential. `Limit::Call` and
+  `Limit::Message` have no production constructor. `Cap::ResponseHead`,
+  `ResponseFields`, `Skip`, `Field`, `Retained`, `Tokens`, `Depth`,
+  `Strings`, `Number` and `ErrorBody` can describe framing or a transient
+  error body, rather than the call's configured allowance.
+  `Cap::AccessToken` and `Cap::AccountId` depend on credentials.
+  `Limit::Pool` is a connection reservation, which can depend on
+  credential-bearing request headers; `CompletionFailure::ApplicationLimit`
+  also covers temporary call-slot refusal. None is classified as one of
+  the nine call bounds. Other completion failures retain their `Model`
+  classification.
+
 ## 5. Checkouts
 
 The checkout child domain is the worker's workspace capability (jig's
