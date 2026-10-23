@@ -235,7 +235,6 @@ pub(super) fn root_at_with_demo(
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     root_at_with_activity(address, limits, project_name, demo, None, None)
 }
-#[expect(clippy::too_many_lines, reason = "one fixture delivers the page's documents and the session's reads together")]
 fn root_at_with_activity(
     address: temper_client_domain::Address,
     limits: &Limits,
@@ -244,6 +243,20 @@ fn root_at_with_activity(
     activity: Option<c::ActivityPage>,
     forge_rows: Option<List<w::ForgeRow>>,
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
+    let (root, me, page, tree, accounts, _) =
+        root_at_with_forges(address, limits, project_name, demo, activity, forge_rows);
+    (root, me, page, tree, accounts)
+}
+
+#[expect(clippy::too_many_lines, reason = "one fixture delivers the page's documents and the session's reads together")]
+fn root_at_with_forges(
+    address: temper_client_domain::Address,
+    limits: &Limits,
+    project_name: &[u8],
+    demo: Option<(u32, bool)>,
+    activity: Option<c::ActivityPage>,
+    forge_rows: Option<List<w::ForgeRow>>,
+) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>, Option<Token>) {
     use jig_client::contract::{Delivery, Subject, WatchEvent};
     use temper_client_domain::{Event, Request};
     let forge_rows_answered = forge_rows.is_some();
@@ -393,7 +406,7 @@ fn root_at_with_activity(
             deliver_no_demo(&mut root, read.expect("demo read"), account_watch.expect("accounts watch"));
         }
     }
-    (root, watch.expect("me opened"), inbox_watch, tree_watch, account_watch)
+    (root, watch.expect("me opened"), inbox_watch, tree_watch, account_watch, forges)
 }
 fn deliver_no_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Token) {
     root_event(
@@ -1456,4 +1469,13 @@ pub fn demo_forges_root(
     rows: List<w::ForgeRow>,
 ) -> temper_client_domain::Domain {
     root_at_with_activity(address, &domain_limits(), b"Shop", Some((PROJECT, true)), None, Some(rows)).0
+}
+
+/// A forge flow that can receive subsequent watch deliveries.
+pub fn forge_root_watch(
+    address: temper_client_domain::Address,
+    rows: List<w::ForgeRow>,
+) -> (temper_client_domain::Domain, Token) {
+    let (root, _, _, _, _, watch) = root_at_with_forges(address, &domain_limits(), b"Shop", None, None, Some(rows));
+    (root, watch.expect("forges watch"))
 }

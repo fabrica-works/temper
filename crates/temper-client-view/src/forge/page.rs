@@ -166,7 +166,13 @@ fn kinds(kinds: forge::Kinds, words: &Words) -> Box<[u8]> {
     }
     writer.finish()
 }
-fn outcome(builder: &mut Builder, form: &forge::Form, answer: &forge::Answer, words: &Words, text_limit: u32) {
+pub(super) fn outcome(
+    builder: &mut Builder,
+    form: &forge::Form,
+    answer: &forge::Answer,
+    words: &Words,
+    text_limit: u32,
+) {
     match answer {
         forge::Answer::Adopted(adopted) => {
             let role = forge::words::role(adopted.role);

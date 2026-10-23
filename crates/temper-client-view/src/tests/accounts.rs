@@ -689,6 +689,7 @@ mod memory_literal;
 // Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
 // Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
 // The flow's three state words (444 B).
+// First-repository setup fields and Ready words add 2,076 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 const ACCOUNT_BYTES: u64 = 10348343792;
 #[test]

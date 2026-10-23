@@ -328,13 +328,7 @@ fn adopted(state: &mut Forges, env: &Env<Limits>, mut adopting: Adopting, outcom
         adopting.adoption.home = false;
         let request = temper_client_domain::forge::ask(&adopting.adoption, &env.limits.domain.forge)
             .expect("the admitted adoption with only home cleared still encodes");
-        let mut measure = Text::measure();
-        measure.put(b"first-repository-additional-");
-        measure.number(u64::from(adopting.adoption.forge));
-        let mut text = Text::writing_exact(measure);
-        text.put(b"first-repository-additional-");
-        text.number(u64::from(adopting.adoption.forge));
-        let name = crate::key::engine(&jig::key::Name::new(&text.finish()).expect("first repository key fits"));
+        let name = temper_client_domain::forge::first_repository_key(adopting.adoption.forge, true);
         let key = Key { asker: Owner::Forge.asker(), number: (u64::from(adopting.called.call_number) << 32u32) | 4 };
         state.adopting.insert(key, adopting);
         out.push(Out::Client { event: Event::Send { key, name: Some(name), request } });
@@ -861,13 +855,7 @@ fn setup_changed(state: &mut Forges, env: &Env<Limits>, handle: Handle, rows: &[
                 finish(watch.called, printed, out);
                 return;
             };
-            let mut measure = Text::measure();
-            measure.put(b"first-repository-");
-            measure.number(u64::from(intent.forge));
-            let mut text = Text::writing_exact(measure);
-            text.put(b"first-repository-");
-            text.number(u64::from(intent.forge));
-            let name = crate::key::engine(&jig::key::Name::new(&text.finish()).expect("first repository key fits"));
+            let name = temper_client_domain::forge::first_repository_key(intent.forge, false);
             let key = Key { asker: Owner::Forge.asker(), number: (u64::from(watch.called.call_number) << 32u32) | 3 };
             state.adopting.insert(key, Adopting { called: watch.called, adoption });
             out.push(Out::Client { event: Event::Send { key, name: Some(name), request } });

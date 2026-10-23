@@ -2,6 +2,7 @@
 use crate::{Action, Address, Domain, Event, Fact, Limits, Place, Request, forge, owner::Owner};
 use skein_lib::{Env, Queue};
 pub(crate) fn forge(root: &mut Domain, env: &Env<Limits>, event: forge::Event, out: &mut Queue<Request>) {
+    forge::forges::project(&mut root.forge, root.pages.project().unwrap_or(1));
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
     forge::step(&mut root.forge, &Env { now: env.now, wall: env.wall, limits: env.limits.forge }, event, &mut child);
     route_forge(root, env, &mut child, out);
@@ -86,12 +87,12 @@ pub(crate) fn route_forge(
                 let forge::Address::Adopt { project } = address;
                 out.push(Request::Show { address: Address::Adopt { project }, replace: false });
             }
-            forge::Request::Send { request, ask } => client(
+            forge::Request::Send { request, name, ask } => client(
                 root,
                 env,
                 jig_client::Event::Send {
                     key: jig_client::Key { asker: Owner::Forge.asker(), number: request.raw() },
-                    name: None,
+                    name,
                     request: ask,
                 },
                 out,

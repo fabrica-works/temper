@@ -36,7 +36,14 @@ pub fn welcome_fixture(seed: u64) -> (Joint, Root) {
 /// The first-run forge is owned by the box; the test scripts its connection rows.
 #[must_use]
 pub fn forge_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, false, WelcomeForge::Owned, false)
+    let (mut front, root) = fixture_root(seed, false, 2, None, false, WelcomeForge::Owned, false);
+    // The scripted box's Create makes the first repository available to Adopt.
+    front.engine.forge = Some(temper_engine_domain_world::forge_stand::ForgeStand::with(&[
+        (b"acme", b"shop", 7),
+        (b"acme", b"second", 8),
+        (b"work", b"hello", 42),
+    ]));
+    (front, root)
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum WelcomeForge {

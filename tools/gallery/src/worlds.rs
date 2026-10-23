@@ -289,7 +289,31 @@ fn forges(world: World) -> Box<[u8]> {
                     mode: w::Mode::Owned,
                     connection,
                     offer: w::Offer::Offered,
-                    first: None,
+                    first: if step == 6 || step == 7 {
+                        Some(
+                            w::FirstRepository::new(
+                                &limits,
+                                w::FirstRepositoryParts {
+                                    org: b"work".as_slice().into(),
+                                    repository: b"hello".as_slice().into(),
+                                    project: w::SetUpProject::Existing(
+                                        w::ExistingProject::new(&limits, w::ExistingProjectParts { project: 1 })
+                                            .expect("project"),
+                                    ),
+                                    state: if step == 7 {
+                                        w::FirstState::Made(
+                                            w::Made::new(&limits, w::MadeParts { id: 42 }).expect("made"),
+                                        )
+                                    } else {
+                                        w::FirstState::Making
+                                    },
+                                },
+                            )
+                            .expect("first repository"),
+                        )
+                    } else {
+                        None
+                    },
                 },
             )
             .expect("owned Forgejo"),

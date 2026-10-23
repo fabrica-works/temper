@@ -892,3 +892,5 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-account-row button { margin: 6px 6px 6px 0 !important; }
 .temper-account-row [role=term] { color: var(--temper-muted); font-size: 10px; }
 .temper-account-row [role=definition] { margin: 0; font-size: 11px; }
+/* The first repository stays visible in a folded forge's summary (client/forge.md, 5.4). */
+.temper-forge-row > summary > [id^="skein-ui-description-"] { white-space: pre-line; }

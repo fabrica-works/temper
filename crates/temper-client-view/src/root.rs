@@ -197,6 +197,9 @@ pub fn href(view: &mut View, node: NodeId) -> Option<Box<[u8]>> {
         }
     }
     match act(view, node, Act::Press)? {
+        Action::Pages(temper_client_domain::pages::Act::OpenProject { .. }) => {
+            Some(temper_client_domain::address::print(&temper_client_domain::Address::Chats))
+        }
         Action::Pages(temper_client_domain::pages::Act::Go { address }) => {
             Some(temper_client_domain::address::print(&address))
         }

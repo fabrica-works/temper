@@ -41,6 +41,9 @@ pub struct Pages {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
+    OpenProject {
+        project: u32,
+    },
     Project {
         project: u32,
     },
@@ -377,6 +380,10 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
                 | Act::Confirm
                 | Act::Cancel),
         } => confirmation(pages, env, client, act, out),
+        Event::Act { act: Act::OpenProject { project } } => {
+            choose_project(pages, client, project);
+            out.push(Request::Show { address: Address::Chats });
+        }
         Event::Act { act: Act::Project { project } } => choose_project(pages, client, project),
         Event::Act { act: Act::SignOut } => out.push(Request::Client(jig_client::Event::SignOut)),
         Event::Act { act: Act::Go { address } } => out.push(Request::Show { address }),
@@ -695,6 +702,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::SendAmendment
         | Act::AmendAgain
         | Act::Choice(_)
+        | Act::OpenProject { .. }
         | Act::Project { .. }
         | Act::Accounts(_)
         | Act::ConnectModel(_)
