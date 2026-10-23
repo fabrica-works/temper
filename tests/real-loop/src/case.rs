@@ -518,6 +518,8 @@ pub const PLAN_WORDS: &str = "A nearer end: this mission ends at the end-to-end 
 pub const PLAN_ANSWER: &str =
     "Green light: the nearer end, M1 and M2 approved; every ask granted, including B's files.";
 pub const SUBOWNER_REFUSAL: &str = "Authority needs proposal: authority ceiling; ";
+/// What the refusal adds when the batch also asks more spend than A1 has left.
+pub const SPEND_DEFICIT: &str = "spend allowance; ";
 pub const SUBOWNER_REPORT: &str = "M1's sub-owner could not delegate its own helper.";
 pub const PLANNER_REPORT: &str = "The recalled plan started M1's sub-owner under its deadline; it could not delegate.";
 pub const PLAN_REPORT: &str = "A's answered plan and M1's sub-owner have reported.";
