@@ -26,6 +26,7 @@ pub struct Run {
     told: Vec<Told>,
     kit: Kit,
     workers: BTreeMap<u64, String>,
+    steps: Vec<calls::Step>,
 }
 impl Run {
     #[must_use]
@@ -45,6 +46,7 @@ impl Run {
             })
             .collect();
         Observed { documents, told: self.told.clone(), commands: Vec::new(), kit: self.kit.clone() }
+            .with_commands(&self.steps)
     }
     /// Placement only where an act's document retains a live observation channel.
     #[must_use]
@@ -178,10 +180,12 @@ pub fn run(
         hosts,
         git,
         steps: steps.into(),
+        ran: Vec::new(),
         calls: Vec::new(),
         slots: Vec::new(),
         client: scratch.path().join("client"),
         provisioning: false,
+        live: None,
         placed: placed.to_vec(),
         run: result.clone(),
         stopped: false,
@@ -204,6 +208,7 @@ enum Stage {
     S1,
     Acts,
     Provision,
+    Live,
     Accounts,
     Stop,
 }
@@ -218,10 +223,12 @@ struct Judge {
     hosts: SocketAddr,
     git: PathBuf,
     steps: VecDeque<calls::Step>,
+    ran: Vec<calls::Step>,
     calls: Vec<Ended>,
     slots: Vec<usize>,
     client: PathBuf,
     provisioning: bool,
+    live: Option<Value>,
     placed: Vec<u64>,
     run: std::rc::Rc<std::cell::RefCell<Option<Run>>>,
     stopped: bool,
@@ -346,13 +353,32 @@ impl Judge {
             self.stage = Stage::Provision;
             return;
         }
+        if self.live.is_none()
+            && matches!(self.ran.last(), Some(Step::Call { argv, .. }) if self.arguments(argv)[0] == "chat")
+        {
+            // The harness's own read, as the provisioning is: the director's chat
+            // can end before an act reads it live, and an ended document names no
+            // worker, so read its running document once.
+            self.live = Some(Value::Null);
+            let director = temper_real_loop_world::case::DIRECTOR.to_string();
+            batch.push(ctl::Step::Run(ctl::Call::new(&[
+                "wait",
+                "task",
+                &director,
+                "--until",
+                "phase:running",
+                "--json",
+            ])));
+            self.stage = Stage::Live;
+            return;
+        }
         let Some(step) = self.steps.pop_front() else {
             self.mark("acts", now);
             batch.push(ctl::Step::Run(ctl::Call::new(&["accounts", "--json"])));
             self.stage = Stage::Accounts;
             return;
         };
-        match step {
+        match &step {
             Step::SignIn { at } => {
                 assert_eq!(at.0, 1);
                 self.slots.push(batch.ends().len());
@@ -360,19 +386,19 @@ impl Judge {
             }
             Step::Call { at, argv } => {
                 assert_eq!(at.0, 1);
-                let args = self.arguments(&argv);
+                let args = self.arguments(argv);
                 self.slots.push(batch.ends().len());
                 batch.push(ctl::Step::Run(ctl::Call::new(&args.iter().map(String::as_str).collect::<Vec<_>>())));
             }
             Step::Start { at, argv } => {
                 assert_eq!(at.0, 1);
-                let args = self.arguments(&argv);
+                let args = self.arguments(argv);
                 self.slots.push(batch.ends().len());
                 batch.push(ctl::Step::Start(ctl::Call::new(&args.iter().map(String::as_str).collect::<Vec<_>>())));
             }
             Step::Until { at, argv, holds, early: _ } => {
                 assert_eq!(at.0, 1);
-                let args = self.arguments(&argv);
+                let args = self.arguments(argv);
                 self.slots.push(batch.ends().len());
                 batch.push(ctl::Step::Until(
                     ctl::Call::new(&args.iter().map(String::as_str).collect::<Vec<_>>()),
@@ -380,7 +406,7 @@ impl Judge {
                 ));
             }
             Step::Join { call } => {
-                assert!(call < self.slots.len());
+                assert!(*call < self.slots.len());
                 batch.push(ctl::Step::Join);
             }
             Step::AddWorker { .. } => panic!("AddWorker unsupported"),
@@ -396,6 +422,8 @@ impl Judge {
             Step::Kill { .. } => panic!("Kill unsupported"),
             Step::Watching { .. } => panic!("Watching unsupported"),
         }
+        // The oracle's commands are the acts' verbs (Observed::with_commands).
+        self.ran.push(step);
     }
 }
 impl Referee<cluster::Root> for Judge {
@@ -457,12 +485,19 @@ impl Referee<cluster::Root> for Judge {
                 }
                 self.stage = Stage::Acts;
             }
+            Stage::Live if Self::calls(root).foreground_idle() => {
+                let read = Self::calls(root).ends().last().expect("director's running read");
+                success(read);
+                self.live = Some(ctl::json(read));
+                self.stage = Stage::Acts;
+            }
             Stage::Forge
             | Stage::Llm
             | Stage::Engine
             | Stage::Ws
             | Stage::S1
             | Stage::Provision
+            | Stage::Live
             | Stage::Accounts
             | Stage::Stop => {}
         }
@@ -586,8 +621,13 @@ impl Judge {
             .map(|file| (decode(&file["path"]), decode(&file["content"])))
             .collect();
         let workers = self.placements(accounts);
-        *self.run.borrow_mut() =
-            Some(Run { calls: std::mem::take(&mut self.calls), told, kit: Kit { main, merged_green: green }, workers });
+        *self.run.borrow_mut() = Some(Run {
+            calls: std::mem::take(&mut self.calls),
+            told,
+            kit: Kit { main, merged_green: green },
+            workers,
+            steps: std::mem::take(&mut self.ran),
+        });
     }
 }
 impl Judge {
@@ -605,16 +645,16 @@ impl Judge {
     }
     fn placements(&self, accounts: &Value) -> BTreeMap<u64, String> {
         // jig retains a task's channel only while claimed/running. Use only JSON
-        // stdout already read by the acts, with the same document's hosts or the
-        // authorized post-act accounts read. Each worker must link exactly once;
-        // ended tasks remain a named gap.
+        // stdout already read: the director's running read, the acts', and the
+        // post-act accounts read with the hosts. Each worker must link exactly
+        // once; ended tasks remain a named gap.
         let mut workers = BTreeMap::new();
         let mut pending = BTreeMap::new();
         for call in &self.calls {
             success(call);
         }
         let documents = self.calls.iter().filter_map(|call| serde_json::from_slice::<Value>(&call.stdout).ok());
-        for document in documents.chain(std::iter::once(accounts.clone())) {
+        for document in self.live.iter().cloned().chain(documents).chain(std::iter::once(accounts.clone())) {
             live_channels(&document, &mut pending);
             if let Some(hosts) = document.pointer("/accounts/deployment_facts/program_hosts").and_then(Value::as_array)
             {

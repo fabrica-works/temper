@@ -1984,10 +1984,14 @@ fn a_worker_pushes_to_github_by_its_installations_token() {
     support::github::push();
 }
 
+// Leaves out what testing.md 5.3's 4.1 row names, s2's part included, and
+// A's and the reviewer's placement: an ended task's documents name no
+// worker, so only the coder's change is placed, by s1's workspace after the
+// stop.
 #[test]
+#[ignore = "backlog: R1, finding 10's root: on processes, kit's landing news can wake A between its question and the green light, and the fake LLM picks a turn by the count of replies said, so A's script falls out of step; comes off at case-2's M2 head (testing.md 2.6)"]
 fn the_opener_runs_on_ws_and_s1_as_processes() {
     use temper_real_loop_world::case::{self, acts, oracle};
-    let steps = acts::step_4_1();
     let run = support::case::run(
         &["ws", "s1"],
         case::fixture_placed(),
@@ -2003,10 +2007,7 @@ fn the_opener_runs_on_ws_and_s1_as_processes() {
             String::from_utf8_lossy(&call.stderr)
         );
     }
-    let observed = run.observed(acts::READS_4_1).with_commands(&steps);
+    let observed = run.observed(acts::READS_4_1);
     oracle::assert_met(&oracle::step_4_1(&observed));
     assert_eq!(run.placed().get(&case::DIRECTOR).map(String::as_str), Some("ws"));
-    // Leaves out domain/testing.md 5.3's 4.1 row, s2's part, and A's and
-    // the reviewer's placement: an ended task's document names no worker.
-    // The harness checks after stop that only s1's workspace holds the design.
 }
