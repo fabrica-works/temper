@@ -900,6 +900,13 @@ impl LiveJudge<'_> {
                     self.queue(&["tasks", "--project", "1", "--parent", "2", "--json"]);
                     self.phase = LivePhase::Progress;
                 } else {
+                    // The person's signal that the change ended; the landing's checks follow.
+                    super::live::notice(&format!(
+                        "CHANGE ENDED {} after {}s: task2={}",
+                        if self.plan.first { "first box" } else { "after restart" },
+                        self.wait_started.map_or(0, |started| now.saturating_since(started).as_nanos() / 1_000_000_000),
+                        last["task"]["chip"]["phase"].as_str().unwrap_or("?")
+                    ));
                     self.found_at = calls.ends().len() - 1;
                     self.queue(&["task", "2"]);
                     self.queue(&["task", "3", "--json"]);
