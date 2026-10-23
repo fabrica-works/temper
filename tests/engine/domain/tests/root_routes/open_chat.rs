@@ -410,3 +410,14 @@ fn an_open_chat_on_a_program_endpoint_is_refused_and_starts_nothing() {
     assert_eq!(live(&control, assigned.task).tries, tasks::Tries::NONE);
     assert!(ended(&control, assigned.task).is_none());
 }
+
+#[test]
+fn an_open_chat_that_meets_a_bound_is_held_and_stays_open() {
+    let (mut driver, run) = open_chat();
+    super::exceeded::meets_bound(&mut driver, &run, host::Bound::Reasoning);
+    super::exceeded::assert_held(&driver, &run, tasks::Bound::Reasoning);
+    past_idle_and_backoff(&mut driver);
+    super::exceeded::assert_held(&driver, &run, tasks::Bound::Reasoning);
+    assert_eq!(live(&driver, run.task).flags.ended_by, tasks::EndedBy::Requester);
+    assert!(ended(&driver, run.task).is_none());
+}

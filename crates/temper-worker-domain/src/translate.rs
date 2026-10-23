@@ -190,8 +190,8 @@ pub(crate) const fn operation(operation: agent::Operation) -> host::Operation {
     }
 }
 
-/// Why a run failed, as it reports it. A limited or refused account stays a
-/// failure of its own (`domain/worker.md`, 4.3; jig's `domain/hosts.md`, 6.3),
+/// Why a run failed: configured model-call bounds hold at once. A limited
+/// or refused account stays a failure of its own (`domain/worker.md`, 4.3; jig's `domain/hosts.md`, 6.3),
 /// for the engine to retry the run once the account has room.
 pub(crate) const fn run_failure(failure: &agent::RunFailure) -> host::RunFailure {
     match failure {
@@ -201,6 +201,13 @@ pub(crate) const fn run_failure(failure: &agent::RunFailure) -> host::RunFailure
         agent::RunFailure::Model(agent::ModelFault::Refused { account, code: _ }) => {
             host::RunFailure::Refused { account: *account }
         }
+        agent::RunFailure::Model(agent::ModelFault::Completion {
+            failure: agent::CompletionFailure::Limit { which, bound: value },
+            ..
+        }) => match exceeded(which) {
+            Some(bound) => host::RunFailure::Exceeded(host::Exceeded { bound, value: *value }),
+            None => host::RunFailure::Model,
+        },
         agent::RunFailure::Transcript(_)
         | agent::RunFailure::Model(
             agent::ModelFault::Completion { .. }
@@ -215,6 +222,38 @@ pub(crate) const fn run_failure(failure: &agent::RunFailure) -> host::RunFailure
         agent::RunFailure::Policy(_) => host::RunFailure::Policy,
         agent::RunFailure::Cancelled => host::RunFailure::Cancelled,
         agent::RunFailure::Stale => host::RunFailure::Stale,
+    }
+}
+
+/// The configured call bounds that jig holds instead of retrying (domain/worker.md, 4.3).
+const fn exceeded(which: &agent::Limit) -> Option<host::Bound> {
+    match which {
+        agent::Limit::Path(cap) => match cap {
+            agent::Cap::Reasoning => Some(host::Bound::Reasoning),
+            agent::Cap::Metadata => Some(host::Bound::Metadata),
+            agent::Cap::OutputItems => Some(host::Bound::Items),
+            agent::Cap::Answer => Some(host::Bound::Answer),
+            agent::Cap::Tools => Some(host::Bound::Tools),
+            agent::Cap::HistoryItems => Some(host::Bound::HistoryItems),
+            agent::Cap::Output => Some(host::Bound::Output),
+            agent::Cap::Request
+            | agent::Cap::RequestHead
+            | agent::Cap::ResponseHead
+            | agent::Cap::ResponseFields
+            | agent::Cap::Skip
+            | agent::Cap::Field
+            | agent::Cap::Retained
+            | agent::Cap::Tokens
+            | agent::Cap::Depth
+            | agent::Cap::Strings
+            | agent::Cap::Number
+            | agent::Cap::ErrorBody
+            | agent::Cap::AccessToken
+            | agent::Cap::AccountId => None,
+        },
+        agent::Limit::History => Some(host::Bound::History),
+        agent::Limit::Window => Some(host::Bound::Window),
+        agent::Limit::Pool { .. } | agent::Limit::Call | agent::Limit::Message => None,
     }
 }
 
