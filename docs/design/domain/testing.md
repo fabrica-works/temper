@@ -159,7 +159,10 @@ in temper.
   start's load of each forge's records, a connect at runtime, a forge
   stopped, GitHub's installations, git's tokens' generations and pasted
   values are `temper-service`'s own tests (../protocol/forge.md, section
-  10). The joint's GitHub stories hold the component's half of git's
+  10). On GitHub's layer, a change is checked by its head's check runs,
+  pending then passed, merged at that head and landed; a failed run is
+  a repair (forge.md, 5.3 and 8.4). The joint's GitHub stories hold the
+  component's half of git's
   tokens under temper's settings: every accepted installation's token
   before the forge's first `Connected`, and each renewed before it
   expires on the fake's clock, at GitHub's hour (../protocol/credentials.md,
@@ -519,10 +522,19 @@ in the lower world that owns it, never here.
     the route's transport beside the typed one the other stories keep),
     so each clone and push carries the token the route checks.
   - **The stories:**
-    1. the meeting point (`../draft/github.md`, 16.1): jig's secrets'
-       store seeded with an App's records before the start, its key one
-       of the layer's fixed test keys, and a change landed directly on
-       the fake's GitHub;
+    1. a direct landing (`tests/real-loop/tests/github_land.rs`), on
+       story 6's layer and connection: the App connected with `temper
+       ctl forge-connect` and installed on `acme`, the person adopts
+       `acme/app`, and a chat asks for a change whose coder reads, edits
+       and finishes it and whose reviewer approves, as `fuzzy_landing`'s
+       scripts run on Forgejo. The layer's CI reports the head's check
+       run, context `ci`, pending then passed, within the story's
+       latency; the change is merged at that head and ends landed. The
+       layer's record shows one merge, at the head the coder pushed, by
+       a token minted for `acme`'s installation, and the change task's
+       result names the pull request and its merge commit, which is the
+       tip of `main` on the layer. A whole chat: at most 3 s (1.5 s
+       before the user's doubling of 10-22, provisional);
     2. GitHub connected through the manifest flow from `temper ctl`,
        the browser's steps as the requests above;
     3. a repository added to a project later, from the picker;
@@ -1181,6 +1193,17 @@ and 10).
     provisional),** as a world's story does (6.1); the restart's own
     cost is measured beside the first life's, and a story past its aim
     goes to the user with its figures, never cut by weakening a Must.
+- **A chat's change on connected GitHub, through a restart,** a test of
+  its own, on the same processes, layer and connection as the App's
+  story above, by `crates/temper/tests/support/github_land.rs` on
+  `support/github.rs`'s steps: the chat asks for a change, scripted as
+  the real loop's story 1 is (2.4), and the story waits until the
+  change task has ended. Then the worker and the engine are restarted
+  as above. Its Musts, after the restart: the change task ended landed,
+  its result the same pull request and merge commit as in the first
+  life; the layer saw one merge and one pull request opened across both
+  lives, and no task was made after the restart; the forge reconnects as
+  in the App's story. Its aim is the App's story's.
 - **Outside the suites:** nextest profile `process`, run by
   `scripts/proof-one-process.sh`, which builds the binary and the fake
   `claude` first and sets `TEMPER_TEST_CLAUDE`. It aims at 6 minutes (3

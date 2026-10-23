@@ -598,6 +598,21 @@ tip, the pull request's reviews, and the files of the pull requests an
 overlap compares. These are also the facts the forge's requirements are
 judged on (8.7).
 
+- **CI on a commit** is read as its checks, skein's `Read::Checks`: the
+  commit statuses and, on GitHub, the check runs, each a row with its
+  context and verdict (skein's `forge.md`, 5.2; `forge-github.md`, 4.4),
+  never the combined status alone, which on GitHub stays pending with no
+  status at all while Actions' check runs end. Which rows are CI is the
+  adoption's: where the landing branch's rules name required checks
+  (4.4, `Protection`'s contexts), those contexts, each of which must
+  have reported; otherwise every row. They fold to one verdict: failed
+  when any of them failed; else pending when any is pending or a
+  required context has no row; else passed when any is there; else
+  unknown, which the change waits on as pending (8.4, stalls). The
+  head's, the base tip's and the CI a topic publishes (7.1) are read
+  and folded alike, on every forge: on Forgejo the checks are
+  its statuses, each context's latest, so its CI reads as before.
+
 ### 5.4 The request budget
 
 Held by skein's `forge-client.md`, section 6: the four queues in their
@@ -714,7 +729,7 @@ recovery are skein's `forge-client.md`, section 7. temper's effects:
 | Topic | Published when | Read by |
 |---|---|---|
 | landings on a repository's branch | a landing branch's tip moves | goals working in that repository; landing queues |
-| CI on a head | a head's combined state changes | changes; tasks that subscribe |
+| CI on a head | a head's CI, as 5.3 reads it, changes | changes; tasks that subscribe |
 | a pull request's state | opened, closed, merged, its head moved, its mergeability known | changes; tasks that subscribe |
 | comments and reviews on a participating object | another party writes there | the task dealing with it (section 13) |
 
@@ -1569,3 +1584,10 @@ the group's commit.
   and echoes already on the forge are the old user's. Moving a
   deployment to another App or user, and disconnecting a forge, are
   later.
+- **Which checks are CI on GitHub, without required checks:** temper's
+  draft (`../draft/github.md`, section 9) takes the repository's Actions
+  workflows' check runs there, so that another App's check run (a
+  Codecov's) is not CI. That needs each row's App, which skein's
+  `Status` carries only for a failed Actions run; until skein's dialect
+  carries it on every row, every row is CI (5.3), another App's check
+  runs among them, and its suites with no run list nothing.
