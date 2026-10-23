@@ -2,6 +2,22 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+extern crate std;
+fn h1_now() -> u128 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("wall clock").as_nanos()
+}
+fn h1_end(ending: &jig_domain_host::Ending) -> &'static str {
+    use jig_domain_host::{Ending, Failure, Refusal};
+    match ending {
+        Ending::Refused(Refusal::Busy) => "refused-busy",
+        Ending::Refused(Refusal::Invalid(_)) => "refused-invalid",
+        Ending::Failed { failure: Failure::Agent(_), .. } => "failed-agent",
+        Ending::Failed { failure: Failure::Cancelled(_), .. } => "failed-cancelled",
+        Ending::Failed { .. } => "failed-other",
+        Ending::Ended { .. } => "ended",
+        Ending::Parked { .. } => "parked",
+    }
+}
 use alloc::boxed::Box;
 pub mod forge;
 pub use forge::ForgeRuntime;

@@ -187,8 +187,15 @@ impl Worker {
         let Connection::Socket(remote) = &mut self.connection else { unreachable!("worker alone has a socket") };
         &mut remote.notes
     }
+    fn h1_name(&self) -> &str {
+        match &self.connection {
+            Connection::Socket(remote) => core::str::from_utf8(&remote.worker).unwrap_or("?"),
+            Connection::InProcess(_) => "inline",
+        }
+    }
     pub fn stop(&mut self) {
         if !self.stopping {
+            std::eprintln!("H1 ns={} worker={} ending-began hosted={}", crate::h1_now(), self.h1_name(), self.root.host().hosted());
             self.stopping = true;
             self.git_request(temper_worker_protocol_git::Request::Shutdown);
             self.events.push(root::Event::Shutdown);
@@ -327,6 +334,14 @@ impl Worker {
         self.values.expire(now);
     }
     pub(crate) fn link(&mut self, _now: Time, request: link::Request) {
+        match &request {
+            link::Request::Down { down: hub::LinkDown::Assign { assignment }, .. } => std::eprintln!(
+                "H1 ns={} worker={} assign run={} attempt={} stopping={} hosted={}",
+                crate::h1_now(), self.h1_name(), assignment.assignment.run.raw(), assignment.assignment.attempt.raw(), self.stopping, self.root.host().hosted()),
+            link::Request::Lost => std::eprintln!("H1 ns={} worker={} link-lost", crate::h1_now(), self.h1_name()),
+            link::Request::Closed => std::eprintln!("H1 ns={} worker={} link-closed", crate::h1_now(), self.h1_name()),
+            _ => {},
+        }
         match request {
             link::Request::Ready => {
                 if let Connection::Socket(remote) = &mut self.connection {
@@ -480,6 +495,7 @@ impl Worker {
             }
             root::Request::Link(up) => self.link_down(self.env.now, link::Event::Up { up, parts: Box::default() }),
             root::Request::Answer { run, attempt, answer, work, preparation } => {
+                std::eprintln!("H1 ns={} worker={} answer run={} attempt={} ending={} stopping={} hosted={}", crate::h1_now(), self.h1_name(), run.raw(), attempt.raw(), crate::h1_end(&answer.ending), self.stopping, self.root.host().hosted());
                 let parts = worker_route::answer_parts(&answer, &work, preparation.as_ref());
                 self.link_down(
                     self.env.now,
@@ -507,7 +523,10 @@ impl Worker {
             root::Request::CancelRelay { run, attempt, call } => {
                 self.link_down(self.env.now, link::Event::CancelRelay { run, attempt, call });
             }
-            root::Request::Stop => self.link_down(self.env.now, link::Event::Stop),
+            root::Request::Stop => {
+                std::eprintln!("H1 ns={} worker={} domain-delivered-stop", crate::h1_now(), self.h1_name());
+                self.link_down(self.env.now, link::Event::Stop);
+            },
             root::Request::Process(request) => self.process(*request),
             root::Request::Decode { agent, run, start } => {
                 let start = worker_route::decode(run, *start, &self.agent);

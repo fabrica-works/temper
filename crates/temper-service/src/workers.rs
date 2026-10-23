@@ -128,6 +128,7 @@ impl Workers {
         events: &mut Queue<root::Event>,
     ) {
         let (task, attempt) = (value.task, value.attempt);
+        std::eprintln!("H1 ns={} engine assign channel={} run={} attempt={}", crate::h1_now(), channel.raw(), task, attempt);
         match self.encoded_assignment(now, channel, value, values) {
             Some(event) => self.down(now, event, events),
             None => events.push(root::Event::Worker(root::WorkerInput::Link {
@@ -263,6 +264,7 @@ impl Workers {
                     self.received(channel, up, &parts, events);
                 }
                 kit::Request::Lost { channel } => {
+                    std::eprintln!("H1 ns={} engine link-lost channel={}", crate::h1_now(), channel.raw());
                     events.push(root::Event::Worker(root::WorkerInput::Link { channel, link: root::Link::Lost }));
                 }
                 kit::Request::Closed => self.component_closed = true,
@@ -338,6 +340,9 @@ enum Closing {
 impl Workers {
     /// Decode application records in this step, discarding and counting a bad set.
     pub fn received(&mut self, channel: Token, up: host::LinkUp, records: &[Part], events: &mut Queue<root::Event>) {
+        if let host::LinkUp::Answer { run, attempt, answer } = &up {
+            std::eprintln!("H1 ns={} engine answer channel={} run={} attempt={} ending={}", crate::h1_now(), channel.raw(), run.raw(), attempt.raw(), crate::h1_end(&answer.ending));
+        }
         let parts = match parts(&up, records, &self.encoding.limits) {
             Some(parts) => parts,
             None => {

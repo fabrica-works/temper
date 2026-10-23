@@ -727,7 +727,7 @@ impl Referee<cluster::Root> for Judge {
                 self.map_channels(&ctl::json(Self::calls(root).ends().last().expect("first life hosts")));
                 self.first_workers = std::mem::take(&mut self.workers);
                 self.channels.clear();
-                eprintln!("CASE_DIAG stop_one(ws) now={now:?} last_act={}", describe(self.ran.last().expect("stop act")));
+                eprintln!("CASE_DIAG stop_one(ws) ns={} now={now:?} last_act={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("wall").as_nanos(), describe(self.ran.last().expect("stop act")));
                 self.members.stop_one("ws");
                 self.stage = Stage::Stopping;
             }
