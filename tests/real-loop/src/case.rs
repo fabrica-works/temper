@@ -98,11 +98,15 @@ pub enum Agent {
     Phase,
     Rules,
     Scope,
+    Shape,
+    Mover,
 }
 impl Agent {
     #[must_use]
     pub fn cue(self) -> &'static [u8] {
         match self {
+            Self::Shape => b"@case_shape",
+            Self::Mover => b"@case_mover",
             Self::Rules => b"@case_rules",
             Self::Scope => b"@case_scope",
             Self::Hang => b"@case_hang",
@@ -346,5 +350,55 @@ pub fn fixture_5_1() -> forge::Fixture {
             value["application"]["landing"]["projects"] = json!([]);
             landing::admit(value);
         },
+    }
+}
+
+// Act 2, step 5.3 (domain/testing.md, 5.3)
+pub const SHAPE: u64 = 1;
+pub const MOVER: u64 = 2;
+pub const MOVER_QUESTION_NUMBER: u64 = 1;
+pub const MOVER_AMENDMENT_REVISION: u64 = 1;
+pub const SHAPE_PERSON: &str = "@case_shape Help A move Export to the new shape; amend its instructions when it asks.";
+pub const MOVER_SPEC: &str = "@case_mover Own Export; ask the director how to go on under the new shape and report.";
+pub const OLD_BRIEF: &str = "Implement Export in one long session.";
+pub const MOVER_QUESTION: &str = "How do I go on under the new shape?";
+pub const NEW_BRIEF: &str = "x3 finishes the old way, outside any milestone, under the person's two-hour cap; if it doesn't finish, we evaluate together. Then make the milestone plan first.";
+pub const SHAPE_REASON: &str = "Continue x3 under the cap, then plan the milestones.";
+pub const SHAPE_DELEGATED: &str = "A owns Export under its old brief.";
+pub const SHAPE_AMENDED: &str = "A's instructions now answer its question.";
+pub const MOVER_ASKED: &str = "The new-shape question awaits the director.";
+pub const MOVER_REPORT: &str = "x3 will finish under the cap; the milestone plan comes next.";
+pub const SHAPE_REPORT: &str = "A reported under its amended instructions.";
+
+#[must_use]
+pub fn fixture_5_3() -> forge::Fixture {
+    forge::Fixture {
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            let mut owner = value["engine"]["charters"][0].clone();
+            owner["number"] = 2.into();
+            // Configuration names an instruction file. Keep it in this fixture's
+            // private data tree, also when the cluster separates config and data.
+            let directory =
+                std::path::Path::new(value["workers"][0]["agent"]["configuration"].as_str().expect("agent path"))
+                    .parent()
+                    .expect("fixture data");
+            let instructions = directory.join("charters/owner.txt");
+            fixtures::private(&instructions, OLD_BRIEF.as_bytes()).expect("owner instructions");
+            owner["instructions"] = instructions.to_str().expect("instructions path").into();
+            value["engine"]["charters"].as_array_mut().expect("charters").push(owner);
+            value["engine"]["limits"]["overrides"]["tasks.charters"] = 2.into();
+            let mut kinds = value["engine"]["rules"]["ceiling"]["delegation"]["kinds"].clone();
+            kinds.as_array_mut().expect("executor kinds").push(json!({"kind":"charter","number":2}));
+            value["engine"]["rules"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+                project["policy"]["roles"][0]["authority"]["delegation"]["kinds"] = kinds.clone();
+            }
+            // Neither task mounts a repository or delegates a change.
+            value["application"]["landing"]["projects"] = json!([]);
+            landing::admit(value);
+        },
+        ..fixture()
     }
 }

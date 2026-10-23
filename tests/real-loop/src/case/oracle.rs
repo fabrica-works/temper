@@ -130,6 +130,8 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::Phase,
         Agent::Rules,
         Agent::Scope,
+        Agent::Shape,
+        Agent::Mover,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -1916,6 +1918,245 @@ mod rules_tests {
                 *observed.documents.get_mut(&read).expect("ended").pointer_mut(path).expect("field") = Value::Null;
                 rejects(&observed, RULES_CONTROL, "original director and A");
             }
+        }
+    }
+}
+
+// Act 2, step 5.3 (domain/testing.md, 5.3)
+const SHAPE_INSTRUCTIONS: Promise = Promise::Must("instructions amended (exact)");
+const SHAPE_HISTORY: Promise = Promise::Add("the amendment is in A's history, with what it replaced");
+const SHAPE_ENDINGS: Promise = Promise::Step("the chat and A report under the new brief");
+
+/// The observable before/after, without a deadline's hold (waiting on jig)
+/// or a ctl read of the stored amendment history (a client gap).
+#[must_use]
+pub fn step_5_3(observed: &Observed) -> Vec<Miss> {
+    use super::{
+        MOVER, MOVER_AMENDMENT_REVISION, MOVER_QUESTION, MOVER_QUESTION_NUMBER, MOVER_REPORT, NEW_BRIEF, OLD_BRIEF,
+        SHAPE, SHAPE_REPORT,
+    };
+    let mut misses = Vec::new();
+    let ended = task_document(observed, Read::MoverEnded);
+    step_check(
+        &mut misses,
+        "5.3",
+        text(ended, "/instructions/bytes") == NEW_BRIEF
+            && ended.pointer("/instructions/cut") == Some(&Value::Bool(false))
+            && number(ended, "/spec_revision/value") == Some(MOVER_AMENDMENT_REVISION),
+        SHAPE_HISTORY,
+        "A's document must hold the whole new brief at the amendment's revision",
+    );
+    let a: Vec<_> = observed.told.iter().filter(|told| told.agent == Agent::Mover).collect();
+    step_check(
+        &mut misses,
+        "5.3",
+        a.first().is_some_and(|told| contains(&told.system, OLD_BRIEF) && !contains(&told.system, NEW_BRIEF)),
+        SHAPE_HISTORY,
+        "A's first query must carry the old instructions alone in system text",
+    );
+    let amended = a
+        .iter()
+        .position(|told| contains(&told.system, NEW_BRIEF) || user_words(told).any(|words| contains(words, NEW_BRIEF)));
+    let after = amended.map_or(&a[a.len()..], |at| &a[at..]);
+    step_check(
+        &mut misses,
+        "5.3",
+        amended.is_some_and(|at| at > 0)
+            && !after.is_empty()
+            && after.iter().all(|told| contains(&told.system, NEW_BRIEF) && !contains(&told.system, OLD_BRIEF)),
+        SHAPE_INSTRUCTIONS,
+        "every A query from the amendment onward must use the new instructions alone",
+    );
+    step_check(
+        &mut misses,
+        "5.3",
+        !after.is_empty()
+            && after.iter().all(|told| {
+                user_words(told).map(|words| calls::occurrences(words, NEW_BRIEF.as_bytes())).sum::<usize>() == 1
+            }),
+        SHAPE_INSTRUCTIONS,
+        "A must be told the amendment's whole message once in each later query's history",
+    );
+    let chat: Vec<_> = observed.told.iter().filter(|told| told.agent == Agent::Shape).collect();
+    step_check(
+        &mut misses,
+        "5.3",
+        !chat.is_empty()
+            && chat.iter().all(|told| !contains(&told.system, OLD_BRIEF) && !contains(&told.system, NEW_BRIEF)),
+        SHAPE_INSTRUCTIONS,
+        "the chat's charter must carry neither of A's instruction briefs",
+    );
+    let sent = format!("Message {MOVER_QUESTION_NUMBER} sent");
+    let question_at = observed
+        .told
+        .iter()
+        .position(|told| told.agent == Agent::Shape && user_words(told).any(|words| contains(words, MOVER_QUESTION)));
+    let amendment_at = observed.told.iter().position(|told| {
+        told.agent == Agent::Mover
+            && (contains(&told.system, NEW_BRIEF) || user_words(told).any(|words| contains(words, NEW_BRIEF)))
+    });
+    step_check(
+        &mut misses,
+        "5.3",
+        a.iter().any(|told| contains(&told.words, &sent))
+            && question_at.zip(amendment_at).is_some_and(|(question, amendment)| question < amendment),
+        SHAPE_INSTRUCTIONS,
+        "A's numbered question must reach the chat before it amends A",
+    );
+    for (read, task, report) in [(Read::MoverEnded, MOVER, MOVER_REPORT), (Read::ShapeEnded, SHAPE, SHAPE_REPORT)] {
+        let ended = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "5.3",
+            number(ended, "/chip/task") == Some(task)
+                && number(ended, "/project") == Some(PROJECT)
+                && text(ended, "/chip/phase") == "ended"
+                && text(ended, "/result/value/report/bytes") == report,
+            SHAPE_ENDINGS,
+            "the original chat and A must end with their reports in the project",
+        );
+    }
+    misses
+}
+
+#[cfg(test)]
+mod shape_tests {
+    use super::*;
+    use crate::case::{
+        MOVER, MOVER_AMENDMENT_REVISION, MOVER_QUESTION, MOVER_QUESTION_NUMBER, MOVER_REPORT, NEW_BRIEF, OLD_BRIEF,
+        SHAPE, SHAPE_REPORT,
+    };
+    use serde_json::json;
+    use skein_fake_llm_domain::api::{Message, Part, Role};
+
+    fn user(words: &str) -> Message {
+        Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
+    }
+    fn told(agent: Agent, brief: &str, messages: &[Message]) -> Told {
+        Told::new(&[agent.cue(), b"\n", brief.as_bytes()].concat(), b"fake", Some(0), messages).expect("case cue")
+    }
+    fn met() -> Observed {
+        let a = json!({"chip":{"task":MOVER,"phase":"ended"},"project":PROJECT,
+            "instructions":{"bytes":NEW_BRIEF,"cut":false},"spec_revision":{"value":MOVER_AMENDMENT_REVISION},
+            "result":{"value":{"report":{"bytes":MOVER_REPORT}}}});
+        let shape = json!({"chip":{"task":SHAPE,"phase":"ended"},"project":PROJECT,
+            "result":{"value":{"report":{"bytes":SHAPE_REPORT}}}});
+        Observed {
+            documents: BTreeMap::from([(Read::MoverEnded, a), (Read::ShapeEnded, shape)]),
+            told: vec![
+                told(Agent::Mover, OLD_BRIEF, &[]),
+                told(
+                    Agent::Mover,
+                    OLD_BRIEF,
+                    &[Message {
+                        role: Role::User,
+                        parts: Box::new([Part::ToolOutput {
+                            id: b"question".as_slice().into(),
+                            is_error: false,
+                            output: format!("Message {MOVER_QUESTION_NUMBER} sent").into_bytes().into(),
+                        }]),
+                    }],
+                ),
+                told(Agent::Shape, "", &[user(MOVER_QUESTION)]),
+                told(Agent::Mover, NEW_BRIEF, &[user(NEW_BRIEF)]),
+                told(Agent::Mover, NEW_BRIEF, &[user(NEW_BRIEF), user("Continue")]),
+            ],
+            commands: Vec::new(),
+            kit: Kit { main: BTreeMap::new(), merged_green: false },
+        }
+    }
+    fn rejects(observed: &Observed, promise: Promise, what: &str) {
+        let misses = step_5_3(observed);
+        assert!(misses.iter().all(|miss| miss.step == "5.3"));
+        assert!(
+            misses.iter().any(|miss| miss.promise == promise && miss.what.contains(what)),
+            "expected {what}: {}",
+            misses.iter().map(ToString::to_string).collect::<Vec<_>>().join("; ")
+        );
+    }
+    #[test]
+    fn amendment_and_its_observable_before_and_after_meet_the_checkpoint() {
+        assert_met(&step_5_3(&met()));
+    }
+    #[test]
+    fn the_current_instructions_and_their_revision_are_checked() {
+        for path in ["/instructions/bytes", "/instructions/cut", "/spec_revision/value"] {
+            let mut observed = met();
+            *observed
+                .documents
+                .get_mut(&Read::MoverEnded)
+                .expect("A's document")
+                .pointer_mut(path)
+                .expect("mutated field") = Value::Null;
+            rejects(&observed, SHAPE_HISTORY, "A's document");
+        }
+    }
+    #[test]
+    fn the_opening_system_must_have_only_the_old_brief() {
+        for brief in [String::new(), NEW_BRIEF.into(), format!("{OLD_BRIEF}\n{NEW_BRIEF}")] {
+            let mut observed = met();
+            observed.told[0].system = brief.into_bytes().into();
+            rejects(&observed, SHAPE_HISTORY, "first query");
+        }
+    }
+    #[test]
+    fn every_system_after_the_amendment_must_have_only_the_new_brief() {
+        for at in [3, 4] {
+            for brief in [String::new(), OLD_BRIEF.into(), format!("{OLD_BRIEF}\n{NEW_BRIEF}")] {
+                let mut observed = met();
+                observed.told[at].system = brief.into_bytes().into();
+                rejects(&observed, SHAPE_INSTRUCTIONS, "every A query");
+            }
+        }
+    }
+    #[test]
+    fn the_amendment_message_must_arrive_once() {
+        for at in [3, 4] {
+            for messages in [vec![], vec![user(NEW_BRIEF), user(NEW_BRIEF)]] {
+                let mut observed = met();
+                observed.told[at].history = messages.into();
+                rejects(&observed, SHAPE_INSTRUCTIONS, "whole message once");
+            }
+        }
+        let mut observed = met();
+        observed.told.truncate(3);
+        rejects(&observed, SHAPE_INSTRUCTIONS, "every A query");
+    }
+    #[test]
+    fn the_chat_never_inherits_either_brief() {
+        for brief in [OLD_BRIEF, NEW_BRIEF] {
+            let mut observed = met();
+            observed.told[2].system = brief.as_bytes().into();
+            rejects(&observed, SHAPE_INSTRUCTIONS, "chat's charter");
+        }
+        let mut observed = met();
+        observed.told.retain(|told| told.agent != Agent::Shape);
+        rejects(&observed, SHAPE_INSTRUCTIONS, "chat's charter");
+    }
+    #[test]
+    fn the_numbered_question_and_its_delivery_are_checked() {
+        let mut observed = met();
+        observed.told[1] = told(Agent::Mover, OLD_BRIEF, &[]);
+        rejects(&observed, SHAPE_INSTRUCTIONS, "numbered question");
+        let mut observed = met();
+        observed.told[2].history = Box::new([]);
+        rejects(&observed, SHAPE_INSTRUCTIONS, "numbered question");
+        let mut observed = met();
+        observed.told.swap(2, 3);
+        rejects(&observed, SHAPE_INSTRUCTIONS, "numbered question");
+    }
+    #[test]
+    fn both_numbered_tasks_must_report_in_the_project() {
+        for read in [Read::MoverEnded, Read::ShapeEnded] {
+            for path in ["/chip/task", "/project", "/chip/phase", "/result/value/report/bytes"] {
+                let mut observed = met();
+                *observed.documents.get_mut(&read).expect("ended document").pointer_mut(path).expect("mutated field") =
+                    Value::Null;
+                rejects(&observed, SHAPE_ENDINGS, "original chat and A");
+            }
+            let mut observed = met();
+            observed.documents.remove(&read);
+            rejects(&observed, SHAPE_ENDINGS, "original chat and A");
         }
     }
 }

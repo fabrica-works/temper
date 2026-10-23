@@ -41,6 +41,8 @@ pub enum Read {
     RulesQuestionWaiting,
     ScopeEnded,
     RulesEnded,
+    ShapeEnded,
+    MoverEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -352,5 +354,21 @@ pub fn step_5_1() -> Vec<calls::Step> {
         call(D1, argv!["release", number(RULES), "--hold", number(RULES_HOLD_REVISION), "--key", "rules-release"]),
         join(RULES_ENDED),
         call(D1, argv!["task", number(SCOPE), "--json"]),
+    ]
+}
+
+// Act 2, step 5.3 (domain/testing.md, 5.3)
+const SHAPE_ENDED: usize = 2;
+pub const READS_5_3: &[(Read, usize)] = &[(Read::MoverEnded, 3), (Read::ShapeEnded, SHAPE_ENDED)];
+
+#[must_use]
+pub fn step_5_3() -> Vec<calls::Step> {
+    use super::{MOVER, SHAPE, SHAPE_PERSON};
+    vec![
+        sign_in(D1),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "shape", SHAPE_PERSON]),
+        start(D1, argv!["wait", "task", number(SHAPE), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(MOVER), "--until", "ended", "--json"]),
+        join(SHAPE_ENDED),
     ]
 }

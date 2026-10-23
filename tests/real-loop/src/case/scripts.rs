@@ -454,3 +454,44 @@ pub fn step_5_1_rules() -> Box<[Box<[Rule]>]> {
     .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
     Box::new([Box::new(director), Box::new([])])
 }
+
+// Act 2, step 5.3 (domain/testing.md, 5.3)
+#[must_use]
+pub fn step_5_3(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        MOVER, MOVER_AMENDMENT_REVISION, MOVER_ASKED, MOVER_QUESTION, MOVER_REPORT, MOVER_SPEC, NEW_BRIEF, SHAPE,
+        SHAPE_AMENDED, SHAPE_DELEGATED, SHAPE_REASON, SHAPE_REPORT,
+    };
+    Box::new([
+        Script {
+            cue: Agent::Shape.cue().into(),
+            turns: Box::new([
+                call(
+                    b"delegate",
+                    &json!({"batch":[{
+                        "executor":{"kind":"agent","charter":2},"tracked":{"priority":1},
+                        "spec":{"words":MOVER_SPEC,"parameters":[]},"contract":{"kind":"report","words":128},
+                        "authority":{"tools":3,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},
+                            "budget":{"spend":20},"notes":0}
+                    }]}),
+                ),
+                wait(SHAPE_DELEGATED),
+                call(
+                    b"amend",
+                    &json!({"target":MOVER,"revision":MOVER_AMENDMENT_REVISION - 1,
+                    "amendment":{"instructions":NEW_BRIEF,"reason":SHAPE_REASON}}),
+                ),
+                wait(SHAPE_AMENDED),
+                report(SHAPE_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::Mover.cue().into(),
+            turns: Box::new([
+                call(b"message", &json!({"target":SHAPE,"form":"question","words":MOVER_QUESTION})),
+                wait(MOVER_ASKED),
+                report(MOVER_REPORT),
+            ]),
+        },
+    ])
+}
