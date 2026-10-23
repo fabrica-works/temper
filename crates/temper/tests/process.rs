@@ -85,6 +85,56 @@ fn temper_ctl_signs_in_by_the_link_read_on_stdin() {
 }
 
 #[test]
+fn a_fresh_link_keeps_the_sign_in_held() {
+    use support::ctl::{Call, Step, Story};
+    let scratch = ctl_scratch("fresh_link_keeps_sign_in");
+    let clock = skein_shell::Clock::new();
+    let mut mismatches = Vec::new();
+    let mut first_party = None;
+    let mut first_token = Vec::new();
+    // Three native runs are one more than the configuration's people.sign_ins pool holds (2).
+    for run in 1..=3 {
+        let began = clock.now().now;
+        let seen = support::ctl::run(Story::new(
+            scratch.path(),
+            vec![Step::Run(Call::sign_in()), Step::Run(Call::new(&["me", "--json"]))],
+        ));
+        eprintln!("fresh link serve run {run}: {:?}", clock.now().now.saturating_since(began));
+        let [signed, me] = seen.calls.as_slice() else { panic!("sign-in and me each ended") };
+        if signed.exit != Some(Exit::Code(0)) {
+            mismatches.push(format!(
+                "run {run}: sign-in exited {:?}, expected Code(0); stderr: {}",
+                signed.exit,
+                String::from_utf8_lossy(&signed.stderr).trim_end()
+            ));
+        }
+        let document = serde_json::from_slice::<serde_json::Value>(&me.stdout).unwrap_or_default();
+        let party = document["party"]["number"].as_u64();
+        if me.exit != Some(Exit::Code(0)) || party.is_none() || run > 1 && party != first_party {
+            mismatches.push(format!(
+                "run {run}: me exited {:?}, party {party:?}, expected Code(0) and {}; stderr: {}",
+                me.exit,
+                first_party.map_or_else(|| "a party number".into(), |number| format!("party {number}")),
+                String::from_utf8_lossy(&me.stderr).trim_end()
+            ));
+        }
+        let token = fs_read(&scratch.path().join("client/token"));
+        if token.len() != 40 {
+            mismatches.push(format!("run {run}: client/token has {} bytes, expected 40", token.len()));
+        }
+        if run == 1 {
+            first_party = party;
+            // All 40 bytes: the big-endian sign-in number followed by its 32-byte random secret.
+            first_token = token;
+        } else if token != first_token {
+            mismatches.push(format!("run {run}: client/token differs from run 1 (sign-in number or secret changed)"));
+        }
+    }
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+    scratch.remove();
+}
+
+#[test]
 fn a_wait_past_its_timeout_exits_3() {
     use support::ctl::{Call, Step, Story};
     let scratch = ctl_scratch("ctl_timeout");
