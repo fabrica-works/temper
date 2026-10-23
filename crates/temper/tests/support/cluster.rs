@@ -10,7 +10,7 @@ use skein_world::{
     real,
 };
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     os::unix::fs::DirBuilderExt,
     path::{Component, Path, PathBuf},
@@ -30,7 +30,7 @@ pub struct Cluster {
     experiment: PathBuf,
     specs: Vec<Value>,
     bindings: BTreeMap<String, String>,
-    prepared: std::collections::BTreeSet<String>,
+    prepared: BTreeSet<String>,
     /// The settled cgroup preflight's wall time, including its world.
     pub probe_cost: Duration,
 }
@@ -99,7 +99,7 @@ impl Cluster {
                 "{name}'s memory bound"
             );
         }
-        Self { experiment, specs, bindings, prepared: Default::default(), probe_cost: Duration::ZERO }
+        Self { experiment, specs, bindings, prepared: BTreeSet::new(), probe_cost: Duration::ZERO }
     }
     /// Rename one member and its template bindings before any files are rendered.
     pub fn rename(&mut self, member: &str, name: &str) {
@@ -482,6 +482,7 @@ impl Members {
     pub fn prepare(&mut self, process: &str) -> PathBuf {
         self.cluster.prepare(process)
     }
+    #[must_use]
     pub fn dir(&self, process: &str) -> PathBuf {
         self.cluster.dir(process)
     }

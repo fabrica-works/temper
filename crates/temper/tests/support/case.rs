@@ -28,9 +28,11 @@ pub struct Run {
     workers: BTreeMap<u64, String>,
 }
 impl Run {
+    #[must_use]
     pub fn calls(&self) -> &[Ended] {
         &self.calls
     }
+    #[must_use]
     pub fn observed(&self, reads: &[(acts::Read, usize)]) -> Observed {
         let documents = reads
             .iter()
@@ -45,6 +47,7 @@ impl Run {
         Observed { documents, told: self.told.clone(), commands: Vec::new(), kit: self.kit.clone() }
     }
     /// Placement only where an act's document retains a live observation channel.
+    #[must_use]
     pub fn placed(&self) -> &BTreeMap<u64, String> {
         &self.workers
     }
@@ -63,7 +66,7 @@ fn encode(scripts: &[Script]) -> Value {
         let lines: Vec<Value> = turn.lines.iter().map(|line| match line {
             Line::Text { text: words } => json!({"text":text(words)}),
             Line::Call { name, arguments } => json!({"call":text(name),"arguments":serde_json::from_slice::<Value>(arguments).expect("arguments")}),
-            other => panic!("case script line unsupported: {other:?}"),
+            other @ (Line::Fail { .. } | Line::Pieces { .. } | Line::Opaque { .. }) => panic!("case script line unsupported: {other:?}"),
         }).collect();
         let finish = match turn.finish { Finish::Stop => "stop", Finish::ToolCalls => "tool_calls", Finish::Length => "length", Finish::ContentFilter => "content_filter" };
         json!({"lines":lines,"finish":finish,"tokens":turn.tokens})
@@ -209,7 +212,7 @@ impl Judge {
         );
         self.marked = now;
     }
-    fn calls<'a>(root: &'a mut cluster::Root) -> &'a mut ctl::Calls {
+    fn calls(root: &mut cluster::Root) -> &mut ctl::Calls {
         let cluster::Root::Client { calls: Some(calls), .. } = root else { panic!("client calls") };
         calls
     }
@@ -400,7 +403,7 @@ impl Referee<cluster::Root> for Judge {
                 let directory = self.members.prepare("llm");
                 let path = directory.join("llm.json");
                 let mut document = read(&path);
-                document["models"] = json!([{"name":"fake","window":1048576,"output":8192},{"name":"owner","window":1048576,"output":8192}]);
+                document["models"] = json!([{"name":"fake","window":1_048_576,"output":8192},{"name":"owner","window":1_048_576,"output":8192}]);
                 document["cued"] = encode(&(self.scripts)(address));
                 write(&path, &document);
                 self.members.up(&["llm"]);
@@ -502,15 +505,19 @@ impl Referee<cluster::Root> for Judge {
                     String::from_utf8_lossy(&member.stderr)
                 );
                 assert!(!member.killed && member.survivors.is_empty(), "no surviving process");
+                if member.name == "engine" {
+                    let expected = format!("listening webhooks {}", self.hooks);
+                    assert!(
+                        String::from_utf8_lossy(&member.stderr).lines().any(|line| line == expected),
+                        "configured webhook address is bound"
+                    );
+                }
             }
             if !self.stopped {
                 for member in ["llm", "forge"] {
                     let bytes = fs::read(self.members.dir(member).join("observations.jsonl")).expect("final records");
-                    let last = bytes
-                        .split(|byte| *byte == b'\n')
-                        .filter(|line| !line.is_empty())
-                        .next_back()
-                        .expect("final checkpoint");
+                    let last =
+                        bytes.split(|byte| *byte == b'\n').rfind(|line| !line.is_empty()).expect("final checkpoint");
                     assert_eq!(
                         serde_json::from_slice::<Value>(last).expect("checkpoint"),
                         json!({"observations_lost":0})
@@ -598,6 +605,29 @@ impl Judge {
             .iter()
             .map(|file| (decode(&file["path"]), decode(&file["content"])))
             .collect();
+        let workers = self.placements(accounts);
+        eprintln!(
+            "case LLM records: queries={}, bytes={}",
+            told.len(),
+            fs::metadata(self.members.dir("llm").join("observations.jsonl")).expect("records metadata").len()
+        );
+        eprintln!(
+            "case evidence: pushed={}, checked_head={head}, merge={merge}, spare_observations={}",
+            rows.iter().filter(|row| row["observation"] == "moved" && row["repository"] == "acme/app").count(),
+            rows.iter().filter(|row| row["repository"] == "acme/spare").count()
+        );
+        eprintln!(
+            "case spare visibility: act_stdout={}, accounts={}, told={}",
+            self.calls.iter().filter(|call| call.stdout.windows(b"spare".len()).any(|word| word == b"spare")).count(),
+            accounts.to_string().contains("spare"),
+            told.iter().filter(|query| query.words.windows(b"spare".len()).any(|word| word == b"spare")).count(),
+        );
+        *self.run.borrow_mut() =
+            Some(Run { calls: std::mem::take(&mut self.calls), told, kit: Kit { main, merged_green: green }, workers });
+    }
+}
+impl Judge {
+    fn placements(&self, accounts: &Value) -> BTreeMap<u64, String> {
         // jig retains a task's channel only while claimed/running. Use only JSON
         // stdout already read by the acts, with the same document's hosts or the
         // authorized post-act accounts read. Each worker must link exactly once;
@@ -630,22 +660,12 @@ impl Judge {
             } else {
                 "gap: no act read a live task channel"
             };
-            eprintln!("case placement {task}: {}", workers.get(task).map(String::as_str).unwrap_or(gap));
+            eprintln!("case placement {task}: {}", workers.get(task).map_or(gap, String::as_str));
         }
-        eprintln!(
-            "case LLM records: queries={}, bytes={}",
-            told.len(),
-            fs::metadata(self.members.dir("llm").join("observations.jsonl")).expect("records metadata").len()
-        );
-        eprintln!(
-            "case evidence: pushed={}, checked_head={head}, merge={merge}, spare_observations={}",
-            rows.iter().filter(|row| row["observation"] == "moved" && row["repository"] == "acme/app").count(),
-            rows.iter().filter(|row| row["repository"] == "acme/spare").count()
-        );
-        *self.run.borrow_mut() =
-            Some(Run { calls: std::mem::take(&mut self.calls), told, kit: Kit { main, merged_green: green }, workers });
+        workers
     }
 }
+
 fn decode(value: &Value) -> Vec<u8> {
     base64::decode(
         base64::Alphabet::Standard,

@@ -182,16 +182,16 @@ pub fn configure(
     // shell.md 6.5 has no absent setting; Default alone means absent.
     // In particular --ready "" is a present, empty prefix.
     let ready = if resolved.value(1).origin == Origin::Default { None } else { Some(resolved.value(1).bytes.clone()) };
-    let observations = if resolved.value(3).origin != Origin::Default {
-        Some(super::path(&resolved.value(3).bytes).to_path_buf())
-    } else {
+    let observations = if resolved.value(3).origin == Origin::Default {
         None
+    } else {
+        Some(super::path(&resolved.value(3).bytes).to_path_buf())
     };
     Ok(super::Command::Fake { arguments: Arguments { kind, source, ready, seed, observations } })
 }
 
 pub const SEED_USAGE: &str = "usage: temper fake seed [DIRECTORIES]";
-const LLM_USAGE: &str = "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]";
+const LLM_USAGE: &str = "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] [--observations FILE] | temper fake llm --document FILE [--ready PREFIX] [--seed N] [--observations FILE]";
 const FORGE_USAGE: &str = "usage: temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]";
 fn forge_number(number: &[u8]) -> Result<u16, &'static str> {
     std::str::from_utf8(number)
@@ -526,12 +526,12 @@ impl Host {
         }
         let Peer::Llm(peer) = &self.peer else { unreachable!("LLM records") };
         for record in peer.observations().iter().skip(self.llm_written) {
-            if let llm_peer::Observation::Query { query, .. } = record {
-                if llm::observations::encode(query, &mut self.buffer).is_err() {
-                    self.buffer.clear();
-                    self.fail("observations", &"query record exceeds its byte bound");
-                    return;
-                }
+            if let llm_peer::Observation::Query { query, .. } = record
+                && llm::observations::encode(query, &mut self.buffer).is_err()
+            {
+                self.buffer.clear();
+                self.fail("observations", &"query record exceeds its byte bound");
+                return;
             }
         }
         self.llm_written = peer.observations().len();

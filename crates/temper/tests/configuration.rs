@@ -116,7 +116,7 @@ fn the_clusters_description_is_the_labs_canonical_form() {
     for process in value["processes"].as_array().expect("cluster processes") {
         let name = process["name"].as_str().expect("process name");
         let memory = match name {
-            "llm" => serde_json::Value::Null,
+            "forge" | "llm" => serde_json::Value::Null,
             "engine" => cluster_document(&cluster, name)["engine"]["memory_bytes"].clone(),
             "w1" | "w2" => cluster_document(&cluster, name)["workers"][0]["memory_bytes"].clone(),
             _ => panic!("unknown cluster process {name}"),

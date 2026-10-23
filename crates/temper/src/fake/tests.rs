@@ -13,6 +13,15 @@ fn arguments() {
         (vec!["fake", "llm", "--document", "llm.json"], vec![], Kind::Llm, "llm.json", None, 0, None),
         (vec!["fake", "forge", "--document", "forge.json"], vec![], Kind::Forge, "forge.json", None, 0, None),
         (
+            vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
+            vec![],
+            Kind::Llm,
+            "doc",
+            None,
+            0,
+            Some("seen"),
+        ),
+        (
             vec!["fake", "llm", "--document", "llm.json", "--ready", "ready ", "--seed", "23"],
             vec![],
             Kind::Llm,
@@ -78,10 +87,6 @@ fn arguments() {
         (
             vec!["fake", "llm", "--document", "doc", "--seed", "no"],
             "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
-        ),
-        (
-            vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
-            "temper fake llm: unexpected argument --observations\n",
         ),
         (
             vec!["fake", "forge", "--document", "doc", "extra"],

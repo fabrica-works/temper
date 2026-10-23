@@ -978,11 +978,15 @@ impl skein_world::Referee<support::cluster::Root> for ClusterJudge {
         self.members.observe(now, hosts);
         if let Some(stopped) = self.members.stopped() {
             if self.workers {
-                assert_eq!(stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["w2", "w1", "engine", "llm"]);
+                assert_eq!(
+                    stopped.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+                    ["w2", "w1", "engine", "llm", "forge"]
+                );
             } else {
-                let [engine, llm] = stopped else { panic!("engine and llm stopped") };
+                let [engine, llm, forge] = stopped else { panic!("engine, llm and forge stopped") };
                 assert_eq!(engine.name, "engine");
                 assert_eq!(llm.name, "llm");
+                assert_eq!(forge.name, "forge");
                 engine_lines(engine);
             }
             for member in stopped {
@@ -1876,11 +1880,29 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
         }
         if let Some(stopped) = self.members.stopped() {
             let expected = if self.story == ClusterStory::Restart {
-                vec![("w1", FIRST_LIFE), ("w1", SECOND_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+                vec![
+                    ("w1", FIRST_LIFE),
+                    ("w1", SECOND_LIFE),
+                    ("engine", FIRST_LIFE),
+                    ("llm", FIRST_LIFE),
+                    ("forge", FIRST_LIFE),
+                ]
             } else if self.story == ClusterStory::Kill {
-                vec![("w1", FIRST_LIFE), ("w2", FIRST_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+                vec![
+                    ("w1", FIRST_LIFE),
+                    ("w2", FIRST_LIFE),
+                    ("engine", FIRST_LIFE),
+                    ("llm", FIRST_LIFE),
+                    ("forge", FIRST_LIFE),
+                ]
             } else {
-                vec![("w2", FIRST_LIFE), ("w1", FIRST_LIFE), ("engine", FIRST_LIFE), ("llm", FIRST_LIFE)]
+                vec![
+                    ("w2", FIRST_LIFE),
+                    ("w1", FIRST_LIFE),
+                    ("engine", FIRST_LIFE),
+                    ("llm", FIRST_LIFE),
+                    ("forge", FIRST_LIFE),
+                ]
             };
             assert_eq!(stopped.iter().map(|s| (s.name.as_str(), s.life)).collect::<Vec<_>>(), expected);
             for member in stopped {
