@@ -13,13 +13,15 @@ fn an_owners_amended_instructions_reach_its_next_run_without_a_deadlines_hold_or
     // Leaves out the deadline's hold: jig never enforces a budget deadline on
     // a running task (jig's crates/jig-domain-tasks/src/domain.rs:698 and
     // crates/jig-domain-core/src/run.rs:121), in jig's backlog.
-    // Leaves out the amendment history's read: jig keeps the before/after
-    // (crates/jig-domain-tasks/src/control.rs:698, save_history), and its store
-    // serves Scope::History (crates/jig-protocol-store/src/reads.rs:59), but no
-    // temper ctl command reads it (crates/temper-client-tools/src/table.rs:8;
+    // Leaves out the amendment history's read: jig's History keeps the task's
+    // settings override before and after (crates/jig-domain-tasks/src/control.rs:698,
+    // save_history), so when the brief comes from the charter, as here, "before"
+    // records no override, not the old text; its store serves Scope::History
+    // (crates/jig-protocol-store/src/reads.rs:59), but no temper ctl command
+    // reads it (crates/temper-client-tools/src/table.rs:8;
     // crates/temper-client-tools/src/jig/render.rs:55 maps ReadValue::History to
-    // nothing). This client gap is covered here only by what A was told before
-    // and after. No x3 is delegated, and the two hours remain words. Also leaves
+    // nothing). A ctl read alone wouldn't show what was replaced; this story
+    // covers it only by what A was told before and after. No x3 is delegated, and the two hours remain words. Also leaves
     // out reference-case 6.8(c)'s charter run policy:
     // a charter changes only in config, across a restart; this amends A's task.
     // Pruning A's notes into an archive is A's own work (domain/testing.md, 5.3).
