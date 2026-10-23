@@ -402,11 +402,10 @@ impl Judge {
             })
             .collect()
     }
-    fn advance(&mut self, now: Time, root: &mut cluster::Root) {
-        use calls::Step;
+    fn prepare_calls(&mut self, root: &mut cluster::Root) -> bool {
         let batch = Self::calls(root);
         if !batch.foreground_idle() {
-            return;
+            return false;
         }
         self.calls = self
             .slots
@@ -439,9 +438,9 @@ impl Judge {
             ])));
             batch.push(ctl::Step::Run(ctl::Call::new(&["wait", "accounts", "--until", "usable"])));
             self.stage = Stage::Provision;
-            return;
+            return false;
         }
-        if matches!(self.ran.last(), Some(Step::Call { argv, .. }) if self.arguments(argv)[0] == "chat")
+        if matches!(self.ran.last(), Some(calls::Step::Call { argv, .. }) if self.arguments(argv)[0] == "chat")
             && !matches!(self.live.as_ref(), Some(value) if value["chat_act"] == self.ran.len())
         {
             // The harness's own read, as the provisioning is: the director's chat
@@ -464,8 +463,16 @@ impl Judge {
                 "--json",
             ])));
             self.stage = Stage::Live;
+            return false;
+        }
+        true
+    }
+    fn advance(&mut self, now: Time, root: &mut cluster::Root) {
+        use calls::Step;
+        if !self.prepare_calls(root) {
             return;
         }
+        let batch = Self::calls(root);
         let Some(step) = self.steps.pop_front() else {
             self.mark("acts", now);
             batch.push(ctl::Step::Run(ctl::Call::new(&["accounts", "--json"])));
@@ -545,6 +552,65 @@ impl Judge {
         self.ran.push(step);
     }
 }
+impl Judge {
+    fn release_placed(&self) {
+        if let Some(control) = self.control
+            && !matches!(self.stage, Stage::Accounts | Stage::Stop)
+            && ["ws", "s1", "s2"].iter().all(|name| self.members.linked(name) == 0 || self.assigned.contains(*name))
+            && !self.assigned.is_empty()
+        {
+            release(control);
+        }
+    }
+    fn start_llm(&mut self, now: Time) {
+        self.mark("forge ready", now);
+        let address = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
+        let directory = self.members.prepare("llm");
+        let path = directory.join("llm.json");
+        let mut document = read(&path);
+        document["models"] =
+            json!([{"name":"fake","window":1_048_576,"output":8192},{"name":"owner","window":1_048_576,"output":8192}]);
+        document["cued"] = encode(&(self.scripts)(address), &(self.rules)());
+        if has_holds(&document["cued"]) {
+            let [control] = super::free_addresses(&[address, self.hosts]);
+            self.control = Some(control);
+            document["control"] = json!({"socket":control.to_string()});
+        }
+        write(&path, &document);
+        self.members.up(&["llm"]);
+        self.stage = Stage::Llm;
+    }
+    fn add_worker(&mut self, root: &mut cluster::Root) {
+        let document = ctl::json(Self::calls(root).ends().last().expect("before add"));
+        self.map_channels(&document);
+        for name in ["ws", "s1"] {
+            assert!(self.assigned.contains(name), "{name} held a run before s2 started");
+        }
+        let target = self.members.linked("s2") + 1;
+        self.members.up(&["s2"]);
+        self.stage = Stage::Added { target };
+    }
+    fn record_placement(&mut self, root: &mut cluster::Root) {
+        let batch = Self::calls(root);
+        for call in &batch.ends()[self.processed..] {
+            success(call);
+            live_channels(&ctl::json(call), &mut self.channels);
+        }
+        self.processed = batch.ends().len();
+        self.map_channels(&ctl::json(batch.ends().last().expect("placement hosts")));
+        self.stage = Stage::Acts;
+    }
+    fn finish_acts(&mut self, now: Time, root: &mut cluster::Root) {
+        let accounts = Self::calls(root).ends().last().expect("post-act accounts");
+        success(accounts);
+        let accounts = ctl::json(accounts);
+        self.collect(&accounts);
+        self.mark("reads", now);
+        Self::calls(root).release();
+        self.members.stop();
+        self.stage = Stage::Stop;
+    }
+}
 impl Referee<cluster::Root> for Judge {
     fn act(&mut self, now: Time, roots: &mut [cluster::Root]) {
         self.members.act(now, roots);
@@ -558,23 +624,7 @@ impl Referee<cluster::Root> for Judge {
         }
         let root = roots.last_mut().expect("client root");
         match self.stage {
-            Stage::Forge if self.members.is_up() => {
-                self.mark("forge ready", now);
-                let address = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
-                let directory = self.members.prepare("llm");
-                let path = directory.join("llm.json");
-                let mut document = read(&path);
-                document["models"] = json!([{"name":"fake","window":1_048_576,"output":8192},{"name":"owner","window":1_048_576,"output":8192}]);
-                document["cued"] = encode(&(self.scripts)(address), &(self.rules)());
-                if has_holds(&document["cued"]) {
-                    let [control] = super::free_addresses(&[address, self.hosts]);
-                    self.control = Some(control);
-                    document["control"] = json!({"socket":control.to_string()});
-                }
-                write(&path, &document);
-                self.members.up(&["llm"]);
-                self.stage = Stage::Llm;
-            }
+            Stage::Forge if self.members.is_up() => self.start_llm(now),
             Stage::Llm if self.members.is_up() => {
                 self.mark("llm ready", now);
                 self.configure();
@@ -605,16 +655,7 @@ impl Referee<cluster::Root> for Judge {
                 self.queue(root);
                 self.stage = Stage::Acts;
             }
-            Stage::BeforeAdd if Self::calls(root).foreground_idle() => {
-                let document = ctl::json(Self::calls(root).ends().last().expect("before add"));
-                self.map_channels(&document);
-                for name in ["ws", "s1"] {
-                    assert!(self.assigned.contains(name), "{name} held a run before s2 started");
-                }
-                let target = self.members.linked("s2") + 1;
-                self.members.up(&["s2"]);
-                self.stage = Stage::Added { target };
-            }
+            Stage::BeforeAdd if Self::calls(root).foreground_idle() => self.add_worker(root),
             Stage::Added { target } if self.members.linked("s2") == target => {
                 let task = temper_real_loop_world::case::BENCHMARK.to_string();
                 let batch = Self::calls(root);
@@ -622,16 +663,7 @@ impl Referee<cluster::Root> for Judge {
                 batch.push(ctl::Step::Run(ctl::Call::new(&["accounts", "--json"])));
                 self.stage = Stage::Placed;
             }
-            Stage::Placed if Self::calls(root).foreground_idle() => {
-                let batch = Self::calls(root);
-                for call in &batch.ends()[self.processed..] {
-                    success(call);
-                    live_channels(&ctl::json(call), &mut self.channels);
-                }
-                self.processed = batch.ends().len();
-                self.map_channels(&ctl::json(batch.ends().last().expect("placement hosts")));
-                self.stage = Stage::Acts;
-            }
+            Stage::Placed if Self::calls(root).foreground_idle() => self.record_placement(root),
             Stage::BeforeStop if Self::calls(root).foreground_idle() => {
                 self.map_channels(&ctl::json(Self::calls(root).ends().last().expect("first life hosts")));
                 self.first_workers = std::mem::take(&mut self.workers);
@@ -645,16 +677,7 @@ impl Referee<cluster::Root> for Judge {
             }
             Stage::Starting { target } if self.members.linked("ws") == target => self.stage = Stage::Acts,
             Stage::Acts => self.advance(now, root),
-            Stage::Accounts if Self::calls(root).foreground_idle() => {
-                let accounts = Self::calls(root).ends().last().expect("post-act accounts");
-                success(accounts);
-                let accounts = ctl::json(accounts);
-                self.collect(&accounts);
-                self.mark("reads", now);
-                Self::calls(root).release();
-                self.members.stop();
-                self.stage = Stage::Stop;
-            }
+            Stage::Accounts if Self::calls(root).foreground_idle() => self.finish_acts(now, root),
             Stage::Provision if Self::calls(root).foreground_idle() => {
                 for call in Self::calls(root).ends() {
                     success(call);
@@ -685,13 +708,7 @@ impl Referee<cluster::Root> for Judge {
             | Stage::Accounts
             | Stage::Stop => {}
         }
-        if let Some(control) = self.control
-            && !matches!(self.stage, Stage::Accounts | Stage::Stop)
-            && ["ws", "s1", "s2"].iter().all(|name| self.members.linked(name) == 0 || self.assigned.contains(*name))
-            && !self.assigned.is_empty()
-        {
-            release(control);
-        }
+        self.release_placed();
     }
     fn observe(&mut self, now: Time, roots: &[cluster::Root]) {
         self.members.observe(now, &roots[..roots.len() - 1]);
