@@ -963,6 +963,7 @@ fn forges_encode_the_domains_rows_without_settings() {
             &w::ForgeRow::new(
                 &w::CEILINGS,
                 w::ForgeRowParts {
+                    app: None,
                     installations: List::with_capacity(0),
                     ended: None,
                     first: None,

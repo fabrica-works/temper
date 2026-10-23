@@ -447,6 +447,7 @@ fn deliver_first_record(
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                app: None,
                 installations: List::with_capacity(0),
                 ended: None,
                 number: HERE,

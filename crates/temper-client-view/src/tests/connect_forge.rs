@@ -16,6 +16,7 @@ pub(super) fn row(
     w::ForgeRow::new(
         &w::CEILINGS,
         w::ForgeRowParts {
+            app: None,
             installations: List::with_capacity(0),
             ended: None,
             first: None,
@@ -476,6 +477,7 @@ pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> Lis
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                app: None,
                 installations: List::with_capacity(0),
                 ended: None,
                 number: HERE,

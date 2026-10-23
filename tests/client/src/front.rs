@@ -849,6 +849,7 @@ impl Joint {
                 w::ForgeRow::new(
                     &w::CEILINGS,
                     w::ForgeRowParts {
+                        app: None,
                         first: None,
                         number: demo.forge(),
                         kind: w::Kind::Forgejo,

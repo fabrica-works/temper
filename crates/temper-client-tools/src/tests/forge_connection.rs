@@ -61,7 +61,7 @@ fn connect_carries_the_bundle_once_without_saving_it() {
         let call = root.submit_value(CONNECT, Some(Secret::new(pem.into())));
         let w::Request::Connect(connect) = request(&root, call) else { panic!("connect") };
         assert_eq!(connect.forge(), 3);
-        let w::How::GithubApp(app) = connect.into_parts().how;
+        let w::How::GithubApp(app) = connect.into_parts().how else { panic!("pasted App") };
         assert_eq!(app.id(), 4242);
         assert_eq!(root.sent_name(call), Some(f::named("app")));
         let mut expected = skein_lib::Writer::new(pem.len().checked_add(6).expect("bundle length"));

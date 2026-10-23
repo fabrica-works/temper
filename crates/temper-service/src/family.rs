@@ -81,6 +81,11 @@ pub fn to_root(
                         w::Request::Connect(value) => {
                             let app = match value.how() {
                                 w::How::GithubApp(app) => app.id(),
+                                w::How::GithubManifest(_) => {
+                                    return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable {
+                                        to: reply_to,
+                                    })));
+                                }
                             };
                             forge::Ask::Connect {
                                 forge: value.forge(),
@@ -621,6 +626,7 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                 w::ForgeRow::new(
                     limits,
                     w::ForgeRowParts {
+                        app: None,
                         installations,
                         ended,
                         number: row.number,

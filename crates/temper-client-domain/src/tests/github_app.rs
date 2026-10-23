@@ -86,7 +86,7 @@ fn carried(pem: &[u8]) -> Secret {
                 panic!("Connect")
             };
             assert_eq!(connect.forge(), 2);
-            let w::How::GithubApp(app) = connect.how();
+            let w::How::GithubApp(app) = connect.how() else { panic!("pasted App") };
             assert_eq!(app.id(), 7);
             carried = Some(value);
         }

@@ -33,6 +33,7 @@ fn record_first(connection: w::Connection, first: Option<w::FirstRepository>) ->
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    app: None,
                     installations: List::with_capacity(0),
                     ended: None,
                     first,
@@ -752,6 +753,7 @@ fn settled_wait_with_installations(count: u32) {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    app: None,
                     number: 3,
                     kind: w::Kind::Github,
                     mode: w::Mode::Connected,
@@ -897,6 +899,7 @@ fn human_forges_bounds_the_wire_maximum_installations_with_longest_logins() {
             w::ForgeRow::new(
                 &bounds,
                 w::ForgeRowParts {
+                    app: None,
                     number: 3,
                     kind: w::Kind::Github,
                     mode: w::Mode::Connected,
