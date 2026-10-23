@@ -12,6 +12,7 @@ pub struct Request {
     pub broken: Option<Broken>,
     value: Option<Secret>,
     written: u64,
+    returned: Option<u32>,
 }
 impl Request {
     #[must_use]
@@ -41,6 +42,22 @@ impl Request {
     /// Started is an address to visit, never proof of a completed login.
     #[must_use]
     pub fn sign_in_state(&self, client: &Client) -> SignInState {
+        if self.pending.is_none()
+            && let Some(source) = self.returned
+        {
+            let Some(accounts) = document(client) else { return SignInState::Signing { source } };
+            for signing in &accounts.signing {
+                if signing.source == source {
+                    return SignInState::Signing { source };
+                }
+            }
+            if let Some(end) = &accounts.last_end
+                && end.source == source
+            {
+                return SignInState::Ended { source };
+            }
+            return SignInState::Unknown;
+        }
         let Some((source, _)) = self.started() else {
             return SignInState::Unknown;
         };
@@ -84,6 +101,13 @@ impl Request {
             SignInState::Started { .. } | SignInState::Signing { .. } => Some(self.started()?.1),
             SignInState::Unknown | SignInState::Ended { .. } => None,
         }
+    }
+    #[must_use]
+    pub const fn returned(&self) -> bool {
+        self.pending.is_none() && self.returned.is_some()
+    }
+    pub(crate) fn return_from(&mut self, source: Option<u32>) {
+        self.returned = source;
     }
     fn started(&self) -> Option<(u32, &[u8])> {
         if let jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
@@ -225,6 +249,6 @@ impl Request {
 #[expect(clippy::derivable_impls, reason = "the programming model uses explicit Default implementations")]
 impl Default for Request {
     fn default() -> Self {
-        Self { pending: None, confirm: None, broken: None, value: None, written: 0 }
+        Self { pending: None, confirm: None, broken: None, value: None, written: 0, returned: None }
     }
 }

@@ -166,7 +166,7 @@ fn a_connected_forge_and_usable_model_remove_the_setup_strip_and_dot() {
     let strip = view(&root);
     node(&strip, Role::Region, b"Setup");
     node(&strip, Role::Link, b"View");
-    let way = d::ModelWay { provider: accounts::PROVIDER, kind: d::WayKind::Key };
+    let way = d::ModelWay { source: None, provider: accounts::PROVIDER, kind: d::WayKind::Key };
     for event in [
         d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model { way: Some(way) } }) },
         d::Event::AccountKey { value: skein_lib::Secret::new(b"test-private-key".as_slice().into()) },

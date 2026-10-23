@@ -55,7 +55,7 @@ fn driver_with_limits(limits: &engine::Limits) -> (Driver, u64) {
         key: [71; 16],
         digest: [71; 32],
         carried: None,
-        request: forge::Ask::Adopt(fixtures::adoption(1)),
+        request: temper_engine_domain::Application::Forge(forge::Ask::Adopt(fixtures::adoption(1))),
     }));
     driver.settle();
     (driver, sign_in)
@@ -259,7 +259,7 @@ fn restart_forgets_ci_until_the_next_step_reads_it() {
         key: [71; 16],
         digest: [71; 32],
         carried: None,
-        request: forge::Ask::Adopt(fixtures::adoption(1)),
+        request: temper_engine_domain::Application::Forge(forge::Ask::Adopt(fixtures::adoption(1))),
     }));
     driver.settle();
     let stand = driver.forge.as_mut().expect("fake forge");

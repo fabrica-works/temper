@@ -233,7 +233,8 @@ pub fn answer(value: &jig_client::Answered, limits: &Limits) -> Option<StartAnsw
         | w::Outcome::CoreRefused(_)
         | w::Outcome::ForgeRefused(_)
         | w::Outcome::SettingUp
-        | w::Outcome::SetUpRefused(_) => return None,
+        | w::Outcome::SetUpRefused(_)
+        | w::Outcome::Returning => return None,
     })
 }
 fn start_key(side: &Side, key: jig_client::Key) -> bool {

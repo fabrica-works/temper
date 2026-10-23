@@ -10,6 +10,7 @@ pub mod acts;
 pub mod address;
 pub mod amend;
 pub mod boundary;
+mod departure;
 pub mod domain;
 pub mod forge;
 pub mod key;
@@ -19,7 +20,7 @@ pub mod pages;
 mod route;
 pub use address::{Address, Choice, ModelWay, Place, Step, WayKind};
 pub use boundary::{Action, Event, Fact, Request};
-pub use domain::{Domain, fire, new, next_deadline, shown, step, take, unlinked};
+pub use domain::{Domain, fire, new, new_departing, next_deadline, shown, step, take, unlinked, unlinked_departing};
 pub use limits::{Limits, max_out, worst_case};
 #[cfg(test)]
 mod tests;

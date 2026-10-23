@@ -65,9 +65,9 @@ fn first(state: v1::FirstState) -> v1::FirstRepository {
     .expect("record within schema ceilings")
 }
 #[test]
-fn setup_and_every_first_repository_state_round_trip_at_version_seven() {
+fn setup_and_every_first_repository_state_round_trip_at_version_eight() {
     use temper_client_protocol_wire as wire;
-    assert_eq!(wire::CLIENT_VERSION, 7);
+    assert_eq!(wire::CLIENT_VERSION, 8);
     for project in [
         project(),
         v1::SetUpProject::New(

@@ -23,6 +23,7 @@ pub struct Host {
     stream: jig_client_protocol_http::Stream,
     tickets: BTreeMap<u32, Token>,
     next: u32,
+    pub navigate: Option<Box<[u8]>>,
     pub show: Option<(Box<[u8]>, bool)>,
 }
 impl Host {
@@ -32,7 +33,7 @@ impl Host {
         assert!(limits::worst_case(&client).is_some(), "web capacities are checked");
         let (bounds, words) = limits::view(&client).expect("web view capacities are checked");
         Self {
-            root: root::new(&client, seed),
+            root: root::new_departing(&client, seed),
             view: view::View::new(&bounds, &client, words, temper_client_protocol_wire::FORGE),
             bounds,
             env: Env { now, wall, limits: client },
@@ -44,6 +45,7 @@ impl Host {
             tickets: BTreeMap::new(),
             next: 0,
             show: None,
+            navigate: None,
         }
     }
     pub fn start(&mut self, path: &[u8], records: Vec<skein_ui_web::store::Record>, secret: Option<Box<[u8]>>) {
@@ -161,6 +163,7 @@ impl Host {
                         self.event(Event::Went { place: Place::Address(address) });
                     }
                 }
+                Request::Leave { to } => self.navigate = Some(to),
                 Request::SignOut => self.client(jig_client::Event::SignOut),
                 Request::Dropped { .. } | Request::Fact { .. } => {}
             }

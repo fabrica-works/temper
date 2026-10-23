@@ -136,6 +136,7 @@ pub enum Event {
 pub enum Request {
     Client(jig_client::Event),
     Show { address: Address },
+    Replace { address: Address },
 }
 impl Default for Pages {
     fn default() -> Self {
@@ -396,6 +397,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
     }
+    returned(pages, client, out);
     let owner = pages.accounts_open
         && match accounts::current_me(client) {
             Some(me) => me.deployment_role == Some(jig_client::contract::HeldRole::Owner),
@@ -533,6 +535,27 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
         }
         pages.choice = choice::Draft::default();
         pages.confirm = None;
+    }
+    if let Some(page) = &mut pages.connect_model {
+        let source = match &address {
+            Address::ConnectModel { way: Some(way) }
+            | Address::Welcome { step: crate::Step::Model { way: Some(way) } }
+                if way.kind == crate::WayKind::SignIn =>
+            {
+                way.source
+            }
+            Address::Inbox { .. }
+            | Address::Chats
+            | Address::Accounts
+            | Address::Forges
+            | Address::ConnectForge { .. }
+            | Address::ConnectModel { .. }
+            | Address::Welcome { .. }
+            | Address::Chat { .. }
+            | Address::Task { .. }
+            | Address::Adopt { .. } => None,
+        };
+        page.request.return_from(source);
     }
     pages.address = address;
 }
@@ -865,4 +888,32 @@ fn start_chat(pages: &mut Pages, env: &Env<Limits>, client: &Client, out: &mut Q
     if let Some(chats) = &mut pages.chats {
         chats.start(env, me, pages.project, &pages.choice, &mut pages.serial, out);
     }
+}
+
+fn returned(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
+    let Some(page) = &mut pages.connect_model else { return };
+    if !page.request.returned()
+        || accounts::document(client).is_none()
+        || page.request.sign_in_state(client) != accounts::SignInState::Unknown
+    {
+        return;
+    }
+    match &mut pages.address {
+        Address::ConnectModel { way: Some(way) } | Address::Welcome { step: crate::Step::Model { way: Some(way) } } => {
+            way.source = None;
+        }
+        Address::Inbox { .. }
+        | Address::Chats
+        | Address::Accounts
+        | Address::Forges
+        | Address::ConnectForge { .. }
+        | Address::ConnectModel { .. }
+        | Address::Welcome { .. }
+        | Address::Chat { .. }
+        | Address::Task { .. }
+        | Address::Adopt { .. } => return,
+    }
+    page.request.return_from(None);
+    pages.shown = pages.shown.checked_add(1).expect("pages shown fits");
+    out.push(Request::Replace { address: pages.address.clone() });
 }

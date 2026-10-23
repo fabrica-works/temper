@@ -115,6 +115,9 @@ fn choice(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, wa
     flow::choice(b, &heading, &description, &say(w, note), control);
 }
 fn request_for_way(page: &model::ConnectModel, way: Way) -> bool {
+    if page.request.returned() && model::model_way(way).kind == WayKind::SignIn {
+        return true;
+    }
     let Some(pending) = &page.request.pending else { return false };
     match (&pending.ask, way) {
         (c::Ask::SignIn { provider, .. }, Way::SignIn { provider: chosen, .. }) => *provider == chosen,
@@ -133,6 +136,12 @@ fn ready(root: &Domain, way: Way) -> bool {
     let Some(page) = root.pages().connect_model() else { return false };
     if !request_for_way(page, way) {
         return false;
+    }
+    if page.request.returned() {
+        return match page.request.sign_in_state(root.client()) {
+            SignInState::Ended { .. } => true,
+            SignInState::Unknown | SignInState::Started { .. } | SignInState::Signing { .. } => false,
+        };
     }
     if let Some(p) = &page.request.pending {
         match (&p.ask, &p.outcome, way) {
@@ -306,13 +315,13 @@ fn ready_body(
     let Some(page) = root.pages().connect_model() else { return };
     let Some(me) = accounts::current_me(root.client()) else { return };
     let (brand, plan) = names(me, way);
-    let Some(pending) = &page.request.pending else { return };
     match way {
         Way::Key { .. } => {
             crate::cards::text(b, Role::Status, &named(w, W::KeyAdded, brand));
             text(b, w, Role::Paragraph, W::KeyRuns);
         }
         Way::Program { .. } => {
+            let Some(pending) = &page.request.pending else { return };
             let name = match &pending.outcome {
                 Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
                     c::OwnerOutcome::AccountProgramDeclared { name, .. },
@@ -448,8 +457,12 @@ fn facts(b: &mut Builder, root: &Domain, w: &Words, way: Way) {
     let doc = accounts::document(root.client());
     let Some(me) = accounts::current_me(root.client()) else { return };
     let (brand, plan) = names(me, way);
+    let outcome = match &page.request.pending {
+        Some(pending) => pending.outcome.as_ref(),
+        None => None,
+    };
     let account = match doc {
-        Some(doc) => match &page.request.pending.as_ref().expect("ready request").outcome {
+        Some(doc) => match outcome {
             Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
                 c::OwnerOutcome::AccountKeyKept { source },
             ))))) => {

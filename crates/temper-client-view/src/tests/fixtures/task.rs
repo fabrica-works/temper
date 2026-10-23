@@ -275,6 +275,7 @@ pub fn agent_root_with_page(
             }),
             Request::Client { .. }
             | Request::Show { .. }
+            | Request::Leave { .. }
             | Request::SignOut
             | Request::Dropped { .. }
             | Request::Fact { .. } => None,

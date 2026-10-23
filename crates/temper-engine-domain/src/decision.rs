@@ -69,7 +69,7 @@ pub enum Delivery {
     },
     Application {
         to: ReplyTo,
-        outcome: Option<temper_engine_domain_forge::Answered>,
+        outcome: Option<crate::ApplicationAnswer>,
     },
     /// Host protocol handoffs follow their prerequisite commits.
     Host(Box<crate::HostDelivery>),
@@ -651,6 +651,7 @@ pub fn resume(journal: &mut Journal, out: &mut Queue<Output>) {
             | crate::Output::Account(_)
             | crate::Output::Busy(_)
             | crate::Output::Drained
+            | crate::Output::Return { .. }
             | crate::Output::Stop) => out.push(Output::Now(request)),
         }
     }
