@@ -343,6 +343,7 @@ pub fn incoming(
         | engine::Request::EraseCarried { .. }
         | engine::Request::StopGroup { .. }
         | engine::Request::SetUp { .. }
+        | engine::Request::Bound { .. }
         | engine::Request::Return { .. }
         | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)
@@ -400,6 +401,7 @@ pub fn incoming(
         | Delivery::Link { .. }
         | Delivery::ForgeCommitted { .. }
         | Delivery::ForgeCall { .. }
+        | Delivery::Bound { .. }
         | Delivery::Procedure { .. }
         | Delivery::Relay { .. }
         | Delivery::ReadEscalationDecision { .. }

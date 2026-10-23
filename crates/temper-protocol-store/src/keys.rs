@@ -4,6 +4,9 @@ use skein_kv::{KeyReader, KeyWriter};
 use skein_lib::List;
 use temper_engine_domain_forge as forge;
 
+/// The `Binding` family's byte, taken at landing as a version is (protocol/store.md, 2).
+pub const BINDING: u8 = 18;
+
 fn write_name(writer: &mut KeyWriter, name: &forge::Name) {
     writer.u64(u64::from(name.forge)).u64(u64::from(name.repository));
     match &name.what {
@@ -65,7 +68,8 @@ pub fn largest(limits: &forge::Limits) -> Option<u32> {
     let name = limits.name_bytes.checked_mul(3)?.checked_add(19)?;
     let topic = limits.name_bytes.checked_mul(2)?.checked_add(28)?;
     // Writer is one family byte and an eight-byte forge number: 9 bytes.
-    Some(name.max(topic).max(92))
+    // Binding: family byte, visible address bytes (no zero escapes), and byte-string terminator.
+    Some(name.max(topic).max(92).max(1 + 254 + 2))
 }
 
 /// Encode one relative key, or refuse it when it exceeds `limit`.
@@ -134,6 +138,12 @@ pub fn encode(key: &forge::Key, limit: u32) -> Option<Box<[u8]>> {
         forge::Key::Application(token) => {
             writer.tag(15).u64(*token);
         }
+        forge::Key::Binding(address) => {
+            if !forge::binding_address(address) {
+                return None;
+            }
+            writer.tag(BINDING).bytes(address);
+        }
         forge::Key::Demo(forge) => {
             writer.tag(17).u64(u64::from(*forge));
         }
@@ -172,6 +182,13 @@ pub fn decode(bytes: &[u8], limits: &forge::Limits) -> Option<forge::Key> {
         15 => forge::Key::Application(reader.u64()?),
         16 => forge::Key::Writer(u16::try_from(reader.u64()?).ok()?),
         17 => forge::Key::Demo(u16::try_from(reader.u64()?).ok()?),
+        BINDING => {
+            let address = reader.bytes()?;
+            if !forge::binding_address(&address) {
+                return None;
+            }
+            forge::Key::Binding(address)
+        }
         _ => return None,
     };
     if !reader.is_empty() {

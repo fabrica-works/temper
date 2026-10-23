@@ -15,7 +15,7 @@ static HEAP: Counting = Counting;
 
 #[test]
 fn a_turn_reserves_no_patch_queue() {
-    let mut host = host::Host::new(11, Time::ZERO, Wall::EPOCH);
+    let mut host = host::Host::new(11, Time::ZERO, Wall::EPOCH, temper_client_view::sign_in::Ways::NONE);
     host.start(b"/chats", Vec::new(), None);
     let bound = u64::from(host.bounds.tree.patches) * u64::try_from(size_of::<Patch>()).expect("patch size fits");
     let meter = Meter::new();

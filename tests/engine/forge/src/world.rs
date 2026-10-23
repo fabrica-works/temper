@@ -46,6 +46,7 @@ pub const LIMITS: top::Limits = top::Limits {
     facts: 16,
     adoptions: 2,
     applications: 4,
+    bindings: 4,
     collaborators: 8,
     landings: 8,
     judge_projects: 2,
@@ -587,7 +588,8 @@ impl World {
                     };
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
-                other @ (top::Request::DemoStart { .. }
+                other @ (top::Request::Bound { .. }
+                | top::Request::DemoStart { .. }
                 | top::Request::StopGroup { .. }
                 | top::Request::SetUpGroup { .. }
                 | top::Request::SetUp { .. }
@@ -700,6 +702,7 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
         top::Stored::Demo(row) => top::Key::Demo(row.forge),
+        top::Stored::Binding { address, .. } => top::Key::Binding(address.clone()),
         top::Stored::Release(row) => top::Key::Release(row.task),
         top::Stored::Application { token, .. } => top::Key::Application(*token),
         top::Stored::Writer(row) => top::Key::Writer(row.forge),

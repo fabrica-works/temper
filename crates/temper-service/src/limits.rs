@@ -147,6 +147,8 @@ const FORGE: forge::Limits = forge::Limits {
     adoptions: 2,
     // Keyed application requests retained, from the engine forge world fixture.
     applications: 4,
+    // protocol/sign-in.md, 5: small permits 64 durable member bindings.
+    bindings: 64,
     // Collaborators kept by the forge, from the engine forge world fixture.
     collaborators: 8,
     // Landing operations retained, from the engine forge world fixture.

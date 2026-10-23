@@ -324,13 +324,16 @@ its sockets tagged as the server's are.
   name="temper-sign-in" content="WAYS">` before the page's `</head>`,
   `WAYS` the configured ways, space-separated (`google`, or nothing),
   and the `ETag` is the page's so made; a page without `</head>` is
-  refused at start, naming the bundle. The web shell reads the meta at
-  start and gives the view the ways at construction. Further facts of a
+  refused at start, naming the bundle. The web shell reads the meta and
+  the page's origin (`location.origin`) at start and gives the view
+  both at construction; a page whose origin is not `http` or `https`
+  offers no way. Further facts of a
   signed-out page come as further `temper-` metas made the same way
   (stage 2: the forge's name, for "to continue to").
 - **The signed-out main** (`../client/README.md`, 5.1), in the browser
   with a way: temper's mark, the level-1 heading "Sign in", and a link
-  for each way, "Continue with Google" to `/sign-in/google?then=PATH`,
+  for each way, "Continue with Google" to
+  `ORIGIN/sign-in/google?then=PATH`, absolute as skein-ui's links are,
   `PATH` the printed address of the page, percent-encoded. With no way,
   the printed link's line, as before. The terminal's "Signed out." is
   unchanged.

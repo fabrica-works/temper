@@ -125,6 +125,7 @@ fn delivered(delivery: root::Delivery) -> Option<kit::Event> {
         | root::Delivery::Link { .. }
         | root::Delivery::ForgeCommitted { .. }
         | root::Delivery::ForgeCall { .. }
+        | root::Delivery::Bound { .. }
         | root::Delivery::Procedure { .. }
         | root::Delivery::Relay { .. }
         | root::Delivery::ReadEscalationDecision { .. }

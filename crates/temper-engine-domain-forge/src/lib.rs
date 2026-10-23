@@ -222,6 +222,7 @@ pub fn stored_key(row: &Stored) -> Key {
         Stored::Application { token, .. } => Key::Application(*token),
         Stored::Writer(row) => Key::Writer(row.forge),
         Stored::Demo(row) => Key::Demo(row.forge),
+        Stored::Binding { address, .. } => Key::Binding(address.clone()),
     }
 }
 /// Checked payload bytes of one connector record for its parent's store page.
@@ -368,6 +369,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             }
             Some(held)
         }
+        Stored::Binding { address, subject } => bytes(address)?.checked_add(bytes(subject)?),
         Stored::BranchHead(row) => name(&row.name),
         Stored::PullState(row) => name(&row.name),
         Stored::Ci(_) | Stored::Landed { .. } | Stored::Writer(_) | Stored::Demo(_) => Some(0),
@@ -484,4 +486,25 @@ pub fn describe_projection_effect(
         skein_forge_client::Recovery::Unrecoverable => Recovery::Unrecoverable,
     };
     Some(ProjectionEffect { access: effect_access(repository, &resource, kind), resource, kind, form, recovery })
+}
+
+/// A canonical member address, bounded as protocol/sign-in.md, 3.1 requires.
+#[must_use]
+pub fn binding_address(address: &[u8]) -> bool {
+    if !(3..=254).contains(&address.len()) || address.first() == Some(&b'@') || address.last() == Some(&b'@') {
+        return false;
+    }
+    let mut at = false;
+    for byte in address {
+        if !byte.is_ascii_graphic() || byte.is_ascii_uppercase() {
+            return false;
+        }
+        if *byte == b'@' {
+            if at {
+                return false;
+            }
+            at = true;
+        }
+    }
+    at
 }

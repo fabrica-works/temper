@@ -773,7 +773,8 @@ fn a_change_produced_opened_checked_queued_and_landed() {
                 top::Request::ChangeDecision { decision: change::Decision::Delegate(_), .. } => {
                     panic!("unexpected delegate")
                 }
-                top::Request::DemoStart { .. }
+                top::Request::Bound { .. }
+                | top::Request::DemoStart { .. }
                 | top::Request::StopGroup { .. }
                 | top::Request::SetUpGroup { .. }
                 | top::Request::Connect { .. }

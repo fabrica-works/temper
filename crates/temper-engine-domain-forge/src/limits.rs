@@ -31,6 +31,8 @@ pub struct Limits {
     pub facts: u32,
     pub adoptions: u32,
     pub applications: u32,
+    /// Durable member address bindings (protocol/sign-in.md, 5).
+    pub bindings: u32,
     pub collaborators: u32,
     pub landings: u32,
     /// Project judge tables retained beside committed policy.
@@ -96,7 +98,9 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     let criteria = u64::from(l.judge_criteria).checked_mul(u64::try_from(size_of::<Criterion>()).ok()?)?;
     let judges = Map::<u32, Box<[Criterion]>>::worst_case(l.judge_projects)?
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
-    crate::adoption::worst_case(l)?
+    Map::<Box<[u8]>, Box<[u8]>>::worst_case(l.bindings)?
+        .checked_add(u64::from(l.bindings).checked_mul(254 + 255)?)?
+        .checked_add(crate::adoption::worst_case(l)?)?
         .checked_add(crate::connect::worst_case(l.applications)?)?
         .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
         .checked_add(Map::<skein_lib::Token, crate::StartAnswer>::worst_case(l.applications)?)?

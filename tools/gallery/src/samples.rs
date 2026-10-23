@@ -17,6 +17,7 @@ pub enum Then {
     Filled,
     Refused,
     SignedOut,
+    GoogleSignIn,
     OutOfDate,
     Closing,
     Rejecting,
@@ -37,7 +38,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 45;
+pub const N: usize = 46;
 #[must_use]
 pub fn samples() -> [Sample; N] {
     use Then::{
@@ -104,6 +105,7 @@ pub fn samples() -> [Sample; N] {
         },
         Sample { name: "accounts-reference", world: Reference, address: Address::Accounts, then: Shown },
         Sample { name: "accounts-first-run-1", world: FirstRun { step: 1 }, address: Address::Accounts, then: Shown },
+        Sample { name: "google-sign-in", world: Bare, address: Address::Chats, then: Then::GoogleSignIn },
         Sample { name: "signed-out", world: Bare, address: Address::Chats, then: SignedOut },
         Sample { name: "out-of-date", world: Bare, address: Address::Chats, then: OutOfDate },
         Sample { name: "chats-empty", world: Bare, address: Address::Chats, then: Shown },
@@ -143,6 +145,9 @@ fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: T
 }
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
+    if sample.then == Then::GoogleSignIn {
+        return Some("sign-in.html?world=google-sign-in&bare".to_owned());
+    }
     if sample.then != Then::Shown {
         if !matches!(sample.address, Address::ConnectModel { .. }) {
             return None;
@@ -158,6 +163,7 @@ pub fn mockup(sample: &Sample) -> Option<String> {
             | Then::Filled
             | Then::Refused
             | Then::SignedOut
+            | Then::GoogleSignIn
             | Then::OutOfDate
             | Then::Closing
             | Then::Rejecting
@@ -224,7 +230,7 @@ pub fn domain(sample: &Sample) -> Domain {
     match sample.then {
         Then::Shown | Then::Held => {}
         Then::Filled | Then::Refused => adoption(&mut root, sample.then == Then::Refused, &mut out),
-        Then::SignedOut => step(&mut root, Event::SignedOut, &mut out),
+        Then::SignedOut | Then::GoogleSignIn => step(&mut root, Event::SignedOut, &mut out),
         Then::OutOfDate => step(
             &mut root,
             Event::Client {

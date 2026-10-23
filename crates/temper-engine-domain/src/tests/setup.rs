@@ -71,6 +71,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Request]> {
                 request @ (Request::StopGroup { .. }
                 | Request::SetUpGroup { .. }
                 | Request::SetUp { .. }
+                | Request::Bound { .. }
                 | Request::Return { .. }
                 | Request::Connect { .. }
                 | Request::Install { .. }
@@ -209,7 +210,9 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
     };
     crate::try_step(&mut domain, &env, setup(1)).unwrap();
     for request in settle(&mut domain, &env) {
-        if let Request::SetUpGroup { .. } | Request::SetUp { .. } | Request::Return { .. } = request {
+        if let Request::SetUpGroup { .. } | Request::SetUp { .. } | Request::Bound { .. } | Request::Return { .. } =
+            request
+        {
             panic!("a party without a deployment role never reaches the box")
         }
     }
@@ -351,4 +354,46 @@ fn public_connect_refuses_other_deployment_roles_and_names_their_carry_unused_on
             }
         }));
     }
+}
+
+#[test]
+fn a_new_binding_answers_only_after_its_commit_is_durable() {
+    let (mut domain, env) = super::resume_fixture::root();
+    let token = Token::new(90);
+    crate::try_step(
+        &mut domain,
+        &env,
+        Event::Forge(Box::new(forge::Event::Bind {
+            request: token,
+            address: b"Sam@example.com".as_slice().into(),
+            subject: b"google-subject".as_slice().into(),
+        })),
+    )
+    .unwrap();
+    let mut out = Queue::with_capacity(crate::max_out(&env.limits));
+    let mut committed = None;
+    // A release pass may issue a commit; none may deliver its dependent answer.
+    let binding = forge::Stored::Binding {
+        address: b"sam@example.com".as_slice().into(),
+        subject: b"google-subject".as_slice().into(),
+    };
+    for _ in 0_u32..8_u32 {
+        crate::release(&mut domain, &env, &mut out);
+        while let Some(request) = out.pop() {
+            let Request::Store(StoreRequest::Commit { number, writes }) = request else {
+                panic!("binding before durable commit: {request:?}");
+            };
+            assert!(writes.iter().any(|write| match write {
+                crate::Write::Save(crate::Record::Forge { row }) => row.as_ref() == &binding,
+                crate::Write::Save(_) | crate::Write::Erase(_) => false,
+            }));
+            committed = Some(number);
+        }
+    }
+    let number = committed.expect("binding commit issued");
+    crate::try_step(&mut domain, &env, Event::Store(StoreInput::Committed { number, fill: 0 })).unwrap();
+    assert_eq!(
+        settle(&mut domain, &env).as_ref(),
+        [Request::Bound { request: token, answer: forge::BindAnswer::Bound }]
+    );
 }

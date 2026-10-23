@@ -103,6 +103,7 @@ pub struct Domain {
     pub(crate) configured: Map<u16, crate::Configured>,
     pub(crate) under_box: bool,
     pub(crate) demo: Option<crate::DemoConfig>,
+    bindings: Map<Box<[u8]>, Box<[u8]>>,
     pub(crate) demo_state: Option<crate::DemoState>,
     pub(crate) demo_pending: Map<Token, Token>,
     pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
@@ -471,6 +472,7 @@ impl Domain {
             under_box,
             demo: None,
             demo_state: None,
+            bindings: Map::with_capacity(l.bindings),
             demo_pending: Map::with_capacity(l.applications),
             demo_answers: Map::with_capacity(l.applications),
             connections: Map::with_capacity(l.client.repositories),
@@ -927,6 +929,22 @@ pub const fn max_out(l: &Limits) -> u32 {
 #[expect(clippy::too_many_lines, reason = "one exhaustive connector input dispatcher")]
 pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Bind { request, mut address, subject } => {
+            address.make_ascii_lowercase();
+            assert!(crate::binding_address(&address) && subject.len() <= 255, "admitted binding fields");
+            let answer = if let Some(bound) = d.bindings.get(&address) {
+                if *bound == subject { crate::BindAnswer::Bound } else { crate::BindAnswer::Another }
+            } else {
+                d.bindings.insert(address.clone(), subject.clone()).expect("configured members bound bindings");
+                out.push(Request::Save {
+                    record: Stored::Binding { address, subject },
+                    read_afresh: None,
+                    release: None,
+                });
+                crate::BindAnswer::Bound
+            };
+            out.push(Request::Bound { request, answer });
+        }
         Event::DemoAnswered { answer } => crate::demo::answered(d, answer, out),
         Event::BoxClosed => {
             d.under_box = false;
@@ -4023,6 +4041,10 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
             d.entries
                 .insert(entry.number, Outboxed { entry, held, handoff: Handoff::Handed })
                 .expect("restored entry within limits");
+        }
+        Stored::Binding { address, subject } => {
+            assert!(crate::binding_address(&address) && subject.len() <= 255, "restored binding fields");
+            d.bindings.insert(address, subject).expect("restored binding within limits");
         }
         Stored::Demo(row) => {
             if let Some(demo) = &d.demo

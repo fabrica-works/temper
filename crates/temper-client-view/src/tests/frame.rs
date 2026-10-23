@@ -211,8 +211,14 @@ fn assert_link_main(answer: jig_client_protocol_wire::SignInAnswer, expected: &[
     assert_eq!(root.client().link().state, jig_client::Link::SignedOut);
     assert!(root.client().link().not_signed_in.is_some());
     for shell in [crate::words::Shell::Browser, crate::words::Shell::Terminal] {
-        let mut view = fixtures::view_of(crate::words::Words::english(fixtures::FORGE, 64, shell).expect("words"));
-        assert_eq!(&*fixtures::main_text(fixtures::build(&mut view, &root)), expected, "{shell:?}");
+        for google in [false, true] {
+            let view = fixtures::sign_in_view(
+                &root,
+                shell,
+                crate::sign_in::Ways { google, origin: Some(Box::from(b"https://temper.example.com".as_slice())) },
+            );
+            assert_eq!(&*fixtures::main_text(view.tree()), expected, "{shell:?}, google={google}");
+        }
     }
 }
 #[test]
@@ -797,4 +803,55 @@ fn accounts_navigation_reads_attention_as_needing_and_spent_usage_as_limited() {
         Some(skein_lib::Wall::from_nanos(60_000_000_000));
     deliver_navigation_accounts(&mut root, watch, spent);
     assert_account_mark(&root, Some((Mark::Limited, b"an account is limited")));
+}
+
+#[test]
+fn known_sign_in_ways_ignore_unknown_words_and_duplicates() {
+    for (content, google) in
+        [("", false), ("unknown", false), ("google", true), ("future google google", true), ("Google", false)]
+    {
+        assert_eq!(
+            crate::sign_in::Ways::parse(content, b"https://temper.example.com"),
+            crate::sign_in::Ways { google, origin: Some(Box::from(b"https://temper.example.com".as_slice())) },
+            "{content}"
+        );
+    }
+    for origin in [b"".as_slice(), b"null", b"file://", b"chrome-extension://x"] {
+        assert_eq!(crate::sign_in::Ways::parse("google", origin), crate::sign_in::Ways::NONE);
+    }
+}
+#[test]
+fn browser_google_sign_in_has_the_mark_heading_and_return_link() {
+    use crate::{sign_in::Ways, words::Shell};
+    use temper_client_domain::{Address, Event};
+    for (address, expected) in [
+        // Signed out, the page stays at its address; its query is percent-encoded into `then`.
+        (Address::Chats, b"https://temper.example.com/sign-in/google?then=/%3Fproject%3D1".as_slice()),
+    ] {
+        let mut root = fixtures::signed_out();
+        fixtures::root_event(&mut root, Event::Act { action: Action::Pages(pages::Act::Go { address }) });
+        let mut view = fixtures::sign_in_view(
+            &root,
+            Shell::Browser,
+            Ways { google: true, origin: Some(Box::from(b"https://temper.example.com".as_slice())) },
+        );
+        assert!(fixtures::find(view.tree(), Role::Heading { level: 1 }, b"Sign in").is_some());
+        let brand = fixtures::styles(view.tree(), Role::Paragraph);
+        let mut marked = false;
+        for styles in &brand {
+            marked |= styles.contains(&crate::look::BRAND);
+        }
+        assert!(marked);
+        let link = fixtures::find(view.tree(), Role::Link, b"Continue with Google").unwrap();
+        assert_eq!(crate::href(&mut view, link).as_deref(), Some(expected));
+    }
+}
+#[test]
+fn terminal_with_google_keeps_its_signed_out_main() {
+    let view = fixtures::sign_in_view(
+        &fixtures::signed_out(),
+        crate::words::Shell::Terminal,
+        crate::sign_in::Ways { google: true, origin: Some(Box::from(b"https://temper.example.com".as_slice())) },
+    );
+    assert_eq!(&*fixtures::main_text(view.tree()), b"Signed out.");
 }

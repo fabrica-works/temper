@@ -8,6 +8,7 @@ use temper_client_domain::{Action, Domain};
 #[derive(Debug)]
 pub struct View {
     render: skein_ui::View,
+    sign_in: crate::sign_in::Ways,
     forge_words: Words,
     forge: forge::bindings::Bindings,
     pages: crate::frame::Bindings,
@@ -21,9 +22,21 @@ pub struct View {
 impl View {
     #[must_use]
     pub fn new(limits: &Limits, domain: &temper_client_domain::Limits, forge_words: Words, forge: u16) -> View {
+        Self::with_sign_in(limits, domain, forge_words, forge, crate::sign_in::Ways::NONE)
+    }
+    /// Construct the browser view with the ways advertised by its page.
+    #[must_use]
+    pub fn with_sign_in(
+        limits: &Limits,
+        domain: &temper_client_domain::Limits,
+        forge_words: Words,
+        forge: u16,
+        sign_in: crate::sign_in::Ways,
+    ) -> View {
         assert!(forge_words.connector == forge, "phrasebook belongs to its forge connector");
         assert!(crate::worst_case(limits, domain, &forge_words).is_some(), "view capacities are checked");
         View {
+            sign_in,
             render: skein_ui::View::new(&limits.tree),
             forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
             pages: crate::frame::Bindings::new(limits.tree.bindings),
@@ -105,7 +118,11 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
             crate::frame::demo_banner(&mut builder, root, &view.forge_words, &mut view.pages);
         }
     }
-    if crate::frame::unavailable(root).is_some() {
+    if crate::sign_in::offered(root, &view.forge_words, &view.sign_in)
+        && let Some(origin) = &view.sign_in.origin
+    {
+        crate::sign_in::main(&mut builder, root, &view.forge_words, origin);
+    } else if crate::frame::unavailable(root).is_some() {
         builder.open(Role::Main);
         builder.style(crate::look::MAIN);
         builder.open(Role::Paragraph);

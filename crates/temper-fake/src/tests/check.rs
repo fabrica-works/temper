@@ -60,6 +60,7 @@ pub const LIMITS: d::Limits = d::Limits {
     facts: 16,
     adoptions: 2,
     applications: 4,
+    bindings: 4,
     collaborators: 8,
     landings: 8,
     judge_projects: 2,

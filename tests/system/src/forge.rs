@@ -400,6 +400,7 @@ impl World {
                 | engine::Request::EraseCarried { .. }
                 | engine::Request::StopGroup { .. }
                 | engine::Request::SetUp { .. }
+                | engine::Request::Bound { .. }
                 | engine::Request::Return { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Party(_)

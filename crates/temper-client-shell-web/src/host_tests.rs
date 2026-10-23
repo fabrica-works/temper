@@ -7,7 +7,7 @@ mod departure;
 const KEY: &[u8] = b"private-host-key";
 const ADDRESS: &[u8] = b"http://127.0.0.1:9/authorize?state=test";
 fn fixture() -> Host {
-    let mut host = Host::new(11, Time::ZERO, Wall::EPOCH);
+    let mut host = Host::new(11, Time::ZERO, Wall::EPOCH, temper_client_view::sign_in::Ways::NONE);
     host.root = root::unlinked(&host.env.limits, 11);
     host.event(Event::Start { address: Address::Accounts, kept: List::with_capacity(0), with: None });
     host.client(jig_client::Event::StartUnlinked { kept: List::with_capacity(0) });
@@ -284,7 +284,7 @@ mod memory_literal;
 // The setup draft, retained intent and adoption, shared keys and Ready words add 70,031 B.
 // The demo start's retained state, words, failure text and retry nodes (2,509,493 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 332244820869;
+const WEB_BYTES: u64 = 332244821213;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
@@ -333,7 +333,7 @@ fn the_first_task_activity_answer_survives_transport_sign_in() {
     const TASK_PATH: &[u8] = b"/tasks/9";
     const RUN: u64 = 44;
     const ONE_LINE: u32 = 1;
-    let mut host = Host::new(11, Time::ZERO, Wall::EPOCH);
+    let mut host = Host::new(11, Time::ZERO, Wall::EPOCH, temper_client_view::sign_in::Ways::NONE);
     host.start(TASK_PATH, Vec::new(), None);
     let activity = host
         .requests()

@@ -278,6 +278,7 @@ impl Protocol {
             | engine::Request::Install { .. }
             | engine::Request::EraseCarried { .. }
             | engine::Request::SetUp { .. }
+            | engine::Request::Bound { .. }
             | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)
             | engine::Request::Busy(_)

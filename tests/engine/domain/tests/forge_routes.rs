@@ -588,6 +588,7 @@ impl World {
                 | engine::Request::Install { .. }
                 | engine::Request::EraseCarried { .. }
                 | engine::Request::SetUp { .. }
+                | engine::Request::Bound { .. }
                 | engine::Request::Return { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Party(_)

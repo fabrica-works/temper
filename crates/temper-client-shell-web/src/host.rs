@@ -28,13 +28,13 @@ pub struct Host {
 }
 impl Host {
     #[must_use]
-    pub fn new(seed: u64, now: Time, wall: Wall) -> Self {
+    pub fn new(seed: u64, now: Time, wall: Wall, ways: view::sign_in::Ways) -> Self {
         let client = limits::client();
         assert!(limits::worst_case(&client).is_some(), "web capacities are checked");
         let (bounds, words) = limits::view(&client).expect("web view capacities are checked");
         Self {
             root: root::new_departing(&client, seed),
-            view: view::View::new(&bounds, &client, words, temper_client_protocol_wire::FORGE),
+            view: view::View::with_sign_in(&bounds, &client, words, temper_client_protocol_wire::FORGE, ways),
             bounds,
             env: Env { now, wall, limits: client },
             out: Queue::with_capacity(root::max_out(&client)),

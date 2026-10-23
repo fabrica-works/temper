@@ -1,5 +1,6 @@
 use crate::*;
 mod adoption;
+mod binding;
 mod change;
 mod connect;
 mod demo;
@@ -52,6 +53,7 @@ const LIMITS: Limits = Limits {
     facts: 16,
     adoptions: 2,
     applications: 4,
+    bindings: 4,
     collaborators: 8,
     landings: 8,
     judge_projects: 2,
@@ -306,6 +308,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
         | Request::SetUp { .. }
+        | Request::Bound { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
     };
@@ -366,6 +369,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
         | Request::SetUp { .. }
+        | Request::Bound { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
     };
@@ -426,6 +430,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
         | Request::SetUp { .. }
+        | Request::Bound { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),
     }

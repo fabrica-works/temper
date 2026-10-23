@@ -381,6 +381,7 @@ fn stopping_continues_projection_deferred_finishing_without_new_commits() {
                 | Request::Install { .. }
                 | Request::EraseCarried { .. }
                 | Request::SetUp { .. }
+                | Request::Bound { .. }
                 | Request::Return { .. }
                 | Request::Store(_)
                 | Request::Worker(_)

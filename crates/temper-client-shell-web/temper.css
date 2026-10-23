@@ -894,3 +894,13 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-account-row [role=definition] { margin: 0; font-size: 11px; }
 /* The first repository stays visible in a folded forge's summary (client/forge.md, 5.4). */
 .temper-forge-row > summary > [id^="skein-ui-description-"] { white-space: pre-line; }
+
+/* protocol/sign-in.md, 7: the stock browser sign-in card. */
+.temper-main.temper-sign-in { width: min(500px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 70px; }
+.temper-sign-in > .temper-card { padding: 26px 28px 22px; }
+.temper-sign-in .temper-brand { margin: 0 0 22px; }
+.temper-sign-in h1 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.temper-sign-in a { display: inline-flex; margin: 20px 0 14px; padding: 10px 16px; border: 1px solid var(--temper-line); border-radius: 5px; background: var(--temper-paper); font-weight: 700; }
+.temper-sign-in a:hover { border-color: var(--temper-accent); }
+.temper-sign-in a:focus-visible { outline: 2px solid var(--temper-accent); outline-offset: 3px; }
+@media (max-width: 600px) { .temper-main.temper-sign-in { padding-top: 24px; } .temper-sign-in > .temper-card { padding: 20px 18px 18px; } }

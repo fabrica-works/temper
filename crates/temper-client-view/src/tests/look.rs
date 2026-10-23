@@ -15,12 +15,13 @@ fn the_looks_names_pass_skeins_check() {
 }
 #[test]
 fn each_style_or_region_is_named_under_temper() {
-    let named: [(skein_ui::Style, &[u8]); 93] = [
+    let named: [(skein_ui::Style, &[u8]); 94] = [
         (PROPOSAL_FACTS, b"temper-proposal-facts"),
         (NAV_COUNT, b"temper-nav-count"),
         (BANNER, b"temper-banner"),
         (NAVIGATION, b"temper-navigation"),
         (MAIN, b"temper-main"),
+        (SIGN_IN, b"temper-sign-in"),
         (CARD, b"temper-card"),
         (TURN, b"temper-turn"),
         (COMPOSER, b"temper-composer"),

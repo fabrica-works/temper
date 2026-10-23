@@ -48,7 +48,16 @@ pub fn start() {
     // Replace the printed secret's address before starting anything that can send.
     let secret = sign_in::web::take_from_page(&sign_in::Route { path: b"/jig/v1/sign-in/link", home: b"/welcome" });
     let window = web_sys::window().expect("window");
-    let mount = window.document().expect("document").get_element_by_id("app").expect("bundle mount");
+    let document = window.document().expect("document");
+    let ways = document
+        .query_selector("meta[name=\"temper-sign-in\"]")
+        .expect("sign-in selector")
+        .and_then(|meta| meta.get_attribute("content"))
+        .map_or(temper_client_view::sign_in::Ways::NONE, |content| {
+            let origin = window.location().origin().expect("origin");
+            temper_client_view::sign_in::Ways::parse(&content, origin.as_bytes())
+        });
+    let mount = document.get_element_by_id("app").expect("bundle mount");
     let facts = platform::facts();
     let path = window.location().pathname().expect("path") + &window.location().search().expect("query");
     #[cfg(debug_assertions)]
@@ -57,7 +66,7 @@ pub fn start() {
     let platform =
         platform::Browser::new(fetch::web::Fetch::new(limits::EXCHANGES + 1, Rc::clone(&inbox), Report::Fetch));
     let store = Store::new(b"temper.", None);
-    let mut host = host::Host::new(facts.seed, facts.now, facts.wall);
+    let mut host = host::Host::new(facts.seed, facts.now, facts.wall, ways);
     host.start(path.as_bytes(), store.read_all(&platform), secret);
     let page = Rc::new(RefCell::new(Page::new(
         Look {

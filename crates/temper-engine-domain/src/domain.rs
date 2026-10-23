@@ -604,6 +604,7 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             | Request::StopGroup { .. }
             | Request::SetUpGroup { .. }
             | Request::SetUp { .. }
+            | Request::Bound { .. }
             | Request::Return { .. }
             | Request::Forge { .. }
             | Request::Store(crate::StoreRequest::Load { .. } | crate::StoreRequest::Read { .. })
@@ -858,6 +859,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
         delivery @ (Delivery::Host(_)
         | Delivery::Link { .. }
         | Delivery::ForgeCall { .. }
+        | Delivery::Bound { .. }
         | Delivery::Procedure { .. }
         | Delivery::Assigned { .. }
         | Delivery::Forges { .. }
