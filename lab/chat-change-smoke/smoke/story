@@ -1,8 +1,8 @@
 #!/bin/sh
-# qa.md, 5.2. Same trusted prefix as tools/ctl; the runner owns the 240s
+# qa.md, 5.2. Same trusted prefix as tools/ctl; the attended host owns the 240s
 # command deadline. The one product watch uses the provisional 220s timeout.
 set -eu
-[ "$#" -eq 3 ] || { printf 'story: expected temper, client directory and run link\n' >&2; exit 1; }
+[ "$#" -eq 3 ] || { printf 'story: expected temper, client directory and public origin\n' >&2; exit 1; }
 base=${0%/*}/..
 # Keep the prefix separate from each literal call; no agent input is evaluated.
 created=$(/bin/sh "$base/tools/ctl" "$@" chat --project 1 --key smoke-chat \

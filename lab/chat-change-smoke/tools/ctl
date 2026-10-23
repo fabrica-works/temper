@@ -1,10 +1,11 @@
 #!/bin/sh
-# qa.md, 6.2. Trusted prefix: TEMPER CLIENT_DIRECTORY SERVE_LINK.
+# qa.md, 6.2. Trusted prefix: TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN.
+# The attended host supplies http://HOST:PORT/, with no credential.
 # Shell builtins only until exec; never interpret a driver's words as code.
 set -f
 refuse() { printf 'ctl: refused: %s\n' "$1" >&2; exit 1; }
-[ "$#" -ge 4 ] || refuse 'expected temper, client directory, run link and tool'
-temper=$1 client=$2 link=$3
+[ "$#" -ge 4 ] || refuse 'expected temper, client directory, public origin and tool'
+temper=$1 client=$2 origin=$3
 shift 3
 tool=$1
 leading_json=no
@@ -104,11 +105,11 @@ case $authority in
     *) refuse 'address requires a port' ;;
 esac
 decimal "$port" 5 65535 || refuse 'invalid address port'
-case $link in
-    http://*/*) run_authority=${link#http://}; run_authority=${run_authority%%/*} ;;
-    *) refuse 'invalid run link' ;;
+case $origin in
+    http://*/*) run_authority=${origin#http://}; run_authority=${run_authority%%/*} ;;
+    *) refuse 'invalid public origin' ;;
 esac
-[ "$authority" = "$run_authority" ] || refuse 'address differs from run link'
+[ "$authority" = "$run_authority" ] || refuse 'address differs from public origin'
 
 if [ "$tool" = help ]; then
     if [ "$leading_json" = yes ]; then
