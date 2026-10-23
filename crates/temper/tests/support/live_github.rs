@@ -195,6 +195,7 @@ enum Stage {
     RestartWorker,
     Reconnected,
     After,
+    Ended,
     Stopping,
 }
 struct Judge<'a> {
@@ -212,6 +213,7 @@ struct Judge<'a> {
     digest: Option<String>,
     busy: u32,
     started: Time,
+    landing: Option<Landing>,
 }
 fn story(inputs: &Inputs, relay: &Relay) {
     let clock = Clock::new();
@@ -241,6 +243,7 @@ fn story(inputs: &Inputs, relay: &Relay) {
         digest: None,
         busy: 0,
         started: clock.now().now,
+        landing: None,
     });
     for host in hosts {
         world.spawn(|| host);
@@ -478,6 +481,7 @@ impl Judge<'_> {
                 }
             }
             Stage::Before | Stage::After => self.check_landing(host, calls),
+            Stage::Ended => self.ended_pages(host, calls),
             Stage::Llm
             | Stage::Engine
             | Stage::Worker
@@ -488,28 +492,12 @@ impl Judge<'_> {
             | Stage::Stopping => unreachable!("calls only in script stages"),
         }
     }
-    fn check_landing(&mut self, _host: &mut cluster::Root, calls: &ctl::Calls) {
-        let mut seen = self.seen.borrow_mut();
+    fn check_landing(&mut self, host: &mut cluster::Root, calls: &ctl::Calls) {
         let task = ctl::json(&calls.ends()[0]);
         assert_eq!(task["chip"]["phase"], "ended");
-        assert_eq!(task["result"], *seen.landed.as_ref().expect("first landing"), "same pull and merge");
+        let landed = self.seen.borrow().landed.clone().expect("first landing");
+        assert_eq!(task["result"], landed, "same pull and merge");
         assert_eq!(ctl::json(&calls.ends()[1])["chip"]["phase"], "ended", "chat closed");
-        let mut tasks = vec![1];
-        for index in [2, 3] {
-            let packet = ctl::json(&calls.ends()[index]);
-            super::forge_land::assert_no_live_tasks(&packet);
-            assert_eq!(packet["ended"]["rows"]["cut"], false);
-            assert!(packet["ended"]["rows"]["after"].is_null(), "complete four-task fixture");
-            tasks.extend(
-                packet["ended"]["rows"]["rows"]
-                    .as_array()
-                    .expect("task rows")
-                    .iter()
-                    .map(|row| row["chip"]["task"].as_u64().expect("task id")),
-            );
-        }
-        tasks.sort_unstable();
-        assert_eq!(tasks, [1, 2, 3, 4], "complete task set");
         super::forge_land::assert_no_live_roots(&ctl::json(&calls.ends()[5]));
         assert_eq!(calls.ends()[6].stderr.trim_ascii_end(), br#"{"error":"unknown"}"#);
         let row = Self::row(&ctl::json(&calls.ends()[4]));
@@ -519,18 +507,83 @@ impl Judge<'_> {
         assert!(self.accepted(&row), "same accepted installation");
         let coder = ctl::json(&calls.ends()[7]);
         assert_eq!(coder["chip"]["phase"], "ended");
-        if self.stage == Stage::Before {
-            seen.identity = Some(row);
-            seen.tasks = tasks;
-            seen.coder = Some(coder["result"].clone());
-            self.members.stop_one("w1");
-            self.stage = Stage::StopWorker;
-        } else {
+        let mut landing = Landing {
+            restarted: self.stage == Stage::After,
+            tasks: vec![1],
+            row,
+            coder: coder["result"].clone(),
+            pages: Vec::new(),
+        };
+        for index in [2, 3] {
+            let packet = ctl::json(&calls.ends()[index]);
+            super::forge_land::assert_no_live_tasks(&packet);
+            landing.page(&packet);
+        }
+        self.landing = Some(landing);
+        self.next_page(host);
+    }
+    fn ended_pages(&mut self, host: &mut cluster::Root, calls: &ctl::Calls) {
+        let landing = self.landing.as_mut().expect("landing read");
+        for ended in calls.ends() {
+            landing.page(&ctl::json(ended));
+        }
+        self.next_page(host);
+    }
+    fn next_page(&mut self, host: &mut cluster::Root) {
+        let pages = std::mem::take(&mut self.landing.as_mut().expect("landing read").pages);
+        if !pages.is_empty() {
+            let reads = pages
+                .iter()
+                .map(|next| ctl::Call::new(&next.split_ascii_whitespace().chain(["--json"]).collect::<Vec<_>>()))
+                .collect();
+            self.queue(host, reads);
+            self.stage = Stage::Ended;
+            return;
+        }
+        let Landing { restarted, mut tasks, row, coder, .. } = self.landing.take().expect("landing read");
+        tasks.sort_unstable();
+        assert_eq!(tasks, [1, 2, 3, 4], "complete task set");
+        let mut seen = self.seen.borrow_mut();
+        if restarted {
             assert_eq!(row["id"], seen.identity.as_ref().expect("prior bot")["id"]);
             assert_eq!(tasks, seen.tasks);
-            assert_eq!(Some(&coder["result"]), seen.coder.as_ref());
+            assert_eq!(Some(&coder), seen.coder.as_ref());
             self.members.stop();
             self.stage = Stage::Stopping;
+        } else {
+            seen.identity = Some(row);
+            seen.tasks = tasks;
+            seen.coder = Some(coder);
+            self.members.stop_one("w1");
+            self.stage = Stage::StopWorker;
+        }
+    }
+}
+/// A landing read's checks, held while its ended delegates are read page by page.
+struct Landing {
+    restarted: bool,
+    tasks: Vec<u64>,
+    row: Value,
+    coder: Value,
+    pages: Vec<String>,
+}
+impl Landing {
+    /// One page of a parent's ended delegates. A page may hold fewer rows than match and still name more:
+    /// its `read_on` is the next read, followed until a page names none.
+    fn page(&mut self, packet: &Value) {
+        let rows = &packet["ended"]["rows"];
+        assert_eq!(rows["cut"], false);
+        self.tasks.extend(
+            rows["rows"]
+                .as_array()
+                .expect("task rows")
+                .iter()
+                .map(|row| row["chip"]["task"].as_u64().expect("task id")),
+        );
+        if !rows["after"].is_null() {
+            let next = packet["read_on"].as_str().expect("a page with more names its next read");
+            assert!(next.contains("--after"), "the next read continues after this page: {next}");
+            self.pages.push(next.to_owned());
         }
     }
 }
