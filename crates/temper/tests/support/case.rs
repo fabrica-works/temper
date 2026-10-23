@@ -3,7 +3,7 @@ use super::{Ended, Scratch, WITHIN, cluster, ctl};
 use serde_json::{Value, json};
 use skein_fake_llm_domain::api::{Finish, Line, Rule, Script};
 use skein_io::kernel::Exit;
-use skein_lib::{Time, base64};
+use skein_lib::{Duration, Time, base64};
 use skein_shell::{Clock, Host};
 use skein_world::{Referee, real};
 use std::{
@@ -21,6 +21,9 @@ use temper_real_loop_world::{
     },
     forge::Fixture,
 };
+
+// domain/testing.md, 2.6: pass at least every 20 ms while PLACED's release is due.
+const PLACED_RELEASE_INTERVAL: Duration = Duration::from_millis(20);
 
 pub struct Run {
     calls: Vec<Ended>,
@@ -211,6 +214,7 @@ pub fn run(
         stopped: false,
         late,
         control: None,
+        placed_release: None,
         assigned: BTreeSet::new(),
         channels: BTreeMap::new(),
         workers: BTreeMap::new(),
@@ -270,6 +274,7 @@ struct Judge {
     stopped: bool,
     late: bool,
     control: Option<SocketAddr>,
+    placed_release: Option<Time>,
     assigned: BTreeSet<String>,
     channels: BTreeMap<u64, u64>,
     workers: BTreeMap<u64, String>,
@@ -559,13 +564,19 @@ impl Judge {
     }
 }
 impl Judge {
-    fn release_placed(&self) {
-        if let Some(control) = self.control
-            && !matches!(self.stage, Stage::Accounts | Stage::Stop)
-            && ["ws", "s1", "s2"].iter().all(|name| self.members.linked(name) == 0 || self.assigned.contains(*name))
-            && !self.assigned.is_empty()
-        {
+    fn release_placed(&mut self, now: Time) {
+        if matches!(self.stage, Stage::Accounts | Stage::Stop) {
+            self.placed_release = None;
+            return;
+        }
+        if let Some(control) = self.control {
+            // The placement read follows s2's start; all three are started by then.
+            // Cache the cumulative predicate instead of reading placement on each pass.
+            if self.placed_release.is_none() && !["ws", "s1", "s2"].iter().all(|name| self.assigned.contains(*name)) {
+                return;
+            }
             release(control);
+            self.placed_release = Some(now.saturating_add(PLACED_RELEASE_INTERVAL));
         }
     }
     fn start_llm(&mut self, now: Time) {
@@ -622,6 +633,7 @@ impl Referee<cluster::Root> for Judge {
         self.members.act(now, roots);
         if self.members.failed() {
             self.stage = Stage::Stop;
+            self.placed_release = None;
             return;
         }
         if let Some(links) = self.stopped_links {
@@ -714,7 +726,7 @@ impl Referee<cluster::Root> for Judge {
             | Stage::Accounts
             | Stage::Stop => {}
         }
-        self.release_placed();
+        self.release_placed(now);
     }
     fn observe(&mut self, now: Time, roots: &[cluster::Root]) {
         self.members.observe(now, &roots[..roots.len() - 1]);
@@ -780,7 +792,7 @@ impl Referee<cluster::Root> for Judge {
         }
     }
     fn next_deadline(&self) -> Option<Time> {
-        Some(self.members.next_deadline().map_or(self.deadline, |at| at.min(self.deadline)))
+        Some(self.members.next_deadline().into_iter().chain(self.placed_release).fold(self.deadline, Time::min))
     }
     fn overdue(&self, now: Time) -> Option<String> {
         (now >= self.deadline).then(|| {
