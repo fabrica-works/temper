@@ -2134,7 +2134,7 @@ fn step_4_5_limited_rules() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]> {
 // The retry runs on s1 or s2 by that row's act order: ws stays ended and unlinked
 // until after the ended chat's watch joins; the oracle checks both attempts.
 #[test]
-#[ignore = "M3: 3 in 56 runs (2/50 under 8 busy loops, 1 in the process profile): the chat's attempts not failed as an agent's then finished (6.45 s, a lost link's grace), or the director's committed read and wait not seen before the stop; the profile's one unread; the workers' stop bound is to size below the grace"]
+#[ignore = "waits on jig's fleet: a retry placed on a stopping worker's still-linked channel is rechecked and journaled as an extra refused attempt (3 in 85 runs since the waiting read, all under load); jig is to take a worker out of placement as it drains, before its runs end"]
 fn a_restarted_workstation_keeps_the_directors_question_and_answers_it_once_as_processes_without_a_hang_past_the_grace()
 {
     use temper_real_loop_world::case::{self, acts, oracle};
