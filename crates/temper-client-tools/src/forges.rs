@@ -565,6 +565,11 @@ pub(crate) fn holds(rows: &[Row], condition: &[u8]) -> bool {
     false
 }
 
+// Seven containers at most: wait result, row document, forges array, row,
+// installations array, installation, account. Reads and digests omit the wait
+// result, but share its bound so every encoding of the rows stays in step.
+const ROWS_JSON_DEPTH: u32 = 7;
+
 fn encode_rows(rows: &[Row], digest: Option<Digest>, out: &mut Encoder) {
     out.object_start();
     out.key(b"forges");
@@ -694,6 +699,14 @@ fn text_rows(rows: Option<&[Row]>, digest: Option<Digest>, met: Option<bool>, ou
             out.put(words::forge_mode(row.mode));
             out.put(b" \xc2\xb7 ");
             out.put(&words::forge_connection(row));
+            if let Some(app) = words::app_line(row) {
+                out.put(b" \xc2\xb7 ");
+                out.put(&app);
+            }
+            if let Some(last) = words::last_connect(row) {
+                out.put(b" \xc2\xb7 ");
+                out.put(&last);
+            }
             if let Some(first) = &row.first {
                 out.put(b" \xc2\xb7 ");
                 out.put(&words::first_repository(first));
@@ -713,7 +726,7 @@ fn text_rows(rows: Option<&[Row]>, digest: Option<Digest>, met: Option<bool>, ou
     }
 }
 fn digest(rows: &[Row], limits: &Limits) -> Option<Digest> {
-    let bounds = skein_json::writer::Limits { depth: 6, length: limits.tools.text };
+    let bounds = skein_json::writer::Limits { depth: ROWS_JSON_DEPTH, length: limits.tools.text };
     let mut measure = Encoder::measure(&bounds);
     encode_rows(rows, None, &mut measure);
     let mut out = Encoder::write(measure.measured().ok()?, &bounds);
@@ -729,7 +742,7 @@ pub(crate) fn print_rows(rows: Option<&[Row]>, json: bool, met: Option<bool>, li
         None => None,
     };
     let bytes = if json {
-        let bounds = skein_json::writer::Limits { depth: 6, length: limits.tools.text };
+        let bounds = skein_json::writer::Limits { depth: ROWS_JSON_DEPTH, length: limits.tools.text };
         let mut measure = Encoder::measure(&bounds);
         json_rows(rows, digest, met, &mut measure);
         let Ok(size) = measure.measured() else { return render::failure(b"result limit", json, 1) };

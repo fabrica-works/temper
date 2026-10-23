@@ -75,8 +75,6 @@ pub enum Word {
     ForgeShowHow,
     ForgeAll,
     ForgeConnectGitHub,
-    ForgeGitHubCreate,
-    ForgeOrganization,
     ForgeConnectApp,
     ForgeUseApp,
     ForgeAppLabel,
@@ -537,8 +535,8 @@ pub enum Word {
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
-const PHRASES: u32 = 1022;
-const ALL: [Word; 489] = [
+const PHRASES: u32 = 1020;
+const ALL: [Word; 487] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -603,8 +601,6 @@ const ALL: [Word; 489] = [
     Word::ForgeShowHow,
     Word::ForgeAll,
     Word::ForgeConnectGitHub,
-    Word::ForgeGitHubCreate,
-    Word::ForgeOrganization,
     Word::ForgeConnectApp,
     Word::ForgeUseApp,
     Word::ForgeAppLabel,
@@ -1097,8 +1093,6 @@ impl Word {
             Self::ForgeShowHow => 1732,
             Self::ForgeAll => 1733,
             Self::ForgeConnectGitHub => 1734,
-            Self::ForgeGitHubCreate => 1735,
-            Self::ForgeOrganization => 1736,
             Self::ForgeAppTitle => 1790,
             Self::ForgeConnectAppButton => 1791,
             Self::ForgeInstallTitle => 1792,
@@ -1803,8 +1797,6 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ForgeShowHow => (&[b"Show how"], &[]),
         Word::ForgeAll => (&[b"\xe2\x80\xb9 All forges"], &[]),
         Word::ForgeConnectGitHub => (&[b"Connect GitHub"], &[]),
-        Word::ForgeGitHubCreate => (&[b"Create an App and install it on your account or organization. Choose selected repositories."], &[]),
-        Word::ForgeOrganization => (&[b"An organization, or none for your account"], &[]),
         Word::ForgeAppTitle => (&[b"An App of your own"], &[]),
         Word::ForgeConnectAppButton => (&[b"Connect the App"], &[]),
         Word::ForgeInstallTitle => (&[b"Install temper\xe2\x80\x99s App"], &[]),

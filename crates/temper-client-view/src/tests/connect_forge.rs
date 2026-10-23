@@ -110,13 +110,14 @@ fn choose_draws_a_card_per_choice_in_order() {
     );
 }
 #[test]
-fn github_details_enable_the_app_of_ones_own_and_keep_tempers_app_disabled() {
+fn github_details_offer_only_the_app_of_ones_own_with_a_masked_key() {
     let root = root(Some(Choice::Forge(GITHUB)), w::Connection::NotSetUp, w::Offer::Offered);
     let view = f::browser_page_view(&root);
-    let disabled = node(view.tree(), Role::Button, b"Connect GitHub");
-    assert!(
-        view.tree().nodes().iter().find(|n| n.id == disabled).unwrap().states.as_slice().contains(&State::Disabled)
-    );
+    let words = String::from_utf8_lossy(&f::text(view.tree())).into_owned();
+    assert!(!words.contains("organization"));
+    assert!(!words.contains("Connect GitHub"));
+    assert!(!words.contains("not available yet"));
+    node(view.tree(), Role::Heading { level: 3 }, b"An App of your own");
     let button = node(view.tree(), Role::Button, b"Connect the App");
     assert!(!view.tree().nodes().iter().find(|n| n.id == button).unwrap().states.as_slice().contains(&State::Disabled));
     node(view.tree(), Role::TextField, b"App id");

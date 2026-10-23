@@ -721,3 +721,227 @@ fn forges_json_names_installations_and_the_last_connect_end() {
     assert!(f::json_has(&json, br#""installations":[{"id":11,"account":{"id":111,"login":"acme"},"suspended":true,"stray":false},{"id":22,"account":null,"suspended":false,"stray":true}]"#));
     assert!(f::json_has(&json, br#""ended":"the pasted value changed""#));
 }
+
+fn settled_wait_with_installations(count: u32) {
+    let mut root = f::signed_in(f::PARTY);
+    let call = root.submit(&["wait", "forges", "--until", "settled", "--json"]);
+    let limits = forge::wire_limits(&root.limits.domain.forge).unwrap();
+    let mut installations = List::with_capacity(count);
+    for id in 1..=count {
+        installations
+            .push(
+                w::Installation::new(
+                    &limits,
+                    w::InstallationParts {
+                        id: u64::from(id),
+                        account: Some(
+                            w::Account::new(&limits, w::AccountParts { id: 111, login: b"acme".as_slice().into() })
+                                .unwrap(),
+                        ),
+                        suspended: false,
+                        stray: false,
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+    }
+    let mut forges = List::with_capacity(1);
+    forges
+        .push(
+            w::ForgeRow::new(
+                &limits,
+                w::ForgeRowParts {
+                    number: 3,
+                    kind: w::Kind::Github,
+                    mode: w::Mode::Connected,
+                    connection: w::Connection::Connected(
+                        w::Connected::new(&limits, w::ConnectedParts { id: 42, login: b"app".as_slice().into() })
+                            .unwrap(),
+                    ),
+                    offer: w::Offer::NotOffered,
+                    first: None,
+                    installations,
+                    ended: None,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    deliver(
+        &mut root,
+        client::Family {
+            family: wire::FORGE,
+            version: wire::CLIENT_VERSION,
+            bytes: wire::forges(&w::Forges::new(&limits, w::ForgesParts { forges }).unwrap()),
+        },
+    );
+    let printed = root.answer(call).expect("settled wait completes");
+    assert_eq!(printed.status, 0);
+    assert!(printed.stderr.is_empty());
+    assert!(f::json_has(&printed, br#""kind":"github""#));
+    assert!(f::json_has(&printed, br#""met":true"#));
+    for id in 1..=count {
+        let mut measure = jig::render::Text::measure();
+        measure.number(u64::from(id));
+        let mut number = jig::render::Text::writing_exact(measure);
+        number.number(u64::from(id));
+        let installation = concat(&[
+            br#"{"id":"#,
+            &number.finish(),
+            br#","account":{"id":111,"login":"acme"},"suspended":false,"stray":false}"#,
+        ]);
+        assert!(f::json_has(&printed, &installation));
+    }
+    assert!(printed.stdout.len() <= usize::try_from(root.limits.tools.text).unwrap());
+    assert_eq!(root.closed.len(), 1);
+    assert!(crate::root::next_deadline(&root.root).is_none());
+}
+
+#[test]
+fn settled_wait_prints_an_accepted_installation_with_its_account() {
+    settled_wait_with_installations(1);
+}
+
+#[test]
+fn settled_wait_prints_the_wire_maximum_installations_with_their_accounts() {
+    settled_wait_with_installations(forge::forges::INSTALLATIONS);
+}
+
+#[test]
+fn human_forges_names_the_app_accounts_unknown_installations_and_their_states() {
+    use forge::forges::{Account, Installation};
+    let mut row = row(C::Connected { id: 42, login: Box::from(b"my-app[bot]".as_slice()) });
+    row.kind = Kind::GitHub;
+    row.installations = Box::new([
+        Installation {
+            id: 11,
+            account: Some(Account { id: 111, login: Box::from(b"acme".as_slice()) }),
+            suspended: false,
+            stray: false,
+        },
+        Installation { id: 22, account: None, suspended: true, stray: true },
+    ]);
+    let plain = forges::print_rows(Some(&[row]), false, None, &f::limits_root());
+    assert_eq!(plain.status, 0);
+    assert!(
+        skein_lib::bytes::find(
+            &plain.stdout,
+            " · my-app · acme, installation 22 · suspended · uninstalled at the next reconcile\n".as_bytes(),
+        )
+        .is_some()
+    );
+}
+
+#[test]
+fn human_forges_names_the_last_connect_reason_only_when_present() {
+    let mut row = row(C::NotConnected);
+    for ended in [None, Some(Box::from(b"the pasted value changed".as_slice()))] {
+        row.ended = ended;
+        let plain = forges::print_rows(Some(&[row.clone()]), false, None, &f::limits_root());
+        assert_eq!(plain.status, 0);
+        assert_eq!(skein_lib::bytes::find(&plain.stdout, b"The last connect stopped: ").is_some(), row.ended.is_some(),);
+        if row.ended.is_some() {
+            assert!(
+                skein_lib::bytes::find(
+                    &plain.stdout,
+                    " · The last connect stopped: the pasted value changed\n".as_bytes(),
+                )
+                .is_some()
+            );
+        }
+    }
+}
+
+#[test]
+fn human_forges_prints_an_app_installed_nowhere_yet() {
+    let mut row = row(C::Connected { id: 42, login: Box::from(b"my-app[bot]".as_slice()) });
+    row.kind = Kind::GitHub;
+    let plain = forges::print_rows(Some(&[row]), false, None, &f::limits_root());
+    assert_eq!(plain.status, 0);
+    assert!(skein_lib::bytes::find(&plain.stdout, " · my-app · installed nowhere yet\n".as_bytes()).is_some());
+}
+
+#[test]
+fn human_forges_bounds_the_wire_maximum_installations_with_longest_logins() {
+    let limits = f::limits_root();
+    let preset = forge::wire_limits(&limits.domain.forge).unwrap();
+    for bounds in [preset, w::CEILINGS] {
+        let mut login = skein_lib::Writer::new(usize::try_from(bounds.account_login).unwrap());
+        for _ in 0..bounds.account_login {
+            login.put(b"x").unwrap();
+        }
+        let login = login.finish();
+        let mut installations = List::with_capacity(forge::forges::INSTALLATIONS);
+        for id in 1..=forge::forges::INSTALLATIONS {
+            installations
+                .push(
+                    w::Installation::new(
+                        &bounds,
+                        w::InstallationParts {
+                            id: u64::from(id),
+                            account: Some(
+                                w::Account::new(&bounds, w::AccountParts { id: u64::from(id), login: login.clone() })
+                                    .unwrap(),
+                            ),
+                            suspended: true,
+                            stray: true,
+                        },
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+        }
+        let mut rows = List::with_capacity(1);
+        rows.push(
+            w::ForgeRow::new(
+                &bounds,
+                w::ForgeRowParts {
+                    number: 3,
+                    kind: w::Kind::Github,
+                    mode: w::Mode::Connected,
+                    connection: w::Connection::Connected(
+                        w::Connected::new(
+                            &bounds,
+                            w::ConnectedParts { id: 42, login: b"my-app[bot]".as_slice().into() },
+                        )
+                        .unwrap(),
+                    ),
+                    offer: w::Offer::NotOffered,
+                    first: None,
+                    installations,
+                    ended: None,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let record = client::Family {
+            family: wire::FORGE,
+            version: wire::CLIENT_VERSION,
+            bytes: wire::forges(&w::Forges::new(&bounds, w::ForgesParts { forges: rows }).unwrap()),
+        };
+        let mut domain_limits = limits.domain.forge;
+        domain_limits.field_bytes = bounds.account_login;
+        let rows = forge::forges::rows(&record, &domain_limits).unwrap();
+        let plain = forges::print_rows(Some(&rows), false, None, &limits);
+        if bounds.account_login == preset.account_login {
+            assert_eq!(plain.status, 0);
+            for words in [login.as_ref(), b"suspended", b"uninstalled at the next reconcile"] {
+                let mut count = 0u32;
+                for window in plain.stdout.windows(words.len()) {
+                    if window == words {
+                        count = count.checked_add(1u32).unwrap();
+                    }
+                }
+                assert_eq!(count, forge::forges::INSTALLATIONS);
+            }
+            assert!(plain.stdout.len() <= usize::try_from(limits.tools.text).unwrap());
+        } else {
+            // The digest's JSON exceeds tools.text before the human row is rendered.
+            assert_eq!(plain.status, 1);
+            assert!(plain.stdout.is_empty());
+            assert_eq!(plain.stderr.as_ref(), b"result limit\n");
+        }
+    }
+}

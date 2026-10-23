@@ -348,18 +348,33 @@ fn unoffered_forge_has_no_owned_choose_card() {
 }
 
 #[test]
-fn github_details_enable_the_app_of_ones_own_and_keep_tempers_app_disabled() {
+fn github_details_offer_only_the_app_of_ones_own_with_a_masked_key() {
     let mut world = world();
     let client = world.client_with(f::PARTY, Address::Chats, f::domain_limits(), browser_client);
-    follow(&mut world, client, vec![see(Role::Heading { level: 1 }, b"Chats"), PersonStep::Go { address: at(GITHUB) }]);
+    follow(
+        &mut world,
+        client,
+        vec![
+            see(Role::Heading { level: 1 }, b"Chats"),
+            PersonStep::Go { address: at(GITHUB) },
+            see(Role::Button, b"Connect the App"),
+        ],
+    );
+    let words = text(&world, client);
+    assert!(!words.contains("organization"), "{words}");
+    assert!(!words.contains("Connect GitHub"), "{words}");
+    assert!(!words.contains("not available yet"), "{words}");
+    node(&world, client, Role::Heading { level: 3 }, b"An App of your own");
+    node(&world, client, Role::TextField, b"App id");
+    assert!(!node(&world, client, Role::Button, b"Connect the App").states.as_slice().contains(&State::Disabled));
+    assert_eq!(node(&world, client, Role::TextField, b"Private key").entry, Some(skein_ui::EntryKind::Secret));
+    follow(&mut world, client, vec![PersonStep::Go { address: flow(None) }, see(Role::Button, b"Connect GitHub")]);
+    assert!(node(&world, client, Role::Button, b"Connect GitHub").states.as_slice().contains(&State::Disabled));
     let words = text(&world, client);
     assert!(
         words.contains("Connecting GitHub through temper’s own App is not available yet: use an App of your own."),
         "{words}"
     );
-    assert!(node(&world, client, Role::Button, b"Connect GitHub").states.as_slice().contains(&State::Disabled));
-    assert!(!node(&world, client, Role::Button, b"Connect the App").states.as_slice().contains(&State::Disabled));
-    assert_eq!(node(&world, client, Role::TextArea, b"Private key").entry, Some(skein_ui::EntryKind::Secret));
 }
 
 #[test]
@@ -534,6 +549,15 @@ fn failure_dot_wins_over_progress_then_clears_on_connect() {
     follow(&mut world, client, vec![see(Role::Text, b"a forge needs you"), gone(Role::Text, b"a forge is setting up")]);
     connection(&mut world, OWNED, connected());
     connection(&mut world, GITHUB, connected());
+    world.front().engine.send(engine::Event::Forge(Box::new(forge::Event::Installation {
+        forge: GITHUB,
+        installation: 1,
+        state: Some(forge::Installation {
+            account: Some((1, b"qa-account".as_slice().into())),
+            suspended: false,
+            stray: false,
+        }),
+    })));
     follow(
         &mut world,
         client,

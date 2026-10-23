@@ -202,14 +202,6 @@ fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, pl
 }
 fn github(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
     flow::card(b, &w.say(Word::ForgeGitHub, &[]));
-    text(b, w, Role::Heading { level: 3 }, Word::ForgeConnectGitHub);
-    text(b, w, Role::Paragraph, Word::ForgeGitHubCreate);
-    b.open(Role::TextField);
-    b.name(&w.say(Word::ForgeOrganization, &[]));
-    b.state(State::Disabled);
-    b.close();
-    flow::control(b, Control::Disabled { name: &w.say(Word::ForgeConnectGitHub, &[]) });
-    text(b, w, Role::Paragraph, Word::ForgeGitHubUnavailable);
     text(b, w, Role::Heading { level: 3 }, Word::ForgeAppTitle);
     text(b, w, Role::Paragraph, Word::ForgeAppDescription);
     crate::cards::text(b, Role::Paragraph, &w.say(Word::ForgeSetupUrl, &[Hole::Number(u64::from(row.number))]));
