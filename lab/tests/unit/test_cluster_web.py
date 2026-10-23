@@ -25,7 +25,7 @@ def entry(**changes):
 
 class FilesTests(unittest.TestCase):
     def test_copies_and_engine_line(self):
-        names = ['llm.json', 'chat.txt', 'agent.json', 'w1.json', 'w1.digest', 'w1.secret',
+        names = ['llm.json', 'chat.txt', 'coding.txt', 'agent.json', 'w1.json', 'w1.digest', 'w1.secret',
                  'w2.json', 'w2.digest', 'w2.secret', 'forge-1.api-token',
                  'forge-1.user', 'forge-1.git-token']
         for name in names:
