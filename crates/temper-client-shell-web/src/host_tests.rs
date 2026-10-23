@@ -2,6 +2,8 @@
 use super::*;
 use jig_client::contract as c;
 use skein_ui::{EntryKind, Role};
+#[path = "host_tests_departure.rs"]
+mod departure;
 const KEY: &[u8] = b"private-host-key";
 const ADDRESS: &[u8] = b"http://127.0.0.1:9/authorize?state=test";
 fn fixture() -> Host {

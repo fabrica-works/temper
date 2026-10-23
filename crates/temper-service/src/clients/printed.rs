@@ -15,7 +15,7 @@ pub(crate) fn link(address: ::core::net::SocketAddr, secret: &skein_lib::Secret)
     out.finish()
 }
 
-pub(super) fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
+pub(crate) fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
     use ::core;
     let mut text = skein_lib::Intake::with_capacity(64);
     match address.ip() {

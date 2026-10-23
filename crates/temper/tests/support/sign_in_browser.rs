@@ -1,6 +1,7 @@
 //! The person's browser, cut down to what a sign-in's visit needs here: one
 //! GET of the URL the driver asks to be visited, its answer's status kept.
-//! It follows the issuer's loopback redirect and knows no OAuth.
+//! It follows the issuer's 302 and listener's 303, ending at the returned page.
+//! The page itself needs no cookie; this visitor knows no OAuth or browser sign-in.
 // Adapted from jig's protocol-accounts world's private browser at the pinned revision.
 const ROOM: u32 = 64;
 fn limits() -> skein_oauth_accounts::Limits {
@@ -103,13 +104,13 @@ impl Visitor {
                     if self.status.is_none() {
                         self.status = Some(response.status);
                     }
-                    if response.status == 302 {
+                    if matches!(response.status, 302 | 303) {
                         self.account_redirect = response
                             .headers
                             .iter()
                             .find(|header| header.name.eq_ignore_ascii_case(b"location"))
                             .map(|header| header.value.clone());
-                        assert!(self.account_redirect.is_some(), "account sign-in issuer redirect");
+                        assert!(self.account_redirect.is_some(), "account sign-in redirect");
                     }
                     self.calls.push(http::Request::Body(Down::Demand { read: Read::Arrived { max: BODY }, room: 0 }));
                 }
