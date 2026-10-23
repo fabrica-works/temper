@@ -595,7 +595,10 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                                     .ok()?
                                     .checked_mul(u64::try_from(size_of::<jig_domain_people::Use>()).ok()?)
                             }
-                            AccountChange::CheckProgram { .. }
+                            AccountChange::MoveOut { .. }
+                            | AccountChange::Written { .. }
+                            | AccountChange::MoveIn { .. }
+                            | AccountChange::CheckProgram { .. }
                             | AccountChange::AddKey { .. }
                             | AccountChange::ReplaceKey { .. }
                             | AccountChange::RemoveKey { .. }
@@ -646,6 +649,9 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                         };
                         scope_bytes.checked_add(change_bytes)
                     }
+                    jig_domain_people::Ask::Rename { name, .. }
+                    | jig_domain_people::Ask::MakeProject { name, .. }
+                    => u64::try_from(name.len()).ok(),
                     jig_domain_people::Ask::MakeService { name, .. } => u64::try_from(name.len()).ok(),
                     jig_domain_people::Ask::Adopt { adoption, .. } => {
                         let mut bytes =
@@ -901,6 +907,10 @@ fn program_answer_bytes(outcome: &jig_domain_people::Outcome) -> Option<u64> {
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
         | Outcome::AccountKeyKept { .. }
+        | Outcome::Renamed { .. }
+        | Outcome::ProjectMade { .. }
+        | Outcome::AccountMovingOut { .. }
+        | Outcome::AccountMovedIn { .. }
         | Outcome::AccountChanged
         | Outcome::Refused(_) => Some(0),
     }

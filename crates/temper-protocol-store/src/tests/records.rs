@@ -508,8 +508,8 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
 fn application_refusal_lists(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
     use jig_domain_people as p;
     for (count, circle) in [
-        (jig_protocol_store::people_v11::CEILINGS.refusal_circle_tasks, true),
-        (jig_protocol_store::people_v11::CEILINGS.refusal_kept_pending, false),
+        (jig_protocol_store::people_v13::CEILINGS.refusal_circle_tasks, true),
+        (jig_protocol_store::people_v13::CEILINGS.refusal_kept_pending, false),
     ] {
         let mut tasks = skein_lib::List::with_capacity(count);
         for task in 0..count {
@@ -657,7 +657,7 @@ fn every_application_outcome_preserves_its_complete_record() {
         assert_eq!(bytes[2], 15, "the Application family tag");
     }
     assert!(
-        jig_protocol_store::people_v11::Refusal::worst_case_bytes(&jig_protocol_store::people_v11::CEILINGS)
+        jig_protocol_store::people_v13::Refusal::worst_case_bytes(&jig_protocol_store::people_v13::CEILINGS)
             .expect("bounded facts")
             <= u64::from(v8::CEILINGS.core_refused_refusal)
     );

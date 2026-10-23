@@ -1,5 +1,5 @@
 use crate::engine::Engine;
-use jig_client_protocol_wire::v15 as wire;
+use jig_client_protocol_wire::v17 as wire;
 use skein_io as io;
 use skein_lib::{Decimal, Reader, Time, Token, Wall, Writer};
 const REQUEST_AT: Time = Time::from_nanos(1);
@@ -101,7 +101,14 @@ impl Peer {
             if decide {
                 crate::engine::iterate(engine, now, wall);
             } else {
-                engine.clients.iterate(now, wall, &mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+                engine.clients.iterate(
+                    now,
+                    wall,
+                    &mut engine.events,
+                    &engine.workers.forges,
+                    engine.demo.as_ref(),
+                    &mut engine.accounts,
+                );
                 engine.clients.secrets_step(&mut engine.store);
             }
             for _ in 0..engine.clients.io.len() {

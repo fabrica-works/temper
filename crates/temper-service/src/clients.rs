@@ -137,6 +137,11 @@ impl Clients {
         room: u32,
         journal: &root::JournalLimits,
     ) -> Result<Self, Problems> {
+        if jig_protocol_accounts::moved::bound(&config.limits.driver.client.document)
+            > u64::from(config.limits.clients.wire.keyed_value_some)
+        {
+            return Err(invalid(What::Bound));
+        }
         let config::Address::Addr(listener) = listener else {
             return Err(invalid(What::Form));
         };
@@ -194,6 +199,14 @@ impl Clients {
             seed: seeds.crypto.clone(),
             stream: seeds.seed,
             models: config::clients::models(&config.llm),
+            key_bytes: config
+                .limits
+                .driver
+                .client
+                .document
+                .token_bytes
+                .min(config.limits.clients.wire.keyed_value_some),
+            moved_bytes: jig_protocol_accounts::moved::bound(&config.limits.driver.client.document),
         };
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
         let mut out = Queue::with_capacity(room);
@@ -378,6 +391,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         for _ in 0..self.demo_ready.len() {
             if events.room() == 0 || (self.starting.is_some() && self.early.room() == 0) {
@@ -403,6 +417,13 @@ impl Clients {
                 kit::Request::Link { secret } => {
                     self.secret = Some(secret);
                     self.print_link();
+                }
+                kit::Request::TakeMoved { exchange, source } => {
+                    let record = match accounts {
+                        Some(accounts) => accounts.take_moved(source),
+                        None => None,
+                    };
+                    self.down(kit::Event::MovedTaken { exchange, record });
                 }
                 kit::Request::Secrets(value) => self.secrets.push(value),
                 kit::Request::Core(value) => match translation::to_root(*value) {
@@ -455,6 +476,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         self.env.now = now;
         self.env.wall = wall;
@@ -473,15 +495,15 @@ impl Clients {
         self.server.fire(&mut self.server_out);
         let server_pending = self.server.advance(&mut self.server_out);
         self.server_requests();
-        self.endings_step(events, forges, demo);
-        self.advance(events, forges, demo);
+        self.endings_step(events, forges, demo, accounts);
+        self.advance(events, forges, demo, accounts);
         if self.closed {
             return;
         }
         if !self.component_closed {
             self.component.fire(&self.env, &mut self.out);
         }
-        self.advance(events, forges, demo);
+        self.advance(events, forges, demo, accounts);
         self.pending = server_pending || !self.server_out.is_empty();
         let mount_pending = self.mount.up(&self.mount_env, &mut self.mount_out);
         self.pending |= mount_pending;
@@ -500,7 +522,7 @@ impl Clients {
             self.pending |= self.component.up(&self.env, &mut self.out);
         }
 
-        self.advance(events, forges, demo);
+        self.advance(events, forges, demo, accounts);
     }
 }
 #[must_use]
@@ -641,6 +663,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         for _ in 0..self.endings.len().checked_mul(self.writes).expect("bounded sign-in endings") {
             if !self.room(1) || events.room() < kit::MAX_OUT_DOWN {
@@ -661,7 +684,7 @@ impl Clients {
                 self.endings.remove(&number);
             }
             self.down(kit::Event::SignInEnded { sign_in });
-            self.advance(events, forges, demo);
+            self.advance(events, forges, demo, accounts);
         }
     }
 }
@@ -841,5 +864,5 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
 }
 
 fn http_settings() -> http::Settings {
-    http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
+    http::Settings { prefix: Box::from(b"/jig".as_slice()), public: None }
 }

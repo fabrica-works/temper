@@ -276,7 +276,8 @@ impl Domain {
                 match output.pop() {
                     Some(jig_domain_core::Request::Decided) => {}
                     Some(
-                        jig_domain_core::Request::Write(_)
+                        jig_domain_core::Request::ProjectMade { .. }
+                        | jig_domain_core::Request::Write(_)
                         | jig_domain_core::Request::Ask { .. }
                         | jig_domain_core::Request::Held(_)
                         | jig_domain_core::Request::Now(_),
@@ -546,7 +547,8 @@ fn only_decided(requests: &jig_domain_core::Requests) -> bool {
     for request in output {
         match request {
             jig_domain_core::Request::Decided => {}
-            jig_domain_core::Request::Write(_)
+            jig_domain_core::Request::ProjectMade { .. }
+            | jig_domain_core::Request::Write(_)
             | jig_domain_core::Request::Ask { .. }
             | jig_domain_core::Request::Held(_)
             | jig_domain_core::Request::Now(_) => return false,

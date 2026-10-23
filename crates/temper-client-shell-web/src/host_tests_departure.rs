@@ -1,6 +1,6 @@
 //! The linked host's own sign-in answer must reach the return handshake.
 use super::*;
-use jig_client_protocol_wire::{VERSION, v15 as w};
+use jig_client_protocol_wire::{VERSION, v17 as w};
 use skein_lib::{Duration, Reader};
 use temper_client_protocol_wire::{self as wire, v1 as f};
 

@@ -232,7 +232,7 @@ pub(crate) fn route_core_requests(
             core::Request::Ask { connector, ask } => asks::ask(domain, env, decision, connector, ask),
             core::Request::Held(output) => held::held(domain, env, decision, *output),
             core::Request::Now(output) => now::now(domain, env, decision, *output),
-            core::Request::Decided => {}
+            core::Request::ProjectMade { .. } | core::Request::Decided => {}
         }
     }
 }

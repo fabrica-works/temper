@@ -317,8 +317,15 @@ fn registered() -> (config::Engine, AccountsRuntime) {
     (config, AccountsRuntime { providers, trust_roots: 0, trust_root_bytes: 0 })
 }
 fn host(config: &config::Engine, runtime: AccountsRuntime) -> Accounts {
-    Accounts::new(config, &fixtures::seeds(), Some(runtime), 64, &config.limits.store.secrets)
-        .expect("public registration fits")
+    Accounts::new(
+        crate::system::ACCOUNT_APPLICATION.into(),
+        config,
+        &fixtures::seeds(),
+        Some(runtime),
+        64,
+        &config.limits.store.secrets,
+    )
+    .expect("public registration fits")
 }
 #[test]
 fn dynamic_sources_use_provider_templates_and_restore_their_kept_records() {
@@ -384,7 +391,17 @@ fn dynamic_sources_use_provider_templates_and_restore_their_kept_records() {
 #[test]
 fn missing_registration_runtime_is_refused_before_start() {
     let (config, _) = registered();
-    assert!(Accounts::new(&config, &fixtures::seeds(), None, 64, &config.limits.store.secrets).is_err());
+    assert!(
+        Accounts::new(
+            crate::system::ACCOUNT_APPLICATION.into(),
+            &config,
+            &fixtures::seeds(),
+            None,
+            64,
+            &config.limits.store.secrets
+        )
+        .is_err()
+    );
 }
 #[test]
 fn overflowing_account_bounds_are_refused_before_start() {
