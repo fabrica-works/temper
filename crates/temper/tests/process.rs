@@ -689,6 +689,7 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
     use std::{fs, os::unix::fs::PermissionsExt};
     use support::ctl::Step;
 
+    let _ports = support::DefaultPorts::hold("forgejo-from-client");
     let scratch = support::Scratch::new("forgejo-from-client");
     let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
     for path in &paths {
@@ -1101,6 +1102,7 @@ fn first_run_directories(scratch: &support::Scratch) -> ([std::path::PathBuf; 3]
 #[test]
 fn a_first_run_ctl_demo_start_answers_running_twice() {
     use support::ctl::{Call, Step};
+    let _ports = support::DefaultPorts::hold("first-run-ctl");
     let scratch = support::Scratch::new("first-run-ctl");
     let (_, flags) = first_run_directories(&scratch);
     let seen = support::boxed::run_ctl(
@@ -1135,6 +1137,7 @@ fn a_second_forge_ends_the_playground_for_good() {
     use std::{fs, os::unix::fs::PermissionsExt};
     use support::ctl::{Call, Step};
 
+    let _ports = support::DefaultPorts::hold("playground-end");
     let scratch = support::Scratch::new("playground-end");
     let (paths, flags) = first_run_directories(&scratch);
     for run in ["first", "second", "third"] {
@@ -1261,6 +1264,7 @@ fn playground_end_second_forge(config: &std::path::Path) {
 
 fn first_run(restart: bool) {
     use std::{fs, os::unix::fs::PermissionsExt};
+    let _ports = support::DefaultPorts::hold("first-run");
     let scratch = support::Scratch::new("first-run");
     let (paths, flags) = first_run_directories(&scratch);
     let mut bot = None;
@@ -2471,6 +2475,7 @@ impl skein_world::Referee<support::cluster::Root> for ClusterChatJudge {
 #[ignore = "backlog: a start without DNS fails while sign-in endpoints resolve at start (director 554)"]
 fn a_default_box_with_a_sign_in_registration_starts_without_dns() {
     use std::{ffi::OsString, fs, os::unix::fs::PermissionsExt};
+    let _ports = support::DefaultPorts::hold("first-run-no-dns");
     let scratch = support::Scratch::new("first-run-no-dns");
     let hosts = scratch.path().join("hosts");
     let nsswitch = scratch.path().join("nsswitch.conf");
