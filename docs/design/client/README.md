@@ -1144,9 +1144,11 @@ for its kind, its user's login and its installations. Its nodes:
   for the forge's group; *set up refused*, with why: not offered (the
   forge's connection does not offer it, or no such forge), not under
   the box, busy (`../protocol/forge.md`, 2.8), a new project, which
-  waits on jig's projects at runtime, or invalid, the org, the
-  repository or a new project's name empty or past the engine's
-  `name_bytes`, as `Adopt`'s are; or *unknown*, its
+  waits on jig's projects at runtime, or invalid, a name Forgejo
+  would refuse (the org a login of at most 40 bytes, the repository
+  1 to 100 bytes of letters, digits, `.`, `_` or `-`, neither `.` nor
+  `..`; skein `forge-setup.md`, 4.9) or past the engine's
+  `name_bytes`, or a new project's name empty or past it; or *unknown*, its
   outcome no longer held (section 8), the same unknown as an
   adoption's. A refusal at admission is jig's answer, as for `Adopt`.
 - **The small store's record of a pending request** is `jig-client`'s
