@@ -8,6 +8,7 @@ use skein_lib::Queue;
 const OUTPUTS: u32 = 16;
 const SERIAL: u64 = 37;
 const EMPTY: u32 = 0;
+const REPLY: u64 = 1;
 #[test]
 fn opening_a_chat_watches_task_and_reads_its_first_activity_page() {
     let mut out = Queue::with_capacity(OUTPUTS);
@@ -182,7 +183,38 @@ fn chat_told(pages: &mut crate::pages::Pages, client: &jig_client::Client, told:
     );
     out
 }
-fn chat_move(pages: &mut crate::pages::Pages, client: &jig_client::Client, position: u64) -> Queue<Request> {
+fn owner_activity(position: u64, line: c::OwnerActivity) -> c::ActivityLine {
+    c::ActivityLine {
+        position,
+        at: skein_lib::Wall::EPOCH,
+        event: c::Activity::Owner {
+            source: Box::new(c::OwnerActivityLine { task: f::TASK, position, at: skein_lib::Wall::EPOCH, line }),
+            decoded: None,
+        },
+    }
+}
+fn owner_turn(position: u64, reply: u64) -> c::ActivityLine {
+    owner_activity(
+        position,
+        c::OwnerActivity::Turn { reply, attempt: f::ATTEMPT, turn: u32::try_from(reply).unwrap(), read: None },
+    )
+}
+fn chat_move(
+    pages: &mut crate::pages::Pages,
+    client: &jig_client::Client,
+    position: u64,
+    reply: u64,
+) -> Queue<Request> {
+    let mut rows = skein_lib::List::with_capacity(1);
+    rows.push(owner_turn(position, reply)).unwrap();
+    chat_activity(pages, client, position, rows)
+}
+fn chat_activity(
+    pages: &mut crate::pages::Pages,
+    client: &jig_client::Client,
+    position: u64,
+    rows: skein_lib::List<c::ActivityLine>,
+) -> Queue<Request> {
     let mut task = f::task();
     task.activity = position;
     let document = pages.chat().unwrap().document;
@@ -194,17 +226,6 @@ fn chat_move(pages: &mut crate::pages::Pages, client: &jig_client::Client, posit
             page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(task)))),
         },
     );
-    let mut rows = skein_lib::List::with_capacity(1);
-    rows.push(c::ActivityLine {
-        position,
-        at: skein_lib::Wall::EPOCH,
-        event: c::Activity::RunBegan {
-            attempt: f::ATTEMPT,
-            how: c::RunBeginning::Resumed,
-            why: fixtures::acts::text(b"resume"),
-        },
-    })
-    .unwrap();
     chat_told(
         pages,
         client,
@@ -237,29 +258,29 @@ fn seen_ask(through: u64) -> c::Ask {
 fn a_chats_first_loaded_page_is_seen_automatically() {
     let (mut pages, client) = chat_pages();
     assert_eq!(
-        fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION)).as_ref(),
-        [seen_ask(f::POSITION)]
+        fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION, REPLY)).as_ref(),
+        [seen_ask(REPLY)]
     );
 }
 #[test]
 fn turns_arriving_while_a_chat_is_open_are_seen_through_the_newest() {
     let (mut pages, client) = chat_pages();
-    chat_move(&mut pages, &client, f::POSITION);
+    chat_move(&mut pages, &client, f::POSITION, REPLY);
     let key = seen_key(&pages);
     chat_told(&mut pages, &client, Told::Answered { key, outcome: seen_answer() });
     assert_eq!(
-        fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION + 2)).as_ref(),
-        [seen_ask(f::POSITION + 2)]
+        fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION + 2, REPLY + 1)).as_ref(),
+        [seen_ask(REPLY + 1)]
     );
 }
 #[test]
-fn a_chat_waits_for_the_pending_seen_before_sending_the_newest_position() {
+fn a_chat_waits_for_the_pending_seen_before_sending_the_newest_reply() {
     let (mut pages, client) = chat_pages();
-    chat_move(&mut pages, &client, f::POSITION);
+    chat_move(&mut pages, &client, f::POSITION, REPLY);
     let key = seen_key(&pages);
-    assert!(fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION + 1)).is_empty());
+    assert!(fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION + 1, REPLY + 1)).is_empty());
     let mut out = chat_told(&mut pages, &client, Told::Answered { key, outcome: seen_answer() });
-    assert_eq!(fixtures::acts::sent(&mut out).as_ref(), [seen_ask(f::POSITION + 1)]);
+    assert_eq!(fixtures::acts::sent(&mut out).as_ref(), [seen_ask(REPLY + 1)]);
     assert_ne!(seen_key(&pages), key);
 }
 #[test]
@@ -274,7 +295,7 @@ fn a_refused_or_failed_chat_seen_is_resent_at_the_next_move() {
         })),
     ] {
         let (mut pages, client) = chat_pages();
-        chat_move(&mut pages, &client, f::POSITION);
+        chat_move(&mut pages, &client, f::POSITION, REPLY);
         let key = seen_key(&pages);
         assert!(fixtures::acts::sent(&mut chat_told(&mut pages, &client, Told::Answered { key, outcome })).is_empty());
         assert_eq!(pages.chat().unwrap().seen, 0);
@@ -288,19 +309,86 @@ fn a_refused_or_failed_chat_seen_is_resent_at_the_next_move() {
                 page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(Box::new(f::task())))),
             },
         );
-        assert_eq!(fixtures::acts::sent(&mut out).as_ref(), [seen_ask(f::POSITION)]);
+        assert_eq!(fixtures::acts::sent(&mut out).as_ref(), [seen_ask(REPLY)]);
         assert_ne!(seen_key(&pages), key);
     }
 }
 #[test]
-fn a_chat_sends_no_seen_without_a_new_loaded_position() {
+fn a_chat_sends_no_seen_without_a_new_loaded_reply() {
     let (mut pages, client) = chat_pages();
-    chat_move(&mut pages, &client, f::POSITION);
+    chat_move(&mut pages, &client, f::POSITION, REPLY);
     let key = seen_key(&pages);
     chat_told(&mut pages, &client, Told::Answered { key, outcome: seen_answer() });
-    assert!(fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION)).is_empty());
-    assert!(fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION - 1)).is_empty());
-    assert_eq!(pages.chat().unwrap().seen, f::POSITION);
+    assert!(fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION, REPLY)).is_empty());
+    assert!(fixtures::acts::sent(&mut chat_move(&mut pages, &client, f::POSITION - 1, REPLY)).is_empty());
+    assert_eq!(pages.chat().unwrap().seen, REPLY);
+}
+#[test]
+fn a_chat_sees_reply_numbers_instead_of_activity_positions() {
+    let (mut pages, client) = chat_pages();
+    let mut rows = skein_lib::List::with_capacity(4);
+    rows.push(owner_activity(
+        1,
+        c::OwnerActivity::RunBegan { attempt: f::ATTEMPT, why: c::OwnerRunWhy::Made, resumed: false },
+    ))
+    .unwrap();
+    rows.push(owner_activity(
+        2,
+        c::OwnerActivity::Words {
+            message: 1,
+            by: c::OwnerRequester::Person(fixtures::PARTY),
+            kind: c::OwnerMessageKind::Words,
+            words: fixtures::acts::text(b"Hello"),
+        },
+    ))
+    .unwrap();
+    rows.push(owner_turn(3, 1)).unwrap();
+    rows.push(owner_activity(
+        4,
+        c::OwnerActivity::RunEnded { attempt: f::ATTEMPT, end: c::OwnerRunEnd::Parked, spent: 0 },
+    ))
+    .unwrap();
+    let mut out = chat_activity(&mut pages, &client, 4, rows);
+    assert_eq!(pages.chat().unwrap().thread.loaded, 4);
+    assert_eq!(fixtures::acts::sent(&mut out).as_ref(), [seen_ask(1)]);
+    assert_eq!(pages.chat().unwrap().seen, 1);
+    let key = seen_key(&pages);
+    chat_told(&mut pages, &client, Told::Answered { key, outcome: seen_answer() });
+    assert_eq!(fixtures::acts::sent(&mut chat_move(&mut pages, &client, 5, 2)).as_ref(), [seen_ask(2)]);
+    assert_eq!(pages.chat().unwrap().seen, 2);
+}
+#[test]
+fn a_chat_with_activity_but_no_numbered_owner_turn_sends_no_seen() {
+    let (mut pages, client) = chat_pages();
+    let mut rows = skein_lib::List::with_capacity(3);
+    rows.push(owner_activity(
+        1,
+        c::OwnerActivity::RunBegan { attempt: f::ATTEMPT, why: c::OwnerRunWhy::Made, resumed: false },
+    ))
+    .unwrap();
+    rows.push(owner_activity(
+        2,
+        c::OwnerActivity::Words {
+            message: 1,
+            by: c::OwnerRequester::Person(fixtures::PARTY),
+            kind: c::OwnerMessageKind::Words,
+            words: fixtures::acts::text(b"Hello"),
+        },
+    ))
+    .unwrap();
+    rows.push(c::ActivityLine {
+        position: 4,
+        at: skein_lib::Wall::EPOCH,
+        event: c::Activity::Turn {
+            name: c::TurnName { attempt: f::ATTEMPT, number: 1 },
+            turn: c::TurnRead::Undecodable { why: c::TurnProblem::Malformed },
+        },
+    })
+    .unwrap();
+    assert!(fixtures::acts::sent(&mut chat_activity(&mut pages, &client, 4, rows)).is_empty());
+    assert_eq!(pages.chat().unwrap().thread.loaded, 4);
+    assert_eq!(pages.chat().unwrap().seen, 0);
+    assert!(pages.chat().unwrap().pending.is_empty());
 }
 #[test]
 fn automatic_seen_preserves_the_last_acts_outcome_on_send_and_answer() {
@@ -309,7 +397,21 @@ fn automatic_seen_preserves_the_last_acts_outcome_on_send_and_answer() {
     f.chat.act(&fixtures::env(&fixtures::limits()), &f.client, Act::Stop, &mut serial, &mut f.out);
     let key = f.chat.pending.as_slice()[0].0;
     f.chat.told(&f.client, Told::Answered { key, outcome: jig_client::Outcome::Unknown }, &mut f.out);
-    f::activity(&mut f, &[], f::POSITION);
+    let mut rows = skein_lib::List::with_capacity(1);
+    rows.push(owner_turn(f::POSITION, REPLY)).unwrap();
+    f.chat.told(
+        &f.client,
+        Told::Page {
+            handle: f.chat.activity,
+            page: jig_client::Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(Box::new(c::ActivityPage {
+                rows,
+                before: None,
+                after: None,
+                cut: false,
+            })))),
+        },
+        &mut f.out,
+    );
     f.chat.see(&mut serial, &mut f.out);
     assert_eq!(f.chat.outcome, Some(jig_client::Outcome::Unknown));
     assert_eq!(f.chat.outcome_kind, Some(Sending::Stop));
@@ -359,16 +461,7 @@ fn chat_with_loaded_turn() -> (crate::Domain, Queue<crate::Request>) {
         &mut out,
     );
     let mut rows = skein_lib::List::with_capacity(1);
-    rows.push(c::ActivityLine {
-        position: f::POSITION,
-        at: skein_lib::Wall::EPOCH,
-        event: c::Activity::RunBegan {
-            attempt: f::ATTEMPT,
-            how: c::RunBeginning::Resumed,
-            why: fixtures::acts::text(b"resume"),
-        },
-    })
-    .unwrap();
+    rows.push(owner_turn(f::POSITION, REPLY)).unwrap();
     let handle = root.pages().chat().unwrap().activity;
     crate::route::told(
         &mut root,
@@ -420,7 +513,7 @@ fn an_automatic_seen_and_a_message_can_both_be_pending_and_answered() {
     assert_eq!(
         asks.as_slice(),
         [
-            seen_ask(f::POSITION),
+            seen_ask(REPLY),
             c::Ask::Message { project: fixtures::PROJECT, task: f::TASK, words: fixtures::acts::text(b"Hello") },
         ]
     );
@@ -449,7 +542,7 @@ fn an_automatic_seen_and_a_message_can_both_be_pending_and_answered() {
     for (key, _) in &pending {
         assert!(root.client().pending(*key).is_none(), "both requests answered");
     }
-    assert_eq!(root.pages().chat().unwrap().seen, f::POSITION);
+    assert_eq!(root.pages().chat().unwrap().seen, REPLY);
     assert_eq!(root.pages().chat().unwrap().outcome_kind, Some(Sending::Message));
 }
 
