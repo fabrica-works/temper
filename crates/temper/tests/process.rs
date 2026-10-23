@@ -23,6 +23,14 @@ fn a_person_signs_in_with_chatgpt_and_a_chat_is_answered_on_the_plan() {
 }
 
 #[test]
+fn a_plan_chat_whose_reasoning_passes_its_allowance_is_held_with_its_reason() {
+    let scratch = support::Scratch::new("plan_chat_reasoning_bound");
+    let issuer = support::sign_in::configuration(scratch.path());
+    support::sign_in::exceeded(scratch.path(), issuer);
+    scratch.remove();
+}
+
+#[test]
 fn a_first_owner_adds_a_key_under_the_deployments_accounts() {
     let scratch = support::Scratch::new("deployment_accounts");
     let _issuer = support::sign_in::configuration(scratch.path());
