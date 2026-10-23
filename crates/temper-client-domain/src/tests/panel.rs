@@ -344,6 +344,8 @@ fn output_and_memory_bounds_cover_replacement_and_a_full_panel() {
         + w::Answer::worst_case_heap(&wire).unwrap()
         + u64::from(wire.group_failed_why)
         + forge::forges::worst_case(&limits.forge).unwrap()
+        // App draft key, answered install link and editable App id.
+        + 4097 + 2048 + u64::from(limits.forge.field_bytes)
         + u64::try_from(size_of::<Handle>()).unwrap();
     assert_eq!(forge::worst_case(&limits.forge), Some(existing + u64::try_from(panel_heap).unwrap()));
     assert!(crate::worst_case(&limits).unwrap() >= forge::worst_case(&limits.forge).unwrap());

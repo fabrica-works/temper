@@ -14,21 +14,12 @@ impl Limits {
             .capacity()?
             .max(receiving.text.checked_mul(2)?)
             .max(receiving.turn_text)
-            .max(domain.forge.field_bytes.checked_add(64)?);
+            .max(domain.forge.field_bytes.checked_mul(3)?.checked_add(128)?);
         // An account heading joins the provider, plan/display and holder's words.
         let text = text.max(receiving.text.checked_add(words.name_bytes.min(256).checked_mul(3)?)?.checked_add(64)?);
         let text = text.max(fold_bytes(receiving, words)?);
         let markdown = skein_ui::markdown::max_nodes(receiving.text)?;
-        // Each grant and note scope has a bounded sequence of pattern segments.
-        let pattern = receiving.segments.checked_add(2)?.checked_mul(2)?;
-        let authority = pattern.checked_mul(2)?.checked_add(4)?.checked_mul(receiving.rows)?.checked_add(24)?;
-        let proposed = markdown
-            .checked_mul(2)?
-            .checked_add(authority)?
-            .checked_add(receiving.rows.checked_mul(16)?)?
-            .checked_add(32)?;
-        let card = proposed.checked_mul(receiving.rows)?.checked_add(128)?;
-        let cards = card.checked_mul(receiving.reads.checked_add(1)?)?;
+        let cards = card_nodes(receiving, markdown)?;
         // Each watched task has one card at its first anchor: fourteen structural
         // nodes plus the result's markdown, and one region for live delegates.
         let delegations = temper_client_domain::pages::delegation::bound(domain);
@@ -149,7 +140,13 @@ impl Limits {
             // a failed demo start's alert, its text leaf and Try again (3).
             .checked_add(5)?
             // The adoption form's region, named by the page's heading.
-            .checked_add(1)?;
+            .checked_add(1)?
+            // GitHub's App line keeps each installation in its own bounded text slot.
+            .checked_add(
+                temper_client_domain::forge::forges::ROWS
+                    .checked_mul(temper_client_domain::forge::forges::INSTALLATIONS)?
+                    .checked_mul(2)?,
+            )?;
         let tree = skein_ui::Limits {
             nodes,
             depth: receiving.rows.checked_add(34)?,
@@ -169,6 +166,19 @@ impl Limits {
         worst_case(&limits, domain, words)?;
         Some(limits)
     }
+}
+fn card_nodes(receiving: &jig_client::DomainLimits, markdown: u32) -> Option<u32> {
+    // Each grant and note scope has a bounded sequence of pattern segments.
+    let pattern = receiving.segments.checked_add(2)?.checked_mul(2)?;
+    let authority = pattern.checked_mul(2)?.checked_add(4)?.checked_mul(receiving.rows)?.checked_add(24)?;
+    let proposed = markdown
+        .checked_mul(2)?
+        .checked_add(authority)?
+        .checked_add(receiving.rows.checked_mul(16)?)?
+        .checked_add(32)?;
+    let card = proposed.checked_mul(receiving.rows)?.checked_add(128)?;
+    let cards = card.checked_mul(receiving.reads.checked_add(1)?)?;
+    Some(cards)
 }
 // A disclosure joins admitted tool names, count, separators and repetition
 // suffixes into one name (client/README.md, 3.5), beyond the turn's text budget.

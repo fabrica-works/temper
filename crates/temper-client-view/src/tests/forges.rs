@@ -206,3 +206,69 @@ fn a_full_forge_reason_and_login_fit_after_utf8_replacement() {
         assert_eq!(summary.matches('�').count(), 256_usize);
     }
 }
+
+#[test]
+fn the_github_row_draws_its_app_installations_and_last_connect() {
+    let root = f::forge_root(Address::Forges, cf::github_rows(true));
+    let view = f::browser_page_view(&root);
+    cf::words_in_order(
+        view.tree(),
+        &[
+            "Account",
+            "my-app[bot] · user 9",
+            "temper’s App",
+            "my-app · ",
+            "acme",
+            ", installation 2 · suspended",
+            ", installation 3 · uninstalled at the next reconcile",
+            "The last connect stopped: fixture stopped",
+            "Install on another account",
+        ],
+    );
+}
+#[test]
+fn install_on_another_account_follows_an_accepted_installation() {
+    for (accepted, name) in [(true, b"Install on another account".as_slice()), (false, b"Install on GitHub")] {
+        let root = f::forge_root(Address::Forges, cf::github_rows(accepted));
+        assert_eq!(
+            action(&root, Role::Button, name),
+            d::Action::Forge(d::forge::Act::Install { forge: 2, back: b"/forges".as_slice().into() })
+        );
+    }
+}
+#[test]
+fn all_sixty_four_installations_fit_without_shortening_their_logins() {
+    let mut rows = cf::github_rows(true);
+    let mut row = rows.as_slice()[0].clone().into_parts();
+    rows.clear();
+    row.installations = List::with_capacity(d::forge::forges::INSTALLATIONS);
+    for id in 1..=u64::from(d::forge::forges::INSTALLATIONS) {
+        row.installations
+            .push(
+                w::Installation::new(
+                    &w::CEILINGS,
+                    w::InstallationParts {
+                        id,
+                        account: Some(
+                            w::Account::new(&w::CEILINGS, w::AccountParts { id, login: Box::from([255_u8; 256]) })
+                                .unwrap(),
+                        ),
+                        suspended: true,
+                        stray: true,
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+    }
+    rows.push(w::ForgeRow::new(&w::CEILINGS, row).unwrap()).unwrap();
+    let root = f::forge_root(Address::Forges, rows);
+    let domain = f::limits();
+    let words = f::browser_words();
+    let limits = crate::Limits::of(&domain, &words).unwrap();
+    let mut view = crate::View::new(&limits, &domain, words, wire::FORGE);
+    crate::build(&mut view, &root, f::NOW, &mut skein_lib::Queue::with_capacity(limits.tree.patches));
+    let text = f::text(view.tree());
+    let text = core::str::from_utf8(&text).unwrap();
+    assert_eq!(text.matches('�').count(), 64 * 256);
+}

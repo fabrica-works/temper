@@ -220,9 +220,7 @@ pub fn event(view: &mut View, node: NodeId, act: Act) -> Option<temper_client_do
         return Some(temper_client_domain::Event::Act { action: view.pages.decode(bound.binding.token, bound.act)? });
     }
     if bound.binding.owner == temper_client_domain::forge::words::owner(view.forge_words.connector) {
-        Some(temper_client_domain::Event::Act {
-            action: forge::bindings::decode(&view.forge, bound.binding.token, bound.act)?,
-        })
+        forge::bindings::event(&view.forge, bound.binding.token, bound.act)
     } else {
         None
     }

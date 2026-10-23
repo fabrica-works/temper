@@ -950,6 +950,9 @@ pub fn forge_connection(row: &super::forges::Row) -> Box<[u8]> {
         }),
         C::SetUpFailed { why } => join_words(&[b"Set up failed: ", &lossy(why)]),
         C::Connecting => Box::from(b"Connecting".as_slice()),
+        C::Connected { .. } if row.kind == super::forges::Kind::GitHub && !super::forges::accepted(row) => {
+            Box::from(b"Connecting: installed nowhere yet".as_slice())
+        }
         C::Connected { id, login } => {
             join_words(&[b"Connected as ", &lossy(login), b" (", skein_lib::Decimal::of(*id).as_bytes(), b")"])
         }
@@ -1014,4 +1017,80 @@ pub fn first_repository(first: &super::forges::First) -> Box<[u8]> {
         }
         FirstState::Failed { step } => join_words(&[b"Making ", &name, b" failed: ", create_step(step)]),
     }
+}
+
+/// GitHub App presentation from the row's facts (client/forge.md, 5.4).
+#[must_use]
+pub fn app_line(row: &super::forges::Row) -> Option<Box<[u8]>> {
+    let slug = super::forges::slug(row)?;
+    let mut line = join_words(&[&lossy(slug), b" \xc2\xb7 "]);
+    if row.installations.is_empty() {
+        return Some(join_words(&[&line, b"installed nowhere yet"]));
+    }
+    for (index, installation) in row.installations.iter().enumerate() {
+        let separator: &[u8] = if index == 0 { b"" } else { b", " };
+        line = join_words(&[&line, separator, &installation_words(installation)]);
+    }
+    Some(line)
+}
+#[must_use]
+pub fn installation_words(installation: &super::forges::Installation) -> Box<[u8]> {
+    let account = match &installation.account {
+        Some(account) => lossy(&account.login),
+        None => join_words(&[b"installation ", skein_lib::Decimal::of(installation.id).as_bytes()]),
+    };
+    join_words(&[
+        &account,
+        if installation.suspended { b" \xc2\xb7 suspended" } else { b"" },
+        if installation.stray { b" \xc2\xb7 uninstalled at the next reconcile" } else { b"" },
+    ])
+}
+#[must_use]
+pub fn last_connect(row: &super::forges::Row) -> Option<Box<[u8]>> {
+    Some(join_words(&[b"The last connect stopped: ", &lossy(row.ended.as_ref()?)]))
+}
+#[must_use]
+pub fn app_refusal(why: super::github::Answer, forge: u16) -> Option<Box<[u8]>> {
+    use super::github::Answer;
+    use temper_client_protocol_wire::v1::ForgeRefusal as F;
+    let number = skein_lib::Decimal::of(u64::from(forge));
+    Some(match why {
+        Answer::Refused(F::Role) => join_words(&[b"Only the deployment's owner connects a forge."]),
+        Answer::Refused(F::NoSuchForge) => join_words(&[b"No forge ", number.as_bytes(), b" is configured."]),
+        Answer::Refused(F::NotTaken) => join_words(&[b"Forge ", number.as_bytes(), b" does not take an App."]),
+        Answer::Refused(F::Connected) => join_words(&[b"GitHub is connected already."]),
+        Answer::Refused(F::Busy) => {
+            join_words(&[b"temper is busy with forge ", number.as_bytes(), b": try again when it ends."])
+        }
+        Answer::Refused(F::NoKey) => join_words(&[b"The key did not reach temper: paste it again."]),
+        Answer::Refused(F::NotConnected) => join_words(&[b"Connect the App first."]),
+        Answer::Unknown => join_words(&[b"It is not known whether the App was connected: see Forges."]),
+        Answer::Connecting | Answer::Link(_) | Answer::Entrance(_) => return None,
+    })
+}
+#[must_use]
+pub fn app_terminal(forge: u16) -> Box<[u8]> {
+    join_words(&[
+        b"Paste the key on this page in a browser, or run temper ctl forge-connect ",
+        skein_lib::Decimal::of(u64::from(forge)).as_bytes(),
+        b" github-app ID FILE, FILE the key's file, readable by you alone.",
+    ])
+}
+#[must_use]
+pub fn app_install(row: &super::forges::Row) -> Box<[u8]> {
+    join_words(&[
+        &lossy(super::forges::slug(row).unwrap_or(b"")),
+        b" is connected to temper, and installed nowhere yet. Install it, and choose the repositories temper may use.",
+    ])
+}
+pub const APP_ID: &[u8] = b"An App's id is a number, as GitHub shows it on the App's page.";
+pub const APP_TOO_LONG: &[u8] = b"The pasted values are past 4 KiB, the most a request carries.";
+
+#[must_use]
+pub fn app_head(slug: &[u8], empty: bool) -> Box<[u8]> {
+    join_words(&[&lossy(slug), b" \xc2\xb7 ", if empty { b"installed nowhere yet" } else { b"" }])
+}
+#[must_use]
+pub fn app_installation(installation: &super::forges::Installation, first: bool) -> Box<[u8]> {
+    join_words(&[if first { b"" } else { b", " }, &installation_words(installation)])
 }

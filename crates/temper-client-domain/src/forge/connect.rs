@@ -39,6 +39,7 @@ pub fn step(choice: Option<Choice>, rows: &State, demo: Option<&Demo>) -> Shown 
                 return Shown::SettingUp(number);
             }
             match &row.connection {
+                Connection::Stopped { .. } if row.kind == Kind::GitHub => Shown::Details(Choice::Forge(number)),
                 Connection::NotSetUp | Connection::NotConnected => {
                     if offered(row) {
                         Shown::Details(Choice::Forge(number))
@@ -63,7 +64,14 @@ pub fn step(choice: Option<Choice>, rows: &State, demo: Option<&Demo>) -> Shown 
 }
 fn offered(row: &Row) -> bool {
     match row.kind {
-        Kind::GitHub => row.connection == Connection::NotConnected,
+        Kind::GitHub => match row.connection {
+            Connection::NotConnected | Connection::Stopped { .. } => true,
+            Connection::NotSetUp
+            | Connection::SettingUp { .. }
+            | Connection::SetUpFailed { .. }
+            | Connection::Connecting
+            | Connection::Connected { .. } => false,
+        },
         Kind::Forgejo => {
             row.mode == Mode::Owned && row.connection == Connection::NotSetUp && row.offer != Offer::NotOffered
         }
@@ -117,6 +125,7 @@ pub fn personal<'a>(rows: &'a State, demo: Option<&Demo>) -> Option<&'a Row> {
 pub fn underway(row: &Row) -> bool {
     match row.connection {
         Connection::SettingUp { .. } | Connection::Connecting => true,
+        Connection::Connected { .. } if row.kind == Kind::GitHub && !super::forges::accepted(row) => true,
         Connection::Connected { .. } => match &row.first {
             Some(first) => first.state == super::forges::FirstState::Making,
             None => false,

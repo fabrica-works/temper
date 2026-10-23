@@ -78,6 +78,13 @@ pub enum Word {
     ForgeGitHubCreate,
     ForgeOrganization,
     ForgeConnectApp,
+    ForgeUseApp,
+    ForgeAppLabel,
+    ForgeInstallAnother,
+    ForgeInstall,
+    ForgeInstallTitle,
+    ForgeConnectAppButton,
+    ForgeAppTitle,
     ForgeAppDescription,
     ForgeAppId,
     ForgePrivateKey,
@@ -527,8 +534,8 @@ pub enum Word {
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
-const PHRASES: u32 = 1012;
-const ALL: [Word; 479] = [
+const PHRASES: u32 = 1019;
+const ALL: [Word; 486] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -596,6 +603,13 @@ const ALL: [Word; 479] = [
     Word::ForgeGitHubCreate,
     Word::ForgeOrganization,
     Word::ForgeConnectApp,
+    Word::ForgeUseApp,
+    Word::ForgeAppLabel,
+    Word::ForgeInstallAnother,
+    Word::ForgeInstall,
+    Word::ForgeInstallTitle,
+    Word::ForgeConnectAppButton,
+    Word::ForgeAppTitle,
     Word::ForgeAppDescription,
     Word::ForgeAppId,
     Word::ForgePrivateKey,
@@ -1079,6 +1093,13 @@ impl Word {
             Self::ForgeConnectGitHub => 1734,
             Self::ForgeGitHubCreate => 1735,
             Self::ForgeOrganization => 1736,
+            Self::ForgeAppTitle => 1790,
+            Self::ForgeConnectAppButton => 1791,
+            Self::ForgeInstallTitle => 1792,
+            Self::ForgeInstall => 1793,
+            Self::ForgeInstallAnother => 1794,
+            Self::ForgeAppLabel => 1795,
+            Self::ForgeUseApp => 1796,
             Self::ForgeConnectApp => 1737,
             Self::ForgeAppDescription => 1738,
             Self::ForgeAppId => 1739,
@@ -1516,6 +1537,7 @@ pub enum Shell {
 }
 #[derive(Clone, Debug)]
 pub struct Words {
+    pub shell: Shell,
     pub book: Phrasebook,
     pub language: u16,
     pub connector: u16,
@@ -1652,7 +1674,7 @@ impl Words {
                 .max(temper_client_domain::forge::DEMO_WHY_BYTES),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
-        Ok(Words { book, language: 0, connector, name_bytes: joined })
+        Ok(Words { shell, book, language: 0, connector, name_bytes: joined })
     }
     #[must_use]
     pub fn say(&self, word: Word, holes: &[Hole]) -> Box<[u8]> {
@@ -1774,12 +1796,19 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ForgeConnectGitHub => (&[b"Connect GitHub"], &[]),
         Word::ForgeGitHubCreate => (&[b"Create an App and install it on your account or organization. Choose selected repositories."], &[]),
         Word::ForgeOrganization => (&[b"An organization, or none for your account"], &[]),
+        Word::ForgeAppTitle => (&[b"An App of your own"], &[]),
+        Word::ForgeConnectAppButton => (&[b"Connect the App"], &[]),
+        Word::ForgeInstallTitle => (&[b"Install temper\xe2\x80\x99s App"], &[]),
+        Word::ForgeInstall => (&[b"Install on GitHub"], &[]),
+        Word::ForgeInstallAnother => (&[b"Install on another account"], &[]),
+        Word::ForgeAppLabel => (&[b"temper\xe2\x80\x99s App"], &[]),
+        Word::ForgeUseApp => (&[b"Use an App of your own \xe2\x80\xba"], &[]),
         Word::ForgeConnectApp => (&[b"Connect an App of your own"], &[]),
         Word::ForgeAppDescription => (&[b"Its id, and its private key as GitHub gives it."], &[]),
         Word::ForgeAppId => (&[b"App id"], &[]),
         Word::ForgePrivateKey => (&[b"Private key"], &[]),
         Word::ForgePasted => (&[b"A pasted value is sent once and shown nowhere, then or after."], &[]),
-        Word::ForgeGitHubUnavailable => (&[b"Connecting GitHub from temper is not available yet."], &[]),
+        Word::ForgeGitHubUnavailable => (&[b"Connecting GitHub through temper\xe2\x80\x99s own App is not available yet: use an App of your own."], &[]),
         Word::ForgeHereDetails => (&[b"temper box downloads Forgejo and its runner, starts them, and makes your first repository, with a README and a CI workflow. No restart."], &[]),
         Word::ForgeIsolation => (&[b"Its CI jobs run on this machine, as you, with no isolation."], &[]),
         Word::ForgeStorage => (&[b"Forgejo stops when temper box stops. Its repositories are kept in temper\xe2\x80\x99s data directory."], &[]),

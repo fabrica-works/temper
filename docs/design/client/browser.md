@@ -637,15 +637,16 @@ to the page, and the page come back, a new client, drawing the end.
   absence and a return for no sign-in, skein's listener tier.
 
 **`ConnectForge`'s App of your own, the pasted key,** has no story
-here: what a browser alone would show, a PEM's line feeds reaching
-temper from the key's field, is a text area's, and the composer's
-story (4.1, 3) shows a text area's line feed reaching temper. The key's
-field is that text area with a secret entry kind, which skein's page
-maps to a `type` attribute alone, never read from a text area
-(skein's `ui-web.md`), so its value takes the composer's path. The
-view's tests hold that the field is a text area of the secret kind;
-the client domain's, that its text is sent whole as the `Pasted` item,
-one final line feed off, and emptied (`forge.md`, 5.4).
+here. Its field is a text field of the secret kind, which skein's page
+maps to `<input type="password">` (skein's `ui-web.md`), its value read
+as any text field's; HTML's value sanitization strips a password
+input's line feeds, the one thing a browser alone would add, and the
+client restores the PEM's armour from what is left (`forge.md`, 5.4).
+The view's tests hold that the field is a text field of the secret
+kind; the client domain's, that the stripped, the file's and the CRLF
+forms reach one carried value with the armour's two line feeds, and
+that the field is emptied; the service's, that `Paste` reads the fake's
+real key in that restored form.
 
 ### 4.3 Its budget and the gate
 

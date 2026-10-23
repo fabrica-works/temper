@@ -51,6 +51,12 @@ pub fn rows<'a>(state: &'a State, demo: Option<&Demo>) -> List<&'a Row> {
 pub fn dot(state: &State, demo: Option<&Demo>) -> Dot {
     let mut dot = Dot::None;
     for row in &rows(state, demo) {
+        if row.ended.is_some() {
+            return Dot::Red;
+        }
+        if connect::underway(row) {
+            dot = Dot::Amber;
+        }
         if let Some(first) = &row.first {
             match first.state {
                 super::forges::FirstState::Failed { .. } => return Dot::Red,
