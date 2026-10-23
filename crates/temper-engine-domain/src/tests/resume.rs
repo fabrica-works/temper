@@ -9,6 +9,42 @@ const CLOCK_PAIRS: u32 = 3;
 const WATCHER: skein_lib::Token = skein_lib::Token::new(30);
 const SIGN_IN: u64 = 10;
 
+#[test]
+fn reconciliation_can_start_once_the_connectors_restore_and_stays_open() {
+    use jig_domain_core::{RestartRequest, RestartStep};
+    let limits = super::resume_fixture::limits();
+    let mut domain = Domain::new(super::resume_fixture::config(7), &limits).unwrap();
+    assert!(!domain.connectors_restored());
+    let mut request = domain.core.restart_begin();
+    // False through the last connector restore, true from the next step on.
+    let (mut restoring, mut after) = (false, false);
+    for _ in 0_u32..16 {
+        match request {
+            RestartRequest::Step(step) => {
+                match step {
+                    RestartStep::RestoreConnector { .. } => restoring = true,
+                    RestartStep::LoadCore
+                    | RestartStep::LoadInbox
+                    | RestartStep::AdoptRuns
+                    | RestartStep::ReadAfresh { .. }
+                    | RestartStep::SettleOutbox { .. }
+                    | RestartStep::Open => after = after || restoring,
+                }
+                assert_eq!(domain.connectors_restored(), after, "{step:?}");
+                assert!(!domain.ready());
+                request = domain.core.restart_done(step);
+            }
+            RestartRequest::Idle => {
+                assert!(after, "a step followed the connectors' restore");
+                assert!(domain.connectors_restored() && domain.ready());
+                return;
+            }
+            RestartRequest::Refused { step } => panic!("empty restore: {step:?}"),
+        }
+    }
+    panic!("restart did not open");
+}
+
 fn resume(domain: &mut Domain, env: &Env<Limits>) {
     for _ in 0..RESUMES {
         crate::try_step(domain, env, Event::Resume).unwrap();

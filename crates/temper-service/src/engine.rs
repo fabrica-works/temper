@@ -222,7 +222,7 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
         engine.forge.iterate(now, wall);
     }
     // Reconcile must observe the root's restored repositories.
-    if !engine.begin && engine.domain.ready() {
+    if !engine.begin && engine.domain.connectors_restored() {
         crate::setup::lifecycle::restored(engine);
     }
     crate::setup::advance(engine);

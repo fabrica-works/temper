@@ -670,7 +670,7 @@ pub(super) fn refused(engine: &mut crate::engine::Engine, run: Token, forge: u16
     }
 }
 
-/// Called only once the root has completed its restore, never by the records loader.
+/// Called after connector rows restore, before fresh reads need their connections.
 pub(crate) fn restored(engine: &mut crate::engine::Engine) {
     if engine.setup.lifecycle.restored {
         return;

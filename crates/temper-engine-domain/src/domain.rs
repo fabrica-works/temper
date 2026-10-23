@@ -346,6 +346,22 @@ impl Domain {
         self.core.restart_ready() && !self.journal.stopped()
     }
 
+    /// Stored connector rows are available for reconciliation before fresh reads finish.
+    #[must_use]
+    pub fn connectors_restored(&self) -> bool {
+        use jig_domain_core::RestartStep;
+        match self.core.restart_step() {
+            Some(RestartStep::LoadCore | RestartStep::LoadInbox | RestartStep::RestoreConnector { .. }) => false,
+            Some(
+                RestartStep::AdoptRuns
+                | RestartStep::ReadAfresh { .. }
+                | RestartStep::SettleOutbox { .. }
+                | RestartStep::Open,
+            ) => !self.journal.stopped(),
+            None => self.ready(),
+        }
+    }
+
     /// Pure shell idle query: no immediate internal handoff or issued store operation
     /// remains unfinished. Call after the iteration's reclaim; sessions, idle
     /// workers, assigned workers awaiting external answers and future task/account
