@@ -329,6 +329,9 @@ impl Judge {
             // tests/real-loop/src/cluster.rs: one admitted position/attempt per worker.
             value["engine"]["limits"]["overrides"][key] = 3.into();
         }
+        // accounts' program hosts hold documents.lines rows (jig documents/programs.rs `hosts`);
+        // the lab's 2 would cut s2 from the placement read.
+        value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
         value["engine"]["hosts"]["workers"][0]["name"] = "ws".into();
         value["engine"]["hosts"]["workers"][1]["name"] = "s1".into();
         value["engine"]["hosts"]["workers"]
