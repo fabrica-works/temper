@@ -634,6 +634,29 @@ impl Caller {
         self.running.pop().expect("settled key call");
         self.recording = Recording::Story;
     }
+    fn kill_call(&mut self, index: usize) -> bool {
+        if self.current.is_none() {
+            let pidfd = self.running[index].as_ref().expect("kill running call").pidfd.expect("spawned call");
+            self.submit(index, Op::Signal { pidfd, signal: Signal::Kill, to: skein_io::kernel::Target::Child });
+            self.current = Some(index);
+            return false;
+        }
+        if self.running[index].is_some() {
+            return false;
+        }
+        self.current = None;
+        true
+    }
+    fn terminal_act(&mut self) -> bool {
+        let Step::Terminal(act) = &self.steps[self.next] else { panic!("terminal step") };
+        self.terminal.act(
+            act,
+            &self.scratch,
+            self.root.expect("terminal launch root"),
+            self.links.get(),
+            &mut self.submissions,
+        )
+    }
     fn advance(&mut self, now: Time) {
         if matches!(self.steps.get(self.next), Some(Step::Held { .. })) && self.held.get() {
             // Issue the following kill in this pass, before the hosted caller's next turn.
@@ -644,14 +667,8 @@ impl Caller {
             return;
         };
         match step {
-            Step::Terminal(act) => {
-                if !self.terminal.act(
-                    act,
-                    &self.scratch,
-                    self.root.expect("terminal launch root"),
-                    self.links.get(),
-                    &mut self.submissions,
-                ) {
+            Step::Terminal(_) => {
+                if !self.terminal_act() {
                     return;
                 }
             }
@@ -663,17 +680,9 @@ impl Caller {
             Step::StopWorker { .. } | Step::StartWorker { .. } | Step::AddWorker { .. } | Step::Advance => {}
             Step::Held { .. } => return,
             Step::Kill { call } => {
-                let index = *call;
-                if self.current.is_none() {
-                    let pidfd = self.running[index].as_ref().expect("kill running call").pidfd.expect("spawned call");
-                    self.submit(index, Op::Signal { pidfd, signal: Signal::Kill, to: skein_io::kernel::Target::Child });
-                    self.current = Some(index);
+                if !self.kill_call(*call) {
                     return;
                 }
-                if self.running[index].is_some() {
-                    return;
-                }
-                self.current = None;
             }
             Step::Probe { at } => {
                 if !self.acquire_probe(*at) {
