@@ -930,6 +930,9 @@ pub fn forge_summary(head: &[u8], connection: &[u8]) -> Box<[u8]> {
 #[must_use]
 pub fn forge_connection(row: &super::forges::Row) -> Box<[u8]> {
     use super::forges::{Connection as C, Offer, Step};
+    if let Some(super::forges::First { state: super::forges::FirstState::Failed { step }, .. }) = &row.first {
+        return join_words(&[b"Set up failed: ", create_step(*step)]);
+    }
     match &row.connection {
         C::NotConnected => Box::from(b"Not connected".as_slice()),
         C::NotSetUp => {

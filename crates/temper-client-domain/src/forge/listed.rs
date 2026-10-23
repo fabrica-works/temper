@@ -51,6 +51,13 @@ pub fn rows<'a>(state: &'a State, demo: Option<&Demo>) -> List<&'a Row> {
 pub fn dot(state: &State, demo: Option<&Demo>) -> Dot {
     let mut dot = Dot::None;
     for row in &rows(state, demo) {
+        if let Some(first) = &row.first {
+            match first.state {
+                super::forges::FirstState::Failed { .. } => return Dot::Red,
+                super::forges::FirstState::Making => dot = Dot::Amber,
+                super::forges::FirstState::Made { .. } => {}
+            }
+        }
         match row.connection {
             Connection::SetUpFailed { .. } | Connection::Stopped { .. } => return Dot::Red,
             Connection::SettingUp { .. } | Connection::Connecting => dot = Dot::Amber,
@@ -90,7 +97,7 @@ pub fn setup(root: &Domain) -> Option<Setup> {
     let mut started = false;
     for row in &rows(root.forges(), root.forge().demo()) {
         if let Connection::Connected { .. } = row.connection {
-            connected = true;
+            connected |= !connect::underway(row) && !connect::failed(row);
             started = true;
         }
         started |= connect::underway(row);

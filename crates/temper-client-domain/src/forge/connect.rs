@@ -35,6 +35,9 @@ pub fn step(choice: Option<Choice>, rows: &State, demo: Option<&Demo>) -> Shown 
         Some(Choice::Elsewhere) => Shown::Details(Choice::Elsewhere),
         Some(Choice::Forge(number)) => {
             let Some(row) = row(number, rows, demo) else { return Shown::Choose };
+            if failed(row) {
+                return Shown::SettingUp(number);
+            }
             match &row.connection {
                 Connection::NotSetUp | Connection::NotConnected => {
                     if offered(row) {
@@ -46,7 +49,13 @@ pub fn step(choice: Option<Choice>, rows: &State, demo: Option<&Demo>) -> Shown 
                 Connection::SettingUp { .. } | Connection::SetUpFailed { .. } | Connection::Connecting => {
                     Shown::SettingUp(number)
                 }
-                Connection::Connected { .. } => Shown::Ready(number),
+                Connection::Connected { .. } => {
+                    if underway(row) || failed(row) {
+                        Shown::SettingUp(number)
+                    } else {
+                        Shown::Ready(number)
+                    }
+                }
                 Connection::Stopped { .. } => Shown::Choose,
             }
         }
@@ -108,9 +117,30 @@ pub fn personal<'a>(rows: &'a State, demo: Option<&Demo>) -> Option<&'a Row> {
 pub fn underway(row: &Row) -> bool {
     match row.connection {
         Connection::SettingUp { .. } | Connection::Connecting => true,
+        Connection::Connected { .. } => match &row.first {
+            Some(first) => first.state == super::forges::FirstState::Making,
+            None => false,
+        },
         Connection::NotConnected
         | Connection::NotSetUp
         | Connection::SetUpFailed { .. }
+        | Connection::Stopped { .. } => false,
+    }
+}
+#[must_use]
+pub fn failed(row: &Row) -> bool {
+    if let Some(first) = &row.first {
+        match first.state {
+            super::forges::FirstState::Failed { .. } => return true,
+            super::forges::FirstState::Making | super::forges::FirstState::Made { .. } => {}
+        }
+    }
+    match row.connection {
+        Connection::SetUpFailed { .. } => true,
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::Connecting
         | Connection::Connected { .. }
         | Connection::Stopped { .. } => false,
     }

@@ -387,6 +387,7 @@ impl Task {
             | Act::DiscardAmendment
             | Act::SendAmendment
             | Act::AmendAgain
+            | Act::OpenProject { .. }
             | Act::Project { .. }
             | Act::Choice(_)
             | Act::SignOut
@@ -481,7 +482,8 @@ impl Task {
                 }
             }
             Act::SendAmendment => self.send(env, client, Sending::Amend, serial, out),
-            Act::Project { .. }
+            Act::OpenProject { .. }
+            | Act::Project { .. }
             | Act::Choice(_)
             | Act::SignOut
             | Act::Accounts(_)

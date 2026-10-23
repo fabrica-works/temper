@@ -887,3 +887,6 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-setup-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px; padding: 10px 24px; background: var(--temper-amber-pale); border-bottom: 1px solid var(--temper-line); font-size: 11px; }
 .temper-setup-strip > p { margin: 0; }
 .temper-setup-strip > a { color: var(--temper-accent-dark); font-weight: 700; }
+
+/* The first repository stays visible in a folded forge's summary (client/forge.md, 5.4). */
+.temper-forge-row > summary > [id^="skein-ui-description-"] { white-space: pre-line; }

@@ -12,6 +12,7 @@ pub mod amend;
 pub mod boundary;
 pub mod domain;
 pub mod forge;
+pub mod key;
 pub mod limits;
 pub mod owner;
 pub mod pages;
