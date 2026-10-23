@@ -720,6 +720,11 @@ impl Referee<cluster::Root> for Judge {
     }
     fn observe(&mut self, now: Time, roots: &[cluster::Root]) {
         self.members.observe(now, &roots[..roots.len() - 1]);
+        if self.members.failed() {
+            // Once drained, report the member's failure before checking the story's cast.
+            let _ = self.members.passed();
+            return;
+        }
         if let Some(stopped) = self.members.stopped() {
             assert_eq!(
                 stopped.iter().map(|member| member.name.as_str()).collect::<Vec<_>>(),
