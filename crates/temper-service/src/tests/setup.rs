@@ -14,7 +14,15 @@ fn service(states: u32, life: Duration) -> crate::Service {
 }
 // Token routing observes queued root inputs, so it needs no second service's restarted root.
 fn routing_service(states: u32, life: Duration) -> crate::Service {
+    routing_service_at(states, life, None)
+}
+fn routing_service_at(
+    states: u32,
+    life: Duration,
+    public: Option<crate::startup::application::Origin>,
+) -> crate::Service {
     let mut config = fixtures::engine();
+    config.clients.public = public;
     config.forges[0].kind = crate::settings::Kind::GitHub;
     config.identities[0].token = Secret::new(Box::new([]));
     config.identities[0].login = Box::new([]);
@@ -1833,4 +1841,19 @@ fn the_manifest_script_hash_matches_the_form_page() {
     let mut writer = skein_lib::Writer::new(usize::try_from(size).unwrap());
     skein_lib::base64::encode(alphabet, &digest, &mut writer).unwrap();
     assert_eq!(writer.finish().as_ref(), MANIFEST_SCRIPT_HASH);
+}
+
+#[test]
+fn github_app_urls_use_the_clients_public_origin() {
+    let public = crate::startup::application::Origin {
+        scheme: crate::startup::application::Scheme::Https,
+        host: Box::from(b"temper.example.com".as_slice()),
+        port: Some(8443),
+        name: Box::from(b"temper.example.com:8443".as_slice()),
+    };
+    let mut service = routing_service_at(8, Duration::from_secs(3600), Some(public));
+    let state = manifest(&mut service, 1);
+    let page = service.setup_page(1, &state, Time::ZERO).unwrap();
+    assert!(contains(page, b"https://temper.example.com:8443/forges/1/github/redirect"));
+    assert!(contains(page, b"https://temper.example.com:8443/forges/1/github/setup"));
 }

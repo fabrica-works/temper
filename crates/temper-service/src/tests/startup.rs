@@ -136,7 +136,8 @@ fn the_clients_listener_is_read_from_the_application_member() {
 fn a_missing_clients_member_is_named_by_its_path() {
     let jig = fixtures::engine().jig;
     let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
-    let input = input.replace("\"clients\":{\"listener\":{\"socket\":\"127.0.0.1:7100\"},\"bundle\":null},", "");
+    let input = input
+        .replace("\"clients\":{\"listener\":{\"socket\":\"127.0.0.1:7100\"},\"public\":null,\"bundle\":null},", "");
     let (members, problems) = application(input.as_bytes(), &jig);
     assert!(members.is_none());
     assert_eq!(&*lines(&problems), b"application.clients: missing\n");
@@ -1674,4 +1675,105 @@ fn a_records_only_forgejo_identity_still_requires_its_configured_author() {
     let input = fixtures::with(&records_only_document(), b"application.identities[0].author", b"null");
     let refused = crate::named(&input, &config::Directories::working()).unwrap_err();
     assert_eq!(lines(&refused).as_ref(), b"application.identities[0].author: invalid form\n");
+}
+
+#[test]
+fn clients_public_keeps_the_parsed_origin_and_jig_name() {
+    let jig = fixtures::engine().jig;
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
+    let (members, problems) = application(input.as_bytes(), &jig);
+    assert!(lines(&problems).is_empty());
+    assert!(members.unwrap().clients.public.is_none());
+    for (origin, scheme, host, port, name) in [
+        ("https://temper.example.com", application::Scheme::Https, "temper.example.com", None, "temper.example.com"),
+        (
+            "https://temper.example.com:8443",
+            application::Scheme::Https,
+            "temper.example.com",
+            Some(8443),
+            "temper.example.com:8443",
+        ),
+        ("http://127.0.0.1:9000", application::Scheme::Http, "127.0.0.1", Some(9000), "127.0.0.1:9000"),
+        ("http://localhost", application::Scheme::Http, "localhost", None, "localhost"),
+        ("http://[::1]:9000", application::Scheme::Http, "[::1]", Some(9000), "[::1]:9000"),
+    ] {
+        let input = input.replace("\"public\":null", &format!("\"public\":\"{origin}\""));
+        let (members, problems) = application(input.as_bytes(), &jig);
+        assert!(lines(&problems).is_empty(), "{origin}: {:?}", lines(&problems));
+        let public = members.unwrap().clients.public.unwrap();
+        assert_eq!(
+            (public.scheme, public.host.as_ref(), public.port, public.name.as_ref()),
+            (scheme, host.as_bytes(), port, name.as_bytes())
+        );
+        assert_eq!(public.base().as_ref(), format!("{origin}/").as_bytes());
+    }
+}
+#[test]
+fn clients_public_refusals_name_the_public_member() {
+    let jig = fixtures::engine().jig;
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
+    let missing = input.replace("\"public\":null,", "");
+    let (_, problems) = application(missing.as_bytes(), &jig);
+    assert_eq!(lines(&problems).as_ref(), b"application.clients.public: missing\n");
+    for origin in [
+        "https://temper.example.com:443",
+        "https://Temper.example.com",
+        "https://temper.example.com/path",
+        "https://temper.example.com/",
+        "https://temper.example.com?query",
+        "https://temper.example.com#fragment",
+        "https://user@temper.example.com",
+        "http://temper.example.com",
+        "https://-bad.example.com",
+        "https://bad-.example.com",
+        "https://bad..example.com",
+        "https://bad_label.example.com",
+        "https://temper.example.com:",
+        "https://temper.example.com:0",
+        "https://temper.example.com:65536",
+        "https://temper.example.com:+8443",
+        "https://",
+        "ftp://temper.example.com",
+        "http://127.0.0.1:9000/path",
+        "http://192.0.2.1:9000",
+        "http://[::2]:9000",
+        "https://127.0.0.1",
+        "https://temper.example.com.",
+    ] {
+        let input = input.replace("\"public\":null", &format!("\"public\":\"{origin}\""));
+        let (_, problems) = application(input.as_bytes(), &jig);
+        assert_eq!(lines(&problems).as_ref(), b"application.clients.public: invalid form\n", "{origin}");
+    }
+    for value in ["true", "8", "{}"] {
+        let input = input.replace("\"public\":null", &format!("\"public\":{value}"));
+        let (_, problems) = application(input.as_bytes(), &jig);
+        assert_eq!(lines(&problems).as_ref(), b"application.clients.public: wrong value kind\n", "{value}");
+    }
+}
+#[test]
+fn webhooks_public_is_an_unknown_member() {
+    let input = core::str::from_utf8(fixtures::APPLICATION)
+        .unwrap()
+        .replace("\"webhooks\":null", "\"webhooks\":{\"listener\":{\"socket\":\"127.0.0.1:7200\"},\"public\":null}");
+    let (_, problems) = application(input.as_bytes(), &fixtures::engine().jig);
+    assert_eq!(lines(&problems).as_ref(), b"application.webhooks.public: unknown member\n");
+}
+
+#[test]
+fn clients_public_bounds_dns_labels_and_the_host() {
+    let jig = fixtures::engine().jig;
+    let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
+    let longest = format!("{}.{}.{}.{}", "a".repeat(63), "b".repeat(63), "c".repeat(63), "d".repeat(61));
+    assert_eq!(longest.len(), 253);
+    for (host, admitted) in [(longest.clone(), true), (format!("{longest}d"), false), ("a".repeat(64), false)] {
+        let origin = format!("https://{host}");
+        let input = input.replace("\"public\":null", &format!("\"public\":\"{origin}\""));
+        let (members, problems) = application(input.as_bytes(), &jig);
+        if admitted {
+            assert!(lines(&problems).is_empty());
+            assert_eq!(members.unwrap().clients.public.unwrap().host.as_ref(), host.as_bytes());
+        } else {
+            assert_eq!(lines(&problems).as_ref(), b"application.clients.public: invalid form\n");
+        }
+    }
 }

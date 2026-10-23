@@ -88,6 +88,7 @@ pub fn engine() -> settings::Engine {
         clients: crate::startup::application::Clients {
             listener: jig_protocol_config::Address::Addr(http::address()),
             bundle: None,
+            public: None,
         },
         files: settings::Files { entries: skein_lib::List::with_capacity(0) },
         forges: forges(),
@@ -839,8 +840,7 @@ pub use worker_git::{
 };
 pub fn clients() -> crate::clients::Clients {
     let engine = engine();
-    crate::clients::Clients::new(&engine.jig, &engine.clients.listener, &seeds(), 64, &engine.limits.root.journal)
-        .unwrap()
+    crate::clients::Clients::new(&engine.jig, &engine.clients, &seeds(), 64, &engine.limits.root.journal).unwrap()
 }
 mod startup;
 pub use startup::{

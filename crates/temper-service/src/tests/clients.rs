@@ -146,7 +146,7 @@ fn a_sign_in_ending_waits_for_its_erase_to_commit() {
     journal.commits = 1;
     let mut clients = crate::clients::Clients::new(
         &config,
-        &super::fixtures::engine().clients.listener,
+        &super::fixtures::engine().clients,
         &super::fixtures::seeds(),
         64,
         &journal,
@@ -317,4 +317,38 @@ fn original_model_names_reach_the_root() {
     });
     let Ok(root::PartyInput::Ask { models, .. }) = translation::to_root(event) else { panic!("party ask") };
     assert_eq!(models.as_ref(), &[Box::<[u8]>::from(b"small".as_slice())]);
+}
+
+#[test]
+fn clients_public_admits_the_public_and_listener_hosts_and_refuses_an_unknown_host() {
+    for (host, status) in [
+        ("temper.example.com:8443", "HTTP/1.1 404"),
+        ("127.0.0.1:7100", "HTTP/1.1 404"),
+        ("unknown.example.com", "HTTP/1.1 421"),
+    ] {
+        let mut config = super::fixtures::engine();
+        config.clients.public = Some(crate::startup::application::Origin {
+            scheme: crate::startup::application::Scheme::Https,
+            host: Box::from(b"temper.example.com".as_slice()),
+            port: Some(8443),
+            name: Box::from(b"temper.example.com:8443".as_slice()),
+        });
+        let mut service = super::fixtures::started();
+        let engine = service.engine.as_mut().unwrap();
+        engine.clients = crate::clients::Clients::new(
+            &config.jig,
+            &config.clients,
+            &super::fixtures::seeds(),
+            64,
+            &config.limits.root.journal,
+        )
+        .unwrap();
+        engine.clients.iterate(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, &mut engine.events, &[], None);
+        let Some(skein_io::Request::Listen { owner, addr }) = engine.clients.io.pop() else { panic!("listen") };
+        assert!(engine.clients.up(skein_io::Event::Listening { owner, listener: LISTENER, addr }));
+        let request = format!("GET /jig/unknown HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+        let mut peer = peer::Peer::raw(engine, request.as_bytes());
+        peer.pump(engine, false);
+        assert!(peer.received().starts_with(status.as_bytes()), "{host}: {:?}", peer.received());
+    }
 }

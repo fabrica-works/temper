@@ -1042,7 +1042,7 @@ one worker, complete:
     }]
   },
   "charter": 2,
-  "clients": {"listener": {"socket": "127.0.0.1:7100"}, "bundle": null},
+  "clients": {"listener": {"socket": "127.0.0.1:7100"}, "bundle": null, "public": null},
   "webhooks": null,
   "setup": [],
   "demo": null,

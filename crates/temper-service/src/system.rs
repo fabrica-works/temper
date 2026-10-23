@@ -151,8 +151,7 @@ impl Service {
             .expect("client pass headroom")
             .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
             .expect("client routing room");
-        let clients =
-            clients::Clients::new(&settings.jig, &settings.clients.listener, seeds, client_room, &limits.journal)?;
+        let clients = clients::Clients::new(&settings.jig, &settings.clients, seeds, client_room, &limits.journal)?;
         let setup_room = max.checked_add(SETUP_ROUTING_HEADROOM).expect("setup routing headroom");
         let setup = crate::setup::prepare(&settings, &mut forge_settings, &seeds.crypto, setup_room, under_box)?;
         let forge = crate::forge::Layer::new(
@@ -967,6 +966,10 @@ fn memory(
         temper_engine_domain::max_out(root).checked_add(1)?.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
         &root.journal,
     )?)?;
+    if let Some(public) = &settings.clients.public {
+        // The HTTP mount retains its own copy of the configured Host name.
+        bytes = bytes.checked_add(u64::try_from(public.name.len()).ok()?)?;
+    }
     bytes = bytes.checked_add(clients::bundle::worst_case(&settings.limits.clients)?)?;
     if let Some(demo) = &settings.demo {
         let mut retained = List::<Box<[u8]>>::worst_case(u32::try_from(demo.cues.len()).ok()?)?

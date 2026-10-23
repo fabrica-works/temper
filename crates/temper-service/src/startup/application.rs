@@ -1,11 +1,13 @@
 //! Temper's members, read strictly with jig's readers (protocol/configuration.md, 3, 4, 10).
 mod demo;
 mod landing;
+mod public;
 mod read;
 use super::{Problems, What};
 use crate::{limits, settings};
 use alloc::boxed::Box;
 use jig_protocol_config::{self as config, Path};
+pub use public::{Origin, Scheme};
 use skein_json::{Document, document::Kind};
 use skein_lib::{List, bytes};
 
@@ -32,13 +34,15 @@ pub struct Clients {
     pub listener: config::Address,
     /// `application.clients.bundle`: the bundle's directory; `None` serves no browser.
     pub bundle: Option<Box<[u8]>>,
+    /// The browser origin and jig public name (protocol/sign-in.md, 2.2).
+    pub public: Option<Origin>,
 }
 /// The optional webhook listener (protocol/configuration.md, section 3).
 #[derive(Debug)]
 pub struct Webhooks {
     pub listener: config::Address,
 }
-/// Read the listener with jig's address reader, refusing non-socket forms; and `bundle` when asked (the clients').
+/// Read a socket listener, and the clients' bundle and public origin when asked.
 #[must_use]
 pub fn clients(document: &Document, at: u32, path: &Path, bundle: bool, problems: &mut Problems) -> Option<Clients> {
     let mut object = read::object(document, at, path, problems)?;
@@ -58,6 +62,19 @@ pub fn clients(document: &Document, at: u32, path: &Path, bundle: bool, problems
             Err(what) => problems.push(path.member(b"bundle"), What::Jig(what)),
         }
     }
+    let mut public = None;
+    if bundle
+        && let Some(at) = read::required(&mut object, document, b"public", path, problems)
+        && document.token(at)?.kind != Kind::Null
+    {
+        match config::read::text(document, at, 267) {
+            Ok(value) => match Origin::parse(&value) {
+                Some(origin) => public = Some(origin),
+                None => problems.push(path.member(b"public"), What::Jig(config::What::Form)),
+            },
+            Err(what) => problems.push(path.member(b"public"), What::Jig(what)),
+        }
+    }
     read::finish(object, document, path, problems);
     let path = path.member(b"listener");
     let mut found = config::Problems::empty();
@@ -69,7 +86,7 @@ pub fn clients(document: &Document, at: u32, path: &Path, bundle: bool, problems
         config::Address::Addr(skein_io::Addr::InProcess(_)) | config::Address::Host { .. } => false,
     };
     read::form(socket, path, problems);
-    Some(Clients { listener, bundle: directory })
+    Some(Clients { listener, bundle: directory, public })
 }
 #[derive(Debug)]
 pub struct Forge {

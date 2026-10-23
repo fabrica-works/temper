@@ -24,6 +24,7 @@ pub(crate) const DEMO_STARTS: u32 = 8;
 pub struct Clients {
     /// Bound address awaiting the system's note routing.
     pub(crate) listening: Option<::core::net::SocketAddr>,
+    public: Option<crate::startup::application::Origin>,
     component: kit::Component,
     initial: Option<kit::Settings>,
     server: crate::server::Server,
@@ -132,12 +133,12 @@ impl Clients {
     }
     pub fn new(
         config: &config::Engine,
-        listener: &config::Address,
+        clients: &crate::startup::application::Clients,
         seeds: &Seeds,
         room: u32,
         journal: &root::JournalLimits,
     ) -> Result<Self, Problems> {
-        let config::Address::Addr(listener) = listener else {
+        let config::Address::Addr(listener) = &clients.listener else {
             return Err(invalid(What::Form));
         };
         let mut providers = List::with_capacity(u32::try_from(config.providers.len()).expect("bounded providers"));
@@ -200,10 +201,11 @@ impl Clients {
         let component = kit::Component::new(settings.clone(), &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
             listening: None,
+            public: clients.public.clone(),
             component,
             initial: Some(settings),
             server: crate::server::Server::new(*listener, &crate::limits::server(&config.limits)),
-            mount: http::Mount::new(http_settings(), &config.limits.clients_http),
+            mount: http::Mount::new(http_settings(clients.public.as_ref()), &config.limits.clients_http),
             mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
             mount_out: Queue::with_capacity(room),
             server_out: Queue::with_capacity(room),
@@ -321,7 +323,10 @@ impl Clients {
         if let io::Event::Listening { addr, .. } = &event
             && let Some(address) = addr.socket()
         {
-            let mut hosts = List::with_capacity(1);
+            let mut hosts = List::with_capacity(2);
+            if let Some(origin) = &self.public {
+                hosts.push(origin.name.clone()).expect("public host");
+            }
             hosts.push(printed::address_text(address).expect("bound listener address")).expect("one listener host");
             self.mount.down(&self.mount_env, http::Event::Listening { hosts }, &mut self.mount_out);
         }
@@ -344,7 +349,8 @@ impl Clients {
             match self.server_out.pop().expect("server requests") {
                 crate::server::Routed::Io(request) => self.io.push(tag(request)),
                 crate::server::Routed::Call { call, head } => {
-                    let claimed = http::claims(&http_settings(), &head);
+                    // Claims depend on the prefix alone; the mounted mapping checks the Host.
+                    let claimed = http::claims(&http_settings(None), &head);
                     if claimed && self.mount.room() > 0 {
                         self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
                     } else if !claimed && github::claims(&head.target) {
@@ -840,6 +846,6 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
     Some(kit::Kept { digest: skein_lib::Secret::new(Box::from(bytes.get(8..)?)), expires: Wall::from_nanos(expires) })
 }
 
-fn http_settings() -> http::Settings {
+fn http_settings(_public: Option<&crate::startup::application::Origin>) -> http::Settings {
     http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
 }

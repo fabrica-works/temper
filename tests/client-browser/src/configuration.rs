@@ -58,7 +58,7 @@ pub(crate) fn documents(directory: &Path, program: &Path, bundle: &Path) -> (Box
     value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
     value["application"] = serde_json::json!({
         "webhooks":null,
-        "clients":{"listener":{"socket":"127.0.0.1:0"},"bundle":bundle},
+        "clients":{"listener":{"socket":"127.0.0.1:0"},"public":null,"bundle":bundle},
         "forges":[{"number":1,"kind":"forgejo","api":{"socket":UNREACHED},"transport":"plaintext",
             "git":format!("http://{UNREACHED}"),"webhook_secret":null,"api_token":"secrets/forge-1.api-token","user":{"file":"secrets/forge-1.user"},"identity":1}],
         "identities":[{"number":1,"token":"secrets/forge-1.git-token","login":"temper",

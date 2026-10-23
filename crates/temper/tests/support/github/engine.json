@@ -822,7 +822,8 @@
       "listener": {{
         "socket": "{story.clients}"
       }},
-      "bundle": null
+      "bundle": null,
+      "public": null
     }},
     "forges": [
       {{

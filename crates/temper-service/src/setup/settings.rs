@@ -42,7 +42,10 @@ pub(super) fn fixed(
             }
             continue;
         }
-        let url = listener(&config.clients.listener)?;
+        let url = match &config.clients.public {
+            Some(origin) => origin.base(),
+            None => listener(&config.clients.listener)?,
+        };
         let number = skein_lib::Decimal::of(u64::from(source.number));
         let given = github::given::Given {
             forge: source.number,

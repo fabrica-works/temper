@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 pub(crate) fn link(address: ::core::net::SocketAddr, secret: &skein_lib::Secret) -> Box<[u8]> {
     let host = address_text(address).expect("bound listener address");
-    let path = jig_protocol_engine_clients_http::link_path(&super::http_settings(), secret);
+    let path = jig_protocol_engine_clients_http::link_path(&super::http_settings(None), secret);
     let parts: [&[u8]; 3] = [b"http://", &host, &path];
     let mut length = 0_usize;
     for part in parts {
