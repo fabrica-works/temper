@@ -196,6 +196,8 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   | `Task { task }` | `/tasks/<task>` |
   | `Adopt { project }` | `/projects/<project>/adopt` |
   | `Welcome { step }` | `/welcome`, and its step's query |
+  | `Forges` | `/forges` |
+  | `ConnectForge { forge }` | `/forges/connect`, and its choice's query |
 
   `<task>` and `<project>` are the task's and the project's numbers in
   decimal. A later page's path comes with it, in this shape
@@ -214,8 +216,9 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   or edited link opens the inbox less filtered, never refused, and its
   address is replaced with the printed one. It reads numbers, not the
   person's projects: a project the person isn't in shows an empty
-  inbox, which "All projects" undoes. The inbox's filter and the
-  welcome's step (below) alone are in an address: the chats list's
+  inbox, which "All projects" undoes. The inbox's filter, the
+  welcome's step and `ConnectForge`'s choice (below) alone are in an
+  address: the chats list's
   and a goal's plan's are the page's, "All" at each open (section 5),
   and another page's query is dropped,
   `/chats/7?x=1` replaced with `/chats/7`.
@@ -225,13 +228,23 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   the inbox's filter, an `at` that doesn't read as a step, or a field
   of another name, is dropped, and the address replaced with the
   printed one: `/welcome?at=done` opens the welcome at `/welcome`.
+  Its Forge step adds its choice, as `ConnectForge`'s (below):
+  `/welcome?at=forge&forge=3`.
+- **`ConnectForge`'s choice is its query:** none at Choose, so that
+  `/forges/connect` is the flow's first step; `?forge=N`, N a forge's
+  number in decimal, or `?forge=elsewhere`, for a Forgejo elsewhere
+  (`forge.md`, 5.4). A value that doesn't read as one, or a field of
+  another name, is dropped, and the address replaced with the printed
+  one. It reads a number, not the deployment's forges: a number that
+  names no forge shows Choose.
 - **A filter chosen is a move** (below), with its history entry: a
   link's, at the page's top with the focus on its heading, and back
   returns to the filter before. Like any move it folds the open
   disclosures (2.5), so the Kind menu closes on its choice.
 - **A path that is no page** opens the inbox, and the address is
   replaced with `/`. The codec never prints a path under `/jig`,
-  `/bundle/` or `/test/`, nor `/robots.txt`.
+  `/bundle/`, `/test/` or `/forges/N/github/`, temper's routes for
+  GitHub's steps (`forge.md`, 9.1), nor `/robots.txt`.
 - **Moving** is skein's (skein's `ui-web.md`, section 9): a link pressed
   is a move within the client, with a new history entry; back and
   forward are moves too, each entry keeping its scroll; a reload, or an

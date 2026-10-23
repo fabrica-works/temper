@@ -311,7 +311,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | the person's forges, each row folded until opened: its connection, its mode and access, on GitHub temper's App and its installations, a connect under way and how the last ended, its load; then the playground's forge, folded, while the demo's forge half holds; "+ Add a forge", to `ConnectForge` (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect a stopped forge; replace a key or tokens; install on another account; new repository; forget the admin's token; set up again (section 8) |
-| `ConnectForge` | `connect-forge.html` | connecting one more forge: Choose, Details, Setting up and Ready, which ends on the work it adopted (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect; connect as its admin; set up a Forgejo here (section 8) |
+| `ConnectForge { forge }` | `connect-forge.html` | connecting one more forge, `forge` the choice it is at: Choose, Details, Setting up and Ready, which ends on the work it adopted (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect; connect as its admin; set up a Forgejo here (section 8) |
 | `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `ConnectModel`'s acts |
 | `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's, each row folded until opened: its LLM provider and display name, its holder, its deciding source's state and its line (5.5, An account's line); opened, that state's words and acts, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), what it pays for, the runs using it, the tasks waiting for it and its acts; the checks under way, and how the last ended; then the playground's account, folded, while the demo's model half holds; "+ Connect a model", to `ConnectModel` | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in again or add a key from a state's acts, as `ConnectModel`'s ways; sign a source out; add a key to an account; replace a key; remove a source or an account; check a program's login again; move an account, or a source, up or down; resume a limited source |
 | `ConnectModel` | `connect-model.html` | connecting one more LLM account: Choose, a card for each way its providers offer (5.5, The ways); Signing in, at the provider, for a sign-in, or Details, a way's field, for a key or a program's login; and Ready, the account made, or how the sign-in ended (5.5, A sign-in) | `accounts`; `me`'s LLM providers | sign in with an LLM provider; add a key as an account of its own; declare a program's login |
@@ -599,11 +599,34 @@ keeps (`../protocol/configuration.md`, section 2).
     engine's, after asking the engine to start the playground while it
     has not started.
     *"Set up temper"* opens its Forge step.
-  - *Forge* is `ConnectForge`'s Choose and Details (`forge.md`, 5.4).
+  - *Forge* is `ConnectForge`'s Choose and Details (`forge.md`, 5.4),
+    its choice in the welcome's address (`browser.md`, 2.3), "‹ All
+    forges" back to its Choose. A forge already setting up, connecting
+    or connected is no choice: the step says it, "FORGE · CONNECTION",
+    with "View", to `ConnectForge` at it. Once "Set up a Forgejo here"
+    is accepted, the welcome moves on to Model, the set up running on.
     *Model* is `ConnectModel`'s Choose and Details, its state and acts
     (above), so that an account added there is the accounts page's too;
-    a sign-in sends the browser back to the welcome at its Ready. *Ready*
-    names the forge and the model as set up or under way.
+    a sign-in sends the browser back to the welcome at its Ready. Above
+    them, while a forge sets up or connects, the set up's line,
+    "FORGE · CONNECTION", and a disclosure, "Each step", holding
+    `ConnectForge`'s Setting up steps. *The seam:* the Model step's
+    body is `ConnectModel`'s, the step's frame, heading, lead, set up
+    line and foot the welcome's; until `ConnectModel` is built, its body
+    is the accounts page's "Add an account".
+    *Ready* names the forge and the model as set up or under way, under
+    "Almost ready": a list of "Forge: FORGE, connected as LOGIN" or
+    "Forge: FORGE · CONNECTION" (with its "Each step"), or "Forge: none
+    yet" with "Connect a forge", to the Forge step; "Model: ACCOUNT",
+    the first usable account's heading (5.5, An account), or "Model:
+    none yet" with "Connect a model", to the Model step; and "Project
+    PROJECT, with ORG/NAME" once the forge's first repository is on its
+    row. Once that repository is adopted (`forge.md`, 5.4, Ready), its
+    heading is "ORG/NAME is ready", with "Open PROJECT", to the chats
+    page in that project; while the forge is connected with no first
+    repository, "Adopt a repository", to `Adopt { project }`. Ready is
+    done, not current, along the top once its forge and model both
+    are.
 - **A suggested request** (`chats.html`) starts a chat with the
   cue's words as its first message, as the composer's send does: one
   act, one request (3.6), the suggestions and the send disabled while
@@ -1088,7 +1111,13 @@ for its kind, its user's login and its installations. Its nodes:
   under the box, or not offered, which is what "Set up a Forgejo here", "Set up again"
   and the commands to run by hand follow (`forge.md`, 5.4). The read of the forges, the
   tools' `forges` (`tools.md`, 5.5, area 6), is the watch's first
-  document.
+  document. *The client's forge side watches it once,* for the
+  session, from when `me` is first delivered while the link is live,
+  for every person, so that the engine judges the role: a watch
+  refused or ended is kept as such, with no rows, and not opened again
+  until the next sign-in. Its rows feed the Forges page,
+  `ConnectForge`, the welcome, the Forges entry's dot, the setup strip,
+  a set up under way in the banners and the demo's forge half (4.8).
 - **The forge's documents' records:** its other reads, subjects and
   documents, and its other requests, beside `Adopt` and `SetUp`
   (`forge.md`, section 9).
@@ -1143,9 +1172,8 @@ of each (`../draft/first-run.md`, 3.6).
   deployment's part (`forge.md`, 5.4) shows no forge connected but the
   demo's. That part is read only for a person whose role holds the
   deployment's forges (3.5); for any other person, and while the part
-  is not served, the half does not hold. *Until the forge's side reads
-  that part* (o/github's), the half holds while the demo is answered:
-  a departure, kept in the domain's `halves` alone (section 11).
+  is not served, the half does not hold. The part is the `forges`
+  watch's rows (4.6).
 - **Ending for good,** with the welcome (`../draft/first-run.md`, 2.3,
   its step 5): the model's half ends when an account of another LLM
   provider is first usable, and does not hold again; the demo ends
@@ -1209,10 +1237,15 @@ of each (`../draft/first-run.md`, 3.6).
     start among them, above their chatbars;
   - *the setup strip,* in the demo's banner's place, while the demo has
     not started and the person has no usable account or no connected
-    forge (`../draft/first-run.md`, 2.3): its words and links (5.6), on
-    the same pages;
-  - in either, *a set up under way:* while a forge sets up or connects,
-    its step and a link to `ConnectForge` at it (`forge.md`, 5.4);
+    forge (`../draft/first-run.md`, 2.3), the welcome's facts in and
+    its first run not over (3.5, The welcome): a region named "Setup",
+    its words and links (5.6), on the same pages. Until the demo has a
+    state of the engine's (4.8), "not started" is the demo's read
+    answering none;
+  - in either, *a set up under way:* while a forge of the person's sets
+    up or connects, "FORGE · CONNECTION", its name and its connection's
+    words, and "View", a link to `ConnectForge` at it (`forge.md`,
+    5.4), in the demo's banner in place of "Connect a forge";
   - *the main:* the page at the address (3.5), its title its level-1
     heading.
 
@@ -1275,16 +1308,31 @@ of each (`../draft/first-run.md`, 3.6).
 - **The forges' page:** a level-1 heading, "Forges", then "Your
   forges" with their count and "+ Add a forge", then a disclosure per
   listed forge, folded, named by the forge's name, its summary the
-  forge's number, kind and `web` address and its connection, holding
-  its rows and its actions (`forge.md`, 5.4); the playground's forge in
-  a section of its own; a pasted value a secret field (3.6), a link an
-  external link (6.5), and a connect's or an action's status under its
-  button.
-- **`ConnectForge`:** its steps as a list, the current one marked; a
-  level-1 heading per step; Choose's cards as a list of links, each
-  with its words; Details' fields, as the forges' page's; Setting up's
-  steps as a list, each with its state in words; Ready's link to the
-  project.
+  forge's number, kind and `web` address, its connection and its line,
+  holding its rows and its actions (`forge.md`, 5.4); the playground's
+  forge in a section of its own; a pasted value a secret field (3.6), a
+  link an external link (6.5), and a connect's or an action's status
+  under its button. While the `forges` watch is refused, the page says
+  so in jig's words; until it has delivered, its headings alone.
+- **`ConnectForge`:** its level-1 heading, "Connect a forge"; its steps
+  as a list, the current one marked; the step's card, under its level-2
+  heading: Choose's cards as a list of links, each with its words;
+  Details' fields, as the forges' page's; Setting up's steps as a list,
+  each with its state in words; Ready's link to the project.
+- **A flow's parts,** shared by `ConnectForge`, `ConnectModel` and the
+  welcome, are the view's `flow` module, each drawing one part from
+  words already said and the bindings it is given, so that each flow
+  keeps its own state and words:
+  - *its steps,* the list along the top, named "Steps", each item a
+    step's name, the current one `State::Current`, those before it
+    styled done;
+  - *a choice,* one of Choose's cards: a region named by its level-2
+    heading, its words, its muted line and its link or button;
+  - *a progress,* a list of lines, each with its state in words
+    ("done", "under way", "failed", or none for one to come);
+  - *a card,* the step's one card, holding the rest.
+  A flow's page builds its main from them; the welcome's own steps are
+  the same list.
 - **Bindings:** writing a field, choosing a role, toggling home or ci,
   choosing a picker's installation or row, its "Next" and "First page",
   pressing Adopt, each of the forges' page's actions, and going to
@@ -1301,7 +1349,9 @@ the person from `me`, omitted when zero; "Chats"; then, for the project
 the person is in, "Board" and "Changes"; and after them "Adopt a
 repository", to `Adopt { project }`; then "Forges", to `Forges`, with
 a dot, amber while a forge sets up or connects and red while one needs
-the person (`forge.md`, 5.4), its state also in words; and last,
+the person (`forge.md`, 5.4), its state also in words, "a forge is
+setting up" or "a forge needs you", a text node of its own after the
+entry's name; current on `Forges` and `ConnectForge`; and last,
 "Accounts", to `Accounts`, with a dot, amber while an account is
 limited and red while one needs the person (5.5, Each state), its
 state also in words, both whatever the project. With no project chosen, the
@@ -1544,8 +1594,8 @@ the cues the demo's, copied in:
   scripted model." or "This is the playground: a playground forge."
   while one does; then "Connect a model", a link to `ConnectModel`, while the model's
   half holds, and "Connect a forge", a link to `ConnectForge`, while the
-  forge's half holds. Until the client has `ConnectForge`, "Connect a
-  forge" is a disabled button.
+  forge's half holds, or, while a forge of the person's sets up or
+  connects, its set up under way (5.1).
 - **The demo's start,** on the chats page, in place of its level-1
   heading "Chats" (`first-run.html`, the first run's first step): a
   chatbar, "New
@@ -1608,9 +1658,13 @@ the cues the demo's, copied in:
   demo's read answering none) has neither the playground's card nor
   the closing line, and no step offers the playground.
 - **The setup strip:** "temper has no forge and no model yet.", or the
-  one missing alone; a set up under way (5.1); then "Continue setting
-  up", to `Welcome` at its step, and "Try the playground" while no forge
-  of the person's is connected. With no usable account, a composer's
+  one missing alone ("temper has no forge yet.", "temper has no model
+  yet."; for a person whose role does not hold the deployment's forges,
+  the model alone); a set up under way (5.1); then "Continue setting
+  up", to `Welcome` at its step: Forge while no forge of the person's
+  sets up, connects or is connected, else Model while no account is
+  usable, else Ready; and "Try the playground" while no forge of the
+  person's is connected and the demo is answered. With no usable account, a composer's
   line is "No model yet · Connect a model", and it does not send (5.5).
 - **Not drawn:** the mockup's placeholder, "Try a suggested request…",
   and "Reset demo" (section 11).
@@ -3217,12 +3271,6 @@ own tests:
 - **"Reset demo"** (the first-run mockup's earlier draft): the demo's
   chats and their work set aside for a fresh start. Default: not
   offered.
-- **The demo's forge half** (4.8): the forge's side does not read the
-  deployment's part yet, so the half holds while the demo is answered,
-  even once a real forge is connected. Default: that rule, in the
-  domain's `halves` alone, until the forge's side reads the part
-  (o/github's); "Connect a forge" a disabled button until the client
-  has `ConnectForge`.
 - **"Signed in as the deployment’s owner"** (5.6) reads `me`'s role on
   the deployment, which the engine gives only once it seeds the
   deployment's owner (jig's t31a). Default: the project's role
