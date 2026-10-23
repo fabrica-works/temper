@@ -672,7 +672,8 @@ pub fn step_5_5(_forge: SocketAddr) -> Box<[Script]> {
             turns: Box::new([
                 call(
                     b"delegate",
-                    &json!({"batch":[member("A helper under M1's sub-owner.", 1, 0, 0, 0, 0, A1_DEADLINE)]}),
+                    // The helper asks no spend, so depth 0 is the batch's only deficit.
+                    &json!({"batch":[member("A helper under M1's sub-owner.", 0, 0, 0, 0, 0, A1_DEADLINE)]}),
                 ),
                 report(SUBOWNER_REPORT),
             ]),
