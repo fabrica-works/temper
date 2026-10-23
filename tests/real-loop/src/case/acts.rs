@@ -7,6 +7,16 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Read {
+    BEndedEarlier,
+    ImplementerRunning,
+    H1Running,
+    HelperEnded,
+    BHeld,
+    BStillHeld,
+    ImplementerEnded,
+    H1Ended,
+    OwnerEnded,
+    PauseEnded,
     DirectorEnded,
     AEnded,
     DesignEnded,
@@ -352,5 +362,100 @@ pub fn step_5_1() -> Vec<calls::Step> {
         call(D1, argv!["release", number(RULES), "--hold", number(RULES_HOLD_REVISION), "--key", "rules-release"]),
         join(RULES_ENDED),
         call(D1, argv!["task", number(SCOPE), "--json"]),
+    ]
+}
+
+// Act 2, step 5.2 (domain/testing.md, 5.3)
+const B_ENDED_5_2: usize = 16;
+pub const READS_5_2: &[(Read, usize)] = &[
+    (Read::ImplementerRunning, 5),
+    (Read::H1Running, 7),
+    (Read::HelperEnded, 8),
+    (Read::BHeld, 11),
+    (Read::ImplementerEnded, 12),
+    (Read::H1Ended, 13),
+    (Read::BStillHeld, 14),
+    (Read::BEnded, B_ENDED_5_2),
+    (Read::BEndedEarlier, 17),
+    (Read::OwnerEnded, 18),
+    (Read::PauseEnded, 19),
+];
+
+#[must_use]
+pub fn step_5_2() -> Vec<calls::Step> {
+    use super::{
+        Agent, B_HOLD, BOWNER, H1, H1_REVIEWER, HELPER, IMPLEMENTER, IMPLEMENTER_HOLD, OWNER, PAUSE, PAUSE_PERSON,
+        PROJECT, REVIEW_HOLD,
+    };
+    vec![
+        sign_in(D1),
+        call(
+            D1,
+            argv![
+                "adopt",
+                "--project",
+                number(PROJECT),
+                "--owner",
+                "acme",
+                "--name",
+                "app",
+                "--landing",
+                "main",
+                "--no-home",
+                "--key",
+                "adopt-kit"
+            ],
+        ),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "pause", PAUSE_PERSON]),
+        call(D1, argv!["wait", "task", number(PAUSE), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(BOWNER), "--until", "replied"]),
+        // The documents establish the case's in-flight work before Stop.
+        // The fake Pieces keep each run writing until its release below.
+        calls::until(D1, argv!["task", number(IMPLEMENTER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        // h1 exists after B's reply; its review is created asynchronously.
+        // Wait for its live delegate card before reading the review's document.
+        calls::until(D1, argv!["task", number(H1), "--json"], Agent::Review.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(H1_REVIEWER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        calls::until(
+            D1,
+            argv!["task", number(HELPER), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        // replied alone can still be writing; read the parked owner's phase.
+        call(D1, argv!["wait", "task", number(BOWNER), "--until", "phase:idle"]),
+        call(D1, argv!["stop", number(BOWNER), "--key", "stop-b"]),
+        calls::until(
+            D1,
+            argv!["task", number(BOWNER), "--activity", "32", "--json"],
+            b"\"phase\":\"held\"",
+            b"\"task\"",
+        ),
+        calls::release_hold(IMPLEMENTER_HOLD),
+        calls::release_hold(REVIEW_HOLD),
+        calls::until(
+            D1,
+            argv!["task", number(IMPLEMENTER), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        calls::until(D1, argv!["task", number(H1), "--activity", "32", "--json"], b"\"phase\":\"ended\"", b"\"task\""),
+        call(D1, argv!["task", number(BOWNER), "--activity", "32", "--json"]),
+        call(D1, argv!["release", number(BOWNER), "--hold", number(B_HOLD), "--key", "release-b"]),
+        calls::until(
+            D1,
+            argv!["task", number(BOWNER), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        // B's two attempts span two activity pages; retain the supplied cursor.
+        call(D1, argv!["activity", number(BOWNER), "--before", calls::activity_before(B_ENDED_5_2), "--json"]),
+        call(D1, argv!["task", number(OWNER), "--activity", "32", "--json"]),
+        calls::until(
+            D1,
+            argv!["task", number(PAUSE), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
     ]
 }

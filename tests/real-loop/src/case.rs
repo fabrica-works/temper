@@ -98,6 +98,12 @@ pub enum Agent {
     Phase,
     Rules,
     Scope,
+    Pause,
+    Owner,
+    Bowner,
+    Helper,
+    Implementer,
+    H1Coder,
 }
 impl Agent {
     #[must_use]
@@ -105,6 +111,12 @@ impl Agent {
         match self {
             Self::Rules => b"@case_rules",
             Self::Scope => b"@case_scope",
+            Self::H1Coder => b"@case_h1",
+            Self::Pause => b"@case_pause",
+            Self::Owner => b"@case_owner",
+            Self::Bowner => b"@case_bowner",
+            Self::Helper => b"@case_helper",
+            Self::Implementer => b"@case_implementer",
             Self::Hang => b"@case_hang",
             Self::Phase => b"@case_phase",
             Self::Check => b"@case_check",
@@ -344,6 +356,78 @@ pub fn fixture_5_1() -> forge::Fixture {
             (fixture_placed().configure)(value, agent, forge);
             value["engine"]["charters"][1]["resume"] = false.into();
             value["application"]["landing"]["projects"] = json!([]);
+            landing::admit(value);
+        },
+    }
+}
+
+// Act 2, step 5.2 (domain/testing.md, 5.3)
+// The chat delegates A, the helper, then B; only B creates descendants.
+// B delegates its implementer, then h1, which creates its coder and reviewer.
+pub const PAUSE_WORKERS: &[&str] = &["ws", "s1", "s2"];
+pub const PAUSE: u64 = 1;
+pub const OWNER: u64 = 2;
+pub const HELPER: u64 = 3;
+pub const HELPER_CHARTER: u64 = 3;
+pub const BOWNER: u64 = 4;
+pub const IMPLEMENTER: u64 = 5;
+pub const H1: u64 = 6;
+pub const H1_CODER: u64 = 7;
+pub const H1_REVIEWER: u64 = 8;
+pub const B_HOLD: u64 = 1;
+pub const PAUSE_PERSON: &str = "@case_pause Pause every owner but A; I'll go through each one's work and say what resumes. Stop the old shape's leftovers.";
+pub const OWNER_SPEC: &str = "@case_owner A remains free to report.";
+pub const BOWNER_SPEC: &str = "@case_bowner Delegate your implementer and h1, then await their endings.";
+pub const HELPER_SPEC: &str = "@case_helper Wait on the old shape's charter.";
+pub const IMPLEMENTER_SPEC: &str = "@case_implementer Finish your running work when released.";
+pub const H1_SPEC: &str = "@case_h1 Write docs/design/h1.md, Markdown alone.";
+pub const PAUSE_PROPOSAL: &str = "I propose stopping B; the person must stop it.";
+pub const HELPER_REASON: &str = "The person has stopped the old shape's leftovers; cancel this helper.";
+pub const IMPLEMENTER_RESULT: &str = "B's implementer finished its running work.";
+pub const OWNER_REPORT: &str = "A remained free and finished.";
+pub const BOWNER_REPORT: &str = "B received its implementer's result and h1's landing after release.";
+pub const PAUSE_REPORT: &str = "B reported after release; A finished and the old helper was cancelled.";
+pub const H1_DOC: &str = "docs/design/h1.md";
+pub const H1_WORDS: &str = "# h1\n\nB's change went on while B was stopped.\n";
+pub const H1_LINE: &str = "B's change went on while B was stopped.";
+pub const IMPLEMENTER_HOLD: &[u8] = b"case-5-2-implementer";
+pub const REVIEW_HOLD: &[u8] = b"case-5-2-review";
+
+#[must_use]
+pub fn fixture_5_2() -> forge::Fixture {
+    forge::Fixture {
+        setup: || {
+            let mut setup = (fixture().setup)();
+            setup.checks.cue =
+                Some(api::Cue::File { path: H1_DOC.as_bytes().into(), green: H1_LINE.as_bytes().into() });
+            setup
+        },
+        configure: |value, agent, forge| {
+            (fixture_placed().configure)(value, agent, forge);
+            // One host call for each of the three one-slot workers.
+            value["engine"]["limits"]["overrides"]["fleet.calls"] = PAUSE_WORKERS.len().into();
+            // Initial adoption and forge hooks supply the listing changes,
+            // as in fixture_check; repeating the listing adds no evidence.
+            let story_ms = crate::PATIENCE.as_nanos().div_euclid(1_000_000);
+            for name in ["poll_ms", "poll_max_ms"] {
+                value["application"]["limits"]["overrides"][format!("forge.client.{name}")] = (story_ms + 1).into();
+            }
+            let mut helper = value["engine"]["charters"][0].clone();
+            helper["number"] = HELPER_CHARTER.into();
+            value["engine"]["charters"].as_array_mut().expect("charters").push(helper);
+            value["engine"]["limits"]["overrides"]["tasks.charters"] = 3.into();
+            let mut kinds = value["engine"]["rules"]["ceiling"]["delegation"]["kinds"].clone();
+            kinds.as_array_mut().expect("kinds").push(json!({"kind":"charter","number":HELPER_CHARTER}));
+            value["engine"]["rules"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+                project["policy"]["roles"][0]["authority"]["delegation"]["kinds"] = kinds.clone();
+                // The chat's run, A, the helper and B reserve 10 + 5 + 5 + 25.
+                project["policy"]["roles"][0]["authority"]["budget"]["spend"] = 50.into();
+            }
+            // The coder's checkout needs both its LLM and application git grants,
+            // as in fixture_check. The cluster supplies one slot per worker.
+            value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
             landing::admit(value);
         },
     }

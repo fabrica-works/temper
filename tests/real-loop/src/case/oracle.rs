@@ -130,6 +130,12 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::Phase,
         Agent::Rules,
         Agent::Scope,
+        Agent::Pause,
+        Agent::Owner,
+        Agent::Bowner,
+        Agent::Helper,
+        Agent::Implementer,
+        Agent::H1Coder,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -1916,6 +1922,518 @@ mod rules_tests {
                 *observed.documents.get_mut(&read).expect("ended").pointer_mut(path).expect("field") = Value::Null;
                 rejects(&observed, RULES_CONTROL, "original director and A");
             }
+        }
+    }
+}
+
+// Act 2, step 5.2 (domain/testing.md, 5.3)
+const PERSON_STOP: Promise = Promise::Must("Stop, which is the person's (exact)");
+const DELEGATES_GO_ON: Promise =
+    Promise::Must("delegates and queued changes going on under a stopped goal (to check, 6.8)");
+const OLD_HELPER: Promise = Promise::Must("retiring a charter that still has tasks (to check, 6.8)");
+const STOPPED_NEWS: Promise =
+    Promise::Add("a stopped goal's news waits for its release, so nothing is relayed by hand");
+
+#[must_use]
+pub fn step_5_2(observed: &Observed) -> Vec<Miss> {
+    use super::{BOWNER, H1, H1_REVIEWER, HELPER, IMPLEMENTER, OWNER, PAUSE, PROJECT};
+    let mut misses = Vec::new();
+    for (read, expected, parent) in [
+        (Read::ImplementerRunning, IMPLEMENTER, BOWNER),
+        (Read::H1Running, H1_REVIEWER, H1),
+        (Read::BHeld, BOWNER, PAUSE),
+        (Read::BStillHeld, BOWNER, PAUSE),
+        (Read::BEnded, BOWNER, PAUSE),
+        (Read::OwnerEnded, OWNER, PAUSE),
+        (Read::HelperEnded, HELPER, PAUSE),
+        (Read::ImplementerEnded, IMPLEMENTER, BOWNER),
+        (Read::H1Ended, H1, BOWNER),
+    ] {
+        let task = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "5.2",
+            number(task, "/chip/task") == Some(expected)
+                && number(task, "/project") == Some(PROJECT)
+                && number(task, "/requester/task") == Some(parent),
+            DELEGATES_GO_ON,
+            &format!("{read:?} must identify task {expected} under {parent} in project {PROJECT}"),
+        );
+    }
+    for read in [Read::ImplementerRunning, Read::H1Running] {
+        let task = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "5.2",
+            text(task, "/chip/phase") == "running"
+                && text(task, "/chip/details/owner/details/observation/work") == "writing"
+                && number(task, "/chip/details/owner/phase/active/running/attempt")
+                    .is_some_and(|attempt| number(task, "/chip/details/owner/details/attempt") == Some(attempt))
+                && task["result"].is_null(),
+            DELEGATES_GO_ON,
+            &format!("{read:?} must show an open attempt writing before B's Stop"),
+        );
+    }
+    pause_stop(observed, &mut misses);
+    pause_children(observed, &mut misses);
+    pause_news(observed, &mut misses);
+    misses
+}
+
+fn pause_stop(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{B_HOLD, BOWNER, OWNER_REPORT};
+    let held = task_document(observed, Read::BHeld);
+    let still = task_document(observed, Read::BStillHeld);
+    let b = task_document(observed, Read::BEnded);
+    let a = task_document(observed, Read::OwnerEnded);
+    for task in [held, still] {
+        step_check(
+            misses,
+            "5.2",
+            text(task, "/chip/phase") == "held"
+                && number(task, "/hold/owner/revision") == Some(B_HOLD)
+                && number(task, "/hold/owner/reason/stopped_by/party") == Some(1),
+            PERSON_STOP,
+            "B must stay held at the person's Stop revision",
+        );
+    }
+    step_check(
+        misses,
+        "5.2",
+        text(a, "/chip/phase") == "ended"
+            && text(a, "/result/value/report/bytes") == OWNER_REPORT
+            && a["hold"].is_null()
+            && check_activity(observed, Read::OwnerEnded)
+                .iter()
+                .filter(|row| number(row, "/line/milestone/position").is_some())
+                .count()
+                == 2
+            && check_activity(observed, Read::OwnerEnded)
+                .iter()
+                .filter(|row| number(row, "/line/run_began/attempt").is_some())
+                .count()
+                == 1
+            && pause_activity(observed, Read::OwnerEnded)["cut"] == false
+            && pause_activity(observed, Read::OwnerEnded)["before"].is_null()
+            && !check_activity(observed, Read::OwnerEnded).iter().any(|row| row["line"].get("decided").is_some()),
+        PERSON_STOP,
+        "A must finish without a hold or control decision",
+    );
+    let before = check_activity(observed, Read::BHeld);
+    let after: Vec<_> = check_activity(observed, Read::BEnded)
+        .into_iter()
+        .chain(check_activity(observed, Read::BEndedEarlier))
+        .collect();
+    let attempts =
+        |rows: &[&Value]| rows.iter().filter_map(|row| number(row, "/line/run_began/attempt")).collect::<Vec<_>>();
+    let previous = attempts(&before);
+    let following = attempts(&after);
+    step_check(
+        misses,
+        "5.2",
+        number(held, "/chip/details/owner/details/attempt").is_some()
+            && number(held, "/chip/details/owner/details/attempt")
+                == number(still, "/chip/details/owner/details/attempt")
+            && previous.first().copied() == number(held, "/chip/details/owner/details/attempt")
+            && following.len() == previous.len() + 1
+            && following.first().copied() == number(b, "/chip/details/owner/details/attempt")
+            && following.get(1..) == Some(previous.as_slice())
+            && following.first() > following.get(1)
+            && after
+                .iter()
+                .find(|row| number(row, "/line/run_began/attempt").is_some())
+                .and_then(|row| number(row, "/position"))
+                .zip(number(still, "/activity"))
+                .is_some_and(|(began, held_head)| began > held_head)
+            && after.iter().all(|row| number(row, "/task") == Some(BOWNER))
+            && after.windows(2).all(|pair| {
+                number(pair[0], "/position").zip(number(pair[1], "/position")).is_some_and(|(new, old)| new > old)
+            })
+            && [Read::BHeld, Read::BEnded, Read::BEndedEarlier]
+                .iter()
+                .all(|read| pause_activity(observed, *read)["cut"] == false)
+            && pause_activity(observed, Read::BHeld)["before"].is_null()
+            && pause_activity(observed, Read::BEndedEarlier)["before"].is_null(),
+        STOPPED_NEWS,
+        "B's complete journal must add exactly one attempt after its unchanged held attempt",
+    );
+}
+
+fn pause_children(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{H1, H1_CODER, H1_DOC, H1_REVIEWER, H1_WORDS, IMPLEMENTER, IMPLEMENTER_RESULT};
+    let held = task_document(observed, Read::BHeld);
+    let implementer = task_document(observed, Read::ImplementerEnded);
+    let h1 = task_document(observed, Read::H1Ended);
+    step_check(
+        misses,
+        "5.2",
+        text(implementer, "/chip/phase") == "ended"
+            && implementer.pointer("/result/ending/task/done").is_some_and(Value::is_object)
+            && text(implementer, "/result/value/report/bytes") == IMPLEMENTER_RESULT,
+        DELEGATES_GO_ON,
+        "the implementer must finish its report under B",
+    );
+    step_check(
+        misses,
+        "5.2",
+        text(h1, "/chip/phase") == "ended"
+            // The change procedure returns Done(Change) only after landing;
+            // ctl renders its commit as hex bytes, not the word "landed".
+            && number(h1, "/result/ending/task/done/change/kind") == Some(1)
+            && number(h1, "/result/value/change/part/connector") == Some(1)
+            && text(h1, "/result/value/change/part/kind") == "result"
+            && observed.kit.merged_green
+            && observed.kit.main.get(H1_DOC.as_bytes()).is_some_and(|words| words == H1_WORDS.as_bytes()),
+        DELEGATES_GO_ON,
+        "h1 must end landed with its Markdown on kit's main, merged green",
+    );
+    let h1_activity = check_activity(observed, Read::H1Ended);
+    step_check(
+        misses,
+        "5.2",
+        h1_activity.iter().any(|row| {
+            number(row, "/line/heard/from/task") == Some(H1_CODER)
+                && row.pointer("/line/heard/kind/result/change").is_some_and(Value::is_object)
+        }) && h1_activity.iter().any(|row| {
+            number(row, "/line/heard/from/task") == Some(H1_REVIEWER)
+                && number(row, "/line/heard/kind/result/verdict/code") == Some(1)
+        }),
+        DELEGATES_GO_ON,
+        "h1 must receive its coder's change and its held reviewer's passing verdict",
+    );
+    let activity = check_activity(observed, Read::BStillHeld);
+    let stopped = number(held, "/activity");
+    // BHeld's activity head is read at Stop revision B_HOLD, before either
+    // fake release. Each ending's journal position must be beyond that head;
+    // BStillHeld follows both ended reads and precedes ctl Release.
+    for child in [IMPLEMENTER, H1] {
+        let heard = activity.iter().position(|row| {
+            number(row, "/line/heard/from/task") == Some(child) && row.pointer("/line/heard/kind/result").is_some()
+        });
+        step_check(
+            misses,
+            "5.2",
+            heard
+                .and_then(|at| number(activity[at], "/position"))
+                .zip(stopped)
+                .is_some_and(|(heard, stop)| heard > stop && stop != 0),
+            DELEGATES_GO_ON,
+            &format!("B must retain task {child}'s ending after its Stop decision"),
+        );
+    }
+}
+
+fn pause_news(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{Agent, BOWNER_REPORT, H1, HELPER_CHARTER, HELPER_REASON, IMPLEMENTER_RESULT, PAUSE, PAUSE_REPORT};
+    let b = task_document(observed, Read::BEnded);
+    let helper = task_document(observed, Read::HelperEnded);
+    let pause = task_document(observed, Read::PauseEnded);
+    let queries: Vec<_> = observed.told.iter().filter(|query| query.agent == Agent::Bowner).collect();
+    let resumed = queries.last();
+    let label = format!("Result from task {H1}:\n");
+    step_check(
+        misses,
+        "5.2",
+        resumed.is_some_and(|query| contains(&query.words, IMPLEMENTER_RESULT) && contains(&query.words, &label))
+            && queries
+                .iter()
+                .rev()
+                .skip(1)
+                .all(|query| !contains(&query.words, IMPLEMENTER_RESULT) && !contains(&query.words, &label))
+            && resumed.is_some_and(|query| {
+                calls::occurrences(&query.words, IMPLEMENTER_RESULT.as_bytes()) == 1
+                    && calls::occurrences(&query.words, label.as_bytes()) == 1
+            }),
+        STOPPED_NEWS,
+        "only B's query after Release must receive both endings once",
+    );
+    step_check(
+        misses,
+        "5.2",
+        number(helper, "/chip/executor/agent/charter") == Some(HELPER_CHARTER)
+            && number(helper, "/result/ending/task/cancelled/by/task") == Some(PAUSE)
+            && text(helper, "/result/ending/task/cancelled/reason/bytes") == HELPER_REASON
+            && text(helper, "/chip/phase") == "ended"
+            && number(helper, "/chip/details/owner/details/live_delegates") == Some(0),
+        OLD_HELPER,
+        "the helper subtree must end cancelled by the director with its reason; charter retirement stays out",
+    );
+    for (task, expected, label) in [(b, BOWNER_REPORT, "B"), (pause, PAUSE_REPORT, "chat")] {
+        step_check(
+            misses,
+            "5.2",
+            text(task, "/chip/phase") == "ended" && text(task, "/result/value/report/bytes") == expected,
+            STOPPED_NEWS,
+            &format!("{label} must finish with its report"),
+        );
+    }
+    step_check(
+        misses,
+        "5.2",
+        number(pause, "/chip/task") == Some(PAUSE)
+            && observed.told.iter().any(|query| query.agent == Agent::Pause && contains(&query.words, BOWNER_REPORT)),
+        STOPPED_NEWS,
+        "the chat must hear B's report before finishing",
+    );
+}
+
+fn pause_activity(observed: &Observed, read: Read) -> &Value {
+    let doc = document(observed, read);
+    doc.get("activity").unwrap_or(doc)
+}
+
+#[cfg(test)]
+mod pause_tests {
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+
+    fn task(task: u64, parent: u64) -> Value {
+        json!({"task":{"chip":{"task":task,"phase":"ended","details":{"owner":{"details":{"attempt":1,"live_delegates":0}}}},
+            "project":PROJECT,"requester":{"task":parent},"hold":null,
+            "result":{"ending":{"task":{"done":{}}}}},
+            "activity":{"rows":[],"cut":false,"before":null,"after":null}})
+    }
+    fn documents() -> BTreeMap<Read, Value> {
+        let mut documents = BTreeMap::from([
+            (Read::ImplementerRunning, task(IMPLEMENTER, BOWNER)),
+            (Read::H1Running, task(H1_REVIEWER, H1)),
+            (Read::BHeld, task(BOWNER, PAUSE)),
+            (Read::BStillHeld, task(BOWNER, PAUSE)),
+            (Read::BEnded, task(BOWNER, PAUSE)),
+            (
+                Read::BEndedEarlier,
+                json!({"activity":{"rows":[{"position":2,"line":{"run_began":{"attempt":1}}}],"before":null,"cut":false}}),
+            ),
+            (Read::OwnerEnded, task(OWNER, PAUSE)),
+            (Read::HelperEnded, task(HELPER, PAUSE)),
+            (Read::ImplementerEnded, task(IMPLEMENTER, BOWNER)),
+            (Read::H1Ended, task(H1, BOWNER)),
+            (Read::PauseEnded, task(PAUSE, 0)),
+        ]);
+        for read in [Read::ImplementerRunning, Read::H1Running] {
+            let document = documents.get_mut(&read).expect("running");
+            document["task"]["chip"]["phase"] = "running".into();
+            document["task"]["chip"]["details"]["owner"]["phase"] = json!({"active":{"running":{"attempt":1}}});
+            document["task"]["chip"]["details"]["owner"]["details"]["observation"] = json!({"work":"writing"});
+            document["task"]["result"] = Value::Null;
+        }
+        for read in [Read::BHeld, Read::BStillHeld] {
+            let document = documents.get_mut(&read).expect("held");
+            document["task"]["chip"]["phase"] = "held".into();
+            document["task"]["hold"] = json!({"owner":{"revision":B_HOLD,"reason":{"stopped_by":{"party":1}}}});
+        }
+        documents.get_mut(&Read::BHeld).expect("held")["task"]["activity"] = 7.into();
+        documents.get_mut(&Read::BStillHeld).expect("still")["task"]["activity"] = 10.into();
+        documents.get_mut(&Read::BHeld).expect("held")["activity"]["rows"] =
+            json!([{"position":2,"line":{"run_began":{"attempt":1}}}]);
+        documents.get_mut(&Read::BStillHeld).expect("still")["activity"]["rows"] = json!([
+            {"position":10,"line":{"heard":{"from":{"task":H1},"kind":{"result":"done"}}}},
+            {"position":8,"line":{"heard":{"from":{"task":IMPLEMENTER},"kind":{"result":"done"}}}},
+            {"position":7,"line":{"milestone":{"position":7}}},
+        ]);
+        documents.get_mut(&Read::BEnded).expect("B")["activity"]["rows"] =
+            json!([{"position":12,"line":{"run_began":{"attempt":2}}}]);
+        documents.get_mut(&Read::BEnded).expect("B")["task"]["chip"]["details"]["owner"]["details"]["attempt"] =
+            2.into();
+        for (read, report) in [
+            (Read::OwnerEnded, OWNER_REPORT),
+            (Read::BEnded, BOWNER_REPORT),
+            (Read::ImplementerEnded, IMPLEMENTER_RESULT),
+            (Read::PauseEnded, PAUSE_REPORT),
+        ] {
+            documents.get_mut(&read).expect("report")["task"]["result"]["value"] = json!({"report":{"bytes":report}});
+        }
+        let change = json!({"kind":1,"part":{"connector":1,"kind":"result","key":{"number":1}}});
+        documents.get_mut(&Read::H1Ended).expect("h1")["task"]["result"] =
+            json!({"ending":{"task":{"done":{"change":change}}},"value":{"change":change}});
+        documents.get_mut(&Read::HelperEnded).expect("helper")["task"]["result"]["ending"] =
+            json!({"task":{"cancelled":{"by":{"task":PAUSE},"reason":{"bytes":HELPER_REASON}}}});
+        documents.get_mut(&Read::OwnerEnded).expect("A")["activity"]["rows"] = json!([
+            {"position":5,"line":{"milestone":{"position":5}}},
+            {"position":2,"line":{"run_began":{"attempt":1}}},
+            {"position":1,"line":{"milestone":{"position":1}}},
+        ]);
+        documents.get_mut(&Read::H1Ended).expect("h1")["activity"]["rows"] = json!([
+            {"position":3,"line":{"heard":{"from":{"task":H1_REVIEWER},"kind":{"result":{"verdict":{"code":1}}}}}},
+            {"position":2,"line":{"heard":{"from":{"task":H1_CODER},"kind":{"result":{"change":{}}}}}},
+        ]);
+        documents.get_mut(&Read::HelperEnded).expect("helper")["task"]["chip"]["executor"] =
+            json!({"agent":{"charter":HELPER_CHARTER}});
+        for document in documents.values_mut() {
+            let task = number(document, "/task/chip/task").unwrap_or(BOWNER);
+            for row in document["activity"]["rows"].as_array_mut().expect("rows") {
+                *row = json!({"event":{"owner":{"source":{"task":task,"position":row["position"].clone(),"line":row["line"].clone()}}}});
+            }
+        }
+        documents
+    }
+    fn met() -> Observed {
+        let documents = documents();
+        let told = |agent, words: String| Told {
+            system: Box::new([]),
+            agent,
+            words: words.into_bytes().into(),
+            history: Box::new([]),
+            model: Box::new([]),
+            credential: None,
+        };
+        Observed {
+            documents,
+            commands: Vec::new(),
+            told: vec![
+                told(Agent::Bowner, "Delegated".into()),
+                told(Agent::Bowner, format!("{IMPLEMENTER_RESULT}\nResult from task {H1}:\nlanded")),
+                told(Agent::Pause, BOWNER_REPORT.into()),
+            ],
+            kit: Kit {
+                main: BTreeMap::from([(H1_DOC.as_bytes().to_vec(), H1_WORDS.as_bytes().to_vec())]),
+                merged_green: true,
+            },
+        }
+    }
+    #[test]
+    fn pause_checkpoint_met() {
+        assert_met(&step_5_2(&met()));
+    }
+
+    #[test]
+    fn every_required_document_field_rejects_a_mutation() {
+        let required = [
+            (Read::BHeld, "/task/chip/task"),
+            (Read::BHeld, "/task/project"),
+            (Read::BHeld, "/task/requester/task"),
+            (Read::BHeld, "/task/chip/phase"),
+            (Read::BHeld, "/task/hold/owner/revision"),
+            (Read::BHeld, "/task/hold/owner/reason/stopped_by/party"),
+            (Read::BStillHeld, "/task/chip/phase"),
+            (Read::BStillHeld, "/task/hold/owner/revision"),
+            (Read::BStillHeld, "/task/chip/details/owner/details/attempt"),
+            (Read::BEnded, "/task/chip/details/owner/details/attempt"),
+            (Read::BHeld, "/activity/cut"),
+            (Read::BEndedEarlier, "/activity/cut"),
+            (Read::BEndedEarlier, "/activity/rows/0/event/owner/source/line/run_began/attempt"),
+            (Read::BEnded, "/activity/cut"),
+            (Read::BEnded, "/task/result/value/report/bytes"),
+            (Read::OwnerEnded, "/task/result/value/report/bytes"),
+            (Read::OwnerEnded, "/task/chip/phase"),
+            (Read::ImplementerEnded, "/task/result/value/report/bytes"),
+            (Read::ImplementerEnded, "/task/result/ending/task/done"),
+            (Read::H1Ended, "/task/result/ending/task/done/change/kind"),
+            (Read::H1Ended, "/task/result/value/change/part/connector"),
+            (Read::H1Ended, "/task/result/value/change/part/kind"),
+            (Read::BStillHeld, "/activity/rows/0/event/owner/source/line/heard/from/task"),
+            (Read::BStillHeld, "/activity/rows/1/event/owner/source/line/heard/from/task"),
+            (Read::BHeld, "/task/activity"),
+            (Read::BStillHeld, "/activity/rows/0/event/owner/source/position"),
+            (Read::BStillHeld, "/activity/rows/1/event/owner/source/position"),
+            (Read::H1Ended, "/activity/rows/0/event/owner/source/line/heard/from/task"),
+            (Read::H1Ended, "/activity/rows/0/event/owner/source/line/heard/kind/result/verdict/code"),
+            (Read::H1Ended, "/activity/rows/1/event/owner/source/line/heard/from/task"),
+            (Read::OwnerEnded, "/activity/rows/0/event/owner/source/line/milestone/position"),
+            (Read::OwnerEnded, "/activity/rows/1/event/owner/source/line/run_began/attempt"),
+            (Read::HelperEnded, "/task/chip/executor/agent/charter"),
+            (Read::HelperEnded, "/task/result/ending/task/cancelled/by/task"),
+            (Read::HelperEnded, "/task/result/ending/task/cancelled/reason/bytes"),
+            (Read::HelperEnded, "/task/chip/details/owner/details/live_delegates"),
+            (Read::PauseEnded, "/task/result/value/report/bytes"),
+            (Read::PauseEnded, "/task/chip/task"),
+        ];
+        for (read, path) in required {
+            let mut observed = met();
+            *observed.documents.get_mut(&read).expect("doc").pointer_mut(path).expect("field") = Value::Null;
+            assert!(!step_5_2(&observed).is_empty(), "{read:?}{path}");
+        }
+        for read in [Read::ImplementerRunning, Read::H1Running] {
+            for path in [
+                "/task/chip/task",
+                "/task/project",
+                "/task/requester/task",
+                "/task/chip/phase",
+                "/task/chip/details/owner/phase/active/running/attempt",
+                "/task/chip/details/owner/details/attempt",
+                "/task/chip/details/owner/details/observation/work",
+            ] {
+                let mut observed = met();
+                *observed.documents.get_mut(&read).expect("running").pointer_mut(path).expect("field") = Value::Null;
+                assert!(!step_5_2(&observed).is_empty(), "{read:?}{path}");
+            }
+            let mut observed = met();
+            observed.documents.get_mut(&read).expect("running")["task"]["result"] = json!({"done":{}});
+            assert!(!step_5_2(&observed).is_empty(), "{read:?} already ended");
+        }
+        for &(read, _) in crate::case::acts::READS_5_2 {
+            let mut observed = met();
+            observed.documents.remove(&read);
+            assert!(!step_5_2(&observed).is_empty(), "missing {read:?}");
+        }
+    }
+    #[test]
+    fn news_cannot_arrive_early_twice_or_without_both_endings() {
+        let mut early = met();
+        early.told[0].words = early.told[1].words.clone();
+        let mut missing_h1 = met();
+        missing_h1.told[1].words = IMPLEMENTER_RESULT.as_bytes().into();
+        let mut twice = met();
+        twice.told[1].words =
+            format!("{} {IMPLEMENTER_RESULT}", String::from_utf8_lossy(&twice.told[1].words)).into_bytes().into();
+        let mut twice_h1 = met();
+        twice_h1.told[1].words =
+            format!("{} Result from task {H1}:\n", String::from_utf8_lossy(&twice_h1.told[1].words))
+                .into_bytes()
+                .into();
+        let mut no_chat_delivery = met();
+        no_chat_delivery.told[2].words = Box::new([]);
+        let mut no_queries = met();
+        no_queries.told.clear();
+        for (label, observed) in [
+            ("early", early),
+            ("missing h1", missing_h1),
+            ("twice", twice),
+            ("twice h1", twice_h1),
+            ("chat", no_chat_delivery),
+            ("no queries", no_queries),
+        ] {
+            assert!(!step_5_2(&observed).is_empty(), "{label}");
+        }
+    }
+    #[test]
+    fn stop_order_a_hold_and_the_merge_are_checked() {
+        let mut red = met();
+        red.kit.merged_green = false;
+        let mut missing_file = met();
+        missing_file.kit.main.clear();
+        let mut early = met();
+        early.documents.get_mut(&Read::BHeld).expect("held")["task"]["activity"] = 10.into();
+        let mut a_held = met();
+        a_held.documents.get_mut(&Read::OwnerEnded).expect("A")["task"]["hold"] = json!({"owner":{}});
+        let mut a_released = met();
+        a_released.documents.get_mut(&Read::OwnerEnded).expect("A")["activity"]["rows"]
+            .as_array_mut()
+            .expect("rows")
+            .push(json!({"event":{"owner":{"source":{"line":{"milestone":{"position":3}}}}}}));
+        let mut a_retried = met();
+        a_retried.documents.get_mut(&Read::OwnerEnded).expect("A")["activity"]["rows"]
+            .as_array_mut()
+            .expect("rows")
+            .push(json!({"event":{"owner":{"source":{"line":{"run_began":{"attempt":3}}}}}}));
+        let mut incomplete = met();
+        incomplete.documents.get_mut(&Read::BEndedEarlier).expect("earlier")["activity"]["before"] =
+            json!({"value":"older"});
+        let mut unordered = met();
+        unordered.documents.get_mut(&Read::BEndedEarlier).expect("earlier")["activity"]["rows"][0]["event"]["owner"]
+            ["source"]["position"] = 13.into();
+        for (label, observed) in [
+            ("red", red),
+            ("missing file", missing_file),
+            ("early", early),
+            ("A held", a_held),
+            ("A released", a_released),
+            ("A retried", a_retried),
+            ("incomplete", incomplete),
+            ("unordered", unordered),
+        ] {
+            assert!(!step_5_2(&observed).is_empty(), "{label}");
         }
     }
 }
