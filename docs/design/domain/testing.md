@@ -749,17 +749,14 @@ and 10).
   by `SIGINT` or `SIGTERM` sends nothing more, prints nothing more,
   leaves DIRECTORY's kept requests as they are, and exits 130 or 143
   (../client/tools.md, 8.2).
-- **A sign-in kept,** on a scratch directory of its own, over five
+- **A sign-in kept,** on a scratch directory of its own, over three
   starts of `temper serve`, each printing a fresh link: `temper ctl
-  DIRECTORY sign-in -` with each of three starts' links keeps the
-  first's token, byte for byte, and each passes, though the
-  configuration's pool holds two sign-ins (`people.sign_ins`); then the
-  link's route, posted as a browser posts it, sets a cookie, and the
-  next start's link posted with that cookie is answered signed in with
-  no credential and no `Set-Cookie`, DIRECTORY's sign-in still live
-  (../client/README.md, section 7; jig's `domain/people.md`, section 3).
-  The cookie is proved here, below the browser, whose harness can't yet
-  open a later printed link in the same context.
+  DIRECTORY sign-in -` with each start's link keeps the first's token,
+  byte for byte, and every sign-in passes in a pool the configuration
+  makes two (`people.sign_ins`; ../client/README.md, section 7; jig's
+  `domain/people.md`, section 3). The browser's cookie on the link route
+  is proved in jig, by the mapping's step tests and the clients'
+  component's world (jig's `protocol/client.md`, section 14).
 - **The server's guards,** a third test, against `temper serve`'s
   clients' listener: jig's one attack story that needs no browser, a
   rebound Host (jig's `protocol/browser.md`, section 15): a request
