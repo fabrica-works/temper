@@ -128,8 +128,9 @@ pub fn transcript_turn(sequence: u32, length: usize, first: bool) -> Box<[u8]> {
 
 /// The hub's start, decoded into smith's for the run `run`, as the routing
 /// does: the charter and transcript with the agent's endpoints, the calls
-/// answered after the transcript by their names, the start's inbox, and its
-/// LLM accounts' grants. The root adds the workspace's directories.
+/// answered after the transcript by their names, the start's inbox, its
+/// LLM accounts' grants, and the live content asked of it (none when nothing
+/// is). The root adds the workspace's directories.
 ///
 /// # Errors
 ///
@@ -178,7 +179,15 @@ pub fn decode(run: Token, source: host::Start, limits: &agent::Limits) -> Result
         answered: answered.into_boxed_slice(),
         directories: Box::new([]),
         grants: grants.into_boxed_slice(),
-        live: None,
+        live: if source.live == host::LiveAsk::NONE {
+            None
+        } else {
+            Some(agent::channel::LiveAsk {
+                text: source.live.text,
+                reasoning: source.live.reasoning,
+                input: source.live.input,
+            })
+        },
     }))
 }
 
