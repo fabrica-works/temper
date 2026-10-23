@@ -4,7 +4,11 @@ use skein_io::kernel::{Complete, Done, Error, Exit, Fd, Op, Pipe, Signal, Spawn,
 use skein_lib::{Duration, Queue, Time, Token, Wall};
 use skein_shell::{Clock, Host};
 use skein_world::{Referee, end_to_end::Streams, real};
-use std::{collections::VecDeque, os::unix::ffi::OsStrExt, path::Path};
+use std::{
+    collections::VecDeque,
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+};
 
 // The service's output bound also holds the complete tools guide (4,698 bytes).
 const OUTPUT: usize = 65_536;
@@ -34,6 +38,7 @@ pub struct Call {
     arguments: Vec<Box<[u8]>>,
     stdin: Stdin,
     directory: bool,
+    client: Option<Box<[u8]>>,
 }
 impl Call {
     #[must_use]
@@ -42,11 +47,16 @@ impl Call {
             arguments: arguments.iter().map(|word| word.as_bytes().into()).collect(),
             stdin: Stdin::Nothing,
             directory: true,
+            client: None,
         }
     }
     #[must_use]
     pub fn bare(arguments: &[&str]) -> Self {
         Self { directory: false, ..Self::new(arguments) }
+    }
+    #[must_use]
+    pub fn in_directory(self, name: &str) -> Self {
+        Self { client: Some(name.as_bytes().into()), ..self }
     }
     #[must_use]
     pub fn sign_in() -> Self {
@@ -64,27 +74,47 @@ pub enum Step {
     Cut,
     Pause,
     Resume,
+    NextLink,
+    Open { directory: &'static str, until: Option<&'static [u8]> },
 }
 pub struct Story<'a> {
     scratch: &'a Path,
     steps: Vec<Step>,
     forgejo: Option<u32>,
+    measured: bool,
+    tokens: Vec<String>,
 }
 impl<'a> Story<'a> {
+    /// Bound each new story step, retaining its wall-time window and token observations.
+    #[must_use]
+    pub fn measured(mut self, tokens: &[&str]) -> Self {
+        self.measured = true;
+        self.tokens = tokens.iter().map(|name| (*name).into()).collect();
+        self
+    }
     #[must_use]
     pub fn new(scratch: &'a Path, steps: Vec<Step>) -> Self {
-        Self { scratch, steps, forgejo: None }
+        Self { scratch, steps, forgejo: None, measured: false, tokens: Vec::new() }
     }
     #[must_use]
     pub fn on(scratch: &'a Path, forgejo: &super::forgejo::Throwaway, steps: Vec<Step>) -> Self {
-        Self { scratch, steps, forgejo: Some(forgejo.pid()) }
+        Self { scratch, steps, forgejo: Some(forgejo.pid()), measured: false, tokens: Vec::new() }
     }
 }
 pub struct Seen {
     pub calls: Vec<Ended>,
     pub serve: Ended,
+    pub mismatches: Vec<String>,
+    pub spans: Vec<(Wall, Wall)>,
+    /// Token modes after each call, in the order passed to `Story::measured`.
+    pub tokens: Vec<Vec<Option<u32>>>,
 }
 
+enum Input {
+    Eof,
+    Hold,
+    After(&'static [u8]),
+}
 struct Child {
     base: u64,
     pidfd: Option<Fd>,
@@ -98,6 +128,7 @@ struct Child {
     ended: Ended,
     cancelled: bool,
     signals: u32,
+    typing: Input,
 }
 impl Child {
     fn new(input: Vec<u8>, base: u64) -> Self {
@@ -114,6 +145,7 @@ impl Child {
             ended: Ended { exit: None, stdout: Vec::new(), stderr: Vec::new() },
             cancelled: false,
             signals: 0,
+            typing: Input::Eof,
         }
     }
     fn token(&self, token: Token) -> Token {
@@ -127,6 +159,7 @@ impl Child {
         });
     }
     fn completed(&mut self, complete: Complete, submit: &mut Queue<Submit>, cancelling: bool) {
+        let cancelling = cancelling || self.cancelled;
         if complete.op == self.token(CANCEL) || cancelling && complete.op == self.token(CUT) {
             assert!(
                 matches!(complete.result, Ok(_) | Err(Error::NotFound | Error::Other(3))),
@@ -199,7 +232,17 @@ impl Child {
                 kind: Op::Signal { pidfd: self.pidfd.expect("ctl pidfd"), signal: Signal::Kill, to: Target::Child },
             });
         }
+        if let Input::After(words) = self.typing
+            && skein_lib::bytes::find(&self.ended.stdout, words).is_some()
+        {
+            self.typing = Input::Eof;
+            self.input = b"q\n".to_vec();
+        }
+        if self.pipes[1..].iter().all(Option::is_none) || cancelling {
+            self.typing = Input::Eof;
+        }
         if !self.writing
+            && matches!(self.typing, Input::Eof)
             && let Some(fd) = self.pipes[0]
         {
             if self.written == self.input.len() {
@@ -242,6 +285,7 @@ enum Action {
     Until(Call, &'static [u8]),
     Stderr(&'static [u8]),
     Signal,
+    NextLink,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -260,6 +304,14 @@ pub struct Calls {
     reading: bool,
     closing: u32,
     link: Vec<u8>,
+    selected: usize,
+    within: Option<Duration>,
+    deadline: Option<Time>,
+    began: Option<Wall>,
+    wall: Wall,
+    spans: Vec<(Wall, Wall)>,
+    tokens: Vec<Vec<Option<u32>>>,
+    mismatches: Vec<String>,
     steps: VecDeque<Step>,
     child: Option<Child>,
     action: Option<Action>,
@@ -295,7 +347,7 @@ impl Calls {
     }
     #[must_use]
     pub fn link(&self) -> &[u8] {
-        super::printed_link(&self.link).expect("serve printed its link")
+        super::printed_link(&self.link[self.selected..]).expect("serve printed its link")
     }
     #[must_use]
     pub fn foreground_idle(&self) -> bool {
@@ -359,6 +411,14 @@ impl Calls {
             reading: false,
             closing: 0,
             link: Vec::new(),
+            selected: 0,
+            within: None,
+            deadline: None,
+            began: None,
+            wall: Wall::from_nanos(0),
+            spans: Vec::new(),
+            tokens: Vec::new(),
+            mismatches: Vec::new(),
             steps: steps.into(),
             child: None,
             action: None,
@@ -425,13 +485,13 @@ impl Calls {
     fn start(&mut self, call: Call, started: bool) {
         let mut args: Vec<Box<[u8]>> = vec![b"ctl".as_slice().into()];
         if call.directory {
-            args.push(self.client.clone());
+            args.push(call.client.unwrap_or_else(|| self.client.clone()));
         }
         args.extend(call.arguments);
         let input = match call.stdin {
             Stdin::Nothing => Vec::new(),
             Stdin::Link => {
-                let mut bytes = super::printed_link(&self.link).expect("serve link").to_vec();
+                let mut bytes = self.link().to_vec();
                 bytes.push(b'\n');
                 bytes
             }
@@ -448,6 +508,7 @@ impl Calls {
             return;
         }
         let ended = self.child.take().expect("finished ctl").ended;
+        self.finish_step(true);
         match self.action.take().expect("current action") {
             Action::Run => self.ends.push(ended),
             Action::Until(call, bytes) => {
@@ -459,12 +520,61 @@ impl Calls {
                 }
             }
             Action::Stderr(_) => panic!("a stderr gate has no child"),
+            Action::NextLink => unreachable!("link wait has no child"),
             Action::Signal => assert_eq!(
                 ended.exit,
                 Some(Exit::Code(0)),
                 "Forgejo signal: {}",
                 String::from_utf8_lossy(&ended.stderr)
             ),
+        }
+    }
+    fn finish_step(&mut self, call: bool) {
+        if let Some(wall) = self.began.take()
+            && call
+        {
+            self.spans.push((wall, self.wall));
+        }
+        self.deadline = None;
+    }
+    fn bound(&mut self, now: Time) {
+        if matches!(self.action, Some(Action::NextLink)) {
+            let after =
+                self.selected + self.link[self.selected..].iter().position(|b| *b == b'\n').map_or(0, |n| n + 1);
+            if super::printed_link(&self.link[after..]).is_some() {
+                self.selected = after;
+                // Select the newest complete line; an incomplete line is never a link.
+                while let Some(end) = self.link[self.selected..].iter().position(|b| *b == b'\n') {
+                    let next = self.selected + end + 1;
+                    if super::printed_link(&self.link[next..]).is_none() {
+                        break;
+                    }
+                    self.selected = next;
+                }
+                self.action = None;
+                self.finish_step(false);
+            }
+        }
+        if self.deadline.is_some_and(|deadline| now >= deadline) {
+            let name = self
+                .steps
+                .iter()
+                .find_map(|step| {
+                    if let Step::Mark(name) = step { Some(name.strip_prefix("pool ").unwrap_or(name)) } else { None }
+                })
+                .unwrap_or("story step");
+            self.mismatches.push(format!("{name}: timed out after WITHIN"));
+            self.deadline = None;
+            if let Some(child) = &mut self.child {
+                child.drive(&mut self.submit, true);
+            } else {
+                if super::printed_link(&self.link).is_none() {
+                    // No dependent call can be formed without the initial printed link.
+                    self.steps.clear();
+                }
+                self.action = None;
+                self.finish_step(false);
+            }
         }
     }
     fn advance(&mut self, now: Time) {
@@ -478,7 +588,7 @@ impl Calls {
         if self.cancelling
             || self.child.is_some()
             || self.awaiting_started
-            || matches!(self.action, Some(Action::Stderr(_)))
+            || matches!(self.action, Some(Action::Stderr(_) | Action::NextLink))
             || self.retry.is_some_and(|retry| retry > now)
         {
             return;
@@ -487,6 +597,14 @@ impl Calls {
             self.start(call.clone(), false);
             self.retry = None;
             return;
+        }
+        if let Some(within) = self.within
+            && self.began.is_none()
+            && !self.steps.is_empty()
+            && !matches!(self.steps.front(), Some(Step::Mark(_)))
+        {
+            self.began = Some(self.wall);
+            self.deadline = Some(now.saturating_add(within));
         }
         match self.steps.pop_front() {
             Some(Step::Mark(name)) => {
@@ -499,6 +617,19 @@ impl Calls {
                 assert!(matches!(self.box_stderr, BoxStderr::Captured), "Step::Stderr requires captured box stderr");
                 assert!(!bytes.is_empty(), "Step::Stderr requires nonempty bytes");
                 self.action = Some(Action::Stderr(bytes));
+            }
+            Some(Step::NextLink) => {
+                self.action = Some(Action::NextLink);
+                self.bound(now);
+                if self.action.is_none() {
+                    self.advance(now);
+                }
+            }
+            Some(Step::Open { directory, until }) => {
+                self.action = Some(Action::Run);
+                let args = super::terminal::open_arguments(Path::new(directory), self.link());
+                self.spawn(env!("CARGO_BIN_EXE_temper").as_bytes().into(), args, Vec::new(), false);
+                self.child.as_mut().expect("open child").typing = until.map_or(Input::Hold, Input::After);
             }
             Some(Step::Run(call)) => {
                 self.action = Some(Action::Run);
@@ -538,7 +669,8 @@ impl Calls {
     }
 }
 impl Host for Calls {
-    fn iterate(&mut self, now: Time, _wall: Wall) {
+    fn iterate(&mut self, now: Time, wall: Wall) {
+        self.wall = wall;
         while let Some(complete) = self.complete.pop() {
             if complete.op == LINK {
                 self.reading = false;
@@ -560,6 +692,7 @@ impl Host for Calls {
             }
         }
         self.finish(now);
+        self.bound(now);
         if self.closing == 0 && (self.output.is_none() || super::printed_link(&self.link).is_some()) {
             self.advance(now);
         }
@@ -592,10 +725,10 @@ impl Host for Calls {
         !self.complete.is_empty() || !self.submit.is_empty() || self.retry.is_some_and(|retry| retry <= now)
     }
     fn next_deadline(&self) -> Option<Time> {
-        self.retry
+        self.retry.into_iter().chain(self.deadline).min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        self.retry
+        self.retry.into_iter().chain(self.deadline).min()
     }
     fn is_empty(&self) -> bool {
         self.done() && self.root.is_none() && self.output.is_none() && self.closing == 0
@@ -612,9 +745,28 @@ struct Judge {
     stopped: bool,
     settled: bool,
     deadline: Time,
+    scratch: PathBuf,
+    token_names: Vec<String>,
 }
 impl Referee<Process> for Judge {
     fn act(&mut self, _now: Time, procs: &mut [Process]) {
+        use std::os::unix::fs::PermissionsExt;
+        if !self.token_names.is_empty()
+            && let Some(Process::Calls(calls)) = procs.get_mut(1)
+        {
+            while calls.tokens.len() < calls.ends.len() {
+                calls.tokens.push(
+                    self.token_names
+                        .iter()
+                        .map(|name| {
+                            std::fs::symlink_metadata(self.scratch.join(name).join("token"))
+                                .ok()
+                                .map(|metadata| metadata.permissions().mode() & 0o777)
+                        })
+                        .collect(),
+                );
+            }
+        }
         if procs.len() == 2 && !self.stopped {
             let Process::Calls(calls) = &procs[1] else { panic!("calls host") };
             if calls.done() {
@@ -653,24 +805,55 @@ pub fn run(story: Story<'_>) -> Seen {
     let mut fds = streams.descriptors();
     let root = skein_shell::open_root(story.scratch).expect("scratch root");
     fds.push(root);
-    let mut world =
-        real::World::new(Judge { stopped: false, settled: false, deadline: clock.now().now.saturating_add(WITHIN) });
+    let within = if story.measured {
+        // Each wait keeps WITHIN, with one more WITHIN to drain after the last timeout.
+        let waits = story.steps.iter().filter(|step| !matches!(step, Step::Mark(_))).count();
+        Duration::from_nanos(WITHIN.as_nanos() * u64::try_from(waits + 1).expect("story waits"))
+    } else {
+        WITHIN
+    };
+    let mut world = real::World::new(Judge {
+        stopped: false,
+        settled: false,
+        deadline: clock.now().now.saturating_add(within),
+        scratch: story.scratch.into(),
+        token_names: story.tokens,
+    });
     world.spawn_with_fds(serve.descriptors(), || Process::Binary(Box::new(serve)));
-    world
-        .spawn_with_fds(fds, || Process::Calls(Box::new(Calls::new(root, story.steps, Some(&streams), story.forgejo))));
-    let mut outcome = world.run(&clock, WITHIN);
+    world.spawn_with_fds(fds, || {
+        let mut calls = Calls::new(root, story.steps, Some(&streams), story.forgejo);
+        calls.within = story.measured.then_some(WITHIN);
+        if story.measured {
+            let began = clock.now();
+            calls.began = Some(began.wall);
+            calls.deadline = Some(began.now.saturating_add(WITHIN));
+        }
+        Process::Calls(Box::new(calls))
+    });
+    let mut outcome = world.run(&clock, within);
     let Process::Binary(serve) = &outcome.procs[0] else { panic!("serve binary") };
     let serve = Ended { exit: serve.exit_status(), stdout: Vec::new(), stderr: serve.stderr().to_vec() };
     assert_eq!(serve.exit, Some(Exit::Code(0)), "serve drained: {}", String::from_utf8_lossy(&serve.stderr));
     let Process::Calls(calls) = &mut outcome.procs[1] else { panic!("calls host") };
-    Seen { calls: std::mem::take(&mut calls.ends), serve }
+    Seen {
+        calls: std::mem::take(&mut calls.ends),
+        serve,
+        mismatches: std::mem::take(&mut calls.mismatches),
+        spans: std::mem::take(&mut calls.spans),
+        tokens: std::mem::take(&mut calls.tokens),
+    }
 }
 #[must_use]
 pub fn alone(scratch: &Path, call: Call) -> Ended {
     let clock = Clock::new();
     let root = skein_shell::open_root(scratch).expect("scratch root");
-    let mut world =
-        real::World::new(Judge { stopped: false, settled: false, deadline: clock.now().now.saturating_add(WITHIN) });
+    let mut world = real::World::new(Judge {
+        stopped: false,
+        settled: false,
+        deadline: clock.now().now.saturating_add(WITHIN),
+        scratch: scratch.into(),
+        token_names: Vec::new(),
+    });
     world.spawn_with_fds(vec![root], || Process::Calls(Box::new(Calls::new(root, vec![Step::Run(call)], None, None))));
     let mut outcome = world.run(&clock, WITHIN);
     let Process::Calls(calls) = &mut outcome.procs[0] else { panic!("calls host") };
