@@ -40,7 +40,7 @@ fn open_from_chats(world: &mut Pages, step: Step) -> ClientId {
 fn every_welcome_step_has_its_canonical_address() {
     for (path, step) in [
         (b"/welcome".as_slice(), Step::Welcome),
-        (b"/welcome?at=forge", Step::Forge),
+        (b"/welcome?at=forge", Step::Forge { forge: None }),
         (b"/welcome?at=model", Step::Model),
         (b"/welcome?at=ready", Step::Ready),
     ] {
@@ -72,10 +72,10 @@ fn unknown_and_unrelated_fields_drop_from_welcome() {
 fn repeated_step_keeps_first_readable_value() {
     // browser.md, 2.3: as the inbox query, repeats after the first that read are dropped.
     for (path, step) in [
-        ("/welcome?at=forge&at=model", Step::Forge),
+        ("/welcome?at=forge&at=model", Step::Forge { forge: None }),
         ("/welcome?at=model&at=ready", Step::Model),
         ("/welcome?at=ready&at=done", Step::Ready),
-        ("/welcome?at=done&at=forge", Step::Forge),
+        ("/welcome?at=done&at=forge", Step::Forge { forge: None }),
         ("/welcome?at=&at=ready", Step::Ready),
     ] {
         assert_eq!(address::parse(path.as_bytes()), Place::Address(welcome(step)), "{path}");
@@ -107,7 +107,7 @@ fn null_demo_owner_stays_and_offers_only_setup() {
 
 #[test]
 fn null_demo_later_steps_never_offer_the_playground() {
-    for step in [Step::Forge, Step::Model, Step::Ready] {
+    for step in [Step::Forge { forge: None }, Step::Model, Step::Ready] {
         let mut world = f::accounts_world(f::SEED);
         let client = open_from_chats(&mut world, step);
         follow(&mut world, client, vec![see(Role::Link, b"Later")]);
@@ -139,7 +139,7 @@ fn non_deployment_owner_without_account_can_set_up() {
 #[test]
 fn later_welcome_steps_do_not_redirect_on_their_own() {
     for (step, heading) in [
-        (Step::Forge, b"Connect a forge".as_slice()),
+        (Step::Forge { forge: None }, b"Connect a forge".as_slice()),
         (Step::Model, b"Connect a model"),
         (Step::Ready, b"Almost ready"),
     ] {

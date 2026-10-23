@@ -480,7 +480,7 @@ pub enum Word {
 // Nine of jig's phrases for a hold on a configured bound.
 // The flow's three state words (5.2).
 // ConnectForge's and the welcome's forge words (client/forge.md, 5.4).
-const PHRASES: u32 = 920;
+const PHRASES: u32 = 919;
 const ALL: [Word; 440] = [
     Word::ForgeSetupUrl,
     Word::ForgeFirstRepository,
@@ -1510,7 +1510,8 @@ impl Words {
             languages: 1,
             phrases: PHRASES,
             holes: 3,
-            segments: 1536,
+            // 1,600 segments with ConnectForge's words; room for a few more.
+            segments: 1664,
             text_bytes: 24576,
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined.max(temper_client_domain::forge::DEMO_FIELD_BYTES),

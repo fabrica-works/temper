@@ -814,6 +814,9 @@ impl Joint {
             }
             self.packet(engine::Request::Party(engine::PartyRequest::Deliver(delivery)));
         }
+        self.immediate();
+    }
+    fn immediate(&mut self) {
         let immediate = std::mem::take(&mut self.engine.immediate);
         for request in immediate {
             if let engine::Request::SetUp { forge, request } = &request {
