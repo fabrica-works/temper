@@ -2591,6 +2591,7 @@ fn its_tasks_delivery(delivery: c::Delivery, phase: c::Phase, page: Option<c::Ta
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         fixtures::domain_limits().client.domain.rows,
+        &mut crate::words::Times::new(fixtures::NOW),
     );
     builder.finish()
 }

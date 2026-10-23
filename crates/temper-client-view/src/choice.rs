@@ -1,7 +1,7 @@
 //! Supplied next-run choices and account waits (client/README.md, 3.5 and 5.5).
 use crate::{
     frame::Bindings,
-    words::{Word as W, Words},
+    words::{TimeForm, Times, Word as W, Words},
 };
 use alloc::boxed::Box;
 use jig_client::contract as c;
@@ -56,7 +56,14 @@ pub(crate) fn banner(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut B
     }
     b.close();
 }
-pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w: &Words, bindings: &mut Bindings) {
+pub(crate) fn composer(
+    b: &mut Builder,
+    root: &Domain,
+    task: Option<&c::Task>,
+    w: &Words,
+    bindings: &mut Bindings,
+    times: &mut Times,
+) {
     if let Some(task) = task {
         match task.chip.executor {
             c::Executor::Agent { .. } => {}
@@ -133,7 +140,7 @@ pub(crate) fn composer(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w
         crate::pages::chats::outcome_text(b, w, outcome, 0);
     }
     if let Some(task) = task {
-        waiting(b, root, task.run_wait, w, bindings);
+        waiting(b, root, task.run_wait, w, bindings, times);
     }
     b.close();
 }
@@ -562,14 +569,81 @@ pub(crate) fn waiting(
     wait: Option<c::TaskRunWait>,
     w: &Words,
     bindings: &mut Bindings,
+    times: &mut Times,
 ) {
     match wait {
         None => {}
         Some(c::TaskRunWait::Credential) => line(b, w, W::WaitCredential, &[]),
-        Some(c::TaskRunWait::Refused(_)) => line(b, w, W::WaitRefused, &[]),
+        Some(c::TaskRunWait::Refused(why)) => {
+            line(b, w, W::WaitRefused, &[Hole::Name(refused(w, times, why))]);
+        }
         Some(c::TaskRunWait::Host) => line(b, w, W::WaitCapacity, &[]),
         Some(c::TaskRunWait::Account { account, source, why }) => {
             account_wait(b, root, account, source, why, w, bindings);
+        }
+    }
+}
+fn sentences(w: &Words, first: Box<[u8]>, next: Box<[u8]>) -> Box<[u8]> {
+    w.say(W::RefusalSentences, &[Hole::Name(first), Hole::Name(next)])
+}
+fn refused(w: &Words, times: &mut Times, why: c::TaskWaitRefused) -> Box<[u8]> {
+    match why {
+        c::TaskWaitRefused::Program(program) => {
+            let (first, last) = match program {
+                c::OpenProgram::Model => (w.say(W::OpenProgramModel, &[]), W::OpenProgramChooseModel),
+                c::OpenProgram::Source { account, source } => (
+                    w.say(W::OpenProgramSource, &[Hole::Number(u64::from(account)), Hole::Number(u64::from(source))]),
+                    W::OpenProgramNoSwitch,
+                ),
+            };
+            sentences(w, sentences(w, first, w.say(W::OpenProgramUnavailable, &[])), w.say(last, &[]))
+        }
+        c::TaskWaitRefused::Hello { kind, at, why } => {
+            let word = match kind {
+                c::OwnerHostKind::Engine => W::RefusedEngineAt,
+                c::OwnerHostKind::Worker => W::RefusedWorkerAt,
+            };
+            let first = w.say(word, &[Hole::Name(times.say(w, TimeForm::Clock, at))]);
+            sentences(w, first, hello_refusal(w, why))
+        }
+    }
+}
+fn hello_refusal(w: &Words, why: c::OwnerHelloRefusal) -> Box<[u8]> {
+    match why {
+        c::OwnerHelloRefusal::ReservedChannel => w.say(W::HelloReservedChannel, &[]),
+        c::OwnerHelloRefusal::Position { worker } => w.say(W::HelloPosition, &[Hole::Number(u64::from(worker))]),
+        c::OwnerHelloRefusal::Workers { limit } => {
+            sentences(w, w.say(W::HelloWorkers, &[]), w.say(W::HelloLimit, &[Hole::Number(u64::from(limit))]))
+        }
+        c::OwnerHelloRefusal::StopBound { grace } => {
+            sentences(w, w.say(W::HelloStopBound, &[]), w.say(W::HelloAllowedGrace, &[Hole::Span(grace)]))
+        }
+        c::OwnerHelloRefusal::Agent { why } => agent_shortfall(w, why),
+    }
+}
+fn agent_shortfall(w: &Words, why: c::OwnerAgentShortfall) -> Box<[u8]> {
+    use c::OwnerAgentShortfall as S;
+    let word = match why {
+        S::Model { .. } => W::AgentModel,
+        S::Window { .. } => W::AgentWindow,
+        S::Output { .. } => W::AgentOutput,
+        S::Turns => W::AgentTurns,
+        S::Spend => W::AgentSpend,
+        S::Time => W::AgentTime,
+        S::Waiting => W::AgentWaiting,
+        S::Checks => W::AgentChecks,
+        S::Message => W::AgentMessage,
+        S::Inbox => W::AgentInbox,
+        S::Unacknowledged => W::AgentUnacknowledged,
+    };
+    match why {
+        S::Model { charter, model } | S::Window { charter, model } | S::Output { charter, model } => sentences(
+            w,
+            w.say(word, &[Hole::Number(u64::from(charter))]),
+            w.say(W::AgentModelPosition, &[Hole::Number(u64::from(model))]),
+        ),
+        S::Turns | S::Spend | S::Time | S::Waiting | S::Checks | S::Message | S::Inbox | S::Unacknowledged => {
+            w.say(word, &[])
         }
     }
 }

@@ -242,6 +242,7 @@ fn wait(why: c::TaskWaitWhy) -> skein_ui::Tree {
         Some(c::TaskRunWait::Account { account: Some(7), source: Some(8), why }),
         &fixtures::words(),
         &mut bindings,
+        &mut crate::words::Times::new(fixtures::NOW),
     );
     b.close();
     b.finish()
@@ -566,23 +567,115 @@ fn a_waiting_account_shows_its_display() {
         Some(c::TaskRunWait::Account { account: Some(3), source: None, why: c::TaskWaitWhy::Refreshing }),
         &fixtures::words(),
         &mut crate::frame::Bindings::new(32),
+        &mut crate::words::Times::new(fixtures::NOW),
     );
     b.close();
     assert!(String::from_utf8(fixtures::text(&b.finish()).into_vec()).unwrap().contains("Waiting account: Personal"));
 }
 
 #[test]
-fn a_refused_next_run_says_so() {
-    let root = task_root();
-    let mut builder = Builder::new(&fixtures::tree_limits());
-    crate::choice::waiting(
-        &mut builder,
-        &root,
-        Some(c::TaskRunWait::Refused(c::TaskWaitRefused::Program(c::OpenProgram::Model))),
-        &fixtures::words(),
-        &mut crate::frame::Bindings::new(32),
-    );
-    assert_eq!(fixtures::text(&builder.finish()).as_ref(), b"Next run refused");
+fn a_refused_next_run_says_why() {
+    use c::{OpenProgram as P, OwnerHelloRefusal as F, OwnerHostKind as H, TaskWaitRefused as R};
+    for (name, refusal, expected) in [
+        (
+            "model",
+            R::Program(P::Model),
+            "Next run refused · This model runs through a program. A chat can't stay open through a program yet. To chat now, choose a model that doesn't run through a program.",
+        ),
+        (
+            "source",
+            R::Program(P::Source { account: 3, source: 8 }),
+            "Next run refused · Account 3 would use its program source 8. A chat can't stay open through a program yet. This chat does not switch to another source on its own.",
+        ),
+        (
+            "engine",
+            R::Hello { kind: H::Engine, at: fixtures::NOW, why: F::ReservedChannel },
+            "Next run refused · An engine host was refused at 00:00. Channel zero belongs to the engine's own host.",
+        ),
+        (
+            "worker",
+            R::Hello { kind: H::Worker, at: fixtures::NOW, why: F::Position { worker: 7 } },
+            "Next run refused · A worker was refused at 00:00. Unconfigured or occupied worker position 7.",
+        ),
+    ] {
+        let root = task_root();
+        let mut builder = Builder::new(&fixtures::tree_limits());
+        let mut times = crate::words::Times::new(fixtures::NOW);
+        crate::choice::waiting(
+            &mut builder,
+            &root,
+            Some(c::TaskRunWait::Refused(refusal)),
+            &fixtures::words(),
+            &mut crate::frame::Bindings::new(32),
+            &mut times,
+        );
+        assert_eq!(fixtures::text(&builder.finish()).as_ref(), expected.as_bytes(), "{name}");
+        let midnight = match refusal {
+            R::Hello { .. } => Some(skein_lib::Wall::from_nanos(86_400_000_000_000)),
+            R::Program(_) => None,
+        };
+        assert_eq!(times.next, midnight, "{name}");
+        let source = fixtures::chat::messaging_root();
+        let mut task = source.pages().chat().unwrap().task(source.client()).unwrap().clone();
+        task.flags.ended_by = c::EndedBy::Requester;
+        task.run_wait = Some(c::TaskRunWait::Refused(refusal));
+        let c::ChipPhase::Owner { phase, .. } = task.chip.details.as_mut() else { panic!("owner") };
+        *phase = c::OwnerChipPhase::Active(c::RunStage::Due);
+        let (mut root, _, watch) =
+            fixtures::root_at(Address::Chat { task: fixtures::chat::TASK }, &fixtures::domain_limits());
+        delivered(&mut root, watch.unwrap(), c::Delivery::Task(Box::new(task)));
+        let view = fixtures::page_view(&root);
+        assert!(fixtures::find(view.tree(), Role::Status, b"Cannot start yet").is_some(), "{name}");
+        assert!(fixtures::find(view.tree(), Role::Paragraph, expected.as_bytes()).is_some(), "{name}");
+        assert!(fixtures::find(view.tree(), Role::TextArea, b"Message").is_some(), "{name}");
+        assert!(fixtures::find(view.tree(), Role::Button, b"Send").is_some(), "{name}");
+        assert_eq!(view.next_change(), midnight, "{name}");
+    }
+}
+
+#[test]
+fn every_hello_refusal_keeps_its_cause_and_numbers() {
+    use c::{OwnerAgentShortfall as S, OwnerHelloRefusal as F};
+    for (why, cause) in [
+        (F::Workers { limit: 7 }, "No room for another worker. Limit: 7."),
+        (
+            F::StopBound { grace: skein_lib::Duration::from_secs(30) },
+            "It would not stop before the engine's grace ends. Allowed grace: 30.",
+        ),
+        (F::Agent { why: S::Model { charter: 3, model: 8 } }, "Agent model missing for charter 3. Model position 8."),
+        (
+            F::Agent { why: S::Window { charter: 3, model: 8 } },
+            "Agent window too small for charter 3. Model position 8.",
+        ),
+        (
+            F::Agent { why: S::Output { charter: 3, model: 8 } },
+            "Agent output too small for charter 3. Model position 8.",
+        ),
+        (F::Agent { why: S::Turns }, "Agent turns too few."),
+        (F::Agent { why: S::Spend }, "Agent spend too small."),
+        (F::Agent { why: S::Time }, "Agent time too short."),
+        (F::Agent { why: S::Waiting }, "Agent waiting too short."),
+        (F::Agent { why: S::Checks }, "Agent checks exceed the change reserve."),
+        (F::Agent { why: S::Message }, "Agent message bound too small."),
+        (F::Agent { why: S::Inbox }, "Agent inbox too small."),
+        (F::Agent { why: S::Unacknowledged }, "Agent unacknowledged turns too few."),
+    ] {
+        let mut builder = Builder::new(&fixtures::tree_limits());
+        crate::choice::waiting(
+            &mut builder,
+            &task_root(),
+            Some(c::TaskRunWait::Refused(c::TaskWaitRefused::Hello {
+                kind: c::OwnerHostKind::Worker,
+                at: fixtures::NOW,
+                why,
+            })),
+            &fixtures::words(),
+            &mut crate::frame::Bindings::new(32),
+            &mut crate::words::Times::new(fixtures::NOW),
+        );
+        let expected = format!("Next run refused · A worker was refused at 00:00. {cause}");
+        assert_eq!(fixtures::text(&builder.finish()).as_ref(), expected.as_bytes());
+    }
 }
 
 fn source(kind: c::OwnerAccountKind, usable: bool) -> c::OwnerAccountSource {

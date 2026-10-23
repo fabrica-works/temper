@@ -2,7 +2,7 @@
 use crate::{
     frame::Bindings,
     look,
-    words::{Word, Words},
+    words::{Times, Word, Words},
 };
 use alloc::boxed::Box;
 use jig_client::{Latest, contract as c};
@@ -27,11 +27,18 @@ fn region(b: &mut Builder, word: Word, words: &Words) {
     b.name(&words.say(word, &[]));
     text(b, Role::Heading { level: 2 }, &words.say(word, &[]));
 }
-pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, rows: u32) {
+pub(crate) fn main(
+    b: &mut Builder,
+    root: &Domain,
+    words: &Words,
+    bindings: &mut Bindings,
+    rows: u32,
+    times: &mut Times,
+) {
     if let Some(page) = root.pages().task()
         && page.shape == Shape::Agent
     {
-        super::agent::main(b, root, words, bindings, rows);
+        super::agent::main(b, root, words, bindings, rows, times);
         return;
     }
     b.open(Role::Main);
@@ -77,7 +84,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut
             outcome(b, root, words);
         }
         controls(b, &task.chip, root, words, bindings, rows);
-        crate::choice::composer(b, root, Some(task), words, bindings);
+        crate::choice::composer(b, root, Some(task), words, bindings, times);
         if page.shape == Shape::Tracked {
             asked(b, task, words);
             result(b, task, words, look::TASK_CARD);

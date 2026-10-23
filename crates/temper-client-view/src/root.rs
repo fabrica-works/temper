@@ -39,8 +39,8 @@ impl View {
             clock_revision: 0,
         }
     }
-    fn task_main(&mut self, b: &mut Builder, root: &Domain) {
-        crate::pages::task::main(b, root, &self.forge_words, &mut self.pages, self.rows);
+    fn task_main(&mut self, b: &mut Builder, root: &Domain, times: &mut crate::words::Times) {
+        crate::pages::task::main(b, root, &self.forge_words, &mut self.pages, self.rows, times);
     }
     fn adoption_main(&mut self, b: &mut Builder, root: &Domain) {
         let Some(form) = root.forge().form() else { return };
@@ -148,7 +148,7 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
             &mut times,
         );
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
-        view.task_main(&mut builder, root);
+        view.task_main(&mut builder, root, &mut times);
     } else if *root.pages().address() == temper_client_domain::Address::Accounts {
         crate::pages::accounts::main(
             &mut builder,

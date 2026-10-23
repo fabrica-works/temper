@@ -260,8 +260,9 @@ mod memory_literal;
 // skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
 // The page reserves its patch queue once, at four patches a node.
 // A chat's composer placeholder adds one phrase (148 B).
+// Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388737719;
+const WEB_BYTES: u64 = 274388742011;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

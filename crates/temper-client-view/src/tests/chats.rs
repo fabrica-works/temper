@@ -471,6 +471,46 @@ fn a_chats_line_reads_its_owner_wake_policy_for_news() {
     assert!(fixtures::find(&tree, Role::Status, b"waiting on your words").is_some());
 }
 
+#[test]
+fn an_open_chat_at_rest_says_waiting_on_your_words_on_its_line() {
+    let mut line = line();
+    line.flags.ended_by = EndedBy::Requester;
+    line.waits_on = WaitsOn::News;
+    let ChipPhase::Owner { phase, details } = line.chip.details.as_mut() else { panic!("owner") };
+    *phase = OwnerChipPhase::Active(RunStage::Idle);
+    details.wake.words = WakeRule::Immediate;
+    details.live_delegates = 0;
+    let (tree, _) = tree(&line);
+    assert!(fixtures::find(&tree, Role::Status, b"waiting on your words").is_some());
+}
+#[test]
+fn a_closed_chat_says_closed_on_its_line() {
+    for (by, expected) in [
+        (Some(OwnerRequester::Person(73)), b"Closed".as_slice()),
+        (Some(OwnerRequester::Person(74)), b"Ended"),
+        (None, b"Ended"),
+    ] {
+        let mut line = line();
+        let ChipPhase::Owner { phase, details } = line.chip.details.as_mut() else { panic!("owner") };
+        *phase = OwnerChipPhase::Ended;
+        details.ended_at = Some(Wall::EPOCH);
+        details.ending = Some(match by {
+            Some(by) => OwnerChipEnding::Cancelled {
+                by,
+                reason: DocumentText::complete(fixtures::first_run::text(b"Chat closed")),
+                result: None,
+                at: Wall::EPOCH,
+            },
+            None => OwnerChipEnding::Done(ResultValue::Report(DocumentText::complete(fixtures::first_run::text(
+                b"A report",
+            )))),
+        });
+        let (tree, _) = tree(&line);
+        assert!(fixtures::find(&tree, Role::Status, expected).is_some());
+        assert_eq!(fixtures::styles(&tree, Role::Status).as_ref(), [Box::from([crate::look::STATUS_QUIET])]);
+    }
+}
+
 fn filter(root: &mut Domain, filter: temper_client_domain::pages::chats::Filter) {
     fixtures::root_event(
         root,
