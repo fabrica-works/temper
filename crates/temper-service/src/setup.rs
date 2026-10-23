@@ -15,6 +15,7 @@ use temper_protocol_records::Item;
 pub(crate) struct Layer {
     component: Option<host::Host>,
     pending: Option<(host::Settings, CryptoRng)>,
+    waiting_for_webhooks: bool,
     pub(crate) env: Env<host::Limits>,
     pub(crate) above: Queue<host::Event>,
     pub(crate) io: Queue<skein_io::Request>,
@@ -53,7 +54,16 @@ pub(crate) fn worst_case(
     batch: u32,
 ) -> Option<u64> {
     use temper_engine_domain_forge::{BOT_LOGIN_SUFFIX, STOPPED_TEXT_BYTES};
-    let (settings, l) = settings::fixed(config, forges).ok()?;
+    let (mut settings, l) = settings::fixed(config, forges).ok()?;
+    // Port 0 may bind any port: price the longest hook URL before admission.
+    for index in 0..settings.forges.len() {
+        if let host::Kind::Forgejo(given) = &mut settings.forges.get_mut(index)?.kind
+            && let Some(listener) = &mut given.listener
+            && listener.port() == 0
+        {
+            listener.set_port(u16::MAX);
+        }
+    }
     let host = host::worst_case(&l, &settings)?; // Includes pending fixed Settings, moved into Host::new.
     let installations = config.limits.forge_component.installations;
     let count = l.forges.checked_mul(installations)?;
@@ -157,6 +167,19 @@ pub(crate) fn worst_case(
 }
 
 impl Layer {
+    /// Consume the listener's typed bind result before any setup plan can copy Given.
+    pub(crate) fn webhooks_listening(&mut self, addr: core::net::SocketAddr) {
+        if let Some((settings, _)) = &mut self.pending {
+            for index in 0..settings.forges.len() {
+                if let host::Kind::Forgejo(given) = &mut settings.forges.get_mut(index).expect("configured forge").kind
+                    && given.listener.is_some()
+                {
+                    given.listener = Some(addr);
+                }
+            }
+        }
+        self.waiting_for_webhooks = false;
+    }
     pub(crate) fn records_only(&self, forge: u16) -> bool {
         self.lifecycle.local(forge).is_some()
     }
@@ -176,6 +199,7 @@ impl Layer {
         Self {
             component: None,
             pending: Some((settings, crypto)),
+            waiting_for_webhooks: false,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(host::MAX_OUT.above.checked_mul(batch).expect("host output room")),
             io: Queue::with_capacity(host::MAX_OUT.below.checked_mul(batch).expect("host IO room")),
@@ -354,6 +378,7 @@ fn ended(engine: &mut crate::engine::Engine, run: Token, end: root::SetupEnd) {
 }
 fn begin(engine: &mut crate::engine::Engine) {
     if !engine.forge_records.loading()
+        && !engine.setup.waiting_for_webhooks
         && engine.end.is_none()
         && engine.drain.is_none()
         && let Some((settings, crypto)) = engine.setup.pending.take()

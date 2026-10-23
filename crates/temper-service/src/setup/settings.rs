@@ -118,7 +118,7 @@ fn forgejo(
                 } else {
                     None
                 };
-                // temper-14h replaces this configured listener with its bound address.
+                // The configured fallback is replaced by Listening before the host starts.
                 let mut limits = config.limits.setup.plan();
                 limits.repositories = config.limits.forge.client.repositories;
                 let given = temper_forge_setup::given::values(&setup.entry, listener, &limits);
@@ -152,6 +152,17 @@ pub(crate) fn prepare(
         batch,
         own.forge_component.installations,
     );
+    // Only Forgejo entries that can make hooks need the bind before starting.
+    if let Some((settings, _)) = &layer.pending {
+        for forge in &settings.forges {
+            if let host::Kind::Forgejo(given) = &forge.kind
+                && given.listener.is_some()
+            {
+                layer.waiting_for_webhooks = true;
+                break;
+            }
+        }
+    }
     for forge in &config.forges {
         if !layer.served.contains_key(&forge.number) {
             let reason: &[u8] = match forge.kind {

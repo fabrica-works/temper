@@ -265,9 +265,12 @@ fn old_form_service(hooks: bool) -> crate::Service {
     assert!(service.engine.as_ref().expect("engine").setup.runs.is_empty(), "wait for records");
     service.engine.as_mut().expect("engine").forge.iterate(Time::ZERO, Wall::EPOCH);
     for _ in 0..service.engine.as_mut().expect("engine").forge.io.len() {
-        let Some(skein_io::Request::Listen { .. }) = service.engine.as_mut().expect("engine").forge.io.pop() else {
+        let Some(skein_io::Request::Listen { addr, .. }) = service.engine.as_mut().expect("engine").forge.io.pop()
+        else {
             panic!("no API connection without access")
         };
+        // The fixture supplies the forge's successful bind result before starting setup.
+        service.engine.as_mut().expect("engine").setup.webhooks_listening(addr.socket().unwrap());
     }
     for _ in 0_u32..8 {
         crate::forge::records::advance(service.engine.as_mut().expect("engine"));

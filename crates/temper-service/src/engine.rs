@@ -526,6 +526,7 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
             }
             skein_forge_connection::Event::Listening { addr } => {
                 if let Some(addr) = addr.socket() {
+                    engine.setup.webhooks_listening(addr);
                     let note = crate::Note::Listening { listener: crate::Listening::Webhooks, addr };
                     engine.listening.try_push(note).expect("one note per listener bind");
                 }
