@@ -11,7 +11,6 @@ pub mod forge;
 pub mod limits;
 pub mod llm;
 mod read;
-pub mod seed;
 pub mod steps;
 pub mod turn;
 mod wire;

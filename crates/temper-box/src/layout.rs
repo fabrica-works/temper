@@ -5,6 +5,7 @@ use temper_forge_setup::{Stage, Step, Steps};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Asked {
     pub forge: u16,
+    pub recorded: bool,
     pub stage: Stage,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -35,7 +36,11 @@ pub fn flatten(steps: Steps) -> Box<[Placed]> {
             {
                 let group = group.take().expect("present group");
                 for (stage, step) in group.steps {
-                    out.push(Placed { step, asked: Some(Asked { forge: group.forge, stage }) }).expect("step capacity");
+                    out.push(Placed {
+                        step,
+                        asked: Some(Asked { forge: group.forge, recorded: group.recorded, stage }),
+                    })
+                    .expect("step capacity");
                 }
             }
         }

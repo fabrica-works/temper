@@ -518,6 +518,7 @@ fn groups_fetch_before_preparation() {
                 ]
                 .into_boxed_slice(),
                 asked: Box::new([Group {
+                    recorded: true,
                     forge: 3,
                     before: 3,
                     steps: Box::new([

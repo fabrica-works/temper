@@ -59,6 +59,7 @@ enum Status {
 #[derive(Debug)]
 pub(crate) struct GroupState {
     forge: u16,
+    recorded: bool,
     first: usize,
     end: usize,
     chained: bool,
@@ -132,6 +133,7 @@ impl Machine {
                             groups
                                 .push(GroupState {
                                     forge: asked.forge,
+                                    recorded: asked.recorded,
                                     first: index,
                                     end: index.saturating_add(1),
                                     chained: false,
@@ -174,7 +176,7 @@ impl Machine {
         if !self.begun && self.outcome.is_none() {
             self.begun = true;
             for group in &mut self.groups {
-                if recorded.contains(&group.forge) {
+                if group.recorded && recorded.contains(&group.forge) {
                     group.chained = true;
                     group.status = Status::Started;
                 }
@@ -516,8 +518,12 @@ impl Machine {
             self.spawn(step, self.successor(step), orders);
         } else {
             let group = self.groups.get_mut(index).expect("group");
-            group.status = Status::Recording { next: None };
-            orders.push(Order::Record { forge: group.forge });
+            if group.recorded {
+                group.status = Status::Recording { next: None };
+                orders.push(Order::Record { forge: group.forge });
+            } else {
+                self.group_started(index, orders);
+            }
         }
     }
     fn group_started(&mut self, index: usize, orders: &mut Queue<Order>) {

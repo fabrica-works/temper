@@ -38,6 +38,9 @@ pub(crate) struct Link {
     pub(crate) write: Option<Box<[u8]>>,
     ended: bool,
     asked: Option<u16>,
+    // which the box link holds while another group starts and sends once that
+    // one answers (protocol/setup.md, 8.4).
+    held: Option<u16>,
     line_bytes: u32,
     partial: List<u8>,
     skipping: bool,
@@ -49,6 +52,7 @@ impl Link {
             write: None,
             ended: false,
             asked: None,
+            held: None,
             line_bytes,
             partial: List::with_capacity(line_bytes),
             skipping: false,
@@ -56,18 +60,27 @@ impl Link {
     }
     /// The caller reserves three output slots before asking.
     pub(crate) fn ask(&mut self, forge: u16, request: Token, out: &mut Queue<Out>) {
-        if self.asked.is_some() || self.write.is_some() || self.ended {
+        if self.held.is_some()
+            || self.asked == Some(forge)
+            || self.ended
+            || self.asked.is_none() && self.write.is_some()
+        {
             out.push(Out::Named(Box::from(b"box link: fault: a setup ask while busy or closed".as_slice())));
             out.push(Out::Answered { forge, request, answer: Err(Refused::Busy) });
             return;
         }
-        self.asked = Some(forge);
-        out.push(Out::Write(joined(&[b"start ", Decimal::of(u64::from(forge)).as_bytes(), b"\n"])));
+        if self.asked.is_some() {
+            self.held = Some(forge);
+        } else {
+            self.asked = Some(forge);
+            out.push(Out::Write(start(forge)));
+        }
         out.push(Out::SettingUp { forge, step: None });
         out.push(Out::Answered { forge, request, answer: Ok(()) });
     }
     /// Any chunking is accepted. The caller reserves one output slot per LF in
-    /// this chunk (including an LF completing a previous partial line).
+    /// this chunk (including an LF completing a previous partial line), plus
+    /// one for a held ask sent after the active group's answer.
     /// No output is emitted before LF, so a bounded read bounds its outputs.
     pub(crate) fn read(&mut self, input: &[u8], out: &mut Queue<Out>) {
         if self.ended {
@@ -92,6 +105,12 @@ impl Link {
             if *byte == b'\n' {
                 line(&mut self.asked, self.partial.as_slice(), out);
                 self.partial.clear();
+                if self.asked.is_none()
+                    && let Some(forge) = self.held.take()
+                {
+                    self.asked = Some(forge);
+                    out.push(Out::Write(start(forge)));
+                }
             } else if self.partial.room() == 0 {
                 self.partial.clear();
                 self.skipping = true;
@@ -109,8 +128,13 @@ impl Link {
         self.skipping = false;
         out.push(Out::Named(Box::from(b"box link: the box closed the pipe".as_slice())));
         self.asked = None;
+        self.held = None;
         out.push(Out::Closed);
     }
+}
+
+fn start(forge: u16) -> Box<[u8]> {
+    joined(&[b"start ", Decimal::of(u64::from(forge)).as_bytes(), b"\n"])
 }
 
 fn line(asked: &mut Option<u16>, line: &[u8], out: &mut Queue<Out>) {

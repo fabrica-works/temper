@@ -1176,7 +1176,10 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
     let mut rows = List::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
     for forge in &settings.forges {
         let mut mode = Mode::Connected;
-        let mut asked = false;
+        let mut asked = match &settings.demo {
+            Some(demo) => demo.forge == forge.number,
+            None => false,
+        };
         for setup in &settings.setup {
             if setup.entry.forge == forge.number {
                 mode = match &setup.entry.mode {
@@ -1184,7 +1187,7 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
                     temper_forge_setup::setup::Mode::Owned(_) => Mode::Owned,
                     temper_forge_setup::setup::Mode::Fake(_) => Mode::Fake,
                 };
-                asked = setup.entry.asked;
+                asked |= setup.entry.asked;
                 break;
             }
         }

@@ -240,6 +240,7 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
             always: Box::new([step(b"anchor", Kind::Long), step(b"serve", Kind::Long)]),
             asked: Box::new([
                 Group {
+                    recorded: true,
                     forge: 3,
                     before: 1,
                     steps: Box::new([
@@ -250,6 +251,7 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
                     ]),
                 },
                 Group {
+                    recorded: true,
                     forge: 4,
                     before: 2,
                     steps: Box::new([
@@ -411,6 +413,7 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
         let placed = layout::flatten(Steps {
             always: Box::new([]),
             asked: Box::new([Group {
+                recorded: true,
                 forge: 9,
                 before: 0,
                 steps: Box::new([(
@@ -460,7 +463,7 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
     // Flatten includes end placements, and preserves the stage on every item.
     let placed = placed();
     assert_eq!(placed.len(), 8);
-    assert_eq!(placed[6].asked, Some(Asked { forge: 4, stage: Stage::Prepare }));
+    assert_eq!(placed[6].asked, Some(Asked { recorded: true, forge: 4, stage: Stage::Prepare }));
 }
 
 #[test]
@@ -638,6 +641,7 @@ fn a_link_takes_the_first_line_once_across_restarts_and_stop() {
                 step(b"seed", Kind::Link),
             ]),
             asked: Box::new([Group {
+                recorded: true,
                 forge: 3,
                 before: 4,
                 steps: Box::new([
@@ -686,7 +690,7 @@ fn a_link_cannot_belong_to_a_group() {
         Placed { step: super::fixtures::step(b"serve", Kind::Long), asked: None },
         Placed {
             step: super::fixtures::step(b"seed", Kind::Link),
-            asked: Some(Asked { forge: 3, stage: temper_forge_setup::Stage::Run }),
+            asked: Some(Asked { recorded: true, forge: 3, stage: temper_forge_setup::Stage::Run }),
         },
     ]);
 }
@@ -706,7 +710,7 @@ fn a_link_cannot_follow_a_group_step() {
     check_link_placement(&[
         Placed {
             step: super::fixtures::step(b"serve", Kind::Long),
-            asked: Some(Asked { forge: 3, stage: temper_forge_setup::Stage::Run }),
+            asked: Some(Asked { recorded: true, forge: 3, stage: temper_forge_setup::Stage::Run }),
         },
         Placed { step: super::fixtures::step(b"seed", Kind::Link), asked: None },
     ]);
@@ -724,6 +728,7 @@ fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask(
     let placed = layout::flatten(Steps {
         always: Box::new([]),
         asked: Box::new([Group {
+            recorded: true,
             forge: 3,
             before: 0,
             steps: Box::new([
@@ -771,15 +776,14 @@ fn an_asked_groups_final_once_step_gates_started_and_failure_allows_another_ask(
 #[test]
 fn an_owned_version_gates_the_runner_and_record_on_ask_and_restart() {
     use super::fixtures::step;
-    use crate::{
-        layout,
-        machine::{Machine, Said, Why},
-    };
+    use crate::layout;
+    use crate::machine::{Machine, Said, Why};
     use skein_lib::{Queue, Time};
     use temper_forge_setup::{Group, Stage, Steps};
     let placed = layout::flatten(Steps {
         always: Box::new([step(b"serve", Kind::Long)]),
         asked: Box::new([Group {
+            recorded: true,
             forge: 3,
             before: 0,
             steps: Box::new([
@@ -869,5 +873,53 @@ fn an_owned_version_gates_the_runner_and_record_on_ask_and_restart() {
                 _ => unreachable!(),
             }
         }
+    }
+}
+
+#[test]
+fn an_unrecorded_group_runs_only_when_asked_even_with_a_stale_record() {
+    use super::fixtures::step;
+    use crate::{
+        layout,
+        machine::{Machine, Said},
+    };
+    use skein_lib::{Queue, Time};
+    use temper_forge_setup::{Group, Stage, Steps};
+    let placed = layout::flatten(Steps {
+        always: Box::new([step(b"serve", Kind::Long)]),
+        asked: Box::new([Group {
+            forge: 1,
+            before: 0,
+            recorded: false,
+            steps: Box::new([
+                (Stage::Run, step(b"fake llm", Kind::Long)),
+                (Stage::Prepare, step(b"prepare 1", Kind::Once)),
+                (Stage::Run, step(b"fake forge 1", Kind::Long)),
+            ]),
+        }]),
+    });
+    for records in [&[][..], &[1][..]] {
+        let mut machine = Machine::new(&limits::small(), &placed).unwrap();
+        let mut out = Queue::with_capacity(machine.max_out());
+        machine.start(Time::ZERO, records, &mut out);
+        assert_eq!(out.pop(), Some(Order::Spawn { step: 3 }));
+        machine.input(Time::ZERO, Input::Started { step: 3 }, &mut out);
+        assert!(out.is_empty(), "only serve starts, also on a second box");
+        machine.input(Time::ZERO, Input::Ask { forge: 1 }, &mut out);
+        for step in 0..3 {
+            assert_eq!(out.pop(), Some(Order::Spawn { step }));
+            assert_eq!(out.pop(), Some(Order::Say { said: Said::Step { step } }));
+            machine.input(Time::ZERO, Input::Started { step }, &mut out);
+            if step == 1 {
+                machine.input(Time::ZERO, Input::Exited { step, exit: Exit::Code(0) }, &mut out);
+                assert_eq!(out.pop(), Some(Order::Close { step }));
+                machine.input(Time::ZERO, Input::Closed { step }, &mut out);
+            }
+        }
+        assert_eq!(out.pop(), Some(Order::Say { said: Said::Started { forge: 1 } }));
+        assert!(out.is_empty(), "no record order");
+        machine.input(Time::ZERO, Input::Ask { forge: 1 }, &mut out);
+        assert_eq!(out.pop(), Some(Order::Say { said: Said::Started { forge: 1 } }));
+        assert!(out.is_empty());
     }
 }

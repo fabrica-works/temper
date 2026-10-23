@@ -65,7 +65,12 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         Kind::Once,
     );
     let serve = command("serve", &["serve", "--config", "C", "--data", "D", "--cache", "K", "--box"], Kind::Long);
-    let seed = command("seed", &["fake", "seed", "--config", "C", "--data", "D", "--cache", "K"], Kind::Link);
+    let demo_group = Group {
+        forge: 1,
+        recorded: false,
+        before: 0,
+        steps: Box::new([(Stage::Run, llm), (Stage::Prepare, prepare1.clone()), (Stage::Run, fake1.clone())]),
+    };
     let rows = [
         ("empty", document(json!([]), false), Steps { always: Box::new([serve.clone()]), asked: Box::new([]) }),
         (
@@ -76,52 +81,53 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         (
             "demo",
             document(json!([fake]), true),
-            Steps {
-                always: Box::new([llm.clone(), prepare1.clone(), fake1.clone(), serve.clone(), seed.clone()]),
-                asked: Box::new([]),
-            },
+            Steps { always: Box::new([serve.clone()]), asked: Box::new([demo_group.clone()]) },
         ),
         (
             "owned with runner",
             document(json!([fake, owned]), true),
             Steps {
-                always: Box::new([
-                    llm.clone(),
-                    prepare1.clone(),
-                    fake1.clone(),
-                    prepare2.clone(),
-                    forgejo2.clone(),
-                    runner2.clone(),
-                    serve.clone(),
-                    seed.clone(),
-                ]),
-                asked: Box::new([]),
+                always: Box::new([prepare2.clone(), forgejo2.clone(), runner2.clone(), serve.clone()]),
+                asked: Box::new([demo_group.clone()]),
             },
         ),
         (
             "owned without runner",
             document(json!([fake, without_runner]), true),
             Steps {
-                always: Box::new([
-                    llm.clone(),
-                    prepare1.clone(),
-                    fake1.clone(),
-                    prepare2.clone(),
-                    forgejo2.clone(),
-                    serve.clone(),
-                    seed.clone(),
-                ]),
-                asked: Box::new([]),
+                always: Box::new([prepare2.clone(), forgejo2.clone(), serve.clone()]),
+                asked: Box::new([demo_group.clone()]),
             },
         ),
         (
             "asked",
             document(json!([fake, asked]), true),
             Steps {
-                always: Box::new([llm, prepare1.clone(), fake1.clone(), serve.clone(), seed]),
+                always: Box::new([serve.clone()]),
+                asked: Box::new([
+                    demo_group.clone(),
+                    Group {
+                        forge: 2,
+                        recorded: true,
+                        before: 0,
+                        steps: Box::new([
+                            (Stage::Prepare, prepare2.clone()),
+                            (Stage::Run, forgejo2.clone()),
+                            (Stage::Run, runner2.clone()),
+                        ]),
+                    },
+                ]),
+            },
+        ),
+        (
+            "asked after an unasked fake",
+            document(json!([fake, asked]), false),
+            Steps {
+                always: Box::new([prepare1.clone(), fake1.clone(), serve.clone()]),
                 asked: Box::new([Group {
                     forge: 2,
-                    before: 3,
+                    recorded: true,
+                    before: 2,
                     steps: Box::new([
                         (Stage::Prepare, prepare2.clone()),
                         (Stage::Run, forgejo2),
@@ -133,7 +139,15 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         (
             "two fakes in document order",
             document(json!([second_fake, fake]), false),
-            Steps { always: Box::new([prepare2, fake2, prepare1, fake1, serve.clone()]), asked: Box::new([]) },
+            Steps {
+                always: Box::new([prepare2.clone(), fake2.clone(), prepare1, fake1, serve.clone()]),
+                asked: Box::new([]),
+            },
+        ),
+        (
+            "another fake with the demo",
+            document(json!([second_fake, fake]), true),
+            Steps { always: Box::new([prepare2, fake2, serve.clone()]), asked: Box::new([demo_group]) },
         ),
         (
             "managed unchanged",

@@ -154,7 +154,7 @@ impl Service {
         let clients =
             clients::Clients::new(&settings.jig, &settings.clients.listener, seeds, client_room, &limits.journal)?;
         let setup_room = max.checked_add(SETUP_ROUTING_HEADROOM).expect("setup routing headroom");
-        let setup = crate::setup::prepare(&settings, &mut forge_settings, &seeds.crypto, setup_room)?;
+        let setup = crate::setup::prepare(&settings, &mut forge_settings, &seeds.crypto, setup_room, under_box)?;
         let forge = crate::forge::Layer::new(
             forge_settings,
             settings.limits.forge_component,

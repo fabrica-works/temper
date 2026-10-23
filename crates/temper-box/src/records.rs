@@ -40,6 +40,7 @@ impl Records {
         let mut forges = List::with_capacity(count);
         for step in steps {
             if let Some(asked) = step.asked
+                && asked.recorded
                 && !forges.as_slice().contains(&asked.forge)
             {
                 forges.push(asked.forge).expect("bounded groups");

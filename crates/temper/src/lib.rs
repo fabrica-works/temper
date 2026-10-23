@@ -33,7 +33,7 @@ mod program_login;
 mod setup;
 mod worker_alone;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] [--box] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake seed [DIRECTORIES] | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] [--box] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -47,7 +47,6 @@ pub enum Command {
     Ctl { arguments: Vec<OsString> },
     Fake { arguments: fake::Arguments },
     FakeCheck { directories: Directories, check: fake::Check },
-    FakeSeed { directories: Directories },
     FakeGit { arguments: Box<[Box<[u8]>]> },
     Forge { directories: Directories, arguments: Vec<OsString>, ssl_cert_file: Option<PathBuf> },
 }
@@ -61,7 +60,6 @@ pub fn usage() -> String {
     help.extend_from_slice(b"\ntemper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]\n");
     skein_shell::help(&fake::FORGE_SETTINGS, &mut help);
     help.extend_from_slice(b"\ntemper fake forge check [DIRECTORIES] N OBSERVATIONS STORE\n");
-    help.extend_from_slice(b"\ntemper fake seed [DIRECTORIES]\n");
     help.extend_from_slice(b"\ntemper fake git ARGS...\n");
     String::from_utf8(help).expect("help is UTF-8")
 }
@@ -157,7 +155,6 @@ pub fn run(command: Command) -> Result<u8, String> {
         }
         Command::Fake { arguments } => return fake::run(&arguments),
         Command::FakeCheck { directories, check } => return Ok(fake::check::run(&directories, &check)),
-        Command::FakeSeed { directories } => return fake::seed::run(&directories),
         Command::FakeGit { arguments } => return Ok(fake::git::run(&arguments)),
         Command::Forge { directories, arguments, ssl_cert_file } => {
             return Ok(forge::run(&directories, &arguments, ssl_cert_file));

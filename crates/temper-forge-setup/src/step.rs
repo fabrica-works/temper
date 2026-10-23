@@ -26,6 +26,8 @@ impl Stage {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Group {
     pub forge: u16,
+    /// `recorded` whether its `started` writes the box's record: an owned forge's does, the demo's does not.
+    pub recorded: bool,
     pub before: u32,
     pub steps: Box<[(Stage, Step)]>,
 }
@@ -132,7 +134,7 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
                 }
                 if e.asked {
                     asked
-                        .push(Group { forge: e.forge, before: out.len(), steps: group.into_boxed() })
+                        .push(Group { forge: e.forge, recorded: true, before: out.len(), steps: group.into_boxed() })
                         .expect("entry capacity");
                 } else {
                     for (_, step) in group.into_boxed() {

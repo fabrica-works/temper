@@ -139,6 +139,7 @@ pub(crate) fn prepare(
     forges: &mut skein_forge_connection::Settings,
     seed: &skein_lib::Secret,
     batch: u32,
+    under_box: bool,
 ) -> Result<super::Layer, Problems> {
     let (settings, limits) = fixed(config, forges)?;
     let own = &config.limits;
@@ -184,7 +185,7 @@ pub(crate) fn prepare(
             layer.unserved.insert(forge.number, reason).expect("configured setup exclusions");
         }
     }
-    local_starts(config, &mut layer)?;
+    local_starts(config, &mut layer, under_box)?;
     // temper-15 removes the old file access and fake handover/adoption branch.
     for setup in &config.setup {
         if !config.records_only.contains(&setup.entry.forge)
@@ -218,8 +219,12 @@ pub(crate) fn prepare(
     }
     Ok(layer)
 }
-fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> Result<(), Problems> {
+fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer, under_box: bool) -> Result<(), Problems> {
     let own = &config.limits;
+    let demo_forge = match &config.demo {
+        Some(demo) if under_box => Some(demo.forge),
+        Some(_) | None => None,
+    };
     for setup in &config.setup {
         if !config.records_only.contains(&setup.entry.forge) {
             continue; // temper-15 removes old-form file startup and its fake adoption.
@@ -250,7 +255,9 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> R
             path: temper_forge_setup::place::Place { directory: setup.entry.directory.clone(), user: Box::new([]) }
                 .path(temper_forge_setup::place::File::AdminToken),
             file: super::lifecycle::FileStep::Idle,
-            trigger: if setup.entry.asked {
+            trigger: if demo_forge == Some(setup.entry.forge) {
+                super::lifecycle::Trigger::StartDemo
+            } else if setup.entry.asked {
                 super::lifecycle::Trigger::StartAsked
             } else {
                 super::lifecycle::Trigger::Start

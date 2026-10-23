@@ -155,6 +155,7 @@ fn grouped_steps() -> temper_forge_setup::Steps {
     Steps {
         always: Box::new([long(b"serve", &[b"never"])]),
         asked: Box::new([Group {
+            recorded: true,
             forge: 3,
             before: 0,
             steps: Box::new([
@@ -518,5 +519,33 @@ fn a_link_receives_only_the_first_line_and_its_end() {
         assert_eq!(harness.run_to_end(), Exit::Code(0), "{name}: stop");
         harness.sim.assert_quiescent(harness.pid);
         harness.sim.assert_no_open_fds(harness.pid);
+    }
+}
+
+#[test]
+fn an_unrecorded_group_neither_probes_nor_writes_and_waits_at_every_box_start() {
+    use skein_fake_machine::{How, Item};
+    // A non-directory would expose either an accidental probe or a write.
+    for _restart in 0_u8..2 {
+        let mut steps = grouped_steps();
+        steps.asked[0].recorded = false;
+        let mut harness = Harness::grouped(steps, &[Item::file(b"box", b"kept")], true);
+        harness.run_until_idle();
+        assert_eq!(harness.launches.len(), 1, "only serve starts");
+        assert!(harness.stderr().is_empty(), "no probe of box/started/3");
+        harness.ask(b"start 3\n");
+        harness.run_until_idle();
+        assert_eq!(&*harness.reply_bytes(), b"step 3 prepare\nstep 3 run\nstarted 3\n");
+        assert!(harness.stderr().is_empty(), "no record write");
+        let root = harness.machine.reopen_root(0);
+        let file = harness.machine.open(root, b"box", How::Read).unwrap();
+        assert_eq!(harness.machine.read(file, 0, 4).unwrap().as_slice(), b"kept");
+        harness.machine.close(file);
+        harness.machine.close(root);
+        harness.terminate();
+        assert_eq!(harness.run_to_end(), Exit::Code(0));
+        harness.sim.assert_quiescent(harness.pid);
+        harness.sim.assert_no_open_fds(harness.pid);
+        assert_eq!(harness.machine.open_handles(), 0);
     }
 }

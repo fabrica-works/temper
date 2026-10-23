@@ -46,25 +46,49 @@ fn an_ask_writes_start_and_sets_up_with_no_step() {
     tells(&mut out, &accepted());
 }
 #[test]
-fn another_ask_is_refused_busy_until_started_or_failed() {
+fn an_ask_is_held_until_started_or_failed_and_a_second_held_ask_is_busy() {
     for ending in [b"started 7\n".as_slice(), b"failed 7 prepare exited 1\n"] {
         let (mut link, mut out) = asked();
-        link.ask(FORGE, REQUEST, &mut out);
         link.ask(OTHER, OTHER_REQUEST, &mut out);
         tells(
             &mut out,
             &[
-                named(b"box link: fault: a setup ask while busy or closed"),
-                Out::Answered { forge: FORGE, request: REQUEST, answer: Err(Refused::Busy) },
-                named(b"box link: fault: a setup ask while busy or closed"),
-                Out::Answered { forge: OTHER, request: OTHER_REQUEST, answer: Err(Refused::Busy) },
+                Out::SettingUp { forge: OTHER, step: None },
+                Out::Answered { forge: OTHER, request: OTHER_REQUEST, answer: Ok(()) },
             ],
         );
+        link.ask(9, REQUEST, &mut out);
+        tells(
+            &mut out,
+            &[
+                named(b"box link: fault: a setup ask while busy or closed"),
+                Out::Answered { forge: 9, request: REQUEST, answer: Err(Refused::Busy) },
+            ],
+        );
+        link.read(b"step 7 prepare\n", &mut out);
+        tells(&mut out, &[Out::SettingUp { forge: FORGE, step: Some(Step::Prepare) }]);
         link.read(ending, &mut out);
-        discard(&mut out);
+        let event = if ending.starts_with(b"started") {
+            Out::Started { forge: FORGE }
+        } else {
+            Out::Failed { forge: FORGE, why: b"prepare exited 1".as_slice().into() }
+        };
+        tells(&mut out, &[event, Out::Write(b"start 8\n".as_slice().into())]);
+        link.read(b"started 8\n", &mut out);
+        tells(&mut out, &[Out::Started { forge: OTHER }]);
         link.ask(FORGE, REQUEST, &mut out);
         tells(&mut out, &accepted());
     }
+}
+#[test]
+fn a_held_ask_is_dropped_when_the_pipe_closes() {
+    let (mut link, mut out) = asked();
+    link.ask(OTHER, OTHER_REQUEST, &mut out);
+    discard(&mut out);
+    link.closed(&mut out);
+    tells(&mut out, &[named(b"box link: the box closed the pipe"), Out::Closed]);
+    link.read(b"started 7\n", &mut out);
+    tells(&mut out, &[]);
 }
 #[test]
 fn a_fault_ask_needs_only_one_forges_diagnostic_slot() {

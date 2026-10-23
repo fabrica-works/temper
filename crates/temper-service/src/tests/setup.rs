@@ -440,7 +440,7 @@ fn tls_forges() -> (crate::settings::Engine, List<crate::ForgeRuntime>) {
 fn each_github_tls_entry_keeps_its_prepared_name_trust_and_address() {
     let (config, runtime) = tls_forges();
     let (mut endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
-    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2, false).unwrap();
     assert_eq!(setup.served.len(), 2);
     let (settings, _) = setup.pending.unwrap();
     assert_eq!(settings.forges.len(), 2);
@@ -473,7 +473,7 @@ fn tls_selects_a_larger_host_price_than_plaintext() {
         runtime.get_mut(index).unwrap().address.set_ip([127, 0, 0, 1].into());
     }
     let (mut endpoints, _) = crate::forge::prepare(&config, runtime).unwrap();
-    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2, false).unwrap();
     let (mut settings, _) = setup.pending.unwrap();
     let tls = host::worst_case(&setup.env.limits, &settings).unwrap();
     for index in 0..settings.forges.len() {
@@ -544,7 +544,7 @@ fn setup_memory_includes_the_whole_host_and_its_owner() {
     config.identities[0].author.email = Box::new([]);
     config.forges[0].api_token = None;
     let (mut endpoints, _) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
-    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
+    let setup = prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2, false).unwrap();
     let (settings, _) = setup.pending.unwrap();
     assert_eq!(settings.user_agent.as_ref(), crate::forge::USER_AGENT.as_bytes());
     let given = settings.forges.get(0).unwrap().github().unwrap();
@@ -624,7 +624,7 @@ fn invalid_host_limits_stop_after_load_and_setup_overrides_are_checked() {
     config.limits.forge_component.inner = 13;
     let (mut endpoints, _) = crate::forge::prepare(&fixtures::engine(), fixtures::forge_runtime()).unwrap();
     service.engine.as_mut().expect("engine").setup =
-        prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2).unwrap();
+        prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2, false).unwrap();
     advance(service.engine.as_mut().expect("engine"));
     assert!(service.end().is_some());
     let mut own = crate::limits::profile(crate::limits::Profile::Small);
@@ -1043,7 +1043,7 @@ fn local_given_uses_the_one_repository_capacity_nested_orgs_and_configured_liste
     assert_eq!(given.orgs.as_ref(), &[Box::<[u8]>::from(b"nested".as_slice())]);
     assert_eq!(given.org_owner.as_deref(), Some(b"owner".as_slice()));
     assert_eq!(given.listener, Some(([127, 0, 0, 1], 7101).into()));
-    assert_eq!(prepare(&config, &mut { endpoints }, &fixtures::seeds().crypto, 2).unwrap().served.len(), 1);
+    assert_eq!(prepare(&config, &mut { endpoints }, &fixtures::seeds().crypto, 2, false).unwrap().served.len(), 1);
 }
 #[test]
 fn an_old_form_owned_start_makes_no_reconcile() {
@@ -1621,3 +1621,65 @@ mod bound_webhook;
 
 #[path = "setup_create.rs"]
 mod create_tests;
+
+#[test]
+fn the_demo_waits_for_started_only_under_the_box_even_with_retained_access() {
+    for (under_box, retained) in [(false, false), (false, true), (true, false), (true, true)] {
+        let mut config = local_config(true, true);
+        config.demo = Some(crate::settings::Demo {
+            project: 1,
+            forge: 1,
+            provider: 3,
+            owner: b"demo".as_slice().into(),
+            name: b"widget".as_slice().into(),
+            cues: Box::new([]),
+        });
+        config.setup[0].handover = Some(Secret::new(b"stale-handover".as_slice().into()));
+        let configured = crate::startup::application::configured(&config);
+        assert!(configured[0].asked);
+        assert_eq!(configured[0].mode, domain::Mode::Fake);
+        let (endpoints, roots) = crate::forge::prepare(&config, fixtures::forge_runtime()).unwrap();
+        let owned = skein_forge_connection::settings::owned_bytes(&endpoints).unwrap();
+        let io = config.jig.limits.io;
+        let mut service = crate::Service::prepared(
+            config,
+            &fixtures::seeds(),
+            None,
+            (endpoints, roots, owned),
+            None,
+            0,
+            io,
+            under_box,
+        )
+        .unwrap();
+        service.engine.as_mut().unwrap().store = local_store(retained);
+        restore_local(&mut service);
+        let engine = service.engine.as_ref().unwrap();
+        if !under_box {
+            assert_eq!(
+                engine.setup.runs.first().unwrap().1.kind,
+                Kind::LocalTakeOver,
+                "without the box, the runner has already prepared the fake"
+            );
+            continue;
+        }
+        assert!(
+            told_local(engine, &domain::Connection::NotSetUp)
+                || engine.domain.forge_connection(1) == domain::Connection::NotSetUp
+        );
+        assert_eq!(engine.domain.forges().rows[0].offer, domain::Offer::NotOffered);
+        assert!(engine.setup.runs.is_empty());
+        assert!(engine.forge.starts.is_empty());
+        assert!(engine.notes.is_empty());
+        let read = box_started(&mut service);
+        service.handover_read(1, read.run, Ok(Some(Secret::new(b"test-admin".as_slice().into()))));
+        advance(service.engine.as_mut().unwrap());
+        let mut face = Face::new();
+        let remove = takeover_done(&mut service, &mut face);
+        service.handover_removed(1, remove.run, Ok(()));
+        advance(service.engine.as_mut().unwrap());
+        finish_local(&mut service, &mut face);
+        let engine = service.engine.as_ref().unwrap();
+        assert!(told_local(engine, &domain::Connection::Connected { id: 42, login: b"temper".as_slice().into() }));
+    }
+}

@@ -69,6 +69,7 @@ pub(super) struct Local {
 pub(super) enum Trigger {
     Start,
     StartAsked,
+    StartDemo,
     Asked,
 }
 #[derive(Debug)]
@@ -688,7 +689,9 @@ fn local_stopped(engine: &mut crate::engine::Engine, forge: u16, why: crate::Set
     let connection = match local.trigger {
         Trigger::Start => domain::Connection::NotConnected,
         Trigger::StartAsked if why == crate::SetupStopped::NotPrepared => domain::Connection::NotSetUp,
-        Trigger::StartAsked | Trigger::Asked => domain::Connection::SetUpFailed { why: local_failure(forge, &why) },
+        Trigger::StartDemo | Trigger::StartAsked | Trigger::Asked => {
+            domain::Connection::SetUpFailed { why: local_failure(forge, &why) }
+        }
     };
     engine.notes.push(crate::Note::ForgeSetupStopped { number: forge, why });
     state(engine, forge, connection);
@@ -704,7 +707,12 @@ fn start_pending(engine: &mut crate::engine::Engine, forge: u16) -> bool {
     false
 }
 fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
-    engine.setup.lifecycle.local_mut(forge).expect("local start").pending = false;
+    let local = engine.setup.lifecycle.local_mut(forge).expect("local start");
+    local.pending = false;
+    if local.trigger == Trigger::StartDemo {
+        state(engine, forge, domain::Connection::NotSetUp);
+        return;
+    }
     if busy(engine, forge) || engine.setup.runs.len() == engine.setup.env.limits.runs {
         local_stopped(engine, forge, crate::SetupStopped::Busy);
         return;
