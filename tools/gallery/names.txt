@@ -21,6 +21,7 @@ chat-first-run-4-T4
 inbox-reference
 accounts-reference
 accounts-first-run-1
+google-sign-in
 signed-out
 out-of-date
 chats-empty

@@ -51,6 +51,11 @@ pub struct Limits {
 /// resumed by the root and never passed to the protocol as child events.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Delivery {
+    /// Sign-in binding answer held behind the row's commit (protocol/sign-in.md, 5).
+    Bound {
+        request: Token,
+        answer: temper_engine_domain_forge::BindAnswer,
+    },
     /// Whole forge panel, held with the decision that requested it (domain/root.md, 5.1).
     Panel {
         watcher: Token,
@@ -461,6 +466,7 @@ impl Decision {
             | Delivery::Link { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
+            | Delivery::Bound { .. }
             | Delivery::Procedure { .. }
             | Delivery::Application { .. }
             | Delivery::WebReply { .. }
@@ -646,6 +652,9 @@ pub fn resume(journal: &mut Journal, out: &mut Queue<Output>) {
             crate::Output::Worker(crate::WorkerRequest::Deliver(delivery))
             | crate::Output::Party(crate::PartyRequest::Deliver(delivery))
             | crate::Output::ToChild(crate::Released(delivery)) => out.push(Output::Deliver(delivery)),
+            crate::Output::Bound { request, answer } => {
+                out.push(Output::Deliver(Delivery::Bound { request, answer }));
+            }
             crate::Output::Forge { call, repository, op } => {
                 out.push(Output::Deliver(Delivery::ForgeCall { call, repository, op }));
             }

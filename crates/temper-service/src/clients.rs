@@ -79,6 +79,10 @@ fn invalid(what: What) -> Problems {
     problems
 }
 impl Clients {
+    #[expect(clippy::unused_self, reason = "task B consumes binding answers in this composition")]
+    pub(crate) fn bound(&mut self, _request: Token, _answer: temper_engine_domain_forge::BindAnswer) {
+        // Task B (o/sign-in-m2) adds pending sign-ins and consumes their binding answers here.
+    }
     pub(crate) fn demo_read(&mut self) -> Option<crate::HandoverRead> {
         self.demo_reads.pop()
     }

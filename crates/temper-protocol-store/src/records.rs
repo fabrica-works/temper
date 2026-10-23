@@ -1,5 +1,5 @@
 //! Total translations between durable domain rows and generated records.
-use crate::{Bounds, Undecodable, v7 as w};
+use crate::{Bounds, Undecodable, v8 as w};
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
@@ -35,6 +35,10 @@ pub fn encode(value: &d::Stored) -> Box<[u8]> {
         d::Stored::ProposedEffect(value) => w::Value::ProposedEffect(entries::encode_proposed(value)),
         d::Stored::Entry { entry, held } => w::Value::Entry(entries::encode_entry_row(entry, *held)),
         d::Stored::Call { key, answer } => w::Value::Call(entries::encode_call(key, answer)),
+        d::Stored::Binding { address, subject } => w::Value::Binding(
+            w::Binding::new(&w::CEILINGS, w::BindingParts { address: address.clone(), subject: subject.clone() })
+                .expect(FITS),
+        ),
         d::Stored::Demo(value) => w::Value::Demo(
             w::Demo::new(
                 &w::CEILINGS,
@@ -69,6 +73,13 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
         w::Value::Application(value) => application::decode(value, bounds)?,
         w::Value::Issue(value) => d::Stored::Issue(issues::decode(*value)),
         w::Value::Change(value) => d::Stored::Change(change::decode_change_row(*value)),
+        w::Value::Binding(value) => {
+            let w::BindingParts { address, subject } = value.into_parts();
+            if !d::binding_address(&address) {
+                return Err(Undecodable);
+            }
+            d::Stored::Binding { address, subject }
+        }
         w::Value::Demo(value) => {
             let w::DemoParts { forge, state } = value.into_parts();
             d::Stored::Demo(d::Demo {
@@ -120,6 +131,8 @@ pub fn row(key: &[u8], value: &[u8], bounds: &Bounds) -> Result<d::Stored, Undec
 
 pub(crate) fn limits(forge: &d::Limits) -> Option<w::Limits> {
     Some(w::Limits {
+        binding_address: 254,
+        binding_subject: 255,
         application_adopted_owner: forge.name_bytes,
         application_adopted_name: forge.name_bytes,
         plan_item_text: forge.issue_policy.comment_bytes,

@@ -234,6 +234,11 @@ const HOLDS: [Holds; samples::N] = [
         parts: &[Part::Named { role: Role::Disclosure, name: "Scripted model · the playground’s" }],
     },
     Holds {
+        name: "google-sign-in",
+        heading: "Sign in",
+        parts: &[Part::Named { role: Role::Link, name: "Continue with Google" }],
+    },
+    Holds {
         name: "signed-out",
         heading: "",
         parts: &[Part::Named {

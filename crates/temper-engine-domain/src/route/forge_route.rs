@@ -2113,6 +2113,9 @@ pub(crate) fn outputs(
             forge::Request::Install { forge, request, back } => {
                 assert!(super::now(domain, Request::Install { forge, request, back }), "install door");
             }
+            forge::Request::Bound { request, answer } => {
+                emit(decision, &env.limits, Delivery::Bound { request, answer });
+            }
             forge::Request::DemoStart { request } => super::demo::start(domain, env, decision, request),
             forge::Request::StopGroup { forge } => {
                 assert!(super::now(domain, Request::StopGroup { forge }), "demo stop door reserved");

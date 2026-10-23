@@ -683,6 +683,7 @@ pub fn settle_root(
                 | root::Request::Install { .. }
                 | root::Request::EraseCarried { .. }
                 | root::Request::SetUp { .. }
+                | root::Request::Bound { .. }
                 | root::Request::Return { .. }
                 | root::Request::Forge { .. }
                 | root::Request::Busy(_)

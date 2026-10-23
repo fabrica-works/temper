@@ -460,7 +460,8 @@ impl Protocol {
                     };
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
-                other @ (top::Request::DemoStart { .. }
+                other @ (top::Request::Bound { .. }
+                | top::Request::DemoStart { .. }
                 | top::Request::StopGroup { .. }
                 | top::Request::SetUpGroup { .. }
                 | top::Request::Connect { .. }
@@ -594,6 +595,7 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Change(row) => top::Key::Change(row.task),
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
         top::Stored::Demo(row) => top::Key::Demo(row.forge),
+        top::Stored::Binding { address, .. } => top::Key::Binding(address.clone()),
         top::Stored::Release(row) => top::Key::Release(row.task),
         top::Stored::Application { token, .. } => top::Key::Application(*token),
         top::Stored::Writer(row) => top::Key::Writer(row.forge),

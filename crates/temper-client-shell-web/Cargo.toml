@@ -23,7 +23,7 @@ temper-client-domain.workspace = true
 temper-client-view.workspace = true
 temper-client-protocol-wire.workspace = true
 wasm-bindgen.workspace = true
-web-sys = { workspace = true, features = ["Window", "Document", "Location", "HtmlElement"] }
+web-sys = { workspace = true, features = ["Window", "Document", "Element", "Location", "HtmlElement"] }
 
 [lints.rust]
 unsafe_code = "forbid"

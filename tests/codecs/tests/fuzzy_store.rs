@@ -26,38 +26,41 @@ fn key(bytes: &[u8]) {
 fn golden(bytes: &[u8], bounds: &Bounds) {
     record(bytes, bounds);
     // Value's goldens hold each family; prepend Row's version to reach its decoder.
-    let mut versioned = vec![0_u8, 6];
+    let mut versioned = vec![0_u8, 8];
     versioned.extend_from_slice(bytes);
     record(&versioned, bounds);
+}
+/// A drawn row, its key, and one mutation of each.
+fn row_and_key(row: &forge::Stored, rng: &mut Rng, bounds: &Bounds) {
+    let bytes = records::encode(row);
+    record(&bytes, bounds);
+    record(&temper_codecs_world::mutated(rng, &bytes), bounds);
+    let bytes = keys::encode(&forge::stored_key(row), u32::MAX).expect("drawn key");
+    key(&bytes);
+    key(&temper_codecs_world::mutated(rng, &bytes));
 }
 #[test]
 fn store_decoders_never_panic_and_reencode_the_same() {
     let bounds = temper_protocol_store::bounds(&LIMITS).expect("fixture limits fit");
     let mut rng = Rng::new(0x7e3d_0405);
-    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v7");
+    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v8");
     for _ in 0..2_000 {
+        let address = format!("member{}@example.com", rng.next_u64()).into_bytes().into_boxed_slice();
+        let binding =
+            forge::Stored::Binding { address, subject: temper_codecs_world::drawn(&mut rng, 255).into_boxed_slice() };
+        row_and_key(&binding, &mut rng, &bounds);
         record(&temper_codecs_world::drawn(&mut rng, 512), &bounds);
         key(&temper_codecs_world::drawn(&mut rng, 512));
         let demo = forge::Stored::Demo(forge::Demo {
             forge: u16::try_from(rng.below(65_536)).expect("u16"),
             state: if rng.below(2) == 0 { forge::DemoState::Running } else { forge::DemoState::Ended },
         });
-        let bytes = records::encode(&demo);
-        record(&bytes, &bounds);
-        record(&temper_codecs_world::mutated(&mut rng, &bytes), &bounds);
-        let bytes = keys::encode(&forge::stored_key(&demo), u32::MAX).expect("demo key");
-        key(&bytes);
-        key(&temper_codecs_world::mutated(&mut rng, &bytes));
+        row_and_key(&demo, &mut rng, &bounds);
         let writer = forge::Stored::Writer(skein_forge_client::Writer {
             forge: u16::try_from(rng.below(65_536)).expect("u16"),
             author: rng.next_u64().max(1),
         });
-        let bytes = records::encode(&writer);
-        record(&bytes, &bounds);
-        record(&temper_codecs_world::mutated(&mut rng, &bytes), &bounds);
-        let bytes = keys::encode(&forge::stored_key(&writer), u32::MAX).expect("writer key");
-        key(&bytes);
-        key(&temper_codecs_world::mutated(&mut rng, &bytes));
+        row_and_key(&writer, &mut rng, &bounds);
     }
     for _ in 0..128 {
         let flags = u8::try_from(rng.below(16)).expect("four flags");

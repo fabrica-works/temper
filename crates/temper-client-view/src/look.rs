@@ -249,6 +249,8 @@ pub const FORGES: Style = Style { owner: owner(), token: 120 };
 pub const FORGE_ROW: Style = Style { owner: owner(), token: 121 };
 /// The setup strip (client/README.md, 5.1, 5.6).
 pub const SETUP_STRIP: Style = Style { owner: owner(), token: 122 };
+/// Browser sign-in page (protocol/sign-in.md, 7).
+pub const SIGN_IN: Style = Style { owner: owner(), token: 123 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -377,6 +379,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-forges",
         b"temper-forge-row",
         b"temper-setup-strip",
+        b"temper-sign-in",
         b"temper-account-row",
     ],
     regions: &[b"temper-link"],

@@ -1,6 +1,7 @@
 use super::fixtures;
 use crate::keys;
 use skein_lib::Rng;
+use temper_engine_domain_forge::Key;
 
 #[test]
 fn encoded_keys_sort_as_the_derived_order() {
@@ -46,7 +47,7 @@ fn a_key_decoder_refuses_each_malformed_key() {
     }
     branch.tag(0);
     for (name, bytes) in [
-        ("family tag", Box::from([18])),
+        ("family tag", Box::from([19])),
         ("What tag", what.finish().expect("small key")),
         ("forge width", forge.finish().expect("small key")),
         ("trailing byte", trailing.finish().expect("small key")),
@@ -133,4 +134,20 @@ fn demo_keys_follow_writer_and_take_every_forge_number() {
     let mut too_wide = skein_kv::KeyWriter::new(u32::MAX);
     too_wide.tag(17).u64(65_536);
     assert_eq!(keys::decode(&too_wide.finish().expect("small key"), &fixtures::LIMITS), None);
+}
+
+#[test]
+fn binding_keys_use_family_eighteen_and_canonical_addresses() {
+    for address in [b"a@b".as_slice(), b"sam@example.com"] {
+        let key = Key::Binding(address.into());
+        let bytes = keys::encode(&key, u32::MAX).unwrap();
+        assert_eq!(bytes[0], keys::BINDING);
+        assert_eq!(keys::decode(&bytes, &fixtures::LIMITS), Some(key));
+        let mut trailing = skein_kv::KeyWriter::new(u32::MAX);
+        trailing.tag(keys::BINDING).bytes(address).tag(0);
+        assert_eq!(keys::decode(&trailing.finish().expect("small key"), &fixtures::LIMITS), None);
+    }
+    for address in [b"Sam@example.com".as_slice(), b"a@@b", b"no-at"] {
+        assert_eq!(keys::encode(&Key::Binding(address.into()), u32::MAX), None);
+    }
 }

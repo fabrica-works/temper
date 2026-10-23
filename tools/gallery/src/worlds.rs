@@ -1887,6 +1887,7 @@ fn accounts(w: World, then: Then) -> c::OwnerAccounts {
             | Then::Filled
             | Then::Refused
             | Then::SignedOut
+            | Then::GoogleSignIn
             | Then::OutOfDate
             | Then::Closing
             | Then::Rejecting

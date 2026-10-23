@@ -720,6 +720,7 @@ impl World {
             | engine::Request::EraseCarried { .. }
             | engine::Request::StopGroup { .. }
             | engine::Request::SetUp { .. }
+            | engine::Request::Bound { .. }
             | engine::Request::Return { .. }
             | engine::Request::Setup { .. }
             | engine::Request::Busy(_)
@@ -759,6 +760,7 @@ impl World {
             | engine::Request::EraseCarried { .. }
             | engine::Request::StopGroup { .. }
             | engine::Request::SetUp { .. }
+            | engine::Request::Bound { .. }
             | engine::Request::Return { .. }
             | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)
@@ -854,6 +856,7 @@ impl World {
             | Delivery::WatchEnded { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
+            | Delivery::Bound { .. }
             | Delivery::Relay { .. }
             | Delivery::ReadEscalationDecision { .. }
             | Delivery::Fleet(_)

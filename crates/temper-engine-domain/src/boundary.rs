@@ -483,6 +483,10 @@ pub enum PartyInput {
 /// and 4). Every output crosses the journal door in its peer's vocabulary.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    Bound {
+        request: Token,
+        answer: forge::BindAnswer,
+    },
     /// Stop the ended demo's box group; no request waits for its answer.
     StopGroup {
         forge: u16,
@@ -738,6 +742,7 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
         | Delivery::Result { .. }) => Request::Party(PartyRequest::Deliver(delivery)),
         Delivery::ReadLoad { load, range } => Request::Store(StoreRequest::Read { load, range }),
         Delivery::Drained => Request::Drained,
+        Delivery::Bound { request, answer } => Request::Bound { request, answer },
         Delivery::ForgeCall { call, repository, op } => Request::Forge { call, repository, op },
     }
 }

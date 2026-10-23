@@ -13,6 +13,7 @@ pub mod limits;
 pub mod look;
 pub mod pages;
 mod root;
+pub mod sign_in;
 pub mod words;
 pub use limits::{Limits, worst_case};
 pub use root::{View, act, build, event, href};

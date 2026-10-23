@@ -1,4 +1,4 @@
-family temper-store 6
+family temper-store 8
 
 # 04.2: values the families share (protocol/store.md, 2 and 3).
 record Repository { forge: u16 repository: u32 }
@@ -186,5 +186,7 @@ record ForgeWriter { forge: u16 author: u64 }
 # Family 17: the demo's state (protocol/store.md, 2; protocol/setup.md, 8.4).
 enum DemoState { running, ended }
 record Demo { forge: u16 state: DemoState }
-enum Value { call: Call, proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, client: ClientRow, change: boxed ChangeRow, issue: boxed IssueRow, release: ReleaseRow, application: Application, writer: ForgeWriter, demo: Demo }
+# Family 18: first Google subject for a folded member address (protocol/sign-in.md, 5).
+record Binding { address: bytes 254 subject: bytes 255 }
+enum Value { call: Call, proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, client: ClientRow, change: boxed ChangeRow, issue: boxed IssueRow, release: ReleaseRow, application: Application, writer: ForgeWriter, demo: Demo, binding: Binding }
 versioned record Row { value: Value }

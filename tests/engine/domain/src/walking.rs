@@ -746,6 +746,7 @@ impl World {
                 | engine::Request::Install { .. }
                 | engine::Request::EraseCarried { .. }
                 | engine::Request::SetUp { .. }
+                | engine::Request::Bound { .. }
                 | engine::Request::Return { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Busy(_)
@@ -848,6 +849,7 @@ impl World {
             Delivery::Host(_)
             | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
+            | Delivery::Bound { .. }
             | Delivery::Procedure { .. }
             | Delivery::Application { .. }
             | Delivery::Forges { .. }

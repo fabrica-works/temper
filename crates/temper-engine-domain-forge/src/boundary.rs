@@ -611,6 +611,11 @@ pub enum Stored {
     Writer(skein_forge_client::Writer),
     /// The demo's state, kept by its forge (protocol/setup.md, 8.4): no record is not started.
     Demo(Demo),
+    /// First Google subject for a member address (protocol/sign-in.md, 5).
+    Binding {
+        address: Box<[u8]>,
+        subject: Box<[u8]>,
+    },
 }
 /// A bounded connector payload awaiting an authority holder's decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -648,6 +653,7 @@ pub enum Key {
     Writer(u16),
     /// The demo's forge, application.demo.forge.
     Demo(u16),
+    Binding(Box<[u8]>),
 }
 /// A completed phase of the connector's restart contract.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -708,6 +714,12 @@ pub struct Installation {
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// Bind the folded member address before minting a sign-in.
+    Bind {
+        request: Token,
+        address: Box<[u8]>,
+        subject: Box<[u8]>,
+    },
     DemoAnswered {
         answer: StartAnswer,
     },
@@ -996,6 +1008,11 @@ pub enum Event {
 /// The connector's output to the root, including child API calls.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// The root holds this answer behind the decision's durable commit.
+    Bound {
+        request: Token,
+        answer: BindAnswer,
+    },
     /// Stop the ended demo's box group; no request waits for its answer.
     StopGroup {
         forge: u16,
@@ -1218,4 +1235,11 @@ pub struct Demo {
 pub enum DemoState {
     Running,
     Ended,
+}
+
+/// Whether this member address belongs to the presented Google subject.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BindAnswer {
+    Bound,
+    Another,
 }

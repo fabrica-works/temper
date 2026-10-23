@@ -407,6 +407,8 @@ pub enum Word {
     SignedOut,
     OutOfDate,
     SignedOutMain,
+    SignInTitle,
+    ContinueGoogle,
     SignInFull,
     SignInBusy,
     SignInNotReady,
@@ -540,8 +542,9 @@ pub enum Word {
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
-const PHRASES: u32 = 1024;
-const ALL: [Word; 491] = [
+// The browser sign-in heading and Google link add two phrases.
+const PHRASES: u32 = 1026;
+const ALL: [Word; 493] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -929,6 +932,8 @@ const ALL: [Word; 491] = [
     Word::SignedOut,
     Word::OutOfDate,
     Word::SignedOutMain,
+    Word::SignInTitle,
+    Word::ContinueGoogle,
     Word::SignInFull,
     Word::SignInBusy,
     Word::SignInNotReady,
@@ -1251,6 +1256,8 @@ impl Word {
             Self::SignedOut => 180,
             Self::OutOfDate => 181,
             Self::SignedOutMain => 182,
+            Self::SignInTitle => 1910,
+            Self::ContinueGoogle => 1911,
             Self::SignInFull => 1907,
             Self::SignInBusy => 1908,
             Self::SignInNotReady => 1909,
@@ -1682,7 +1689,7 @@ impl Words {
             phrases: PHRASES,
             holes: 4,
             // Setup fields and first repository need 28 more segments; the demo's start 15.
-            segments: 1802,
+            segments: 1804,
             text_bytes: 32768,
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined
@@ -2171,6 +2178,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Offline => (&[b"Offline"], &[]),
         Word::SignedOut => (&[b"Signed out"], &[]),
         Word::OutOfDate => (&[b"Out of date"], &[]),
+        Word::SignInTitle => (&[b"Sign in"], &[]),
+        Word::ContinueGoogle => (&[b"Continue with Google"], &[]),
         Word::SignedOutMain => match shell {
             Shell::Terminal => (&[b"Signed out."], &[]),
             Shell::Browser => (&[b"Signed out. To sign in, open a sign-in link temper serve printed."], &[]),

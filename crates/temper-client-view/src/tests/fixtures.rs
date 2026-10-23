@@ -1560,3 +1560,17 @@ pub fn forge_root_watch(
     let (root, _, _, _, _, watch) = root_at_with_forges(address, &domain_limits(), b"Shop", None, None, Some(rows));
     (root, watch.expect("forges watch"))
 }
+
+/// Page-advertised sign-in ways, in either shell.
+pub fn sign_in_view(
+    root: &temper_client_domain::Domain,
+    shell: crate::words::Shell,
+    ways: crate::sign_in::Ways,
+) -> crate::View {
+    let domain = domain_limits();
+    let limits = crate::Limits { tree: tree_limits() };
+    let words = crate::words::Words::english(FORGE, domain.client.domain.text, shell).unwrap();
+    let mut view = crate::View::with_sign_in(&limits, &domain, words, FORGE, ways);
+    build(&mut view, root);
+    view
+}

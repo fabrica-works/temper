@@ -11,6 +11,7 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         demo.state = engine.domain.demo_state();
     }
     match request {
+        root::Request::Bound { request, answer } => engine.clients.bound(request, answer),
         root::Request::StopGroup { forge } => {
             let mut out = skein_lib::Queue::with_capacity(1);
             engine.box_link.stop(forge, &mut out);
@@ -249,6 +250,7 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
             | root::Delivery::Result { .. }
             | root::Delivery::ForgeCommitted { .. }
             | root::Delivery::ForgeCall { .. }
+            | root::Delivery::Bound { .. }
             | root::Delivery::Relay { .. }
             | root::Delivery::ReadEscalationDecision { .. }
             | root::Delivery::Fleet(_)
