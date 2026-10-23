@@ -927,7 +927,8 @@ temper box
 
   One ask at a time: a `start` for another forge while a group starts,
   or while a failed group's steps close, is answered `failed FORGE busy`;
-  one for the forge whose group is starting, by that group's own lines;
+  one for the forge whose group is starting, or whose failed steps
+  close, by that group's own lines, its `failed` once they have closed;
   one for a forge with no group, `failed FORGE not asked`; one for a
   started group, `started FORGE`; one while the box stops,
   `failed FORGE stopping`. A `stop` is an ask as a `start` is, one at a
@@ -935,8 +936,9 @@ temper box
   `stopped FORGE`; for a dormant one, `stopped FORGE` at once; for a
   group starting, or whose failed steps close, `failed FORGE busy`; for
   a forge with no group, `failed FORGE not asked`; and while the box
-  stops, `failed FORGE stopping`. While a group's steps close, a `start`
-  or a `stop` for any forge is answered `failed FORGE busy`. An
+  stops, `failed FORGE stopping`. While a group's steps close at its
+  `stop`, a `start` or a `stop` for any forge is answered `failed FORGE
+  busy`. An
   answer to a `temper serve` that has exited is dropped: its restart
   finds the handover at its start (6.5). Each line is at most
   `box.line_bytes` (configuration.md, section 7), which both sides
