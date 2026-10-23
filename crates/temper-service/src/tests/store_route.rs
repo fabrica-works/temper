@@ -242,6 +242,29 @@ fn call_row() -> core::Record {
         settled: None,
     }))
 }
+
+#[test]
+fn account_continuations_stay_in_jigs_restore_interval() {
+    use jig_domain_accounts::Key;
+    for (key, interval) in [
+        (Key::Issued { number: 2 }, 0),
+        (Key::Next, 1),
+        (Key::Account { number: 3 }, 1),
+        (Key::Source { account: 1, number: 0 }, 1),
+        (Key::Source { account: 3, number: 2 }, 1),
+    ] {
+        let key = core::Key::Accounts(key);
+        let Some(store::Request::Restore { after: Some(cursor), .. }) = route::down(
+            &mut fixtures::routes(),
+            load(engine::Range::Core(engine::CoreRange::Accounts), Some(engine::Key::Core(key.clone())), 2, 8192),
+        ) else {
+            panic!("account continuation")
+        };
+        assert_eq!(cursor.interval, interval, "{key:?}");
+        assert_eq!(store::keys::decode(&cursor.after), Some(key));
+    }
+}
+
 #[test]
 fn a_task_page_keeps_projections_then_live_tasks_and_drops_calls() {
     let projection = projection_row();

@@ -12,7 +12,16 @@ pub(super) fn cursor(range: &Range, key: &Key) -> Option<store::Cursor> {
     };
     let interval = match (range, key) {
         (Range::Census(census), Key::Core(key)) => census.interval(key)?,
-        (Range::Core(CoreRange::Tasks), Key::Core(core::Key::Tasks(_))) => 1,
+        // jig restores issued names first, then the counter, accounts and sources.
+        (
+            Range::Core(CoreRange::Accounts),
+            Key::Core(core::Key::Accounts(
+                jig_domain_accounts::Key::Next
+                | jig_domain_accounts::Key::Account { .. }
+                | jig_domain_accounts::Key::Source { .. },
+            )),
+        )
+        | (Range::Core(CoreRange::Tasks), Key::Core(core::Key::Tasks(_))) => 1,
         (Range::Core(_) | Range::Census(_) | Range::Forge, Key::Core(_) | Key::Forge(_)) => 0,
     };
     Some(store::Cursor { interval, after })
