@@ -355,7 +355,11 @@ keeps (`../protocol/configuration.md`, section 2).
   chat whose host refuses its start says jig's "Cannot start yet", and
   its composer's line says why (below); a line of the chats page holds
   no run wait, so it is never refused, and says jig's word for its
-  stage (jig's `client/domain/client.md`, 19.1).
+  stage (jig's `client/domain/client.md`, 19.1). A chat held on a
+  configured bound (jig's `Exceeded` hold) says jig's phrase for that
+  hold, as its hold card does: "Held: the model's reasoning went past
+  its configured allowance of 2048 bytes". Any other hold says jig's
+  "Held", and the chat's page says why.
 - **A chat's conversation** is the chat's own, drawn from jig's thread
   (jig's `client/domain/objects.md`, section 10), never its runs'
   mechanics (`chat.html`, the mockups' first run):
