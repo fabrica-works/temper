@@ -315,3 +315,26 @@ h3 { font-size: 14px; line-height: 1.35; letter-spacing: -.015em; margin-bottom:
   .welcome-page .card-pad { padding: 18px; }
   .welcome-foot { gap: 12px; }
 }
+
+/* A deployment's front page, signed out, and its sign-in's endings (draft
+   dev-site.md, sections 4 to 6). */
+.sign-in-page { width: min(500px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 70px; }
+.sign-in-card { padding: 26px 28px 22px; }
+.sign-in-brand { display: flex; align-items: center; gap: 7px; margin: 0 0 22px; font-weight: 700; }
+.sign-in-brand svg { width: 15px; height: 15px; color: var(--accent); }
+.sign-in-card h1 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.sign-in-card p { font-size: 12px; line-height: 1.65; }
+.sign-in-notice { margin: 16px 0 0; padding: 9px 11px; border-radius: 4px; background: var(--accent-pale); }
+.sign-in-ways { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0 14px; }
+.sign-in-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 14px 0 0; }
+.sign-in-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin: 12px 2px 0; }
+.sign-in-variants { margin: 0; padding-left: 18px; font-size: 11px; line-height: 1.9; }
+/* Google's own button, as its branding guidelines draw it: white, its
+   mark, its words in Roboto. */
+.google-button { display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 12px; border: 1px solid #747775; border-radius: 4px; background: #fff; color: #1f1f1f; font: 500 14px/20px Roboto, Arial, sans-serif; letter-spacing: .25px; white-space: nowrap; }
+.google-button:hover { background: #f8f9fa; color: #1f1f1f; box-shadow: 0 1px 2px rgba(60, 64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, .15); }
+.google-mark { width: 20px; height: 20px; flex: none; }
+@media (max-width: 600px) {
+  .sign-in-page { padding-top: 24px; }
+  .sign-in-card { padding: 20px 18px 18px; }
+}

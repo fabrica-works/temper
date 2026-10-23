@@ -507,7 +507,7 @@
       ${bare ? '' : `<span class="terminal-divider" aria-hidden="true"></span>
       <span class="terminal-project">${project()} <span aria-hidden="true">⌄</span></span>
       <nav class="terminal-nav" aria-label="Main navigation">${links}</nav>`}
-      <div class="terminal-top-right">${bare ? '' : `<span class="terminal-live"><i class="status-dot"></i> ${fact('jig-client: the link’s state', 'Live')}</span>`}<span class="terminal-user">${fact('jig: the party signed in', esc(world.person))}</span><a class="terminal-user" href="#" data-later="Mockup: signing out is not drawn.">Sign out</a></div>
+      <div class="terminal-top-right">${bare ? '' : `<span class="terminal-live"><i class="status-dot"></i> ${fact('jig-client: the link’s state', 'Live')}</span>`}<span class="terminal-user">${fact('jig: the party signed in', esc(world.person))}</span>${world.site ? `<a class="terminal-user" href="${esc(u('sign-in.html?state=signed-out'))}">Sign out</a>` : '<a class="terminal-user" href="#" data-later="Mockup: signing out is not drawn.">Sign out</a>'}</div>
       ${bare ? '' : `<details class="terminal-mobile-menu"><summary aria-label="Open navigation">☰</summary><nav aria-label="Mobile navigation">${navShown().map(e => navLink(e, active)).join('')}</nav></details>`}
     </header>`;
   }
@@ -718,7 +718,7 @@
       <p>${esc(step.summary)}</p>
       <ol>${look}</ol>
       <h2>Pages</h2>
-      <p>${pagesList}; a chat, a task and a change open from them. <a href="first-run.html">first-run.html</a> opens the first run at its first step: the link <code>temper box</code> prints. <a href="${u(`github.html?world=${GH_WORLD}`, '2')}">github.html</a> draws GitHub’s own pages, in the world First run, on GitHub.</p>
+      <p>${pagesList}; a chat, a task and a change open from them. <a href="first-run.html">first-run.html</a> opens the first run at its first step: the link <code>temper box</code> prints. <a href="${u(`github.html?world=${GH_WORLD}`, '2')}">github.html</a> draws GitHub’s own pages, in the world First run, on GitHub. <a href="${u(`sign-in.html?world=${DEV_WORLD}`, '1')}">sign-in.html</a> draws a deployment’s front page, signed out, and its sign-in’s endings, in the world Dev site.</p>
       <h2>Marks</h2>
       <p>Slate marks are annotations, not the product: the reference case's names (<i class="case-ref">B</i>, <i class="case-ref">f1</i>) and the gaps temper lacks for what a page draws (<i class="gap">gap 6.5</i>). <b>Sources</b>, in View, underlines each value by where it comes from: <span class="legend-engine">an engine fact</span>, <span class="legend-config">a name from the configuration</span>, <span class="legend-written">words as a person or an agent wrote them</span>, or <span class="legend-ops">an ops application</span>. Unmarked text is the UI's own words, and names no workflow.</p>
     </div>`;
@@ -1387,6 +1387,14 @@
         <button class="button" data-later="Mockup: the adoption form (client README, 4.4) has no mockup.">Adopt a repository</button></div>
         <p class="muted tiny">Open Forgejo signs you in as ${conf('the person’s Forgejo login', esc(f.person))}, through temper.</p>
         <p class="gap-note">Until signing in through temper: sign in as ${conf('the person’s Forgejo login', esc(f.person))} with the password in ${conf('the owned forge’s person password file', esc(`~/.local/share/temper/forge-${f.n}/person_password`))}. Forgejo asks for a new one at once.</p>`;
+    // A Forgejo whose people sign in through temper, as its OpenID
+    // provider (draft dev-site.md, section 5).
+    if (f.through && f.state === 'connected') return `<div class="rule"></div><div class="button-row">
+      <a class="button primary" href="#" data-later="${esc(`Mockup: ${f.web}/user/oauth2/temper, in a new tab: Forgejo starts its sign-in with the temper source, temper answers at once, and Forgejo opens signed in as ${world.site.login}.`)}">Open Forgejo ↗</a>${ahead('provider', 'temper as Forgejo’s OpenID provider: draft dev-site.md, section 5')}
+      <button class="button" data-later="Mockup: the set-up’s three fields again; temper makes the repository, grants its bot, and adopts it.">New repository</button>
+      <button class="button" data-later="Mockup: the adoption form (client README, 4.4) has no mockup.">Adopt a repository</button>
+      <button class="button" data-later="Mockup: the admin’s token erased; temper keeps its bot and tokens, and the forge becomes connected.">Forget the admin’s token</button></div>
+      <p class="muted tiny">Open Forgejo signs you in as ${conf('the member’s login', esc(world.site.login))}, through temper: Forgejo’s sign-in is temper’s.</p>`;
     if (f.kind === 'Forgejo' && f.state === 'connected' && ['managed', 'connected'].includes(f.mode)) return `<div class="rule"></div><div class="button-row">
       <a class="text-link" href="#" data-later="Mockup: its web page; you sign in there your own way.">Open Forgejo ↗</a>
       ${f.mode === 'managed' ? '<button class="button" data-later="Mockup: the set-up’s three fields again; temper makes the repository, grants its bot, and adopts it.">New repository</button>' : ''}
@@ -1674,6 +1682,100 @@
       ['Connected, for comparison', { n: 5, kind: 'Forgejo', name: 'Forgejo at git.example', web: 'https://git.example', mode: 'connected', state: 'connected', login: 'ci-bot', id: 31 }],
     ].map(([heading, f]) => `<h3>${esc(heading)}</h3>${forgeRow(f, true)}`).join('')}</section>` : '';
     return listPage('forges', [['Forges']], `<div class="section-heading" style="margin-top:0"><div><h2>Your forges <span class="subtle-count">${fact('temper: the person’s forges, demo excluded', esc(forges.length))}</span></h2><p class="muted tiny">Each forge temper is connected to, or setting up. Add one to bring its repositories to temper.</p></div><a class="button" href="${esc(u('connect-forge.html'))}">+ Add a forge</a></div><div class="stack">${forges.length ? forges.map(f => forgeRow(f)).join('') : `<div class="empty-state">No forge of yours yet. <a class="button primary" href="${esc(u('connect-forge.html'))}">Connect a forge</a></div>`}</div>${fake ? `<div class="section-heading"><h2>The playground</h2></div><details class="card forge-row forge-demo"><summary><span>${fact('temper: the demo’s forge and repository', 'Playground forge · the playground’s, until a forge of yours connects · playground/widget')}</span></summary><div class="card-pad">${forgeBody(fake)}</div></details>` : ''}${worldKey === 'first-run' && demo?.state === 'retired' ? `<p class="gap-note">${ahead('playground’s end', 'the playground ending once a forge of the person’s connects: no mission yet')} The playground’s forge stopped when forge 3 connected; it no longer shows.</p>` : ''}${variants}`);
+  };
+
+  // ---- Signing in -----------------------------------------------------
+
+  // A deployment whose people sign in with Google, in the world dev-site
+  // (draft dev-site.md, sections 4 to 6): its front page, which is the
+  // client's signed-out main in the browser, the client's Authorize place
+  // for Forgejo, and the pages Google's return route answers at each
+  // ending. `?state=` names an ending, `?from=forgejo` an authorization of
+  // Forgejo's. Each says, in slate, the address the tab is at and how it
+  // got there.
+  const DEV_WORLD = 'dev-site';
+  // Google's button as its branding guidelines draw it: its mark, its words.
+  const googleMark = '<svg class="google-mark" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
+  const googleButton = (label, note) => `<a class="google-button" href="#" data-later="${esc(note)}">${googleMark}<span>${esc(label)}</span></a>`;
+  const SIGN_IN_STATES = [
+    ['signed-out', 'Signed out, by Sign out: Forgejo keeps its own sign-in'],
+    ['not-member', 'Back from Google: an address that is no member’s'],
+    ['other-account', 'Back from Google: a member’s address, from another Google account than the one bound to it'],
+    ['unverified', 'Back from Google: an address Google has not verified'],
+    ['cancelled', 'Back from Google: cancelled there'],
+    ['expired', 'Back from Google: the state unknown, used, past its deadline, or from before a restart'],
+    ['busy', 'Back from Google: jig’s Mint refused, not ready or busy'],
+    ['unknown-client', 'An authorization whose redirect URI is not Forgejo’s registered one'],
+  ];
+  pages['sign-in'] = () => {
+    document.body.classList.add('terminal-pages');
+    const site = world.site;
+    if (!site) return `<div class="mock-index"><p>The sign-in page is drawn in the world <a href="${esc(u(`sign-in.html?world=${DEV_WORLD}`, '1'))}">Dev site</a>.</p></div>`;
+    const forge = forgeOf(site.forge);
+    const forgeHost = new URL(forge.web).host;
+    const siteHost = new URL(site.origin).host;
+    const state = params.get('state');
+    const fromForgejo = params.get('from') === 'forgejo';
+    const name = conf('the deployment’s name, with its public address (draft dev-site.md, 2.2)', esc(site.name));
+    const where = (address, how) => `<p class="mock-url"><b>${esc(address)}</b>${how ? `<br>${how}` : ''}</p>`;
+    const googleMarkNote = ahead('Google', 'signing in with Google, through jig’s Mint: draft dev-site.md, section 4');
+    const providerNote = ahead('provider', 'temper as Forgejo’s OpenID provider: draft dev-site.md, section 5');
+    const brand = '<p class="sign-in-brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1.5c1.5 5.6 2.9 7 8.5 8.5-5.6 1.5-7 2.9-8.5 8.5C10.5 12.9 9.1 11.5 3.5 10 9.1 8.5 10.5 7.1 12 1.5Z"/><circle cx="18.5" cy="18.5" r="2" fill="currentColor"/></svg><span>temper</span></p>';
+    const foot = `<p class="sign-in-foot muted tiny"><span>${conf('the public address', esc(siteHost))}</span><span>Signing in here also opens ${conf('the forge’s name', esc(forge.name))}</span></p>`;
+    const page = (address, how, body, after = '') => `<main class="sign-in-page">${where(address, how)}<section class="card sign-in-card">${brand}${body}</section>${foot}${after}</main>`;
+    const authorize = `${site.origin}/oauth/authorize?client_id=forgejo&redirect_uri=https%3A%2F%2F${forgeHost}%2Fuser%2Foauth2%2Ftemper%2Fcallback&response_type=code&scope=openid+email+profile&state=Zk9x…&nonce=…`;
+    const returned = query => `${site.origin}/sign-in/google/return?${query}`;
+    const start = then => `Mockup: GET /sign-in/google?then=${then} draws the sign-in’s state, binds it to this browser by a cookie, and sends the tab to Google; Google sends it back to /sign-in/google/return.`;
+    const chooser = 'Mockup: a fresh sign-in, with Google’s account chooser, back to /sign-in/google/return.';
+    const ways = (then, label = 'Continue with Google', note = start(then)) => `<div class="sign-in-ways">${googleButton(label, note)}${googleMarkNote}</div>`;
+    const back = `<a class="text-link" href="${esc(u('sign-in.html', '1'))}">Back to ${name}</a>`;
+    const member = fact('Google: the ID token’s verified address', esc(site.member));
+    const stranger = fact('Google: the ID token’s address', esc(site.stranger));
+    const front = (notice, then) => `<h1>${name}</h1><p class="muted">${conf('the deployment’s line about itself', esc(site.line))}</p>${notice}${ways(then)}<p class="muted tiny">For ${name}’s members. An owner adds you by your Google address.</p>`;
+    const variants = bare ? '' : `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the front page after Sign out (draft dev-site.md, section 6), each page Google’s return route answers instead of signing in (4.3), and Forgejo’s authorization refused (5.3).</p><ul class="sign-in-variants">${SIGN_IN_STATES.map(([s, what]) => `<li><a href="${esc(u(`sign-in.html?state=${s}`))}">${esc(what)}</a></li>`).join('')}</ul></section>`;
+
+    if (fromForgejo && world.signedIn) {
+      return page(authorize, `From Forgejo’s “Sign in with temper”, or its route /user/oauth2/temper, which Open Forgejo ↗ opens. temper’s page, read by the client as its Authorize place: signed in, it sends jig’s Authorize, and replaces its address with Forgejo’s callback and the code. ${providerNote}`,
+        `<h1>Continuing to Forgejo…</h1><p class="muted">Signed in to ${name} as ${fact('jig: the party signed in', esc(world.person))} · ${member}. ${conf('the forge’s name', esc(forge.name))} opens in a moment, signed in as ${conf('the member’s login', esc(site.login))}.</p><p class="sign-in-acts"><a class="text-link" href="#" data-later="${esc(`Mockup: ${forge.web}, signed in as ${site.login}: Forgejo’s page, not drawn.`)}">Forgejo, a blink later ↗</a></p>`);
+    }
+    if (fromForgejo) {
+      return page(authorize, `From Forgejo’s “Sign in with temper”, or its route /user/oauth2/temper. temper’s page, read by the client as its Authorize place: signed out, it draws the sign-in, its then this address. Google’s return lands back here, and the authorization continues. ${providerNote}`,
+        front(`<p class="sign-in-notice">Sign in to continue to <b>${conf('the forge’s name', esc(forge.name))}</b></p>`, '/oauth/authorize…'));
+    }
+    if (!state && world.signedIn) {
+      return `<main class="sign-in-page">${where(`${site.origin}/`, '')}<p class="mock-note">Signed in, the front page is the chats page: <a class="text-link" href="${esc(u('chats.html'))}">Chats</a>. The signed-out page is <a class="text-link" href="${esc(u('sign-in.html?state=signed-out'))}">after Sign out</a>.</p></main>`;
+    }
+    const tryAgain = ways('/', 'Continue with Google');
+    const another = `<div class="sign-in-ways">${googleButton('Use another Google account', chooser)}</div><p class="sign-in-acts">${back}</p>`;
+    switch (state) {
+      case 'signed-out':
+        return page(`${site.origin}/`, 'After Sign out: jig ended the sign-in and cleared its cookie. The client’s signed-out main, with a line of the page’s own for having signed out.',
+          front(`<p class="sign-in-notice">Signed out of ${name}. ${conf('the forge’s name', esc(forge.name))} keeps its own sign-in: sign out there too. ${ahead('sign-out', 'no single sign-out: draft dev-site.md, section 6')}</p>`, '/'));
+      case 'not-member':
+        return page(returned('code=…&state=Rk2p…'), 'Google’s return: the state matched this browser’s cookie and the ID token checked, but its address is no member’s. Nothing is minted.',
+          `<h1>${stranger} isn’t a member of ${name}</h1><p class="muted">Google signed you in, but ${name} doesn’t know this address. Ask one of its owners to add it, or use the Google account they added.</p>${another}`);
+      case 'other-account':
+        return page(returned('code=…&state=Rk2p…'), `Google’s return: ${esc(site.member)} is a member, bound at its first sign-in to another Google account (its subject), so this one is refused.`,
+          `<h1>${member} is a member of ${name} with another Google account</h1><p class="muted">This Google account isn’t the one that first signed in with this address. Use that one, or ask an owner.</p>${another}`);
+      case 'unverified':
+        return page(returned('code=…&state=Rk2p…'), 'Google’s return: the ID token says its address is not verified.',
+          `<h1>Google hasn’t verified ${stranger}</h1><p class="muted">${name} signs in only an address Google has verified. Verify it with Google, or use another account.</p>${another}`);
+      case 'cancelled':
+        return page(returned('error=access_denied&state=Rk2p…'), 'Google’s return with its error: the person cancelled at Google.',
+          `<h1>The sign-in didn’t finish</h1><p class="muted">${fact('Google: the return’s error, in words', 'You cancelled at Google.')} Nothing was kept.</p>${tryAgain}<p class="sign-in-acts">${back}</p>`);
+      case 'expired':
+        return page(returned('code=…&state=Rk2p…'), 'Google’s return with a state temper does not hold: used, past the sign-in’s deadline, from before a restart, or with no cookie of this browser’s.',
+          `<h1>The sign-in didn’t finish</h1><p class="muted">It took too long, or temper restarted while you were at Google. Nothing was kept.</p>${tryAgain}<p class="sign-in-acts">${back}</p>`);
+      case 'busy':
+        return page(returned('code=…&state=Rk2p…'), 'Google’s return for a member, and jig’s Mint refused: not ready, while the engine stops, or busy, at the people child’s limits.',
+          `<h1>temper couldn’t sign you in just now</h1><p class="muted">It is starting or stopping, or signing many people in at once. Nothing was kept: try again in a moment.</p>${tryAgain}`);
+      case 'unknown-client':
+        return page(`${site.origin}/oauth/authorize?client_id=forgejo&redirect_uri=https%3A%2F%2Fgit.example%2Fcallback&response_type=code&scope=openid&state=…`, `An authorization whose redirect URI is not the one registered for its client: jig refuses Authorize, and the page goes nowhere. ${providerNote}`,
+          `<h1>This sign-in can’t continue</h1><p class="muted">The site that sent you here asked temper to send you back to an address temper doesn’t know. Nothing was sent anywhere.</p><p class="sign-in-acts"><a class="text-link" href="${esc(u('sign-in.html', '1'))}">Go to ${name}</a></p>`);
+      default:
+        return page(`${site.origin}/`, 'No cookie of temper’s, or one the engine doesn’t know: the client’s signed-out main, with the ways of signing in the configuration gives.',
+          front('', '/'), variants);
+    }
   };
 
   // ---- Mount ----------------------------------------------------------
