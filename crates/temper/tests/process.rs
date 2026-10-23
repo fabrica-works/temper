@@ -675,6 +675,9 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         let began = clock.now().now;
         steps.push(Step::Mark("first repository ready"));
         if run == "first" {
+            // protocol/setup.md, 13.4: main's push run is taken before the owner's
+            // first task; no pull exists yet to have caused this runner line.
+            steps.push(Step::Stderr(b" repo is work/hello "));
             steps.extend(support::first_repository::task_steps(&client_root));
         } else {
             steps.extend(support::first_repository::found_steps());
@@ -794,14 +797,6 @@ fn assert_forgejo_setup(
         for step in ["forgejo 3: ", "runner 3: "] {
             assert!(stderr.lines().any(|line| line.starts_with(step)), "group step {step}: {stderr}");
         }
-        // The box harness has no mid-story stderr gate. CreateFile's main push
-        // precedes the pull whose Passed check assert_task reads (setup.md, 13.4).
-        let tasks: std::collections::BTreeSet<u64> = stderr
-            .lines()
-            .filter(|line| line.starts_with("runner 3: "))
-            .filter_map(|line| line.split_once("msg=\"task ")?.1.split_once(" repo is work/hello ")?.0.parse().ok())
-            .collect();
-        assert!(tasks.len() >= 2, "the runner took main's push and the pull on work/hello: {stderr}");
     } else {
         assert!(
             !stderr.lines().any(|line| line.starts_with("fetch ") || line.contains("download")),

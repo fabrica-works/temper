@@ -377,6 +377,7 @@ impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
         {
             on_link();
         }
+        calls.observe_box_stderr(binary.stderr(), now);
         let failed = calls.ends().iter().enumerate().any(|(index, call)| {
             let expected = self.expected_exits.iter().find(|(at, _)| *at == index).map_or(0, |(_, code)| *code);
             call.exit != Some(Exit::Code(expected))
@@ -527,7 +528,9 @@ fn run_ctl_peers<T>(
         )),
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
-    world.spawn_with_fds(fds, || Process::Calls(Box::new(super::ctl::Calls::new(root, steps, Some(&streams), None))));
+    world.spawn_with_fds(fds, || {
+        Process::Calls(Box::new(super::ctl::Calls::new(root, steps, Some(&streams), None).with_box_stderr()))
+    });
     if let Some(peer) = peer {
         world.spawn(|| Process::Peer(Box::new(peer)));
     }

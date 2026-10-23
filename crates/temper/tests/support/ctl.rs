@@ -55,6 +55,8 @@ impl Call {
 }
 pub enum Step {
     Mark(&'static str),
+    /// Wait for bytes in the box's captured stderr; requires a box referee.
+    Stderr(&'static [u8]),
     Run(Call),
     Start(Call),
     Join,
@@ -238,6 +240,7 @@ impl Child {
 enum Action {
     Run,
     Until(Call, &'static [u8]),
+    Stderr(&'static [u8]),
     Signal,
 }
 
@@ -245,6 +248,10 @@ enum Action {
 enum Admission {
     Batch,
     Open,
+}
+enum BoxStderr {
+    Absent,
+    Captured,
 }
 pub struct Calls {
     root: Option<Fd>,
@@ -256,6 +263,7 @@ pub struct Calls {
     steps: VecDeque<Step>,
     child: Option<Child>,
     action: Option<Action>,
+    box_stderr: BoxStderr,
     started: Option<(Child, usize)>,
     awaiting_started: bool,
     cancelling: bool,
@@ -328,6 +336,21 @@ impl Calls {
     pub(super) fn pending(&self) -> Option<&Ended> {
         self.child.as_ref().map(|child| &child.ended)
     }
+    #[must_use]
+    pub(super) fn with_box_stderr(mut self) -> Self {
+        self.box_stderr = BoxStderr::Captured;
+        self
+    }
+    /// The box referee checks after each ring wake, including stderr reads.
+    pub(super) fn observe_box_stderr(&mut self, stderr: &[u8], now: Time) {
+        while let Some(Action::Stderr(bytes)) = &self.action {
+            if !stderr.windows(bytes.len()).any(|window| window == *bytes) {
+                break;
+            }
+            self.action = None;
+            self.advance(now);
+        }
+    }
     pub(super) fn new(root: Fd, steps: Vec<Step>, streams: Option<&Streams>, forgejo: Option<u32>) -> Self {
         let mut calls = Self {
             root: Some(root),
@@ -339,6 +362,7 @@ impl Calls {
             steps: steps.into(),
             child: None,
             action: None,
+            box_stderr: BoxStderr::Absent,
             started: None,
             awaiting_started: false,
             cancelling: false,
@@ -434,6 +458,7 @@ impl Calls {
                     self.retry = Some(now.saturating_add(PACE));
                 }
             }
+            Action::Stderr(_) => panic!("a stderr gate has no child"),
             Action::Signal => assert_eq!(
                 ended.exit,
                 Some(Exit::Code(0)),
@@ -453,6 +478,7 @@ impl Calls {
         if self.cancelling
             || self.child.is_some()
             || self.awaiting_started
+            || matches!(self.action, Some(Action::Stderr(_)))
             || self.retry.is_some_and(|retry| retry > now)
         {
             return;
@@ -468,6 +494,11 @@ impl Calls {
                     eprintln!("{name}: {} ms", now.saturating_since(began).as_nanos() / 1_000_000);
                 }
                 self.advance(now);
+            }
+            Some(Step::Stderr(bytes)) => {
+                assert!(matches!(self.box_stderr, BoxStderr::Captured), "Step::Stderr requires captured box stderr");
+                assert!(!bytes.is_empty(), "Step::Stderr requires nonempty bytes");
+                self.action = Some(Action::Stderr(bytes));
             }
             Some(Step::Run(call)) => {
                 self.action = Some(Action::Run);
