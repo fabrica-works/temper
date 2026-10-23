@@ -37,6 +37,15 @@ impl Domain {
         self.demo_state
     }
     #[must_use]
+    /// Ended state comes from the demo record, independently of routing events.
+    pub fn forge_ended(&self, forge: u16) -> bool {
+        self.demo_state == Some(DemoState::Ended)
+            && match &self.demo {
+                Some(demo) => demo.adoption.forge == forge,
+                None => false,
+            }
+    }
+    #[must_use]
     pub fn demo_adopted(&self) -> bool {
         let Some(demo) = &self.demo else { return false };
         let wanted = &demo.adoption;
@@ -120,4 +129,25 @@ pub(crate) fn restart(d: &Domain, out: &mut Queue<Request>) {
             request: Token::new(u64::MAX),
         });
     }
+}
+
+/// The first other configured forge ends the playground in this decision
+/// (protocol/setup.md, 8.4). Its records remain available to lookups.
+pub(crate) fn connected(d: &mut Domain, forge: u16, out: &mut Queue<Request>) {
+    let Some(demo) = &d.demo else { return };
+    let demo_forge = demo.adoption.forge;
+    if forge == demo_forge || !d.configured.contains_key(&forge) || d.demo_state == Some(DemoState::Ended) {
+        return;
+    }
+    let ran = d.demo_state == Some(DemoState::Running);
+    d.demo_state = Some(DemoState::Ended);
+    out.push(Request::Save {
+        read_afresh: None,
+        release: None,
+        record: Stored::Demo(Demo { forge: demo_forge, state: DemoState::Ended }),
+    });
+    if ran && d.under_box {
+        out.push(Request::StopGroup { forge: demo_forge });
+    }
+    answered(d, StartAnswer::NotOffered, out);
 }

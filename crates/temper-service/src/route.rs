@@ -1,5 +1,6 @@
 //! Exhaustive root routing to its protocol components.
 use crate::{engine::Engine, stop};
+use alloc::boxed::Box;
 use temper_engine_domain as root;
 
 pub(crate) mod box_link;
@@ -10,6 +11,11 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         demo.state = engine.domain.demo_state();
     }
     match request {
+        root::Request::StopGroup { forge } => {
+            let mut out = skein_lib::Queue::with_capacity(1);
+            engine.box_link.stop(forge, &mut out);
+            box_link::drain(engine, &mut out);
+        }
         root::Request::SetUpGroup { forge, request } => {
             let mut out = skein_lib::Queue::with_capacity(3);
             engine.box_link.ask(forge, request, &mut out);
@@ -36,7 +42,19 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
             }
         }
         root::Request::Forge { call, repository, op } => {
-            engine.forge.down(skein_forge_connection::Request::Call { call, repository, op });
+            if crate::forge::ended(engine, repository.forge) {
+                engine.events.push(root::Event::Forge(Box::new(temper_engine_domain_forge::Event::Client(
+                    skein_forge_client::Event::Answered {
+                        call,
+                        cost: 0,
+                        result: Err(skein_forge::api::Error::NotConnected),
+                        free: 0,
+                        rate: None,
+                    },
+                ))));
+            } else {
+                engine.forge.down(skein_forge_connection::Request::Call { call, repository, op });
+            }
         }
         root::Request::ToChild(released) => engine.events.push(root::Event::Released(released)),
         root::Request::Busy(event) => {

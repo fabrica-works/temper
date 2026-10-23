@@ -100,7 +100,7 @@ enum Handoff {
 /// The bounded forge connector subtree.
 #[derive(Debug)]
 pub struct Domain {
-    configured: Map<u16, crate::Configured>,
+    pub(crate) configured: Map<u16, crate::Configured>,
     pub(crate) under_box: bool,
     pub(crate) demo: Option<crate::DemoConfig>,
     pub(crate) demo_state: Option<crate::DemoState>,
@@ -168,6 +168,9 @@ impl Domain {
     }
     #[must_use]
     pub fn connection(&self, forge: u16) -> crate::Connection {
+        if self.forge_ended(forge) {
+            return crate::Connection::NotConnected;
+        }
         match self.connections.get(&forge) {
             Some((state, _)) => state.clone(),
             None => crate::Connection::NotConnected,
@@ -193,6 +196,9 @@ impl Domain {
     pub fn forges(&self) -> crate::Forges {
         let mut rows = List::with_capacity(self.configured.len());
         for (forge, config) in &self.configured {
+            if self.forge_ended(*forge) {
+                continue;
+            }
             rows.push(crate::Row {
                 number: *forge,
                 kind: config.kind,
@@ -209,7 +215,7 @@ impl Domain {
     #[must_use]
     pub fn offer(&self, forge: u16) -> crate::Offer {
         let Some(config) = self.configured.get(&forge) else { return crate::Offer::NotOffered };
-        if config.mode != crate::Mode::Owned || !config.asked {
+        if self.forge_ended(forge) || config.mode != crate::Mode::Owned || !config.asked {
             return crate::Offer::NotOffered;
         }
         match self.connection(forge) {
@@ -636,7 +642,7 @@ impl Domain {
     pub fn adopted_ids(&self, forge: u16) -> Box<[u64]> {
         let mut ids = List::with_capacity(self.repositories.len());
         for (repository, _) in &self.repositories {
-            if repository.forge == forge {
+            if repository.forge == forge && !self.forge_ended(forge) {
                 ids.push(u64::from(repository.repository)).expect("bounded adopted repositories");
             }
         }
@@ -778,7 +784,7 @@ impl Domain {
     #[expect(clippy::manual_find, reason = "the strict subset uses explicit iteration instead of iterator closures")]
     pub fn home(&self, project: u32) -> Option<&Repository> {
         for (_, repository) in &self.repositories {
-            if repository.project == project && repository.home {
+            if repository.project == project && repository.home && !self.forge_ended(repository.provider.forge) {
                 return Some(repository);
             }
         }
@@ -891,6 +897,9 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::BoxClosed => {
             d.under_box = false;
             for (forge, _) in &d.configured {
+                if d.forge_ended(*forge) {
+                    continue;
+                }
                 if let Some((state, _)) = d.connections.get_mut(forge)
                     && let crate::Connection::SettingUp { .. } = state
                 {
@@ -923,8 +932,12 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             }
         }
         Event::Connection { forge, state } => {
+            if d.forge_ended(forge) {
+                return;
+            }
             match &state {
                 crate::Connection::Connected { id, .. } => {
+                    crate::demo::connected(d, forge, out);
                     assert!(
                         writer(d, env, skein_forge_client::Writer { forge, author: *id }, out),
                         "same forge writer"
