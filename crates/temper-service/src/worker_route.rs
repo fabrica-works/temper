@@ -127,6 +127,7 @@ pub fn activity(body: &[u8], agent: &crate::settings::Agent) -> Option<hub::Acti
     Some(hub::Activity::Count { kind, elapsed: fact.elapsed(), count: fact.count() })
 }
 
+/// Decode the hub start, including its live ask (domain/worker.md, 4.1 and 7).
 pub fn decode(run: Token, source: hub::Start, agent: &crate::settings::Agent) -> Result<Box<smith::Start>, Invalid> {
     let Ok(charter) = smith_protocol_channel::decode_charter(&source.charter, &agent.limits.charter, &agent.endpoints)
     else {
@@ -190,7 +191,15 @@ pub fn decode(run: Token, source: hub::Start, agent: &crate::settings::Agent) ->
         messages: messages.into_boxed(),
         directories: Box::default(),
         grants: grants.into_boxed(),
-        live: None,
+        live: if source.live == hub::LiveAsk::NONE {
+            None
+        } else {
+            Some(smith::channel::LiveAsk {
+                text: source.live.text,
+                reasoning: source.live.reasoning,
+                input: source.live.input,
+            })
+        },
     }))
 }
 
@@ -204,7 +213,30 @@ pub fn process(event: smith_host_protocol::ProcessEvent) -> Option<temper_worker
         ProcessEvent::Reaped { agent, detail } => smith::process::Event::Reaped { owner: agent, detail },
         ProcessEvent::Channel { agent, event } => match *event {
             OpenEvent::Opened { .. } | OpenEvent::WriteFailed => return None,
-            OpenEvent::Live { .. } => smith::process::Event::Progress { owner: agent },
+            OpenEvent::Live { turn, retry, kind, offset, bytes, call } => {
+                let kind = match kind {
+                    smith_channel::LiveKind::Text => {
+                        if call.is_some() {
+                            return None;
+                        }
+                        hub::LiveKind::Text
+                    }
+                    smith_channel::LiveKind::Reasoning => {
+                        if call.is_some() {
+                            return None;
+                        }
+                        hub::LiveKind::Reasoning
+                    }
+                    smith_channel::LiveKind::Input => {
+                        let call = call?.into_parts();
+                        hub::LiveKind::Input { call: call.id, tool: call.tool }
+                    }
+                };
+                return Some(temper_worker_domain::Event::Live {
+                    agent,
+                    piece: hub::Piece { turn, retry, kind, offset, bytes },
+                });
+            }
             OpenEvent::Hangup { .. } => smith::process::Event::Hangup { owner: agent },
             OpenEvent::Sent { .. } => smith::process::Event::Sent { owner: agent },
             OpenEvent::Unsent { .. } => smith::process::Event::Unsent { owner: agent },

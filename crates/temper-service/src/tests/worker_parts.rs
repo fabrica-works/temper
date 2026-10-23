@@ -44,10 +44,7 @@ fn a_call_name_is_encoded_as_smiths_channel_record() {
 fn a_process_exit_keeps_its_owner_and_status() {
     let owner = Token::new(9);
     assert_eq!(
-        worker_route::process(smith_host_protocol::ProcessEvent::Exited {
-            agent: owner,
-            exit: Some(skein_io::kernel::Exit::Code(3)),
-        }),
+        worker_route::process(ProcessEvent::Exited { agent: owner, exit: Some(skein_io::kernel::Exit::Code(3)) }),
         Some(temper_worker_domain::Event::Process(Box::new(agent::process::Event::Exited {
             owner,
             exit: Some(agent::Exit::Code(3)),
@@ -55,21 +52,104 @@ fn a_process_exit_keeps_its_owner_and_status() {
     );
 }
 
+use smith_host_protocol::{OpenEvent, ProcessEvent};
+
+const AGENT: Token = Token::new(71);
+const RUN: Token = Token::new(43);
+const TURN: u32 = 7;
+const RETRY: u32 = 3;
+// An offset wider than the core keeps must still cross this hand-out whole.
+const OFFSET: u64 = 1_u64 << 32;
+
+fn call() -> smith_channel::LiveCall {
+    smith_channel::LiveCall::new(
+        &smith_channel::CEILINGS,
+        smith_channel::LiveCallParts { id: b"provider-call".as_slice().into(), tool: b"tool".as_slice().into() },
+    )
+    .expect("bounded call")
+}
+
+fn live(kind: smith_channel::LiveKind, call: Option<smith_channel::LiveCall>) -> ProcessEvent {
+    ProcessEvent::Channel {
+        agent: AGENT,
+        event: Box::new(OpenEvent::Live {
+            turn: TURN,
+            retry: RETRY,
+            kind,
+            offset: OFFSET,
+            bytes: b"piece".as_slice().into(),
+            call,
+        }),
+    }
+}
+
 #[test]
-fn a_live_piece_becomes_progress_for_its_owner() {
-    let owner = Token::new(9);
-    let live = smith_host_protocol::OpenEvent::Live {
-        turn: 1,
-        retry: 0,
-        kind: smith_channel::LiveKind::Text,
-        offset: 0,
-        bytes: b"live text".as_slice().into(),
-        call: None,
-    };
-    assert_eq!(
-        worker_route::process(smith_host_protocol::ProcessEvent::Channel { agent: owner, event: Box::new(live) }),
-        Some(temper_worker_domain::Event::Process(Box::new(agent::process::Event::Progress { owner }))),
-    );
+fn each_live_kind_keeps_every_field() {
+    for (kind, call, expected) in [
+        (smith_channel::LiveKind::Text, None, host::LiveKind::Text),
+        (smith_channel::LiveKind::Reasoning, None, host::LiveKind::Reasoning),
+        (
+            smith_channel::LiveKind::Input,
+            Some(call()),
+            host::LiveKind::Input { call: b"provider-call".as_slice().into(), tool: b"tool".as_slice().into() },
+        ),
+    ] {
+        assert_eq!(
+            worker_route::process(live(kind, call)),
+            Some(temper_worker_domain::Event::Live {
+                agent: AGENT,
+                piece: host::Piece {
+                    turn: TURN,
+                    retry: RETRY,
+                    kind: expected,
+                    offset: OFFSET,
+                    bytes: b"piece".as_slice().into()
+                },
+            })
+        );
+    }
+}
+
+#[test]
+fn a_live_kind_disagreeing_with_its_call_is_dropped() {
+    for (kind, call) in [
+        (smith_channel::LiveKind::Text, Some(call())),
+        (smith_channel::LiveKind::Reasoning, Some(call())),
+        (smith_channel::LiveKind::Input, None),
+    ] {
+        assert_eq!(worker_route::process(live(kind, call)), None);
+    }
+}
+
+#[test]
+fn the_start_passes_each_ask_and_omits_an_empty_one() {
+    let agent = fixtures::agent();
+    for text in [false, true] {
+        for reasoning in [false, true] {
+            for input in [false, true] {
+                let jig_protocol_worker_link::Request::Down { down: host::LinkDown::Assign { assignment }, .. } =
+                    fixtures::chat_assignment()
+                else {
+                    panic!("fixture assignment")
+                };
+                let source = host::Start {
+                    live: host::LiveAsk { text, reasoning, input },
+                    workspace: None,
+                    charter: assignment.assignment.charter,
+                    activation: 1,
+                    identity: assignment.assignment.identity,
+                    turns: Box::new([]),
+                    answered: Box::new([]),
+                    messages: Box::new([]),
+                    grants: Box::new([]),
+                };
+                assert_eq!(
+                    worker_route::decode(RUN, source, &agent).expect("decoded fixture").live,
+                    (text || reasoning || input).then_some(agent::channel::LiveAsk { text, reasoning, input })
+                );
+            }
+        }
+    }
 }
 
 use super::fixtures;
