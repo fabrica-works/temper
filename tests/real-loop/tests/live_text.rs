@@ -56,7 +56,8 @@ fn a_person_reads_a_chats_reply_as_it_is_written_then_its_committed_turn() {
             previous = prefix.len();
         }
         if let Some((_, assistant)) = text.split_once("Conversation:\n").and_then(|(_, c)| c.split_once("Temper\n"))
-            && assistant.lines().next().is_some_and(|line| line.trim_ascii_start() == reply)
+            // The committed turn's lines follow its speaker and clock.
+            && assistant.lines().any(|line| line.trim_ascii_start() == reply)
         {
             assert!(
                 !text.contains(PROVISIONAL),
