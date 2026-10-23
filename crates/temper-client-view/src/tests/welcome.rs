@@ -181,3 +181,53 @@ fn an_unavailable_welcome_keeps_the_signed_out_and_out_of_date_frame() {
         assert!(f::find(view.tree(), Role::Heading { level: 1 }, b"Welcome to temper").is_none());
     }
 }
+
+fn ready_model_fixture() -> (d::Domain, skein_lib::Token) {
+    let (mut root, watch) = super::connect_model::flow_fixture(d::WayKind::SignIn);
+    f::root_event(&mut root, d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Ready }) });
+    (root, watch)
+}
+fn signing_document() -> jig_client::contract::OwnerAccounts {
+    let mut doc =
+        super::accounts::card_document(b"openai", b"alice@example.com", jig_client::contract::OwnerAccountKind::SignIn);
+    doc.accounts.clear();
+    doc
+}
+#[test]
+fn ready_waits_for_the_accounts_document_before_drawing_a_model_line() {
+    let (root, _) = ready_model_fixture();
+    let view = f::page_view(&root);
+    let words = String::from_utf8_lossy(&f::text(view.tree())).into_owned();
+    assert!(!words.contains("Model:"));
+    assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
+}
+#[test]
+fn ready_names_an_own_sign_in_under_way_without_a_connect_act() {
+    let (mut root, watch) = ready_model_fixture();
+    super::accounts::deliver(&mut root, watch, signing_document());
+    let view = f::page_view(&root);
+    node(view.tree(), Role::Paragraph, "Model: ChatGPT · signing in");
+    assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
+}
+#[test]
+fn ready_does_not_name_another_holders_sign_in() {
+    let (mut root, watch) = ready_model_fixture();
+    let mut doc = signing_document();
+    doc.signing.get_mut(0).unwrap().holder = jig_client::contract::OwnerAccountHolder::Deployment;
+    super::accounts::deliver(&mut root, watch, doc);
+    let view = f::page_view(&root);
+    node(view.tree(), Role::Paragraph, "Model: none yet");
+    node(view.tree(), Role::Link, "Connect a model");
+}
+#[test]
+fn ready_names_a_usable_account_before_a_sign_in_under_way() {
+    let (mut root, watch) = ready_model_fixture();
+    super::accounts::deliver(
+        &mut root,
+        watch,
+        super::accounts::card_document(b"openai", b"alice@example.com", jig_client::contract::OwnerAccountKind::SignIn),
+    );
+    let view = f::page_view(&root);
+    node(view.tree(), Role::Paragraph, "Model: ChatGPT · alice@example.com · OpenAI · held by Pat");
+    assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
+}

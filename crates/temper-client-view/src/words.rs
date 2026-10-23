@@ -50,6 +50,7 @@ pub enum Word {
     WelcomeForgeConnected,
     WelcomeForgeStatus,
     WelcomeModelAccount,
+    WelcomeModelSigningIn,
     ForgeConfigCode,
     ForgeIdentityCode,
     ForgeSetupCode,
@@ -524,8 +525,8 @@ pub enum Word {
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
-const PHRASES: u32 = 1009;
-const ALL: [Word; 476] = [
+const PHRASES: u32 = 1010;
+const ALL: [Word; 477] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -565,6 +566,7 @@ const ALL: [Word; 476] = [
     Word::WelcomeForgeConnected,
     Word::WelcomeForgeStatus,
     Word::WelcomeModelAccount,
+    Word::WelcomeModelSigningIn,
     Word::ForgeConfigCode,
     Word::ForgeIdentityCode,
     Word::ForgeSetupCode,
@@ -1046,6 +1048,7 @@ impl Word {
             Self::WelcomeForgeConnected => 1708,
             Self::WelcomeForgeStatus => 1709,
             Self::WelcomeModelAccount => 1710,
+            Self::WelcomeModelSigningIn => 1832,
             Self::ForgeConfigCode => 1711,
             Self::ForgeIdentityCode => 1712,
             Self::ForgeSetupCode => 1713,
@@ -1738,6 +1741,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::WelcomeForgeConnected => (&[b"Forge: ", b", connected as ", b""], &[Name, Name]),
         Word::WelcomeForgeStatus => (&[b"Forge: ", b" \xc2\xb7 ", b""], &[Name, Name]),
         Word::WelcomeModelAccount => (&[b"Model: ", b""], &[Name]),
+        Word::WelcomeModelSigningIn => (&[b"Model: ", b" \xc2\xb7 signing in"], &[Name]),
         Word::ForgeConfigCode => (&[b"{\n  \"number\": ", b",\n  \"kind\": \"forgejo\",\n  \"api\": {\"host\": \"forge.example\", \"port\": 443},\n  \"transport\": {\"tls\": {\n    \"server_name\": \"forge.example\", \"trust\": null\n  }},\n  \"git\": \"https://forge.example\",\n  \"web\": null,\n  \"log_origins\": null\n}"], &[Number]),
         Word::ForgeIdentityCode => (&[b"{\n  \"number\": ", b", \"forge\": ", b", \"login\": null,\n  \"author\": {\n    \"name\": \"temper\",\n    \"email\": \"temper-bot@forge.example\"\n  }\n}"], &[Number, Number]),
         Word::ForgeSetupCode => (&[b"{\n  \"forge\": ", b",\n  \"bot\": {\"login\": \"temper\", \"email\": \"temper-bot@forge.example\"},\n  \"mode\": \"managed\"\n}"], &[Number]),

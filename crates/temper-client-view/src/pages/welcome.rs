@@ -217,14 +217,18 @@ fn ready(
         go(b, w, bindings, Word::WelcomeForgeTitle, Step::Forge { forge: None });
     }
     b.close();
-    b.open(Role::Item);
-    if let Some(account) = super::accounts::first_usable_heading(root, w) {
-        crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeModelAccount, &[Hole::Name(account)]));
-    } else {
-        text(b, w, Role::Paragraph, Word::WelcomeNoModel);
-        go(b, w, bindings, Word::WelcomeModelTitle, Step::Model { way: None });
+    if temper_client_domain::pages::accounts::document(root.client()).is_some() {
+        b.open(Role::Item);
+        if let Some(account) = super::accounts::first_usable_heading(root, w) {
+            crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeModelAccount, &[Hole::Name(account)]));
+        } else if let Some(provider) = super::accounts::own_signing_name(root, w) {
+            crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeModelSigningIn, &[Hole::Name(provider)]));
+        } else {
+            text(b, w, Role::Paragraph, Word::WelcomeNoModel);
+            go(b, w, bindings, Word::WelcomeModelTitle, Step::Model { way: None });
+        }
+        b.close();
     }
-    b.close();
     b.close();
     if let Some(row) = row
         && row.first.is_none()
