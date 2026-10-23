@@ -60,6 +60,12 @@ pub enum Read {
     PlannerFirst,
     PlanEnded,
     SubownerEnded,
+    MisreadParked,
+    MisreadHelperRunning,
+    MisreadRulePending,
+    MisreadFresh,
+    MisreadHelperEnded,
+    MisreadEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -519,5 +525,64 @@ pub fn step_5_5() -> Vec<calls::Step> {
         call(D1, argv!["activity", number(PLANNER), "--before", calls::activity_before(5), "--json"]),
         call(D1, argv!["activity", number(PLANNER), "--before", calls::activity_before(6), "--json"]),
         call(D1, argv!["task", number(SUBOWNER), "--json"]),
+    ]
+}
+
+// Act 2, step 5.6 (domain/testing.md, 5.3)
+const MISREAD_ENDED: usize = 2;
+pub const READS_5_6: &[(Read, usize)] = &[
+    (Read::MisreadEnded, MISREAD_ENDED),
+    (Read::MisreadParked, 3),
+    (Read::MisreadHelperRunning, 4),
+    (Read::MisreadRulePending, 6),
+    (Read::MisreadFresh, 7),
+    (Read::MisreadHelperEnded, 9),
+];
+
+#[must_use]
+pub fn step_5_6() -> Vec<calls::Step> {
+    use super::{
+        MISREAD_CORRECTION, MISREAD_DIRECTOR, MISREAD_HELPER, MISREAD_HELPER_HOLD, MISREAD_PERSON, MISREAD_RECALL_HOLD,
+        MISREAD_RULE_PENDING,
+    };
+    vec![
+        sign_in(D1),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "misread", MISREAD_PERSON]),
+        start(D1, argv!["wait", "task", number(MISREAD_DIRECTOR), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(MISREAD_DIRECTOR), "--until", "phase:idle", "--json"]),
+        // As in 5.2, observe the helper's open writing run before cancelling it.
+        calls::until(D1, argv!["task", number(MISREAD_HELPER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["message", number(MISREAD_DIRECTOR), "--key", "informative", MISREAD_CORRECTION]),
+        calls::until(
+            D1,
+            argv!["run", number(MISREAD_DIRECTOR), "--json"],
+            MISREAD_RULE_PENDING.as_bytes(),
+            b"\"writing\":",
+        ),
+        call(D1, argv!["task", number(MISREAD_DIRECTOR), "--activity", "32", "--json"]),
+        calls::release_hold(MISREAD_HELPER_HOLD),
+        call(D1, argv!["wait", "task", number(MISREAD_HELPER), "--until", "ended"]),
+        call(D1, argv!["task", number(MISREAD_HELPER), "--activity", "32", "--json"]),
+        // Adopt only when the read needs it: no repeated forge polling while
+        // the two scripted runs establish the cancellation and fresh context.
+        call(
+            D1,
+            argv![
+                "adopt",
+                "--project",
+                number(PROJECT),
+                "--owner",
+                "acme",
+                "--name",
+                "app",
+                "--landing",
+                "main",
+                "--no-home",
+                "--key",
+                "misread-kit"
+            ],
+        ),
+        calls::release_hold(MISREAD_RECALL_HOLD),
+        join(MISREAD_ENDED),
     ]
 }
