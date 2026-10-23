@@ -58,3 +58,8 @@ pub fn peer() -> Limits {
         observation_bytes: 0,
     }
 }
+
+/// Retained for the peer's life, as smith's tests/agent-process/src/fake.rs
+/// peer used by the real loop (not a drain budget).
+pub const LLM_OBSERVATIONS: u32 = 256;
+pub const LLM_OBSERVATION_BYTES: u32 = 4_194_304;

@@ -13,6 +13,15 @@ fn arguments() {
         (vec!["fake", "llm", "--document", "llm.json"], vec![], Kind::Llm, "llm.json", None, 0, None),
         (vec!["fake", "forge", "--document", "forge.json"], vec![], Kind::Forge, "forge.json", None, 0, None),
         (
+            vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
+            vec![],
+            Kind::Llm,
+            "doc",
+            None,
+            0,
+            Some("seen"),
+        ),
+        (
             vec!["fake", "llm", "--document", "llm.json", "--ready", "ready ", "--seed", "23"],
             vec![],
             Kind::Llm,
@@ -78,10 +87,6 @@ fn arguments() {
         (
             vec!["fake", "llm", "--document", "doc", "--seed", "no"],
             "temper fake llm: --seed N (TEMPER_SEED): expected a decimal u64\n",
-        ),
-        (
-            vec!["fake", "llm", "--document", "doc", "--observations", "seen"],
-            "temper fake llm: unexpected argument --observations\n",
         ),
         (
             vec!["fake", "forge", "--document", "doc", "extra"],
@@ -313,6 +318,72 @@ fn observation_write_failure_drains_the_peer_and_keeps_its_outputs() {
         assert!(directory.join("forge/admin_token").exists());
         fs::remove_dir_all(directory).expect("valid fixture");
     }
+}
+
+#[test]
+fn llm_records_full_counts_connections_without_queries() {
+    let directory = std::env::temp_dir().join(format!("temper-llm-records-full-{}", std::process::id()));
+    crate::directories::make_private(&directory, skein_shell::effective_user()).expect("private fixture");
+    let document = directory.join("llm.json");
+    fs::write(
+        &document,
+        serde_json::to_vec(&serde_json::json!({
+            "listen":{"socket":"127.0.0.1:0"},"key":directory.join("key"),"tls":null,
+            "models":[{"name":"qa","window":4096,"output":1024}],
+            "cued":[],"asked":[],"otherwise":["answer"]
+        }))
+        .expect("document"),
+    )
+    .expect("fixture");
+    let path = directory.join("observations");
+    let arguments = Arguments {
+        kind: Kind::Llm,
+        source: Source::Document(document),
+        ready: None,
+        seed: 23,
+        observations: Some(path.clone()),
+    };
+    let (mut host, mut kernel) = start(&arguments, &mut Created::default()).expect("fixture");
+    let clock = skein_shell::Clock::new();
+    let mut connected = false;
+    let mut seen = 0;
+    while !host.failed {
+        kernel.reap(host.completions());
+        let skein_shell::Now { now, wall } = clock.now();
+        host.iterate(now, wall);
+        host.drain();
+        let Peer::Llm(peer) = &host.peer else { panic!("LLM peer") };
+        let closed =
+            peer.observations().iter().skip(seen).any(|record| matches!(record, llm_peer::Observation::Closed { .. }));
+        seen = peer.observations().len();
+        if !host.failed
+            && (!connected || closed)
+            && let Some(address) = host.peer.address()
+        {
+            // Accept and close are retained records even though no query is sent.
+            drop(std::net::TcpStream::connect(address).expect("connect"));
+            connected = true;
+        }
+        let wait = if host.work_pending(now) {
+            skein_shell::Wait::No
+        } else {
+            host.next_deadline().map_or(skein_shell::Wait::Forever, skein_shell::Wait::Until)
+        };
+        kernel.submit(host.submissions(), wait);
+    }
+    assert_eq!(host.llm_cursor, usize::try_from(limits::LLM_OBSERVATIONS).expect("record cap"));
+    assert_eq!(skein_shell::drive(&mut kernel, &clock, &mut host), Exit::Code(1));
+    assert!(host.is_empty());
+    assert_eq!(kernel.in_flight(), 0);
+    let records = fs::read_to_string(&path).expect("records");
+    let rows: Vec<serde_json::Value> = records.lines().map(|line| serde_json::from_str(line).expect("JSON")).collect();
+    assert!(rows.iter().all(|row| row["observation"] != "query"));
+    assert_eq!(rows[rows.len() - 2], serde_json::json!({"observations_lost":0}));
+    assert_eq!(
+        rows.last(),
+        Some(&serde_json::json!({"observation":"records_full","capacity":limits::LLM_OBSERVATIONS}))
+    );
+    fs::remove_dir_all(directory).expect("remove fixture");
 }
 
 #[test]

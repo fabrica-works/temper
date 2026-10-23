@@ -66,11 +66,19 @@ pub(crate) fn llm_limits() -> provider::Limits {
         documents: documents::Limits { anthropic: native, openai: native, model_ceiling: l::MODEL_CEILING },
     }
 }
-pub(crate) fn llm(configuration: llm::Configuration) -> Result<skein_fake_peers::llm::Peer, skein_fake_peers::Error> {
+pub(crate) fn llm(
+    configuration: llm::Configuration,
+    recording: bool,
+) -> Result<skein_fake_peers::llm::Peer, skein_fake_peers::Error> {
+    let mut limits = l::peer();
+    if recording {
+        limits.observations = l::LLM_OBSERVATIONS;
+        limits.observation_bytes = l::LLM_OBSERVATION_BYTES;
+    }
     let peer = skein_fake_peers::llm::Peer::new(
         configuration.listen,
         if configuration.tls { skein_fake_peers::Transport::Tls } else { skein_fake_peers::Transport::Plaintext },
-        l::peer(),
+        limits,
         provider::Config {
             without_credential: false,
             echo: skein_llm::openai::Echo::NONE,
@@ -84,5 +92,5 @@ pub(crate) fn llm(configuration: llm::Configuration) -> Result<skein_fake_peers:
         configuration.domain,
         llm::LIMITS,
     )?;
-    Ok(peer.without_records())
+    if recording { Ok(peer) } else { Ok(peer.without_records()) }
 }

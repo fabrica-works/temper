@@ -390,7 +390,7 @@ fn refused_deployment_start(root: &Path) {
         ("llm_public", "llm", true, Some(TOKEN.to_vec()), 0o644, false, "readable by others or reached through a link".to_owned(), true),
         ("llm_empty", "llm", true, Some(b"\n".to_vec()), 0o600, false, "holds no key".to_owned(), true),
         ("llm_long", "llm", true, Some(vec![b'k'; bound + 1]), 0o600, false, format!("past {bound} bytes"), true),
-        ("llm_word", "llm", true, None, 0o600, true, "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]".to_owned(), false),
+        ("llm_word", "llm", true, None, 0o600, true, "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] [--observations FILE] | temper fake llm --document FILE [--ready PREFIX] [--seed N] [--observations FILE]".to_owned(), false),
         ("seed_null", "seed", false, None, 0o600, false, "application.demo is null: the deployment has no demo".to_owned(), false),
         ("seed_word", "seed", true, None, 0o600, true, "usage: temper fake seed [DIRECTORIES]".to_owned(), false),
     ] {

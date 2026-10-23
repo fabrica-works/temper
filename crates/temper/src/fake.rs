@@ -40,6 +40,12 @@ pub const LLM_SETTINGS: Settings = Settings {
             about: "The domain and credential seed, a decimal u64.",
             fallback: Fallback::Text("0"),
         },
+        Setting {
+            name: "observations",
+            value: "FILE",
+            about: "Create the LLM's JSON lines query stream.",
+            fallback: Fallback::Text(""),
+        },
     ],
 };
 pub const FORGE_SETTINGS: Settings = Settings {
@@ -176,16 +182,16 @@ pub fn configure(
     // shell.md 6.5 has no absent setting; Default alone means absent.
     // In particular --ready "" is a present, empty prefix.
     let ready = if resolved.value(1).origin == Origin::Default { None } else { Some(resolved.value(1).bytes.clone()) };
-    let observations = if kind == Kind::Forge && resolved.value(3).origin != Origin::Default {
-        Some(super::path(&resolved.value(3).bytes).to_path_buf())
-    } else {
+    let observations = if resolved.value(3).origin == Origin::Default {
         None
+    } else {
+        Some(super::path(&resolved.value(3).bytes).to_path_buf())
     };
     Ok(super::Command::Fake { arguments: Arguments { kind, source, ready, seed, observations } })
 }
 
 pub const SEED_USAGE: &str = "usage: temper fake seed [DIRECTORIES]";
-const LLM_USAGE: &str = "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] | temper fake llm --document FILE [--ready PREFIX] [--seed N]";
+const LLM_USAGE: &str = "usage: temper fake llm [DIRECTORIES] [--ready PREFIX] [--seed N] [--observations FILE] | temper fake llm --document FILE [--ready PREFIX] [--seed N] [--observations FILE]";
 const FORGE_USAGE: &str = "usage: temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE]";
 fn forge_number(number: &[u8]) -> Result<u16, &'static str> {
     std::str::from_utf8(number)
@@ -339,12 +345,15 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
                 }
                 Source::Setup { .. } => unreachable!("LLM has document and demo forms"),
             };
-            let observations = arguments.observations.as_ref().map(|path| created.file(path, b"")).transpose()?;
-            let peer = llm::peer(configuration).map_err(|why| format!("peer: {why:?}"))?;
-            let writer = arguments
+            let observations = arguments
                 .observations
                 .as_ref()
-                .map(|_| skein_fake_forge_protocol::observations::Writer::new(&forge::LIMITS.limits));
+                .map(|path| created.file(path, b"{\"observations_lost\":0}\n"))
+                .transpose()?;
+            let peer =
+                if observations.is_some() { llm::recording_peer(configuration) } else { llm::peer(configuration) }
+                    .map_err(|why| format!("peer: {why:?}"))?;
+            let writer = None;
             let buffer =
                 List::with_capacity(if arguments.observations.is_some() { limits::OBSERVATION_BYTES } else { 0 });
             (Peer::Llm(peer), None, observations, writer, buffer)
@@ -385,6 +394,7 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
         observations,
         writer,
         git_calls: forge::observations::GitCalls::new(),
+        llm_cursor: 0,
         buffer,
         stopped: false,
         peer_submissions: 0,
@@ -468,6 +478,7 @@ struct Host {
     writer: Option<skein_fake_forge_protocol::observations::Writer>,
     buffer: List<u8>,
     git_calls: forge::observations::GitCalls,
+    llm_cursor: usize,
     stopped: bool,
     peer_submissions: u32,
     checkpoint: bool,
@@ -509,7 +520,53 @@ impl Host {
             }
         }
     }
+    fn llm_observations(&mut self) {
+        if self.observations.is_none() || self.failed || self.checkpoint {
+            return;
+        }
+        let Peer::Llm(peer) = &self.peer else { unreachable!("LLM records") };
+        for record in peer.observations().iter().skip(self.llm_cursor) {
+            if let llm_peer::Observation::Query { query, .. } = record
+                && llm::observations::encode(query, &mut self.buffer).is_err()
+            {
+                self.buffer.clear();
+                self.fail("observations", &"query record exceeds its byte bound");
+                return;
+            }
+        }
+        let observed = peer.observations().len() > self.llm_cursor;
+        self.llm_cursor = peer.observations().len();
+        // The peer retains connection, answer and query records for its whole life.
+        let full = peer.observations().len() >= usize::try_from(limits::LLM_OBSERVATIONS).expect("record cap");
+        let stopped = self.stopped && peer.is_empty();
+        if !observed && !full && !stopped {
+            return;
+        }
+        let file = self.observations.as_mut().expect("record file");
+        let written = file.write_all(self.buffer.as_slice());
+        self.buffer.clear();
+        let written = written.and_then(|()| file.write_all(b"{\"observations_lost\":0}\n"));
+        let written = if full {
+            written.and_then(|()| {
+                writeln!(file, "{{\"observation\":\"records_full\",\"capacity\":{}}}", limits::LLM_OBSERVATIONS)
+            })
+        } else {
+            written
+        };
+        if let Err(why) = written {
+            self.fail("observations", &why);
+            return;
+        }
+        self.checkpoint |= stopped;
+        if full {
+            self.fail("observations", &"the LLM record is full; the stream has ended");
+        }
+    }
     fn observations(&mut self) {
+        if matches!(self.peer, Peer::Llm(_)) {
+            self.llm_observations();
+            return;
+        }
         let Some(shared) = &self.shared else { return };
         let stopped = self.stopped && self.peer.host().is_empty();
         let mut forge = shared.borrow_mut();
