@@ -483,6 +483,7 @@ pub fn limits(settings: &crate::settings::Engine) -> Option<kit::Limits> {
     let ceilings = jig_protocol_worker_wire::CEILINGS;
     let sizes = jig_protocol_worker_wire::sizes::Sizes {
         program_sources: core.fleet.program_sources,
+        piece: hub.piece_bytes,
         charter: u32::try_from(hub.charter_bytes).ok()?,
         transcript: u32::try_from(hub.transcript_bytes).ok()?,
         turn: u32::try_from(hub.turn_bytes).ok()?,
