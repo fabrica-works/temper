@@ -577,7 +577,9 @@ fn run_ctl_peers<T>(
 ) -> (CtlOutcome<T>, Option<super::forge_land::Seen>) {
     let (peer, on_link, face, reply) = match peers.model {
         CtlModel::Llm(llm) => (Some(llm.peer), Some(llm.on_link), None, None),
-        CtlModel::Face(story) => (None, None, Some(story.face), Some(super::forge_land::Reply::new(story.first))),
+        CtlModel::Face(story) => {
+            (None, None, Some(story.face), Some(super::forge_land::Reply::new(story.first, story.reply)))
+        }
         CtlModel::None => (None, None, None, None),
     };
     let clock = Clock::new();

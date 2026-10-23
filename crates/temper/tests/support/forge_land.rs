@@ -67,6 +67,8 @@ pub struct Plan<'a> {
 pub const LANDED: &str = "The change landed.";
 /// The restarted chat's answer: the second box's reply.
 pub const RESTARTED: &str = "The change is still on main.";
+/// The chat's answer to a held change's escalation.
+pub const HELD: &str = "The change is held: its coder could not make it.";
 
 /// Delegate, wait, then reply as an Open chat.
 #[must_use]
@@ -123,6 +125,24 @@ pub fn plan_scripts(plan: &Plan<'_>) -> Box<[Script]> {
     // The first box stops without Close; no finish request or closing turn runs here.
     chat.turns[2] = text(LANDED.as_bytes());
     scripts.into_boxed_slice()
+}
+
+/// The coder fails at once, so the change holds and escalates to the chat, which
+/// answers with HELD instead of LANDED.
+#[must_use]
+pub fn held_scripts(plan: &Plan<'_>) -> Box<[Script]> {
+    let mut scripts = plan_scripts(plan);
+    scripts[1].turns = Box::new([Turn {
+        lines: Box::new([Line::Call {
+            name: b"finish".as_slice().into(),
+            arguments: br#"{"form":"failure","reason":"cannot","fields":{}}"#.as_slice().into(),
+        }]),
+        finish: Finish::ToolCalls,
+        tokens: 20,
+    }]);
+    scripts[0].turns[2] =
+        Turn { lines: Box::new([Line::Text { text: HELD.as_bytes().into() }]), finish: Finish::Stop, tokens: 20 };
+    scripts
 }
 
 /// The fake face uses the shared plan bearer and existing test TLS root.
@@ -183,11 +203,20 @@ pub(super) fn peer_seen(procs: &[Process], index: usize) -> Seen {
 pub struct CtlFace {
     pub face: Face,
     pub first: bool,
+    /// The chat's reply the box waits for before it stops.
+    pub reply: &'static str,
+}
+
+/// The plan story's face: the first box waits for the landing, the second for the restarted answer.
+#[must_use]
+pub fn plan_face(issuer: oauth::Peer, scripts: Box<[Script]>, first: bool) -> CtlFace {
+    CtlFace { face: fake_face(issuer, scripts), first, reply: if first { LANDED } else { RESTARTED } }
 }
 
 /// Follow the committed reply, paging the conversation and waiting from a read's digest.
 pub(super) struct Reply {
     first: bool,
+    awaited: &'static str,
     snapshot: Option<String>,
     phase: ReplyPhase,
     replied: bool,
@@ -198,8 +227,8 @@ enum ReplyPhase {
     Done,
 }
 impl Reply {
-    pub fn new(first: bool) -> Self {
-        Self { first, snapshot: None, phase: ReplyPhase::Snapshot, replied: false }
+    pub fn new(first: bool, awaited: &'static str) -> Self {
+        Self { first, awaited, snapshot: None, phase: ReplyPhase::Snapshot, replied: false }
     }
     pub fn advance(&mut self, calls: &mut super::ctl::Calls, expected_exits: &mut Vec<(usize, u8)>) {
         use super::ctl::{Call, Step, json};
@@ -215,8 +244,8 @@ impl Reply {
         }
         // The first box waits for the change's reply; the second, for the
         // restarted chat's answer, before it closes the chat.
-        let reply = if self.first { LANDED } else { RESTARTED };
-        self.replied |= serde_json::to_string(&last["activity"]["rows"]).expect("conversation JSON").contains(reply);
+        self.replied |=
+            serde_json::to_string(&last["activity"]["rows"]).expect("conversation JSON").contains(self.awaited);
         if let Some(before) = last["activity"]["before"]["value"].as_str() {
             calls.push(Step::Run(Call::new(&["chat", "1", "--before", before, "--json"])));
         } else if !self.replied {
@@ -377,7 +406,19 @@ pub fn plan_change_steps(
     setup_calls: usize,
     words: &str,
 ) -> (usize, usize) {
-    change_steps(steps, first, setup_calls, words, "120s", false)
+    change_steps(steps, first, setup_calls, words, "120s", Ends::Landed)
+}
+
+/// The first box's steps when its coder fails: the change holds, and the chat,
+/// woken by the held change's escalation, answers.
+pub fn held_change_steps(steps: &mut Vec<super::ctl::Step>, setup_calls: usize, words: &str) -> (usize, usize) {
+    change_steps(steps, true, setup_calls, words, "120s", Ends::Held)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ends {
+    Landed,
+    Held,
 }
 
 fn change_steps(
@@ -386,18 +427,14 @@ fn change_steps(
     setup_calls: usize,
     words: &str,
     within: &str,
-    live: bool,
+    ends: Ends,
 ) -> (usize, usize) {
     use super::ctl::{Call, Step};
     steps.push(Step::Run(Call::new(&["me", "--json"])));
     if first {
         steps.extend([
             Step::Run(Call::new(&["connect", "1", "--key", "connect-plan"])),
-            Step::Run(Call::new(if live {
-                &["wait", "accounts", "--until", "settled", "--timeout", "600s", "--json"]
-            } else {
-                &["wait", "accounts", "--until", "settled", "--json"]
-            })),
+            Step::Run(Call::new(&["wait", "accounts", "--until", "settled", "--json"])),
         ]);
     }
     let account_at = setup_calls + if first { 3 } else { 1 };
@@ -421,11 +458,15 @@ fn change_steps(
         steps.push(Step::Run(Call::new(&["wait", "task", "1", "--until", "replied", "--timeout", within, "--json"])));
     }
     let found_at = account_at + 1 + 2 * usize::from(first);
-    let mut found = super::first_repository::found_steps();
-    if live {
-        found[0] = Step::Run(Call::new(&["wait", "task", "2", "--until", "ended", "--timeout", within, "--json"]));
-    }
-    steps.extend(found);
+    steps.extend(match ends {
+        Ends::Landed => super::first_repository::found_steps(),
+        // The box's referee then waits for the chat's HELD reply to the
+        // escalation; a chat refused before each run never gives it.
+        Ends::Held => vec![
+            Step::Run(Call::new(&["wait", "task", "2", "--until", "held", "--timeout", within, "--json"])),
+            Step::Run(Call::new(&["task", "2", "--json"])),
+        ],
+    });
     // The referee holds ctl open, reads and pages the conversation, and
     // follows --since if the procedure's end has not yet reached the chat.
     steps.push(Step::Run(Call::new(&["task", "1", "--json"])));
