@@ -1715,6 +1715,20 @@ the process tier's (../protocol/README.md, 15.6).
   end to end, once; the cases each Must rests on are tested in the
   lower worlds that own them. Each story is held to 6.1's guide, and
   one past it after its cost has been cut is a fuzzy test (6.1).
+- **The process tier reruns a step only where processes are the
+  point** (the user's rule, 10-23): a step gets a story on the
+  process tier's cluster (2.6) only where its Musts depend on
+  processes, that is workers, placement, a run moving between workers,
+  a restart, a kill or a stop, since a behaviour is tested in the
+  lowest world that owns it and the tiers above hold smokes. 4.1, 4.3
+  and 4.6 do; every other step is a smoke in the real loop alone.
+  4.4's and 4.5's process stories,
+  `the_pace_question_reaches_the_person_and_its_answer_is_kept_as_processes_on_one_worker_without_plan_pacing`,
+  `a_refused_key_holds_its_work_until_it_is_replaced_as_processes_on_one_worker_without_a_sign_in`
+  and `a_limited_account_holds_its_work_until_its_reset_as_processes_on_one_worker`,
+  were written before the rule: their Musts are the deployment's
+  accounts, which no worker holds (2.6), and they are the last of
+  their kind.
 - **What a gap holds is named.** A step whose Must needs what temper
   lacks (`../draft/reference-case.md`, section 9) runs the part that
   works; its story's name says what it shows, and the table below what
