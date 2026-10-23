@@ -1,6 +1,4 @@
 //! Parts shared by `ConnectForge`, `ConnectModel` and the welcome (client/README.md, 5.2).
-// The remaining flows consume this API in the following commits.
-#![allow(dead_code, reason = "shared flow API is introduced before its forge and model consumers")]
 use crate::{
     look,
     words::{Word, Words},
@@ -15,6 +13,7 @@ pub(crate) enum Control<'a> {
 pub(crate) enum Mark {
     Done,
     UnderWay,
+    #[cfg_attr(not(test), expect(dead_code, reason = "a shared progress part also supports failed steps"))]
     Failed,
     ToCome,
 }

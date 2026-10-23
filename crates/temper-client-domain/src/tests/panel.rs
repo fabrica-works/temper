@@ -296,6 +296,7 @@ fn a_late_tell_from_the_previous_subject_changes_nothing() {
 }
 #[test]
 fn output_and_memory_bounds_cover_replacement_and_a_full_panel() {
+    const PANEL_REPLACEMENT_REQUESTS: u32 = 2; // Unwatch followed by watch.
     let limits = f::limits();
     let mut side = forge::Side::new(&limits.forge, f::SEED);
     let mut out = Queue::with_capacity(forge::max_out(&limits.forge));
@@ -310,7 +311,7 @@ fn output_and_memory_bounds_cover_replacement_and_a_full_panel() {
         forge::Event::Panel { subject: Some(Subject { task: NEXT, project: PROJECT }) },
         &mut out,
     );
-    assert_eq!(out.len(), forge::max_out(&limits.forge));
+    assert_eq!(out.len(), PANEL_REPLACEMENT_REQUESTS);
     let Some(forge::Request::Client { asked: jig_client::Event::Unwatch { handle } }) = out.pop() else {
         panic!("unwatch first")
     };
@@ -339,6 +340,8 @@ fn output_and_memory_bounds_cover_replacement_and_a_full_panel() {
     let existing = u64::from(limits.forge.field_bytes) * 6
         + u64::from(limits.forge.checks) * 4
         + w::DemoAnswer::worst_case_heap(&wire).unwrap()
+        + w::Answer::worst_case_heap(&wire).unwrap()
+        + forge::forges::worst_case(&limits.forge).unwrap()
         + u64::try_from(size_of::<Handle>()).unwrap();
     assert_eq!(forge::worst_case(&limits.forge), Some(existing + u64::try_from(panel_heap).unwrap()));
     assert!(crate::worst_case(&limits).unwrap() >= forge::worst_case(&limits.forge).unwrap());

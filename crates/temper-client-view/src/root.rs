@@ -68,6 +68,7 @@ impl View {
         &self.limits
     }
 }
+#[expect(clippy::too_many_lines, reason = "one ordered tree build dispatches every page")]
 pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>) {
     let shown = temper_client_domain::shown(root).checked_add(view.accounts.revision()).expect("view revisions fit");
     let shown = shown.checked_add(view.clock_revision).expect("view clock revisions fit");
@@ -99,6 +100,8 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
         | temper_client_domain::Address::Chat { .. }
         | temper_client_domain::Address::Task { .. }
         | temper_client_domain::Address::Inbox { .. }
+        | temper_client_domain::Address::Forges
+        | temper_client_domain::Address::ConnectForge { .. }
         | temper_client_domain::Address::Adopt { .. } => {
             crate::choice::banner(&mut builder, root, &view.forge_words, &mut view.pages);
             crate::frame::demo_banner(&mut builder, root, &view.forge_words, &mut view.pages);
@@ -123,6 +126,7 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
             &view.forge_words,
             &mut view.pages,
             &mut view.accounts,
+            &mut view.forge,
             *step,
             view.limits.tree.text_per_node,
         );
@@ -157,6 +161,13 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
             &mut view.accounts,
             view.limits.tree.text_per_node,
         );
+    } else if let temper_client_domain::Address::ConnectForge { forge } = root.pages().address() {
+        forge::connect::main(&mut builder, root, &view.forge_words, &mut view.pages, &mut view.forge, *forge);
+    } else if *root.pages().address() == temper_client_domain::Address::Forges {
+        builder.open(Role::Main);
+        builder.style(crate::look::MAIN);
+        crate::cards::text(&mut builder, Role::Heading { level: 1 }, &view.forge_words.say(Word::ForgesTitle, &[]));
+        builder.close();
     } else if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
         view.adoption_main(&mut builder, root);
     }

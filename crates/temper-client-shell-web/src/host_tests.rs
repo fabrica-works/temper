@@ -263,8 +263,9 @@ mod memory_literal;
 // Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
 // Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
 // The flow's three state words (444 B).
+// ConnectForge's and the welcome's forge words and nodes (75,464 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388743787;
+const WEB_BYTES: u64 = 274388819251;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

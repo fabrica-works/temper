@@ -74,8 +74,8 @@ fn opened(owner: bool, step: Step) -> (Domain, Token, Token, Option<Token>) {
         })
         .unwrap();
     frame.deployment_role = Some(if owner { c::HeldRole::Owner } else { c::HeldRole::Member });
-    deliver(&mut root, me, c::Delivery::Me(frame));
-    let mut out = go(&mut root, step);
+    let mut out = deliver(&mut root, me, c::Delivery::Me(frame));
+    go(&mut root, step);
     let mut forges = None;
     while let Some(request) = out.pop() {
         if let Request::Client {
@@ -156,7 +156,7 @@ fn the_demos_account_and_forge_keep_the_welcome() {
 #[test]
 fn an_account_alone_decides_for_a_person_without_the_forges_role() {
     let (mut root, _, accounts, forges) = opened(false, Step::Welcome);
-    assert!(forges.is_none());
+    assert!(forges.is_some());
     answer(&mut root, true);
     assert!(moved(account(&mut root, accounts, 18, true), true));
 }
@@ -217,12 +217,12 @@ fn the_welcome_decides_once_each_time_it_opens() {
     assert!(!moved(account(&mut root, accounts, 18, false), true));
     assert!(decided(&root));
     assert!(!moved(account(&mut root, accounts, 18, true), true));
-    go(&mut root, Step::Forge);
+    go(&mut root, Step::Forge { forge: None });
     assert!(moved(go(&mut root, Step::Welcome), true));
 }
 #[test]
 fn a_later_step_never_moves_on() {
-    for step in [Step::Forge, Step::Model, Step::Ready] {
+    for step in [Step::Forge { forge: None }, Step::Model, Step::Ready] {
         let (mut root, _, accounts, forges) = opened(true, step);
         answer(&mut root, true);
         account(&mut root, accounts, 18, true);
@@ -268,7 +268,7 @@ fn the_model_step_sends_the_accounts_acts() {
     assert!(!root.pages().accounts().unwrap().has_key());
 }
 #[test]
-fn leaving_the_welcome_unwatches_its_forges() {
+fn leaving_the_welcome_keeps_the_sessions_forges() {
     let (mut root, _, _, forges) = opened(true, Step::Welcome);
     let watch = forges.unwrap();
     up(&mut root, Up::Watched { watch, event: c::WatchEvent::Opened });
@@ -280,11 +280,11 @@ fn leaving_the_welcome_unwatches_its_forges() {
             closed |= closing == watch;
         }
     }
-    assert!(closed);
+    assert!(!closed);
     assert!(root.pages().welcome().is_none());
 }
 #[test]
-fn losing_the_owner_role_closes_the_welcomes_watch() {
+fn losing_the_owner_role_keeps_the_sessions_watch() {
     let (mut root, me, _, forges) = opened(true, Step::Welcome);
     let watch = forges.unwrap();
     up(&mut root, Up::Watched { watch, event: c::WatchEvent::Opened });
@@ -297,7 +297,7 @@ fn losing_the_owner_role_closes_the_welcomes_watch() {
             closed |= closing == watch;
         }
     }
-    assert!(closed);
+    assert!(!closed);
 }
 #[test]
 fn an_invalid_forges_document_counts_as_no_forge() {
@@ -319,7 +319,5 @@ fn an_invalid_forges_document_counts_as_no_forge() {
         true
     ));
     assert!(decided(&root));
-    let pages::welcome::Forges::Ended = root.pages().welcome().unwrap().forges else {
-        panic!("invalid rows end the watch")
-    };
+    let forge::forges::State::Ended = root.forges() else { panic!("invalid rows end the watch") };
 }

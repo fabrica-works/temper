@@ -115,3 +115,5 @@ mod change;
 mod welcome;
 
 mod flow;
+
+mod connect_forge;

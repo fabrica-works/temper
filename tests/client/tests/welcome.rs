@@ -83,7 +83,7 @@ fn a_first_run_welcome_without_a_demo() {
         d::Event::Went { place: Place::Address(Address::Welcome { step: Step::Welcome }) }.into(),
         &mut out,
     );
-    // Reopening the welcome opens a fresh forges watch. Its engine answer completes the decision.
+    // Reopening the welcome decides from the session's current forges rows.
     // The root-only pump discards shell navigation, so retain it here through its actual callbacks.
     let mut moved = false;
     for _ in 0..32 {

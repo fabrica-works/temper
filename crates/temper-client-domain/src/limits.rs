@@ -26,7 +26,6 @@ pub fn max_out(limits: &Limits) -> u32 {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let mut total = crate::pages::task::worst_case(limits)?;
-    total = total.checked_add(crate::pages::welcome::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::choice::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::accounts::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::inbox::worst_case(limits)?)?;

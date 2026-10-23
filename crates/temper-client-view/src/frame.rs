@@ -196,9 +196,13 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     let (inbox_current, adopt_current) = match root.pages().address() {
         Address::Inbox { .. } => (true, false),
         Address::Adopt { .. } => (false, true),
-        Address::Welcome { .. } | Address::Chats | Address::Chat { .. } | Address::Task { .. } | Address::Accounts => {
-            (false, false)
-        }
+        Address::ConnectForge { .. }
+        | Address::Forges
+        | Address::Welcome { .. }
+        | Address::Chats
+        | Address::Chat { .. }
+        | Address::Task { .. }
+        | Address::Accounts => (false, false),
     };
     let count = match root.pages().me(root.client()) {
         Some(me) => me.needs_total,
@@ -239,7 +243,9 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         Act::Go { address: Address::Chats },
         match root.pages().address() {
             Address::Chats | Address::Chat { .. } => true,
-            Address::Welcome { .. }
+            Address::ConnectForge { .. }
+            | Address::Forges
+            | Address::Welcome { .. }
             | Address::Inbox { .. }
             | Address::Task { .. }
             | Address::Adopt { .. }
@@ -274,7 +280,7 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
         return;
     }
     match root.pages().address() {
-        Address::Accounts | Address::Welcome { .. } => return,
+        Address::Accounts | Address::Welcome { .. } | Address::ConnectForge { .. } | Address::Forges => return,
         Address::Chats
         | Address::Chat { .. }
         | Address::Task { .. }

@@ -137,7 +137,7 @@ fn the_welcome_prints_and_parses_each_step() {
     use crate::Step;
     for (step, path) in [
         (Step::Welcome, b"/welcome".as_slice()),
-        (Step::Forge, b"/welcome?at=forge"),
+        (Step::Forge { forge: None }, b"/welcome?at=forge"),
         (Step::Model, b"/welcome?at=model"),
         (Step::Ready, b"/welcome?at=ready"),
     ] {
@@ -158,4 +158,52 @@ fn a_welcome_query_it_cannot_read_opens_its_first_step() {
         assert_eq!(parse(path), Place::Address(Address::Welcome { step: crate::Step::Welcome }));
     }
     assert_eq!(parse(b"/welcome?x=1&at=model&at=forge"), Place::Address(Address::Welcome { step: crate::Step::Model }));
+}
+
+#[test]
+fn connect_forge_prints_and_parses_its_choice() {
+    use crate::Choice;
+    for (forge, path) in [
+        (None, b"/forges/connect".as_slice()),
+        (Some(Choice::Forge(3)), b"/forges/connect?forge=3"),
+        (Some(Choice::Forge(u16::MAX)), b"/forges/connect?forge=65535"),
+        (Some(Choice::Elsewhere), b"/forges/connect?forge=elsewhere"),
+    ] {
+        let address = Address::ConnectForge { forge };
+        assert_eq!(print(&address).as_ref(), path);
+        assert_eq!(parse(path), Place::Address(address));
+    }
+    assert_eq!(print(&Address::Forges).as_ref(), b"/forges");
+    assert_eq!(parse(b"/forges"), Place::Address(Address::Forges));
+}
+#[test]
+fn a_forge_choice_it_cannot_read_opens_choose() {
+    for path in [
+        b"/forges/connect?forge=unknown".as_slice(),
+        b"/forges/connect?forge=65536",
+        b"/forges/connect?forge=03",
+        b"/forges/connect?forge=-1",
+        b"/forges/connect?forge=&forge=3",
+        b"/forges/connect?x=1",
+    ] {
+        assert_eq!(parse(path), Place::Address(Address::ConnectForge { forge: None }));
+    }
+    assert_eq!(
+        parse(b"/forges/connect?forge=3&forge=4&x=1"),
+        Place::Address(Address::ConnectForge { forge: Some(crate::Choice::Forge(3)) })
+    );
+    assert_eq!(parse(b"/forges/3/github/setup"), Place::Missing);
+}
+#[test]
+fn the_welcomes_forge_step_carries_its_choice() {
+    for (forge, path) in [
+        (Some(crate::Choice::Forge(3)), b"/welcome?at=forge&forge=3".as_slice()),
+        (Some(crate::Choice::Elsewhere), b"/welcome?at=forge&forge=elsewhere"),
+        (None, b"/welcome?at=forge"),
+    ] {
+        let address = Address::Welcome { step: crate::Step::Forge { forge } };
+        assert_eq!(print(&address).as_ref(), path);
+        assert_eq!(parse(path), Place::Address(address));
+    }
+    assert_eq!(parse(b"/welcome?forge=3&at=model"), Place::Address(Address::Welcome { step: crate::Step::Model }));
 }

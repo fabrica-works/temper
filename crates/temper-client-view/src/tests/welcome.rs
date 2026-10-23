@@ -68,7 +68,7 @@ fn the_welcome_step_says_its_words_and_offers_both_cards() {
     assert_eq!(press(&root, Role::Button, "Try the playground"), d::Action::Pages(pages::Act::Playground));
     assert_eq!(
         press(&root, Role::Link, "Set up temper"),
-        d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Forge } })
+        d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Forge { forge: None } } })
     );
 }
 #[test]
@@ -98,9 +98,12 @@ fn the_welcome_shows_its_heading_alone_until_it_decides() {
 }
 #[test]
 fn the_steps_mark_the_current_one() {
-    for (step, name) in
-        [(Step::Welcome, "Welcome"), (Step::Forge, "Forge"), (Step::Model, "Model"), (Step::Ready, "Ready")]
-    {
+    for (step, name) in [
+        (Step::Welcome, "Welcome"),
+        (Step::Forge { forge: None }, "Forge"),
+        (Step::Model, "Model"),
+        (Step::Ready, "Ready"),
+    ] {
         let view = f::page_view(&f::welcome_root(step, true));
         node(view.tree(), Role::List, "Steps");
         let current: Vec<_> =
@@ -115,29 +118,6 @@ fn the_steps_mark_the_current_one() {
             .as_ref(),
             name.as_bytes()
         );
-    }
-}
-#[test]
-fn forge_and_ready_say_they_are_not_available_yet() {
-    for (step, heading, phrase) in [
-        (Step::Forge, "Connect a forge", "Connecting a forge here is not available yet."),
-        (Step::Ready, "Almost ready", "This step is not available yet."),
-    ] {
-        let root = f::welcome_root(step, true);
-        let view = f::page_view(&root);
-        node(view.tree(), Role::Heading { level: 1 }, heading);
-        node(view.tree(), Role::Paragraph, phrase);
-        if step == Step::Forge {
-            node(
-                view.tree(),
-                Role::Paragraph,
-                "Where your repositories live: temper’s agents push branches and open pull requests there.",
-            );
-            assert_eq!(
-                press(&root, Role::Link, "Connect a model"),
-                d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Model } })
-            );
-        }
     }
 }
 #[test]
@@ -156,7 +136,11 @@ fn the_model_step_offers_the_accounts_ways() {
 }
 #[test]
 fn each_later_step_offers_back_later_and_the_playground_while_the_demo_is_answered() {
-    for (step, back) in [(Step::Forge, Step::Welcome), (Step::Model, Step::Forge), (Step::Ready, Step::Model)] {
+    for (step, back) in [
+        (Step::Forge { forge: None }, Step::Welcome),
+        (Step::Model, Step::Forge { forge: None }),
+        (Step::Ready, Step::Model),
+    ] {
         for demo in [false, true] {
             let root = f::welcome_root(step, demo);
             assert_eq!(

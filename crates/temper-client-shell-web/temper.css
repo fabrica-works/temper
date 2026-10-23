@@ -847,3 +847,10 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-flow-progress { padding-left: 20px; }
 .temper-flow-progress li { margin: 10px 0; }
 .temper-flow-progress [role="status"] { display: inline; margin-left: 8px; }
+/* ConnectForge's column and the flow's configuration entries. */
+.temper-connect-forge { max-width: 760px; margin: 28px auto; }
+.temper-flow-code { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 10px; background: var(--temper-topbar); padding: 12px; border: 1px solid var(--temper-line); }
+.temper-flow-card > a, .temper-flow-card > button { display: inline-flex; align-items: center; min-height: 30px; border: 1px solid var(--temper-accent); border-radius: 5px; padding: 6px 11px; background: var(--temper-paper); color: var(--temper-accent-dark); }
+.temper-flow-card > button:disabled { cursor: default; opacity: .55; }
+.temper-connect-forge > a { color: var(--temper-accent-dark); text-decoration: underline; text-underline-offset: 3px; }
+.temper-flow-card input, .temper-flow-card textarea { display: block; width: 100%; margin: 4px 0 12px; padding: 6px 8px; border: 1px solid var(--temper-line); border-radius: 5px; background: var(--temper-paper); }

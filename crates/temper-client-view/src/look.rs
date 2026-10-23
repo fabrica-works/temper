@@ -233,6 +233,10 @@ pub const FLOW_CARD: Style = Style { owner: owner(), token: 113 };
 pub const FLOW_MUTED: Style = Style { owner: owner(), token: 114 };
 /// Shared flow presentation (client/README.md, 5.2).
 pub const FLOW_PROGRESS: Style = Style { owner: owner(), token: 115 };
+/// The forge connection flow's main.
+pub const CONNECT_FORGE: Style = Style { owner: owner(), token: 116 };
+/// A configuration entry or terminal command.
+pub const FLOW_CODE: Style = Style { owner: owner(), token: 117 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -354,6 +358,8 @@ pub const NAMES: Names<'static> = Names {
         b"temper-flow-card",
         b"temper-flow-muted",
         b"temper-flow-progress",
+        b"temper-connect-forge",
+        b"temper-flow-code",
     ],
     regions: &[b"temper-link"],
 };
