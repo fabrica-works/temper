@@ -705,24 +705,33 @@ fn gallery_chat_clocks_are_separate_leaves_under_the_speakers() {
 }
 
 #[test]
-fn model_samples_link_their_way_to_the_model_mockup() {
-    use temper_client_domain::{Address, WayKind};
-    for sample in samples::samples() {
-        if let Address::ConnectModel { way } = sample.address {
-            let suffix = match way {
-                None => "",
-                Some(way) => match way.kind {
-                    WayKind::Key => "&way=key",
-                    WayKind::Program => "&way=program",
-                    WayKind::SignIn => "&way=chatgpt",
-                },
-            };
-            assert_eq!(
-                samples::mockup(&sample),
-                Some(format!("connect-model.html?world=reference{suffix}&bare")),
-                "{}",
-                sample.name
-            );
-        }
+fn model_samples_link_the_mockup_state_that_draws_them() {
+    let rows = [
+        ("connect-model-choose", Some("connect-model.html?world=reference&bare")),
+        ("connect-model-key-details", Some("connect-model.html?world=reference&way=key&bare")),
+        ("connect-model-program-details", Some("connect-model.html?world=reference&way=program&bare")),
+        ("connect-model-signing-in", None),
+        ("connect-model-key-ready", None),
+        ("connect-model-signin-ready", Some("connect-model.html?world=first-run&step=5&way=chatgpt&bare")),
+        (
+            "connect-model-declined",
+            Some("connect-model.html?world=first-run&step=5&way=chatgpt&bare#other-states-declined"),
+        ),
+        (
+            "connect-model-renewed",
+            Some("connect-model.html?world=first-run&step=5&way=chatgpt&bare#other-states-renewed"),
+        ),
+        (
+            "connect-model-refused",
+            Some("connect-model.html?world=first-run&step=5&way=chatgpt&bare#other-states-refused"),
+        ),
+        ("connect-model-key-lost", None),
+    ];
+    let models: Vec<_> =
+        samples::samples().into_iter().filter(|sample| sample.name.starts_with("connect-model-")).collect();
+    assert_eq!(models.len(), rows.len(), "every model sample has a row");
+    for (sample, (name, expected)) in models.iter().zip(rows) {
+        assert_eq!(sample.name, name);
+        assert_eq!(samples::mockup(sample).as_deref(), expected, "{name}");
     }
 }

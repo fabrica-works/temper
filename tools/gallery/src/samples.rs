@@ -143,8 +143,31 @@ fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: T
 }
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
-    if sample.then != Then::Shown && !matches!(sample.address, Address::ConnectModel { .. }) {
-        return None;
+    if sample.then != Then::Shown {
+        if !matches!(sample.address, Address::ConnectModel { .. }) {
+            return None;
+        }
+        // The mockup draws these endings in the first run after ChatGPT is connected.
+        // It draws no sign-in under way, key Ready, or lost key answer.
+        let anchor = match sample.then {
+            Then::SignInReady => "",
+            Then::Declined => "#other-states-declined",
+            Then::Renewed => "#other-states-renewed",
+            Then::SignInRefused => "#other-states-refused",
+            Then::Shown
+            | Then::Filled
+            | Then::Refused
+            | Then::SignedOut
+            | Then::OutOfDate
+            | Then::Closing
+            | Then::Rejecting
+            | Then::Held
+            | Then::Releasing
+            | Then::SigningIn
+            | Then::AccountRefused
+            | Then::KeyReady => return None,
+        };
+        return Some(format!("connect-model.html?world=first-run&step=5&way=chatgpt&bare{anchor}"));
     }
     let world = match sample.world {
         World::Reference => "reference".to_owned(),
