@@ -175,9 +175,10 @@ temper-engine-domain-forge              the connector's top: resources and holds
   forge does not have refuses the adoption as not found.
 - **A task names a repository by its tag, the pair packed.** jig's
   resource number, opaque to jig, is temper's tag: `(forge << 32) |
-  repository`, the forge's number in the high half and the forge's id
-  for the repository in the low, both 32 bits, packed and read back by
-  one pair of functions in the forge's domain. A delegation's resource,
+  repository`, the forge's number (16 bits) in the high half and the
+  forge's id for the repository (32 bits) in the low, packed and read
+  back by one pair of functions in the forge's domain; a tag with a bit
+  set above the forge's names none. A delegation's resource,
   a workspace's repository, what a run left and a pushed head carry it,
   and a saved resource's path is the pair itself (`root.md`, section
   6), so two forges' repositories with the same id in one project stay
