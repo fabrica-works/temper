@@ -841,5 +841,5 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
 }
 
 fn http_settings() -> http::Settings {
-    http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
+    http::Settings { prefix: Box::from(b"/jig".as_slice()), public: None }
 }
