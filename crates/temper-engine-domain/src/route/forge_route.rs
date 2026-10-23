@@ -1986,6 +1986,9 @@ pub(crate) fn outputs(
         let request = out.pop().expect("connector output count");
         match request {
             forge::Request::DemoStart { request } => super::demo::start(domain, env, decision, request),
+            forge::Request::StopGroup { forge } => {
+                assert!(super::now(domain, Request::StopGroup { forge }), "demo stop door reserved");
+            }
             forge::Request::SetUpGroup { forge, request } => {
                 assert!(super::now(domain, Request::SetUpGroup { forge, request }), "demo box group door reserved");
             }

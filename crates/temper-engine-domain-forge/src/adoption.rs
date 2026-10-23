@@ -87,7 +87,7 @@ pub(crate) fn start(
         // Direct domain worlds may supply writers; the service configures none.
         crate::Connection::NotConnected => d.writers.contains_key(&adoption.forge),
     };
-    if !connected {
+    if d.forge_ended(adoption.forge) || !connected {
         return finish(
             d,
             env,
@@ -255,7 +255,11 @@ pub(crate) fn adopt(d: &mut Domain, env: &Env<Limits>, reply_to: Token, out: &mu
     }
     if request.home {
         for (_, existing) in &d.repositories {
-            if existing.project == request.project && existing.home && existing.provider != repository {
+            if existing.project == request.project
+                && existing.home
+                && existing.provider != repository
+                && !d.forge_ended(existing.provider.forge)
+            {
                 adopted(d, out, reply_to, Err(api::Error::Refused));
                 return;
             }
