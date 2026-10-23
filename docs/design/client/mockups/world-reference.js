@@ -97,8 +97,7 @@
         {
           name: 'ChatGPT', provider: 'OpenAI', holder: 'Pat', plan: 'ChatGPT plan',
           sources: [
-            { name: 'pat@example.com', kind: 'sign-in', use: 'In use',
-              usage: { window: 31, windowReset: 185, week: 22, weekReset: 'Tue 09:00', pace: 28 } },
+            { name: 'pat@example.com', kind: 'sign-in', use: 'In use' },
           ],
         },
       ],

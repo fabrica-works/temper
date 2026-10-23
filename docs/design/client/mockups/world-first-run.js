@@ -23,9 +23,10 @@
         period: 'month',
         allotment: 100,
         ops: false,
-        // The owned example's providers: OpenAI, with keys only (setup.md,
-        // 8.1), and the playground's.
-        ways: ['Use an API key'],
+        // The default document's providers: OpenAI, by its ChatGPT sign-in
+        // and by keys (setup.md, 8.1), and the playground's. The ways are
+        // client README 5.5's, the playground's provider left out.
+        ways: ['Continue with ChatGPT', 'Use an API key'],
         providers: ['OpenAI'],
         restart: 'temper box',
       },
@@ -85,14 +86,14 @@
       summary: 'Sam chooses Try the playground. The engine asks temper box for the playground’s fakes, adds the scripted model’s account and adopts playground/widget into Default itself, and the link’s page is the playground’s start.',
       look: [
         ['chats.html', 'Chats: the playground’s start'],
-        ['accounts.html', 'Accounts: the scripted model’s key, the one account'],
+        ['accounts.html', 'Accounts: none of Sam’s yet; the scripted model, the playground’s'],
         ['forges.html', 'Forges: no forge of yours yet, and the playground’s, folded'],
         ['workers.html', 'Workers: one, in temper’s process'],
         ['changes.html', 'Changes: playground/widget on Playground forge, nothing in flight'],
       ],
       apply(w) {
         w.demo.state = 'running';
-        w.accounts.push({ name: 'Playground', display: 'Scripted model', provider: 'Playground', holder: 'Sam',
+        w.accounts.push({ name: 'Playground', display: 'Scripted model', provider: 'Playground', holder: 'the deployment',
           sources: [{ name: 'playground', kind: 'key', use: 'Idle', usage: null }] });
         Object.assign(w.forges[0], { n: 1, kind: 'Forgejo', name: 'Playground forge', web: 'http://127.0.0.1:8369', mode: 'fake', state: 'connected', login: 'temper', id: 2,
           load: { used: 9, rate: 600, window: 'minute', reserve: 60, uses: [['fresh reads', 5], ['writes', 0], ['keeping up', 4], ['the slow pass', 0]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['playground/widget', 0]] } });
@@ -198,21 +199,26 @@
     },
     {
       id: '5', label: '5', hour: 15 / 60, act: 2, title: 'A model connected',
-      summary: 'Sam follows “Connect a model” and adds an OpenAI API key. Another provider’s account is usable, so the model’s half of the playground ends: the banner says a playground forge alone, the chats page is a chats page, and T1’s next run takes the first of its charter’s models with an account, gpt-6-luna (setup.md, 8.3). The scripted model steps aside: its account is gone from Accounts.',
+      summary: 'Sam follows the banner’s “Connect a model”, chooses ChatGPT, and signs in to ChatGPT in a browser on this machine as sam@example.com. Another provider’s account is usable, so the model’s half of the playground ends: the banner says a playground forge alone, the chats page is a chats page, and T1’s next run takes the first of its charter’s models with an account, gpt-6-luna on the ChatGPT plan (setup.md, 8.3). The scripted model steps aside: it is gone from Accounts.',
       look: [
-        ['accounts.html', 'Accounts: the new key; the scripted model gone'],
+        ['connect-model.html?way=chatgpt', 'Connect a model: signed in to ChatGPT'],
+        ['accounts.html', 'Accounts: ChatGPT · sam@example.com, folded; the scripted model gone'],
         ['chats.html', 'Chats: no playground’s start; the banner, a playground forge alone'],
-        ['chat.html?task=T1', 'T1: its composer’s line names the new key'],
+        ['chat.html?task=T1', 'T1: its composer’s line, Using ChatGPT plan'],
+        ['connect-model.html#other-states', 'Connect a model, below: the sign-in waiting, its other endings, a key and Claude'],
+        ['accounts.html#other-states', 'Accounts, below: the ChatGPT row in each state, and a key’s and Claude’s rows'],
+        ['chats.html#other-states', 'Chats, below: a plan’s first use, and a limited plan'],
         ['connect-forge.html', 'Connect a forge: GitHub, Forgejo on this machine, a Forgejo elsewhere'],
         ['connect-forge.html?forge=3', 'Forgejo on this machine: the set-up’s details'],
         ['forges.html', 'Forges: still no forge of yours'],
       ],
       apply(w, id) {
         w.accounts = w.accounts.filter(a => a.provider !== w.demo.provider);
-        w.accounts.unshift({ name: 'OpenAI', provider: 'OpenAI', holder: 'Sam', at: id,
-          sources: [{ name: 'sam-key', kind: 'key', use: 'Idle', usage: null }] });
-        Object.assign(w.tasks.T1, { model: 'gpt-6-luna', account: 'OpenAI' });
-        w.config.next = { account: 'OpenAI', model: 'gpt-6-luna' };
+        w.accounts.unshift({ name: 'ChatGPT', plan: 'ChatGPT plan', provider: 'OpenAI', holder: 'Sam', models: ['gpt-6-luna'], at: id,
+          sources: [{ name: 'sam@example.com', kind: 'sign-in', since: 14, use: 'Idle' }] });
+        Object.assign(w.tasks.T1, { model: 'gpt-6-luna', account: 'ChatGPT' });
+        w.config.next = { account: 'ChatGPT', model: 'gpt-6-luna' };
+        w.signIn = { state: 'signed in' };
       },
     },
     {
@@ -263,7 +269,7 @@
 
   MOCKUPS.worlds['first-run'] = {
     name: 'First run',
-    about: 'the owner’s first run after temper box: the welcome, the playground chosen and its end once a forge connects, a suggested request landed on the playground forge by the scripted model’s script, a text-only one, then a real model connected, and a Forgejo set up here',
+    about: 'the owner’s first run after temper box: the welcome, the playground chosen and its end once a forge connects, a suggested request landed on the playground forge by the scripted model’s script, a text-only one, then a ChatGPT plan signed in to, and a Forgejo set up here',
     HOUR0: Date.UTC(2026, 9, 22, 21, 0),
     initial, steps, upcoming: [], acts: { 1: 'The playground', 2: 'Going real' },
   };

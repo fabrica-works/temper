@@ -270,6 +270,11 @@
       : first.kind === 'sign-in' ? `Using ${a.plan} · ${modelName} · Manage usage`
       : `Using your ${a.provider} API key · ${modelName}`;
   }
+  // A plan's Manage usage is an external link (6.5).
+  function usingHtml(a, modelName) {
+    const words = esc(usingWords(a, modelName));
+    return a.sources[0].kind === 'sign-in' ? words.replace(/Manage usage$/, `<a class="text-link" href="#" data-later="${esc(MANAGE)}">Manage usage ↗</a>`) : words;
+  }
   // While the demo's model holds, its line names it, and "Default" for
   // the model while none is requested (5.6).
   const DEMO_LINE = () => fact('temper: the demo’s model half holds, and no model is requested (client README, 5.6)', 'Using Scripted model · Default');
@@ -277,12 +282,12 @@
     if (modelHalf()) return DEMO_LINE();
     const t = T(id);
     if (!account(t.account)) return noModelLine();
-    return fact(`jig: the account and model ${id}'s next run takes; the account's first source, in temper's words`, esc(usingWords(account(t.account), t.model)));
+    return fact(`jig: the account and model ${id}'s next run takes; the account's first source, in temper's words`, usingHtml(account(t.account), t.model));
   }
   function newChatLine() {
     if (modelHalf()) return DEMO_LINE();
     const n = world.config.next;
-    return n ? fact('jig: the account and model a new chat’s first run takes: its charter’s first model with a usable account', esc(usingWords(account(n.account), n.model))) : noModelLine();
+    return n ? fact('jig: the account and model a new chat’s first run takes: its charter’s first model with a usable account', usingHtml(account(n.account), n.model)) : noModelLine();
   }
 
   // The demo (client README, 4.8): its model's half holds while no
@@ -294,21 +299,25 @@
   const ownForge = () => world.forges.some(f => f.mode !== 'fake' && f.state === 'connected');
   const welcomeMark = () => ahead('welcome', 'the first run’s welcome, and the demo started only when chosen: no mission yet');
   const tryDemo = (label = 'Try the playground') => `<a href="${esc(u('chats.html?world=first-run&step=1'))}">${label}</a>`;
-  const noModelLine = () => `No model yet · <a class="text-link" href="${esc(u('welcome.html?at=model'))}">Connect a model</a>`;
+  const noModelLine = () => `No model yet · <a class="text-link" href="${esc(u(demo?.state === 'not started' ? 'welcome.html?at=model' : 'connect-model.html'))}">Connect a model</a>`;
   const modelHalf = () => demoRunning() && !world.accounts.some(a => a.provider !== demo.provider);
   const forgeHalf = () => demoRunning() && !world.forges.some(f => f.n !== demo.forge && f.state === 'connected');
   function demoBanner() {
     const m = modelHalf(), f = forgeHalf();
     if (!m && !f) return '';
     const words = m && f ? 'This is the playground: a scripted model and a playground forge.' : m ? 'This is the playground: a scripted model.' : 'This is the playground: a playground forge.';
-    return `<aside class="first-run-banner" aria-label="Playground"><p>${fact('temper: the demo, as the forge’s side reads it, and which of its halves hold (client README, 4.8)', words)}</p><div class="terminal-proposal-actions">${m ? `<a href="${u('accounts.html')}">Connect a model</a>` : ''}${f ? forgeBannerAct() : ''}</div></aside>`;
+    return `<aside class="first-run-banner" aria-label="Playground"><p>${fact('temper: the demo, as the forge’s side reads it, and which of its halves hold (client README, 4.8)', words)}</p><div class="terminal-proposal-actions">${m ? `<a href="${u('connect-model.html')}">Connect a model</a>` : ''}${f ? forgeBannerAct() : ''}</div></aside>`;
   }
   function demoStrip() {
     const setup = demo?.state === 'not started' && (!ownForge() || !usableModel());
     const words = !ownForge() && !usableModel() ? 'temper has no forge and no model yet.' : !ownForge() ? 'temper has no forge yet.' : 'temper has no model yet.';
     const settingUp = world.forges.some(f => f.mode !== 'fake' && ['setting up', 'connecting'].includes(f.state));
-    const banner = setup ? `<aside class="first-run-banner" aria-label="Setup"><p>${words} ${welcomeMark()}</p><div class="terminal-proposal-actions">${settingUp ? forgeBannerAct('welcome.html') : ''}<a href="${esc(u('welcome.html'))}">Continue setting up</a>${!ownForge() ? tryDemo() : ''}</div></aside>` : demoBanner();
+    const banner = setup ? `<aside class="first-run-banner" aria-label="Setup"><p>${words} ${welcomeMark()}</p><div class="terminal-proposal-actions">${settingUp ? forgeBannerAct('welcome.html') : ''}${modelBannerAct('welcome.html')}<a href="${esc(u('welcome.html'))}">Continue setting up</a>${!ownForge() ? tryDemo() : ''}</div></aside>` : demoBanner();
     return banner ? `<div class="demo-strip">${banner}</div>` : '';
+  }
+  // A sign-in under way, in the strip, as a forge's set-up is.
+  function modelBannerAct(target) {
+    return world.signIn?.state === 'waiting' ? `<span class="banner-status">${fact('temper: the sign-in, under way', 'ChatGPT · waiting for you in your browser')}</span> <a href="${esc(u(target || 'connect-model.html?way=chatgpt'))}">View</a>` : '';
   }
   function forgeBannerAct(target) {
     const f = world.forges.find(f => f.mode !== 'fake' && ['setting up', 'connecting'].includes(f.state));
@@ -484,7 +493,7 @@
     return needs || forges.some(f => ['setting up', 'connecting'].includes(f.state)) ? `<i class="nav-mark ${needs ? 'red' : 'amber'}" aria-label="${needs ? 'a forge needs you' : 'a forge is setting up'}"></i>` : '';
   }
   const navLink = ([key, h, label, later], active, n = '') => h
-    ? `<a href="${u(h)}"${key === active ? ' class="active" aria-current="page"' : ''}>${label}${key === 'forges' ? forgeNavMark() : ''}${n}</a>`
+    ? `<a href="${u(h)}"${key === active ? ' class="active" aria-current="page"' : ''}>${label}${key === 'forges' ? forgeNavMark() : key === 'accounts' ? accountNavMark() : ''}${n}</a>`
     : `<a href="#" data-later="${esc(later)}">${label}</a>`;
 
   function topbar(active, { bare = false } = {}) {
@@ -505,7 +514,7 @@
   // its head, under the banner, and no crumbs.
   function listPage(active, crumbs, body, actions = '', head = null) {
     const trail = (crumbs || []).map((c, i) => i === crumbs.length - 1 ? `<strong>${c[0]}</strong>` : `<a href="${u(c[1])}">${c[0]}</a><span class="sep">/</span>`).join('');
-    const strip = ['welcome', 'accounts', 'forges', 'connect-forge'].includes(page) ? '' : demoStrip();
+    const strip = ['welcome', 'accounts', 'forges', 'connect-forge', 'connect-model'].includes(page) ? '' : demoStrip();
     document.body.classList.add('terminal-pages');
     return `${topbar(active)}${strip}${head ?? ''}<div class="app"><main class="main">
       ${crumbs ? `<header class="topbar"><div class="breadcrumbs">${trail}</div><div class="top-actions">${actions}<button class="icon-button" aria-label="More" title="Visual mockup"></button></div></header>` : ''}
@@ -694,7 +703,7 @@
     const worlds = Object.entries(C.worlds).map(([key, w]) => key === worldKey
       ? `<li><b>${esc(w.name)}</b> · ${esc(w.about)}</li>`
       : `<li><a href="index.html?world=${key}">${esc(w.name)}</a> · ${esc(w.about)}</li>`).join('');
-    const pagesList = [['welcome.html', 'Welcome'], ['inbox.html', 'Inbox'], ['chats.html', 'Chats'], ['board.html', 'Board'], ['changes.html', 'Changes'], ['tasks.html', 'Tasks'], ['forges.html', 'Forges'], ['connect-forge.html', 'Connect a forge'], ['workers.html', 'Workers'], ['accounts.html', 'Accounts']]
+    const pagesList = [['welcome.html', 'Welcome'], ['inbox.html', 'Inbox'], ['chats.html', 'Chats'], ['board.html', 'Board'], ['changes.html', 'Changes'], ['tasks.html', 'Tasks'], ['forges.html', 'Forges'], ['connect-forge.html', 'Connect a forge'], ['workers.html', 'Workers'], ['accounts.html', 'Accounts'], ['connect-model.html', 'Connect a model']]
       .map(([h, label]) => `<a href="${u(h)}">${label}</a>`).join(' · ');
     return `<div class="mock-index">
       <h1>temper's client, in mockups</h1>
@@ -779,7 +788,7 @@
     const line = newChatLine();
     const composer = `${line ? `<div class="composer-line">${line}</div>` : ''}<div class="terminal-entry-composer"><span class="entry-prompt" aria-hidden="true">›</span><textarea rows="1" aria-label="Start a new chat"></textarea><span class="entry-hint">temper · Enter to start · Shift+Enter for newline</span><button class="send-button" aria-label="Start chat"${usableModel() ? ' data-later' : ' disabled'}>↑</button></div>`;
     const list = `<div class="section-heading"><h2>Your chats</h2><div class="filter-row"><button class="filter active">All</button><button class="filter">Live</button><button class="filter">Closed</button></div></div>${all.length ? `<div class="chat-list">${all.join('')}</div>` : '<div class="empty-state">No chats yet.</div>'}`;
-    if (!modelHalf()) return listPage('chats', [['Chats']], `${params.has('project') ? `<div class="compact-context"><span>${project()} · ${fact('temper: the project’s repositories, and their forges', Object.values(world.repos).filter(r => !r.retired && inProject(r)).map(r => `${esc(r.name)} on ${esc(forgeName(forgeOf(r.forge)))}`).join(' · '))}</span></div>` : ''}<div class="welcome"><div class="section-heading" style="margin-top:0"><h2>Start a chat</h2></div>${composer}</div>${list}`);
+    if (!modelHalf()) return listPage('chats', [['Chats']], `${params.has('project') ? `<div class="compact-context"><span>${project()} · ${fact('temper: the project’s repositories, and their forges', Object.values(world.repos).filter(r => !r.retired && inProject(r)).map(r => `${esc(r.name)} on ${esc(forgeName(forgeOf(r.forge)))}`).join(' · '))}</span></div>` : ''}<div class="welcome"><div class="section-heading" style="margin-top:0"><h2>Start a chat</h2></div>${composer}</div>${list}${planVariants()}`);
     // The demo's start, in place of the page's heading (client README,
     // 5.6): a chat starts with its first message, so no task, no number.
     const chatbar = `<div class="terminal-chatbar"><div class="terminal-chat-identity"><strong class="terminal-title">New chat</strong><span class="terminal-phase" role="status">Ready</span></div><div class="terminal-chat-meta"><span>${fact('temper: the demo’s model half holds', 'Scripted model')}</span></div></div>`;
@@ -789,6 +798,23 @@
       <p class="first-run-hint">The scripted model plays these requests from its script.</p></section>`;
     return listPage('chats', null, `${demoContext()}${start}<div class="welcome">${composer}</div>${list}`, '', chatbar);
   };
+
+  // A plan's first use: a card in the conversation of the run that first
+  // used it, from the document's fact (client README, 5.5).
+  function firstUseCard(a) {
+    return `<article class="terminal-proposal plan-card" aria-label="Your ${esc(a.plan)}"><div class="terminal-proposal-heading"><span class="terminal-proposal-type">${conf('the provider’s plan, in temper’s words', esc(a.plan.toUpperCase()))}</span><span>${fact('jig: the account’s first use, a fact of its document', 'First use')}</span></div><p>${fact('jig: a plan’s first use (jig’s accounts.md, section 5), in temper’s words', esc(`You’re using your ${a.plan}. Eligible requests from temper use your plan’s included usage. You can see it, and set a weekly cap for temper, in ${a.name}’s settings.`))}</p><div class="terminal-proposal-actions">${manageUsage()}</div></article>`;
+  }
+  function planVariants() {
+    const a = ownAccounts().find(isPlan);
+    if (worldKey !== 'first-run' || !a) return '';
+    const limited = chatgptLike({ source: { state: 'limited' } });
+    return `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: a chat as the plan’s first use shows it, and a chat whose plan is limited.</p>
+      <h3>A plan’s first use, in the conversation of the run that first used it</h3>
+      <div class="plan-sample"><section class="terminal-turn terminal-turn-user"><div class="terminal-role">You</div><div class="terminal-turn-content"><span class="terminal-prompt">›</span>${conf('a cue of the demo’s scripts, for the sample', `<div class="md"><p>${esc(demo.cues[1])}</p></div>`)}</div></section>${firstUseCard(a)}<p class="mock-note">The run’s turns follow. Nothing is kept to dismiss the card: it is part of the conversation.</p></div>
+      <h3>A chat whose plan is limited ${ahead('limited chat', 'where a chat shows its account’s limit: client README 5.5 words the account’s state, not the chat’s')}</h3>
+      <div class="plan-sample">${stateNotice(limited)}<div class="composer-line">${fact('jig: the account and model the chat’s next run takes', usingHtml(a, 'gpt-6-luna'))}</div></div>
+    </section>`;
+  }
 
   // A suggested request: the cue's words, copied in from the demo's
   // configuration. Where a later step draws what it starts, it leads there.
@@ -1037,34 +1063,254 @@
       <div class="worker-grid${world.workers.length === 1 ? ' one' : ''}">${cards}</div>`);
   };
 
-  // The person's LLM accounts, in temper's words (client README, 5.5);
-  // the plans' windows are gap 6.3's.
-  function sourceRow(s, i) {
-    const what = s.kind === 'program' ? `${s.program}’s login · on ${s.hosts.map(esc).join(', ')}`
-      : s.kind === 'sign-in' ? 'Signed in' : 'A key';
-    const usage = s.usage
-      ? fact('gap 6.3: the plan’s usage per window, as the provider reports it', `${usageLine('5-hour window', s.usage.window, s.usage.windowReset != null ? hm(s.usage.windowReset) : null, null)}${usageLine('Week', s.usage.week, s.usage.weekReset, s.usage.pace)}`)
-      : `<p class="muted tiny" style="margin:0">${fact('jig: a key has no plan', 'No plan windows.')}</p>`;
-    return `<div class="source-row"><span class="queue-no">${i + 1}</span><div><h3>${conf('a source of the account, in its order', esc(s.name))} <span class="tag green">${fact('jig: the source’s state, in temper’s words', 'Ready')}</span>${s.use === 'In use' ? ` <span class="tag">${fact('jig: a run uses it now', 'In use')}</span>` : ''}</h3><p>${fact('jig: the source’s kind, and for a program’s, the hosts it is signed in on', esc(what))}</p></div><div class="usage">${usage}</div></div>`;
+  // The person's LLM accounts, in temper's words (client README, 5.5): a
+  // row for each account, folded, with its sources in order, what it pays
+  // for and who uses it, and the acts its state offers. A plan shows its
+  // limit, never its windows: OpenAI reports none to temper, and Manage
+  // usage reaches them. A program's windows are gap 6.3's.
+  const MANAGE = 'Mockup: ChatGPT’s settings open in a new tab, at chatgpt.com/settings/usage: the plan’s usage, and a weekly cap for temper.';
+  const manageUsage = (cls = 'text-link') => conf('the provider’s manage-usage address, in the configuration: chatgpt.com/settings/usage', `<a class="${cls}" href="#" data-later="${esc(MANAGE)}">Manage usage ↗</a>`);
+  const displayMark = () => ahead('display', 'the account’s display, its email: jig carries none yet, so the heading drops it until it does (client README, 5.5)');
+  const SOURCE_STATES = {
+    usable: ['green', 'Ready'],
+    limited: ['amber', 'Limited'],
+    refused: ['red', 'Refused'],
+    'needs sign-in': ['red', 'Signed out'],
+    misconfigured: ['red', 'Misconfigured'],
+    unloaded: ['red', 'Can’t be used'],
+  };
+  const sourceState = s => s.state || 'usable';
+  // The source that decides, in this slice: the first.
+  const accountState = a => sourceState(a.sources[0]);
+  const ownAccounts = () => world.accounts.filter(a => a.provider !== demo?.provider);
+  function sourceKind(a, s) {
+    if (s.kind === 'sign-in') return `${a.name} sign-in`;
+    if (s.kind === 'program') return `${s.program} login ${s.name}`;
+    return 'API key';
+  }
+  function holderWords(a) {
+    const holder = a.holder === 'the deployment' ? 'held by the deployment' : `held by ${a.holder}`;
+    return a.sources.every(s => s.kind === 'key') ? holder : `${a.provider} · ${holder}`;
+  }
+  const isPlan = a => a.sources.some(s => s.kind === 'sign-in');
+  const paysFor = a => (isPlan(a) ? 'Your own work, and projects where you’re the only member' : 'Your own work');
+  const accountUsers = a => Object.keys(world.tasks).filter(k => T(k).account === a.name && isLive(k) && T(k).kind !== 'change').sort((x, y) => x.slice(1) - y.slice(1));
+
+  // A source's state, in the words of 5.5's table, with its acts.
+  function stateNotice(a) {
+    const s = a.sources[0];
+    const act = (label, why, cls = 'button') => `<button class="${cls}" data-later="${esc(why)}">${label}</button>`;
+    const again = act('Continue with ChatGPT', 'Mockup: a sign-in starts, as Connect a model’s: the address to open, then this row reads Ready.', 'button primary');
+    const key = act('Use an API key', 'Mockup: the key’s form, as Connect a model’s; the key joins this account.');
+    const resume = act('Resume', 'Mockup: temper tries the plan again now; its tasks go on if OpenAI allows them.');
+    const keyFirst = a.sources.some(x => x.kind === 'key') ? act('Use the API key first', 'Mockup: the key moves before the sign-in; the account’s waiting tasks go on, billed to the key.') : '';
+    const [words, acts, red] = {
+      limited: s.reset != null
+        ? [`Limited by ${a.provider} until ${hm(s.reset)}. Tasks on it wait.`, resume + keyFirst]
+        : [`temper reached its usage limit on your ${a.plan}. Tasks on it wait.`, manageUsage('button') + resume + keyFirst],
+      refused: s.why === 'declined'
+        ? ['You signed in without plan usage.', again + key, true]
+        : [`This ${a.name} account can’t be used for plan usage in temper. Plan usage needs an eligible ${a.plan}.`, key + act('Sign in to another account', 'Mockup: sign out of ChatGPT in your browser first; then a sign-in starts, as Connect a model’s.'), true],
+      'needs sign-in': s.unconfirmed
+        ? [`temper removed its tokens, but ${a.name} didn’t confirm. Disconnect temper in ${a.name}’s settings, under Apps.`, again, true]
+        : [`Signed out of ${a.name}.`, again, true],
+      misconfigured: [`${a.provider} refused temper’s sign-in. Check the configuration’s registration.`, '', true],
+      unloaded: [`Can’t be used on ${s.host}: ${s.why}.`, '', true],
+    }[sourceState(s)] || [];
+    if (!words) return '';
+    return `<div class="notice${red ? ' red' : ''} account-notice"><div>${fact('jig: the deciding source’s state, in temper’s words', esc(words))}${acts ? `<div class="button-row">${acts}</div>` : ''}</div></div>`;
+  }
+
+  function sourceRow(a, s, i) {
+    const [tone, word] = SOURCE_STATES[sourceState(s)];
+    const what = s.kind === 'program' ? `on ${s.hosts.map(esc).join(', ')}`
+      : s.kind === 'sign-in' ? `${esc(s.name)}${s.since != null ? ` · signed in ${clock(s.since)}` : ''}` : esc(s.name);
+    const usage = s.kind === 'program' && s.usage
+      ? `<div class="usage">${fact('gap 6.3: the plan’s usage per window, as the provider reports it', `${usageLine('5-hour window', s.usage.window, s.usage.windowReset != null ? hm(s.usage.windowReset) : null, null)}${usageLine('Week', s.usage.week, s.usage.weekReset, s.usage.pace)}`)}</div>`
+      : '';
+    return `<div class="source-row${usage ? '' : ' plain'}"><span class="queue-no">${i + 1}</span><div><h3>${fact('jig: the source’s kind, in temper’s words', esc(sourceKind(a, s)))} <span class="tag ${tone}">${fact('jig: the source’s state, in temper’s words', word)}</span>${s.use === 'In use' ? ` <span class="tag">${fact('jig: a run uses it now', 'In use')}</span>` : ''}</h3><p>${conf('the source’s name, and for a program’s, the hosts it is signed in on', what)}</p></div>${usage}</div>`;
+  }
+
+  function accountActs(a) {
+    const first = a.sources[0];
+    const remove = '<button class="button" data-later="Mockup: the account is removed, with its sources.">Remove</button>';
+    if (first.kind === 'sign-in' && sourceState(first) === 'needs sign-in') return remove;
+    const addKey = a.sources.some(s => s.kind === 'key') ? '' : '<button class="button" data-later="Mockup: a key joins this account, after its sign-in; a run takes it when the plan can’t serve it.">Add an API key</button>';
+    if (first.kind === 'sign-in') return `${manageUsage()}${addKey}<button class="button" data-later="Mockup: temper revokes the sign-in at ChatGPT and removes its tokens; the row reads Signed out.">Sign out</button>`;
+    if (first.kind === 'program') return `<button class="button" data-later="Mockup: temper program-login ${esc(first.name)}, to run on another host.">Sign in on another host</button><button class="button" data-later="Mockup: the login is removed on every host that has it.">Sign out on every machine</button>`;
+    return '<button class="button" data-later="Mockup: a new key, pasted; the old is erased once the new is kept.">Replace</button><button class="button" data-later="Mockup: the key is erased, and the account with it.">Remove</button>';
+  }
+
+  function accountRow(a, open = false) {
+    const [tone, word] = SOURCE_STATES[accountState(a)];
+    const waiting = (a.waiting || []).filter(k => T(k));
+    const users = accountUsers(a).filter(k => !waiting.includes(k));
+    const name = `${esc(accountName(a))}${isPlan(a) ? ` ${displayMark()}` : ''}`;
+    const summary = [a.models ? a.models.join(', ') : '', a.models ? paysFor(a).replace(/^Y/, 'y') : paysFor(a), waiting.length ? `${plural(waiting.length, 'task')} waiting` : users.length ? `used by ${users.join(', ')}` : 'no task uses it now'].filter(Boolean).join(' · ');
+    const kv = (k, v) => `<div class="kv"><span>${k}</span><strong>${v}</strong></div>`;
+    const links = ks => ks.map(k => `<a class="text-link" href="${href(k)}">${k}</a>`).join(', ');
+    return `<details class="card forge-row account-row${fresh(a)}"${open ? ' open' : ''}><summary><div class="forge-name">${fact('jig: the account’s provider and display name, its provider and holder, in temper’s words', `${name}<small>${esc(holderWords(a))}</small>`)}</div><span class="tag ${tone}">${fact('jig: the deciding source’s state, in temper’s words', word)}</span><div class="forge-summary-line"><p class="muted tiny">${fact('jig: its models, its uses, and the tasks on it', esc(summary))}</p></div></summary><div class="card-pad">
+        ${stateNotice(a)}
+        <p class="muted tiny" style="margin:0 0 4px">Its sources in order: a run takes the first usable one.</p>
+        ${a.sources.map((s, i) => sourceRow(a, s, i)).join('')}
+        <div class="rule"></div>
+        <div class="repo-lines">
+          ${a.models ? kv('Models', conf('the models its provider’s endpoints serve, in the configuration', esc(a.models.join(', ')))) : ''}
+          ${kv('Pays for', fact('jig: the account’s uses; a plan serves its holder alone', esc(paysFor(a))))}
+          ${kv('Used by', users.length ? `${fact('jig: the live tasks whose runs use it', links(users))} · ${fact('jig: their runs now', `${users.filter(k => T(k).phase === 'running').length} running`)}` : 'none')}
+          ${kv('Waiting for it', fact('jig: tasks waiting for the account; temper never moves them to another', waiting.length ? links(waiting) : 'none'))}
+        </div>
+        <div class="button-row account-acts">${accountActs(a)}</div>
+      </div></details>`;
+  }
+
+  // A sign-in under way, before it makes an account.
+  function signingInRow() {
+    return `<details class="card forge-row account-row"><summary><div class="forge-name">${conf('the provider’s plan, in temper’s words', 'ChatGPT')}<small>OpenAI · for you</small></div><span class="tag amber">${fact('temper: the sign-in, under way', 'Signing in')}</span><div class="forge-summary-line"><p class="muted tiny">${fact('temper: the sign-in’s deadline', esc(`Waiting for you in your browser, until ${hm(world.signIn.until)}`))}</p></div></summary><div class="card-pad"><a class="text-link" href="${esc(u('connect-model.html?way=chatgpt'))}">Open its sign-in ›</a></div></details>`;
+  }
+
+  function accountNavMark() {
+    const own = ownAccounts();
+    const needs = own.some(a => ['refused', 'needs sign-in', 'misconfigured', 'unloaded'].includes(accountState(a)));
+    const signing = world.signIn?.state === 'waiting';
+    const limited = own.some(a => accountState(a) === 'limited');
+    if (!needs && !signing && !limited) return '';
+    return `<i class="nav-mark ${needs ? 'red' : 'amber'}" aria-label="${needs ? 'an account needs you' : signing ? 'a sign-in is under way' : 'an account is limited'}"></i>`;
+  }
+
+  // The ChatGPT row in each other state, built on the world's own.
+  function chatgptLike(sign) {
+    const a = ownAccounts().find(a => a.name === 'ChatGPT');
+    const base = a || { name: 'ChatGPT', plan: 'ChatGPT plan', provider: 'OpenAI', holder: world.person, models: ['gpt-6-luna'], sources: [{ name: 'sam@example.com', kind: 'sign-in' }] };
+    return { ...base, at: null, waiting: sign.waiting, sources: [{ ...base.sources[0], use: 'Idle', ...sign.source }, ...(sign.more || [])] };
   }
 
   pages.accounts = () => {
-    const cards = world.accounts.map(a => {
-      const users = Object.keys(world.tasks).filter(k => T(k).account === a.name && isLive(k) && T(k).kind !== 'change').sort((x, y) => x.slice(1) - y.slice(1));
-      const windows = a.sources.some(s => s.usage);
-      return `<section class="card card-pad${fresh(a)}"><div class="card-top"><div><h2>${fact('jig: the account’s provider and display name, in temper’s words', esc(accountName(a)))} <span class="muted" style="font-weight:400;font-size:11px">· ${fact('jig: its LLM provider, and the party holding it', `${esc(a.provider)} · held by ${esc(a.holder)}`)}</span></h2><p class="muted tiny" style="margin:5px 0 0">Its sources in order: a run takes the first usable one on its worker.</p></div><div class="filter-row">${windows ? gap('6.3', 'plan usage') : ''}<span class="tag green">${fact('jig: whether it is usable now', 'Ready')}</span></div></div>
-        <div style="margin-top:8px">${a.sources.map(sourceRow).join('')}</div>
-        <div class="rule"></div>
-        <div class="kv"><span>Used by</span><strong>${users.length ? `${fact('jig: the live tasks whose runs use it', users.map(k => `<a class="text-link" href="${href(k)}">${k}</a>`).join(', '))} · ${fact('jig: their runs now', `${users.filter(k => T(k).phase === 'running').length} running`)}` : 'none'}</strong></div>
-        <div class="kv"><span>Waiting for it</span><strong>${fact('jig: tasks waiting for the account', 'none')}</strong></div>
-      </section>`;
-    }).join('');
-    const providers = new Set(world.accounts.map(a => a.provider));
-    const ways = world.config.ways || [providers.has('OpenAI') ? 'Continue with ChatGPT' : '', providers.has('Anthropic') ? 'Use your Claude subscription' : '', 'Use an API key'].filter(Boolean);
-    return listPage('accounts', [['Accounts']], `
-      <div class="section-heading" style="margin-top:0"><div><h2>Your LLM accounts</h2><p class="muted tiny" style="margin:5px 0 0">Each plan’s windows, read as the account’s facts. The mark on a week is its pace: where usage would be if the week were spent evenly.</p></div></div>
-      <div class="stack">${cards}</div>
-      <div class="section-heading"><h2>Add an account</h2><div class="filter-row">${ways.map(w => `<button class="button" data-later>${w}</button>`).join('')}</div></div>`);
+    const own = ownAccounts();
+    const play = demoRunning() ? world.accounts.find(a => a.provider === demo.provider) : null;
+    const rows = [...(world.signIn?.state === 'waiting' ? [signingInRow()] : []), ...own.map(a => accountRow(a))];
+    const windows = own.some(a => a.sources.some(s => s.kind === 'program' && s.usage));
+    const key = { name: 'sam-key', kind: 'key', use: 'Idle' };
+    const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the ChatGPT row in each state of client README 5.5’s table, and an API key’s and a Claude subscription’s rows, to compare.</p>${[
+      ['Limited: temper reached the plan’s limit, with a key after it', chatgptLike({ source: { state: 'limited' }, more: [key], waiting: ['T1'] })],
+      ['Limited, until the reset OpenAI gave', chatgptLike({ source: { state: 'limited', reset: 5 * 60 }, waiting: ['T1'] })],
+      ['Refused: signed in without plan usage', chatgptLike({ source: { state: 'refused', why: 'declined' } })],
+      ['Refused: not eligible', chatgptLike({ source: { state: 'refused', why: 'not eligible' } })],
+      ['Signed out', chatgptLike({ source: { state: 'needs sign-in' } })],
+      ['Signed out, but ChatGPT didn’t confirm', chatgptLike({ source: { state: 'needs sign-in', unconfirmed: true } })],
+      ['Misconfigured', chatgptLike({ source: { state: 'misconfigured' } })],
+      ['Can’t be used on a host', chatgptLike({ source: { state: 'unloaded', host: 'worker', why: 'its record didn’t load' } })],
+      ['An OpenAI API key, for comparison', { name: 'OpenAI', provider: 'OpenAI', holder: world.person, models: ['gpt-6-luna'], sources: [key] }],
+      ['A Claude subscription, where the configuration offers it, for comparison', { name: 'Claude', plan: 'Claude subscription', provider: 'Anthropic', holder: world.person, sources: [{ name: 'claude-sam', kind: 'program', program: 'Claude Code', hosts: ['worker'], use: 'Idle' }] }],
+    ].map(([heading, a]) => `<h3>${esc(heading)}</h3>${accountRow(a, true)}`).join('')}</section>` : '';
+    const empty = `<div class="empty-state">No model of yours yet. <a class="button primary" href="${esc(u('connect-model.html'))}">Connect a model</a></div>`;
+    const playground = play ? `<div class="section-heading"><h2>The playground</h2></div><details class="card forge-row forge-demo"><summary><span>${fact('temper: the demo’s model, the deployment’s account', 'Scripted model · the playground’s, until a model of yours connects · held by the deployment')}</span></summary><div class="card-pad"><p class="muted tiny" style="margin:0">It plays the playground’s scripts: it answers the suggested requests, and nothing else. It costs nothing, and nothing leaves this machine.</p></div></details>` : '';
+    return listPage('accounts', [['Accounts']], `<div class="section-heading" style="margin-top:0"><div><h2>Your accounts <span class="subtle-count">${fact('jig: your LLM accounts, the demo’s excluded', esc(own.length))}</span></h2><p class="muted tiny">The LLM accounts temper’s agents run on for you. A task keeps its account: while the account is limited, the task waits for it.</p></div><a class="button" href="${esc(u('connect-model.html'))}">+ Connect a model</a></div>
+      <div class="stack">${rows.length ? rows.join('') : empty}</div>
+      ${windows ? `<p class="gap-note">${gap('6.3', 'plan usage')} A program’s windows, as the account’s facts. The mark on a week is its pace: where usage would be if the week were spent evenly.</p>` : ''}
+      ${playground}${variants}`);
+  };
+
+  // Connecting a model (client README, 5.5): Choose, Details, Signing in
+  // and Ready. ChatGPT's sign-in is drawn whole; a key's form and Claude's
+  // subscription are sketched, for the context.
+  const SIGN_IN = 'https://auth.openai.com/api/accounts/authorize?response_type=code&client_id=…&redirect_uri=http%3A%2F%2F127.0.0.1%3A1455%2Fauth%2Fcallback&scope=openid+profile+email+offline_access+…&code_challenge=…&state=Qm7v…';
+  const wayLabel = w => conf('a way the configuration offers to connect a model', esc(w));
+  function modelChoices(target = 'connect-model.html?way=') {
+    const ways = world.config.ways || [];
+    const chatgpt = ways.find(w => w.startsWith('Continue with'));
+    const key = ways.find(w => w.startsWith('Use an') && w.endsWith('API key'));
+    return `<div class="forge-choices model-choices">${chatgpt ? `<section class="card card-pad"><h3>ChatGPT</h3><p>Your ChatGPT plan. Sign in with your ChatGPT account, and temper’s agents use your plan’s included usage.</p><p class="muted tiny">In a browser on the engine’s machine · about a minute</p><a class="button primary" href="${esc(u(`${target}chatgpt`))}">${wayLabel(chatgpt)}</a></section>` : ''}${key ? `<section class="card card-pad"><h3>An OpenAI API key</h3><p>A key from OpenAI’s platform. What temper’s agents use is billed to the key’s organization.</p><p class="muted tiny">Pasted here · at once</p><a class="button" href="${esc(u(`${target}key`))}">${wayLabel(key)}</a></section>` : ''}</div>`;
+  }
+  const portFold = () => `<details class="forge-elsewhere model-elsewhere"><summary>Your browser is on another machine?</summary><p>ChatGPT sends your browser back to ${conf('the sign-in’s fixed redirect, in the configuration', '127.0.0.1:1455')} on its own machine. Forward that port to the engine’s machine first, and keep the tunnel open while you sign in:</p><pre><code>${conf('the sign-in’s fixed port, in the configuration', 'ssh -L 1455:127.0.0.1:1455 HOST')}</code></pre><p class="muted tiny">HOST is the engine’s machine. Codex’s own sign-in uses the same port: finish or cancel one before you start the other.</p></details>`;
+  function chatgptDetails(next) {
+    return `<div class="forge-setup">
+        <h3>ChatGPT</h3>
+        <p>Sign in with your ChatGPT account. temper’s agents then run on your plan.</p>
+        <ul class="forge-facts">
+          <li>Plan usage needs an eligible ChatGPT plan, such as Plus or Pro.</li>
+          <li>temper’s use counts toward your plan’s limits, which ChatGPT and your other apps, such as Codex, share. In ChatGPT’s settings you can see it, and set a weekly cap for temper.</li>
+          <li>It pays for your own work, and for projects where you’re the only member.</li>
+          <li>When your plan reaches its limit, its tasks wait for it: temper never moves them to another account.</li>
+        </ul>
+        <p>Sign in from a browser on the engine’s machine: ChatGPT sends you back to it, where temper listens while you sign in.</p>
+        ${portFold()}
+        <a class="button primary" href="${esc(next)}">${wayLabel('Continue with ChatGPT')}</a>
+      </div>`;
+  }
+  function signingIn(until = world.signIn?.until ?? world.now + 10) {
+    return `<h3>Signing in to ChatGPT</h3>
+      <p>Open this address in a browser on the engine’s machine:</p>
+      <pre><code>${fact('temper: the sign-in’s address, made for this sign-in alone', `<a href="#" data-later="Mockup: ChatGPT’s sign-in opens in a new tab. Once you approve, ChatGPT sends the browser back to temper, and this page moves on.">${esc(SIGN_IN)}</a>`)}</code></pre>
+      <div class="button-row"><a class="button primary" href="#" data-later="Mockup: ChatGPT’s sign-in opens in a new tab. Once you approve, ChatGPT sends the browser back to temper, and this page moves on.">Open ChatGPT’s sign-in ↗</a><button class="button" data-later="Mockup: the sign-in ends, and its address with it; Connect a model is back at its start.">Cancel</button></div>
+      <p class="muted tiny">${fact('temper: the sign-in’s deadline, the profile’s', esc(`Waiting for you in your browser. The address works once, until ${hm(until)}, and ends if temper restarts.`))}</p>
+      ${portFold()}`;
+  }
+  function chatgptReady(a, wasPlayground) {
+    const s = a.sources[0];
+    const t = Object.keys(world.tasks).find(k => T(k).account === a.name && isLive(k) && isChat(T(k)));
+    return `<h3>${fact('jig: the sign-in’s subject, its display', esc(`Signed in to ChatGPT as ${s.name}`))} ${displayMark()}</h3>
+      <p>temper’s agents now run on your ChatGPT plan.</p>
+      <div class="repo-lines">
+        <div class="kv"><span>Account</span><strong>${fact('jig: the account, in temper’s words', esc(`${accountName(a)} · ${holderWords(a)}`))}</strong></div>
+        <div class="kv"><span>Model</span><strong>${fact('jig: the model a new chat’s first run takes', esc(world.config.next?.model || 'gpt-6-luna'))}</strong></div>
+        <div class="kv"><span>Pays for</span><strong>${fact('jig: the account’s uses; a plan serves its holder alone', esc(paysFor(a)))}</strong></div>
+      </div>
+      ${wasPlayground ? `<p>The playground’s scripted model stepped aside${t ? `: ${t}’s next run takes ${esc(T(t).model)}` : ''}.</p>` : ''}
+      <div class="button-row"><a class="button primary" href="${esc(u('chats.html'))}">Start a chat</a>${manageUsage()}</div>
+      <p class="muted tiny">${esc(accountName(a))} is on the <a class="text-link" href="${esc(u('accounts.html'))}">Accounts</a> page, with its details.</p>`;
+  }
+  function keyForm() {
+    return `<div class="forge-setup welcome-model"><h3>An OpenAI API key</h3><p>From OpenAI’s platform, under API keys. What temper’s agents use is billed to the key’s organization.</p>
+        <label class="forge-field"><span>Name</span><input type="text" value="sam-key"></label>
+        <label class="forge-field"><span>API key</span><input type="password" placeholder="sk-…"></label>
+        <button class="button primary" data-later="Mockup: the key makes an account, OpenAI API key, held by you, and reads Ready.">Add the key</button>
+        ${PASTED}
+        <p class="gap-note">A key reads Ready until a run is refused: a wrong key shows only once OpenAI refuses a request.</p></div>`;
+  }
+  function claudeSketch() {
+    return `<div class="forge-setup"><h3>Your Claude subscription ${ahead('sketch', 'Claude’s subscription in Connect a model, in outline for the context: the words are client README 5.5’s, the command credentials.md’s')}</h3>
+        <p>temper runs Claude Code, signed in to your Claude subscription on each host its agents run on. Name the login, then sign in on each host, in a terminal there:</p>
+        <label class="forge-field"><span>Name</span><input type="text" value="claude-sam"></label>
+        <pre><code>temper program-login claude-sam</code></pre>
+        <p class="muted tiny">Claude Code asks you to sign in. temper never reads its login.</p>
+        <button class="button" data-later="Mockup: the login is declared; its row on Accounts says, for each host, whether Claude Code is signed in there.">Use your Claude subscription</button></div>`;
+  }
+  // The tab ChatGPT sends the browser back to, at the engine's listener.
+  function callbackTab(ok) {
+    return `<div class="browser-tab"><div class="browser-bar">${esc(`127.0.0.1:1455/auth/callback?code=…&state=Qm7v…`)}</div><div class="browser-page"><p class="browser-brand">✳ temper</p>${ok ? '<h3>Signed in to ChatGPT</h3><p>You can close this tab and go back to temper.</p>' : '<h3>temper couldn’t finish signing in</h3><p>Go back to temper: Connect a model says why.</p>'}</div></div>`;
+  }
+  const endingCard = (words, acts, mark = '', failed = true) => `<h3>Signing in to ChatGPT ${mark}</h3><p${failed ? ' class="forge-failure"' : ''}>${words}</p>${acts ? `<div class="button-row">${acts}</div>` : ''}`;
+
+  pages['connect-model'] = () => {
+    const way = params.get('way');
+    const a = ownAccounts().find(a => a.provider === 'OpenAI' && isPlan(a));
+    const wasPlayground = demoRunning();
+    const next = worldKey === 'first-run-real' ? 'connect-model.html?way=chatgpt&step=3' : 'connect-model.html?way=chatgpt&step=5';
+    let current = 0;
+    let body = modelChoices();
+    if (way === 'chatgpt') {
+      if (world.signIn?.state === 'waiting') { current = 2; body = flowWrap(signingIn()); }
+      else if (a) { current = 3; body = flowWrap(chatgptReady(a, wasPlayground)); }
+      else { current = 1; body = flowWrap(chatgptDetails(u(next))); }
+    } else if (way === 'key') { current = 1; body = flowWrap(keyForm()); }
+    const back = current === 1 ? `<p><a class="text-link" href="${esc(u('connect-model.html'))}">‹ All ways</a></p>` : '';
+    const again = '<button class="button primary" data-later="Mockup: a fresh sign-in, with a new address.">Continue with ChatGPT</button>';
+    const key = '<button class="button" data-later="Mockup: the key’s form.">Use an API key</button>';
+    const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the sign-in while it waits, the tab ChatGPT sends the browser back to, each other ending, and the other ways.</p>${[
+      ['Signing in: waiting for you in your browser', 2, signingIn(world.now + 10)],
+      ['The browser’s tab, once ChatGPT sends it back', 2, `<h3>In the browser ${ahead('callback page', 'what the engine’s loopback listener answers the browser: skein’s oauth.md draws no page')}</h3><div class="browser-tabs">${callbackTab(true)}${callbackTab(false)}</div>`],
+      ['The same account again', 2, endingCard(fact('jig: a sign-in to a subject the person already holds', esc(`That’s ${a ? a.sources[0].name : 'sam@example.com'} again. To add another account, sign out of ChatGPT in your browser first, then Continue with ChatGPT.`)), again, '', false)],
+      ['Signed in without plan usage', 2, endingCard(fact('jig: the sign-in refused, plan usage declined', 'You signed in without plan usage.'), again + key)],
+      ['Not eligible', 2, endingCard(fact('jig: the sign-in refused, not eligible', 'This ChatGPT account can’t be used for plan usage in temper. Plan usage needs an eligible ChatGPT plan.'), `${key}<button class="button" data-later="Mockup: sign out of ChatGPT in your browser first; then a fresh sign-in.">Sign in to another account</button>`)],
+      ['Another person holds that account', 2, endingCard(fact('jig: the sign-in refused, a subject another holder holds', 'Another person here holds that ChatGPT account. To use one of yours, sign out of ChatGPT in your browser first, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in refused for a subject another holder holds (jig’s accounts.md, 3.3): client README 5.5 has no words yet'))],
+      ['Cancelled, or past its deadline', 2, endingCard(fact('skein: the sign-in ended, cancelled or expired', esc(`The sign-in ended at ${hm(world.now + 10)}: no answer came from ChatGPT in time.`)), again, ahead('words', 'a sign-in cancelled or expired: client README 5.5 has no words yet'))],
+      ['The port is taken', 2, endingCard(fact('temper: the loopback listener couldn’t bind the fixed port', 'temper can’t listen on 127.0.0.1:1455: another program has it, such as Codex’s own sign-in. Finish or close that sign-in, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in whose fixed port is taken: client README 5.5 has no words yet'))],
+      ['Misconfigured', 2, endingCard(fact('jig: the sign-in refused by the provider, misconfigured', 'OpenAI refused temper’s sign-in. Check the configuration’s registration.'), '')],
+      ['An OpenAI API key: its details', 1, keyForm()],
+      ['Your Claude subscription, where the configuration offers it', 1, claudeSketch()],
+    ].map(([heading, at, content]) => `<h3>${esc(heading)}</h3>${flowSteps(at, 'Signing in')}${flowWrap(content)}`).join('')}</section>` : '';
+    return listPage('accounts', [['Accounts', 'accounts.html'], ['Connect a model']], `<div class="section-heading" style="margin-top:0"><h2>Connect a model</h2></div>${flowSteps(current, 'Signing in')}${back}${body}${variants}`);
   };
 
   // The forges' part of the deployment's connectors, in temper's words
@@ -1220,7 +1466,8 @@
     const at = params.get('at') || (demoRunning() ? 'demo' : !startedForge ? 'welcome' : !usableModel() ? 'model' : 'ready');
     const views = ['welcome', 'forge', 'model', 'ready'];
     const current = views.includes(at) ? at : 'welcome';
-    const back = current === 'forge' && params.has('forge') ? 'forge' : views[Math.max(0, views.indexOf(current) - 1)];
+    const way = params.get('way') || (world.signIn?.state === 'waiting' ? 'chatgpt' : null);
+    const back = (current === 'forge' && params.has('forge')) || (current === 'model' && way) ? current : views[Math.max(0, views.indexOf(current) - 1)];
     const foot = `<div class="welcome-foot"><a class="text-link" href="${esc(u(`welcome.html?at=${back}`))}">‹ Back</a><a class="text-link" href="${esc(u('chats.html'))}">Later</a>${!ownForge() ? tryDemo('Try the playground instead') : ''}</div>`;
     const heading = (text, tag = 'h2') => `<${tag}>${text} ${welcomeMark()}</${tag}>`;
     const eachStep = () => `<details class="welcome-progress"><summary>Each step</summary>${ownedProgress(f)}</details>`;
@@ -1229,7 +1476,7 @@
       content = `<p class="mock-note">Once the playground runs, the link opens Chats; the welcome is gone. <a class="text-link" href="${esc(u('chats.html'))}">Open Chats</a></p>`;
     } else if (current === 'welcome') {
       const providers = world.config.providers || [...new Set(world.accounts.filter(a => a.provider !== demo?.provider).map(a => a.provider))];
-      const ways = (world.config.ways || []).map(way => way === 'Use an API key' ? providers.map(p => `an ${esc(p)} API key`).join(' or ') : esc(way)).join(' or ');
+      const ways = (world.config.ways || []).map(way => way === 'Use an API key' ? providers.map(p => `an ${esc(p)} API key`).join(' or ') : way.startsWith('Continue with ') ? `your ${esc(way.slice(14))} plan` : esc(way.replace(/^Use /, ''))).join(', or ');
       content = `${heading('Welcome to temper', 'h1')}<p class="welcome-lead">Ask for a change in a chat. temper’s agents make it on a branch, open a pull request, and land it once CI passes.</p>
         <div class="welcome-choices"><section class="card card-pad"><h2>Try the playground</h2><p>A built-in scripted model and forge. Ask one of three requests and follow its change from a branch to main.</p><p class="muted">Nothing leaves this machine, and nothing costs. · Ready at once</p><a class="button primary" href="${esc(u('chats.html?world=first-run&step=1'))}">Try the playground</a></section>
         <section class="card card-pad"><h2>Set up temper</h2><p>Your forge: GitHub, or a Forgejo temper runs on this machine.<br>Your model: ${conf('the configuration’s ways to connect a model, and its providers', ways)}.</p><p class="muted">About five minutes</p><a class="button primary" href="${esc(u('welcome.html?at=forge'))}">Set up temper</a></section></div>
@@ -1242,14 +1489,15 @@
       content = `${heading('Connect a forge')}<p class="muted welcome-lead">Where your repositories live: temper’s agents push branches and open pull requests there.</p>${which ? flowWrap(details) : forgeChoices('welcome.html?at=forge&forge=')}${foot}`;
     } else if (current === 'model') {
       const status = f?.state === 'setting up' ? `<div class="welcome-status">${fact('temper: the forge’s name and set-up state', esc(`${forgeName(f)} · ${f.state}`))}${eachStep()}</div>` : '';
-      const providers = world.config.providers || ['OpenAI'];
-      const ways = (world.config.ways || []).map(way => way === 'Use an API key' ? `<section class="card card-pad forge-setup welcome-model"><h3>${conf('a way the configuration offers to connect a model', esc(way))}</h3><label class="forge-field"><span>Provider</span>${conf('the configuration’s provider offering keys', esc(providers.join(', ')))}</label><label class="forge-field"><span>Name</span><input type="text" value="${esc(providers[0])}"></label><label class="forge-field"><span>API key</span><input type="password" placeholder="sk-…"></label><a class="button primary" href="${esc(u('welcome.html?at=ready&world=first-run-real&step=3'))}">Add the key</a></section>` : `<button class="button" data-later>${conf('a way the configuration offers to connect a model', esc(way))}</button>`).join('');
-      const variants = worldKey === 'first-run-real' ? `<section class="mock-variants" id="other-states"><h2>Other ways, where the configuration offers them</h2><div class="welcome-choices"><section class="card card-pad"><h3>Continue with ChatGPT ${ahead('sign-in', 'ChatGPT’s sign-in in the client: accounts’ live sign-in, off until temper offers it')}</h3><button class="button" data-later>Continue with ChatGPT</button></section><section class="card card-pad"><h3>Use your Claude subscription</h3><button class="button" data-later>Use your Claude subscription</button></section></div></section>` : '';
-      content = `${status}${heading('Connect a model')}<p class="muted welcome-lead">temper’s agents run on it, and what they use is billed to its account.</p>${ways}${foot}${variants}`;
+      // Connect a model's Choose, Details and Signing in, within the
+      // wizard; its Ready is the wizard's.
+      const body = way === 'chatgpt' ? flowWrap(world.signIn?.state === 'waiting' ? signingIn() : chatgptDetails(u('welcome.html?at=model&world=first-run-real&step=3'))) : way === 'key' ? flowWrap(keyForm()) : modelChoices('welcome.html?at=model&way=');
+      const variants = worldKey === 'first-run-real' ? `<section class="mock-variants" id="other-states"><h2>Other ways, where the configuration offers them</h2>${flowWrap(claudeSketch())}<p style="margin-top:14px">ChatGPT’s other endings, and the account’s other states, are drawn in the first run: <a class="text-link" href="${esc(u('connect-model.html?world=first-run&step=5#other-states'))}">Connect a model</a> and <a class="text-link" href="${esc(u('accounts.html?world=first-run&step=5#other-states'))}">Accounts</a>.</p></section>` : '';
+      content = `${status}${heading('Connect a model')}<p class="muted welcome-lead">temper’s agents run on it: on a plan you sign in to, or on a key.</p>${body}${foot}${variants}`;
     } else {
       const ready = f?.state === 'connected';
       const next = world.config.next;
-      const model = next ? `${next.account} · ${next.model}` : 'No model yet';
+      const model = next ? `${accountName(account(next.account))} · ${next.model}` : 'No model yet';
       const modelLine = `<li class="done">${fact('jig: the usable model and its account', esc(`Model: ${model}`))}</li>`;
       const forgeLine = `<li class="${ready ? 'done' : 'current'}">${fact('temper: the forge’s connection state and login', ready ? 'Forge: Forgejo on this machine, connected as temper' : esc(`Forge: ${forgeName(f)} · ${f.state}`))}${!ready ? eachStep() : ''}</li>`;
       content = `${heading(ready ? 'work/hello is ready' : 'Almost ready')}<ul class="forge-progress welcome-checklist">${ready ? forgeLine + modelLine : modelLine + forgeLine}<li class="${ready ? 'done' : ''}">${fact('temper and jig: the first repository, its project and CI', `Project hello, with work/hello${ready ? ' · its first CI run passed' : ''}`)}</li></ul>${ready ? `<div class="button-row"><a class="button primary" href="${esc(u('chats.html?project=hello'))}">Open hello</a><a class="text-link" href="#" data-later="Mockup: Forgejo opens in a new tab, signed in as sam through temper.">Open Forgejo ↗</a>${ahead('sign-in', 'signing in to an owned Forgejo through temper, as its OpenID provider: no mission yet')}</div>` : '<button class="button primary" disabled>Open hello</button><p class="muted tiny welcome-after">It opens once work/hello is made.</p>'}`;

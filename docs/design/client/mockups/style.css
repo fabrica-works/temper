@@ -267,6 +267,27 @@ h3 { font-size: 14px; line-height: 1.35; letter-spacing: -.015em; margin-bottom:
 .nav-mark.red { background: var(--red); }
 @media (max-width: 760px) { .forge-choices { grid-template-columns: 1fr; } }
 
+/* Connecting a model, and managing the person's LLM accounts (client README, 5.5). */
+.model-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.model-elsewhere { margin: 0 0 14px; }
+.composer-line .text-link { font-size: inherit; }
+.account-notice { margin: 0 0 14px; }
+.account-notice .button-row { margin-top: 10px; }
+.account-acts { margin-top: 14px; }
+.source-row.plain { grid-template-columns: 22px minmax(0, 1fr); }
+.browser-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.browser-tab { border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; background: #fff; }
+.browser-bar { padding: 7px 10px; background: #f1eee9; border-bottom: 1px solid var(--line); font: 10px ui-monospace, monospace; color: var(--muted); overflow-wrap: anywhere; }
+.browser-page { padding: 18px 20px; }
+.browser-page h3 { margin: 6px 0 6px; font-size: 13px; }
+.browser-page p { margin: 0; font-size: 11px; color: var(--muted); }
+.browser-brand { font: 700 11px ui-monospace, monospace; color: var(--accent) !important; }
+.plan-sample { border: 1px solid var(--line); border-radius: 8px; background: #fffefd; padding: 16px 18px; }
+.plan-sample .terminal-turn { margin-bottom: 12px; }
+.plan-sample .terminal-proposal { margin: 4px 0 10px; }
+.plan-sample .composer-line { margin-top: 4px; }
+@media (max-width: 760px) { .model-choices, .browser-tabs { grid-template-columns: 1fr; } }
+
 /* The first link, and setup while the box works in the background. */
 .welcome-page { width: min(760px, calc(100% - 48px)); margin: 0 auto; padding: 30px 0 70px; }
 .welcome-page h1 { margin-top: 30px; }
