@@ -77,6 +77,65 @@ fn an_open_chats_text_reply_ends_its_turn_after_one_call() {
 }
 
 #[test]
+fn an_open_chats_reply_reaches_its_run_watch_in_pieces_before_its_turn_commits() {
+    use jig_domain_core::{CoreRecord, Record as CoreRecordRow};
+    use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
+
+    // The process face plays the service's live producer; the world plays
+    // the party's run watch (domain/testing.md, 2.1).
+    let reply = b"Hello there.";
+    let pieces = 3;
+    let mut world = World::open_chat_in_pieces(
+        918,
+        Script {
+            cue: Box::from(&b"@system"[..]),
+            turns: Box::new([Turn {
+                lines: Box::new([Line::Text { text: reply.as_slice().into() }]),
+                finish: Finish::Stop,
+                tokens: 20,
+            }]),
+        },
+        pieces,
+    );
+    for piece in 1..=pieces {
+        let prefix = &reply[..reply.len() * piece / pieces];
+        world.until_reply(prefix);
+        let watch = world.run_watch.as_ref().expect("the party's run watch");
+        assert_eq!(watch.text, prefix);
+        assert_eq!(watch.turn, Some((world.assignment().attempt, 1, 0)));
+        assert_eq!(world.observed.pieces, piece);
+        assert_eq!(world.observed.turns, 0, "the reply turn is still behind its pieces");
+        let task = world.assignment().task;
+        assert!(
+            !world.store.rows.values().any(|row| matches!(
+                row,
+                Record::Core(CoreRecordRow::Core(CoreRecord::Turn(turn))) if turn.task == task
+            )),
+            "no turn is committed while its reply is held"
+        );
+        world.release_reply();
+    }
+    world.run();
+    assert_eq!(world.observed.pieces, pieces);
+    assert_eq!(world.observed.turns, 1);
+    assert_eq!(world.observed.turn_acks, 1);
+    assert_eq!(world.run_watch.as_ref().expect("the party's run watch").text, reply);
+    let task = world.assignment().task;
+    let turns = world
+        .store
+        .rows
+        .values()
+        .filter_map(|row| match row {
+            Record::Core(CoreRecordRow::Core(CoreRecord::Turn(turn))) if turn.task == task => Some(turn),
+            Record::Core(_) | Record::Forge { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(turns.len(), 1, "one committed reply turn");
+    assert_eq!(turns[0].attempt, world.assignment().attempt);
+    assert!(turns[0].transcript.windows(reply.len()).any(|bytes| bytes == reply));
+}
+
+#[test]
 fn smiths_host_call_and_its_durable_reply_traverse_the_worker_process_channel() {
     let mut world = World::chat(911, report_script(true));
     world.run();

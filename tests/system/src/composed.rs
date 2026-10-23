@@ -42,6 +42,7 @@ const CHANNEL: Token = Token::new(7);
 const TICK: Duration = Duration::from_millis(1);
 /// The party's request that adopts the repository.
 const ADOPTION: Token = Token::new(900);
+const RUN_WATCH: Token = Token::new(901);
 
 /// What crossed the independently driven roots and process channel.
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -51,6 +52,8 @@ pub struct Observed {
     pub spawns: usize,
     /// Turns the worker sent the engine.
     pub turns: usize,
+    /// Live pieces the worker sent the engine.
+    pub pieces: usize,
     /// Turns the engine told the worker it keeps.
     pub turn_acks: usize,
     pub relays: usize,
@@ -59,6 +62,14 @@ pub struct Observed {
     pub cancels: usize,
     pub answers: usize,
     pub gone: usize,
+}
+
+/// The party's acknowledged provisional reply, played without a client
+/// (domain/testing.md, 2.1). The turn is its attempt, number and retry.
+#[derive(Default, Debug)]
+pub struct RunWatch {
+    pub turn: Option<(u64, u32, u32)>,
+    pub text: Vec<u8>,
 }
 
 /// Whether the chat works in an adopted repository, and how far its
@@ -98,6 +109,7 @@ pub struct World {
     forge: Forge,
     disk: Checkout,
     pub observed: Observed,
+    pub run_watch: Option<RunWatch>,
 }
 
 /// A two-completion report script; optional host write precedes the report.
@@ -203,6 +215,32 @@ impl World {
     #[must_use]
     pub fn open_chat(seed: u64, script: Script) -> Self {
         Self::configured_with(seed, script, false, open_config)
+    }
+
+    /// Watch an open chat, holding its reply before each later live piece
+    /// and before its turn crosses the process channel (domain/testing.md, 2.1).
+    #[must_use]
+    pub fn open_chat_in_pieces(seed: u64, script: Script, pieces: usize) -> Self {
+        let mut world = Self::open_chat(seed, script);
+        world.process.in_pieces(pieces);
+        world.run_watch = Some(RunWatch::default());
+        world
+    }
+
+    /// Release one later reply piece, or its turn after all pieces arrived.
+    pub fn release_reply(&mut self) {
+        self.process.release_reply(&mut self.worker_events);
+    }
+
+    /// Wait at an event-controlled hold until the run watch has this prefix.
+    pub fn until_reply(&mut self, expected: &[u8]) {
+        for _ in 0..10000 {
+            self.tick();
+            if self.run_watch.as_ref().expect("a run watch").text == expected {
+                return;
+            }
+        }
+        panic!("run watch did not reach {expected:?}: {:?}; {:?}", self.run_watch, self.observed);
     }
 
     /// Prepare an adopted repository through the worker before starting Smith.
@@ -372,6 +410,7 @@ impl World {
             forge,
             disk: Checkout::new(),
             observed: Observed::default(),
+            run_watch: None,
         }
     }
 
@@ -638,14 +677,27 @@ impl World {
             engine::Request::Forge { call, repository, op } => self.forge(call, repository, &op),
             engine::Request::Worker(engine::WorkerRequest::Deliver(delivery))
             | engine::Request::Party(engine::PartyRequest::Deliver(delivery)) => self.delivery(delivery),
+            engine::Request::Party(engine::PartyRequest::RunText { watcher, turn, from, to, text, cut, call }) => {
+                assert_eq!(watcher, RUN_WATCH);
+                let watch = self.run_watch.as_mut().expect("a run watch");
+                assert_eq!(usize::try_from(from).expect("bounded offset"), watch.text.len());
+                assert_eq!(usize::try_from(to).expect("bounded offset"), watch.text.len() + text.len());
+                assert!(call.is_none(), "the reply contains text only");
+                assert!(!cut, "the short reply fits the stream buffer");
+                let name = (turn.attempt, turn.turn, turn.retry);
+                if let Some(previous) = watch.turn {
+                    assert_eq!(previous, name, "one reply turn");
+                }
+                watch.turn = Some(name);
+                watch.text.extend_from_slice(&text);
+                self.root_events.push_back(engine::Event::Party(engine::PartyInput::StreamDelivered { watcher }));
+            }
             other @ (engine::Request::Store(engine::StoreRequest::Read { .. })
             | engine::Request::Worker(
                 engine::WorkerRequest::Host(_) | engine::WorkerRequest::ReadResult { .. },
             )
             | engine::Request::Party(
-                engine::PartyRequest::SignInRefused { .. }
-                | engine::PartyRequest::WatchRefused { .. }
-                | engine::PartyRequest::RunText { .. },
+                engine::PartyRequest::SignInRefused { .. } | engine::PartyRequest::WatchRefused { .. },
             )
             | engine::Request::Account(_)
             | engine::Request::SetUp { .. }
@@ -713,6 +765,13 @@ impl World {
 
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
+            // A run watch first supplies its current document, then streams
+            // provisional suffixes. Acknowledge both kinds of delivery.
+            Delivery::Document { watcher, .. } => {
+                assert_eq!(watcher, RUN_WATCH);
+                assert!(self.run_watch.is_some(), "the party's run watch");
+                self.root_events.push_back(engine::Event::Party(engine::PartyInput::Delivered { watcher }));
+            }
             Delivery::SourceSignedOut { .. } => panic!("this story requests no source sign-out"),
             Delivery::Application { to, outcome } => {
                 assert_eq!(to.into_token(), ADOPTION);
@@ -733,6 +792,15 @@ impl World {
                 let repositories = usize::from(self.adoption != Adoption::Without);
                 assert_eq!(assignment.workspace.repositories.len(), repositories);
                 let (hub, items, save) = link::assignment(&assignment);
+                if self.run_watch.is_some() {
+                    self.root_events.push_back(engine::Event::Party(engine::PartyInput::WatchRun {
+                        watcher: RUN_WATCH,
+                        sign_in: self.party.sign_in.expect("authenticated party"),
+                        task: assignment.task,
+                        turn: None,
+                        offset: 0,
+                    }));
+                }
                 self.worker_events.push_back(worker::Event::Assign { assignment: hub, items: Ok(items), save });
                 self.assignment = Some(assignment);
             }
@@ -757,7 +825,6 @@ impl World {
             | Delivery::Panel { .. }
             | Delivery::Refuse { .. }
             | Delivery::Read { .. }
-            | Delivery::Document { .. }
             | Delivery::WatchEnded { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
@@ -812,10 +879,10 @@ impl World {
             worker::Request::Link(up) => {
                 match &up {
                     host::LinkUp::Turn { .. } => self.observed.turns += 1,
+                    host::LinkUp::Piece { .. } => self.observed.pieces += 1,
                     host::LinkUp::Call { .. } => self.observed.relays += 1,
                     host::LinkUp::Logins { .. }
                     | host::LinkUp::SignedOut { .. }
-                    | host::LinkUp::Piece { .. }
                     | host::LinkUp::Activity { .. }
                     | host::LinkUp::Unauthorized { .. }
                     | host::LinkUp::Limited { .. }
