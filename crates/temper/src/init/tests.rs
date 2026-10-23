@@ -297,7 +297,6 @@ fn generated_configuration_passes_the_same_checks_as_serve() {
     assert_eq!(demo.provider(), 3);
     assert_eq!(demo.forge(), 1);
     assert_eq!(demo.project(), 1);
-    assert_eq!(demo.client(), path(&dirs.data).join("demo/client").as_os_str().as_bytes());
     fs::remove_dir_all(root).expect("cleanup");
 }
 

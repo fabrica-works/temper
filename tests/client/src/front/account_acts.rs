@@ -124,7 +124,7 @@ fn fixture_root(
     if let Some(rows) = rows {
         limits.client.domain.rows = rows;
     }
-    let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
+    let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|index| {
         let mut config = walking::config(seed);
         config.core.settings.llm_providers = a::Providers {
             providers: Box::new([a::Provider {
@@ -136,7 +136,11 @@ fn fixture_root(
                 offers: a::Offers { sign_in: true, key: true, programs: Box::new([]) },
             }]),
         };
-        if let WelcomeForge::Demo { .. } = forge {
+        // Bootstrap restores the demo account alone; the runtime offers both.
+        let runtime = index == 1;
+        if let WelcomeForge::Demo { .. } = forge
+            && runtime
+        {
             demo_providers(&mut config);
         }
         if tools || program {

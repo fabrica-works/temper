@@ -15,8 +15,9 @@ pub(super) struct State {
     pub start: Option<Starting>,
     pub failure: Option<StartFailure>,
     pub sent: bool,
-    pub removed: bool,
-    pub removal: Option<(Handle, u32)>,
+    pub settled: bool,
+    pub deployment: Option<(Handle, u32)>,
+    pub end_provider: Option<u32>,
     pub model_ended: bool,
     pub forge_ended: bool,
 }
@@ -35,8 +36,9 @@ impl State {
             start: None,
             failure: None,
             sent: false,
-            removed: false,
-            removal: None,
+            settled: false,
+            deployment: None,
+            end_provider: None,
             model_ended: false,
             forge_ended: false,
         }
@@ -119,7 +121,12 @@ pub struct Halves {
     pub forge: bool,
 }
 #[must_use]
-pub fn halves(answer: Option<&Demo>, accounts: Option<&c::OwnerAccounts>, forges: &super::forges::State) -> Halves {
+pub fn halves(
+    answer: Option<&Demo>,
+    accounts: Option<&c::OwnerAccounts>,
+    deployment: Option<&c::OwnerDeployment>,
+    forges: &super::forges::State,
+) -> Halves {
     let mut halves = Halves { model: false, forge: false };
     let Some(answer) = answer else { return halves };
     if let super::forges::State::Rows(rows) = forges {
@@ -138,16 +145,16 @@ pub fn halves(answer: Option<&Demo>, accounts: Option<&c::OwnerAccounts>, forges
         return halves;
     }
     for line in &accounts.accounts {
-        if (line.provider != Some(answer.provider) && line.cut) || usable_account(line, Some(answer.provider)) {
+        if line.provider != Some(answer.provider) && line.cut {
             return halves;
         }
     }
-    halves.model = true;
+    halves.model = !other_model_usable(accounts, deployment, answer.provider);
     halves
 }
 
-pub(crate) fn current(side: &Side, accounts: Option<&c::OwnerAccounts>) -> Halves {
-    let mut halves = halves(side.demo.answer.as_ref(), accounts, &side.forges);
+pub(crate) fn current(side: &Side, accounts: Option<&c::OwnerAccounts>, client: &Client) -> Halves {
+    let mut halves = halves(side.demo.answer.as_ref(), accounts, owner_deployment(side, client), &side.forges);
     halves.model &= !side.demo.model_ended;
     halves.forge &= !side.demo.forge_ended;
     halves
@@ -159,12 +166,74 @@ pub fn usable_account(line: &c::OwnerAccountLine, demo_provider: Option<u32>) ->
     if demo_provider.is_some() && line.provider == demo_provider {
         return false;
     }
-    for source in &line.sources {
+    usable_sources(&line.sources)
+}
+
+fn usable_sources(sources: &skein_lib::List<c::OwnerAccountSource>) -> bool {
+    for source in sources {
         if source.usable {
             return true;
         }
     }
     false
+}
+
+/// A usable model of a provider other than the demo's: one of the person's `accounts`
+/// lines, or, for an owner, a deployment-held account of its delivered, uncut
+/// `deployment` document (client/README.md, 3.5 and 4.8).
+#[must_use]
+pub fn other_model_usable(
+    accounts: &c::OwnerAccounts,
+    deployment: Option<&c::OwnerDeployment>,
+    demo_provider: u32,
+) -> bool {
+    for line in &accounts.accounts {
+        if usable_account(line, Some(demo_provider)) {
+            return true;
+        }
+    }
+    match deployment {
+        Some(deployment) => deployment_model(deployment, demo_provider).is_some(),
+        None => false,
+    }
+}
+
+/// The first deployment-held account of another provider than the demo's that is usable
+/// and uncut, in an owner's delivered, uncut `deployment` (client/README.md, 3.5, 4.8).
+#[must_use]
+#[expect(clippy::manual_find, reason = "step code uses bounded loops without closures")]
+pub fn deployment_model(deployment: &c::OwnerDeployment, demo_provider: u32) -> Option<&c::OwnerAccount> {
+    if deployment.cut {
+        return None;
+    }
+    for account in &deployment.accounts {
+        if !account.cut
+            && account.holder == c::OwnerAccountHolder::Deployment
+            && account.provider != Some(demo_provider)
+            && usable_sources(&account.sources)
+        {
+            return Some(account);
+        }
+    }
+    None
+}
+
+/// The owner's delivered, uncut deployment, through the demo's one live watch.
+#[must_use]
+pub fn owner_deployment<'a>(side: &Side, client: &'a Client) -> Option<&'a c::OwnerDeployment> {
+    if !owner(client) {
+        return None;
+    }
+    let (handle, _) = side.demo.deployment?;
+    let document = client.document(handle)?;
+    if document.state != jig_client::State::Live {
+        return None;
+    }
+    let Some(Latest::Jig(c::Delivery::OwnerDeployment(deployment))) = document.latest else { return None };
+    if deployment.cut {
+        return None;
+    }
+    Some(deployment)
 }
 
 /// Observe positive evidence of an end; unavailable or cut documents are not ends.
@@ -175,8 +244,10 @@ pub(crate) fn progress(
     client: &Client,
     out: &mut Queue<Request>,
 ) {
+    watch_deployment(side, client, out);
     observe_end(side, accounts, client, out);
     remove(side, client, out);
+    watch_deployment(side, client, out);
 }
 
 fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Client, out: &mut Queue<Request>) {
@@ -184,12 +255,10 @@ fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Cl
     if demo.state != DemoState::Running {
         return;
     }
-    let mut model_ended = false;
-    if let Some(accounts) = accounts {
-        for line in &accounts.accounts {
-            model_ended |= usable_account(line, Some(demo.provider));
-        }
-    }
+    let model_ended = match accounts {
+        Some(accounts) => other_model_usable(accounts, owner_deployment(side, client), demo.provider),
+        None => false,
+    };
     let mut forge_ended = false;
     if let super::forges::State::Rows(rows) = &side.forges {
         for row in rows {
@@ -203,16 +272,11 @@ fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Cl
     }
     let reread = forge_ended && !side.demo.forge_ended;
     let changed = (model_ended && !side.demo.model_ended) || reread;
-    let first_end = !side.demo.model_ended && !side.demo.forge_ended && (model_ended || forge_ended);
     side.demo.model_ended |= model_ended;
     side.demo.forge_ended |= forge_ended;
-    if first_end && !side.demo.removed && side.demo.removal.is_none() && owner(client) {
-        side.serial = side.serial.checked_add(1).expect("forge handles fit");
-        let handle = Handle { asker: crate::owner::Owner::Forge.asker(), number: side.serial };
-        side.demo.removal = Some((handle, demo.provider));
-        out.push(Request::Client {
-            asked: jig_client::Event::Watch { handle, subject: jig_client::Watchable::Jig(c::Subject::Deployment) },
-        });
+    if model_ended || forge_ended {
+        // Retain the provider if a role change closes the watch before removal settles.
+        side.demo.end_provider = Some(demo.provider);
     }
     if reread {
         read(side, out);
@@ -220,6 +284,33 @@ fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Cl
     if changed {
         side.changed();
     }
+}
+
+fn watch_deployment(side: &mut Side, client: &Client, out: &mut Queue<Request>) {
+    let needed = owner(client)
+        && (side.demo_running() || ((side.demo.model_ended || side.demo.forge_ended) && !side.demo.settled));
+    if !needed {
+        if let Some((handle, _)) = side.demo.deployment.take() {
+            out.push(Request::Client { asked: jig_client::Event::Unwatch { handle } });
+        }
+        return;
+    }
+    if side.demo.deployment.is_some() {
+        return;
+    }
+    let provider = match side.demo.answer.as_ref() {
+        Some(demo) => demo.provider,
+        None => match side.demo.end_provider {
+            Some(provider) => provider,
+            None => return,
+        },
+    };
+    side.serial = side.serial.checked_add(1).expect("forge handles fit");
+    let handle = Handle { asker: crate::owner::Owner::Forge.asker(), number: side.serial };
+    side.demo.deployment = Some((handle, provider));
+    out.push(Request::Client {
+        asked: jig_client::Event::Watch { handle, subject: jig_client::Watchable::Jig(c::Subject::Deployment) },
+    });
 }
 
 fn owner(client: &Client) -> bool {
@@ -233,16 +324,14 @@ fn owner(client: &Client) -> bool {
 
 /// The end holds this watch even when the forge's reread has already answered none.
 fn remove(side: &mut Side, client: &Client, out: &mut Queue<Request>) {
-    let Some((handle, provider)) = side.demo.removal else { return };
-    let Some(document) = client.document(handle) else { return };
-    if document.state != jig_client::State::Live {
+    if side.demo.settled || (!side.demo.model_ended && !side.demo.forge_ended) || !owner(client) {
         return;
     }
-    let Some(Latest::Jig(c::Delivery::OwnerDeployment(deployment))) = document.latest else { return };
+    let Some((_, provider)) = side.demo.deployment else { return };
+    let Some(deployment) = owner_deployment(side, client) else { return };
     for account in &deployment.accounts {
         if account.provider == Some(provider) && account.holder == c::OwnerAccountHolder::Deployment {
             side.serial = side.serial.checked_add(1).expect("forge request serial fits");
-            side.demo.removed = true;
             // No pending page operation owns this key: every outcome is dropped.
             out.push(Request::Client {
                 asked: jig_client::Event::Send {
@@ -257,8 +346,7 @@ fn remove(side: &mut Side, client: &Client, out: &mut Queue<Request>) {
             break;
         }
     }
-    side.demo.removal = None;
-    out.push(Request::Client { asked: jig_client::Event::Unwatch { handle } });
+    side.demo.settled = true;
 }
 
 fn read(side: &mut Side, out: &mut Queue<Request>) {

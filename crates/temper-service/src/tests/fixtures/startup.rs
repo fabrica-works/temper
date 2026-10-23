@@ -19,7 +19,7 @@ pub const DEMO: &str = r#""demo":{"llm":{"listen":{"socket":"$llm"},"provider":3
 {"cue":"Add a dark theme to widget","turns":["Theme"]},
 {"cue":"Fix widget's empty search state","turns":["Search"]}],
 "cued":[{"cue":"Export widget's table as CSV","turns":["Code"]}],"otherwise":["Demo"]},
-"forge":1,"project":1,"client":"demo/client"}"#;
+"forge":1,"project":1}"#;
 pub const DEMO_SETUP: &str = r#""setup":[{"forge":1,"directory":"demo/forge",
 "bot":{"login":"temper","email":"temper@example.test"},"mode":{"fake":{
 "listen":{"socket":"$forge"},"git":"demo/bin/git","owner":"demo",

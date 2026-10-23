@@ -1244,8 +1244,7 @@
         ]
       },
       "forge": 1,
-      "project": 1,
-      "client": "demo/client"
+      "project": 1
     },
     "limits": {
       "profile": "small",

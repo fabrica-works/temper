@@ -262,9 +262,11 @@ fn a_proposal_kicker_precedes_the_title_in_a_chat_but_not_in_the_inbox() {
     use crate::cards::Place;
     use skein_ui::Role;
     let page = batch_proposal();
-    for (root, place) in [
-        (fixtures::chat::proposal_root_with_document(None, Some(page.clone())), Place::Chat),
-        (
+    // One root at a time: two outgrow a stack array's 16 KiB.
+    for place in [Place::Chat, Place::Inbox] {
+        let root = if place == Place::Chat {
+            fixtures::chat::proposal_root_with_document(None, Some(page.clone()))
+        } else {
             fixtures::inbox_with_document(
                 temper_client_domain::address::Filter::ALL,
                 Some((
@@ -274,12 +276,10 @@ fn a_proposal_kicker_precedes_the_title_in_a_chat_but_not_in_the_inbox() {
                             number: fixtures::INBOX_QUESTION,
                         },
                     },
-                    page,
+                    page.clone(),
                 )),
-            ),
-            Place::Inbox,
-        ),
-    ] {
+            )
+        };
         let view = fixtures::page_view(&root);
         let tree = view.tree();
         let level = if place == Place::Chat { 2 } else { 3 };

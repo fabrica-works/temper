@@ -49,7 +49,6 @@ pub struct Demo {
     provider: u32,
     forge: u16,
     project: u32,
-    client: Box<[u8]>,
 }
 impl Demo {
     #[must_use]
@@ -68,10 +67,6 @@ impl Demo {
     pub fn project(&self) -> u32 {
         self.project
     }
-    #[must_use]
-    pub fn client(&self) -> &[u8] {
-        &self.client
-    }
 }
 /// What the demo is checked against, all from the checked document.
 /// A borrowed view used only during this read; no service state retains it.
@@ -82,7 +77,6 @@ pub struct Facts<'a> {
     pub setup: &'a Setup,
     pub listeners: &'a [SocketAddr],
     pub directories: &'a config::Directories,
-    pub taken: &'a [&'a [u8]],
 }
 /// `null` is no demo. Every refusal's path is rooted at `application.demo`.
 pub fn read(document: &Json, at: u32, facts: &Facts<'_>) -> Result<Option<Demo>, Refusal> {
@@ -94,7 +88,6 @@ pub fn read(document: &Json, at: u32, facts: &Facts<'_>) -> Result<Option<Demo>,
     let llm_at = read::required(&mut o, document, b"llm", &p)?;
     let forge_at = read::required(&mut o, document, b"forge", &p)?;
     let project_at = read::required(&mut o, document, b"project", &p)?;
-    let client_at = read::required(&mut o, document, b"client", &p)?;
     read::finish(o, document, &p)?;
     let lp = p.member(b"llm");
     let mut o = read::object(document, llm_at, &lp)?;
@@ -113,7 +106,6 @@ pub fn read(document: &Json, at: u32, facts: &Facts<'_>) -> Result<Option<Demo>,
     let models = models(provider, listen, facts.llm, &pp)?;
     let key = data_path(document, key_at, facts.directories, &lp.member(b"key"))?;
     read::absolute(&key, &lp.member(b"key"))?;
-    let client = data_path(document, client_at, facts.directories, &p.member(b"client"))?;
     let asked = llm::scripts(document, asked_at, &lp.member(b"asked"))?;
     let cp = lp.member(b"cued");
     let cued = match cued_at {
@@ -158,10 +150,7 @@ pub fn read(document: &Json, at: u32, facts: &Facts<'_>) -> Result<Option<Demo>,
     if !facts.projects.contains(&project) {
         return Err(read::why(&p.member(b"project"), b"names no project"));
     }
-    if facts.taken.contains(&client.as_ref()) {
-        return Err(read::why(&p.member(b"client"), b"must be unique"));
-    }
-    Ok(Some(Demo { llm, provider, forge, project, client }))
+    Ok(Some(Demo { llm, provider, forge, project }))
 }
 fn data_path(d: &Json, at: u32, directories: &config::Directories, p: &Path) -> Result<Box<[u8]>, Refusal> {
     let text = read::text(d, at, limits::PATH_BYTES, p)?;

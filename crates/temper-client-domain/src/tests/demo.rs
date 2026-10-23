@@ -31,6 +31,14 @@ pub(super) fn answer(cue: &[u8]) -> Box<[u8]> {
 fn page() -> Readout {
     Readout::Family { family: wire::FORGE, record: Some(answer(CUE)) }
 }
+fn page_with_state(state: w::DemoState) -> Readout {
+    let mut parts = wire::decode_demo_answer(&answer(CUE), &w::CEILINGS).unwrap().into_parts();
+    parts.state = state;
+    Readout::Family {
+        family: wire::FORGE,
+        record: Some(wire::demo_answer(&w::DemoAnswer::new(&w::CEILINGS, parts).unwrap())),
+    }
+}
 fn read(side: &mut forge::Side) -> Handle {
     let mut out = Queue::with_capacity(1);
     assert!(!demo::told(side, &Told::Link { link: Link::Live }, f::limits().forge, &mut out));
@@ -168,7 +176,7 @@ fn the_model_half_waits_for_accounts_and_yields_to_another_provider() {
     ] {
         let forge = answer.is_some();
         assert_eq!(
-            demo::halves(answer, document.as_ref(), &forge::forges::State::Rows(Box::new([]))),
+            demo::halves(answer, document.as_ref(), None, &forge::forges::State::Rows(Box::new([]))),
             demo::Halves { model, forge },
             "{row}"
         );
@@ -198,15 +206,7 @@ fn opened(cue: &[u8]) -> (crate::Domain, skein_lib::Token) {
             },
         );
     }
-    // Install an answer through the same page handler as the routed read.
-    demo::told(&mut root.forge, &Told::Link { link: Link::Offline }, f::limits().forge, &mut Queue::with_capacity(1));
-    let handle = read(&mut root.forge);
-    crate::route::told(
-        &mut root,
-        &f::env(&f::limits()),
-        Told::Page { handle, page: Readout::Family { family: wire::FORGE, record: Some(answer(cue)) } },
-        &mut Queue::with_capacity(crate::max_out(&f::limits())),
-    );
+    deliver_demo_read(&mut root, Readout::Family { family: wire::FORGE, record: Some(answer(cue)) });
     event(&mut root, crate::Event::Went { place: crate::Place::Address(crate::Address::Chats) });
     act(&mut root, Act::ChatWords { words: DRAFT.into() });
     (root, account)
@@ -234,19 +234,7 @@ fn a_suggestion_starts_one_chat_with_its_cue_and_preserves_the_draft() {
             let mut parts = wire::decode_demo_answer(&answer(CUE), &limits).unwrap().into_parts();
             parts.project = project;
             let record = wire::demo_answer(&w::DemoAnswer::new(&limits, parts).unwrap());
-            demo::told(
-                &mut root.forge,
-                &Told::Link { link: Link::Offline },
-                f::limits().forge,
-                &mut Queue::with_capacity(1),
-            );
-            let handle = read(&mut root.forge);
-            crate::route::told(
-                &mut root,
-                &f::env(&f::limits()),
-                Told::Page { handle, page: Readout::Family { family: wire::FORGE, record: Some(record) } },
-                &mut Queue::with_capacity(crate::max_out(&f::limits())),
-            );
+            deliver_demo_read(&mut root, Readout::Family { family: wire::FORGE, record: Some(record) });
         }
         if !model {
             event(
@@ -477,43 +465,49 @@ fn deliver_accounts(
 fn ending_accounts(other_usable: bool) -> c::OwnerAccounts {
     accounts(Some(PROVIDER + 1), other_usable, false)
 }
-fn deployment(demo_account: bool) -> c::OwnerDeployment {
-    let link = jig_client_protocol_link::Limits::new(f::limits().client.domain, 8).unwrap();
+pub(super) type DeploymentAccount = (Option<u32>, bool, bool, c::OwnerAccountHolder);
+pub(super) const DEMO_ACCOUNT: DeploymentAccount = (Some(PROVIDER), true, false, c::OwnerAccountHolder::Deployment);
+pub(super) const OTHER_ACCOUNT: DeploymentAccount =
+    (Some(PROVIDER + 1), true, false, c::OwnerAccountHolder::Deployment);
+pub(super) fn deployment(rows: &[DeploymentAccount]) -> c::OwnerDeployment {
+    let bounds = jig_client_protocol_link::Limits::new(f::limits().client.domain, 8).unwrap();
     let mut document = jig_client_protocol_link::translate::documents::owner_deployment(
         jig_client_test_records::owner_deployment_record(),
-        &link,
+        &bounds,
     )
     .unwrap();
-    document.accounts = List::with_capacity(1);
-    if demo_account {
+    document.accounts = List::with_capacity(u32::try_from(rows.len()).unwrap());
+    for (provider, usable, cut, holder) in rows {
+        let personal = accounts(*provider, *usable, *cut);
+        let line = personal.accounts.get(0).unwrap();
         document
             .accounts
             .push(c::OwnerAccount {
-                number: 42,
+                number: if *provider == Some(PROVIDER) { 42 } else { 43 },
                 place: 0,
-                provider: Some(PROVIDER),
+                provider: *provider,
                 provider_name: None,
                 manage_usage: None,
-                display: c::DocumentText::complete(f::acts::text(b"Demo")),
-                holder: c::OwnerAccountHolder::Deployment,
+                display: line.display.clone(),
+                holder: *holder,
                 uses: None,
                 plan: false,
-                sources: List::with_capacity(0),
+                sources: line.sources.clone(),
                 generation: None,
                 state: c::OwnerAccountState::Granted,
-                usable: true,
+                usable: *usable,
                 expiring: false,
                 attention: false,
                 spent_until: None,
                 runs: List::with_capacity(0),
                 waiting: List::with_capacity(0),
-                cut: false,
+                cut: *cut,
             })
             .unwrap();
     }
     document
 }
-fn deliver_deployment(
+pub(super) fn deliver_deployment(
     root: &mut crate::Domain,
     watch: skein_lib::Token,
     document: c::OwnerDeployment,
@@ -526,7 +520,7 @@ fn deliver_deployment(
         },
     )
 }
-fn deployment_watch(out: &mut Queue<crate::Request>) -> Option<skein_lib::Token> {
+pub(super) fn deployment_watch(out: &mut Queue<crate::Request>) -> Option<skein_lib::Token> {
     let mut watch = None;
     let mut rest = Queue::with_capacity(out.len());
     while let Some(request) = out.pop() {
@@ -558,7 +552,15 @@ fn closed(out: &Queue<crate::Request>, watch: skein_lib::Token) -> bool {
     }
     false
 }
-fn ending_root(role: Option<c::HeldRole>) -> (crate::Domain, skein_lib::Token, skein_lib::Token) {
+fn ending_root(
+    role: Option<c::HeldRole>,
+) -> (crate::Domain, skein_lib::Token, skein_lib::Token, Option<skein_lib::Token>) {
+    ending_root_with_page(role, page())
+}
+fn ending_root_with_page(
+    role: Option<c::HeldRole>,
+    page: Readout,
+) -> (crate::Domain, skein_lib::Token, skein_lib::Token, Option<skein_lib::Token>) {
     let mut root = crate::unlinked(&f::limits(), f::SEED);
     let (me, account) = f::start_accounts(&mut root, List::with_capacity(0));
     let mut frame = f::chats::me();
@@ -579,15 +581,17 @@ fn ending_root(role: Option<c::HeldRole>) -> (crate::Domain, skein_lib::Token, s
             forges = Some(watch);
         }
     }
+    let mut out = deliver_demo_read(&mut root, page);
+    let watch = deployment_watch(&mut out);
+    (root, account, forges.expect("deployment forges"), watch)
+}
+pub(super) fn deliver_demo_read(root: &mut crate::Domain, page: Readout) -> Queue<crate::Request> {
     demo::told(&mut root.forge, &Told::Link { link: Link::Offline }, f::limits().forge, &mut Queue::with_capacity(1));
     let handle = read(&mut root.forge);
-    crate::route::told(
-        &mut root,
-        &f::env(&f::limits()),
-        Told::Page { handle, page: page() },
-        &mut Queue::with_capacity(crate::max_out(&f::limits())),
-    );
-    (root, account, forges.expect("deployment forges"))
+    let mut out = Queue::with_capacity(crate::max_out(&f::limits()));
+    crate::route::told(root, &f::env(&f::limits()), Told::Page { handle, page }, &mut out);
+    crate::route::demo_progress(root, &f::env(&f::limits()), &mut out);
+    out
 }
 fn forge_rows(root: &mut crate::Domain, watch: skein_lib::Token, connected: bool) -> Queue<crate::Request> {
     let mut forges = List::with_capacity(1);
@@ -628,7 +632,7 @@ fn forge_rows(root: &mut crate::Domain, watch: skein_lib::Token, connected: bool
         },
     )
 }
-fn removed(out: &mut Queue<crate::Request>) -> List<skein_lib::Token> {
+pub(super) fn removed(out: &mut Queue<crate::Request>) -> List<skein_lib::Token> {
     let mut attempts = List::with_capacity(4);
     while let Some(request) = out.pop() {
         if let crate::Request::Client {
@@ -663,16 +667,17 @@ fn the_model_end_removes_the_deployment_demo_account_once_and_drops_its_answer()
             at: None,
         })),
     ] {
-        let (mut root, account, forges) = ending_root(Some(c::HeldRole::Owner));
+        let (mut root, account, forges, watch) = ending_root(Some(c::HeldRole::Owner));
+        let watch = watch.expect("running demo opens owner deployment watch");
         assert!(deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(false))).is_none());
         forge_rows(&mut root, forges, false);
-        assert!(root.demo().unwrap().1.model);
+        assert!(root.demo().unwrap().1.model, "accounts alone hold before deployment delivery");
         let mut out = deliver_accounts(&mut root, account, ending_accounts(true));
-        let watch = deployment_watch(&mut out).expect("owner watches deployment at the first end");
+        assert!(deployment_watch(&mut out).is_none(), "the first end keeps the existing watch");
         assert!(removed(&mut out).is_empty(), "wait for deployment delivery");
         assert!(deliver_accounts(&mut root, account, ending_accounts(true)).is_empty(), "watch opened once");
-        let mut out = deliver_deployment(&mut root, watch, deployment(true));
-        assert!(closed(&out, watch), "remove drops the deployment watch");
+        let mut out = deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT]));
+        assert!(!closed(&out, watch), "running demo keeps the deployment model available");
         let attempts = removed(&mut out);
         assert_eq!(attempts.len(), 1);
         assert!(!root.demo().unwrap().1.model);
@@ -688,12 +693,7 @@ fn the_model_end_removes_the_deployment_demo_account_once_and_drops_its_answer()
         assert!(removed(&mut forge_rows(&mut root, forges, true)).is_empty(), "the second end sends no remove");
     }
 }
-#[test]
-fn the_forge_end_rereads_once_removes_the_account_and_none_clears_the_demo() {
-    let (mut root, account, forges) = ending_root(Some(c::HeldRole::Owner));
-    assert!(deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(false))).is_none());
-    assert!(forge_rows(&mut root, forges, false).is_empty());
-    let mut out = forge_rows(&mut root, forges, true);
+fn demo_reread(out: &mut Queue<crate::Request>) -> skein_lib::Token {
     let mut read = None;
     let mut remaining = Queue::with_capacity(out.len());
     while let Some(request) = out.pop() {
@@ -710,41 +710,58 @@ fn the_forge_end_rereads_once_removes_the_account_and_none_clears_the_demo() {
             remaining.push(request);
         }
     }
-    let watch = deployment_watch(&mut remaining).expect("forge end opens deployment watch");
-    assert!(removed(&mut remaining).is_empty(), "wait for deployment");
+    *out = remaining;
+    read.expect("Demo reread")
+}
+fn answer_no_demo(root: &mut crate::Domain, read: skein_lib::Token) -> Queue<crate::Request> {
+    up(root, jig_client::Up::ReadDone { read, result: Readout::Family { family: wire::FORGE, record: None } })
+}
+fn deliver_role(root: &mut crate::Domain, me: skein_lib::Token, role: Option<c::HeldRole>) -> Queue<crate::Request> {
+    let mut frame = f::chats::me();
+    frame.deployment_role = role;
+    up(root, jig_client::Up::Watched { watch: me, event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(frame))) })
+}
+#[test]
+fn the_forge_end_rereads_once_removes_the_account_and_none_clears_the_demo() {
+    let (mut root, account, forges, watch) = ending_root(Some(c::HeldRole::Owner));
+    let watch = watch.expect("running demo opens owner deployment watch");
+    assert!(deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(false))).is_none());
+    assert!(forge_rows(&mut root, forges, false).is_empty());
+    let mut out = forge_rows(&mut root, forges, true);
+    let read = demo_reread(&mut out);
+    assert!(deployment_watch(&mut out).is_none(), "forge end keeps the existing watch");
+    assert!(removed(&mut out).is_empty(), "wait for deployment");
     assert!(forge_rows(&mut root, forges, true).is_empty(), "unchanged connected rows never repeat the read");
-    up(
-        &mut root,
-        jig_client::Up::ReadDone {
-            read: read.expect("Demo reread"),
-            result: Readout::Family { family: wire::FORGE, record: None },
-        },
-    );
+    assert!(!closed(&answer_no_demo(&mut root, read), watch), "unsettled removal keeps its watch");
     assert!(root.forge().demo().is_none());
     assert!(root.demo().is_none());
-    let mut out = deliver_deployment(&mut root, watch, deployment(true));
+    let mut out = deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT]));
     assert!(closed(&out, watch));
     assert_eq!(removed(&mut out).len(), 1, "kept provider survives the none read");
     assert!(removed(&mut deliver_accounts(&mut root, account, ending_accounts(true))).is_empty());
 }
 #[test]
-fn cleanup_watches_only_for_an_owner_at_an_end_and_drops_a_document_without_the_account() {
+fn cleanup_watches_only_for_an_owner_and_closes_once_running_and_removal_end() {
     for role in [None, Some(c::HeldRole::Member), Some(c::HeldRole::Maintainer), Some(c::HeldRole::Owner)] {
-        let (mut root, account, forges) = ending_root(role);
+        let (mut root, account, forges, watch) = ending_root(role);
         assert!(
             deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(false))).is_none(),
             "before end"
         );
         let mut out = deliver_accounts(&mut root, account, ending_accounts(true));
-        let watch = deployment_watch(&mut out);
+        assert!(deployment_watch(&mut out).is_none(), "end never opens another watch");
         assert!(removed(&mut out).is_empty());
         if role == Some(c::HeldRole::Owner) {
             let watch = watch.expect("owner watch");
-            let mut out = deliver_deployment(&mut root, watch, deployment(false));
-            assert!(closed(&out, watch), "absent account drops watch too");
+            let mut out = deliver_deployment(&mut root, watch, deployment(&[]));
+            assert!(!closed(&out, watch), "running demo keeps the watch even with removal settled");
             assert!(removed(&mut out).is_empty());
             assert!(deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(true))).is_none());
-            assert!(deployment_watch(&mut forge_rows(&mut root, forges, true)).is_none(), "second end cannot reopen");
+            let mut out = forge_rows(&mut root, forges, true);
+            let read = demo_reread(&mut out);
+            assert!(deployment_watch(&mut out).is_none(), "second end uses the existing watch");
+            assert!(closed(&answer_no_demo(&mut root, read), watch), "settled removal closes once running ends");
+            assert!(deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(true))).is_none());
         } else {
             assert!(watch.is_none(), "non-owner never watches deployment");
         }
@@ -752,36 +769,244 @@ fn cleanup_watches_only_for_an_owner_at_an_end_and_drops_a_document_without_the_
 }
 #[test]
 fn cleanup_needs_a_running_answer_and_positive_evidence_of_an_end() {
-    for case in ["none", "not started", "missing", "cut"] {
-        let (mut root, account, _) = ending_root(Some(c::HeldRole::Owner));
-        if case == "none" || case == "not started" {
-            demo::told(
-                &mut root.forge,
-                &Told::Link { link: Link::Offline },
-                f::limits().forge,
-                &mut Queue::with_capacity(1),
-            );
-            let handle = read(&mut root.forge);
-            let page = if case == "none" {
-                Readout::Family { family: wire::FORGE, record: None }
-            } else {
-                let mut parts = wire::decode_demo_answer(&answer(CUE), &w::CEILINGS).unwrap().into_parts();
-                parts.state = w::DemoState::NotStarted;
-                Readout::Family {
-                    family: wire::FORGE,
-                    record: Some(wire::demo_answer(&w::DemoAnswer::new(&w::CEILINGS, parts).unwrap())),
-                }
-            };
-            demo::told(&mut root.forge, &Told::Page { handle, page }, f::limits().forge, &mut Queue::with_capacity(1));
-        }
-        let mut document = ending_accounts(case != "cut");
-        document.cut = case == "cut";
-        let mut out = if case == "missing" {
-            event(&mut root, crate::Event::Went { place: crate::Place::Address(crate::Address::Chats) })
-        } else {
-            deliver_accounts(&mut root, account, document)
+    let mut cut = ending_accounts(false);
+    cut.cut = true;
+    for (case, page, accounts, watches) in [
+        ("none", Readout::Family { family: wire::FORGE, record: None }, Some(ending_accounts(true)), false),
+        ("not started", page_with_state(w::DemoState::NotStarted), Some(ending_accounts(true)), false),
+        ("missing", page(), None, true),
+        ("cut", page(), Some(cut), true),
+    ] {
+        let (mut root, account, _, watch) = ending_root_with_page(Some(c::HeldRole::Owner), page);
+        assert_eq!(watch.is_some(), watches, "{case}");
+        let mut out = match accounts {
+            Some(document) => deliver_accounts(&mut root, account, document),
+            None => event(&mut root, crate::Event::Went { place: crate::Place::Address(crate::Address::Chats) }),
         };
         assert!(deployment_watch(&mut out).is_none(), "{case}");
         assert!(removed(&mut out).is_empty(), "{case}");
+        if let Some(watch) = watch {
+            let mut out = deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT]));
+            assert!(!closed(&out, watch), "{case}: no end to settle");
+            assert!(removed(&mut out).is_empty(), "{case}");
+        }
     }
+}
+
+#[test]
+fn deployment_model_skips_ineligible_accounts_and_keeps_document_order() {
+    let mut document = deployment(&[
+        DEMO_ACCOUNT,
+        (Some(PROVIDER + 1), true, false, c::OwnerAccountHolder::Party(f::PARTY)),
+        (Some(PROVIDER + 1), true, true, c::OwnerAccountHolder::Deployment),
+        (Some(PROVIDER + 1), false, false, c::OwnerAccountHolder::Deployment),
+        OTHER_ACCOUNT,
+        (Some(PROVIDER + 2), true, false, c::OwnerAccountHolder::Deployment),
+    ]);
+    assert_eq!(demo::deployment_model(&document, PROVIDER), document.accounts.get(4));
+    document.cut = true;
+    assert!(demo::deployment_model(&document, PROVIDER).is_none());
+}
+
+#[test]
+fn the_model_half_for_an_owner_reads_the_deployments_own_accounts_too() {
+    let answer = forge::family::demo(&answer(CUE), &w::CEILINGS).unwrap();
+    let accounts = accounts(Some(PROVIDER), true, false);
+    let mut cut = deployment(&[]);
+    cut.cut = true;
+    for (row, owner, document, model) in [
+        ("member without deployment", false, None, true),
+        ("owner awaiting deployment", true, None, true),
+        ("deployment cut", true, Some(cut), true),
+        ("demo provider usable", true, Some(deployment(&[DEMO_ACCOUNT])), true),
+        ("other provider usable", true, Some(deployment(&[OTHER_ACCOUNT])), false),
+        (
+            "other provider unusable",
+            true,
+            Some(deployment(&[(Some(PROVIDER + 1), false, false, c::OwnerAccountHolder::Deployment)])),
+            true,
+        ),
+        (
+            "other provider cut",
+            true,
+            Some(deployment(&[(Some(PROVIDER + 1), true, true, c::OwnerAccountHolder::Deployment)])),
+            true,
+        ),
+        (
+            "party held account",
+            true,
+            Some(deployment(&[(Some(PROVIDER + 1), true, false, c::OwnerAccountHolder::Party(f::PARTY))])),
+            true,
+        ),
+    ] {
+        let deployment = if owner { document.as_ref() } else { None };
+        assert_eq!(
+            demo::halves(Some(&answer), Some(&accounts), deployment, &forge::forges::State::Rows(Box::new([]))),
+            demo::Halves { model, forge: true },
+            "{row}"
+        );
+    }
+}
+
+#[test]
+fn an_owners_deployment_account_of_another_provider_ends_the_model_half_and_removes_the_demo_account() {
+    let (mut root, account, forges, watch) = ending_root(Some(c::HeldRole::Owner));
+    let watch = watch.expect("one deployment watch at running demo read");
+    deliver_accounts(&mut root, account, ending_accounts(false));
+    forge_rows(&mut root, forges, false);
+    let mut out = deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT]));
+    assert!(root.demo().unwrap().1.model);
+    assert!(!closed(&out, watch), "before an end the watch stays open");
+    assert!(deployment_watch(&mut out).is_none());
+    assert!(removed(&mut out).is_empty());
+
+    let mut out = deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT, OTHER_ACCOUNT]));
+    assert!(!root.demo().unwrap().1.model);
+    assert!(!closed(&out, watch), "forge half still holds: keep the deployment model available");
+    assert!(deployment_watch(&mut out).is_none(), "the model and removal share one watch");
+    assert_eq!(removed(&mut out).len(), 1);
+    for mut out in [
+        deliver_accounts(&mut root, account, ending_accounts(false)),
+        forge_rows(&mut root, forges, false),
+        deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT])),
+    ] {
+        assert!(deployment_watch(&mut out).is_none());
+        assert!(removed(&mut out).is_empty());
+    }
+    assert!(!root.demo().unwrap().1.model, "the half never returns after its credential disappears");
+    let mut out = forge_rows(&mut root, forges, true);
+    let read = demo_reread(&mut out);
+    assert!(!closed(&out, watch), "running answer keeps the watch");
+    assert!(deployment_watch(&mut out).is_none());
+    assert!(removed(&mut out).is_empty(), "forge end sends no second Remove");
+    let mut out = answer_no_demo(&mut root, read);
+    assert!(closed(&out, watch), "settled removal closes once the reread answers none");
+    assert!(deployment_watch(&mut out).is_none());
+    assert!(removed(&mut out).is_empty());
+    assert!(root.demo().is_none());
+    let mut out = deliver_accounts(&mut root, account, ending_accounts(false));
+    assert!(deployment_watch(&mut out).is_none(), "settled end opens no second watch");
+    assert!(removed(&mut out).is_empty());
+    assert!(root.demo().is_none(), "neither ended half returns");
+}
+
+#[test]
+fn an_owners_start_out_or_failed_before_a_running_read_shows_as_before() {
+    let (mut root, account, forges, watch) =
+        ending_root_with_page(Some(c::HeldRole::Owner), page_with_state(w::DemoState::NotStarted));
+    assert!(watch.is_none(), "not started alone needs no watch");
+    deliver_accounts(&mut root, account, ending_accounts(false));
+    forge_rows(&mut root, forges, false);
+    let mut out = act(&mut root, Act::Playground);
+    let watch = deployment_watch(&mut out).expect("start out opens the owner watch");
+    assert!(root.forge().demo_starting());
+    assert_eq!(root.forge().demo().unwrap().state, demo::DemoState::NotStarted);
+    assert!(root.demo().unwrap().1.model, "accounts alone hold before deployment delivery");
+    let mut attempt = None;
+    while let Some(request) = out.pop() {
+        if let crate::Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt: token, .. } },
+        } = request
+        {
+            assert!(attempt.replace(token).is_none(), "one start");
+        }
+    }
+    let failure = w::Outcome::StartFailed(
+        w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::Account }).unwrap(),
+    );
+    let mut out = up(
+        &mut root,
+        jig_client::Up::Answer {
+            attempt: attempt.expect("start attempt"),
+            envelope: skein_lib::RequestEnvelope::Final,
+            answer: Some(jig_client::Answered::Family(jig_client::Family {
+                family: wire::FORGE,
+                version: wire::CLIENT_VERSION,
+                bytes: wire::answer(&w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome: failure }).unwrap()),
+            })),
+            why: None,
+        },
+    );
+    assert!(!root.forge().demo_starting());
+    assert_eq!(root.forge().demo_failure(), Some(&demo::StartFailure::Account));
+    assert!(root.demo().unwrap().1.model, "failure remains visible without a deployment delivery");
+    assert!(!closed(&out, watch), "failed start keeps its watch");
+    assert!(deployment_watch(&mut out).is_none());
+    assert!(removed(&mut out).is_empty());
+}
+
+#[test]
+fn the_demo_providers_deployment_account_ends_nothing() {
+    let (mut root, account, forges, watch) = ending_root(Some(c::HeldRole::Owner));
+    let watch = watch.expect("owner deployment watch");
+    deliver_accounts(&mut root, account, ending_accounts(false));
+    forge_rows(&mut root, forges, false);
+    for document in [deployment(&[DEMO_ACCOUNT]), deployment(&[DEMO_ACCOUNT, DEMO_ACCOUNT])] {
+        let mut out = deliver_deployment(&mut root, watch, document);
+        assert!(root.demo().unwrap().1.model);
+        assert!(!closed(&out, watch));
+        assert!(deployment_watch(&mut out).is_none());
+        assert!(removed(&mut out).is_empty());
+    }
+}
+
+#[test]
+fn a_members_model_half_is_unchanged() {
+    for role in [None, Some(c::HeldRole::Member), Some(c::HeldRole::Maintainer)] {
+        let (mut root, account, forges, watch) = ending_root(role);
+        assert!(watch.is_none(), "{role:?}: running read opens no deployment watch");
+        let mut out = deliver_accounts(&mut root, account, ending_accounts(false));
+        assert!(deployment_watch(&mut out).is_none());
+        assert!(removed(&mut out).is_empty());
+        assert!(root.demo().unwrap().1.model);
+        let mut out = deliver_accounts(&mut root, account, ending_accounts(true));
+        assert!(deployment_watch(&mut out).is_none(), "{role:?}: end opens no deployment watch");
+        assert!(removed(&mut out).is_empty());
+        let mut out = forge_rows(&mut root, forges, false);
+        assert!(deployment_watch(&mut out).is_none());
+        assert!(removed(&mut out).is_empty());
+        assert!(!root.demo().unwrap().1.model);
+    }
+}
+
+#[test]
+fn the_owner_role_opens_the_watch_when_the_running_read_arrived_first() {
+    let mut root = crate::unlinked(&f::limits(), f::SEED);
+    let (me, _) = f::start_accounts(&mut root, List::with_capacity(0));
+    let mut out = deliver_demo_read(&mut root, page());
+    assert!(deployment_watch(&mut out).is_none(), "wait for live owner evidence");
+    let mut out = deliver_role(&mut root, me, Some(c::HeldRole::Owner));
+    assert!(deployment_watch(&mut out).is_some(), "one watch when the owner role arrives");
+    let mut out = deliver_role(&mut root, me, Some(c::HeldRole::Owner));
+    assert!(deployment_watch(&mut out).is_none(), "repeated me never opens another watch");
+}
+
+#[test]
+fn an_unsettled_removal_reopens_for_a_returning_owner_after_none() {
+    let mut root = crate::unlinked(&f::limits(), f::SEED);
+    let (me, account) = f::start_accounts(&mut root, List::with_capacity(0));
+    deliver_demo_read(&mut root, page());
+    let watch = deployment_watch(&mut deliver_role(&mut root, me, Some(c::HeldRole::Owner))).unwrap();
+    deliver_accounts(&mut root, account, ending_accounts(true));
+    let mut out = deliver_demo_read(&mut root, Readout::Family { family: wire::FORGE, record: None });
+    assert!(!closed(&out, watch), "the end keeps the unsettled watch after none");
+    assert!(deployment_watch(&mut out).is_none());
+    let mut cut = deployment(&[DEMO_ACCOUNT]);
+    cut.cut = true;
+    let mut out = deliver_deployment(&mut root, watch, cut);
+    assert!(removed(&mut out).is_empty(), "cut deployment cannot settle the removal");
+    let mut out = deliver_role(&mut root, me, Some(c::HeldRole::Member));
+    assert!(closed(&out, watch), "a non-owner holds no watch");
+    assert!(removed(&mut out).is_empty());
+    assert!(removed(&mut deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT]))).is_empty());
+
+    let mut out = deliver_role(&mut root, me, Some(c::HeldRole::Owner));
+    let next = deployment_watch(&mut out).expect("returning owner resumes the unsettled removal");
+    assert_ne!(watch, next);
+    let mut out = deliver_deployment(&mut root, next, deployment(&[DEMO_ACCOUNT]));
+    assert!(closed(&out, next), "none plus settled removal needs no watch");
+    assert_eq!(removed(&mut out).len(), 1, "the first end retains the demo provider");
+    let mut out = deliver_role(&mut root, me, Some(c::HeldRole::Owner));
+    assert!(deployment_watch(&mut out).is_none(), "settled end stays closed");
+    assert!(removed(&mut out).is_empty());
 }

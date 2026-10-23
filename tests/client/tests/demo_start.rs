@@ -175,6 +175,41 @@ fn demo_account(front: &mut Joint, root: &mut Root) -> bool {
     found
 }
 #[test]
+fn ready_names_an_owners_deployment_model_never_the_demos() {
+    let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
+    go(&mut front, &mut root, Address::ConnectModel { way: None });
+    press(&mut front, &mut root, b"Use deployment accounts");
+    add_model(&mut front, &mut root);
+
+    let domain = root.person();
+    let me = d::pages::accounts::current_me(domain.client()).expect("owner identity");
+    assert_eq!(me.deployment_role, Some(jig_client::contract::HeldRole::Owner));
+    let document = d::pages::accounts::document(domain.client()).expect("accounts delivered");
+    assert!(!document.accounts.iter().any(|row| d::forge::demo::usable_account(row, Some(accounts::PROVIDER))));
+    let deployment = d::forge::demo::owner_deployment(domain.forge(), domain.client()).expect("owner deployment");
+    assert!(deployment.accounts.iter().any(|account| {
+        account.provider == Some(accounts::PROVIDER + 1)
+            && account.holder == jig_client::contract::OwnerAccountHolder::Deployment
+            && !account.cut
+            && account.sources.iter().any(|source| source.usable)
+    }));
+    assert_eq!(d::pages::welcome::model_usable(domain), Some(true));
+    assert!(!domain.demo().expect("forge half still running").1.model);
+
+    go(&mut front, &mut root, Address::Accounts);
+    let heading = "Other fake API key · held by the deployment".as_bytes();
+    assert!(has(&root, Role::Heading { level: 3 }, heading));
+    go(&mut front, &mut root, Address::Welcome { step: Step::Ready });
+    assert_eq!(root.person().pages().address(), &Address::Welcome { step: Step::Ready });
+    assert!(has(&root, Role::Paragraph, &[b"Model: ".as_slice(), heading].concat()));
+    let ready = view(&root);
+    for node in ready.tree().nodes() {
+        if let Some(name) = &node.name {
+            assert!(!name.windows(b"scripted".len()).any(|part| part.eq_ignore_ascii_case(b"scripted")));
+        }
+    }
+}
+#[test]
 fn a_model_connected_removes_the_scripted_account_and_leaves_the_playground_forge_banner() {
     let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
     assert!(demo_account(&mut front, &mut root));

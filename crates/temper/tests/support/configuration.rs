@@ -135,6 +135,6 @@ pub fn demo_document(directory: &Path, listen: &str) -> serde_json::Value {
     value["application"]["demo"] = serde_json::json!({"llm":{
         "listen":{"socket":listen}, "provider":3, "key":"demo/llm.key",
         "asked":[{"cue":"say hello", "turns":["hello from QA"]}], "otherwise":["fallback"]},
-        "forge":1, "project":1, "client":"demo/client"});
+        "forge":1, "project":1});
     value
 }

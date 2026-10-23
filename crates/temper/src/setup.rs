@@ -77,16 +77,12 @@ pub(crate) fn check(bytes: &[u8], directories: &config::Directories) -> Result<D
         }
     }
     let projects: Vec<_> = named.projects.iter().map(|project| project.number).collect();
-    let mut taken = vec![named.deployment.as_ref()];
-    taken.extend(named.worker.as_ref().map(|worker| worker.root.as_ref()));
-    taken.extend(checked.setup.entries.iter().map(|entry| entry.directory.as_ref()));
     let facts = temper_fake::demo::Facts {
         llm: &named.llm,
         projects: &projects,
         setup: &checked.setup,
         listeners: &members.listeners,
         directories,
-        taken: &taken,
     };
     let demo = temper_fake::demo::read(&document, super::member(&document, application, b"demo"), &facts)
         .map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;

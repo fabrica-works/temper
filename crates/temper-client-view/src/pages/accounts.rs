@@ -640,7 +640,23 @@ pub(crate) fn first_usable_heading(root: &Domain, w: &Words) -> Option<Box<[u8]>
             accounts::current_me(root.client()),
         ));
     }
-    None
+    let demo = root.forge().demo()?;
+    let deployment = temper_client_domain::forge::demo::owner_deployment(root.forge(), root.client())?;
+    let account = temper_client_domain::forge::demo::deployment_model(deployment, demo.provider)?;
+    let supplied = provider_name(account.provider_name.as_ref()).unwrap_or(b"");
+    let shown = crate::choice::provider_shown(root, account.provider, supplied, w);
+    let name = if supplied.is_empty() { None } else { Some(shown.as_ref()) };
+    Some(heading(
+        w,
+        account.number,
+        account.provider,
+        name,
+        &account.display,
+        account.holder,
+        account.plan,
+        &account.sources,
+        accounts::current_me(root.client()),
+    ))
 }
 
 /// Ready names an own sign-in with the same provider words as its offered way.

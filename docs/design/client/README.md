@@ -752,7 +752,10 @@ keeps (`../protocol/configuration.md`, section 2).
     yet" with "Connect a forge", to the Forge step; while a model is
     usable, as *Whether it shows* says (the one test Ready and the
     setup strip share), "Model: ACCOUNT", the first usable account's
-    heading (5.5, An account), or "Model: MODEL" where no account row
+    heading (5.5, An account): the `accounts` document's first usable
+    row, else, for an owner, the first of the deployment's accounts
+    that counts for the demo's model half (4.8), never the demo's
+    own; or "Model: MODEL" where no such account
     is usable (the configured model), MODEL a new chat's as the
     composer's line names it (5.5); or, while
     a sign-in of the person's is under way on the `accounts` document
@@ -1429,9 +1432,11 @@ of each (`../draft/first-run.md`, 3.6).
   document held by the deployment, of a provider other than the demo's,
   is usable, a source of it usable as an `accounts` line's is; the
   demo model's own account, the deployment's of the demo's provider,
-  never counts. While that document is not delivered, or it or such an
-  account is cut, the half does not hold for an owner. For any other
-  person, the `deployment` document plays no part.
+  never counts. That document counts only by such an account: while it
+  is not delivered, or is cut, it ends nothing, and the half reads the
+  `accounts` document alone, as for any other person, for whom the
+  `deployment` document plays no part. Ready and the setup strip judge
+  a model usable by the same accounts (3.5).
 - **The forge's half** holds while the demo is running (above) and the
   deployment's part (`forge.md`, 5.4) shows no forge connected but the
   demo's. That part is read only for a person whose role holds the
@@ -1456,13 +1461,15 @@ of each (`../draft/first-run.md`, 3.6).
   Gone, it supplies no run: the model's half has ended, and at the
   demo's end the demo model, its group stopped, no longer answers.
 - **One `deployment` watch,** for a person whose deployment role is
-  owner alone: the side opens it once it reads the demo running and
-  `me` says the role, and holds it for both of its uses, the model's
-  half before the first end (above) and the removal at it, until the
-  `Remove` is sent, or the document, at or after that end, lists no
-  such account; it then drops the watch and opens none again this
-  session. The end it saw holds the watch, whatever the demo's read
-  answers since. For any other person it opens none.
+  owner alone, for both of its uses, the accounts that count for the
+  model (above) and the removal: the side holds it open while `me`
+  says the role and either the demo is running (above: answered
+  running, or its start out or failed), or the side has seen an end
+  and the removal is not settled: the `Remove` not sent, and the
+  document, at or after that end, still listing such an account. The
+  end it saw holds the watch, whatever the demo's read answers since.
+  Once neither holds, it drops the watch. For any other person it
+  opens none.
 - **What shows:** the demo's banner, while either half holds (5.1); the
   demo's start, on the chats page, while the model's half holds and
   the person is in the demo's project, or in none while its start is
@@ -3458,9 +3465,11 @@ own tests:
   on the demo model alone and ended by a usable account of another
   provider, the person's own, and for an owner the deployment's too;
   the demo provider's deployment account ending nothing; a member's
-  half reading `accounts` alone, with no `deployment` watch; the
-  owner's one watch, opened at the demo read running, held to the
-  removal and dropped then.
+  half reading `accounts` alone, with no `deployment` watch; an
+  owner's undelivered or cut `deployment` ending nothing; the owner's
+  one watch, open while the demo runs, its start out or failed among
+  it, held to the removal, and dropped once neither holds; Ready and
+  the setup strip judging the model by the same accounts.
 - **The accounts pages' steps and views:** in the domain, the
   accounts page's acts each as its request from the row's names, one
   out at a time, those that confirm only once confirmed, a key's value

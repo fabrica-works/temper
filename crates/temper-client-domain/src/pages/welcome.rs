@@ -66,12 +66,9 @@ pub fn model_usable(root: &Domain) -> Option<bool> {
         Some(demo) => demo.provider,
         None => return Some(accounts.usable),
     };
-    let mut model = false;
-    for line in &accounts.accounts {
-        if forge::demo::usable_account(line, Some(provider)) {
-            model = true;
-            break;
-        }
-    }
-    Some(model)
+    Some(forge::demo::other_model_usable(
+        accounts,
+        forge::demo::owner_deployment(root.forge(), root.client()),
+        provider,
+    ))
 }

@@ -90,6 +90,11 @@ fn the_default_is_the_owned_example_so_edited() {
     for (row, facts) in cases() {
         let answered = files(&facts, &DIRECTORIES, &[0; 32], &[0xab; 32]).expect("valid facts");
         let actual = parse(content(&answered, b"temper.json"));
+        let members = actual["application"]["demo"].as_object().unwrap();
+        assert_eq!(members.len(), 3, "{row}");
+        for name in ["llm", "forge", "project"] {
+            assert!(members.contains_key(name), "{row}: {name}");
+        }
         let ports = [
             "/application/clients/listener/socket",
             "/application/forges/0/api/socket",
@@ -252,8 +257,7 @@ fn demo(port: u16) -> Value {
             ]
         },
         "forge": 1,
-        "project": 1,
-        "client": "demo/client"
+        "project": 1
     })
 }
 

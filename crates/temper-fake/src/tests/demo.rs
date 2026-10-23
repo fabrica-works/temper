@@ -29,7 +29,7 @@ pub(super) fn fixture() -> Value {
         "listen":{"socket":"127.0.0.1:8370"}, "provider":3, "key":"demo/llm.key",
         "asked":[{"cue":"Add CSV export to widget","turns":["Export CSV",{
             "lines":[{"text":"Done"}],"finish":"stop","tokens":1
-        }]}],"otherwise":["demo model"]}, "forge":1, "project":1, "client":"demo/client"});
+        }]}],"otherwise":["demo model"]}, "forge":1, "project":1});
     d
 }
 fn member(d: &skein_json::Document, at: u32, name: &[u8]) -> u32 {
@@ -58,11 +58,6 @@ pub(super) fn read(value: &Value) -> Result<Option<demo::Demo>, crate::Refusal> 
         .collect();
     assert!(ps.is_empty());
     let projects: Vec<_> = engine.projects.iter().map(|p| p.number).collect();
-    let worker = directories
-        .join(config::Directory::Data, value["application"]["workers"][0]["root"].as_str().unwrap().as_bytes())
-        .unwrap();
-    let mut taken = vec![engine.deployment.directory.as_ref(), worker.as_ref()];
-    taken.extend(setup.entries.iter().map(|e| e.directory.as_ref()));
     demo::read(
         &d,
         member(&d, app, b"demo"),
@@ -72,7 +67,6 @@ pub(super) fn read(value: &Value) -> Result<Option<demo::Demo>, crate::Refusal> 
             setup: &setup,
             listeners: &listeners,
             directories: &directories,
-            taken: &taken,
         },
     )
 }
@@ -89,7 +83,7 @@ fn demo_refusals() {
     let mut rows: Vec<Row> = vec![
         (vec![("/application/demo/extra", Some(json!(1)))], "application.demo.extra: unknown member\n"),
         (vec![("/application/demo/llm/extra", Some(json!(1)))], "application.demo.llm.extra: unknown member\n"),
-        (vec![("/application/demo/client", None)], "application.demo.client: missing\n"),
+        (vec![("/application/demo/client", Some(json!("demo/client")))], "application.demo.client: unknown member\n"),
         (vec![("/application/demo", Some(json!([])))], "application.demo: wrong value kind\n"),
         (
             vec![("/application/demo/llm/provider", Some(json!("3")))],
@@ -177,10 +171,6 @@ fn demo_refusals() {
             "application.demo.llm.key: past its bound\n",
         ),
         (
-            vec![("/application/demo/client", Some(json!("../client")))],
-            "application.demo.client: relative path must be non-empty with no .. component\n",
-        ),
-        (
             vec![("/application/demo/llm/asked", Some(json!((0..9).map(|_| scripts[0].clone()).collect::<Vec<_>>())))],
             "application.demo.llm.asked: past its bound\n",
         ),
@@ -211,8 +201,6 @@ fn demo_refusals() {
             "application.demo.forge: names no fake setup entry\n",
         ),
         (vec![("/application/demo/project", Some(json!(9)))], "application.demo.project: names no project\n"),
-        (vec![("/application/demo/client", Some(json!("forge-1")))], "application.demo.client: must be unique\n"),
-        (vec![("/application/demo/client", Some(json!("workspaces")))], "application.demo.client: must be unique\n"),
     ];
     rows.push((
         vec![
@@ -296,7 +284,6 @@ fn demo_acceptance() {
         assert_eq!(demo.provider(), 3);
         assert_eq!(demo.forge(), 1);
         assert_eq!(demo.project(), 1);
-        assert_eq!(demo.client(), b"/data/demo/client");
     }
 }
 

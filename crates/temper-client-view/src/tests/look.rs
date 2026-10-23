@@ -348,7 +348,9 @@ fn the_choice_token_stays_on_the_composer_slot() {
 
 #[test]
 fn the_account_and_adoption_bars_keep_their_headings() {
-    for (root, token) in [(fixtures::account_root().0, ACCOUNTS_PAGE), (fixtures::adoption_root(), ADOPTION_PAGE)] {
+    // One root at a time: two outgrow a stack array's 16 KiB.
+    for token in [ACCOUNTS_PAGE, ADOPTION_PAGE] {
+        let root = if token == ACCOUNTS_PAGE { fixtures::account_root().0 } else { fixtures::adoption_root() };
         let view = fixtures::page_view(&root);
         assert_eq!(fixtures::styles(view.tree(), Role::Heading { level: 1 }).as_ref(), [Box::from([])]);
         let mut found = false;

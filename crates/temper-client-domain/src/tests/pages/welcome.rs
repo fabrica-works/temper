@@ -457,3 +457,30 @@ fn with_a_demo_model_usable_reads_other_providers_lines() {
         assert_eq!(pages::welcome::model_usable(&root), Some(expected));
     }
 }
+
+#[test]
+fn ready_and_the_strip_count_an_owners_deployment_model() {
+    let (mut root, _, accounts, _) = opened(true, Step::Model { way: None });
+    answer(&mut root, true);
+    account(&mut root, accounts, 18, false);
+    let mut out = event(&mut root, Event::Act { action: Action::Pages(Act::Playground) });
+    let watch = demo::deployment_watch(&mut out).expect("owner start opens the deployment watch");
+    let mut out =
+        demo::deliver_deployment(&mut root, watch, demo::deployment(&[demo::DEMO_ACCOUNT, demo::OTHER_ACCOUNT]));
+    assert!(demo::removed(&mut out).is_empty(), "removal waits for the running read");
+    assert_eq!(pages::welcome::model_usable(&root), Some(true));
+
+    let mut out = demo::deliver_demo_read(
+        &mut root,
+        Readout::Family { family: wire::FORGE, record: Some(demo::answer(b"Change the title")) },
+    );
+    assert_eq!(demo::removed(&mut out).len(), 1);
+    assert_eq!(pages::welcome::model_usable(&root), Some(true), "the watch keeps the model after removal");
+    demo::deliver_deployment(&mut root, watch, demo::deployment(&[demo::OTHER_ACCOUNT]));
+    assert_eq!(pages::welcome::model_usable(&root), Some(true), "removed demo account changes nothing");
+
+    let (mut member, _, accounts, _) = opened(false, Step::Model { way: None });
+    answer(&mut member, true);
+    account(&mut member, accounts, 18, false);
+    assert_eq!(pages::welcome::model_usable(&member), Some(false));
+}

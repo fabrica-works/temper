@@ -62,7 +62,7 @@ impl Domain {
             return None;
         }
         let answer = self.forge.demo()?;
-        let halves = forge::demo::current(&self.forge, self.pages.accounts_document(&self.client));
+        let halves = forge::demo::current(&self.forge, self.pages.accounts_document(&self.client), &self.client);
         if halves.model || halves.forge { Some((answer, halves)) } else { None }
     }
 
