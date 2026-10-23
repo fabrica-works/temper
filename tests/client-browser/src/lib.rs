@@ -92,6 +92,9 @@ pub fn start_playground_chat(words: &[u8]) -> Vec<Step> {
             within: WITHIN,
         }),
         Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Try the playground") }),
+        // The box starts the demo's group only when asked: wait for its start to be answered.
+        Step::Person(PersonStep::See { find: Find::exactly_named(Role::Status, b"Ready"), within: WITHIN }),
+        Step::Person(PersonStep::Gone { find: Find::exactly_named(Role::Status, b"Starting"), within: WITHIN }),
     ];
     steps.extend(start_chat(words).into_iter().skip(2));
     steps
@@ -113,7 +116,7 @@ impl Tier {
         configuration::write(scratch.path(), &temper(), &bundle());
         Self { scratch, forged: forgery::request(), command: "serve" }
     }
-    /// The first-run demo, with the box's own fake LLM, forge and seed.
+    /// The first-run demo, with the box's own fake LLM and forge, started when the playground is chosen.
     #[must_use]
     pub fn demo(name: &str) -> Self {
         let scratch = skein_scratch::Scratch::new(name);
