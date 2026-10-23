@@ -150,18 +150,17 @@ fn the_welcome_prints_and_parses_each_step() {
 }
 #[test]
 fn a_welcome_query_it_cannot_read_opens_its_first_step() {
-    for path in [
-        b"/welcome?at=done".as_slice(),
-        b"/welcome?x=1",
-        b"/welcome?at=",
-        b"/welcome?at=Forge",
-        b"/welcome?at=done&at=forge",
-    ] {
+    for path in [b"/welcome?at=done".as_slice(), b"/welcome?x=1", b"/welcome?at=", b"/welcome?at=Forge"] {
         assert_eq!(parse(path), Place::Address(Address::Welcome { step: Step::Welcome }));
     }
     assert_eq!(
         parse(b"/welcome?x=1&at=model&at=forge"),
         Place::Address(Address::Welcome { step: Step::Model { way: None } })
+    );
+    // A first that doesn't read is dropped, and the next that reads is the step (browser.md, 2.3).
+    assert_eq!(
+        parse(b"/welcome?at=done&at=forge"),
+        Place::Address(Address::Welcome { step: Step::Forge { forge: None } })
     );
 }
 
@@ -227,13 +226,16 @@ fn a_forge_choice_it_cannot_read_opens_choose() {
         b"/forges/connect?forge=65536",
         b"/forges/connect?forge=03",
         b"/forges/connect?forge=-1",
-        b"/forges/connect?forge=&forge=3",
         b"/forges/connect?x=1",
     ] {
         assert_eq!(parse(path), Place::Address(Address::ConnectForge { forge: None }));
     }
     assert_eq!(
         parse(b"/forges/connect?forge=3&forge=4&x=1"),
+        Place::Address(Address::ConnectForge { forge: Some(crate::Choice::Forge(3)) })
+    );
+    assert_eq!(
+        parse(b"/forges/connect?forge=&forge=3"),
         Place::Address(Address::ConnectForge { forge: Some(crate::Choice::Forge(3)) })
     );
     assert_eq!(parse(b"/forges/3/github/setup"), Place::Missing);

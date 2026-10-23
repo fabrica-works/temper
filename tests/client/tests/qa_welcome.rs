@@ -68,7 +68,6 @@ fn unknown_and_unrelated_fields_drop_from_welcome() {
 }
 
 #[test]
-#[ignore = "backlog: /welcome?at=done&at=forge opens Welcome, not Forge: a first `at` that doesn't read still drops the next (browser.md 2.3); only a hand-edited address meets it"]
 fn repeated_step_keeps_first_readable_value() {
     // browser.md, 2.3: as the inbox query, repeats after the first that read are dropped.
     for (path, step) in [

@@ -264,12 +264,11 @@ fn welcome_step(query: &[u8]) -> Step {
             if seen {
                 continue;
             }
-            seen = true;
-            step = match value {
-                b"forge" => Step::Forge { forge: forge_choice(query) },
-                b"model" => Step::Model { way: parse_way(query) },
-                b"ready" => Step::Ready,
-                _ => Step::Welcome,
+            (step, seen) = match value {
+                b"forge" => (Step::Forge { forge: forge_choice(query) }, true),
+                b"model" => (Step::Model { way: parse_way(query) }, true),
+                b"ready" => (Step::Ready, true),
+                _ => (Step::Welcome, false),
             };
         }
     }
@@ -300,7 +299,6 @@ fn print_choice(base: &[u8], choice: Option<Choice>, separator: &[u8]) -> Box<[u
 }
 fn forge_choice(query: &[u8]) -> Option<Choice> {
     let mut rest = query;
-    let mut seen = false;
     let mut choice = None;
     for _ in 0..query.len() {
         if rest.is_empty() {
@@ -310,10 +308,10 @@ fn forge_choice(query: &[u8]) -> Option<Choice> {
         let field = rest.get(..end).expect("separator in query");
         rest = rest.get(end..).expect("separator in query").strip_prefix(b"&").unwrap_or(b"");
         if let Some(value) = field.strip_prefix(b"forge=") {
-            if seen {
+            if choice.is_some() {
                 continue;
             }
-            seen = true;
+            // A value that doesn't read is dropped, so a repeat after it is the first that reads (browser.md, 2.3).
             choice = if value == b"elsewhere" {
                 Some(Choice::Elsewhere)
             } else {
