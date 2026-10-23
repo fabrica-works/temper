@@ -887,8 +887,10 @@ fn create_stopped(engine: &mut crate::engine::Engine, token: Token, failure: rec
         .org
         .len()
         .checked_add(first.repository.len())
-        .and_then(|bytes| bytes.checked_add(8))
-        .and_then(|bytes| bytes.checked_add(suffix.len()))
+        .expect("bounded Create names")
+        .checked_add(8)
+        .expect("bounded Create prefix")
+        .checked_add(suffix.len())
         .expect("bounded Create diagnostic");
     let mut why = skein_lib::Writer::new(length);
     for part in [b"making ".as_slice(), &first.org, b"/", &first.repository, suffix.as_bytes()] {
