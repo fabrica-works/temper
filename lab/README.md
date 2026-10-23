@@ -483,7 +483,10 @@ experiments stand on, and it costs no model call.
   `cluster/`'s is null. `experiment.json`'s processes `llm`, `engine`,
   `w1` and `w2` are `cluster/`'s member for member, but for `engine`'s
   `files`, which add the bundle's tree, `{"path": "bundle", "tree":
-  "bundle"}` (skein's `lab.md`, 4.3). Copies, not names: an
+  "bundle"}` (skein's `lab.md`, 4.3), and `llm`'s `after`: `cluster/`'s
+  `forge` member, which only the process tier's case stories reach
+  (`docs/design/domain/testing.md`, 2.6), is not the browser's, so its
+  `llm` starts first. Copies, not names: an
   experiment's digest is its own directory's tree (skein's `lab.md`,
   2.3), so an experiment that named another's files would run with
   bytes its key does not hold, and the runner would need a new

@@ -46,7 +46,9 @@ class FilesTests(unittest.TestCase):
             self.assertEqual(exp[field], base[field])
         self.assertEqual(exp['name'], 'cluster-web')
         self.assertEqual(exp['dirs'], ['client', 'hand', 'spent'])
-        processes = base['processes']
+        # cluster/'s forge member is the process tier's case stories' alone.
+        processes = [process for process in base['processes'] if process['name'] != 'forge']
+        del processes[0]['after']
         processes[1]['files'].append(dict(path='bundle', tree='bundle'))
         self.assertEqual(exp['processes'][:4], processes)
         self.assertEqual(exp['processes'][4:], [dict(
