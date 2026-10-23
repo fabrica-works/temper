@@ -1,6 +1,7 @@
 use crate::*;
 mod adoption;
 mod change;
+mod demo;
 mod fixtures;
 mod panel;
 mod purpose;
@@ -298,6 +299,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
         | Request::SetUp { .. }
+        | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
     };
     assert_eq!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Permission { user: 7 }));
@@ -351,6 +353,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
         | Request::SetUp { .. }
+        | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
     };
     assert!(
@@ -404,6 +407,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
         | Request::SetUp { .. }
+        | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),
     }
 }

@@ -6,6 +6,9 @@ pub(crate) mod box_link;
 
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher routes root outputs to their components")]
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
+    if let Some(demo) = &mut engine.demo {
+        demo.state = engine.domain.demo_state();
+    }
     match request {
         root::Request::SetUp { forge, request, org, repository } => {
             crate::setup::lifecycle::first(engine, forge, org, repository);

@@ -60,7 +60,15 @@ pub fn to_root(
                     }));
                 }
                 w::Request::StartDemo => {
-                    return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));
+                    return Ok(root::Event::Party(root::PartyInput::Application {
+                        scope,
+                        reply_to,
+                        sign_in,
+                        key,
+                        digest,
+                        carried,
+                        request: forge::Ask::StartDemo,
+                    }));
                 }
                 w::Request::Adopt(value) => value,
             };
@@ -101,6 +109,7 @@ pub fn to_root(
                 && let Some(reading) = wire::decode_reading(&record, limits)
                 && *reading.read() == w::Read::Demo
                 && let Some(demo) = demo
+                && demo.state != Some(forge::DemoState::Ended)
             {
                 let mut cues = List::with_capacity(u32::try_from(demo.cues.len()).expect("bounded demo cues"));
                 for cue in &demo.cues {
@@ -109,7 +118,10 @@ pub fn to_root(
                 let record = w::DemoAnswer::new(
                     limits,
                     w::DemoAnswerParts {
-                        state: w::DemoState::Running,
+                        state: match demo.state {
+                            Some(forge::DemoState::Running) => w::DemoState::Running,
+                            Some(forge::DemoState::Ended) | None => w::DemoState::NotStarted,
+                        },
                         project: demo.project,
                         forge: demo.forge,
                         provider: demo.provider,
@@ -415,6 +427,28 @@ pub fn answer(
             )
             .ok()?,
         ),
+        Some(forge::Answered::StartDemo(answer)) => match answer {
+            forge::StartAnswer::Running => w::Outcome::Running,
+            forge::StartAnswer::NotOffered => w::Outcome::StartRefused(
+                w::StartRefused::new(limits, w::StartRefusedParts { why: w::StartRefusal::NotOffered }).ok()?,
+            ),
+            forge::StartAnswer::Failed(why) => w::Outcome::StartFailed(
+                w::StartFailed::new(
+                    limits,
+                    w::StartFailedParts {
+                        why: match why {
+                            forge::StartFailure::Group { why } => {
+                                w::StartFailure::Group(w::GroupFailed::new(limits, w::GroupFailedParts { why }).ok()?)
+                            }
+                            forge::StartFailure::Account => w::StartFailure::Account,
+                            forge::StartFailure::Adoption => w::StartFailure::Adoption,
+                            forge::StartFailure::NotConnected => w::StartFailure::NotConnected,
+                        },
+                    },
+                )
+                .ok()?,
+            ),
+        },
         Some(forge::Answered::SetUp(forge::SetUpAnswer::SettingUp)) => w::Outcome::SettingUp,
         Some(forge::Answered::SetUp(forge::SetUpAnswer::Refused(why))) => w::Outcome::SetUpRefused(
             w::SetUpRefused::new(

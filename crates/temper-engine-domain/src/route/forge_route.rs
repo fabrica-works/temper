@@ -1983,6 +1983,7 @@ pub(crate) fn outputs(
     for _ in 0..out.len() {
         let request = out.pop().expect("connector output count");
         match request {
+            forge::Request::DemoStart { request } => super::demo::start(domain, env, decision, request),
             forge::Request::SetUp { forge, request, org, repository } => {
                 assert!(
                     super::now(domain, Request::SetUp { forge, request, org, repository }),
@@ -1994,9 +1995,11 @@ pub(crate) fn outputs(
                 super::applications::part(domain, request, adoption, repository);
             }
             forge::Request::ApplicationDone { request, token } => {
+                super::demo::done(domain, env, decision, request, true);
                 super::applications::finished(domain, request, Ok(token));
             }
             forge::Request::ApplicationAgain { request, why } => {
+                super::demo::done(domain, env, decision, request, false);
                 super::applications::finished(domain, request, Err(why));
             }
             forge::Request::WakeProcedure { task } => {

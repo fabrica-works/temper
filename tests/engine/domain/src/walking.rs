@@ -328,6 +328,7 @@ pub fn config(seed: u64) -> engine::Config {
         forge_charter: 1,
         forges: Box::new([]),
         under_box: false,
+        demo: None,
     }
 }
 

@@ -773,7 +773,7 @@ pub fn parse(
         }
     }
     github_listener(&forges, clients.as_ref(), &path, problems);
-    let demo = demo::parse(document, demo_at, setup_at, &forges, problems);
+    let demo = demo::parse(document, demo_at, setup_at, &forges, directories, problems);
     let workers = workers(document, workers_ats, jig.limits.core.fleet.workers, directories, &path, problems);
     if let Some(charter) = charter
         && forges.len() == forge_count

@@ -1,4 +1,4 @@
-//! Only the demo's public answer; the fakes check the rest (protocol/setup.md, 8.4).
+//! The demo's fake LLM, forge and project (protocol/setup.md, 8.4).
 use super::{Forge, Problems, What, read, settings};
 use alloc::boxed::Box;
 use jig_protocol_config::{self as config, Path};
@@ -28,6 +28,7 @@ pub(super) fn parse(
     at: Option<u32>,
     setup: Option<u32>,
     forges: &List<Forge>,
+    directories: &config::Directories,
     problems: &mut Problems,
 ) -> Option<settings::Demo> {
     let at = at?;
@@ -42,6 +43,8 @@ pub(super) fn parse(
     let llm_path = path.member(b"llm");
     let mut llm = read::object(document, at, &llm_path, problems)?;
     let provider = read::number(&mut llm, document, b"provider", &llm_path, problems)?;
+    let key_file = text(document, &mut llm, b"key", 4096, &llm_path, problems)?;
+    let key_file = super::joined(directories, config::Directory::Data, &key_file, &llm_path.member(b"key"), problems)?;
     // This public view reads asked alone; optional cued is checked by the fake.
     // These objects are not finished here, so cued needs no consuming read.
     let asked = read::list(&mut llm, document, b"asked", w::CEILINGS.demo_answer_cues, &llm_path, problems)?;
@@ -92,7 +95,19 @@ pub(super) fn parse(
         let repository_path = read::index(&fake_path.member(b"repositories"), 0);
         let mut repository = read::object(document, *at, &repository_path, problems)?;
         let name = text(document, &mut repository, b"name", w::CEILINGS.demo_answer_name, &repository_path, problems)?;
-        return Some(settings::Demo { project, forge, provider, owner, name, cues: cues.into_boxed() });
+        let landing =
+            text(document, &mut repository, b"landing", w::CEILINGS.adopt_landing, &repository_path, problems)?;
+        return Some(settings::Demo {
+            project,
+            forge,
+            provider,
+            owner,
+            name,
+            cues: cues.into_boxed(),
+            landing,
+            key_file,
+            state: None,
+        });
     }
     problems.push(path.member(b"forge"), What::Jig(config::What::Refers));
     None

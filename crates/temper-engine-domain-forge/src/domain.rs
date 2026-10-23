@@ -96,7 +96,11 @@ enum Handoff {
 #[derive(Debug)]
 pub struct Domain {
     configured: Map<u16, crate::Configured>,
-    under_box: bool,
+    pub(crate) under_box: bool,
+    pub(crate) demo: Option<crate::DemoConfig>,
+    pub(crate) demo_state: Option<crate::DemoState>,
+    pub(crate) demo_pending: Map<Token, Token>,
+    pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
     connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
     first: Map<u16, crate::First>,
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,
@@ -239,6 +243,9 @@ impl Domain {
     #[must_use]
     #[expect(clippy::manual_map, reason = "step code uses explicit matches (programming-model.md, 10)")]
     pub fn application_answer(&self, token: Token) -> Option<crate::Answered> {
+        if let Some(answer) = self.demo_answers.get(&token) {
+            return Some(crate::Answered::StartDemo(answer.clone()));
+        }
         for (_, (_, kept)) in &self.connections {
             if let Some((held, answer)) = kept
                 && *held == token
@@ -435,6 +442,10 @@ impl Domain {
         Ok(Domain {
             configured,
             under_box,
+            demo: None,
+            demo_state: None,
+            demo_pending: Map::with_capacity(l.applications),
+            demo_answers: Map::with_capacity(l.applications),
             connections: Map::with_capacity(l.client.repositories),
             first: Map::with_capacity(l.client.repositories),
             setup_unknown: None,
@@ -870,13 +881,14 @@ impl Domain {
 pub const fn max_out(l: &Limits) -> u32 {
     // At most one panel mark accompanies each previously bounded output:
     // a saved change, or a read completion whose CI verdict changed.
-    l.output.saturating_mul(2)
+    l.output.saturating_mul(2).saturating_add(l.applications)
 }
 
 /// Decide one parent event and collect its durable records and outputs.
 #[expect(clippy::too_many_lines, reason = "one exhaustive connector input dispatcher")]
 pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::DemoAnswered { answer } => crate::demo::answered(d, answer, out),
         Event::BoxClosed => {
             d.under_box = false;
             for (forge, _) in &d.configured {
@@ -888,7 +900,19 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             }
             out.push(Request::MarkedForges);
         }
-        Event::SetUpAnswered { forge, request, answer } => d.setup_answer(forge, request, answer, out),
+        Event::SetUpAnswered { forge, request, answer } => {
+            if d.demo_pending.contains_key(&request) {
+                if let crate::SetUpAnswer::Refused(_) = answer {
+                    crate::demo::answered(
+                        d,
+                        crate::StartAnswer::Failed(crate::StartFailure::Group { why: Box::from(b"busy".as_slice()) }),
+                        out,
+                    );
+                }
+            } else {
+                d.setup_answer(forge, request, answer, out);
+            }
+        }
         Event::FirstMade { forge, id } => {
             if d.first_made(forge, id) {
                 out.push(Request::MarkedForges);
@@ -930,6 +954,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             }
         },
         Event::Application { request, token, retention, ask } => match ask {
+            crate::Ask::StartDemo => crate::demo::start(d, request, token, out),
             crate::Ask::Adopt(adoption) => adoption::start(d, env, request, token, retention, adoption, out),
             crate::Ask::SetUp { forge, org, repository, project } => {
                 if d.setup_pending.insert(request, token).is_err() {
@@ -3894,7 +3919,13 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
                 .insert(entry.number, Outboxed { entry, held, handoff: Handoff::Handed })
                 .expect("restored entry within limits");
         }
-        Stored::Demo(_) => {} // T1 will retain the demo state on restore.
+        Stored::Demo(row) => {
+            if let Some(demo) = &d.demo
+                && row.forge == demo.adoption.forge
+            {
+                d.demo_state = Some(row.state);
+            }
+        }
         Stored::Writer(row) => {
             let mut discarded = Queue::with_capacity(env.limits.output);
             child(
@@ -3932,6 +3963,7 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
 
 fn restored(d: &mut Domain, env: &Env<Limits>, clock: skein_forge_client::RecoveryClock, out: &mut Queue<Request>) {
     child(d, env, skein_forge_client::Event::Restored { clock }, out);
+    crate::demo::restart(d, out);
     // The client's transient watcher flags are rebuilt from the connector's
     // durable writers before any fresh background read can classify a push.
     {

@@ -49,6 +49,10 @@ pub struct Domain {
     pub(crate) run_workspaces: Map<u64, PreparedWorkspace>,
     pub(crate) forge: forge::Domain,
     pub(crate) application: Option<(Token, forge::Ask)>,
+    pub(crate) application_demo: Option<crate::route::demo::Context>,
+    pub(crate) demo_contexts: Map<Token, crate::route::demo::Context>,
+    pub(crate) demo_start: Option<crate::route::demo::Start>,
+    pub(crate) demo_reply: Option<(Token, crate::route::demo::Phase)>,
     pub(crate) next_application_owner: u64,
     pub(crate) adoption_restore: Map<Token, Option<forge::Repository>>,
     pub(crate) forge_subscribing: Map<Token, forge::Subscriber>,
@@ -89,6 +93,10 @@ impl Domain {
     #[must_use]
     pub fn forges(&self) -> forge::Forges {
         self.forge.forges()
+    }
+    #[must_use]
+    pub fn demo_state(&self) -> Option<forge::DemoState> {
+        self.forge.demo_state()
     }
     /// Restored provider ids for the setup host's start-time reconcile.
     #[must_use]
@@ -193,6 +201,7 @@ impl Domain {
             config.under_box,
         )
         .expect("valid forge configuration");
+        forge.configure_demo(config.demo.take());
         let built = policy_translate::build_landing(
             &config.landing.deployment,
             false,
@@ -293,6 +302,10 @@ impl Domain {
             run_workspaces: Map::with_capacity(limits.tasks.tasks),
             forge,
             application: None,
+            application_demo: None,
+            demo_contexts: Map::with_capacity(limits.forge.applications),
+            demo_start: None,
+            demo_reply: None,
             next_application_owner: 1,
             adoption_restore: Map::with_capacity(limits.forge.adoptions),
             forge_subscribing: Map::with_capacity(limits.fleet.calls),
@@ -719,6 +732,7 @@ pub(crate) fn fire_routed(domain: &mut Domain, env: &Env<Limits>, out: &mut Queu
         forge::fire(&mut domain.forge, &environment_forge(env), &mut forge_out);
         forge_route::outputs(domain, env, &mut decision, &mut forge_out);
     }
+    crate::route::demo::progress(domain, env, &mut decision);
     route_into(domain, env, &mut decision);
     if domain.ready() {
         let routed =
@@ -952,6 +966,9 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
         refused.push(Refused::Forges).expect("counted refusals");
         return refused.into_boxed();
     };
+    if matches!(&config.demo, Some(demo) if !demo.within()) {
+        refused.push(Refused::Forges).expect("counted refusals");
+    }
     let deployment = match policy_translate::build_landing(
         &config.landing.deployment,
         false,

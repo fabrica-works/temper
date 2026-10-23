@@ -272,7 +272,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(load_bytes)?
         .checked_add(landing_bytes)?
         .checked_add(permission_bytes)?;
-    bytes = bytes.checked_add(Queue::<Fact>::worst_case(FACTS)?)?;
+    bytes =
+        bytes
+            .checked_add(Queue::<Fact>::worst_case(FACTS)?)?
+            .checked_add(Map::<Token, crate::route::demo::Context>::worst_case(limits.forge.applications)?)?;
     let effects = limits.call_records.checked_add(limits.tasks.tasks)?;
     let brief_fetches = limits.brief.briefs.checked_mul(limits.brief.sections)?.checked_mul(2)?;
     bytes = bytes

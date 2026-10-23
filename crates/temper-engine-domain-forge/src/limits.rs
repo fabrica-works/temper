@@ -83,7 +83,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     {
         return None;
     }
-    l.output.checked_mul(2)?;
+    l.output.checked_mul(2)?.checked_add(l.applications)?;
     let names =
         u64::from(l.tasks).checked_mul(u64::from(l.resources_per_task))?.checked_mul(u64::from(l.name_bytes))?;
     let goal_tasks = u64::from(l.subscriptions).checked_mul(u64::from(l.issue_policy.plan_items))?.checked_mul(8)?;
@@ -94,6 +94,10 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     let judges = Map::<u32, Box<[Criterion]>>::worst_case(l.judge_projects)?
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
     crate::adoption::worst_case(l)?
+        .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
+        .checked_add(Map::<skein_lib::Token, crate::StartAnswer>::worst_case(l.applications)?)?
+        .checked_add(u64::from(l.applications).checked_mul(256)?)?
+        .checked_add(5 * 1024)?
         .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
         .checked_add(Map::<u16, crate::Configured>::worst_case(l.client.repositories)?)?
         .checked_add(Map::<u16, crate::First>::worst_case(l.client.repositories)?)?

@@ -230,6 +230,9 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     engine.workers.iterate(now, &mut engine.events);
     let open = !engine.begin && engine.domain.ready() && engine.first_periods.is_empty();
     engine.clients.starting = if open { None } else { Some(()) };
+    if let Some(demo) = &mut engine.demo {
+        demo.state = engine.domain.demo_state();
+    }
     engine.clients.iterate(now, wall, &mut engine.events, &engine.workers.forges, engine.demo.as_ref());
     clients_pass(engine);
     for _ in 0..engine.clients.early.len() {

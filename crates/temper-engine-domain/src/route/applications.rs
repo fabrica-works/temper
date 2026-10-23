@@ -21,9 +21,12 @@ pub(super) fn start(domain: &mut Domain, admission: Admission, request: forge::A
     domain.next_application_owner = domain.next_application_owner.checked_add(1).expect("application owner counter");
     let Admission { reply_to, sign_in, key, digest, scope, carried } = admission;
     let scope = match &request {
-        forge::Ask::SetUp { .. } => people::ApplicationScope::Deployment,
+        forge::Ask::SetUp { .. } | forge::Ask::StartDemo => people::ApplicationScope::Deployment,
         forge::Ask::Adopt(_) => scope,
     };
+    if request == forge::Ask::StartDemo {
+        domain.application_demo = Some(super::demo::Context { sign_in, key, carried });
+    }
     domain.application = Some((owner, request));
     domain.work.push(Work::Core(core::Event::Application {
         reply_to,
@@ -40,6 +43,13 @@ pub(super) fn start(domain: &mut Domain, admission: Admission, request: forge::A
 pub(super) fn admitted(domain: &mut Domain, request: Token, token: Token, owner: Token, retention: Duration) {
     let (held, ask) = domain.application.take().expect("one admitted application value");
     assert_eq!(held, owner, "the core admits the application's owner");
+    if let Some(context) = domain.application_demo.take() {
+        if domain.demo_contexts.len() == domain.demo_contexts.capacity() {
+            finished(domain, request, Err(people::Again::Busy));
+            return;
+        }
+        assert!(domain.demo_contexts.insert(request, context).is_ok(), "bounded admitted starts");
+    }
     domain.work.push(Work::Forge(forge::Event::Application { request, token, retention, ask }));
 }
 
@@ -47,6 +57,7 @@ pub(super) fn drop(domain: &mut Domain, owner: Token) {
     if let Some((held, _)) = &domain.application {
         assert_eq!(*held, owner, "drop names the application owner");
         domain.application = None;
+        domain.application_demo = None;
     }
 }
 

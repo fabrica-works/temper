@@ -11,6 +11,15 @@ impl Domain {
             return None;
         }
         let mut next = earliest(self.core.accounts.next_deadline(), self.core.views.next_deadline());
+        if let Some(start) = &self.demo_start
+            && let Some(demo) = self.forge.demo()
+            && !matches!(
+                self.forge.connection(demo.adoption.forge),
+                temper_engine_domain_forge::Connection::Connected { .. }
+            )
+        {
+            next = earliest(next, Some(start.until));
+        }
         if self.core.stopping() {
             return next;
         }

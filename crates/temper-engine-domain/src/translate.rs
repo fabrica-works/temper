@@ -31,6 +31,7 @@ pub struct Config {
     pub forge_charter: u32,
     pub forges: Box<[forge::Configured]>,
     pub under_box: bool,
+    pub demo: Option<forge::DemoConfig>,
 }
 
 /// What the root keeps of its configuration once its children hold theirs.

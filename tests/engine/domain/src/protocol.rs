@@ -128,6 +128,7 @@ pub struct Protocol {
     pub pending_renders: Vec<(ReplyTo, Box<[u8]>)>,
     /// Each account component request the root made.
     pub accounts: Vec<accounts::Request>,
+    pub key_failure: Option<accounts::KeyFailure>,
     /// Worker channels that received their program-source inventory.
     pub sources: Vec<Token>,
     /// Core read loads the world answered as gone.
@@ -260,6 +261,12 @@ impl Protocol {
             engine::Request::Account(request) => {
                 self.accounts.push(request.clone());
                 Ok(match request {
+                    accounts::Request::Signing(accounts::Signing::Keep { source, .. }) => match self.key_failure {
+                        Some(why) => vec![engine::Event::Account(accounts::Event::Component(
+                            accounts::FromComponent::KeepFailed { account: source, why },
+                        ))],
+                        None => vec![granted(source, 1, false)],
+                    },
                     accounts::Request::Component(accounts::ToComponent::Want { account }) => {
                         vec![granted(account, 1, self.sign_in_sources.contains(&account))]
                     }

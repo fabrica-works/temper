@@ -145,12 +145,36 @@ pub struct Adoption {
 pub enum Ask {
     Adopt(Adoption),
     SetUp { forge: u16, org: Box<[u8]>, repository: Box<[u8]>, project: SetUpProject },
+    StartDemo,
 }
 /// A retained application answer; only adoption outcomes are durable.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Answered {
     Adopt(ApplicationOutcome),
     SetUp(SetUpAnswer),
+    StartDemo(StartAnswer),
+}
+/// The start is answered once both are done, *running*, or at the first that
+/// fails, *start failed*, naming why (protocol/setup.md, 8.4).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum StartAnswer {
+    Running,
+    NotOffered,
+    Failed(StartFailure),
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum StartFailure {
+    Group { why: Box<[u8]> },
+    Account,
+    Adoption,
+    NotConnected,
+}
+/// The demo's fake LLM, forge and project (protocol/setup.md, 8.4).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DemoConfig {
+    pub provider: u32,
+    pub adoption: Adoption,
+    pub deadline: skein_lib::Duration,
 }
 /// The setup request's one answer, independent of its later course.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -653,6 +677,9 @@ pub struct Installation {
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    DemoAnswered {
+        answer: StartAnswer,
+    },
     /// The box ended its pipe (domain/forge.md, 4.1).
     BoxClosed,
     /// The routing's answer to a core-admitted setup request.
@@ -918,6 +945,9 @@ pub enum Event {
 /// The connector's output to the root, including child API calls.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    DemoStart {
+        request: Token,
+    },
     /// Ask the box link to set up the forge (protocol/forge.md, 2.8).
     SetUp {
         forge: u16,

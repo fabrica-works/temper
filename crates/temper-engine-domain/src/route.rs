@@ -1,6 +1,7 @@
 //! Exhaustive child routing and synchronous handoffs (jig's domain/root.md, 5).
 mod applications;
 mod asks;
+pub(crate) mod demo;
 pub(crate) mod escalation;
 pub(crate) mod forge_route;
 mod held;
@@ -279,9 +280,18 @@ pub(crate) fn route_into(domain: &mut Domain, env: &Env<Limits>, decision: &mut 
             }
             Work::StartBrief { task } => domain.work.push(Work::Core(core::Event::StartBrief { task })),
             Work::Forge(event) => {
+                if let forge::Event::Connection { forge, state: forge::Connection::SetUpFailed { why } } = &event {
+                    demo::connection(domain, *forge, why);
+                }
+                if event == forge::Event::BoxClosed
+                    && let Some(config) = domain.forge.demo()
+                {
+                    demo::connection(domain, config.adoption.forge, b"the box closed the pipe");
+                }
                 let mut out = Queue::with_capacity(forge::max_out(&env.limits.forge));
                 forge::step(&mut domain.forge, &environment_forge(env), event, &mut out);
                 forge_route::outputs(domain, env, decision, &mut out);
+                demo::progress(domain, env, decision);
             }
             Work::ProjectGoal(goal) => forge_route::project_goal(domain, env, &goal),
             Work::GoalSubscribe(subscriber) => forge_route::goal_subscribed(domain, env, subscriber),

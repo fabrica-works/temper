@@ -557,6 +557,7 @@ fn index_of(numbers: &[u32], number: u32) -> usize {
 }
 /// What the root's construction asserts, refused before it is made, each
 /// naming the configuration that breaks it (domain/root.md, 6).
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches")]
 pub fn root(
     core: jig_domain_core::Config,
     engine: &settings::Engine,
@@ -572,6 +573,10 @@ pub fn root(
     let landing = domain::LandingPolicy { deployment: engine.landing.deployment.clone(), projects };
     let (forge, identities) = crate::forge::config(engine, seeds.deployment);
     let config = domain::Config {
+        demo: match &engine.demo {
+            Some(demo) => Some(demo.domain(&engine.forges, engine.limits.setup.deadline)),
+            None => None,
+        },
         core,
         landing,
         forge,

@@ -87,7 +87,11 @@ impl Service {
         Self::prepared(settings, seeds, accounts, (forges, roots, owned), worker, worker_bytes, io_limits, false)
     }
     #[expect(clippy::too_many_arguments, reason = "startup supplies runtime facts before the domain is built")]
-    #[expect(clippy::too_many_lines, reason = "one startup constructs the service after its worst case is checked")]
+    #[expect(
+        clippy::too_many_lines,
+        clippy::manual_map,
+        reason = "one startup constructs the service; explicit matches follow the strict subset"
+    )]
     pub(crate) fn prepared(
         mut settings: settings::Engine,
         seeds: &settings::Seeds,
@@ -172,6 +176,10 @@ impl Service {
             forge_charter: settings.charter,
             forges: configured,
             under_box,
+            demo: match &settings.demo {
+                Some(demo) => Some(demo.domain(&settings.forges, settings.limits.setup.deadline)),
+                None => None,
+            },
         };
         let store = store::Store::new(&limits, &store_limits, &config.core.settings.models, seeds.installation);
         let demo = settings.demo;
@@ -245,7 +253,11 @@ impl Service {
         })
     }
     pub fn take_handover_read(&mut self) -> Option<crate::HandoverRead> {
-        crate::setup::lifecycle::take_read(self.engine.as_mut()?)
+        let engine = self.engine.as_mut()?;
+        match engine.clients.demo_read() {
+            Some(read) => Some(read),
+            None => crate::setup::lifecycle::take_read(engine),
+        }
     }
     pub fn handover_read(
         &mut self,
@@ -254,7 +266,11 @@ impl Service {
         answer: Result<Option<skein_lib::Secret>, crate::HandoverUnread>,
     ) {
         if let Some(engine) = &mut self.engine {
-            crate::setup::lifecycle::read(engine, forge, run, answer);
+            if engine.clients.owns_demo_read(run) {
+                engine.clients.demo_read_answer(run, answer);
+            } else {
+                crate::setup::lifecycle::read(engine, forge, run, answer);
+            }
         }
     }
     pub fn take_handover_removal(&mut self) -> Option<crate::HandoverRemoval> {
@@ -944,10 +960,14 @@ fn memory(
     if let Some(demo) = &settings.demo {
         let mut retained = List::<Box<[u8]>>::worst_case(u32::try_from(demo.cues.len()).ok()?)?
             .checked_add(u64::try_from(demo.owner.len()).ok()?)?
-            .checked_add(u64::try_from(demo.name.len()).ok()?)?;
+            .checked_add(u64::try_from(demo.name.len()).ok()?)?
+            .checked_add(u64::try_from(demo.landing.len()).ok()?)?
+            .checked_add(u64::try_from(demo.key_file.len()).ok()?)?;
         for cue in &demo.cues {
             retained = retained.checked_add(u64::try_from(cue.len()).ok()?)?;
         }
+        bytes = bytes
+            .checked_add(u64::try_from(demo.key_file.len()).ok()?.checked_mul(u64::from(clients::DEMO_STARTS))?)?;
         // Configuration, plus one transient typed answer and its encoded record.
         bytes = bytes.checked_add(retained.checked_mul(2)?)?.checked_add(
             temper_client_protocol_wire::v1::DemoAnswer::worst_case_bytes(&temper_client_protocol_wire::v1::CEILINGS)?,

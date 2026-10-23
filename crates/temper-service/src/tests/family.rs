@@ -178,6 +178,9 @@ fn demo_record(input: kit::ToApplication, demo: &crate::settings::Demo) -> Box<[
 #[test]
 fn the_demo_read_answers_the_configured_demo() {
     let demo = crate::settings::Demo {
+        state: Some(forge::DemoState::Running),
+        landing: b"main".as_slice().into(),
+        key_file: b"/demo-key".as_slice().into(),
         project: 1,
         forge: 2,
         provider: 3,
@@ -1103,18 +1106,96 @@ fn new_project_and_invalid_setup_refusals_translate_to_the_wire() {
 }
 
 #[test]
-fn demo_start_is_undecodable_until_routed() {
+fn demo_start_reaches_the_root_with_its_admission_envelope() {
     let record = w::Requesting::new(&w::CEILINGS, w::RequestingParts { request: w::Request::StartDemo }).unwrap();
-    let Err(answer) = family::to_root(
+    let Ok(root::Event::Party(root::PartyInput::Application {
+        reply_to, sign_in, key, digest, request, carried, ..
+    })) = family::to_root(
         exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&record)),
         &[],
         None,
         &w::CEILINGS,
-    ) else {
-        panic!("unrouted start is undecodable")
+    )
+    else {
+        panic!("start decoded")
     };
-    let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *answer else {
-        panic!("undecodable reply")
-    };
-    assert_eq!(to, REPLY);
+    assert_eq!(reply_to, REPLY);
+    assert_eq!((sign_in, key, digest, carried), (3, REQUEST_KEY, [7; 32], None));
+    assert_eq!(request, forge::Ask::StartDemo);
+}
+
+#[test]
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches")]
+fn demo_read_tracks_not_started_running_and_ended() {
+    let mut service = fixtures::demo_service();
+    let demo = service.engine.as_mut().unwrap().demo.as_mut().unwrap();
+    for (state, expected) in [
+        (None, Some(w::DemoState::NotStarted)),
+        (Some(forge::DemoState::Running), Some(w::DemoState::Running)),
+        (Some(forge::DemoState::Ended), None),
+    ] {
+        demo.state = state;
+        let Err(answer) =
+            family::to_root(demo_read(people::ApplicationScope::Deployment), &[], Some(demo), &w::CEILINGS)
+        else {
+            panic!("read")
+        };
+        let kit::Event::Application(kit::FromApplication::Read { record, .. }) = *answer else { panic!("demo read") };
+        let got = match record {
+            Some(record) => Some(*wire::decode_demo_answer(&record, &w::CEILINGS).unwrap().state()),
+            None => None,
+        };
+        assert_eq!(got, expected);
+    }
+}
+
+#[test]
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches")]
+fn demo_start_outcomes_encode_every_failure_and_unknown() {
+    let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small).clients.wire;
+    let group = w::GroupFailed::new(&w::CEILINGS, w::GroupFailedParts { why: b"prepare 1 exited 1".as_slice().into() })
+        .unwrap();
+    for (answer, expected) in [
+        (None, w::Outcome::Unknown),
+        (Some(forge::StartAnswer::Running), w::Outcome::Running),
+        (
+            Some(forge::StartAnswer::NotOffered),
+            w::Outcome::StartRefused(
+                w::StartRefused::new(&w::CEILINGS, w::StartRefusedParts { why: w::StartRefusal::NotOffered }).unwrap(),
+            ),
+        ),
+        (
+            Some(forge::StartAnswer::Failed(forge::StartFailure::Account)),
+            w::Outcome::StartFailed(
+                w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::Account }).unwrap(),
+            ),
+        ),
+        (
+            Some(forge::StartAnswer::Failed(forge::StartFailure::Adoption)),
+            w::Outcome::StartFailed(
+                w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::Adoption }).unwrap(),
+            ),
+        ),
+        (
+            Some(forge::StartAnswer::Failed(forge::StartFailure::NotConnected)),
+            w::Outcome::StartFailed(
+                w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::NotConnected }).unwrap(),
+            ),
+        ),
+        (
+            Some(forge::StartAnswer::Failed(forge::StartFailure::Group {
+                why: b"prepare 1 exited 1".as_slice().into(),
+            })),
+            w::Outcome::StartFailed(
+                w::StartFailed::new(&w::CEILINGS, w::StartFailedParts { why: w::StartFailure::Group(group) }).unwrap(),
+            ),
+        ),
+    ] {
+        let answer = match answer {
+            Some(answer) => Some(forge::Answered::StartDemo(answer)),
+            None => None,
+        };
+        let bytes = family::answer(answer, &w::CEILINGS, &jig).unwrap();
+        assert_eq!(w::Answer::decode(&w::CEILINGS, &mut Reader::new(&bytes)).unwrap().into_parts().outcome, expected);
+    }
 }
