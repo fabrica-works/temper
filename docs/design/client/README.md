@@ -1265,7 +1265,9 @@ for its kind, its user's login and its installations. Its nodes:
   not offered (no demo, or the demo ended); *start failed*, with why,
   `StartFailure`: the group's failure, with the box's `WHY` (a byte
   string of at most `box.line_bytes`), the account refused, the
-  adoption refused, or the forge not connected in time; or *unknown*,
+  adoption refused, the acts not granted (`not_granted`, an older
+  document without `engine.acts`' grant), or the forge not connected in
+  time; or *unknown*,
   its outcome no longer held (section 8), as `SetUp`'s. A refusal at
   admission is jig's answer, as for `Adopt`.
 - **`Connect`:** of the deployment's scope (section 8): the forge's
@@ -1435,12 +1437,9 @@ of each (`../draft/first-run.md`, 3.6).
   once it failed, the side holds the demo as running, the demo's start
   saying the start is under way, its suggestions waiting, or why it
   failed, with "Try again", which sends a start under a new key (5.6).
-  Answered running, or unknown, the side reads the demo again. Once in
-  a session, the first time the side reads the demo running with no
-  start of its own sent, it sends `StartDemo` too, which finds what is
-  done and changes nothing shown; answered start failed, the demo's
-  start shows it as above. It mends a start a restart cut short, whose
-  record says running while its acts are not done
+  Answered running, or unknown, the side reads the demo again. It
+  sends no start of its own beyond the person's: a start a restart cut
+  short is the engine's to mend, with no client
   (`../protocol/setup.md`, 8.4).
 - **The model's half** holds while the demo is running (above) and no account
   of the `accounts` document, the one the accounts' banner keeps (5.1),
@@ -1467,9 +1466,13 @@ of each (`../draft/first-run.md`, 3.6).
   provider that counts for it (above) is first usable, the person's own
   or, for an owner, the deployment's, and does not hold again; the demo ends
   when a forge of the person's first connects, and the read then
-  answers none (`../protocol/setup.md`, 8.4). At the first of the two
-  ends the side sees while its last answer is running, it removes the
-  demo model's account: the deployment's account of the demo's
+  answers none (`../protocol/setup.md`, 8.4). Each act has one owner.
+  At the demo's end the engine removes the demo model's account
+  itself, as it closes the demo's chats, whether or not a client saw
+  the end (`../protocol/setup.md`, 8.4), and the side sends nothing.
+  At the model's half's end, which only the client judges, the side
+  removes it, when it sees that end while its last answer is running
+  and before any demo's end: the deployment's account of the demo's
   provider, which only the `deployment` document lists (jig's
   `client/domain/contract.md`, 7.1: the `accounts` document lists the
   person's own), by jig's `Remove` (jig's `client/domain/contract.md`),
@@ -1477,16 +1480,16 @@ of each (`../draft/first-run.md`, 3.6).
   `Accounts`), once a session, for a person whose deployment role is
   owner; for any other person it sends nothing. The answer shows
   nowhere: refused, the account stays, and Accounts offers its Remove.
-  Gone, it supplies no run: the model's half has ended, and at the
-  demo's end the demo model, its group stopped, no longer answers.
+  Gone, it supplies no run: the model's half has ended.
 - **One `deployment` watch,** for a person whose deployment role is
   owner alone, for both of its uses, the accounts that count for the
   model (above) and the removal: the side holds it open while `me`
   says the role and either the demo is running (above: answered
-  running, or its start out or failed), or the side has seen an end
-  and the removal is not settled: the `Remove` not sent, and the
-  document, at or after that end, still listing such an account. The
-  end it saw holds the watch, whatever the demo's read answers since.
+  running, or its start out or failed), or the side has seen the
+  model's half end and the removal is not settled: the `Remove` not
+  sent, and the document, at or after that end, still listing such an
+  account. The end it saw holds the watch, whatever the demo's read
+  answers since.
   Once neither holds, it drops the watch. For any other person it
   opens none.
 - **What shows:** the demo's banner, while either half holds (5.1); the
@@ -1997,8 +2000,10 @@ the cues the demo's, copied in:
   started", and under its lead "The playground did not start: WHY."
   with "Try again", WHY "its fakes did not start (BOX'S WHY)", "the
   scripted model's account was refused", "OWNER/NAME was not adopted",
-  "the playground's project was not made" or "Playground forge did not
-  connect"; the context line; the level-1 heading "What shall we change?"; "Try a request in
+  "the playground's project was not made", "temper's configuration does
+  not grant it its acts: add {"connector": 1, "may": ["close",
+  "add_key", "remove_account", "adopt"]} to engine.acts, as temper init
+  writes it" or "Playground forge did not connect"; the context line; the level-1 heading "What shall we change?"; "Try a request in
   OWNER/NAME. Follow the task from its branch to a landed change."; a
   list named "Suggested requests" of one button per suggested request,
   the demo's `llm.asked` cues in order and never its `llm.cued`

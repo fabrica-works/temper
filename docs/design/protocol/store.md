@@ -1,6 +1,6 @@
 # temper's store
 
-Provisional, 2026-10-05, revised 2026-10-20. What temper keeps in jig's
+Provisional, 2026-10-05, revised 2026-10-23. What temper keeps in jig's
 store, and how: its families, the forge's records, under the
 application's tag; their keys, their records and temper's store
 version; and the restart's ranges. The store itself is jig's
@@ -86,6 +86,7 @@ section 7).
 | 16 | `Writer` | `Writer(forge)`: the forge's number | the forge's writer, given at runtime from its connect's user (skein's `forge-client.md`, 7.1; credentials.md, section 5), restored at start so that restored effects never meet `Forbidden` | the configured `forges` |
 | 17 | `Demo` | `Demo(forge)`: the demo's forge, `application.demo.forge` | the demo's state: running, from the person's choice of the playground, or ended, for good; no row is not started (setup.md, 8.4); and the demo's project's number, once its start has made it (designed, below). Written at the demo's start and at its end, never erased | one row: the configured demo's |
 | 18 | `Binding` | `Binding(address)`: a member's address, ASCII letters folded to lower case | the Google subject that first signed in with that member's address, `{ address, subject }`, the subject at most 255 bytes (`sign-in.md`, section 5). Written by the first sign-in alone, never erased (designed, below). A family of the forge connector's though it is people's, as `Demo` is: `Stored` holds every family of temper's, restored in the one restart step and written in the root's decisions, so it takes no range of its own | `bindings`, the configured members |
+| 19 | `DemoAct` | `DemoAct([u8; 16])`: the act's key, in the forge connector's own key space (jig's `domain/people.md`, 5.3) | an act the demo's end asks in the deployment's name and has not heard answered: a chat's close, its project and task, or the demo model's account's removal, its account (setup.md, 8.4). Written in the end's decision, erased on the act's saved answer, sent again at each start | `tasks`, plus one |
 
 - **Loaded:** every family at the forge's restart step, and never
   otherwise. No party reads them: the engine serves none of the forge's
@@ -159,6 +160,13 @@ section 7).
   `../draft/first-run.md`, 2.4): designed, and waiting on jig's
   projects made at runtime. Its code takes the next `STORE_VERSION` at
   landing; none is reserved.
+- **The demo's end's acts,** the `DemoAct` family, tag 19 (section
+  2), its row `{ key, act }`, the act `Close { project, task }` or
+  `RemoveAccount { account }`: the grace and the reason are the end's
+  constants and the document's, read again at each send, so they are
+  not stored. Its code takes the family number and the next
+  `STORE_VERSION` after main's at its landing's last rebase (19 once
+  `Binding` has taken 18); none is reserved.
 - **The `Binding` family,** tag 18 (`sign-in.md`, section 5):
   designed. Its code takes the next `STORE_VERSION` after main's at
   its landing's last rebase; none is reserved. A store at the version

@@ -1586,6 +1586,17 @@ defaults for a person's real work are open (section 16).
   (configuration.md, section 8). Until jig makes projects at runtime,
   the document seeds project 1 with that policy, and both adopt into it
   (section 15).
+- **Its acts:** `engine.acts` (jig's `protocol/configuration.md`,
+  section 3) grants the forge connector, 1, exactly the acts the demo
+  makes (8.4), `{"connector": 1, "may": ["close", "add_key",
+  "remove_account", "adopt"]}`, and no other connector any. The
+  document's first owner, whom the grant needs, is its `owners`' first.
+  A document written before the grant still serves: `temper serve`
+  starts on it, and only the demo's acts are refused, *not offered*.
+  A start then fails *not granted*, its message naming the missing
+  grant and the line to add to `engine.acts`, the one `temper init`
+  writes; the end's acts are kept and named in serve's log until a
+  start's document grants them.
 - **Its charters and templates,** the owned example's, but both
   charters' models end with `demo`: chat, 1, and coding, 2, the one the
   forge's procedures start agents' work under (`application.charter`);
@@ -2023,30 +2034,47 @@ them as it does any Forgejo.
      `landing`, with the adoption form's defaults
      (`../client/README.md`, 4.4), unless the project has it.
 
-  Each act is the person's own request, as the client would send it,
-  admitted by the root under their sign-in and a key derived from the
-  start's: transitional, as the first repository's adoption is (6.7),
-  until jig carries a deployment owner's acts (section 15). The start
+  Each act is the deployment's, the forge connector's own (jig's
+  `domain/people.md`, 5.3), granted by the document's `acts` (8.3),
+  never the person's: no sign-in admits it and no role of the person's
+  bounds it. The account is `AddKey { provider, join: None, digest }`,
+  carrying the start's value, under a key derived from the start's key
+  and `account`; the adoption is `Adopt { project, adoption }`, the
+  forge connector locating the repository and answering the core's ask
+  as it does a party's adoption, under a key derived from the start's
+  key and `adoption`. The account is asked in the start's own
+  decision, so no restart comes between the two. The start
   is answered once all three are done, *running*, or at the first that
   fails, *start failed*, naming why: the group's `failed` with its
   `WHY`, the project's refusal, the account's refusal, the adoption's
-  refusal, or the forge
+  refusal, the acts not granted (*not granted*, naming the `acts` line
+  to add, above), or the forge
   not connected within `setup.deadline_ms` of the start. A start while
   the demo runs makes what is not done, and is answered the same: a
   second start, or a start that failed, sent again, adds and adopts
   nothing twice. A start while another is under way waits for it and
   takes its answer. The answer is kept in memory alone, as `SetUp`'s
   is (`../client/README.md`, section 8): the same key while it is held
-  answers the same outcome, and after a restart, unknown. A restart
-  during a start leaves the record running and an act undone; the
-  client's next start, which it sends once a session while the demo
-  runs (`../client/README.md`, 4.8), makes it.
+  answers the same outcome, and after a restart, unknown.
+- **A start a restart cut short** leaves the record running and the
+  adoption undone, since it waits for the forge to connect. The engine
+  mends it with no client: each time the demo's forge connects while
+  the record reads running, no start is under way and the project does
+  not have the repository, the forge connector makes the adoption
+  itself, `Adopt` under a key derived from the demo's forge and the
+  repository's number alone, so that every start of the engine sends
+  the same act and jig makes it once. Its refusal is named in serve's
+  log, and the next connection tries again. The account is never
+  re-made: the start made it in its own decision, and a person who
+  removed it since removed it for good.
 - **A restart** of the box starts no fake until serve asks: serve's
   start reads the demo running and asks for its group (above), its
   preparation draws a new handover, and the engine takes it at
   `started` and reconciles, which makes the bot, its tokens and each
   adopted repository's access again (5.3, step 6). The account and the
-  adoption are jig's records and stay; no act is made again. The fake
+  adoption are jig's records and stay; no act is made again but the
+  adoption a start left undone (above), and the end's acts still kept
+  (below). The fake
   seeds its repositories the same at every start, so a worker's clone
   of one still matches it; a branch an agent pushed is lost with the
   fake's state, and the engine's records of it outlive it, until the
@@ -2071,17 +2099,49 @@ them as it does any Forgejo.
      it asks nothing: the fakes are the runner's (7.4), and stopping
      them is the service manager's;
   4. answers a start under way *not offered*, as it answers every
-     start after.
+     start after;
+  5. ends what the demo left, as the deployment's acts (jig's
+     `domain/people.md`, 5.3), each kept as a `DemoAct` row of temper's
+     store (`store.md`, section 2) under its key, written in this
+     decision, and asked in it:
+     - *the demo's chats,* each closed by `Close { project, task, grace,
+       reason }`, its reason `Ended with the playground`, its grace the
+       chat template's (the template whose flags mark a conversation,
+       jig's `engine.templates`), its key derived from the chat's
+       number and `close`. The demo's chats are the live conversations
+       of the demo's project whose requester is a person, as they stand
+       at the end: until the end no forge but the demo's is connected,
+       so no chat of the project works on another forge's repository,
+       while a chat opened after it, on the person's first repository
+       in the same project, is not the demo's and stays open. The
+       selection is the end's, kept in its rows, never read again later;
+     - *the demo model's account,* the deployment's account of
+       `llm.provider`, when it holds one, removed by `RemoveAccount {
+       account }`, its key derived from the account's number and
+       `remove`.
+
+     The client's page of a chat so closed reads it cancelled by the
+     deployment, "Cancelled HH:MM · Ended with the playground"
+     (`../client/README.md`, 3.5).
 
   Each start of the engine reads the record: ended, the demo's forge
   is ended from the start and its group never asked, so a restart and
   the moment of the end look alike. The client's read answers none
-  (`../client/README.md`, 4.8), so no page shows the playground, and
-  the client removes the demo model's account (4.8). Two parts wait
-  (section 15): the demo's open chats stay open, a person's next words
-  in one run on its charter's models, the demo's no longer served; and
-  the demo model's account outlives an end no client saw, until the
-  person removes it from Accounts.
+  (`../client/README.md`, 4.8), so no page shows the playground.
+- **The end's acts, answered and kept.** The forge connector erases an
+  act's row when its answer is saved: made (the compound, the account
+  removed); refused *ended* for a chat or *unknown* for either, which
+  jig answers past its retention for a chat closed or an account
+  removed since, both taken as done; or any other saved refusal, named
+  in serve's log. It keeps the row on an answer jig does not save: *not
+  offered*, the act not granted; lacking the role, no first owner
+  configured; or busy, not ready. The first two are named in serve's
+  log too, never dropped. At each start of the engine, once the core is
+  ready (jig's restart's `Open`), it sends every kept row's act again,
+  with its key: an act made before the restart is answered from its
+  saved answer, the chat closed once, and an act the restart lost is
+  made then, so an end that no client saw, or that a restart cut, ends
+  whole.
 - **`temper fake forge check DIRS N OBSERVATIONS STORE`,** no step: the
   QA loop's check of the fake forge's promises (`../qa.md`, 8.3),
   skein's judge (skein's `fake-forge.md`, 2.5) over forge N's
@@ -2497,8 +2557,24 @@ relies on.
   a second start while running answered the same, adding and adopting
   nothing twice; the same key answered from memory, and unknown after a
   restart; a restart while running asking for the group again and
-  making no act; refused, not offered, with no demo or one ended; and
-  in temper-service's step tests, a start carrying `llm.key`'s bytes.
+  making no act but an adoption a start left undone, made once the
+  forge connects with no client, and once across starts; each act the
+  deployment's, the forge connector's, refused not offered when the
+  document does not grant it, the start failing *not granted* with the
+  `acts` line to add while the engine starts and serves on that
+  document; refused,
+  not offered, with no demo or one ended; and in temper-service's step
+  tests, a start carrying `llm.key`'s bytes.
+- **The demo's end's acts** (8.4), in the engine's domain world: the
+  selection both ways, a chat of the demo's project open at the end
+  closed with its delegates and the reason, and a person's chat opened
+  after the end in the same project, on their first repository, left
+  open; the demo model's account removed, and none asked without one;
+  each act kept in the end's decision and its row erased on its saved
+  answer, ended and unknown among them; a restart between the keep and
+  the answer sending it again, answered once, the chat closed once; an
+  act not granted kept, named in the log, and sent again at the next
+  start.
 - **The fake's start-time adoption** (8.4), in temper-service's step
   tests: after handover and reconcile, one `Adopt` for each seeded
   repository not already restored, in order, with the deployment's
@@ -2641,7 +2717,16 @@ it checks of this document:
   (8.4), the box's terminal says `Playground: stopped` (7.2),
   `wait forges` lists the second forge alone, and `temper ctl
   demo-start` is answered not offered. A third box starts nothing of
-  the demo's group, and answers the same.
+  the demo's group, and answers the same. Before the end, a chat is
+  opened on the demo, and no client watches the end: once the third
+  box is up, the chat reads cancelled by the deployment, `Ended with
+  the playground`, and the deployment holds no account of the demo's
+  provider.
+- **A start a restart cut short,** a test of its own: a first run's
+  box stopped once the demo's start has written running and before its
+  forge connects; a second box on the same directories, with no client
+  and no start sent, adopts `playground/widget` into the demo's project
+  once the forge connects, and a chat on the demo then answers.
 - **A first run set up for real,** a test of its own: `temper box` on
   three empty scratch directories, with the binaries `TEMPER_FORGEJO`
   and `TEMPER_FORGEJO_RUNNER` name placed where the fetch looks,
@@ -2686,27 +2771,21 @@ Each is intended; what it needs is named with it.
   form of the same flow, with the same fields and `Create`, a managed
   forge's org needing an owner. A new project, named in the form,
   waits on jig's projects at runtime (MakeProject); until jig carries
-  acts by a deployment owner (projects at runtime and a follow-up act
-  on `SetUp`'s admission), adoption is the client's, and the demo's
-  start makes its acts in the name of the person who chose the
-  playground (8.4). Projects are
+  a follow-up act on `SetUp`'s admission, the first repository's
+  adoption is the client's, while the demo's start makes its acts as
+  the deployment's (8.4). Projects are
   seeded at the first start only (jig's `domain/core.md`, 6.1) until
   jig makes them at runtime: until then the default document seeds
   project 1, and the playground's start and the first repository adopt
   into it in place of the projects they make (`../draft/first-run.md`,
   2.4; 8.3, 8.4). The set up's intent is kept in
   memory alone; keeping it across a restart is open (section 16).
-- **The rest of the demo's end** (8.4): its open chats ended, "ended
-  with the playground", which needs jig to take a deployment's close of
-  a person's open chat, and a definition of the demo's chats (those its
-  suggested requests started, or every open chat of its project); and
-  the demo model's account removed by the engine at the end, when no
-  client saw it, once jig carries a deployment owner's acts (above).
-  Until then such an end leaves the account: the demo model, its group
-  stopped, answers no run, yet its key is usable in jig's terms, so
-  while it is the person's only model the welcome lands on Chats and
-  the accounts' banner (`../client/README.md`, 5.1) stays hidden;
-  removing it from Accounts mends both.
+- **The playground's own project** (8.4): once jig's deployment acts
+  make a project (`MakeProject`, jig's `domain/people.md`, 5.3), the
+  demo's start makes Playground as its first act, and the demo's chats
+  become simply the open chats of that project, read from it at the
+  end in place of the end's selection by the moment (8.4, step 5),
+  with `make_project` in the document's grant (8.3).
 - **A lock and an exec in skein's shell,** onto which 6.4's module
   moves once skein's shell offers an exec and a lock held across it,
   which skein's `Lock` is not (skein's `io.md`, section 5). A second

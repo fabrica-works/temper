@@ -152,7 +152,8 @@ Forgejo and model).
   repository ended in `../domain/forge.md`, 4.1, and
   `../protocol/forge.md`, 2.8 and 8.1; the client's re-read and the
   demo model's account in `../client/README.md`, 4.8. The demo's open
-  chats' end waits on jig (setup.md, section 15).
+  chats' end and its model's account removed with no client: adopted
+  (first-run-ux-2's M3), in setup.md, 8.4, on jig's deployment acts.
 - **The person meets the demo as the playground.** "Demo" undersells
   it and "fake" is harsh; the design keeps the demo as its concept's
   name (`application.demo`, the `fake` mode, the demo's halves). The
