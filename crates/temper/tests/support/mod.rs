@@ -7,6 +7,7 @@ pub mod ctl;
 pub mod fetch;
 pub mod first_repository;
 pub mod github;
+pub mod github_land;
 pub mod owned;
 pub mod terminal;
 pub mod webhooks;
