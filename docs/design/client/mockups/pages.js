@@ -1254,7 +1254,7 @@
     const signIn = worldKey === 'first-run-real' ? 'connect-model.html?way=chatgpt&step=3' : 'connect-model.html?way=chatgpt&step=5';
     let current = 0;
     let body = modelChoices(signIn);
-    if (way === 'chatgpt' && a) { current = 2; body = flowWrap(chatgptReady(a, wasPlayground)); }
+    if (way === 'chatgpt' && a) { current = 3; body = flowWrap(chatgptReady(a, wasPlayground)); }
     else if (way === 'key') { current = 1; body = flowWrap(keyForm()); }
     const back = way === 'key' ? `<p><a class="text-link" href="${esc(u('connect-model.html'))}">‹ All ways</a></p>` : '';
     const again = '<button class="button primary" data-later="Mockup: a fresh sign-in, with a new address.">Continue with ChatGPT</button>';
@@ -1408,7 +1408,7 @@
     if (['setting up', 'set up failed'].includes(f.state)) return `<h3>Setting up Forgejo on this machine</h3>${chosenValues(f)}${ownedProgress(f, { failedAt: f.state === 'set up failed' ? 'preparing' : null })}${f.state === 'set up failed' ? `${ownedFailure()}<button class="button" data-later="Mockup: the box runs the steps again; a fetched binary is kept.">Set up again</button>` : '<p class="muted tiny">You may leave this page: the steps go on, and the banner says where they are.</p>'}`;
     return f.box ? ownedForm(f) : ownedCommands(f);
   }
-  const flowCurrent = f => !f ? 1 : f.state === 'connected' ? 3 : ['setting up', 'connecting', 'set up failed'].includes(f.state) ? 2 : 1;
+  const flowCurrent = f => !f ? 1 : f.state === 'connected' ? 4 : ['setting up', 'connecting', 'set up failed'].includes(f.state) ? 2 : 1;
   const flowWrap = content => `<section class="card card-pad forge-flow">${content}</section>`;
   function forgeChoices(target = 'connect-forge.html?forge=') {
     const github = world.forges.find(f => f.kind === 'GitHub' && f.state === 'not connected');
@@ -1461,7 +1461,9 @@
       const forgeLine = `<li class="${ready ? 'done' : 'current'}">${fact('temper: the forge’s connection state and login', ready ? 'Forge: Forgejo on this machine, connected as temper' : esc(`Forge: ${forgeName(f)} · ${f.state}`))}${!ready ? eachStep() : ''}</li>`;
       content = `${heading(ready ? 'work/hello is ready' : 'Almost ready')}<ul class="forge-progress welcome-checklist">${ready ? forgeLine + modelLine : modelLine + forgeLine}<li class="${ready ? 'done' : ''}">${fact('temper and jig: the first repository, its project and CI', `Project hello, with work/hello${ready ? ' · its first CI run passed' : ''}`)}</li></ul>${ready ? `<div class="button-row"><a class="button primary" href="${esc(u('chats.html?project=hello'))}">Open hello</a><a class="text-link" href="#" data-later="Mockup: Forgejo opens in a new tab, signed in as sam through temper.">Open Forgejo ↗</a>${ahead('sign-in', 'signing in to an owned Forgejo through temper, as its OpenID provider: no mission yet')}</div>` : '<button class="button primary" disabled>Open hello</button><p class="muted tiny welcome-after">It opens once work/hello is made.</p>'}`;
     }
-    return `${topbar(null, { bare: true })}<main class="welcome-page">${at === 'demo' ? '' : flowSteps(views.indexOf(current), '', ['Welcome', 'Forge', 'Model', 'Ready'])}${content}</main>`;
+    // Ready is done, not current, once the forge is connected too.
+    const step = current === 'ready' && f?.state === 'connected' ? views.length : views.indexOf(current);
+    return `${topbar(null, { bare: true })}<main class="welcome-page">${at === 'demo' ? '' : flowSteps(step, '', ['Welcome', 'Forge', 'Model', 'Ready'])}${content}</main>`;
   };
 
   pages['connect-forge'] = () => {
