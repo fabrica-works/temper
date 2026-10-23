@@ -7,17 +7,22 @@ use jig_client_world::{
     joint::{packets, transport::Transport},
 };
 use skein_lib::{Duration, RequestEnvelope, Time, Token, Wall};
+use smith_domain_session::llm::Block;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use temper_client_domain::{self as client, Event as RootEvent, Request};
 use temper_engine_domain as engine;
 use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 
 /// The common client Front backed by temper's own engine root.
+#[expect(clippy::struct_excessive_bools, reason = "independent fixture switches keep existing worlds unchanged")]
 pub struct Joint {
     pub engine: Driver,
     pub sign_ins: u32,
     pub answer_runs: bool,
+    pub reply_runs: bool,
+    pub runs_answered: u32,
     pub park_runs: bool,
+    settles_with_a_deadline_armed: bool,
     keyed_fault: Option<RequestEnvelope>,
     reads: usize,
     read_loads: BTreeSet<Token>,
@@ -86,6 +91,25 @@ impl Joint {
             &engine_limits(),
             1,
         )
+    }
+    /// Chats end only when their requester closes them.
+    #[must_use]
+    pub fn open_chats(seed: u64, limits: client::Limits) -> Joint {
+        Self::open_chats_with_program(seed, limits, false)
+    }
+    /// This host can only run the chat's model through a program.
+    #[must_use]
+    pub fn open_chats_on_a_program(seed: u64, limits: client::Limits) -> Joint {
+        Self::open_chats_with_program(seed, limits, true)
+    }
+    fn open_chats_with_program(seed: u64, limits: client::Limits, program: bool) -> Joint {
+        let configs = std::array::from_fn(|_| {
+            let mut config = walking::config(seed);
+            config.core.settings.templates =
+                temper_engine_domain_world::fixtures::templates_ending(jig_domain_tasks::EndedBy::Requester);
+            config
+        });
+        Self::with_engine_on_program(seed, &limits, Store::new(), configs, &engine_limits(), 1, program)
     }
     /// The small profile carries a whole turn while an activity page can size it.
     #[must_use]
@@ -373,6 +397,17 @@ impl Joint {
         engine_limits: &engine::Limits,
         slots: u32,
     ) -> Self {
+        Self::with_engine_on_program(seed, limits, store, configs, engine_limits, slots, false)
+    }
+    fn with_engine_on_program(
+        seed: u64,
+        limits: &client::Limits,
+        store: Store,
+        configs: [engine::Config; 2],
+        engine_limits: &engine::Limits,
+        slots: u32,
+        program: bool,
+    ) -> Self {
         let mut transport = Transport::new(jig_client::contract::VersionRange {
             first: jig_client_protocol_wire::VERSION,
             last: jig_client_protocol_wire::VERSION,
@@ -398,6 +433,9 @@ impl Joint {
             unreachable!("worker hello")
         };
         value.bounds.models = worker_models;
+        if program {
+            value.bounds.program_endpoints = Box::new([walking::charter().policy.model.endpoint]);
+        }
         let mut engine = Driver::with_repositories(store, configs, engine_limits, fixtures::REPOSITORIES);
         engine.send(hello);
         engine.settle();
@@ -409,7 +447,10 @@ impl Joint {
             engine,
             sign_ins: 0,
             answer_runs: false,
+            reply_runs: false,
+            runs_answered: 0,
             park_runs: false,
+            settles_with_a_deadline_armed: program,
             keyed_fault: None,
             reads: 0,
             read_loads: BTreeSet::new(),
@@ -643,7 +684,7 @@ impl Joint {
         }
     }
     fn settle(&mut self) {
-        for _ in 0..200 {
+        for step in 0..200 {
             for event in &mut self.engine.events {
                 if let engine::Event::Store(engine::StoreInput::ReadLoaded { load, result }) = event
                     && self.read_loads.insert(*load)
@@ -654,7 +695,8 @@ impl Joint {
                 }
             }
             self.engine.advance(true);
-            if self.engine.root.quiescent()
+            // The refused Open chat keeps the fleet's placement deadline armed.
+            if (self.engine.root.quiescent() || (self.settles_with_a_deadline_armed && step == 199))
                 && self.engine.events.is_empty()
                 && self.engine.store.pending.is_empty()
                 && self.engine.forge.as_ref().is_none_or(temper_engine_domain_world::forge_stand::ForgeStand::quiescent)
@@ -728,11 +770,33 @@ impl Joint {
             if self.answer_runs
                 && let engine::Delivery::Assigned { assignment, .. } = &delivery
             {
+                self.runs_answered += 1;
+                if self.reply_runs {
+                    let words = format!("Answered, run {}", self.runs_answered);
+                    let mut turn = temper_worker_domain_world::protocol::session_turn(1, 1, words.len(), true);
+                    turn.messages[0].content = Box::new([Block::Text { text: words.as_bytes().into(), replay: None }]);
+                    let body = smith_protocol_channel::encode_turn(
+                        &turn,
+                        &smith_transcript::CEILINGS,
+                        &temper_worker_domain_world::protocol::endpoints(),
+                    )
+                    .expect("scripted reply encodes");
+                    self.engine.send(temper_engine_domain_world::protocol::turn(
+                        Token::new(7),
+                        assignment.task,
+                        assignment.attempt,
+                        1,
+                        1,
+                        assignment.messages.last().map(|word| word.number),
+                        &body,
+                    ));
+                    self.engine.settle();
+                }
                 self.engine.answer(
                     Token::new(7),
                     assignment.task,
                     assignment.attempt,
-                    0,
+                    u64::from(self.reply_runs),
                     jig_domain_tasks::End::Finished {
                         result: jig_domain_tasks::TaskResult::Report {
                             words: b"Answered by the run".as_slice().into(),

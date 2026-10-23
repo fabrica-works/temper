@@ -115,6 +115,14 @@ pub fn world(seed: u64) -> World<Temper, Joint> {
     world_with(seed, Joint::new(seed, domain_limits()))
 }
 #[must_use]
+pub fn open_world(seed: u64) -> World<Temper, Joint> {
+    world_with(seed, Joint::open_chats(seed, domain_limits()))
+}
+#[must_use]
+pub fn refusing_world(seed: u64) -> World<Temper, Joint> {
+    world_with(seed, Joint::open_chats_on_a_program(seed, domain_limits()))
+}
+#[must_use]
 pub fn world_with_large_turns(seed: u64) -> World<Temper, Joint> {
     world_with(seed, Joint::with_large_turns(seed, &domain_limits()))
 }
