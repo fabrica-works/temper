@@ -590,7 +590,8 @@ pub fn cached_binary_fingerprint(path: &std::path::Path) -> BinaryFingerprint {
 
 /// Init's shipped issuer, Responses endpoints and charter text, on the same
 /// three roots as the process story. Only sign-in and run deadlines grow.
-pub fn live_deployment(paths: &[PathBuf; 3]) {
+#[must_use]
+pub fn live_deployment(paths: &[PathBuf; 3]) -> std::net::SocketAddr {
     initialize(paths);
     let path = paths[0].join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
@@ -600,22 +601,99 @@ pub fn live_deployment(paths: &[PathBuf; 3]) {
         charter["time_ms"] = 240_000.into();
     }
     super::write_private(&path, &serde_json::to_vec(&value).expect("live configuration"));
+    value["application"]["forges"]
+        .as_array()
+        .expect("forges")
+        .iter()
+        .find(|forge| forge["number"] == 3)
+        .expect("owned forge")["api"]["socket"]
+        .as_str()
+        .expect("forge address")
+        .parse()
+        .expect("socket")
 }
 
-/// Reserve a new kept deployment without reading or replacing an existing store.
-pub fn reserve_live_store(path: &std::path::Path) -> Result<(), String> {
-    use std::os::unix::fs::DirBuilderExt;
-    fs::DirBuilder::new().mode(0o700).create(path).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::AlreadyExists {
-            format!(
-                "kept store {} exists: reruns on a kept sign-in are not built yet; move it aside to sign in afresh",
-                path.display()
-            )
-        } else {
-            format!("create kept store {}: {error}", path.display())
-        }
-    })
+/// Select the launcher's store and admit it before starting any process.
+#[must_use]
+pub fn live_store() -> (PathBuf, bool) {
+    let store = std::path::PathBuf::from(
+        std::env::var_os("TEMPER_LIVE_STORE").expect("run live through scripts/proof-live.sh forge-land"),
+    );
+    let kept = reserve_live_store(&store).unwrap_or_else(|message| {
+        super::live::notice(&message);
+        panic!("{message}")
+    });
+    (store, kept)
 }
+
+/// A unique marker for this live sitting, carried into its README and notice.
+#[must_use]
+pub fn live_tag() -> String {
+    let minute = std::process::Command::new("/usr/bin/date")
+        .args(["-u", "+%Y-%m-%dT%H:%MZ"])
+        .env_clear()
+        .output()
+        .expect("UTC ISO minute");
+    assert!(minute.status.success());
+    format!("live-{}-{}", String::from_utf8(minute.stdout).expect("date UTF-8").trim(), std::process::id())
+}
+
+/// Reserve a fresh store, or validate a kept deployment using metadata only.
+/// An empty directory is fresh; an incomplete deployment is never repaired.
+pub fn reserve_live_store(path: &std::path::Path) -> Result<bool, String> {
+    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
+    use std::os::unix::fs::DirBuilderExt;
+    match fs::DirBuilder::new().mode(0o700).create(path) {
+        Ok(()) => return Ok(false),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(format!("create kept store {}: {error}", path.display())),
+    }
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    require(metadata.is_dir(), &format!("kept store {} is not a directory", path.display()))?;
+    require(metadata.permissions().mode() & 0o777 == 0o700, "kept store must have mode 0700")?;
+    if fs::read_dir(path)
+        .map_err(|error| error.to_string())?
+        .next()
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .is_none()
+    {
+        return Ok(false);
+    }
+    for (name, directory) in [
+        ("config", true),
+        ("data", true),
+        ("cache", true),
+        ("first", true),
+        ("second", true),
+        ("first/client", true),
+        ("second/client", true),
+        ("data/deployment", true),
+        ("data/forge-3/forgejo", true),
+        ("config/temper.json", false),
+        ("config/agent.json", false),
+        ("config/charters/chat.txt", false),
+        ("config/charters/coding.txt", false),
+        ("data/box/started/3", false),
+        ("data/forge-3/forgejo/app.ini", false),
+        ("data/forge-3/forgejo/forgejo.db", false),
+    ] {
+        let present = fs::symlink_metadata(path.join(name))
+            .is_ok_and(|meta| if directory { meta.is_dir() } else { meta.is_file() });
+        require(present, &format!("kept store {} lacks {}", path.display(), name))?;
+    }
+    for name in
+        [format!("cache/forgejo/{VERSION}/forgejo"), format!("cache/forgejo-runner/{RUNNER_VERSION}/forgejo-runner")]
+    {
+        require(
+            fs::symlink_metadata(path.join(&name)).is_ok_and(|meta| meta.is_file()),
+            &format!("kept store {} lacks {}", path.display(), name),
+        )?;
+    }
+    Ok(true)
+}
+
+pub const KEPT_SIGN_IN_EXPIRED: &str = "the kept ChatGPT sign-in is expired or refused; the person signs in afresh";
 
 /// The forge's durable identity, read from this run's private owned repository.
 #[derive(Debug, PartialEq, Eq)]
@@ -629,29 +707,58 @@ pub struct ForgeIdentity {
 
 pub struct LiveEvidence {
     pub task: String,
-    pub reads: super::first_repository::Evidence,
+    pub page: String,
+    pub completions: u32,
+    pub address: std::net::SocketAddr,
+    pub tasks: LiveTasks,
+    pub baseline: std::collections::BTreeSet<u64>,
     pub forge: ForgeIdentity,
     pub replies: std::collections::BTreeMap<u64, serde_json::Value>,
     pub delegates: [Vec<u64>; 2],
 }
 
-fn forge_identity(address: std::net::SocketAddr, line: &str, token: &str) -> ForgeIdentity {
+fn pull_number(pull: &serde_json::Value) -> u64 {
+    pull["number"].as_u64().expect("pull number")
+}
+fn merged_pulls(address: std::net::SocketAddr, token: &str) -> Vec<serde_json::Value> {
+    let mut merged = Vec::new();
+    for page in 1..=100 {
+        let pulls = super::owned::answer(
+            address.port(),
+            &format!("/api/v1/repos/work/hello/pulls?state=closed&limit=100&page={page}"),
+            Some(token),
+        )
+        .expect("owned forge pulls");
+        let pulls = pulls.as_array().expect("pull list");
+        if pulls.is_empty() {
+            return merged;
+        }
+        merged.extend(pulls.iter().filter(|pull| pull["merged"] == true).cloned());
+    }
+    panic!("merged pull pagination exceeded 100 pages")
+}
+
+fn forge_identity(
+    address: std::net::SocketAddr,
+    line: &str,
+    token: &str,
+    baseline: &std::collections::BTreeSet<u64>,
+) -> ForgeIdentity {
     use skein_lib::base64::{self, Alphabet};
     let get = |suffix: &str| {
         super::owned::answer(address.port(), &format!("/api/v1/repos/work/hello/{suffix}"), Some(token))
             .unwrap_or_else(|why| panic!("owned forge read {suffix}: {why}"))
     };
-    let pulls = get("pulls?state=all&limit=100&page=1");
-    let pulls = pulls.as_array().expect("pull list");
-    assert_eq!(pulls.len(), 1, "exactly one pull on work/hello");
-    assert_eq!(get("pulls?state=all&limit=100&page=2"), serde_json::json!([]));
-    let pull = &pulls[0];
-    assert_eq!(pull["merged"], true, "the pull merged");
+    let pulls = merged_pulls(address, token);
+    let numbers: std::collections::BTreeSet<_> = pulls.iter().map(pull_number).collect();
+    assert!(baseline.is_subset(&numbers), "previous merged pulls survive");
+    assert_eq!(numbers.len(), baseline.len() + 1, "exactly one more merged pull");
+    let pull = pulls.iter().find(|pull| !baseline.contains(&pull_number(pull))).expect("new merged pull");
     let head = pull["head"]["sha"].as_str().expect("pull head").to_owned();
     let status = get(&format!("commits/{head}/status"));
     assert_eq!(status["state"], "success", "CI at the merged head");
     assert!(!status["statuses"].as_array().expect("CI jobs").is_empty(), "a CI job ran");
-    let readme = get("contents/README.md?ref=main");
+    let readme = get(&format!("contents/README.md?ref={head}"));
     assert_eq!(readme["encoding"], "base64");
     let encoded: Vec<_> = readme["content"]
         .as_str()
@@ -663,7 +770,7 @@ fn forge_identity(address: std::net::SocketAddr, line: &str, token: &str) -> For
     assert_eq!(
         std::str::from_utf8(&readme).expect("README UTF-8").lines().last(),
         Some(line),
-        "main ends with the tagged line"
+        "the merged pull head ends with the tagged line"
     );
     let branches = get("branches?limit=100&page=1");
     assert_eq!(get("branches?limit=100&page=2"), serde_json::json!([]));
@@ -690,13 +797,6 @@ fn forge_identity(address: std::net::SocketAddr, line: &str, token: &str) -> For
     }
 }
 
-/// Read the live oracle using a credential minted only for this disposable forge.
-#[must_use]
-pub fn live_forge(paths: &[PathBuf; 3], first: bool, address: std::net::SocketAddr, line: &str) -> ForgeIdentity {
-    let token = oracle_token(paths, first);
-    forge_identity(address, line, &token)
-}
-
 /// The starter is private. Mint an independent, read-only oracle credential on
 /// this disposable forge, rather than reading temper's stored credentials.
 fn oracle_token(paths: &[PathBuf; 3], first: bool) -> String {
@@ -718,7 +818,12 @@ fn oracle_token(paths: &[PathBuf; 3], first: bool) -> String {
             "--username",
             "temper",
             "--token-name",
-            if first { "live-oracle-first" } else { "live-oracle-restart" },
+            &format!(
+                "live-oracle-{}-{}-{}",
+                std::process::id(),
+                if first { "first" } else { "restart" },
+                skein_shell::Clock::new().now().now.as_nanos()
+            ),
             "--scopes",
             "read:repository,read:issue",
             "--raw",
@@ -757,9 +862,9 @@ fn oracle_token(paths: &[PathBuf; 3], first: bool) -> String {
 }
 
 /// Commands are admitted one at a time so a failure cannot start the next act.
-fn live_commands(first: bool, words: &str) -> (Vec<Vec<String>>, usize) {
+fn live_commands(fresh: bool) -> (Vec<Vec<String>>, usize) {
     let mut commands = vec![vec!["sign-in", "-"]];
-    if first {
+    if fresh {
         commands.extend([vec!["forges"], vec!["forges", "--json"], vec!["forge-setup", "3"]]);
     }
     commands.extend([
@@ -768,7 +873,7 @@ fn live_commands(first: bool, words: &str) -> (Vec<Vec<String>>, usize) {
         vec!["forges"],
         vec!["me", "--json"],
     ]);
-    if first {
+    if fresh {
         commands.extend([
             vec!["connect", "1", "--key", "connect-plan"],
             vec!["wait", "accounts", "--until", "settled", "--timeout", "600s", "--json"],
@@ -776,12 +881,6 @@ fn live_commands(first: bool, words: &str) -> (Vec<Vec<String>>, usize) {
     }
     let account = commands.len();
     commands.push(vec!["accounts", "--json"]);
-    if first {
-        commands.extend([
-            vec!["chat", "--project", "1", "--model", "gpt-6-luna", "--key", "change-on-plan", words, "--json"],
-            vec!["wait", "task", "1", "--until", "replied", "--timeout", "1800s", "--json"],
-        ]);
-    }
     (commands.into_iter().map(|args| args.into_iter().map(str::to_owned).collect()).collect(), account)
 }
 
@@ -789,8 +888,19 @@ pub struct LivePlan<'a> {
     pub paths: &'a [PathBuf; 3],
     pub client: &'a std::path::Path,
     pub first: bool,
+    pub kept: bool,
+    pub address: Option<std::net::SocketAddr>,
+    pub tasks: Option<LiveTasks>,
+    pub baseline: Option<&'a std::collections::BTreeSet<u64>>,
     pub words: &'a str,
     pub line: &'a str,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LiveTasks {
+    pub project: u64,
+    pub chat: u64,
+    pub change: u64,
 }
 
 /// Only committed assistant text at or after the child's end counts as its reply.
@@ -851,6 +961,8 @@ fn live_json(call: &super::Ended) -> Result<serde_json::Value, String> {
 
 enum LivePhase {
     Setup,
+    Created,
+    Delegates,
     Waiting,
     Progress,
     Snapshot,
@@ -862,7 +974,12 @@ enum LivePhase {
 }
 struct LiveJudge<'a> {
     plan: LivePlan<'a>,
+    visitor: Option<usize>,
     account_at: usize,
+    tasks: LiveTasks,
+    baseline: std::collections::BTreeSet<u64>,
+    address: Option<std::net::SocketAddr>,
+    token: Option<String>,
     found_at: usize,
     checked: usize,
     pending: std::collections::VecDeque<Vec<String>>,
@@ -893,30 +1010,39 @@ impl LiveJudge<'_> {
             return Ok(());
         }
         let last = live_json(calls.ends().last().ok_or("live read missing")?)?;
+        let chat = self.tasks.chat.to_string();
+        let change = self.tasks.change.to_string();
+        let project = self.tasks.project.to_string();
         match self.phase {
-            LivePhase::Setup => {
+            LivePhase::Setup => self.setup(now, calls)?,
+            LivePhase::Created => {
+                self.tasks.chat = last["outcome"]["done"]["owner"]["created"]["first"]
+                    .as_u64()
+                    .ok_or("created chat number missing")?;
                 self.wait_started = Some(now);
                 self.wait_until = Some(now.saturating_add(Duration::from_secs(1800)));
-                self.wait_round(now)?;
+                self.queue_delegates();
             }
+            LivePhase::Delegates => self.find_delegates(now, &last)?,
             LivePhase::Waiting => {
                 self.wait_call = Some(calls.ends().len() - 1);
                 if last["met"] == false {
-                    self.queue(&["task", "2", "--json"]);
-                    self.queue(&["tasks", "--project", "1", "--parent", "2", "--json"]);
+                    self.queue(&["task", &change, "--json"]);
+                    self.queue(&["tasks", "--project", &project, "--parent", &change, "--json"]);
+                    self.queue(&["accounts", "--json"]);
                     self.phase = LivePhase::Progress;
                 } else {
                     // The person's signal that the change ended; the landing's checks follow.
                     super::live::notice(&format!(
-                        "CHANGE ENDED {} after {}s: task2={}",
+                        "CHANGE ENDED {} after {}s: task{}={}",
                         if self.plan.first { "first box" } else { "after restart" },
                         self.wait_started.map_or(0, |started| now.saturating_since(started).as_nanos() / 1_000_000_000),
+                        self.tasks.change,
                         last["task"]["chip"]["phase"].as_str().unwrap_or("?")
                     ));
                     self.found_at = calls.ends().len() - 1;
-                    self.queue(&["task", "2"]);
-                    self.queue(&["task", "3", "--json"]);
-                    self.queue(&["task", "1", "--json"]);
+                    self.queue(&["task", &change]);
+                    self.queue(&["task", &chat, "--json"]);
                     self.phase = LivePhase::Snapshot;
                 }
             }
@@ -932,50 +1058,10 @@ impl LiveJudge<'_> {
                 self.snapshot = Some(last["digest"].as_str().ok_or("chat digest missing")?.to_owned());
 
                 self.pages = 0;
-                self.queue(&["chat", "1", "--json"]);
+                self.queue(&["chat", &chat, "--json"]);
                 self.phase = LivePhase::Pages;
             }
-            LivePhase::Pages => {
-                self.pages += 1;
-                require(self.pages <= 32, "bounded conversation pages")?;
-                let activity = &last["activity"];
-                require(activity["cut"] == false, "whole activity page")?;
-                self.tools.extend(successful_tools(activity));
-                self.replies.extend(replies_after(activity, self.ended_at.ok_or("change end missing")?)?);
-                if let Some(before) = activity["before"]["value"].as_str() {
-                    self.queue(&["chat", "1", "--before", before, "--json"]);
-                } else if self.replies.is_empty() {
-                    self.queue(&[
-                        "wait",
-                        "task",
-                        "1",
-                        "--until",
-                        "replied",
-                        "--since",
-                        &self.snapshot.clone().ok_or("snapshot before conversation missing")?,
-                        "--timeout",
-                        "1800s",
-                        "--json",
-                    ]);
-                    self.queue(&["task", "1", "--json"]);
-                    self.phase = LivePhase::Snapshot;
-                } else {
-                    self.tasks_at = calls.ends().len();
-                    for parent in ["1", "2"] {
-                        self.queue(&["tasks", "--project", "1", "--parent", parent, "--ended", "--json"]);
-                    }
-                    if !self.plan.first {
-                        for args in [
-                            &["close", "1", "--key", "close-live-plan", "--json"][..],
-                            &["wait", "tree", "1", "--until", "ended", "--timeout", "300s", "--json"],
-                            &["tasks", "--project", "1", "--json"],
-                        ] {
-                            self.queue(args);
-                        }
-                    }
-                    self.phase = LivePhase::Closing;
-                }
-            }
+            LivePhase::Pages => self.read_page(calls, &last)?,
             LivePhase::Closing => {
                 self.check_landing(calls)?;
                 calls.release();
@@ -985,13 +1071,171 @@ impl LiveJudge<'_> {
         }
         Ok(())
     }
+    fn setup(&mut self, now: skein_lib::Time, calls: &super::ctl::Calls) -> Result<(), String> {
+        let address = if let Some(address) = self.address {
+            address
+        } else {
+            // first_repository::live's configuration socket read, without
+            // its started-record or transcript reads on a kept deployment.
+            let document: serde_json::Value = serde_json::from_slice(
+                &fs::read(self.plan.paths[0].join("temper.json")).map_err(|error| error.to_string())?,
+            )
+            .map_err(|error| error.to_string())?;
+            document["application"]["forges"]
+                .as_array()
+                .ok_or("forges missing")?
+                .iter()
+                .find(|forge| forge["number"] == 3)
+                .ok_or("owned forge missing")?["api"]["socket"]
+                .as_str()
+                .ok_or("forge address missing")?
+                .parse()
+                .map_err(|_| "forge socket invalid")?
+        };
+        self.address = Some(address);
+        let token = oracle_token(self.plan.paths, self.plan.first);
+        if self.plan.first {
+            let pulls = merged_pulls(address, &token);
+            self.baseline = pulls.iter().map(pull_number).collect();
+            if self.plan.kept {
+                // The first-repository offer is transient and closed chats
+                // are unlisted. The owned pull names its root task; ctl's
+                // durable task document supplies the project it belongs to.
+                let me = live_json(&calls.ends()[4])?;
+                self.tasks.project = kept_project(self.plan.client, &me, &pulls)?;
+            } else {
+                let forges = live_json(&calls.ends()[5])?;
+                let forge = forges["forges"]
+                    .as_array()
+                    .ok_or("forges missing")?
+                    .iter()
+                    .find(|forge| forge["number"] == 3)
+                    .ok_or("owned forge missing")?;
+                require(
+                    forge["first"]["org"] == "work" && forge["first"]["repository"] == "hello",
+                    "first repository is work/hello",
+                )?;
+                self.tasks.project = forge["first"]["project"]["existing"].as_u64().ok_or("first project missing")?;
+            }
+        }
+        self.token = Some(token);
+        if self.plan.first {
+            let key = format!("live-chat-{}", now.as_nanos());
+            self.queue(&[
+                "chat",
+                "--project",
+                &self.tasks.project.to_string(),
+                "--model",
+                "gpt-6-luna",
+                "--key",
+                &key,
+                self.plan.words,
+                "--json",
+            ]);
+            self.phase = LivePhase::Created;
+        } else {
+            self.wait_started = Some(now);
+            self.wait_until = Some(now.saturating_add(Duration::from_secs(1800)));
+            self.wait_round(now)?;
+        }
+
+        Ok(())
+    }
+    fn find_delegates(&mut self, now: skein_lib::Time, last: &serde_json::Value) -> Result<(), String> {
+        let mut delegates = Vec::new();
+        for row in last["live"].as_array().ok_or("live delegates missing")? {
+            delegates.push(row["chip"]["task"].as_u64().ok_or("delegate number missing")?);
+        }
+        let ended = &last["ended"]["rows"];
+        require(
+            last["live_after"].is_null() && ended["after"].is_null() && ended["cut"] == false,
+            "whole chat delegation set",
+        )?;
+        for row in ended["rows"].as_array().ok_or("ended delegates missing")? {
+            delegates.push(row["chip"]["task"].as_u64().ok_or("ended delegate number missing")?);
+        }
+        if delegates.is_empty() {
+            require(now < self.wait_until.ok_or("delegate deadline missing")?, "chat did not delegate within 1800s")?;
+            self.queue(&[
+                "wait",
+                "task",
+                &self.tasks.chat.to_string(),
+                "--until",
+                "replied",
+                "--timeout",
+                "5s",
+                "--json",
+            ]);
+            self.queue(&["accounts", "--json"]);
+            self.queue_delegates();
+        } else {
+            require(delegates.len() == 1, "one change delegated by the new chat")?;
+            self.tasks.change = delegates[0];
+            super::live::notice(&format!(
+                "CHANGE task={} chat={} project={}",
+                self.tasks.change, self.tasks.chat, self.tasks.project
+            ));
+            self.wait_round(now)?;
+        }
+
+        Ok(())
+    }
+    fn read_page(&mut self, calls: &super::ctl::Calls, last: &serde_json::Value) -> Result<(), String> {
+        let chat = self.tasks.chat.to_string();
+        let change = self.tasks.change.to_string();
+        let project = self.tasks.project.to_string();
+        self.pages += 1;
+        require(self.pages <= 32, "bounded conversation pages")?;
+        let activity = &last["activity"];
+        require(activity["cut"] == false, "whole activity page")?;
+        self.tools.extend(successful_tools(activity));
+        self.replies.extend(replies_after(activity, self.ended_at.ok_or("change end missing")?)?);
+        if let Some(before) = activity["before"]["value"].as_str() {
+            self.queue(&["chat", &chat, "--before", before, "--json"]);
+        } else if self.replies.is_empty() {
+            self.queue(&[
+                "wait",
+                "task",
+                &chat,
+                "--until",
+                "replied",
+                "--since",
+                &self.snapshot.clone().ok_or("snapshot before conversation missing")?,
+                "--timeout",
+                "5s",
+                "--json",
+            ]);
+            self.queue(&["accounts", "--json"]);
+            self.queue(&["task", &chat, "--json"]);
+            self.phase = LivePhase::Snapshot;
+        } else {
+            self.tasks_at = calls.ends().len();
+            for parent in [&chat, &change] {
+                self.queue(&["tasks", "--project", &project, "--parent", parent, "--ended", "--json"]);
+            }
+            if !self.plan.first {
+                let key = format!("close-live-chat-{chat}");
+                for args in [
+                    &["close", &chat, "--key", &key, "--json"][..],
+                    &["wait", "tree", &chat, "--until", "ended", "--timeout", "300s", "--json"],
+                    &["tasks", "--project", &project, "--json"],
+                ] {
+                    self.queue(args);
+                }
+            }
+            self.phase = LivePhase::Closing;
+        }
+
+        Ok(())
+    }
     fn progress(
         &mut self,
         now: skein_lib::Time,
         calls: &super::ctl::Calls,
-        last: &serde_json::Value,
+        _last: &serde_json::Value,
     ) -> Result<(), String> {
-        let task = live_json(&calls.ends()[calls.ends().len() - 2])?;
+        let task = live_json(&calls.ends()[calls.ends().len() - 3])?;
+        let last = live_json(&calls.ends()[calls.ends().len() - 2])?;
         let children = last["tasks"]["rows"]
             .as_array()
             .ok_or("children rows missing")?
@@ -1000,11 +1244,11 @@ impl LiveJudge<'_> {
             .collect::<Vec<_>>()
             .join(",");
         super::live::notice(&format!(
-            "PROGRESS {} task2={} children={} completions={} waits_on={} details={}",
+            "PROGRESS {} task{}={} children={} waits_on={} details={}",
             now.saturating_since(self.wait_started.ok_or("watch start missing")?).as_nanos() / 1_000_000_000,
+            self.tasks.change,
             task["chip"]["phase"].as_str().unwrap_or("?"),
             children,
-            super::live::deployment_completions(self.plan.paths),
             task["waits_on"],
             task["chip"]["details"]
         ));
@@ -1028,7 +1272,7 @@ impl LiveJudge<'_> {
                 "no live root tasks",
             )?;
         }
-        let reads = super::first_repository::live(&self.plan.paths[0], &self.plan.paths[1], self.plan.client);
+        let page = live_change_page(client_address(calls)?, self.plan.client, self.tasks.change);
         require(self.tools.contains("change"), "the chat's committed change call succeeded")?;
         let mut delegates = [Vec::new(), Vec::new()];
         for (offset, tasks) in delegates.iter_mut().enumerate() {
@@ -1045,12 +1289,31 @@ impl LiveJudge<'_> {
                 .collect::<Result<_, _>>()?;
             tasks.sort_unstable();
         }
-        require(delegates[0].contains(&2), "change task belongs to the chat that called change")?;
+        require(delegates[0].contains(&self.tasks.change), "change task belongs to the chat that called change")?;
         require(!self.tools.contains("delegate"), "no raw delegate started the task")?;
-        let forge = live_forge(self.plan.paths, self.plan.first, reads.address, self.plan.line);
+        let mut tasks = vec![self.tasks.chat, self.tasks.change];
+        tasks.extend(&delegates[1]);
+        tasks.sort_unstable();
+        tasks.dedup();
+        let completions = super::live::ctl_completions(self.plan.client, &tasks)?;
+        require((1..=25).contains(&completions), "live completion budget: 1–25")?;
+        super::live::notice(&format!(
+            "COMPLETIONS chat={} change={} count={completions}",
+            self.tasks.chat, self.tasks.change
+        ));
+        let forge = forge_identity(
+            self.address.ok_or("forge address missing")?,
+            self.plan.line,
+            self.token.as_deref().ok_or("oracle credential missing")?,
+            &self.baseline,
+        );
         self.evidence.set(Some(LiveEvidence {
             task: String::from_utf8_lossy(&calls.ends()[self.found_at + 1].stdout).into_owned(),
-            reads,
+            page,
+            completions,
+            address: self.address.ok_or("forge address missing")?,
+            tasks: self.tasks.clone(),
+            baseline: self.baseline.clone(),
             forge,
             replies: std::mem::take(&mut self.replies),
             delegates,
@@ -1059,15 +1322,28 @@ impl LiveJudge<'_> {
     }
 }
 impl LiveJudge<'_> {
+    fn queue_delegates(&mut self) {
+        self.queue(&[
+            "tasks",
+            "--project",
+            &self.tasks.project.to_string(),
+            "--parent",
+            &self.tasks.chat.to_string(),
+            "--ended",
+            "--json",
+        ]);
+        self.phase = LivePhase::Delegates;
+    }
     fn queue(&mut self, args: &[&str]) {
         self.pending.push_back(args.iter().map(|arg| (*arg).to_owned()).collect());
     }
     fn wait_round(&mut self, now: skein_lib::Time) -> Result<(), String> {
+        let change = self.tasks.change.to_string();
         let left = self.wait_until.ok_or("watch deadline missing")?.saturating_since(now).as_nanos() / 1_000_000_000;
         self.queue(&[
             "wait",
             "task",
-            "2",
+            &change,
             "--until",
             "ended",
             "--timeout",
@@ -1088,11 +1364,24 @@ impl LiveJudge<'_> {
         ));
     }
     fn fail(&mut self, message: &str, calls: &super::ctl::Calls, failing: Option<usize>) {
+        let chat = self.tasks.chat.to_string();
+        let change = self.tasks.change.to_string();
+        let project = self.tasks.project.to_string();
         let previous = self.failure.take();
         if previous.is_some() {
             self.failure.set(previous);
             return;
         }
+        let account = if self.plan.kept || self.account_checked {
+            self.diagnostic(&["accounts", "--json"]).and_then(|read| live_json(&read).ok())
+        } else {
+            None
+        };
+        let message = if account.as_ref().is_some_and(|value| super::live::ready_account(value).is_err()) {
+            KEPT_SIGN_IN_EXPIRED
+        } else {
+            message
+        };
         let message = if let Some(index) = failing {
             format!("{message}: argv={:?} exit={:?}", self.arguments.get(index), calls.ends()[index].exit)
         } else {
@@ -1107,20 +1396,14 @@ impl LiveJudge<'_> {
         }
         // Each independent read uses ctl's existing 60s bound. Even an unknown
         // task or a broken read is evidence, never a reason to omit later reads.
-        let mut task2 = false;
-        for args in [
-            &["task", "1", "--json"][..],
-            &["task", "2", "--json"],
-            &["task", "3", "--json"],
-            &["tasks", "--project", "1", "--json"],
-        ] {
-            if let Some(read) = self.diagnostic(args) {
-                task2 |= args == ["task", "2", "--json"] && read.exit == Some(Exit::Code(0));
-            }
+        for args in
+            [&["task", &chat, "--json"][..], &["task", &change, "--json"], &["tasks", "--project", &project, "--json"]]
+        {
+            self.diagnostic(args);
         }
         let mut before = None::<String>;
         for _ in 0..32 {
-            let mut args = vec!["chat", "1", "--json"];
+            let mut args = vec!["chat", &chat, "--json"];
             if let Some(cursor) = &before {
                 args.extend(["--before", cursor]);
             }
@@ -1137,14 +1420,6 @@ impl LiveJudge<'_> {
             before = page["activity"]["before"]["value"].as_str().map(str::to_owned);
             if before.is_none() {
                 break;
-            }
-        }
-        if task2 {
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                super::first_repository::change_page(&self.plan.paths[0], self.plan.client)
-            })) {
-                Ok(page) => super::live::notice(&format!("CHANGE PAGE\n{page}")),
-                Err(_) => super::live::notice("CHANGE PAGE unavailable"),
             }
         }
         self.pending.clear();
@@ -1172,26 +1447,35 @@ impl LiveJudge<'_> {
             None
         }
     }
-    fn drive(
-        &mut self,
-        now: skein_lib::Time,
-        binary: &mut skein_world::end_to_end::Binary,
-        calls: &mut super::ctl::Calls,
-    ) {
-        use skein_shell::Host;
-        calls.observe_box_stderr(binary.stderr(), now);
-        if !self.linked && super::printed_link(calls.stdout()).is_some() {
-            super::live::client_notice(&String::from_utf8_lossy(calls.link()));
-            self.linked = true;
-        }
+    fn check_calls(&mut self, now: skein_lib::Time, calls: &super::ctl::Calls) {
         for index in self.checked..calls.ends().len() {
             let call = &calls.ends()[index];
-            let not_yet = matches!(self.phase, LivePhase::Waiting) && call.exit == Some(Exit::Code(3));
+            if (self.plan.kept || self.account_checked)
+                && self.arguments.get(index).is_some_and(|args| args == &["accounts", "--json"])
+                && live_json(call).and_then(|value| super::live::ready_account(&value)).is_err()
+            {
+                self.fail(KEPT_SIGN_IN_EXPIRED, calls, Some(index));
+                break;
+            }
+            if (self.plan.kept || self.account_checked)
+                && let Ok(value) = live_json(call)
+            {
+                let task = value.get("task").unwrap_or(&value);
+                if matches!(
+                    task.pointer("/run_wait/account/why").and_then(serde_json::Value::as_str),
+                    Some("needs_sign_in" | "refused")
+                ) {
+                    self.fail(KEPT_SIGN_IN_EXPIRED, calls, Some(index));
+                    break;
+                }
+            }
+            let not_yet = self.arguments.get(index).is_some_and(|args| args.first().is_some_and(|arg| arg == "wait"))
+                && call.exit == Some(Exit::Code(3));
             if call.exit != Some(Exit::Code(0)) && !not_yet {
                 self.fail("live ctl failed", calls, Some(index));
                 break;
             }
-            if self.plan.first && index == self.account_at - 2 {
+            if self.plan.first && !self.plan.kept && index == self.account_at - 2 {
                 super::live::notice(&String::from_utf8_lossy(&call.stdout));
                 self.signing_until = Some(now.saturating_add(Duration::from_secs(600)));
             }
@@ -1206,9 +1490,27 @@ impl LiveJudge<'_> {
         {
             match live_json(&calls.ends()[self.account_at]).and_then(|value| super::live::ready_account(&value)) {
                 Ok(()) => self.account_checked = true,
-                Err(message) => self.fail(&message, calls, Some(self.account_at)),
+                Err(message) => self.fail(
+                    if self.plan.kept { KEPT_SIGN_IN_EXPIRED } else { &message },
+                    calls,
+                    Some(self.account_at),
+                ),
             }
         }
+    }
+    fn drive(
+        &mut self,
+        now: skein_lib::Time,
+        binary: &mut skein_world::end_to_end::Binary,
+        calls: &mut super::ctl::Calls,
+    ) {
+        use skein_shell::Host;
+        calls.observe_box_stderr(binary.stderr(), now);
+        if !self.linked && super::printed_link(calls.stdout()).is_some() {
+            super::live::client_notice(&String::from_utf8_lossy(calls.link()));
+            self.linked = true;
+        }
+        self.check_calls(now, calls);
         if !self.stopping() && !matches!(self.phase, LivePhase::Done) {
             if self.signing_until.is_some_and(|until| !self.account_checked && now >= until) {
                 self.fail("ChatGPT sign-in exceeded 10 minutes", calls, None);
@@ -1219,9 +1521,6 @@ impl LiveJudge<'_> {
             } else if self.active_until.is_some_and(|until| now >= until) {
                 self.fail("live ctl exceeded its per-call bound", calls, None);
             } else if now >= self.poll {
-                if super::live::deployment_completions(self.plan.paths) > 25 {
-                    self.fail("live completion budget exceeded", calls, None);
-                }
                 self.poll = now.saturating_add(Duration::from_secs(1));
             }
         }
@@ -1262,7 +1561,17 @@ impl LiveJudge<'_> {
 }
 impl Referee<Process> for LiveJudge<'_> {
     fn act(&mut self, now: skein_lib::Time, procs: &mut [Process]) {
-        let [Process::Binary(binary), Process::Calls(calls), ..] = procs else { return };
+        if let Some(index) = self.visitor {
+            let Process::Calls(calls) = &procs[1] else { return };
+            if let Some(address) = calls.ends().iter().find_map(sign_in::authorization_address) {
+                let address = address.to_vec();
+                let Process::Visitor(visitor) = &mut procs[index] else { return };
+                visitor.hand(&address);
+                self.visitor = None;
+            }
+        }
+        let (drivers, peers) = procs.split_at_mut(2);
+        let [Process::Binary(binary), Process::Calls(calls)] = drivers else { return };
         // Legacy oracle assertions must never unwind through the world's Tree.
         // Their recorded failure is raised by the caller after run_live returns.
         if let Err(failed) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.drive(now, binary, calls))) {
@@ -1276,6 +1585,19 @@ impl Referee<Process> for LiveJudge<'_> {
             calls.cancel();
             binary.signal(skein_io::kernel::Signal::Terminate);
             self.phase = LivePhase::Stopping;
+        }
+        if self.stopping() {
+            for peer in peers {
+                match peer {
+                    Process::Peer(peer) => peer.shutdown(),
+                    Process::Issuer(issuer) => issuer.shutdown(),
+                    Process::Calls(_)
+                    | Process::Binary(_)
+                    | Process::Stdout(_)
+                    | Process::Person(_)
+                    | Process::Visitor(_) => {}
+                }
+            }
         }
     }
     fn observe(&mut self, _now: skein_lib::Time, procs: &[Process]) {
@@ -1305,11 +1627,10 @@ impl Referee<Process> for LiveJudge<'_> {
 pub fn run_live(
     plan: LivePlan<'_>,
     budget: Duration,
-    face: &Face,
+    face: Face,
 ) -> Result<super::boxed::CtlOutcome<LiveEvidence>, String> {
     use skein_shell::{Clock, Host};
     use skein_world::end_to_end::{Binary, Command, Expectation, Mode};
-    assert!(matches!(face, Face::Live), "live driver takes the live face");
     let clock = Clock::new();
     let mut binary = Binary::start_with_tree(
         Command {
@@ -1330,11 +1651,16 @@ pub fn run_live(
     let mut fds = streams.descriptors();
     let root = skein_shell::open_root(plan.client).expect("fresh client root");
     fds.push(root);
-    let (commands, account_at) = live_commands(plan.first, plan.words);
+    let (commands, account_at) = live_commands(plan.first && !plan.kept);
     let failure = std::cell::Cell::new(None);
     let evidence = std::cell::Cell::new(None);
     let mut world = real::World::new(LiveJudge {
+        tasks: plan.tasks.clone().unwrap_or_default(),
+        baseline: plan.baseline.cloned().unwrap_or_default(),
+        address: plan.address,
+        token: None,
         plan,
+        visitor: matches!(face, Face::Fake { .. }).then_some(3),
         account_at,
         found_at: 0,
         checked: 0,
@@ -1369,6 +1695,9 @@ pub fn run_live(
         calls.hold();
         Process::Calls(Box::new(calls))
     });
+    if matches!(face, Face::Fake { .. }) {
+        face.spawn(&mut world);
+    }
     // Failure diagnostics: at most 36 ctl reads (60s each), a 20s native
     // change-page read, and ten seconds to cancel, drain and reap afterwards.
     let drain_budget = Duration::from_secs(36 * 60 + 30);
@@ -1376,8 +1705,11 @@ pub fn run_live(
     if !ended.procs.iter().all(Host::is_empty) {
         return Err("live box, descendants and ctl did not drain".into());
     }
-    let [Process::Binary(binary), Process::Calls(calls)] = ended.procs.as_slice() else { panic!("live box and ctl") };
+    let [Process::Binary(binary), Process::Calls(calls), ..] = ended.procs.as_slice() else {
+        panic!("live box and ctl")
+    };
     if let Some(message) = failure.take() {
+        super::live::notice(&format!("BOX stderr: {}", String::from_utf8_lossy(binary.stderr())));
         return Err(message);
     }
     Ok(super::boxed::CtlOutcome {
@@ -1392,4 +1724,116 @@ pub fn run_live(
             .collect(),
         checked: evidence.take(),
     })
+}
+
+fn live_change_page(engine: std::net::SocketAddr, client: &std::path::Path, task: u64) -> String {
+    use skein_shell::{Clock, Host};
+    use skein_world::{Referee, real};
+    use temper_client_shell_terminal::client::{NativeClient, Settings, Start};
+    struct Judge<'a> {
+        task: u64,
+        opened: bool,
+        closing: bool,
+        page: &'a std::cell::Cell<String>,
+        until: skein_lib::Time,
+    }
+    impl Referee<NativeClient> for Judge<'_> {
+        fn act(&mut self, now: skein_lib::Time, clients: &mut [NativeClient]) {
+            let client = &mut clients[0];
+            if client.started() && !self.opened {
+                client.go(temper_client_domain::Address::Task {
+                    task: self.task,
+                    filter: temper_client_domain::PlanFilter::All,
+                });
+                self.opened = true;
+            }
+            if self.closing {
+                return;
+            }
+            let mut page = String::new();
+            for node in client.tree().nodes().iter().filter(|node| !node.text.is_empty()) {
+                for run in &node.text {
+                    page.push_str(&String::from_utf8_lossy(&run.text));
+                }
+                page.push('\n');
+            }
+            if (page.contains("work/hello") && page.contains("CI at its head")) || now >= self.until {
+                self.page.set(page);
+                client.close();
+                self.closing = true;
+            }
+        }
+        fn observe(&mut self, _now: skein_lib::Time, _clients: &[NativeClient]) {}
+        fn next_deadline(&self) -> Option<skein_lib::Time> {
+            (!self.closing).then_some(self.until)
+        }
+        fn overdue(&self, _now: skein_lib::Time) -> Option<String> {
+            None
+        }
+        fn passed(&self) -> bool {
+            self.closing
+        }
+    }
+    let root = skein_shell::open_root(client).expect("client's parent root");
+    let clock = Clock::new();
+    let page = std::cell::Cell::new(String::new());
+    let mut world = real::World::new(Judge {
+        task,
+        opened: false,
+        closing: false,
+        page: &page,
+        until: clock.now().now.saturating_add(skein_lib::Duration::from_secs(10)),
+    });
+    world.spawn_with_fds(vec![root], || {
+        NativeClient::new(
+            Settings {
+                engine: skein_io::Addr::Ip(engine),
+                directory: b"client".as_slice().into(),
+                limits: temper_client_shell_terminal::limits::native(),
+            },
+            root,
+            skein_shell::effective_user(),
+            91,
+            Start::Token,
+        )
+        .expect("native reader")
+    });
+    let ended = world.run(&clock, skein_lib::Duration::from_secs(20));
+    assert!(ended.procs.iter().all(Host::is_empty), "native reader drained");
+    page.take()
+}
+
+fn client_address(calls: &super::ctl::Calls) -> Result<std::net::SocketAddr, String> {
+    let link = std::str::from_utf8(calls.link()).map_err(|_| "client link encoding")?;
+    link.strip_prefix("http://")
+        .ok_or("local client link")?
+        .split('/')
+        .next()
+        .ok_or("client listener")?
+        .parse()
+        .map_err(|_| "client listener address".into())
+}
+
+/// Shipped branches are temper/ROOT/NAME (`forge_route::tree_branch`).
+/// Forgejo keeps the branch in head.label after merge (head.ref becomes
+/// refs/pull/N/head). The root's ctl document supplies its project.
+fn kept_project(client: &std::path::Path, me: &serde_json::Value, pulls: &[serde_json::Value]) -> Result<u64, String> {
+    let projects = me["projects"].as_array().ok_or("person's projects missing")?;
+    for pull in pulls.iter().rev() {
+        let Some(root) = pull["head"]["label"]
+            .as_str()
+            .and_then(|branch| branch.strip_prefix("temper/"))
+            .and_then(|branch| branch.split_once('/'))
+            .and_then(|(root, _)| root.parse::<u64>().ok())
+        else {
+            continue;
+        };
+        let read = super::ctl::alone(client, super::ctl::Call::new(&["task", &root.to_string(), "--json"]));
+        require(read.exit == Some(Exit::Code(0)), "kept change read failed")?;
+        let task = live_json(&read)?;
+        let project = task["project"].as_u64().ok_or("kept change project missing")?;
+        require(projects.iter().any(|row| row["project"] == project), "kept change project is visible to the person")?;
+        return Ok(project);
+    }
+    Err("kept deployment lacks a merged work/hello change".into())
 }

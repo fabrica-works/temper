@@ -1298,12 +1298,12 @@ section 8; testing-strategy.md, 2.9).
   finds the same chat, pull and merge hash after the box restarts on its three
   directories, without another provider sign-in, push or merge. It closes the
   chat and drains the box; the sitting allows ten minutes for sign-in, forty
-  minutes in total and 1–25 completions. Progress and final evidence reach the
-  person through a private notice file, followed by the script and retained
-  with the sign-in secret redacted. Its config, data, cache and client roots
-  stay in `TEMPER_LIVE_STORE` (by default
-  `$HOME/src/rust/tmp/live-store/forge-land`) on pass or failure; a later
-  sitting refuses an existing store until reuse is built.
+  minutes in total and 1–25 completions, counted through ctl. Progress and final
+  evidence reach the person through a private notice file, followed by the
+  script and retained with the sign-in secret redacted. Its config, data, cache
+  and client roots stay in `TEMPER_LIVE_STORE` (by default
+  `$HOME/src/rust/tmp/live-store/forge-land`) on pass or failure. A rerun uses the
+  kept sign-in without a person and stops when that sign-in is expired or refused.
 - **Its referee:** the process tier's, without the restart; and the
   completions, counted from the engine's transcripts. Each completion is
   a turn of main's conversation on either backend: on the program

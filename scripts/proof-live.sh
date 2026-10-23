@@ -10,13 +10,14 @@ case ${1-} in
 esac
 [ "$#" -le 1 ] || { printf '%s\n' 'usage: scripts/proof-live.sh [forge-land]' >&2; exit 2; }
 store=
+rerun=false
 if [ "${1-}" = forge-land ]; then
     store=${TEMPER_LIVE_STORE:-$HOME/src/rust/tmp/live-store/forge-land}
-    # Reserve the store in the test, atomically, before any box starts. Refuse
-    # here too so a rerun needs neither a build nor a new scratch.
     if [ -e "$store" ] || [ -L "$store" ]; then
-        printf 'kept store %s exists: reruns on a kept sign-in are not built yet; move it aside to sign in afresh\n' "$store" >&2
-        exit 1
+        if [ ! -d "$store" ] || [ -n "$(ls -A -- "$store")" ]; then
+            rerun=true
+            printf 'rerunning on the kept ChatGPT sign-in in %s; needs no person\n' "$store"
+        fi
     fi
     store_parent=$(dirname -- "$store")
     mkdir -p -- "$store_parent"
@@ -26,6 +27,16 @@ fi
 export NEXTEST_DOUBLE_SPAWN=0
 heavy cargo nextest run -p temper --profile live --no-run
 scratch=$(readlink -f "$(mktemp -d "${TMPDIR:-/tmp}/temper-live.XXXXXX")")
+# A kept deployment may already have processes. Only this sitting's new
+# processes belong to its cleanup, even when its box refuses a busy store.
+store_before=
+if [ -n "$store" ]; then
+    for process in /proc/[0-9]*; do
+        case $(readlink "$process/cwd" 2>/dev/null || true) in
+            "$store"|"$store"/*) store_before="$store_before ${process#/proc/}" ;;
+        esac
+    done
+fi
 # Every process whose cwd is in this newly created private scratch was started
 # by this sitting. As in jig's live-sign-in.sh, stop those owned descendants
 # before keeping or erasing their stores, including after an interruption.
@@ -38,7 +49,12 @@ stop_owned() {
             *)
                 if [ -n "$store" ]; then
                     case $(readlink "$process/cwd" 2>/dev/null || true) in
-                        "$store"|"$store"/*) owned="$owned ${process#/proc/}" ;;
+                        "$store"|"$store"/*)
+                            case " $store_before " in
+                                *" ${process#/proc/} "*) ;;
+                                *) owned="$owned ${process#/proc/}" ;;
+                            esac
+                            ;;
                     esac
                 fi
                 ;;
@@ -109,8 +125,10 @@ trap finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
-printf '%s\n' 'Approve the printed ChatGPT address in a browser that reaches this machine.' \
-    'For a remote browser: ssh -L 1455:127.0.0.1:1455 -L <client port>:127.0.0.1:<client port> HOST'
+if [ "$rerun" = false ]; then
+    printf '%s\n' 'Approve the printed ChatGPT address in a browser that reaches this machine.' \
+        'For a remote browser: ssh -L 1455:127.0.0.1:1455 -L <client port>:127.0.0.1:<client port> HOST'
+fi
 TMPDIR=$scratch heavy cargo nextest run -p temper --profile live --run-ignored only --no-capture \
     -E "test(=$test_name)" &
 runner=$!

@@ -145,17 +145,12 @@ pub fn ready_account(value: &Value) -> Result<(), String> {
     if account["plan"] != true {
         return Err("ChatGPT is not a plan".into());
     }
-    let source = account["sources"]
-        .as_array()
-        .ok_or("account sources missing")?
+    let sources = account["sources"].as_array().ok_or("account sources missing")?;
+    if !sources
         .iter()
-        .find(|source| source["kind"] == "sign_in")
-        .ok_or("signed-in source missing")?;
-    if source["usable"] != true || source["state"]["kind"] != "granted" {
-        return Err(format!(
-            "live account {} cannot run: state={}, reset={}",
-            account["number"], source["state"], source["spent_until"]
-        ));
+        .any(|source| source["kind"] == "sign_in" && source["usable"] == true && source["state"]["kind"] == "granted")
+    {
+        return Err(format!("live account {} has no usable granted sign-in", account["number"]));
     }
     Ok(())
 }
@@ -379,17 +374,42 @@ pub fn completions(directory: &Path) -> u32 {
     count_completions(directory, &super::configuration::directories(directory))
 }
 
-/// Init's configuration and transcripts live under separate private roots.
-#[must_use]
-pub fn deployment_completions(paths: &[PathBuf; 3]) -> u32 {
-    use std::os::unix::ffi::OsStrExt;
-    let flags: Vec<Box<[u8]>> = ["--config", "--data", "--cache"]
-        .into_iter()
-        .zip(paths)
-        .flat_map(|(flag, path)| [Box::from(flag.as_bytes()), Box::from(path.as_os_str().as_bytes())])
-        .collect();
-    let (directories, _) = temper::directories::resolve(&flags, &[], b"/").expect("live directories");
-    count_completions(&paths[0], &directories)
+/// Count this story's committed turns through ctl, including restarted
+/// attempts. Each source turn names one transcript frame, as the fresh
+/// story's file counter does, without opening any kept deployment file.
+pub fn ctl_completions(client: &Path, tasks: &[u64]) -> Result<u32, String> {
+    let mut turns = std::collections::BTreeSet::new();
+    for task in tasks {
+        let task = task.to_string();
+        let mut before = None::<String>;
+        for page in 0..32 {
+            let mut args = vec!["activity", &task, "--limit", "32", "--json"];
+            if let Some(before) = &before {
+                args.extend(["--before", before]);
+            }
+            let read = super::ctl::alone(client, super::ctl::Call::new(&args));
+            if read.exit != Some(skein_io::kernel::Exit::Code(0)) {
+                return Err("completion read failed".into());
+            }
+            let activity: Value = serde_json::from_slice(&read.stdout).map_err(|error| error.to_string())?;
+            for row in activity["rows"].as_array().ok_or("completion rows missing")? {
+                let Some(turn) = row.pointer("/event/owner/source/line/turn") else { continue };
+                turns.insert((
+                    task.clone(),
+                    turn["attempt"].as_u64().ok_or("completion attempt missing")?,
+                    turn["turn"].as_u64().ok_or("completion turn missing")?,
+                ));
+            }
+            before = activity["before"]["value"].as_str().map(str::to_owned);
+            if before.is_none() {
+                break;
+            }
+            if page == 31 {
+                return Err("completion pagination exceeded 32 pages".into());
+            }
+        }
+    }
+    u32::try_from(turns.len()).map_err(|_| "completion count overflow".into())
 }
 
 fn count_completions(config: &Path, directories: &temper::directories::Directories) -> u32 {
