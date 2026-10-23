@@ -229,7 +229,17 @@ pub fn run(
     world.spawn(cluster::Root::client);
     let outcome = world.run(&clock, WITHIN);
     assert!(outcome.procs.iter().all(Host::is_empty), "every root empty");
-    scratch.remove();
+    if std::env::var_os("TEMPER_CASE_KEEP").is_some() {
+        let observed = result.borrow();
+        let run = observed.as_ref().expect("case observations");
+        let calls: Vec<_> = run.calls.iter().enumerate().map(|(index, call)| json!({
+            "call":index, "stdout":text(&call.stdout), "stderr":text(&call.stderr)
+        })).collect();
+        write(&scratch.path().join("diagnostic-calls.json"), &json!(calls));
+        eprintln!("TEMPER_CASE_SCRATCH={}", scratch.path().display());
+    } else {
+        scratch.remove();
+    }
     result.borrow_mut().take().expect("case observations")
 }
 #[derive(Debug)]
@@ -703,6 +713,7 @@ impl Referee<cluster::Root> for Judge {
                 self.map_channels(&ctl::json(Self::calls(root).ends().last().expect("first life hosts")));
                 self.first_workers = std::mem::take(&mut self.workers);
                 self.channels.clear();
+                eprintln!("CASE_DIAG stop_one(ws) now={now:?} last_act={}", describe(self.ran.last().expect("stop act")));
                 self.members.stop_one("ws");
                 self.stage = Stage::Stopping;
             }
@@ -770,6 +781,10 @@ impl Referee<cluster::Root> for Judge {
                 );
             }
             for member in stopped {
+                if std::env::var_os("TEMPER_CASE_KEEP").is_some() {
+                    let path = self.client.parent().expect("scratch").join(format!("diagnostic-{}-{}.stderr", member.name, member.life));
+                    super::write_private(&path, &member.stderr);
+                }
                 if ["ws", "s1", "s2"].contains(&member.name.as_str()) {
                     assert_eq!(
                         member.stderr.split(|byte| *byte == b'\n').filter(|line| line.starts_with(b"linked ")).count(),

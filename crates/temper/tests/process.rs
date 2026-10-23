@@ -2071,7 +2071,6 @@ fn the_opener_and_the_two_hour_check_run_on_three_workers_as_processes_without_p
 // The retry runs on s1 or s2 by that row's act order: ws stays ended and unlinked
 // until after the ended chat's watch joins; the oracle checks both attempts.
 #[test]
-#[ignore = "M3: 3 in 56 runs (2/50 under 8 busy loops, 1 in the process profile): the chat's attempts not failed as an agent's then finished (6.45 s, a lost link's grace), or the director's committed read and wait not seen before the stop; the profile's one unread; the workers' stop bound is to size below the grace"]
 fn a_restarted_workstation_keeps_the_directors_question_and_answers_it_once_as_processes_without_a_hang_past_the_grace()
 {
     use temper_real_loop_world::case::{self, acts, oracle};
