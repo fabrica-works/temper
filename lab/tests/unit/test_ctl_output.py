@@ -12,7 +12,7 @@ from unittest.mock import patch
 SMOKE = Path(__file__).resolve().parents[2] / 'chat-change-smoke' / 'smoke'
 sys.path.insert(0, str(SMOKE))
 from _ctl_output import _child, _created, _json, _landed, proof
-from _story import Story, main
+from _story import CallFailed, Story, main
 
 # The real landed-owner fixture in task_words.rs, not a model report.
 TOOLS = Path(__file__).resolve().parents[3] / 'crates/temper-client-tools/src'
@@ -154,6 +154,14 @@ CHANGE = evidence()[3]['task']['result']['ending']['task']['done']
 
 
 class StoryDeadline(unittest.TestCase):
+    def test_empty_failed_response_keeps_stdout_empty(self):
+        output = bytearray()
+        with patch('sys.stdout', types.SimpleNamespace(buffer=types.SimpleNamespace(write=output.extend, flush=lambda: None))), \
+                patch('_story.subprocess.run', return_value=types.SimpleNamespace(stdout=b'', returncode=1)):
+            with self.assertRaises(CallFailed):
+                Story(['/temper', '/client', 'http://127.0.0.1:7601/']).call('chat', json=False)
+        self.assertEqual(output, b'')
+
     def drive(self, *, failed=False):
         now = [100.0]
         calls = []
