@@ -204,6 +204,187 @@ fn a_fresh_link_keeps_the_sign_in_held() {
 }
 
 #[test]
+fn a_full_pool_says_so_and_the_same_link_signs_in_once_one_ends() {
+    use support::ctl::{Call, Step, Story};
+    const FULL_CTL: &str =
+        "temper ctl: all 2 sign-ins are in use; the earliest ends at {T}; this link stays usable until it expires\n";
+    const FULL_OPEN: &str =
+        "temper open: all 2 sign-ins are in use; the earliest ends at {T}; this link stays usable until it expires\n";
+    const REFUSED: &[u8] = b"temper ctl: the sign-in link was refused\n";
+    let scratch = ctl_scratch("full_pool_same_link");
+    let sign_in = |name| Step::Run(Call::sign_in().in_directory(name));
+    let sign_out = |name| Step::Run(Call::new(&["sign-out"]).in_directory(name));
+    let open = || Step::Open { directory: "d", until: None };
+    let seen = support::ctl::run(
+        Story::new(
+            scratch.path(),
+            vec![
+                Step::Mark("start"),
+                sign_in("a"),
+                Step::Mark("pool step 1"),
+                sign_in("b"),
+                Step::NextLink,
+                Step::Mark("pool step 2"),
+                sign_in("b"),
+                Step::Mark("pool step 3"),
+                sign_in("c"),
+                Step::NextLink,
+                Step::Mark("pool step 4"),
+                sign_in("c"),
+                Step::Mark("pool step 5"),
+                open(),
+                Step::Mark("pool step 6"),
+                sign_out("a"),
+                Step::Mark("pool step 7"),
+                sign_in("c"),
+                Step::Run(Call::new(&["me", "--json"]).in_directory("c")),
+                Step::Mark("pool step 8"),
+                sign_in("e"),
+                Step::NextLink,
+                Step::Mark("pool step 9"),
+                open(),
+                Step::Mark("pool step 10"),
+                sign_out("b"),
+                Step::Mark("pool step 11"),
+                Step::Open { directory: "d", until: Some(b"== Inbox == Live") },
+                Step::Mark("pool step 12"),
+            ],
+        )
+        .measured(&["c", "d"]),
+    );
+    let mut mismatches = seen.mismatches.clone();
+    if seen.calls.len() != 13 {
+        mismatches.push(format!("story: {} calls ended, expected 13", seen.calls.len()));
+        scratch.remove();
+        panic!("{}", mismatches.join("\n"));
+    }
+    // CLI host::fail finishes with status 1, including a refused sign-in.
+    for (index, step, status, stderr) in [
+        (0, "1", 0, b"".as_slice()),
+        (1, "2", 1, REFUSED),
+        (2, "3", 0, b""),
+        (3, "4", 1, REFUSED),
+        (6, "7", 0, b""),
+        (7, "8 sign-in", 0, b""),
+        (8, "8 me", 0, b""),
+        (9, "9", 1, REFUSED),
+        (11, "11", 0, b""),
+        (12, "12", 0, b""),
+    ] {
+        pool_call(&seen.calls[index], step, status, stderr, &mut mismatches);
+    }
+    // The tier's engine fixture selects Small; configuration overrides the pool, not its lifetime.
+    // jig's protocol-config profile/small.rs supplies people.sign_in_lifetime (24 hours).
+    let lifetime = jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.people.sign_in_lifetime;
+    let full = |index: usize, step: &str, words, owner, mismatches: &mut Vec<String>| {
+        pool_full(&seen.calls[index], step, words, seen.spans[owner], lifetime, mismatches)
+    };
+    let a_ctl = full(4, "5", FULL_CTL, 0, &mut mismatches);
+    let a_open = full(5, "6", FULL_OPEN, 0, &mut mismatches);
+    if let (Some(ctl), Some(open)) = (a_ctl, a_open)
+        && ctl != open
+    {
+        mismatches.push(format!("step 6: expiry {open} differs from step 5's {ctl}"));
+    }
+    full(10, "10", FULL_OPEN, 2, &mut mismatches);
+    for (index, step, token) in [(4, "5", 0), (5, "6", 1)] {
+        if seen.tokens[index][token].is_some() {
+            mismatches.push(format!("step {step}: {}/token exists", ["c", "d"][token]));
+        }
+    }
+    pool_signed_in(&seen, scratch.path(), &mut mismatches);
+    scratch.remove();
+    // Sort by the story's numbered steps, so its first failure is the first broken promise.
+    mismatches.sort_by_key(|line| {
+        line.strip_prefix("step ")
+            .and_then(|s| s.split([':', ' ']).next())
+            .and_then(|n| n.parse::<usize>().ok())
+            .unwrap_or(0)
+    });
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+}
+
+fn pool_signed_in(seen: &support::ctl::Seen, scratch: &std::path::Path, mismatches: &mut Vec<String>) {
+    let me = serde_json::from_slice::<serde_json::Value>(&seen.calls[8].stdout).unwrap_or_default();
+    if !me["party"]["number"].is_u64() {
+        mismatches.push("step 8: me --json has no party number".into());
+    }
+    if skein_lib::bytes::find(&seen.calls[12].stdout, b"== Inbox == Live").is_none() {
+        mismatches.push("step 12: open did not print == Inbox == Live".into());
+    }
+    if seen.tokens[12][1] != Some(0o600) || !support::private(&scratch.join("d/token")) {
+        mismatches.push("step 12: d/token is not kept 0o600".into());
+    }
+}
+
+fn pool_call(ended: &support::Ended, step: &str, status: u8, stderr: &[u8], mismatches: &mut Vec<String>) {
+    if ended.exit != Some(Exit::Code(status)) || ended.stderr != stderr {
+        mismatches.push(format!(
+            "step {step}: exit {:?}, stderr {:?}; expected Code({status}), {:?}",
+            ended.exit,
+            String::from_utf8_lossy(&ended.stderr),
+            String::from_utf8_lossy(stderr)
+        ));
+    }
+}
+
+fn pool_full(
+    ended: &support::Ended,
+    step: &str,
+    words: &str,
+    (began, end): (skein_lib::Wall, skein_lib::Wall),
+    lifetime: Duration,
+    mismatches: &mut Vec<String>,
+) -> Option<u64> {
+    let (prefix, suffix) = words.split_once("{T}").expect("one expiry hole");
+    let time = ended.stderr.strip_prefix(prefix.as_bytes()).and_then(|rest| rest.strip_suffix(suffix.as_bytes()));
+    let parsed = time.and_then(pool_utc_second);
+    if ended.exit != Some(Exit::Code(1)) || parsed.is_none() {
+        mismatches.push(format!(
+            "step {step}: exit {:?}, stderr {:?}; expected Code(1), {words:?} with T in UTC to the second",
+            ended.exit,
+            String::from_utf8_lossy(&ended.stderr)
+        ));
+    }
+    if let Some(second) = parsed {
+        let first = (began.as_nanos() + lifetime.as_nanos()) / 1_000_000_000;
+        let last = (end.as_nanos() + lifetime.as_nanos()) / 1_000_000_000;
+        if second < first || second > last {
+            mismatches
+                .push(format!("step {step}: expiry {second} outside [{first}, {last}] (sign-in step plus lifetime)"));
+        }
+    }
+    parsed
+}
+
+/// Strict UTC, Gregorian calendar, no parser dependency or local timezone.
+fn pool_utc_second(text: &[u8]) -> Option<u64> {
+    if text.len() != 20 || [text[4], text[7], text[10], text[13], text[16], text[19]] != *b"--T::Z" {
+        return None;
+    }
+    let number = |range: std::ops::Range<usize>| {
+        text[range].iter().try_fold(0_u64, |n, b| b.is_ascii_digit().then(|| n * 10 + u64::from(b - b'0')))
+    };
+    let (year, month, day) = (number(0..4)?, number(5..7)?, number(8..10)?);
+    let (hour, minute, second) = (number(11..13)?, number(14..16)?, number(17..19)?);
+    let leap = |y| y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let lengths = [31, if leap(year) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if year < 1970
+        || !(1..=12).contains(&month)
+        || day == 0
+        || day > lengths[usize::try_from(month - 1).ok()?]
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return None;
+    }
+    let years = (1970..year).map(|y| if leap(y) { 366 } else { 365 }).sum::<u64>();
+    let months = lengths[..usize::try_from(month - 1).ok()?].iter().sum::<u64>();
+    Some(((years + months + day - 1) * 24 + hour) * 3600 + minute * 60 + second)
+}
+
+#[test]
 fn a_wait_past_its_timeout_exits_3() {
     use support::ctl::{Call, Step, Story};
     let scratch = ctl_scratch("ctl_timeout");

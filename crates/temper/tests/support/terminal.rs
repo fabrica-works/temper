@@ -28,12 +28,19 @@ pub fn link(serve: &mut Binary, within: Duration) -> Link {
     let Streams::Pipes { output, .. } = streams else { panic!("serve uses pipes") };
     Link { bytes: super::read_line(output, within), streams }
 }
+/// The same piped invocation is also hosted by ctl stories.
+pub(super) fn open_arguments(private: &Path, link: &[u8]) -> Vec<Box<[u8]>> {
+    vec![b"open".as_slice().into(), private.as_os_str().as_bytes().into(), link.into()]
+}
 #[must_use]
 pub fn open(directory: &Path, private: &Path, link: &[u8]) -> Binary {
     Binary::start(
         Command {
             program: env!("CARGO_BIN_EXE_temper").into(),
-            arguments: vec!["open".into(), private.into(), std::ffi::OsStr::from_bytes(link).into()],
+            arguments: open_arguments(private, link)
+                .iter()
+                .map(|word| std::ffi::OsStr::from_bytes(word).into())
+                .collect(),
             directory: directory.into(),
             environment: Vec::new(),
         },
