@@ -442,7 +442,6 @@ impl OneShot {
                     }
                 }
                 root::Request::Kept { line } => self.output.push(true, line),
-                root::Request::Progress { line } => self.output.push(false, line),
                 root::Request::Fact { .. } => {}
             }
         }

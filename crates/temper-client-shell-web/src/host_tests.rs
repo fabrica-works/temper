@@ -101,6 +101,11 @@ fn send(host: &mut Host, name: &[u8]) -> Token {
 #[test]
 fn the_key_patch_declares_a_secret_entry() {
     let mut host = fixture();
+    host.went(b"/accounts/connect");
+    build(&mut host);
+    let way = node(&host, Role::Link, b"Use an API key");
+    host.act(way, Act::Press);
+    host.requests();
     let patches = build(&mut host);
     let key = node(&host, Role::TextField, b"Key (pasted once)");
     let made =
@@ -112,7 +117,6 @@ fn the_key_patch_declares_a_secret_entry() {
             .expect("inserted key field");
     assert_eq!(made.attribute.entry, Some(EntryKind::Secret));
     assert!(made.value.as_ref().expect("empty field").text.is_empty());
-    input(&mut host, b"Provider number", b"17");
     let patches = input(&mut host, b"Key (pasted once)", KEY);
     assert!(!format!("{patches:?} {:?}", host.view).contains("private-host-key"));
 }
@@ -272,9 +276,8 @@ mod memory_literal;
 // ConnectForge's and the welcome's forge words and nodes, and 128 more phrase segments (77,364 B).
 // The chat's saved run state adds 320 B inline and three 512 B call texts (1,856 B).
 // The Forges page, the setup strip and the dot's words (2,664 B).
-// Wire 6's SetUp fields and the row's first repository, written by SKEIN_CODEGEN_WRITE=1 (+27,648 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274389928899;
+const WEB_BYTES: u64 = 274390002455;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

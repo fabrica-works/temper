@@ -69,7 +69,7 @@ fn shown(argument: &Argument, out: &mut Writer) -> Result<(), Overflow> {
         | Kind::Digest
         | Kind::Condition
         | Kind::Subject
-        | Kind::Project { .. }
+        | Kind::Project
         | Kind::Turn
         | Kind::Cursor
         | Kind::Group

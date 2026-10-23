@@ -28,7 +28,6 @@ pub struct Chat {
     pub pending: List<(Key, Sending)>,
     pub outcome: Option<jig_client::Outcome>,
     pub outcome_kind: Option<Sending>,
-    /// Newest reply number marked seen from the retained window.
     pub seen: u64,
     seen_before: u64,
     pub cards: List<super::inbox::Card>,
@@ -638,22 +637,13 @@ impl Chat {
         }
     }
     pub(crate) fn see(&mut self, serial: &mut u64, out: &mut Queue<Request>) {
-        let mut newest = 0;
-        // Backlog for jig: non-owner turns carry no reply number.
-        for row in &self.thread.lines.rows {
-            if let c::Activity::Owner { source, .. } = &row.event
-                && let c::OwnerActivity::Turn { reply, .. } = source.line
-            {
-                newest = newest.max(reply);
-            }
-        }
-        if newest <= self.seen || self.sending(Sending::Seen) {
+        if self.thread.loaded <= self.seen || self.sending(Sending::Seen) {
             return;
         }
         *serial = serial.checked_add(1).expect("chat keys fit");
         let key = Key { asker: Owner::Pages.asker(), number: *serial };
         self.seen_before = self.seen;
-        self.seen = newest;
+        self.seen = self.thread.loaded;
         self.pending.push((key, Sending::Seen)).expect("one seen fits");
         out.push(Request::Client(jig_client::Event::Send {
             key,

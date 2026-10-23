@@ -52,7 +52,7 @@ const USAGES: &[&[u8]] = &[
     b"release N --hold R [--again] [--key NAME]\n",
     b"stop N [--key NAME]\n",
     b"cancel N [--grace D] REASON [--key NAME]\n",
-    b"wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]\nwait forges [--since DIGEST] [--until settled|connected:F|made:F] [--timeout DURATION]\n",
+    b"wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]\nwait forges [--since DIGEST] [--until settled|connected:F] [--timeout DURATION]\n",
     b"adopt --project P [--forge F] --owner O --name N --landing B [--role owned|fork|context] [--prefix X] [--no-home] [--no-ci] [--check G]... --key NAME\n",
     b"sign-in FILE|-\n",
     b"sign-out\n",
@@ -71,7 +71,7 @@ const USAGES: &[&[u8]] = &[
     b"declare PROVIDER ADAPTER NAME [--account A] --key NAME\n",
     b"verify ACCOUNT [--source sign_in|key|program] [--key NAME]\n",
     b"forges\n",
-    b"forge-setup F [--org O] [--repository R] [--project P] [--key NAME]\n",
+    b"forge-setup F [--key NAME]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

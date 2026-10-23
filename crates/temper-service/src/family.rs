@@ -40,7 +40,6 @@ pub fn to_root(
             };
             let request = match request {
                 w::Request::SetUp(value) => {
-                    let value = value.into_parts();
                     return Ok(root::Event::Party(root::PartyInput::Application {
                         scope,
                         reply_to,
@@ -48,15 +47,7 @@ pub fn to_root(
                         key,
                         digest,
                         carried,
-                        request: forge::Ask::SetUp {
-                            forge: value.forge,
-                            org: value.org,
-                            repository: value.repository,
-                            project: match value.project {
-                                w::SetUpProject::Existing(value) => forge::SetUpProject::Existing(value.project()),
-                                w::SetUpProject::New(value) => forge::SetUpProject::New(value.into_parts().name),
-                            },
-                        },
+                        request: forge::Ask::SetUp { forge: value.forge() },
                     }));
                 }
                 w::Request::Adopt(value) => value,
@@ -420,8 +411,6 @@ pub fn answer(
                         forge::SetUpRefusal::NotOffered => w::SetUpRefusal::NotOffered,
                         forge::SetUpRefusal::NotUnderTheBox => w::SetUpRefusal::NotUnderTheBox,
                         forge::SetUpRefusal::Busy => w::SetUpRefusal::Busy,
-                        forge::SetUpRefusal::NewProject => w::SetUpRefusal::NewProject,
-                        forge::SetUpRefusal::Invalid => w::SetUpRefusal::Invalid,
                     },
                 },
             )
@@ -478,10 +467,6 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                             forge::Mode::Owned => w::Mode::Owned,
                             forge::Mode::Fake => w::Mode::Fake,
                         },
-                        first: match row.first {
-                            Some(first) => Some(first_repository(first, limits)?),
-                            None => None,
-                        },
                         connection: connection(row.connection, limits)?,
                         offer: match row.offer {
                             forge::Offer::NotOffered => w::Offer::NotOffered,
@@ -525,38 +510,4 @@ fn connection(value: forge::Connection, limits: &w::Limits) -> Option<w::Connect
             w::Connection::Stopped(w::Stopped::new(limits, w::StoppedParts { reason }).ok()?)
         }
     })
-}
-
-fn first_repository(first: forge::First, limits: &w::Limits) -> Option<w::FirstRepository> {
-    let project = match first.project {
-        forge::SetUpProject::Existing(project) => {
-            w::SetUpProject::Existing(w::ExistingProject::new(limits, w::ExistingProjectParts { project }).ok()?)
-        }
-        forge::SetUpProject::New(name) => {
-            w::SetUpProject::New(w::NewProject::new(limits, w::NewProjectParts { name }).ok()?)
-        }
-    };
-    let state = match first.state {
-        forge::FirstState::Making => w::FirstState::Making,
-        forge::FirstState::Made { id } => w::FirstState::Made(w::Made::new(limits, w::MadeParts { id }).ok()?),
-        forge::FirstState::Failed { step } => w::FirstState::Failed(
-            w::CreateFailed::new(
-                limits,
-                w::CreateFailedParts {
-                    step: match step {
-                        forge::CreateStep::Admin => w::CreateStep::Admin,
-                        forge::CreateStep::Org => w::CreateStep::Org,
-                        forge::CreateStep::Repository => w::CreateStep::Repository,
-                        forge::CreateStep::File => w::CreateStep::File,
-                    },
-                },
-            )
-            .ok()?,
-        ),
-    };
-    w::FirstRepository::new(
-        limits,
-        w::FirstRepositoryParts { org: first.org, repository: first.repository, project, state },
-    )
-    .ok()
 }

@@ -62,7 +62,7 @@ pub enum Kind {
     /// A closed word or a prefix followed by a bounded number.
     NamedNumber {
         words: &'static [&'static [u8]],
-        prefixes: &'static [&'static [u8]],
+        prefix: &'static [u8],
         min: u64,
         max: u64,
     },
@@ -78,9 +78,7 @@ pub enum Kind {
     Digest,
     Condition,
     Subject,
-    Project {
-        empty: bool,
-    },
+    Project,
     Turn,
     Cursor,
     Group,

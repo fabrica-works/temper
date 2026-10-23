@@ -9,7 +9,7 @@ pub const ROW: Tool = Tool {
     line: b"Adopt a repository",
     result: b"adopt",
     forms: &[&[
-        flag(b"project", b"P", Kind::Project { empty: false }, Required, b"Project name or number"),
+        flag(b"project", b"P", Kind::Project, Required, b"Project name or number"),
         flag(b"forge", b"F", Kind::Number, Optional, b"Forge number, within u16"),
         flag(b"owner", b"O", Kind::Text, Required, b"Repository owner"),
         flag(b"name", b"N", Kind::Text, Required, b"Repository name"),

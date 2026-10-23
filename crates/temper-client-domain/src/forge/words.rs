@@ -869,8 +869,6 @@ pub const fn set_up_refusal(why: super::forges::SetUpRefusal) -> &'static [u8] {
         SetUpRefusal::NotOffered => b"not offered",
         SetUpRefusal::NotUnderTheBox => b"not under the box",
         SetUpRefusal::Busy => b"busy",
-        SetUpRefusal::NewProject => b"a new project",
-        SetUpRefusal::Invalid => b"invalid: the organization, repository or project name is empty or too long",
     }
 }
 #[must_use]
@@ -982,32 +980,4 @@ fn lossy(bytes: &[u8]) -> Box<[u8]> {
         }
     }
     out.finish()
-}
-
-/// The first repository's step, in the row's words (client/forge.md, 5.4).
-#[must_use]
-pub const fn create_step(step: super::forges::CreateStep) -> &'static [u8] {
-    use super::forges::CreateStep;
-    match step {
-        CreateStep::Admin => b"checking the admin's token",
-        CreateStep::Org => b"making the organization",
-        CreateStep::Repository => b"making the repository",
-        CreateStep::File => b"adding the starter workflow",
-    }
-}
-#[must_use]
-pub fn first_repository(first: &super::forges::First) -> Box<[u8]> {
-    use super::forges::{FirstState, SetUpProject};
-    let name = full_name(&lossy(&first.org), &lossy(&first.repository));
-    match first.state {
-        FirstState::Making => join_words(&[b"Making ", &name]),
-        FirstState::Made { .. } => {
-            let project = match &first.project {
-                SetUpProject::Existing(number) => Box::from(skein_lib::Decimal::of(u64::from(*number)).as_bytes()),
-                SetUpProject::New(name) => lossy(name),
-            };
-            join_words(&[&name, b" made, in ", &project])
-        }
-        FirstState::Failed { step } => join_words(&[b"Making ", &name, b" failed: ", create_step(step)]),
-    }
 }

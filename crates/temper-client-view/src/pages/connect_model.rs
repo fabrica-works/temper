@@ -376,7 +376,7 @@ fn ready_body(
         button(b, bindings, &label(me, way, ways, w), Act::SignIn { name: root.pages().account_name(), way }, false);
     }
 }
-fn sign_in_end(b: &mut Builder, root: &Domain, w: &Words, way: Way, end: &c::OwnerAccountEnd) -> bool {
+pub(super) fn sign_in_end(b: &mut Builder, root: &Domain, w: &Words, way: Way, end: &c::OwnerAccountEnd) -> bool {
     match end {
         c::OwnerAccountEnd::Made { declined: true, .. } | c::OwnerAccountEnd::Renewed { declined: true, .. } => {
             text(b, w, Role::Alert, W::DeclinedPlan);

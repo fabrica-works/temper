@@ -23,6 +23,18 @@ impl Request {
         self.written = self.written.checked_add(1).expect("account field writes fit");
     }
     #[must_use]
+    pub fn busy(&self, client: &Client) -> bool {
+        if let Some(p) = &self.pending
+            && p.outcome.is_none()
+        {
+            return true;
+        }
+        match self.sign_in_state(client) {
+            SignInState::Started { .. } | SignInState::Signing { .. } => true,
+            SignInState::Unknown | SignInState::Ended { .. } => false,
+        }
+    }
+    #[must_use]
     pub fn has_key(&self) -> bool {
         self.value.is_some()
     }

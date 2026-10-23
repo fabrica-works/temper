@@ -117,7 +117,7 @@ stop N [--key NAME]
 cancel N [--grace D] REASON [--key NAME]
   Cancel a task and its tree
 wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
-wait forges [--since DIGEST] [--until settled|connected:F|made:F] [--timeout DURATION]
+wait forges [--since DIGEST] [--until settled|connected:F] [--timeout DURATION]
   Wait for a subject's change or condition
 adopt --project P [--forge F] --owner O --name N --landing B [--role owned|fork|context] [--prefix X] [--no-home] [--no-ci] [--check G]... --key NAME
   Adopt a repository
@@ -155,5 +155,5 @@ verify ACCOUNT [--source sign_in|key|program] [--key NAME]
   Ask hosts to check a program login; then wait accounts --until settled
 forges
   Read the deployment's forges
-forge-setup F [--org O] [--repository R] [--project P] [--key NAME]
+forge-setup F [--key NAME]
   Set up an owned Forgejo here

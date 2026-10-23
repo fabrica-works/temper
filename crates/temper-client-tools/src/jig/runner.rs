@@ -46,7 +46,6 @@ pub enum Out {
     Client { event: Event },
     Ready,
     Kept { line: Box<[u8]> },
-    Progress { line: Box<[u8]> },
     Printed { number: u32, printed: Printed },
     DraftAmendment { called: Box<Called>, task: Box<jig_client::contract::Task> },
 }

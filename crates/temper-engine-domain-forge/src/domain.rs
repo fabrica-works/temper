@@ -98,7 +98,6 @@ pub struct Domain {
     configured: Map<u16, crate::Configured>,
     under_box: bool,
     connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
-    first: Map<u16, crate::First>,
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,
     setup_pending: Map<Token, Token>,
     installations: Map<(u16, u64), crate::Installation>,
@@ -154,7 +153,6 @@ impl Domain {
     pub fn connection_limits(&mut self, forges: u32, installations: u32) {
         assert!(self.connections.is_empty() && self.installations.is_empty(), "connection limits before inputs");
         self.connections = Map::with_capacity(forges);
-        self.first = Map::with_capacity(forges);
         self.installations = Map::with_capacity(forges.checked_mul(installations).expect("connection bounds"));
     }
     #[must_use]
@@ -163,22 +161,6 @@ impl Domain {
             Some((state, _)) => state.clone(),
             None => crate::Connection::NotConnected,
         }
-    }
-    /// Create's service tell; a forge without a setup intent ignores it.
-    pub fn first_made(&mut self, forge: u16, id: u64) -> bool {
-        if let Some(first) = self.first.get_mut(&forge) {
-            first.state = crate::FirstState::Made { id };
-            return true;
-        }
-        false
-    }
-    /// Create's stopped step is volatile, like its setup intent.
-    pub fn first_failed(&mut self, forge: u16, step: crate::CreateStep) -> bool {
-        if let Some(first) = self.first.get_mut(&forge) {
-            first.state = crate::FirstState::Failed { step };
-            return true;
-        }
-        false
     }
     #[must_use]
     pub fn forges(&self) -> crate::Forges {
@@ -190,7 +172,6 @@ impl Domain {
                 mode: config.mode,
                 connection: self.connection(*forge),
                 offer: self.offer(*forge),
-                first: self.first.get(forge).cloned(),
             })
             .expect("configured forges");
         }
@@ -436,7 +417,6 @@ impl Domain {
             configured,
             under_box,
             connections: Map::with_capacity(l.client.repositories),
-            first: Map::with_capacity(l.client.repositories),
             setup_unknown: None,
             setup_pending: Map::with_capacity(l.applications),
             installations: Map::with_capacity(l.client.rows),
@@ -889,16 +869,6 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             out.push(Request::MarkedForges);
         }
         Event::SetUpAnswered { forge, request, answer } => d.setup_answer(forge, request, answer, out),
-        Event::FirstMade { forge, id } => {
-            if d.first_made(forge, id) {
-                out.push(Request::MarkedForges);
-            }
-        }
-        Event::FirstFailed { forge, step } => {
-            if d.first_failed(forge, step) {
-                out.push(Request::MarkedForges);
-            }
-        }
         Event::Connection { forge, state } => {
             match &state {
                 crate::Connection::Connected { id, .. } => {
@@ -931,50 +901,26 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         },
         Event::Application { request, token, retention, ask } => match ask {
             crate::Ask::Adopt(adoption) => adoption::start(d, env, request, token, retention, adoption, out),
-            crate::Ask::SetUp { forge, org, repository, project } => {
+            crate::Ask::SetUp { forge } => {
                 if d.setup_pending.insert(request, token).is_err() {
                     out.push(Request::ApplicationAgain { request, why: jig_domain_people::Again::Busy });
                 } else {
-                    let refusal = if let crate::SetUpProject::New(_) = project {
-                        Some(crate::SetUpRefusal::NewProject)
-                    } else if !setup_login(&org)
-                        || !setup_repository(&repository)
-                        || org.len() > usize::try_from(env.limits.name_bytes).expect("name bound fits")
-                        || repository.len() > usize::try_from(env.limits.name_bytes).expect("name bound fits")
-                    {
-                        Some(crate::SetUpRefusal::Invalid)
-                    } else {
-                        match d.offer(forge) {
-                            crate::Offer::NotOffered => Some(crate::SetUpRefusal::NotOffered),
-                            crate::Offer::NotUnderTheBox => Some(crate::SetUpRefusal::NotUnderTheBox),
-                            crate::Offer::Offered => {
-                                let mut busy = false;
-                                for (_, (state, _)) in &d.connections {
-                                    if let crate::Connection::SettingUp { .. } = state {
-                                        busy = true;
-                                    }
+                    let refusal = match d.offer(forge) {
+                        crate::Offer::NotOffered => Some(crate::SetUpRefusal::NotOffered),
+                        crate::Offer::NotUnderTheBox => Some(crate::SetUpRefusal::NotUnderTheBox),
+                        crate::Offer::Offered => {
+                            let mut busy = false;
+                            for (_, (state, _)) in &d.connections {
+                                if let crate::Connection::SettingUp { .. } = state {
+                                    busy = true;
                                 }
-                                if busy { Some(crate::SetUpRefusal::Busy) } else { None }
                             }
+                            if busy { Some(crate::SetUpRefusal::Busy) } else { None }
                         }
                     };
                     match refusal {
                         Some(why) => d.setup_answer(forge, request, crate::SetUpAnswer::Refused(why), out),
-                        None => {
-                            d.first
-                                .insert(
-                                    forge,
-                                    crate::First {
-                                        org: org.clone(),
-                                        repository: repository.clone(),
-                                        project,
-                                        state: crate::FirstState::Making,
-                                    },
-                                )
-                                .expect("configured forges bound first repositories");
-                            out.push(Request::MarkedForges);
-                            out.push(Request::SetUp { forge, request, org, repository });
-                        }
+                        None => out.push(Request::SetUp { forge, request }),
                     }
                 }
             }
@@ -4095,24 +4041,4 @@ pub(crate) fn keep_panel_ci(d: &mut Domain, task: u64, read: change::Ci, out: &m
         d.panel_ci.insert(task, read).expect("one CI verdict per held change");
         emit(out, Request::Marked { tasks: Box::new([task]) });
     }
-}
-
-// Admission mirrors skein's Create grammar without an io dependency in this domain.
-// The tests pin both grammars to the same boundary cases (protocol/setup.md, 6.7).
-fn setup_login(name: &[u8]) -> bool {
-    !name.is_empty()
-        && name.len() <= 40
-        && name.first().expect("nonempty login").is_ascii_alphanumeric()
-        && setup_characters(name)
-}
-fn setup_repository(name: &[u8]) -> bool {
-    !name.is_empty() && name.len() <= 100 && name != b"." && name != b".." && setup_characters(name)
-}
-fn setup_characters(name: &[u8]) -> bool {
-    for byte in name {
-        if !byte.is_ascii_alphanumeric() && !b"._-".contains(byte) {
-            return false;
-        }
-    }
-    true
 }

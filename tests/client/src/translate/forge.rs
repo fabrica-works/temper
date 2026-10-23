@@ -132,7 +132,7 @@ pub fn request(
         v1::Request::Adopt(adopt) => adopt,
         v1::Request::SetUp(set_up) => {
             assert!(reader.is_empty(), "whole setup request");
-            return set_up_request(transport, who, attempt, key, scope, ask, set_up.into_parts());
+            return set_up_request(transport, who, attempt, key, scope, ask, set_up.forge());
         }
     })
     .into_parts();
@@ -431,7 +431,7 @@ fn set_up_request(
     key: [u8; 16],
     scope: jig_client::contract::Scope,
     record: &jig_client::Family,
-    setup: temper_client_protocol_wire::v1::SetUpParts,
+    forge: u16,
 ) -> engine::Event {
     let reply_to = transport.reply_to(Reply::Keyed {
         client: who,
@@ -450,19 +450,7 @@ fn set_up_request(
         key,
         digest: skein_lib::sha256::digest(&record.bytes),
         carried: None,
-        request: owner::Ask::SetUp {
-            forge: setup.forge,
-            org: setup.org,
-            repository: setup.repository,
-            project: match setup.project {
-                temper_client_protocol_wire::v1::SetUpProject::Existing(value) => {
-                    owner::SetUpProject::Existing(value.project())
-                }
-                temper_client_protocol_wire::v1::SetUpProject::New(value) => {
-                    owner::SetUpProject::New(value.into_parts().name)
-                }
-            },
-        },
+        request: owner::Ask::SetUp { forge },
     })
 }
 fn open_forges(

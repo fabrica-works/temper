@@ -27,11 +27,11 @@ pub(super) fn valid(
             };
             *n >= min && *n <= max
         }
-        Kind::NamedNumber { words, prefixes, min, max } => {
+        Kind::NamedNumber { words, prefix, min, max } => {
             let Value::Text(bytes) = value else {
                 return Err(Usage::Kind { argument });
             };
-            named_number(bytes, words, prefixes, min, max)
+            named_number(bytes, words, prefix, min, max)
         }
         Kind::Word { set } => {
             let Value::Word(index) = value else {
@@ -55,7 +55,7 @@ pub(super) fn valid(
             };
             true
         }
-        Kind::Project { empty } => return valid_project(value, argument, empty),
+        Kind::Project => return valid_project(value, argument),
         Kind::Turn => {
             let Value::Turn(_) = value else {
                 return Err(Usage::Kind { argument });
@@ -118,7 +118,7 @@ pub(crate) fn decode(table: &[&Tool], kind: Kind, word: &[u8]) -> Option<Value> 
     Some(match kind {
         Kind::Number | Kind::Count => Value::Number(number(word)?),
         Kind::NumberRange { min, max } => Value::Number(bounded_number(word, min, max)?),
-        Kind::NamedNumber { words, prefixes, min, max } => Value::Text(named_text(word, words, prefixes, min, max)?),
+        Kind::NamedNumber { words, prefix, min, max } => Value::Text(named_text(word, words, prefix, min, max)?),
         Kind::Word { set } => {
             let mut found = None;
             for (index, name) in set.iter().enumerate() {
@@ -132,9 +132,9 @@ pub(crate) fn decode(table: &[&Tool], kind: Kind, word: &[u8]) -> Option<Value> 
         Kind::Text | Kind::File if word == b"-" => Value::Stdin,
         Kind::Text | Kind::Literal => Value::Text(Box::from(word)),
         Kind::File => Value::File(Box::from(word)),
-        Kind::Project { empty } => {
+        Kind::Project => {
             if word.is_empty() {
-                return if empty { Some(Value::Project(Project::Name(Box::default()))) } else { None };
+                return None;
             }
             let mut digits = true;
             for byte in word {
@@ -372,16 +372,13 @@ fn duration(word: &[u8]) -> Option<Duration> {
     Some(Duration::from_nanos(number(digits)?.checked_mul(unit)?.checked_mul(1_000_000_000)?))
 }
 
-fn valid_project(value: &Value, argument: u8, empty: bool) -> Result<(), Usage> {
+fn valid_project(value: &Value, argument: u8) -> Result<(), Usage> {
     let Value::Project(project) = value else {
         return Err(Usage::Kind { argument });
     };
     match project {
         Project::Number(_) => Ok(()),
         Project::Name(name) => {
-            if name.is_empty() && empty {
-                return Ok(());
-            }
             let mut digits = true;
             for byte in name {
                 digits &= byte.is_ascii_digit();
@@ -404,18 +401,15 @@ fn valid_number(spec: &Argument, value: &Value, argument: u8, limits: &Limits) -
     Ok(())
 }
 
-fn named_number(word: &[u8], words: &[&[u8]], prefixes: &[&[u8]], min: u64, max: u64) -> bool {
+fn named_number(word: &[u8], words: &[&[u8]], prefix: &[u8], min: u64, max: u64) -> bool {
     if words.contains(&word) {
         return true;
     }
-    for prefix in prefixes {
-        if let Some(digits) = word.strip_prefix(*prefix)
-            && bounded_number(digits, min, max).is_some()
-        {
-            return true;
-        }
+    let Some(digits) = word.strip_prefix(prefix) else { return false };
+    match number(digits) {
+        Some(n) => n >= min && n <= max,
+        None => false,
     }
-    false
 }
 
 fn valid_duration(spec: &Argument, value: &Value, argument: u8, limits: &Limits) -> Result<(), Usage> {
@@ -431,6 +425,6 @@ fn bounded_number(word: &[u8], min: u64, max: u64) -> Option<u64> {
     let n = number(word)?;
     if n < min || n > max { None } else { Some(n) }
 }
-fn named_text(word: &[u8], words: &[&[u8]], prefixes: &[&[u8]], min: u64, max: u64) -> Option<Box<[u8]>> {
-    if named_number(word, words, prefixes, min, max) { Some(Box::from(word)) } else { None }
+fn named_text(word: &[u8], words: &[&[u8]], prefix: &[u8], min: u64, max: u64) -> Option<Box<[u8]>> {
+    if named_number(word, words, prefix, min, max) { Some(Box::from(word)) } else { None }
 }

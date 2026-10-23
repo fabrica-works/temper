@@ -320,7 +320,6 @@ pub(crate) struct Harness {
     pub carried: BTreeMap<u32, skein_lib::Secret>,
     pub saved: BTreeMap<u32, skein_lib::RequestKey>,
     pub kept_lines: List<Box<[u8]>>,
-    pub progress: List<Box<[u8]>>,
     pub facts: u32,
     pub next: u32,
     pub pending_reads: Queue<u32>,
@@ -353,7 +352,6 @@ pub(crate) fn started_with_limits(
         sends: BTreeMap::new(),
         saved: BTreeMap::new(),
         carried: BTreeMap::new(),
-        progress: List::with_capacity(OUTPUTS),
         kept_lines: List::with_capacity(OUTPUTS),
         facts: 0,
         next: 0,
@@ -424,7 +422,6 @@ impl Harness {
                     let call = self.serving.unwrap_or(self.next);
                     self.saved.insert(call, record.key);
                 }
-                root::Request::Progress { line } => self.progress.push(line).expect("bounded progress lines"),
                 root::Request::Kept { line } => {
                     self.kept_lines.push(line).expect("bounded recovery lines");
                 }

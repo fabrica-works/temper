@@ -9,7 +9,6 @@ pub struct Agent {
     root: root::Root,
     ready: bool,
     kept_lines: Vec<Box<[u8]>>,
-    progress: Vec<Box<[u8]>>,
     printed: BTreeMap<u32, Printed>,
     calls: u32,
     release_tasks: BTreeSet<u64>,
@@ -88,7 +87,6 @@ pub fn new(seed: u64) -> (Root, View) {
             root: root::Root::unlinked(&limits, seed).expect("tools preset"),
             ready: false,
             kept_lines: Vec::new(),
-            progress: Vec::new(),
             printed: BTreeMap::new(),
             calls: 0,
             release_tasks: BTreeSet::new(),
@@ -142,7 +140,6 @@ fn drain(agent: &mut Agent, requests: &mut Queue<root::Request>, out: &mut Queue
             root::Request::Fact { fact } => out.push(Request::Fact { fact }),
             root::Request::Ready => agent.ready = true,
             root::Request::Kept { line } => agent.kept_lines.push(line),
-            root::Request::Progress { line } => agent.progress.push(line),
             root::Request::Printed { number, printed } => {
                 for task in released_tasks(&printed) {
                     if agent.release_tasks.insert(task) {

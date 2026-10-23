@@ -890,7 +890,7 @@ impl Joint {
     fn immediate(&mut self) {
         let immediate = std::mem::take(&mut self.engine.immediate);
         for request in immediate {
-            if let engine::Request::SetUp { forge, request, .. } = &request {
+            if let engine::Request::SetUp { forge, request } = &request {
                 self.set_ups.push((*forge, *request));
             }
             self.packet(request);

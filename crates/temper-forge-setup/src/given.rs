@@ -12,14 +12,13 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
     let limits = root.member(b"application").member(b"limits").member(b"overrides");
     let mut what = What::Reason(b"invalid form");
     let path = match why.place {
-        Place::FilesLimit
-        | Place::FileBytesLimit
-        | Place::CreateOrg
+        Place::FilesLimit | Place::FileBytesLimit => unreachable!("temper fixes files and file_bytes above zero"),
+        Place::CreateOrg
         | Place::CreateRepository
         | Place::Files
         | Place::FilePath(_)
         | Place::FileContent(_)
-        | Place::Plan => unreachable!("Create fields and file limits are temper constants or admitted SetUp names"),
+        | Place::Plan => unreachable!("temper sends Create from the first-repository work, not yet"),
         Place::BotLogin => entry.member(b"bot").member(b"login"),
         Place::BotEmail => entry.member(b"bot").member(b"email"),
         Place::Orgs => {
@@ -68,20 +67,19 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
     };
     if let Some(other) = why.other {
         what = What::Against(match other {
+            Place::FilesLimit | Place::FileBytesLimit => unreachable!("temper fixes files and file_bytes above zero"),
+            Place::CreateOrg
+            | Place::CreateRepository
+            | Place::Files
+            | Place::FilePath(_)
+            | Place::FileContent(_)
+            | Place::Plan => unreachable!("temper sends Create from the first-repository work, not yet"),
             Place::BackoffMax => b"setup.backoff_max_ms",
             Place::Deadline => b"setup.deadline_ms",
             Place::ReachableLimit | Place::Page => {
                 unreachable!("no picker until temper-10; reachable is fixed nonzero")
             }
             Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => b"forge.client.repositories",
-            Place::FilesLimit
-            | Place::FileBytesLimit
-            | Place::CreateOrg
-            | Place::CreateRepository
-            | Place::Files
-            | Place::FilePath(_)
-            | Place::FileContent(_)
-            | Place::Plan => unreachable!("Create has no paired limits"),
             Place::Word
             | Place::BotLogin
             | Place::BotEmail

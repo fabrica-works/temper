@@ -502,7 +502,8 @@ pub enum Word {
 // ConnectForge's and the welcome's forge words (client/forge.md, 5.4).
 // The Forges page, navigation dot and setup strip (18 phrases).
 // Thirty-one model-flow phrases (client/README.md, 5.5).
-const PHRASES: u32 = 970;
+// The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
+const PHRASES: u32 = 991;
 const ALL: [Word; 458] = [
     Word::YourForgesTitle,
     Word::YourForges,

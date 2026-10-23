@@ -85,7 +85,7 @@ pub fn deployment_account() -> Script {
             Step::Go { address: Address::Accounts },
             Step::See { find: Find::exactly_named(Role::Heading { level: 1 }, b"Accounts"), within: START_WITHIN },
             Step::See {
-                find: Find::exactly_named(Role::Region, b"OpenAI API key \xc2\xb7 held by the deployment"),
+                find: Find::exactly_named(Role::Disclosure, b"OpenAI API key \xc2\xb7 held by the deployment"),
                 within: START_WITHIN,
             },
         ]),
@@ -103,10 +103,11 @@ pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
             // A sign-in started from another client is drawn on Accounts (README 11).
             Step::Go { address: Address::Accounts },
             Step::See { find: Find::exactly_named(Role::Status, signing), within: START_WITHIN },
-            Step::See { find: Find::exactly_named(Role::Region, card.as_bytes()), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Disclosure, card.as_bytes()), within: START_WITHIN },
+            // TreeFace reads disclosure contents even while the native shell folds them.
             Step::See {
                 find: Find::text("ChatGPT sign-in · Ready".as_bytes()).within(Box::new([Target::Role {
-                    role: Role::Region,
+                    role: Role::Disclosure,
                     name: card.into_bytes().into_boxed_slice(),
                 }])),
                 within: START_WITHIN,

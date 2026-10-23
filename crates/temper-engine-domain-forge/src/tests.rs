@@ -987,7 +987,7 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
     .unwrap()
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
-    Row { first: None, number, kind, mode: Mode::Owned, connection, offer }
+    Row { number, kind, mode: Mode::Owned, connection, offer }
 }
 #[test]
 fn setup_rows_and_answers_agree_in_every_connection_state() {
@@ -1017,18 +1017,7 @@ fn setup_rows_and_answers_agree_in_every_connection_state() {
             let emitted = outputs(&mut d, setup_application(1, request, token));
             match refusal {
                 None => {
-                    assert_eq!(
-                        emitted.as_ref(),
-                        [
-                            Request::MarkedForges,
-                            Request::SetUp {
-                                forge: 1,
-                                request,
-                                org: b"work".as_slice().into(),
-                                repository: b"hello".as_slice().into()
-                            }
-                        ]
-                    );
+                    assert_eq!(emitted.as_ref(), [Request::SetUp { forge: 1, request }]);
                     outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer: SetUpAnswer::SettingUp });
                     assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::SettingUp)));
                 }
@@ -1163,17 +1152,7 @@ fn routing_tables_take_every_installation_with_the_connection_components_bounds(
 }
 
 fn setup_application(forge: u16, request: Token, token: Token) -> Event {
-    Event::Application {
-        request,
-        token,
-        retention: Duration::from_secs(60),
-        ask: Ask::SetUp {
-            forge,
-            org: b"work".as_slice().into(),
-            repository: b"hello".as_slice().into(),
-            project: SetUpProject::Existing(1),
-        },
-    }
+    Event::Application { request, token, retention: Duration::from_secs(60), ask: Ask::SetUp { forge } }
 }
 
 #[test]
@@ -1229,15 +1208,7 @@ fn setup_flights_refuse_busy_at_the_bound_and_an_answer_frees_room() {
     );
     assert_eq!(
         outputs(&mut d, setup_application(1, request, request)).as_ref(),
-        [
-            Request::MarkedForges,
-            Request::SetUp {
-                forge: 1,
-                request,
-                org: b"work".as_slice().into(),
-                repository: b"hello".as_slice().into()
-            }
-        ]
+        [Request::SetUp { forge: 1, request }]
     );
 }
 
@@ -1315,158 +1286,4 @@ fn the_forges_document_orders_connections_and_every_connection_marks_it() {
 fn a_configured_forge_without_routing_input_reads_not_connected() {
     let d = setup_domain(&CONFIGURED[..1], true);
     assert_eq!(d.forges().rows.as_ref(), [setup_row(1, Kind::Forgejo, Connection::NotConnected, Offer::NotOffered)]);
-}
-
-#[test]
-fn a_new_project_is_refused_before_any_box_effect_or_first_repository() {
-    for name in [b"Next".as_slice(), b"", &[b'x'; 129]] {
-        let mut d = setup_domain(&CONFIGURED, true);
-        let request = Token::new(91);
-        let token = Token::new(92);
-        let event = Event::Application {
-            request,
-            token,
-            retention: Duration::from_secs(60),
-            ask: Ask::SetUp {
-                forge: 1,
-                org: Box::default(),
-                repository: Box::default(),
-                project: SetUpProject::New(name.into()),
-            },
-        };
-        assert_eq!(outputs(&mut d, event).as_ref(), [Request::ApplicationDone { request, token }]);
-        assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::NewProject))));
-        for row in &d.forges().rows {
-            assert!(row.first.is_none());
-        }
-    }
-}
-#[test]
-fn setup_names_are_validated_at_admission_on_both_sides_of_the_name_bound() {
-    use skein_forge_setup::{given, host, limits};
-    for domain_bound in [4, LIMITS.name_bytes] {
-        let mut env = env();
-        env.limits.name_bytes = domain_bound;
-        for org in [true, false] {
-            let kit_bound = if org { 40 } else { 100 };
-            let bound = domain_bound.min(kit_bound);
-            let mut cases = skein_lib::List::with_capacity(11);
-            for length in [0, 1, bound, bound + 1, kit_bound, kit_bound + 1] {
-                let mut bytes = skein_lib::Writer::new(usize::try_from(length).unwrap());
-                for _ in 0..length {
-                    bytes.put(b"x").unwrap();
-                }
-                cases.push(bytes.finish()).unwrap();
-            }
-            for name in [b".".as_slice(), b"..", b"a/b", b"-a", b"a._-9"] {
-                cases.push(Box::from(name)).unwrap();
-            }
-            for name in cases.as_slice() {
-                let mut d = setup_domain(&CONFIGURED, true);
-                outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
-                let request = Token::new(91);
-                let token = Token::new(92);
-                let org_name: Box<[u8]> = if org { name.clone() } else { b"o".as_slice().into() };
-                let repository: Box<[u8]> = if org { b"r".as_slice().into() } else { name.clone() };
-                let plan = host::Plan::Create {
-                    forge: 1,
-                    org: org_name.clone(),
-                    repository: repository.clone(),
-                    files: Box::new([]),
-                };
-                let kit_limits = limits::Limits {
-                    orgs: 1,
-                    repositories: 1,
-                    reachable: 1,
-                    files: 1,
-                    file_bytes: 4096,
-                    deadline: Duration::from_secs(120),
-                    backoff: Duration::from_millis(100),
-                    backoff_max: Duration::from_secs(5),
-                };
-                let accepted = given::check_create(&kit_limits, domain_bound, &plan).is_ok();
-                let ask = Ask::SetUp {
-                    forge: 1,
-                    org: org_name.clone(),
-                    repository: repository.clone(),
-                    project: SetUpProject::Existing(1),
-                };
-                let mut emitted = Queue::with_capacity(max_out(&env.limits));
-                step(
-                    &mut d,
-                    &env,
-                    Event::Application { request, token, retention: Duration::from_secs(60), ask },
-                    &mut emitted,
-                );
-                if accepted {
-                    assert_eq!(emitted.pop(), Some(Request::MarkedForges));
-                    assert_eq!(emitted.pop(), Some(Request::SetUp { forge: 1, request, org: org_name, repository }));
-                    assert_eq!(d.forges().rows[0].first.as_ref().unwrap().state, FirstState::Making);
-                } else {
-                    assert_eq!(emitted.pop(), Some(Request::ApplicationDone { request, token }));
-                    assert_eq!(
-                        d.application_answer(token),
-                        Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::Invalid)))
-                    );
-                    assert!(d.forges().rows[0].first.is_none());
-                }
-                assert!(emitted.is_empty());
-            }
-        }
-    }
-}
-#[test]
-fn admitted_setup_projects_its_fields_as_making_and_the_next_admission_replaces_them() {
-    let mut d = setup_domain(&CONFIGURED, true);
-    for (number, org, repository, project) in
-        [(91, b"work".as_slice(), b"hello".as_slice(), 1), (93, b"team", b"widget", 2)]
-    {
-        outputs(
-            &mut d,
-            Event::Connection { forge: 1, state: Connection::SetUpFailed { why: b"retry".as_slice().into() } },
-        );
-        let request = Token::new(number);
-        let token = Token::new(number + 1);
-        let first = First {
-            org: org.into(),
-            repository: repository.into(),
-            project: SetUpProject::Existing(project),
-            state: FirstState::Making,
-        };
-        let ask = Ask::SetUp {
-            forge: 1,
-            org: first.org.clone(),
-            repository: first.repository.clone(),
-            project: first.project.clone(),
-        };
-        assert_eq!(
-            outputs(&mut d, Event::Application { request, token, retention: Duration::from_secs(60), ask }).as_ref(),
-            [
-                Request::MarkedForges,
-                Request::SetUp { forge: 1, request, org: org.into(), repository: repository.into() }
-            ]
-        );
-        assert_eq!(d.forges().rows[0].first, Some(first));
-        outputs(&mut d, Event::SetUpAnswered { forge: 1, request, answer: SetUpAnswer::SettingUp });
-    }
-}
-
-#[test]
-fn first_repository_tells_mark_made_failed_and_retry_and_ignore_absent_intents() {
-    let mut d = setup_domain(&CONFIGURED, true);
-    for forge in [1, 99] {
-        assert!(outputs(&mut d, Event::FirstMade { forge, id: 42 }).is_empty());
-        assert!(outputs(&mut d, Event::FirstFailed { forge, step: CreateStep::File }).is_empty());
-    }
-    outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
-    outputs(&mut d, setup_application(1, Token::new(91), Token::new(92)));
-    assert_eq!(outputs(&mut d, Event::FirstMade { forge: 1, id: 42 }).as_ref(), [Request::MarkedForges]);
-    assert_eq!(d.forges().rows[0].first.as_ref().unwrap().state, FirstState::Made { id: 42 });
-    for step in [CreateStep::Admin, CreateStep::Org, CreateStep::Repository, CreateStep::File] {
-        assert_eq!(outputs(&mut d, Event::FirstFailed { forge: 1, step }).as_ref(), [Request::MarkedForges]);
-        assert_eq!(d.forges().rows[0].first.as_ref().unwrap().state, FirstState::Failed { step });
-    }
-    outputs(&mut d, Event::Connection { forge: 1, state: Connection::SetUpFailed { why: b"file".as_slice().into() } });
-    outputs(&mut d, setup_application(1, Token::new(93), Token::new(94)));
-    assert_eq!(d.forges().rows[0].first.as_ref().unwrap().state, FirstState::Making);
 }

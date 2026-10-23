@@ -28,7 +28,6 @@ pub enum Request {
     Client { request: jig_client::Request },
     Ready,
     Kept { line: Box<[u8]> },
-    Progress { line: Box<[u8]> },
     Printed { number: u32, printed: jig::Printed },
     Fact { fact: temper_client_domain::Fact },
 }
@@ -139,7 +138,6 @@ fn drain(
                 runner::Out::Client { event } => root.client.step(env.now, env.wall, event, client),
                 runner::Out::Ready => out.push(Request::Ready),
                 runner::Out::Kept { line } => out.push(Request::Kept { line }),
-                runner::Out::Progress { line } => out.push(Request::Progress { line }),
                 runner::Out::Printed { number, printed } => out.push(Request::Printed { number, printed }),
                 runner::Out::DraftAmendment { called, task } => {
                     let prepared = match runner::acts::me(&root.runner, &root.client) {

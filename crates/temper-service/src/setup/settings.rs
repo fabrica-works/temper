@@ -240,7 +240,6 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> R
         let identity = joined.expect("checked identity");
         let login = &setup.entry.bot.login;
         let local = super::lifecycle::Local {
-            first: None,
             repositories: match &setup.entry.mode {
                 Mode::Fake(fake) => u64::try_from(fake.repositories.len()).expect("checked repositories"),
                 Mode::Owned(_) | Mode::Managed { .. } => 0,
@@ -306,17 +305,18 @@ fn check(own: &temper_forge_setup::limits::Host) -> Result<(), Problems> {
         for place in [Some(why.place), why.other].into_iter().flatten() {
             use skein_forge_setup::given::Place;
             let name = match place {
-                Place::Backoff => b"setup.backoff_ms".as_slice(),
-                Place::BackoffMax => b"setup.backoff_max_ms",
-                Place::Deadline => b"setup.deadline_ms",
-                Place::FilesLimit
-                | Place::FileBytesLimit
-                | Place::CreateOrg
+                Place::FilesLimit | Place::FileBytesLimit => {
+                    unreachable!("temper fixes files and file_bytes above zero")
+                }
+                Place::CreateOrg
                 | Place::CreateRepository
                 | Place::Files
                 | Place::FilePath(_)
                 | Place::FileContent(_)
-                | Place::Plan => unreachable!("Create inputs are admitted by the domain and fixed starter profile"),
+                | Place::Plan => unreachable!("temper sends Create from the first-repository work, not yet"),
+                Place::Backoff => b"setup.backoff_ms".as_slice(),
+                Place::BackoffMax => b"setup.backoff_max_ms",
+                Place::Deadline => b"setup.deadline_ms",
                 Place::Word
                 | Place::BotLogin
                 | Place::BotEmail
