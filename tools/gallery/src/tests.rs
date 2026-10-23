@@ -216,7 +216,11 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "chat-first-run-4-T4",
         heading: "T4 · Add a dark theme to widget",
-        parts: &[Part::Named { role: Role::Paragraph, name: "I would give widget" }],
+        parts: &[
+            Part::Named { role: Role::Paragraph, name: "I would give widget" },
+            Part::Named { role: Role::TextArea, name: "Message" },
+            Part::Absent { role: Role::Disclosure, name: "1 tool call" },
+        ],
     },
     Holds { name: "inbox-reference", heading: "Inbox", parts: &[Part::Named { role: Role::Link, name: "Task 1" }] },
     Holds {
@@ -666,7 +670,7 @@ fn times_read_against_each_mockup_worlds_fixed_now() {
         ("chat-solo-T10", "waiting 12 min"),
         ("chat-reference-T1", "Today · Thursday 22 October"),
         ("chat-solo-T10", "Today · Tuesday 27 October"),
-        ("chat-first-run-4-T4", "Ended 21:05"),
+        ("chat-first-run-4-T4", "21:05"),
     ] {
         let sample = samples::samples().into_iter().find(|sample| sample.name == name).expect("named sample");
         let view = view(&sample);

@@ -339,9 +339,7 @@ fn scripted_turn(lines: Value) -> Value {
 }
 
 fn demo_turn(text: &str) -> Value {
-    scripted_turn(json!([{"text": text}, {"call": "finish", "arguments": {
-        "form": "report", "text": "The playground changes nothing.", "fields": {}
-    }}]))
+    json!({"lines": [{"text": text}], "finish": "stop", "tokens": text.len().div_ceil(4)})
 }
 
 fn demo_model() -> Value {

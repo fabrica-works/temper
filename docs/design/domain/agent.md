@@ -242,11 +242,11 @@ Checks at `.temper/pre-pr`, guides at `AGENTS.md` (smith's
   charter: a task its result ends runs smith's `Finite` mode, and one
   its requester ends runs `Open`, granted the wait and never
   `deliver`. temper's chats are Open (`../protocol/configuration.md`,
-  section 2): a chat's run that answers and rests, by a text alone or
-  by `finish`, ends its turn with its reply committed, and the chat
-  waits for its person's next words, its finish's result discarded and
-  no try spent; only the person's Close, or a cancel, ends it. Goals
-  and every delegate run Finite and end by their results.
+  section 2): a chat's run answers by ending its turn with text,
+  since Open offers no `finish` (smith's `domain/run.md`, sections 1
+  and 6): the reply is committed with the turn, and the chat waits for
+  its person's next words; only the person's Close, or a cancel, ends
+  it. Goals and every delegate run Finite and end by their results.
 
 ## 5. Messages
 

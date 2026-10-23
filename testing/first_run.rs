@@ -9,7 +9,6 @@ pub const LANDED: &[u8] =
     "CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change."
         .as_bytes();
 pub const DARK_ANSWER: &[u8] = b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.";
-pub const REPORT: &[u8] = b"The playground changes nothing.";
 pub const MERGE: &[u8] = b"1a2b3c4abcdef0123456789abcdef0123456789abcd";
 const OPENING: &[u8] = b"Begin the work your brief describes.";
 const ACK: &[u8] = b"Delegated tasks: 2";
@@ -108,15 +107,14 @@ fn owner(task: u64, position: u64, line: c::OwnerActivity) -> c::ActivityLine {
 fn result(summary: &[u8]) -> c::Message {
     message(c::Speaker::Person, &[c::Block::Result { call: 3, summary: text(summary), failed: false }])
 }
-/// Nine retained rows for settled T1; five for T4. No invented Words/News rows.
+/// Nine retained rows for settled T1; four for T4. No invented Words/News rows.
 pub fn activity(dark: bool, landed: bool, turn_text: u32) -> c::ActivityPage {
     let task = if dark { 4 } else { 1 };
     let attempt = if dark { 4 } else { 1 };
     let mut rows = List::with_capacity(9);
     if dark {
-        rows.push(owner(task, 5, c::OwnerActivity::Milestone { position: 10 })).expect("end milestone");
-        rows.push(owner(task, 4, c::OwnerActivity::RunEnded { attempt, end: c::OwnerRunEnd::Finished, spent: 0 }))
-            .expect("end");
+        rows.push(owner(task, 4, c::OwnerActivity::RunEnded { attempt, end: c::OwnerRunEnd::Parked, spent: 0 }))
+            .expect("parked");
     } else {
         if landed {
             rows.push(owner(task, 9, c::OwnerActivity::RunEnded { attempt: 3, end: c::OwnerRunEnd::Parked, spent: 0 }))
@@ -155,33 +153,26 @@ pub fn activity(dark: bool, landed: bool, turn_text: u32) -> c::ActivityPage {
         rows.push(turn(4, attempt, 2, &[message(c::Speaker::Assistant, &[call(3, b"wait", b"{}", None)])], turn_text))
             .expect("waiting turn");
     }
-    rows.push(turn(
-        3,
-        attempt,
-        1,
-        &[
-            message(c::Speaker::Person, &[c::Block::Text(text(OPENING))]),
-            message(
-                c::Speaker::Assistant,
-                &[
-                    c::Block::Text(text(if dark { DARK_ANSWER } else { DELEGATING })),
-                    if dark {
-                        call(
-                            3,
-                            b"finish",
-                            br#"{"form":"report","text":"The playground changes nothing.","fields":{}}"#,
-                            Some(b"accepted"),
-                        )
-                    } else {
-                        call(3, b"delegate", DELEGATE_INPUT, Some(ACK))
-                    },
-                ],
-            ),
-            result(if dark { b"accepted" } else { ACK }),
-        ],
-        turn_text,
-    ))
-    .expect("first turn");
+    let opening = message(c::Speaker::Person, &[c::Block::Text(text(OPENING))]);
+    let first = if dark {
+        turn(3, attempt, 1, &[opening, message(c::Speaker::Assistant, &[c::Block::Text(text(DARK_ANSWER))])], turn_text)
+    } else {
+        turn(
+            3,
+            attempt,
+            1,
+            &[
+                opening,
+                message(
+                    c::Speaker::Assistant,
+                    &[c::Block::Text(text(DELEGATING)), call(3, b"delegate", DELEGATE_INPUT, Some(ACK))],
+                ),
+                result(ACK),
+            ],
+            turn_text,
+        )
+    };
+    rows.push(first).expect("first turn");
     rows.push(owner(task, 2, c::OwnerActivity::RunBegan { attempt, why: c::OwnerRunWhy::Made, resumed: false }))
         .expect("began");
     rows.push(owner(task, 1, c::OwnerActivity::Milestone { position: 1 })).expect("initial milestone");

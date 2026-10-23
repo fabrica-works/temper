@@ -379,8 +379,7 @@ fn key_file() {
 #[test]
 fn demo_answers_the_brief() {
     let mut value = fixture();
-    // Keep the finish call in these short answers: a text-only stop does not
-    // finish a chat's run.
+    // These fixtures are the fake's own and need not be the template's.
     value["application"]["demo"]["llm"]["asked"] = json!([
         {"cue":"Add CSV export to widget","turns":[{
             "lines":[{"text":"Export CSV"},{"call":"finish","arguments":{

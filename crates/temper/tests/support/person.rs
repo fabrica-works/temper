@@ -119,13 +119,10 @@ pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
 }
 /// Signs in by the printed link; the demo's running start keeps the deployment key.
 /// Asks `cue` in a new chat, task `task`, then sees its committed reply.
-/// Chats are ended by their requester; the scripted finish keeps no report.
+/// Chats are ended by their requester; the scripted text replies and waits.
 #[must_use]
 pub fn demo_chat(task: u64, cue: &[u8], text: &[u8]) -> Script {
     use skein_ui::Role;
-    // The view names each inbox entry by its kind and its source task.
-    let entry: Box<[u8]> = format!("Reply from T{task}").into_bytes().into_boxed_slice();
-    let result = || Box::new([Target::Role { role: Role::Item, name: entry.clone() }]);
     Script {
         begin: Begin::Link,
         steps: Box::new([
@@ -153,10 +150,8 @@ pub fn demo_chat(task: u64, cue: &[u8], text: &[u8]) -> Script {
             },
             Step::See { find: Find::named(Role::TextArea, b"Message"), within: START_WITHIN },
             Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
-            Step::See {
-                find: Find::named(Role::Heading { level: 3 }, b"replied").within(result()),
-                within: START_WITHIN,
-            },
+            // Reading the reply in its chat marks it seen before the inbox opens.
+            Step::Gone { find: Find::named(Role::Heading { level: 3 }, b"replied"), within: START_WITHIN },
             Step::Go { address: Address::Chat { task } },
             Step::See {
                 find: Find::text(text)
