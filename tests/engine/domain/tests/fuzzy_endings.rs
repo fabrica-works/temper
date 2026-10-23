@@ -3,7 +3,7 @@
 use jig_domain_authority as authority;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Queue, ReplyTo, Rng, Token};
+use skein_lib::{ReplyTo, Rng, Token};
 use std::collections::BTreeSet;
 use temper_engine_domain as engine;
 use temper_engine_domain::{Delivery, Key, Record};
@@ -32,15 +32,13 @@ fn chat(seed: u64, child: bool) -> (Driver, engine::Assignment) {
             rules.maximum_run_spend = 60;
             rules.ceiling.delegation.tasks = 4;
             rules.ceiling.delegation.depth = 2;
-            let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
+            let mut policy = configuration.core.seed_projects[0].policy.policy.clone();
             policy.ceiling.delegation.tasks = 4;
             policy.ceiling.delegation.depth = 2;
             policy.roles[0].authority.delegation.tasks = 4;
             policy.roles[0].authority.delegation.depth = 2;
-            let mut domain = authority::Domain::new(rules, bounds.authority).expect("authority bounds");
-            let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-            authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-            assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+            let domain = authority::Domain::new(rules, bounds.authority).expect("authority bounds");
+            configuration.core.seed_projects[0].policy.policy = policy;
             configuration.core.authority = domain;
         }
         bounds.fleet.attempts = 5;

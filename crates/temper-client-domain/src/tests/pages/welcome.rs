@@ -55,7 +55,9 @@ fn opened(owner: bool, step: Step) -> (Domain, Token, Token, Option<Token>) {
         .projects
         .push(c::MeProject {
             project: f::PROJECT,
-            name: None,
+            name: jig_client::contract::DocumentText::complete(
+                jig_client::contract::Text::new(b"Project 1".as_slice().into(), 64).expect("project name"),
+            ),
             role: c::HeldRole::Member,
             pool: None,
             templates: List::with_capacity(0),

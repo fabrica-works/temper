@@ -19,6 +19,7 @@ const LIMITS: Limits =
     Limits { commits: 2, held: 8, writes: 4, deliveries: 4, transcript_bytes: 64, result_bytes: 32, run_bytes: 1 };
 
 const DEPLOYMENT: Deployment = Deployment {
+    projects: 0,
     id: [19; 16],
     tasks: 0,
     people: 0,

@@ -87,7 +87,8 @@ pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> 
         | core::Event::Holdings { .. }
         | core::Event::Account(..)
         | core::Event::View(..)
-        | core::Event::Notes(..) => return Err(Box::new(kit::Event::Abort)),
+        | core::Event::Notes(..)
+        | core::Event::Act { .. } => return Err(Box::new(kit::Event::Abort)),
     };
     Ok(value)
 }

@@ -196,7 +196,7 @@ impl World {
                     rules.ceiling.delegation.tasks = 8;
                     rules.ceiling.delegation.depth = 3;
                 }
-                let mut policy = config.core.authority.policy(1).expect("walk policy").clone();
+                let mut policy = config.core.seed_projects[0].policy.policy.clone();
                 policy.ceiling.tools = authority::Tools(1);
                 policy.ceiling.grants.clone_from(&rules.ceiling.grants);
                 policy.projections.clone_from(&rules.ceiling.grants);
@@ -218,7 +218,9 @@ impl World {
                 authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
                 assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
                 // A chat's authority is its role's, one level shallower (jig a2616181).
-                config.core.authority = domain;
+                config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+                config.core.authority = jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+                    .expect("configured authority");
             }
             limits.notes.scopes = 3 + limits.authority.grants;
             (config, limits)

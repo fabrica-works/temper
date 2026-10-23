@@ -494,7 +494,9 @@ fn a_set_up_asks_for_work_hello_in_the_persons_project_else_one() {
                 .projects
                 .push(c::MeProject {
                     project,
-                    name: None,
+                    name: jig_client::contract::DocumentText::complete(
+                        jig_client::contract::Text::new(b"Project 1".as_slice().into(), 64).expect("project name"),
+                    ),
                     role: c::HeldRole::Owner,
                     pool: None,
                     templates: List::with_capacity(0),

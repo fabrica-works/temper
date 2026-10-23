@@ -19,7 +19,7 @@ fn signed_in_on(role: Option<people::Role>, kind: forge::Kind) -> (Domain, Env<L
     config.forges = Box::new([forge::Configured { number: 1, kind, mode: forge::Mode::Owned, asked: true }]);
     config.under_box = true;
     let (mut domain, env) = root_with_config(config);
-    domain.core.people = people::Domain::new(&env.limits.people, Box::new([]), 1);
+    domain.core.people = people::Domain::new(&env.limits.people, Box::new([]), 1, Box::new([]));
     let mut out = Queue::with_capacity(people::max_out(&env.limits.people));
     for record in [
         people::Stored::Person {

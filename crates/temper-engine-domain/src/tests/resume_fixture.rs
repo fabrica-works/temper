@@ -7,7 +7,7 @@ use jig_domain_authority as authority;
 use jig_domain_fleet as fleet;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Duration, Env, Queue, Time, Wall};
+use skein_lib::{Duration, Env, Time, Wall};
 use temper_engine_domain_forge as forge;
 
 #[expect(clippy::too_many_lines, reason = "one fixture lists the real children's tiny admission limits together")]
@@ -235,7 +235,7 @@ pub fn config(seed: u64) -> engine::Config {
         implies: authority::Implies::new(Box::new([]), 0).expect("empty implication configuration"),
         requirements: Box::new([]),
     };
-    let mut domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
+    let domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
     let policy = authority::Policy {
         projections: ceiling.grants.clone(),
         escalation_role: Some(0),
@@ -250,11 +250,6 @@ pub fn config(seed: u64) -> engine::Config {
         }]),
         requirements: Box::new([]),
     };
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "real policy admitted");
-    let mut projects = skein_lib::List::with_capacity(authority_limits().projects);
-    projects.push(1).expect("one configured project");
     engine::Config {
         core: jig_domain_core::Config {
             deployment: [31; 16],
@@ -267,6 +262,7 @@ pub fn config(seed: u64) -> engine::Config {
                 project: 1,
                 identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
             }]),
+            grants: Box::new([]),
             authority: domain,
             settings: jig_domain_core::Settings {
                 key_bytes: 256,
@@ -287,9 +283,16 @@ pub fn config(seed: u64) -> engine::Config {
                     }]),
                 },
             },
-            template_overrides: skein_lib::Map::with_capacity(authority_limits().projects),
-            projects,
-            permission_roles: permission_roles(),
+            seed_projects: Box::new([jig_domain_core::SeedProject {
+                number: 1,
+                name: "Project 1".into(),
+                policy: jig_domain_core::ConfiguredPolicy {
+                    policy,
+                    permissions: permission_roles().remove(&1).expect("project permissions"),
+                    templates: Box::new([]),
+                },
+            }]),
+            policies: skein_lib::Map::with_capacity(authority_limits().projects),
             // The forge is the deployment's one connector.
             connectors: Box::new([0]),
         },
@@ -452,18 +455,51 @@ pub fn root() -> (engine::Domain, Env<engine::Limits>) {
 }
 pub fn root_with_config(config: engine::Config) -> (engine::Domain, Env<engine::Limits>) {
     let limits = limits();
+    // Model a later start: the store supplies the complete project rows and
+    // their deployment high-water mark, rather than configuration reseeding.
+    let mut projects = skein_lib::List::with_capacity(limits.authority.projects);
+    let mut project_mark = 0;
+    for project in &config.core.seed_projects {
+        project_mark = project_mark.max(u64::from(project.number));
+        let value = jig_domain_core::policy_snapshot(
+            &project.policy.policy,
+            &project.policy.permissions,
+            &project.policy.templates,
+        )
+        .expect("fixture policy snapshot");
+        projects
+            .push(people::Stored::Policy { project: project.number, name: project.name.clone(), value })
+            .expect("bounded fixture projects");
+    }
     let mut root = engine::Domain::new(config, &limits).unwrap();
-    // These units begin after an empty restore; service units exercise the
-    // actual paged startup and its commits.
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut request = root.core.restart_begin();
+    let mut deployment = root.core.counters.deployment();
+    deployment.projects = project_mark;
+    engine::restart::restore_page_row(
+        &mut root,
+        &env,
+        engine::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Deployment(deployment))),
+    );
+    for record in projects.into_boxed() {
+        engine::restart::restore_page_row(
+            &mut root,
+            &env,
+            engine::Record::Core(jig_domain_core::Record::People(record)),
+        );
+    }
+    // In production the page's own write-free decision takes the header's
+    // commit count while the journal is still idle.
+    if let Some(commits) = root.restored_commits.take() {
+        root.journal = engine::Journal::from_durable(&crate::limits::root_journal_limits(&env.limits), commits);
+    }
     for _ in 0..RESTORE_PASSES {
         match request {
             jig_domain_core::RestartRequest::Step(step) => request = root.core.restart_done(step),
             jig_domain_core::RestartRequest::Idle => break,
-            jig_domain_core::RestartRequest::Refused { step } => panic!("empty restore: {step:?}"),
+            jig_domain_core::RestartRequest::Refused { step } => panic!("fixture restore: {step:?}"),
         }
     }
-    root.core_header_loaded = true;
-    root.core.counters = engine::Counters::new(root.core.counters.deployment());
-    (root, Env { now: Time::ZERO, wall: Wall::EPOCH, limits })
+    assert!(root.ready(), "fixture store restored");
+    (root, env)
 }

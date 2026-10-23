@@ -1071,9 +1071,9 @@ fn fixture_me(project_name: &[u8]) -> c::Me {
     projects
         .push(MeProject {
             project: PROJECT,
-            name: Some(DocumentText::complete(
+            name: DocumentText::complete(
                 contract::Text::new(skein_lib::bytes::copy_of(project_name), 32).expect("name fits"),
-            )),
+            ),
             role: HeldRole::Policy { role: 1 },
             pool: None,
             templates: List::with_capacity(0),
@@ -1083,7 +1083,7 @@ fn fixture_me(project_name: &[u8]) -> c::Me {
         .expect("one project");
     let mut second = projects.as_slice()[0].clone();
     second.project = SECOND_PROJECT;
-    second.name = Some(DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits")));
+    second.name = DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits"));
     projects.push(second).expect("second project");
     Me {
         providers: List::with_capacity(0),

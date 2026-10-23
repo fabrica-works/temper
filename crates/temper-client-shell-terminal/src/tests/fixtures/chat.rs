@@ -177,7 +177,7 @@ fn demo_me() -> contract::Me {
         })
         .expect("demo model");
     me.projects.get_mut(0).expect("demo project").models = models;
-    me.projects.get_mut(0).expect("demo project").name = Some(c::DocumentText::complete(delegation_text(b"demo")));
+    me.projects.get_mut(0).expect("demo project").name = c::DocumentText::complete(delegation_text(b"demo"));
     me
 }
 fn delegation_task(number: u64, landed: bool) -> contract::Task {
