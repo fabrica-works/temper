@@ -9,6 +9,10 @@ use temper_engine_domain_world::{direct::Driver, fixtures, forge_stand::ForgeSta
 fn config(under_box: bool) -> engine::Config {
     let mut config = walking::config(71);
     config.under_box = under_box;
+    config.forges = Box::new([
+        forge::Configured { number: 1, kind: forge::Kind::Forgejo, mode: forge::Mode::Fake, asked: true },
+        forge::Configured { number: 2, kind: forge::Kind::Forgejo, mode: forge::Mode::Fake, asked: false },
+    ]);
     config.demo =
         Some(forge::DemoConfig { provider: 1, adoption: fixtures::adoption(1), deadline: Duration::from_secs(10) });
     config
@@ -258,4 +262,75 @@ fn a_busy_box_link_fails_the_demo_start_with_the_groups_reason() {
     assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::Running))]);
     assert_eq!(keeps(&d), 1);
     assert!(matches!(d.delivered.first(), Some(Delivery::CarriedUnused { number: 82 })));
+}
+
+#[test]
+fn another_connected_forge_ends_the_demo_persists_and_stops_once_and_restart_asks_no_group() {
+    let (mut d, sign_in) = driver(true, true);
+    start(&mut d, sign_in, 81, true);
+    let watcher = Token::new(901);
+    d.send(engine::Event::Party(engine::PartyInput::Watch {
+        watcher,
+        sign_in,
+        subject: core::documents::Watched::Application {
+            scope: people::ApplicationScope::Deployment,
+            connector: 0,
+            subject: Token::new(0),
+        },
+        window: core::documents::Window { rows: 2, after: None },
+    }));
+    d.settle();
+    assert!(
+        d.delivered
+            .iter()
+            .any(|delivery| matches!(delivery, Delivery::Forges { forges, .. } if forges.rows.len() == 2))
+    );
+    d.send(engine::Event::Party(engine::PartyInput::Delivered { watcher }));
+    d.settle();
+    d.delivered.clear();
+    for _ in 0..2 {
+        d.send(engine::Event::Forge(Box::new(forge::Event::Connection {
+            forge: 2,
+            state: forge::Connection::Connected { id: 2, login: b"other".as_slice().into() },
+        })));
+        d.settle();
+    }
+    assert!(d.store.rows.values().any(|record| matches!(record, engine::Record::Forge { row }
+        if matches!(row.as_ref(), forge::Stored::Demo(forge::Demo { forge: 1, state: forge::DemoState::Ended })))));
+    assert_eq!(d.root.forges().rows.iter().map(|row| row.number).collect::<Vec<_>>(), [2]);
+    assert!(d.delivered.iter().any(|delivery| matches!(delivery, Delivery::Forges { forges, .. } if forges.rows.len() == 1 && forges.rows[0].number == 2)));
+    assert_eq!(
+        d.immediate.iter().filter(|request| matches!(request, engine::Request::StopGroup { forge: 1 })).count(),
+        1
+    );
+    start(&mut d, sign_in, 82, true);
+    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::NotOffered))]);
+    d.root = engine::Domain::new(config(true), &d.env.limits).expect("valid demo config");
+    d.immediate.clear();
+    d.send(engine::Event::Restart);
+    d.settle();
+    assert_eq!(d.root.demo_state(), Some(forge::DemoState::Ended));
+    assert!(d.root.forge_ended(1));
+    assert!(
+        !d.immediate
+            .iter()
+            .any(|request| matches!(request, engine::Request::SetUpGroup { .. } | engine::Request::StopGroup { .. }))
+    );
+}
+
+#[test]
+fn another_forge_connecting_answers_a_held_demo_start_not_offered() {
+    let (mut d, sign_in) = driver(false, true);
+    start(&mut d, sign_in, 81, true);
+    assert!(answers(&d).is_empty());
+    d.send(engine::Event::Forge(Box::new(forge::Event::Connection {
+        forge: 2,
+        state: forge::Connection::Connected { id: 2, login: b"other".as_slice().into() },
+    })));
+    d.settle();
+    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::NotOffered))]);
+    connection(&mut d, forge::Connection::Connected { id: 1, login: b"temper".as_slice().into() });
+    d.fire_at(Duration::from_secs(10));
+    d.settle();
+    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::NotOffered))]);
 }

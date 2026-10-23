@@ -123,7 +123,10 @@ impl Lifecycle {
         }
     }
     pub(super) fn ready(&self, runs: &Map<Token, Run>, limit: u32, domain: &root::Domain) -> bool {
-        for (_, pending) in &self.reconcile {
+        for (forge, pending) in &self.reconcile {
+            if domain.forge_ended(*forge) {
+                continue;
+            }
             if let Reconcile::Local(local) = pending
                 && (local.pending && local.restored || local.file.completed())
             {
@@ -131,11 +134,17 @@ impl Lifecycle {
             }
         }
         for (forge, _) in &self.adoptions {
+            if domain.forge_ended(*forge) {
+                continue;
+            }
             if runs.len() < limit && !running(runs, *forge) {
                 return true;
             }
         }
         for (forge, pending) in &self.reconcile {
+            if domain.forge_ended(*forge) {
+                continue;
+            }
             match pending {
                 Reconcile::Local(_) => continue,
                 Reconcile::GitHub => {}
@@ -149,6 +158,9 @@ impl Lifecycle {
             }
         }
         for ((forge, _), ()) in &self.deleted {
+            if domain.forge_ended(*forge) {
+                continue;
+            }
             if !self.deleting.contains_key(forge) && !running(runs, *forge) {
                 return true;
             }
@@ -234,6 +246,9 @@ pub(super) fn has_app(engine: &crate::engine::Engine, forge: u16) -> bool {
     }
 }
 pub(crate) fn state(engine: &mut crate::engine::Engine, forge: u16, state: domain::Connection) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     engine.events.push(root::Event::Forge(Box::new(domain::Event::Connection { forge, state })));
 }
 pub(super) fn keep(engine: &mut crate::engine::Engine, forge: u16, item: Item, bytes: &[u8], purpose: Purpose) {
@@ -265,6 +280,10 @@ pub(super) enum Purpose {
 pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
     let run = engine.setup.runs.get(&token).expect("ended setup run");
     let (forge, kind) = (run.forge, run.kind);
+    if crate::forge::ended(engine, forge) {
+        engine.setup.runs.remove(&token);
+        return;
+    }
     if kind == Kind::LocalTakeOver {
         engine.setup.runs.get_mut(&token).expect("takeover done").kind = Kind::LocalRemoval;
         engine.setup.lifecycle.local_mut(forge).expect("local takeover").file =
@@ -331,6 +350,10 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
 }
 pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure: reconcile::Failure) {
     let run = engine.setup.runs.get(&token).expect("stopped setup run");
+    if crate::forge::ended(engine, run.forge) {
+        engine.setup.runs.remove(&token);
+        return;
+    }
     if run.kind == Kind::LocalCreate {
         create_stopped(engine, token, failure);
         return;
@@ -390,6 +413,9 @@ pub(super) fn kept(engine: &mut crate::engine::Engine, purpose: Purpose) {
     match purpose {
         Purpose::LocalOrigin(run) => {
             let active = engine.setup.runs.remove(&run).expect("reconcile waits for Origin Kept");
+            if crate::forge::ended(engine, active.forge) {
+                return;
+            }
             if !create_local(engine, active.forge) {
                 adopt_local(engine, active.forge);
             }
@@ -453,6 +479,9 @@ pub(super) fn installations(engine: &mut crate::engine::Engine, forge: u16) {
     engine.forge.down(connection::Request::Installations { forge, accepted });
 }
 pub(crate) fn connected(engine: &mut crate::engine::Engine, forge: u16) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     let config = configured(engine, forge);
     let github = config.kind == crate::settings::Kind::GitHub;
     let (id, login) = if github {
@@ -562,6 +591,9 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
         forges.push(forge.number).expect("configured forges");
     }
     for forge in &forges {
+        if crate::forge::ended(engine, *forge) {
+            continue;
+        }
         if !engine.setup.room()
             || !engine.store.room()
             || !engine.forge.room(2)
@@ -707,6 +739,9 @@ fn start_pending(engine: &mut crate::engine::Engine, forge: u16) -> bool {
     false
 }
 fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     let local = engine.setup.lifecycle.local_mut(forge).expect("local start");
     local.pending = false;
     if local.trigger == Trigger::StartDemo {
@@ -744,6 +779,9 @@ fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
     reconcile_local(engine, forge);
 }
 fn reconcile_local(engine: &mut crate::engine::Engine, forge: u16) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     let Some(rows) = engine.forge_records.rows.forge(forge) else {
         local_stopped(engine, forge, crate::SetupStopped::NotPrepared);
         return;
@@ -916,6 +954,9 @@ fn create_stopped(engine: &mut crate::engine::Engine, token: Token, failure: rec
     state(engine, run.forge, domain::Connection::SetUpFailed { why });
 }
 fn adopt_local(engine: &mut crate::engine::Engine, forge: u16) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     let repositories = engine.setup.lifecycle.local(forge).expect("reconciled local").repositories;
     if repositories == 0 {
         connect_local(engine, forge);
@@ -929,6 +970,9 @@ fn adopt_local(engine: &mut crate::engine::Engine, forge: u16) {
         .expect("one adoption per local fake");
 }
 pub(super) fn connect_local(engine: &mut crate::engine::Engine, forge: u16) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     let expected = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api);
     let rows = engine.forge_records.rows.forge(forge).expect("reconciled records");
     let local = engine.setup.lifecycle.local_mut(forge).expect("local connection");
@@ -1007,6 +1051,9 @@ pub(super) fn bounded_reason(text: Box<[u8]>) -> Box<[u8]> {
 }
 /// The box's preparation may create a fresh token on every ask.
 pub(crate) fn started(engine: &mut crate::engine::Engine, forge: u16) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
         return;
     }
@@ -1032,6 +1079,9 @@ pub(crate) fn take_read(engine: &mut crate::engine::Engine) -> Option<crate::Han
     }
     for configured in &engine.workers.forges {
         let forge = configured.number;
+        if crate::forge::ended(engine, forge) {
+            continue;
+        }
         if let Some(local) = engine.setup.lifecycle.local_mut(forge)
             && let FileStep::Reading { run, sent } = &mut local.file
             && !*sent
@@ -1053,6 +1103,9 @@ pub(crate) fn read(
     run: Token,
     answer: Result<Option<Secret>, crate::HandoverUnread>,
 ) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
         return;
     }
@@ -1084,6 +1137,9 @@ pub(crate) fn take_removal(engine: &mut crate::engine::Engine) -> Option<crate::
     }
     for configured in &engine.workers.forges {
         let forge = configured.number;
+        if crate::forge::ended(engine, forge) {
+            continue;
+        }
         if let Some(local) = engine.setup.lifecycle.local_mut(forge)
             && let FileStep::Removing { run, sent } = &mut local.file
             && !*sent
@@ -1095,6 +1151,9 @@ pub(crate) fn take_removal(engine: &mut crate::engine::Engine) -> Option<crate::
     None
 }
 pub(crate) fn removed(engine: &mut crate::engine::Engine, forge: u16, run: Token, result: Result<(), i32>) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() {
         return;
     }
@@ -1137,6 +1196,9 @@ fn file_answer(engine: &mut crate::engine::Engine, forge: u16) -> bool {
 }
 
 pub(crate) fn first(engine: &mut crate::engine::Engine, forge: u16, org: Box<[u8]>, repository: Box<[u8]>) {
+    if crate::forge::ended(engine, forge) {
+        return;
+    }
     if let Some(local) = engine.setup.lifecycle.local_mut(forge) {
         local.first = Some(Intent { org, repository });
     }

@@ -95,6 +95,11 @@ impl Domain {
         self.forge.forges()
     }
     #[must_use]
+    /// The connector's durable demo end, shared with setup readiness scans.
+    pub fn forge_ended(&self, forge: u16) -> bool {
+        self.forge.forge_ended(forge)
+    }
+    #[must_use]
     pub fn demo_state(&self) -> Option<forge::DemoState> {
         self.forge.demo_state()
     }
@@ -589,6 +594,7 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             request @ (Request::Worker(_)
             | Request::Party(_)
             | Request::Setup { .. }
+            | Request::StopGroup { .. }
             | Request::SetUpGroup { .. }
             | Request::SetUp { .. }
             | Request::Forge { .. }
