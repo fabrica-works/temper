@@ -572,6 +572,18 @@ area lands with its stories (section 11).
      deployments whose LLM provider has the same registration (issuer
      and client id, as ChatGPT's is: `../protocol/setup.md`, 8.1), and
      is refused "not ours" by another application built on jig.
+   - **The file's versions** (`../draft/upgrades.md`, 4.2 to 4.4): it
+     carries two families, each with its version, a version naming one
+     layout: jig's moved form (`JIGM`, form 1) and, inside it, skein's
+     OAuth record (its `RECORD_VERSION`). It holds one value, not a
+     store, so no store's levels; the nesting fixes a patch's order,
+     the form's patches first, then skein's on the record inside it.
+     `export` writes the form the engine's jig makes. A newer `import`
+     reads every older form and patches it, the form's patches and then
+     the record's, before the engine's checks (section 14). An older
+     `import` refuses a newer form in its own words before anything is
+     sent (below), since the older one is whatever is deployed: the
+     words must be in form 1's `import`.
    - **`export`, step by step,** in the shell
      (`temper-client-shell-cli`), the tools' root deciding each step:
      1. FILE is made new before anything is sent: an exclusive create,
@@ -608,7 +620,14 @@ area lands with its stories (section 11).
    - **`import`, step by step:** FILE is read as a key's file is
      (above), its bytes whole, nothing trimmed, within the bound of
      section 12; refused, exit 1, nothing sent, the line naming FILE's
-     fault and never its bytes. `move_in` carries the bytes once under
+     fault and never its bytes. Its magic and form version are read
+     against the form this temper's jig reads (`jig-protocol-accounts`'
+     `moved::VERSION`): `JIGM` and a newer form, `temper ctl: FILE holds
+     a moved record of form vN; this temper reads up to vM: upgrade
+     temper`, exit 1, nothing sent, FILE kept. Any other start is sent,
+     and the engine refuses it "not ours", as it does a form newer than
+     the engine's jig reads when ctl's and the engine's jig differ
+     (section 15). `move_in` carries the bytes once under
      `--key NAME`, never kept (section 7). Answered *moved in*, the tool
      prints the account, then removes FILE, whose record is dead once
      the engine refreshes it; a removal that fails exits 1, `temper
@@ -924,7 +943,8 @@ may change with them.
   engine's refusal alone, "not signed in", "not ours", "held",
   "moving" and "cancelled"; FILE's faults are the tool's own, exit 1,
   nothing sent: `export`'s FILE already there, `import`'s FILE not
-  private, a link, empty or past its bound; so are a record not
+  private, a link, empty, past its bound or of a newer form than it
+  reads; so are a record not
   written and an answer lost or unsent, exit 1, each line saying what
   the engine does with the account.
 - **Only `sign-in` creates DIRECTORY.** Three of 1's lines, word for
@@ -1586,6 +1606,9 @@ Each is named here and designed when it comes.
   `domain/people.md`, section 3): tools of area 3.
 - **An account's uses** set, as a tool of area 5, when the QA loop asks
   for one (section 15).
+- **An older moved form patched at `import`** (5.5, area 5, the file's
+  versions): jig's form patches, then skein's record patches, before
+  the engine's checks, when a form 2 exists.
 
 ## 15. Open questions
 
@@ -1608,7 +1631,17 @@ Each is named here and designed when it comes.
   FILE when it is refused "cancelled", though FILE's record is then
   dead (an import of it makes an account needing sign-in at its first
   refresh). Default: so, until the QA loop meets it; the alternative
-  keeps FILE's path with the kept request, a stored format.
+  keeps FILE's path with the kept request, a stored format. Until then
+  the agent tells which by `accounts`, which sends the kept `written`
+  first: the account's `sign_in` source gone (or the account), FILE is
+  its only holder; the source still listed, signed in or moving, the
+  move was cancelled and FILE's record is dead.
+- **Why a moved record is "not ours"** (5.5, area 5): jig's refusal
+  carries no reason, so a form newer than the engine's jig reads, another
+  application's record and another registration's read alike. Default:
+  `import`'s own check of the form (5.5) covers ctl's jig; a reason on
+  jig's refusal (form, application, registration) is jig's, when a form
+  2 exists.
 - **A tokens file's layout** (5.5, area 6): temper's bundle is items by
   number (`../protocol/credentials.md`, pasted values), which no person
   writes. Default: `NAME VALUE` lines, as 5.5 has them; JSON, or a file
