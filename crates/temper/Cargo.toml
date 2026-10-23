@@ -121,3 +121,11 @@ allow_attributes_without_reason = "deny"
 disallowed_types = "deny"
 disallowed_methods = "deny"
 
+
+[[test]]
+name = "qa_plan_chat_start"
+path = "tests/qa_plan_chat_start.rs"
+
+[[test]]
+name = "qa_plan_chat"
+path = "tests/qa_plan_chat.rs"
