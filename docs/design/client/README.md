@@ -1139,7 +1139,8 @@ for its kind, its user's login and its installations. Its nodes:
   as kept work at start (6.6; jig's `protocol/client.md`, section 10).
 - **The request, `Requesting`:** which of the family's requests it is,
   `Request`, as `Reading` names a read: `adopt`, `Adopt`, `set_up`,
-  `SetUp`, `start_demo`, `StartDemo` (below), or `return`, `Return`, answered `returning` (section 8). Each is answered by the family's one record,
+  `SetUp`, `start_demo`, `StartDemo`, `connect`, `Connect`, `install`,
+  `Install` (below), or `return`, `Return`, answered `returning` (section 8). Each is answered by the family's one record,
   `Answer`, whose outcome is one of either request's (below); the client
   refuses as undecodable an outcome that does not fit the request it
   sent.
@@ -1198,6 +1199,29 @@ for its kind, its user's login and its installations. Its nodes:
   adoption refused, or the forge not connected in time; or *unknown*,
   its outcome no longer held (section 8), as `SetUp`'s. A refusal at
   admission is jig's answer, as for `Adopt`.
+- **`Connect`:** of the deployment's scope (section 8): the forge's
+  number (u16) and how it connects, `How`: `github_app`, `GitHubApp`,
+  the App's id (u64, never 0). The manifest's way and the Forgejo ways
+  join `How` with their work (section 8's table). The App's key is no
+  field: it rides beside the record as jig's carried value, a bundle of
+  one `Pasted` item (`../protocol/credentials.md`, 2.2). Its outcome,
+  `Answer`'s: *connecting*, the run started; *forge refused*, with why,
+  `ForgeRefusal` (below); or *unknown*, as `SetUp`'s.
+- **`Install`:** of the deployment's scope: the forge's number (u16)
+  and `back`, an optional byte string checked as `Return`'s `path`
+  (section 8). Its outcome: *a link*, `Link`, the install page's
+  address (a byte string of at most 2048 bytes); *connecting*, an
+  `Install` that stopped, its failure said on the forge's row; *forge
+  refused*, `ForgeRefusal`; or *unknown*.
+- **`ForgeRefusal`,** a `Connect`'s or an `Install`'s, by the root
+  before any run: `role`, the sender not the deployment's owner; `no
+  such forge`; `not taken`, the forge's kind or mode does not take the
+  request (a Forgejo, the demo's fake); `connected`, a `Connect` on a
+  forge connected or connecting already, whose key `Replace` replaces;
+  `not connected`, an `Install` on a forge with no App; `busy`, a run
+  holding the forge, or `setup.runs` full; `no key`, a `Connect` of an
+  App with no carried value. Its carried value, if any, is named unused
+  (section 8).
 - **The small store's record of a pending request** is `jig-client`'s
   kept request, its request encoded by this crate as the family's bytes
   at `CLIENT_VERSION` (jig's `protocol/client.md`, section 10).
@@ -3099,7 +3123,8 @@ does for the client:
   - *a link:* the address to open, printed and never opened (6.5);
   - *forgotten:* the admin's token erased;
   - *a page:* the picker's (4.4);
-  - *refused:* the role; no such forge; the forge's kind or mode does not
+  - *refused:* `Connect`'s and `Install`'s as `ForgeRefusal` (4.6) has
+    them: the role; no such forge; the forge's kind or mode does not
     take it (a Forgejo's install, a forget on a forge not managed, a
     replacement on a managed or owned forge); busy, since a forge runs
     one writing plan, a connect, an install or a reconcile, and one
