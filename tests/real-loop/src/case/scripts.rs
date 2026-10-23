@@ -5,8 +5,61 @@ use super::{
     OWNER_EFFORT_NUMBER, OWNER_MODEL_NUMBER, QUESTION, REVIEWED, SCHEDULED, draft_commit,
 };
 use serde_json::{Value, json};
-use skein_fake_llm_domain::api::{Finish, Line, Script, Turn};
+use skein_fake_llm_domain::api::{Finish, Line, Rule, Script, Turn};
 use std::net::SocketAddr;
+
+/// Smith renders its opening in smith-domain-run/src/prompt.rs.
+const BEGIN: &str = "Begin the work your brief describes.";
+/// Smith returns crossed finish feedback in smith-domain-run/src/run.rs via prompt.rs.
+const CROSSED: &str = "Finish was not accepted because messages arrived.";
+/// Temper renders smith's message acknowledgement in temper-engine-smith/src/answers.rs.
+const MESSAGE: &str = "Message ";
+/// Temper renders smith's delegation acknowledgement in temper-engine-smith/src/answers.rs.
+const DELEGATED: &str = "Delegated tasks: ";
+/// Smith renders labelled inbox deliveries in smith-domain-run/src/inbox.rs.
+const DELIVERY: &str = ": ";
+
+/// The turn rules for `step_4_1`'s scripts, index-parallel (skein's fake-llm.md, 2.4).
+#[must_use]
+pub fn step_4_1_rules() -> Box<[Box<[Rule]>]> {
+    let director = [
+        (A_REPORT, 4),
+        (CROSSED, 4),
+        (DESIGN_REPORT, 2),
+        (MESSAGE, 3),
+        (&format!("{DELEGATED}{A}"), 1),
+        (DELIVERY, 1),
+        (BEGIN, 0),
+        ("", 1),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    let a = [
+        (GREEN_LIGHT, 4),
+        (CROSSED, 4),
+        (&format!("Result from task {}:\n", super::DESIGN), 2),
+        (MESSAGE, 3),
+        (&format!("{DELEGATED}{}", super::DESIGN), 1),
+        (DELIVERY, 1),
+        (BEGIN, 0),
+        ("", 1),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    Box::new([Box::new(director), Box::new(a), Box::new([]), Box::new([])])
+}
+
+/// The opener's rules followed by one empty table per check script.
+#[must_use]
+pub fn step_4_1_4_3_rules() -> Box<[Box<[Rule]>]> {
+    let mut rules = step_4_1_rules().into_vec();
+    rules.extend([Box::<[Rule]>::default(), Box::default(), Box::default()]);
+    rules.into_boxed_slice()
+}
+
+/// Both restart scripts count turns, since opening and retry share their input.
+#[must_use]
+pub fn step_4_6_rules() -> Box<[Box<[Rule]>]> {
+    Box::new([Box::new([]), Box::new([])])
+}
 
 fn call(name: &[u8], value: &Value) -> Turn {
     Turn {

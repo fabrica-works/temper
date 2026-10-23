@@ -13,8 +13,14 @@ const WORKERS: &[&str] = &["ws", "s1", "s2"];
 #[test]
 fn the_opener_and_the_two_hour_check_run_on_three_workers() {
     // Leaves out survey, instructions/pool, host kinds, Markdown CI's fast path and goal issue; pools/load/queue/disk, moving B and the plane: testing.md 5.3's 4.1 and 4.3 rows.
-    let cluster =
-        run_cluster_forge(WORKERS, &["s2"], case::fixture_check(), case::scripts::step_4_1_4_3, acts::step_4_1_4_3);
+    let cluster = run_cluster_forge(
+        WORKERS,
+        &["s2"],
+        case::fixture_check(),
+        case::scripts::step_4_1_4_3,
+        case::scripts::step_4_1_4_3_rules,
+        acts::step_4_1_4_3,
+    );
     for (at, called) in cluster.calls().iter().enumerate() {
         assert_eq!(called.exit, Some(Exit::Code(0)), "call {at}: {}", String::from_utf8_lossy(&called.stderr));
     }
