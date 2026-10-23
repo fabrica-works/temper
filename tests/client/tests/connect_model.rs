@@ -47,7 +47,9 @@ fn the_banner_key_way_opens_details_and_ready_removes_the_banner() {
     press(&mut front, &mut root, Role::Link, b"Use an API key", skein_ui::Act::Press);
     assert_eq!(
         root.person().pages().address(),
-        &Address::ConnectModel { way: Some(d::ModelWay { provider: accounts::PROVIDER, kind: d::WayKind::Key }) }
+        &Address::ConnectModel {
+            way: Some(d::ModelWay { source: None, provider: accounts::PROVIDER, kind: d::WayKind::Key })
+        }
     );
     assert!(text(&root).contains("Details"));
     press(
@@ -118,4 +120,125 @@ fn a_creation_key_is_absent_from_the_small_store() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert!(world.kept(person).is_empty(), "a creation key has no small-store record");
+}
+
+fn start_plan_sign_in(front: &mut Joint, root: &mut Root) -> u32 {
+    go(front, root, Address::ConnectModel { way: None });
+    press(front, root, Role::Button, b"Continue with ChatGPT", skein_ui::Act::Press);
+    let source = accounts::signing(front);
+    front.engine.send(temper_engine_domain::Event::Account(jig_domain_accounts::Event::Visited {
+        source,
+        address: b"https://issuer/visit".as_slice().into(),
+    }));
+    accounts::settle(front, root);
+    source
+}
+fn returned_path(source: u32) -> Vec<u8> {
+    format!("/accounts/connect?provider={}&way=sign-in&source={source}", accounts::PROVIDER).into_bytes()
+}
+#[test]
+fn a_departing_page_returns_then_leaves_once_and_a_rebuild_asks_nothing() {
+    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    accounts::reopen(&mut front, &mut root, Address::ConnectModel { way: None }, true);
+    let source = start_plan_sign_in(&mut front, &mut root);
+    assert_eq!(front.engine.protocol.returns, [(source, returned_path(source).into_boxed_slice())]);
+    assert_eq!(front.leaves, [Box::from(b"https://issuer/visit".as_slice())]);
+    assert!(text(&root).contains("Signing in"));
+    view(&root);
+    accounts::settle(&mut front, &mut root);
+    assert_eq!(front.leaves, [Box::from(b"https://issuer/visit".as_slice())]);
+    assert_eq!(front.engine.protocol.returns, [(source, returned_path(source).into_boxed_slice())]);
+}
+#[test]
+fn a_refused_return_keeps_the_page_and_its_sign_in_link() {
+    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    accounts::reopen(&mut front, &mut root, Address::ConnectModel { way: None }, true);
+    front.refuse_return = true;
+    start_plan_sign_in(&mut front, &mut root);
+    assert!(front.leaves.is_empty());
+    assert!(view(&root).tree().nodes().iter().any(|node| node.external.as_deref() == Some(b"https://issuer/visit")));
+}
+#[test]
+fn a_non_departing_page_asks_no_return_and_never_leaves() {
+    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    start_plan_sign_in(&mut front, &mut root);
+    assert!(front.engine.protocol.returns.is_empty());
+    assert!(front.leaves.is_empty());
+}
+#[test]
+fn a_fresh_page_at_the_return_address_follows_the_watch_to_ready_without_departing() {
+    use d::pages::accounts::SignInState;
+    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    let source = start_plan_sign_in(&mut front, &mut root);
+    let Place::Address(address) = d::address::parse(&returned_path(source)) else { panic!("returned address") };
+    accounts::reopen(&mut front, &mut root, address, true);
+    assert_eq!(
+        root.person()
+            .pages()
+            .connect_model()
+            .expect("connect model page")
+            .request
+            .sign_in_state(root.person().client()),
+        SignInState::Signing { source }
+    );
+    assert!(text(&root).contains("Signing in"));
+    assert!(
+        !view(&root)
+            .tree()
+            .nodes()
+            .iter()
+            .any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Continue with ChatGPT"))
+    );
+    front.engine.send(temper_engine_domain::Event::Account(jig_domain_accounts::Event::SignedIn {
+        source,
+        subject: b"subject".as_slice().into(),
+        display: b"alice@example.com".as_slice().into(),
+        declined: false,
+    }));
+    accounts::settle(&mut front, &mut root);
+    assert!(text(&root).contains("Signed in to ChatGPT as alice@example.com"));
+    assert_eq!(
+        root.person()
+            .pages()
+            .connect_model()
+            .expect("connect model page")
+            .request
+            .sign_in_state(root.person().client()),
+        SignInState::Ended { source }
+    );
+    assert!(front.engine.protocol.returns.is_empty());
+    assert!(front.leaves.is_empty());
+}
+#[test]
+fn a_departing_welcome_model_step_returns_to_ready() {
+    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    accounts::reopen(&mut front, &mut root, Address::Welcome { step: d::Step::Model { way: None } }, true);
+    press(&mut front, &mut root, Role::Button, b"Continue with ChatGPT", skein_ui::Act::Press);
+    let source = accounts::signing(&front);
+    front.engine.send(temper_engine_domain::Event::Account(jig_domain_accounts::Event::Visited {
+        source,
+        address: b"https://issuer/visit".as_slice().into(),
+    }));
+    accounts::settle(&mut front, &mut root);
+    assert_eq!(front.engine.protocol.returns, [(source, Box::from(b"/welcome?at=ready".as_slice()))]);
+    assert_eq!(front.leaves, [Box::from(b"https://issuer/visit".as_slice())]);
+}
+#[test]
+fn an_unknown_return_source_is_removed_and_the_way_can_start_again() {
+    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    let Place::Address(address) = d::address::parse(&returned_path(u32::MAX)) else { panic!("returned address") };
+    accounts::reopen(&mut front, &mut root, address, true);
+    assert_eq!(
+        d::address::print(root.person().pages().address()).as_ref(),
+        format!("/accounts/connect?provider={}&way=sign-in", accounts::PROVIDER).as_bytes()
+    );
+    assert!(
+        view(&root)
+            .tree()
+            .nodes()
+            .iter()
+            .any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Continue with ChatGPT"))
+    );
+    assert!(front.leaves.is_empty());
+    assert!(front.engine.protocol.returns.is_empty());
 }

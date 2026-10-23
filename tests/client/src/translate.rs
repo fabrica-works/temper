@@ -228,6 +228,7 @@ pub fn incoming(
         | engine::Request::Account(_)
         | engine::Request::SetUpGroup { .. }
         | engine::Request::SetUp { .. }
+        | engine::Request::Return { .. }
         | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)
         | engine::Request::Busy(_)

@@ -131,6 +131,25 @@ pub fn request(
     let a = (match v1::Requesting::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts().request {
         v1::Request::StartDemo => panic!("client sends no demo start yet"),
         v1::Request::Adopt(adopt) => adopt,
+        v1::Request::Return(returning) => {
+            assert!(reader.is_empty(), "whole return request");
+            let value = returning.into_parts();
+            let reply_to = transport.reply_to(Reply::Keyed {
+                client: who,
+                attempt,
+                key,
+                owner: KeyedOwner::Application { connector: crate::fixtures::FORGE },
+            });
+            return engine::Event::Party(PartyInput::Application {
+                scope: jig_domain_people::ApplicationScope::Own,
+                reply_to,
+                sign_in: transport.sign_in(who).expect("authenticated return"),
+                key,
+                digest: skein_lib::sha256::digest(&ask.bytes),
+                carried: None,
+                request: engine::Application::Return { source: value.source, path: value.path },
+            });
+        }
         v1::Request::SetUp(set_up) => {
             assert!(reader.is_empty(), "whole setup request");
             return set_up_request(transport, who, attempt, key, scope, ask, set_up.into_parts());
@@ -173,7 +192,10 @@ pub fn request(
         key,
         digest: digest(&value),
         carried: None,
-        request: temper_engine_domain_forge::Ask::Adopt(adoption(&value, crate::fixtures::FORGE_HOST)),
+        request: temper_engine_domain::Application::Forge(temper_engine_domain_forge::Ask::Adopt(adoption(
+            &value,
+            crate::fixtures::FORGE_HOST,
+        ))),
     })
 }
 /// Open only the forge's whole, project-scoped change subject (client/forge.md, 9.2).
@@ -315,6 +337,7 @@ pub fn incoming(
         | engine::Request::Account(_)
         | engine::Request::SetUpGroup { .. }
         | engine::Request::SetUp { .. }
+        | engine::Request::Return { .. }
         | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)
         | engine::Request::Busy(_)
@@ -392,7 +415,7 @@ pub fn incoming(
     Ok(Some(answered(&route, body)))
 }
 /// The application's outcome, answered on its keyed route as the forge family's bytes.
-fn answered(route: &Reply, body: Option<owner::Answered>) -> (ClientId, client::Event) {
+fn answered(route: &Reply, body: Option<temper_engine_domain::ApplicationAnswer>) -> (ClientId, client::Event) {
     let Reply::Keyed { client, attempt, owner: KeyedOwner::Application { connector }, .. } = *route else {
         panic!("application reply route")
     };
@@ -452,7 +475,7 @@ fn set_up_request(
         key,
         digest: skein_lib::sha256::digest(&record.bytes),
         carried: None,
-        request: owner::Ask::SetUp {
+        request: temper_engine_domain::Application::Forge(owner::Ask::SetUp {
             forge: setup.forge,
             org: setup.org,
             repository: setup.repository,
@@ -464,7 +487,7 @@ fn set_up_request(
                     owner::SetUpProject::New(value.into_parts().name)
                 }
             },
-        },
+        }),
     })
 }
 fn open_forges(
@@ -633,7 +656,10 @@ mod watch_tests {
         let mut transport = transport();
         let event = super::request(&mut transport, CLIENT, NATIVE, [5; 16], c::Scope::Project(7), &record);
         let engine::Event::Party(PartyInput::Application { request, .. }) = event else { panic!("root adoption") };
-        assert_eq!(request, owner::Ask::Adopt(super::adoption(&adoption, crate::fixtures::FORGE_HOST)));
+        assert_eq!(
+            request,
+            engine::Application::Forge(owner::Ask::Adopt(super::adoption(&adoption, crate::fixtures::FORGE_HOST)))
+        );
     }
 
     #[test]

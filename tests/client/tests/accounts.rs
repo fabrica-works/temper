@@ -11,7 +11,7 @@ fn act(act: Act) -> temper_client_world::app::Event {
 fn select() -> temper_client_world::app::Event {
     d::Event::Went {
         place: d::Place::Address(d::Address::ConnectModel {
-            way: Some(d::ModelWay { provider: accounts::PROVIDER, kind: d::WayKind::Key }),
+            way: Some(d::ModelWay { source: None, provider: accounts::PROVIDER, kind: d::WayKind::Key }),
         }),
     }
     .into()

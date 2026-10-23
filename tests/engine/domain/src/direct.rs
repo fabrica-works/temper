@@ -172,6 +172,7 @@ impl Driver {
                 | engine::Request::Account(_)
                 | engine::Request::SetUpGroup { .. }
                 | engine::Request::SetUp { .. }
+                | engine::Request::Return { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Busy(_)
                 | engine::Request::Drained) => self.immediate.push(other),

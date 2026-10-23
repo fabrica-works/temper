@@ -45,6 +45,10 @@ pub fn down(request: Request) -> Option<jig_client::Down> {
             | jig_client::Request::SignOut
             | jig_client::Request::ServiceCredential { .. } => None,
         },
-        Request::Show { .. } | Request::SignOut | Request::Dropped { .. } | Request::Fact { .. } => None,
+        Request::Show { .. }
+        | Request::Leave { .. }
+        | Request::SignOut
+        | Request::Dropped { .. }
+        | Request::Fact { .. } => None,
     }
 }

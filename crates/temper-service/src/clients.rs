@@ -390,7 +390,7 @@ impl Clients {
                     match crate::family::to_root(value, forges, demo, &temper_client_protocol_wire::v1::CEILINGS) {
                         Ok(mut value) => {
                             if let root::Event::Party(root::PartyInput::Application {
-                                request: temper_engine_domain_forge::Ask::StartDemo,
+                                request: root::Application::Forge(temper_engine_domain_forge::Ask::StartDemo),
                                 ..
                             }) = &value
                                 && let Some(demo) = demo
