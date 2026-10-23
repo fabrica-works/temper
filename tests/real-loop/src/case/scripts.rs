@@ -606,3 +606,187 @@ pub fn step_5_2(forge: SocketAddr) -> Box<[Script]> {
         },
     ])
 }
+
+// Act 2, step 5.5 (domain/testing.md, 5.3)
+#[must_use]
+pub fn step_5_5(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        A_DEADLINE, A1_DEADLINE, PLAN_ANSWER, PLAN_ANSWER_HOLD, PLAN_ANSWER_PENDING, PLAN_DIRECTOR, PLAN_NOTE,
+        PLAN_NOTE_NUMBER, PLAN_QUESTION_NUMBER, PLAN_REPORT, PLAN_WORDS, PLANNER, PLANNER_REPORT, PLANNER_SPEC,
+        PROJECT, SUBOWNER_REPORT, SUBOWNER_SPEC,
+    };
+    use skein_fake_llm_domain::api::Piece;
+    let member = |spec: &str, spend, tools, notes, tasks, depth, deadline| {
+        json!({
+            "executor":{"kind":"agent","charter":2},
+            "spec":{"words":spec,"parameters":[]},"contract":{"kind":"report","words":128},
+            "authority":{"tools":tools,"grants":[],"notes":notes,
+                "delegation":{"kinds":[{"kind":"agent","number":2}],"tasks":tasks,"depth":depth},
+                "budget":{"spend":spend,"deadline":deadline}}
+        })
+    };
+    let mut mission = member(PLANNER_SPEC, 20, 0x0183, 2, 2, 2, A_DEADLINE);
+    mission["tracked"] = json!({"priority":1});
+    let mut answer = call(
+        b"message",
+        &json!({"target":PLANNER,"form":"answer",
+        "question":PLAN_QUESTION_NUMBER,"words":PLAN_ANSWER}),
+    );
+    let mut lines = vec![Line::Pieces {
+        pieces: Box::new([
+            Piece { text: PLAN_ANSWER_PENDING.as_bytes().into(), hold: None },
+            Piece { text: b"The answer is released.".as_slice().into(), hold: Some(PLAN_ANSWER_HOLD.into()) },
+        ]),
+    }];
+    lines.extend(answer.lines);
+    answer.lines = lines.into();
+    Box::new([
+        Script {
+            cue: Agent::Plan.cue().into(),
+            turns: Box::new([
+                call(b"delegate", &json!({"batch":[mission]})),
+                wait("A is planning."),
+                answer,
+                wait("A has its green light."),
+                report(PLAN_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::Planner.cue().into(),
+            turns: Box::new([
+                call(
+                    b"note",
+                    &json!({"scope":{"kind":"project","project":PROJECT},
+                "description":PLAN_NOTE,"body":PLAN_WORDS}),
+                ),
+                call(b"message", &json!({"target":PLAN_DIRECTOR,"form":"question","words":PLAN_WORDS})),
+                wait("A's plan awaits its answer."),
+                call(b"recall", &json!({"kind":"name","name":PLAN_NOTE_NUMBER})),
+                call(b"delegate", &json!({"batch":[member(SUBOWNER_SPEC, 5, 1, 0, 1, 0, A1_DEADLINE)]})),
+                wait("M1's sub-owner is delegated."),
+                report(PLANNER_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::Subowner.cue().into(),
+            turns: Box::new([
+                call(
+                    b"delegate",
+                    // The helper asks no spend, so depth 0 is the batch's only deficit.
+                    &json!({"batch":[member("A helper under M1's sub-owner.", 0, 0, 0, 0, 0, A1_DEADLINE)]}),
+                ),
+                report(SUBOWNER_REPORT),
+            ]),
+        },
+    ])
+}
+
+#[must_use]
+pub fn step_5_5_rules() -> Box<[Box<[Rule]>]> {
+    use super::{PLAN_ANSWER, PLAN_NOTE_NUMBER, PLAN_QUESTION_NUMBER, SUBOWNER, SUBOWNER_REPORT};
+    // The counted stress trial did not settle: a fresh conversation resets
+    // the assistant count, as in 5.1. Follow A's new input across its parks;
+    // the director and A1 keep counted turns.
+    let planner = [
+        (SUBOWNER_REPORT, 6),
+        (CROSSED, 6),
+        (&format!("{DELEGATED}{SUBOWNER}"), 5),
+        (&format!("Note {PLAN_NOTE_NUMBER} revision 1: "), 4),
+        (PLAN_ANSWER, 3),
+        (&format!("Message {PLAN_QUESTION_NUMBER} sent"), 2),
+        (&format!("Note {PLAN_NOTE_NUMBER} revision 1 written"), 1),
+        (BEGIN, 0),
+        ("", 2),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    Box::new([Box::new([]), Box::new(planner), Box::new([])])
+}
+
+// Act 2, step 5.6 (domain/testing.md, 5.3)
+#[must_use]
+pub fn step_5_6(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        MISREAD_HELPER, MISREAD_HELPER_HOLD, MISREAD_HELPER_PENDING, MISREAD_HELPER_SPEC, MISREAD_NOTE, MISREAD_REASON,
+        MISREAD_RECALL_HOLD, MISREAD_REPORT, MISREAD_RULE, MISREAD_RULE_PENDING, MISREAD_TIMER_AT, PROJECT,
+    };
+    use skein_fake_llm_domain::api::Piece;
+    let held = |marker: &str, hold: &[u8], mut turn: Turn| {
+        let mut lines = vec![Line::Pieces {
+            pieces: Box::new([
+                Piece { text: marker.as_bytes().into(), hold: None },
+                Piece { text: b"Continue.".as_slice().into(), hold: Some(hold.into()) },
+            ]),
+        }];
+        lines.extend(turn.lines);
+        turn.lines = lines.into();
+        turn
+    };
+    Box::new([
+        Script {
+            cue: Agent::Misread.cue().into(),
+            turns: Box::new([
+                call(b"subscribe", &json!({"kind":"timer","at":MISREAD_TIMER_AT})),
+                call(
+                    b"delegate",
+                    &json!({"batch":[{
+                        "executor":{"kind":"agent","charter":1},"tracked":{"priority":1},
+                        "spec":{"words":MISREAD_HELPER_SPEC,"parameters":[]},"contract":{"kind":"report","words":128},
+                        "authority":{"tools":0,"grants":[],"notes":0,
+                            "delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":5}}
+                    }]}),
+                ),
+                wait("A helper is acting on the priorities; the timer remains armed."),
+                call(b"cancel", &json!({"target":MISREAD_HELPER,"reason":MISREAD_REASON})),
+                call(
+                    b"note",
+                    &json!({"scope":{"kind":"project","project":PROJECT},
+                "description":MISREAD_NOTE,"body":MISREAD_RULE}),
+                ),
+                held(
+                    MISREAD_RULE_PENDING,
+                    MISREAD_RECALL_HOLD,
+                    call(
+                        b"recall",
+                        &json!({"kind":"search","scopes":[{"kind":"project","project":PROJECT}],
+                    "query":MISREAD_NOTE}),
+                    ),
+                ),
+                call(
+                    b"read_branch",
+                    &json!({"repository":{"forge":1,"repository":crate::forge::ID},"read":{"branch":"main"}}),
+                ),
+                report(MISREAD_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::MisreadHelper.cue().into(),
+            turns: Box::new([held(
+                MISREAD_HELPER_PENDING,
+                MISREAD_HELPER_HOLD,
+                report("The helper has landed nothing."),
+            )]),
+        },
+    ])
+}
+
+#[must_use]
+pub fn step_5_6_rules() -> Box<[Box<[Rule]>]> {
+    use super::{MISREAD_CORRECTION, MISREAD_HELPER, MISREAD_NOTE, MISREAD_RULE, MISREAD_TIMER};
+    // The counted stress trial restarted the opening on the person's later
+    // message: fresh runs reset the assistant count. Only the director needs
+    // input rules; the helper has one held turn, then ends with cancellation.
+    let director = [
+        (CROSSED, 7),
+        (&format!(": {MISREAD_NOTE}\n{MISREAD_RULE}\n"), 6),
+        (&super::draft_commit(), 7),
+        (" revision 1 written", 5),
+        ("Done", 4),
+        (MISREAD_CORRECTION, 3),
+        (&format!("Subscription {MISREAD_TIMER} added"), 1),
+        (&format!("{DELEGATED}{MISREAD_HELPER}"), 2),
+        (BEGIN, 0),
+        ("", 2),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    Box::new([Box::new(director), Box::new([])])
+}
