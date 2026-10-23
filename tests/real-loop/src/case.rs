@@ -109,11 +109,15 @@ pub enum Agent {
     Plan,
     Planner,
     Subowner,
+    Misread,
+    MisreadHelper,
 }
 impl Agent {
     #[must_use]
     pub fn cue(self) -> &'static [u8] {
         match self {
+            Self::Misread => b"@case_misread_director",
+            Self::MisreadHelper => b"@case_misread_helper",
             Self::Plan => b"@case_plan_director",
             Self::Planner => b"@case_planner",
             Self::Subowner => b"@case_subowner",
@@ -536,6 +540,47 @@ pub fn fixture_5_5() -> forge::Fixture {
             for project in value["engine"]["projects"].as_array_mut().expect("projects") {
                 project["policy"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
                 project["policy"]["roles"][0]["authority"]["delegation"]["kinds"] = kinds.clone();
+            }
+            value["application"]["landing"]["projects"] = json!([]);
+            landing::admit(value);
+        },
+        ..fixture()
+    }
+}
+
+// Act 2, step 5.6 (domain/testing.md, 5.3)
+pub const MISREAD_DIRECTOR: u64 = 1;
+pub const MISREAD_HELPER: u64 = 2;
+pub const MISREAD_TIMER: u64 = 1;
+pub const MISREAD_CORRECTION_MESSAGE: u64 = 2;
+pub const MISREAD_TIMER_AT: u64 = 4_102_444_800_000_000_000;
+pub const MISREAD_PERSON: &str = "@case_misread_director Priorities for information: 1, the end-to-end story on fakes; 2, real backends; s1 and s2 preferred for priority 1.";
+pub const MISREAD_HELPER_SPEC: &str = "@case_misread_helper Act on priority 1: the end-to-end story on fakes.";
+pub const MISREAD_CORRECTION: &str = "that was just informative; don't act on it";
+pub const MISREAD_REASON: &str =
+    "The person's priorities were for information, not instructions to act; cancel this helper.";
+pub const MISREAD_NOTE: &str = "Information is not an instruction";
+pub const MISREAD_RULE: &str =
+    "Priorities supplied for information are not instructions. Do not act on them unless the person asks.";
+pub const MISREAD_REPORT: &str =
+    "The misread helper was cancelled before landing anything, and the recalled rule is kept in the project's notes.";
+pub const MISREAD_HELPER_HOLD: &[u8] = b"case-5-6-helper";
+pub const MISREAD_RECALL_HOLD: &[u8] = b"case-5-6-recall";
+pub const MISREAD_HELPER_PENDING: &str = "The helper's first turn is held.";
+pub const MISREAD_RULE_PENDING: &str = "The rule is written; recall waits for the helper's cancellation.";
+
+#[must_use]
+pub fn fixture_5_6() -> forge::Fixture {
+    forge::Fixture {
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            value["engine"]["charters"][0]["resume"] = false.into();
+            // Subscribe is family 32; read is 512 for the unchanged-main check.
+            let tools = 0x0187 | 0x0020 | 0x0200;
+            value["engine"]["rules"]["ceiling"]["tools"] = tools.into();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["tools"] = tools.into();
+                project["policy"]["roles"][0]["authority"]["tools"] = tools.into();
             }
             value["application"]["landing"]["projects"] = json!([]);
             landing::admit(value);

@@ -141,6 +141,8 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::Plan,
         Agent::Planner,
         Agent::Subowner,
+        Agent::Misread,
+        Agent::MisreadHelper,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -3255,6 +3257,557 @@ mod plan_tests {
         ending["run_ended"]["end"] = json!({"failed":{"class":"invalid"}});
         for observed in [early, overlap, unordered, unended, failed] {
             assert!(!step_5_5(&observed).is_empty());
+        }
+    }
+}
+
+// Act 2, step 5.6 (domain/testing.md, 5.3)
+const MISREAD_CANCEL: Promise = Promise::Must("cancel a delegate (exact)");
+const MISREAD_NOTED: Promise = Promise::Must("the direction as the chat's notes (exact)");
+const MISREAD_PRIORITY: Promise = Promise::Must("priorities and preferred host kinds (exact, hosts left out)");
+const MISREAD_FRESH_TIMER: Promise =
+    Promise::Add("timers are the task's, outside its run, so they cannot block a fresh start");
+
+#[must_use]
+pub fn step_5_6(observed: &Observed) -> Vec<Miss> {
+    let mut misses = Vec::new();
+    misread_helper(observed, &mut misses);
+    misread_timer_and_fresh(observed, &mut misses);
+    misread_note(observed, &mut misses);
+    misses
+}
+
+fn misread_helper(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{MISREAD_DIRECTOR, MISREAD_HELPER, MISREAD_REASON};
+    let running = task_document(observed, Read::MisreadHelperRunning);
+    let ended = task_document(observed, Read::MisreadHelperEnded);
+    for (read, task) in [(Read::MisreadHelperRunning, running), (Read::MisreadHelperEnded, ended)] {
+        step_check(
+            misses,
+            "5.6",
+            number(task, "/chip/task") == Some(MISREAD_HELPER)
+                && number(task, "/project") == Some(PROJECT)
+                && number(task, "/requester/task") == Some(MISREAD_DIRECTOR),
+            MISREAD_CANCEL,
+            &format!("{read:?} must identify the helper under the director in the project"),
+        );
+    }
+    step_check(
+        misses,
+        "5.6",
+        number(running, "/goal") == Some(MISREAD_HELPER)
+            && number(running, "/priority") == Some(1)
+            && text(running, "/chip/phase") == "running"
+            && text(running, "/chip/details/owner/details/observation/work") == "writing"
+            && running["result"].is_null(),
+        MISREAD_PRIORITY,
+        "before cancellation the helper must be a priority-1 goal with its first LLM turn held",
+    );
+    let calls = plan_tool_results(observed, Agent::Misread, b"cancel");
+    step_check(
+        misses,
+        "5.6",
+        calls.len() == 1
+            && calls.iter().all(|(_, args, output)| {
+                args["target"] == MISREAD_HELPER && args["reason"] == MISREAD_REASON && output.as_slice() == b"Done"
+            })
+            && text(ended, "/chip/phase") == "ended"
+            && number(ended, "/result/ending/task/cancelled/by/task") == Some(MISREAD_DIRECTOR)
+            && text(ended, "/result/ending/task/cancelled/reason/bytes") == MISREAD_REASON
+            && number(ended, "/chip/details/owner/details/live_delegates") == Some(0)
+            && ended["delegates"].as_array().is_some_and(Vec::is_empty)
+            && observed.documents.values().all(|doc| number(&doc["task"], "/requester/task") != Some(MISREAD_HELPER))
+            && plan_attempts(observed, &[Read::MisreadHelperEnded], MISREAD_HELPER, 1)
+            && check_activity(observed, Read::MisreadHelperEnded).iter().any(|row| {
+                text(row, "/line/run_ended/end") == "cancelled"
+                    && number(row, "/line/run_ended/attempt") == number(ended, "/chip/details/owner/details/attempt")
+            }),
+        MISREAD_CANCEL,
+        "the director's single cancel must end the helper and its subtree, with the reason and no open run",
+    );
+    let heads = plan_tool_results(observed, Agent::Misread, b"read_branch");
+    let recalls = plan_tool_results(observed, Agent::Misread, b"recall");
+    step_check(
+        misses,
+        "5.6",
+        heads.len() == 1
+            && heads.iter().all(|(read, args, output)| {
+                args["repository"] == serde_json::json!({"forge":1,"repository":crate::forge::ID})
+                    && args["read"]["branch"] == "main"
+                    && output.as_slice() == draft_commit().as_bytes()
+                    && recalls.iter().any(|(recalled, _, _)| recalled < read)
+            }),
+        MISREAD_CANCEL,
+        "after the helper ended and its rule was recalled, kit's main must still be the fixture's original commit",
+    );
+}
+
+fn misread_timer_and_fresh(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{MISREAD_DIRECTOR, MISREAD_TIMER, MISREAD_TIMER_AT};
+    let parked = task_document(observed, Read::MisreadParked);
+    let fresh = task_document(observed, Read::MisreadFresh);
+    let ended = task_document(observed, Read::MisreadEnded);
+    for (read, task) in [(Read::MisreadParked, parked), (Read::MisreadFresh, fresh), (Read::MisreadEnded, ended)] {
+        step_check(
+            misses,
+            "5.6",
+            number(task, "/chip/task") == Some(MISREAD_DIRECTOR) && number(task, "/project") == Some(PROJECT),
+            MISREAD_FRESH_TIMER,
+            &format!("{read:?} must identify the director's original chat"),
+        );
+    }
+    for task in [parked, fresh] {
+        step_check(
+            misses,
+            "5.6",
+            task.pointer("/subscriptions/entries").and_then(Value::as_array).is_some_and(|entries| {
+                entries.len() == 1
+                    && entries.iter().all(|entry| {
+                        number(entry, "/number") == Some(MISREAD_TIMER)
+                            && number(entry, "/kind/timer/at") == Some(MISREAD_TIMER_AT)
+                            && entry.pointer("/kind/timer/period") == Some(&Value::Null)
+                    })
+            }),
+            MISREAD_FRESH_TIMER,
+            "the same numbered timer must stay armed after the first run ended and during the next run",
+        );
+    }
+    misread_handover(observed, misses);
+    misread_conversation(observed, misses);
+}
+
+fn misread_handover(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{
+        MISREAD_CORRECTION, MISREAD_CORRECTION_MESSAGE, MISREAD_DIRECTOR, MISREAD_RULE_PENDING, MISREAD_TIMER,
+        MISREAD_TIMER_AT,
+    };
+    let parked = task_document(observed, Read::MisreadParked);
+    let fresh = task_document(observed, Read::MisreadFresh);
+    let subscriptions = plan_tool_results(observed, Agent::Misread, b"subscribe");
+    let pending = document(observed, Read::MisreadRulePending);
+    let prior = number(parked, "/chip/details/owner/details/attempt");
+    let next = number(fresh, "/chip/details/owner/details/attempt");
+    let rows = check_activity(observed, Read::MisreadFresh);
+    let stopped = rows.iter().find_map(|row| {
+        (number(row, "/line/run_ended/attempt") == prior && text(row, "/line/run_ended/end") == "parked")
+            .then(|| number(row, "/position"))
+            .flatten()
+    });
+    let corrected = rows.iter().find_map(|row| {
+        (number(row, "/line/words/message") == Some(MISREAD_CORRECTION_MESSAGE)
+            && number(row, "/line/words/by/person") == Some(1)
+            && text(row, "/line/words/kind") == "words"
+            && text(row, "/line/words/words") == MISREAD_CORRECTION)
+            .then(|| number(row, "/position"))
+            .flatten()
+    });
+    let began = rows.iter().find_map(|row| {
+        (number(row, "/line/run_began/attempt") == next
+            && number(row, "/line/run_began/why/message/message") == Some(MISREAD_CORRECTION_MESSAGE))
+        .then(|| number(row, "/position"))
+        .flatten()
+    });
+    step_check(
+        misses,
+        "5.6",
+        text(parked, "/chip/phase") == "idle"
+            && text(fresh, "/chip/phase") == "running"
+            && text(fresh, "/chip/details/owner/details/observation/work") == "writing"
+            && prior.zip(next).is_some_and(|(old, new)| old != new)
+            && rows.iter().all(|row| number(row, "/task") == Some(MISREAD_DIRECTOR))
+            && stopped
+                .zip(corrected)
+                .zip(began)
+                .is_some_and(|((stop, correction), began)| stop != 0 && stop < correction && correction < began)
+            && subscriptions.len() == 1
+            && subscriptions.iter().all(|(_, args, output)| {
+                args["kind"] == "timer"
+                    && args["at"] == MISREAD_TIMER_AT
+                    && contains(output, &format!("Subscription {MISREAD_TIMER} added"))
+            })
+            && number(pending, "/task") == Some(MISREAD_DIRECTOR)
+            && text(pending, "/writing/text") == MISREAD_RULE_PENDING
+            && pending.pointer("/writing/cut") == Some(&Value::Bool(false)),
+        MISREAD_FRESH_TIMER,
+        "the parked chat must start its next run on the person's later correction, while its note-recall turn is held",
+    );
+}
+
+fn misread_conversation(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{MISREAD_CORRECTION, MISREAD_REPORT};
+    let ended = task_document(observed, Read::MisreadEnded);
+    let helper: Vec<_> =
+        observed.told.iter().enumerate().filter(|(_, told)| told.agent == Agent::MisreadHelper).collect();
+    let corrected_at = observed.told.iter().position(|told| {
+        told.agent == Agent::Misread && user_words(told).any(|words| contains(words, MISREAD_CORRECTION))
+    });
+    step_check(
+        misses,
+        "5.6",
+        helper.first().is_some_and(|(at, _)| corrected_at.is_some_and(|corrected| *at < corrected))
+            && helper.iter().all(|(_, told)| plan_fresh(told)),
+        MISREAD_PRIORITY,
+        "the helper's first query must be in flight, with no completed turn, before the fresh director acts",
+    );
+    let queries: Vec<_> = observed.told.iter().filter(|told| told.agent == Agent::Misread).collect();
+    let at = queries.iter().position(|told| user_words(told).any(|words| contains(words, MISREAD_CORRECTION)));
+    step_check(
+        misses,
+        "5.6",
+        at.is_some_and(|at| {
+            at > 0
+                && plan_fresh(queries[at])
+                && queries[at..].windows(2).all(|pair| pair[1].history.starts_with(&pair[0].history))
+        }) && plan_deliveries(observed, Agent::Misread, MISREAD_CORRECTION) == 1
+            && text(ended, "/chip/phase") == "ended"
+            && text(ended, "/result/value/report/bytes") == MISREAD_REPORT,
+        MISREAD_FRESH_TIMER,
+        "the next run must contain none of the first run's turns and hear the correction once before reporting",
+    );
+}
+
+fn misread_note(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{MISREAD_NOTE, MISREAD_RULE};
+    let writes = plan_tool_results(observed, Agent::Misread, b"note");
+    let recalls = plan_tool_results(observed, Agent::Misread, b"recall");
+    let cancels = plan_tool_results(observed, Agent::Misread, b"cancel");
+    // Like 4.4, search recalls the project's note: its durable name is taken
+    // from the write acknowledgement, never guessed from concurrent endings.
+    let kept = writes.len() == 1
+        && writes.iter().all(|(written, args, output)| {
+            let output = String::from_utf8_lossy(output);
+            let name = output
+                .strip_prefix("Note ")
+                .and_then(|suffix| suffix.strip_suffix(" revision 1 written"))
+                .and_then(|digits| digits.parse::<u64>().ok())
+                .filter(|name| *name != 0);
+            args["scope"] == serde_json::json!({"kind":"project","project":PROJECT})
+                && args["description"] == MISREAD_NOTE
+                && args["body"] == MISREAD_RULE
+                && cancels.iter().any(|(cancelled, _, _)| cancelled < written)
+                && name.is_some_and(|name| {
+                    recalls.iter().any(|(recalled, args, output)| {
+                        written < recalled
+                            && args["kind"] == "search"
+                            && args["query"] == MISREAD_NOTE
+                            && args["scopes"] == serde_json::json!([{"kind":"project","project":PROJECT}])
+                            && contains(output, &format!("Note {name} revision 1: {MISREAD_NOTE}\n{MISREAD_RULE}\n"))
+                    })
+                })
+        });
+    step_check(
+        misses,
+        "5.6",
+        kept,
+        MISREAD_NOTED,
+        "after cancelling the helper, the director must write the project's rule and recall that same note after its write",
+    );
+}
+
+#[cfg(test)]
+mod misread_tests {
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+    use skein_fake_llm_domain::api::{Message, Part, Role};
+
+    fn input(words: &str) -> Message {
+        Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
+    }
+    fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
+        [
+            Message {
+                role: Role::Assistant,
+                parts: Box::new([Part::ToolCall {
+                    id: id.as_bytes().into(),
+                    name: name.as_bytes().into(),
+                    arguments: serde_json::to_vec(args).expect("args").into(),
+                }]),
+            },
+            Message {
+                role: Role::User,
+                parts: Box::new([Part::ToolOutput {
+                    id: id.as_bytes().into(),
+                    output: output.as_bytes().into(),
+                    is_error: false,
+                }]),
+            },
+        ]
+    }
+    fn told(agent: Agent, history: &[Message]) -> Told {
+        Told::new(agent.cue(), b"fake", None, history).expect("agent cue")
+    }
+    fn rows(task: u64, lines: &[Value]) -> Value {
+        Value::Array(
+            lines
+                .iter()
+                .enumerate()
+                .map(|(at, line)| {
+                    json!({"event":{"owner":{"source":{
+                        "task":task,"position":lines.len()-at,"line":line
+                    }}}})
+                })
+                .collect(),
+        )
+    }
+    fn met() -> Observed {
+        let timer =
+            json!({"entries":[{"number":MISREAD_TIMER,"kind":{"timer":{"at":MISREAD_TIMER_AT,"period":null}}}]});
+        let mut documents = BTreeMap::new();
+        for (read, task, parent, phase, attempt) in [
+            (Read::MisreadParked, MISREAD_DIRECTOR, 0, "idle", 1),
+            (Read::MisreadFresh, MISREAD_DIRECTOR, 0, "running", 3),
+            (Read::MisreadEnded, MISREAD_DIRECTOR, 0, "ended", 3),
+            (Read::MisreadHelperRunning, MISREAD_HELPER, MISREAD_DIRECTOR, "running", 2),
+            (Read::MisreadHelperEnded, MISREAD_HELPER, MISREAD_DIRECTOR, "ended", 2),
+        ] {
+            documents.insert(
+                read,
+                json!({"task":{
+                    "chip":{"task":task,"phase":phase,"details":{"owner":{"details":{
+                        "attempt":attempt,"observation":{"work":"writing"},"live_delegates":0
+                    }}}},"project":PROJECT,"requester":{"task":parent},"goal":MISREAD_HELPER,"priority":1,
+                    "subscriptions":timer,"delegates":[],"result":null
+                }}),
+            );
+        }
+        documents.insert(
+            Read::MisreadRulePending,
+            json!({"task":MISREAD_DIRECTOR,"writing":{"text":MISREAD_RULE_PENDING,"cut":false}}),
+        );
+        let fresh = rows(
+            MISREAD_DIRECTOR,
+            &[
+                json!({"run_began":{"attempt":3,"why":{"message":{"message":MISREAD_CORRECTION_MESSAGE}}}}),
+                json!({"words":{"message":MISREAD_CORRECTION_MESSAGE,"by":{"person":1},"kind":"words","words":MISREAD_CORRECTION}}),
+                json!({"run_ended":{"attempt":1,"end":"parked"}}),
+            ],
+        );
+        documents.get_mut(&Read::MisreadFresh).expect("fresh")["activity"] = json!({"rows":fresh});
+        documents.get_mut(&Read::MisreadEnded).expect("chat")["task"]["result"] =
+            json!({"value":{"report":{"bytes":MISREAD_REPORT}}});
+        let helper = documents.get_mut(&Read::MisreadHelperEnded).expect("helper");
+        helper["task"]["result"] = json!({"ending":{"task":{"cancelled":{
+            "by":{"task":MISREAD_DIRECTOR},"reason":{"bytes":MISREAD_REASON}
+        }}}});
+        helper["activity"] = json!({"cut":false,"before":null,"after":null,"rows":rows(MISREAD_HELPER, &[
+            json!({"run_ended":{"attempt":2,"end":"cancelled"}}), json!({"run_began":{"attempt":2}}),
+        ])});
+        let first = tool(
+            "timer",
+            "subscribe",
+            &json!({"kind":"timer","at":MISREAD_TIMER_AT}),
+            &format!("Subscription {MISREAD_TIMER} added"),
+        );
+        let mut next = vec![input(MISREAD_CORRECTION)];
+        let fresh = told(Agent::Misread, &next);
+        next.extend(tool("cancel", "cancel", &json!({"target":MISREAD_HELPER,"reason":MISREAD_REASON}), "Done"));
+        let cancelled = told(Agent::Misread, &next);
+        next.extend(tool(
+            "note",
+            "note",
+            &json!({"scope":{"kind":"project","project":PROJECT},
+            "description":MISREAD_NOTE,"body":MISREAD_RULE}),
+            "Note 3 revision 1 written",
+        ));
+        let written = told(Agent::Misread, &next);
+        next.extend(tool(
+            "recall",
+            "recall",
+            &json!({"kind":"search","scopes":[{"kind":"project","project":PROJECT}],
+            "query":MISREAD_NOTE}),
+            &format!("Note 3 revision 1: {MISREAD_NOTE}\n{MISREAD_RULE}\n"),
+        ));
+        let recalled = told(Agent::Misread, &next);
+        next.extend(tool(
+            "head",
+            "read_branch",
+            &json!({"repository":{"forge":1,"repository":crate::forge::ID},
+            "read":{"branch":"main"}}),
+            &draft_commit(),
+        ));
+        Observed {
+            documents,
+            commands: Vec::new(),
+            told: vec![
+                told(Agent::Misread, &first),
+                told(Agent::MisreadHelper, &[input("Begin the work your brief describes.")]),
+                fresh,
+                cancelled,
+                written,
+                recalled,
+                told(Agent::Misread, &next),
+            ],
+            kit: Kit { main: BTreeMap::new(), merged_green: false },
+        }
+    }
+    #[test]
+    fn informative_direction_meets_the_checkpoint() {
+        assert_met(&step_5_6(&met()));
+        let mut replayed = met();
+        replayed.told.insert(2, replayed.told[1].clone());
+        assert_met(&step_5_6(&replayed));
+    }
+    #[test]
+    fn every_required_field_and_missing_document_rejects_a_mutation() {
+        for (read, paths) in [
+            (
+                Read::MisreadParked,
+                vec![
+                    "/task/chip/task",
+                    "/task/project",
+                    "/task/chip/phase",
+                    "/task/chip/details/owner/details/attempt",
+                ],
+            ),
+            (
+                Read::MisreadFresh,
+                vec![
+                    "/task/chip/task",
+                    "/task/project",
+                    "/task/chip/phase",
+                    "/task/chip/details/owner/details/attempt",
+                    "/task/chip/details/owner/details/observation/work",
+                ],
+            ),
+            (
+                Read::MisreadEnded,
+                vec!["/task/chip/task", "/task/project", "/task/chip/phase", "/task/result/value/report/bytes"],
+            ),
+            (
+                Read::MisreadHelperRunning,
+                vec![
+                    "/task/chip/task",
+                    "/task/project",
+                    "/task/requester/task",
+                    "/task/chip/phase",
+                    "/task/priority",
+                    "/task/goal",
+                    "/task/chip/details/owner/details/observation/work",
+                    "/task/result",
+                ],
+            ),
+            (
+                Read::MisreadHelperEnded,
+                vec![
+                    "/task/chip/task",
+                    "/task/project",
+                    "/task/requester/task",
+                    "/task/chip/phase",
+                    "/task/chip/details/owner/details/attempt",
+                    "/task/chip/details/owner/details/live_delegates",
+                    "/task/delegates",
+                    "/task/result/ending/task/cancelled/by/task",
+                    "/task/result/ending/task/cancelled/reason/bytes",
+                    "/activity/cut",
+                    "/activity/before",
+                    "/activity/after",
+                    "/activity/rows/0/event/owner/source/line/run_ended/end",
+                ],
+            ),
+            (Read::MisreadRulePending, vec!["/task", "/writing/text", "/writing/cut"]),
+        ] {
+            for path in paths {
+                let mut observed = met();
+                let value = observed.documents.get_mut(&read).expect("doc").pointer_mut(path).expect("field");
+                *value = if value.is_null() { json!("unexpected cursor") } else { Value::Null };
+                assert!(!step_5_6(&observed).is_empty(), "{read:?}{path}");
+            }
+        }
+        for &(read, _) in acts::READS_5_6 {
+            let mut observed = met();
+            observed.documents.remove(&read);
+            assert!(!step_5_6(&observed).is_empty(), "missing {read:?}");
+        }
+    }
+    #[test]
+    fn the_timer_identity_deadline_and_period_must_survive_both_reads() {
+        for read in [Read::MisreadParked, Read::MisreadFresh] {
+            for path in [
+                "/task/subscriptions/entries/0/number",
+                "/task/subscriptions/entries/0/kind/timer/at",
+                "/task/subscriptions/entries/0/kind/timer/period",
+            ] {
+                let mut observed = met();
+                *observed.documents.get_mut(&read).expect("timer").pointer_mut(path).expect("field") = json!(99);
+                assert!(!step_5_6(&observed).is_empty(), "{read:?}{path}");
+            }
+        }
+        let mut extra = met();
+        extra.documents.get_mut(&Read::MisreadFresh).expect("fresh")["task"]["subscriptions"]["entries"]
+            .as_array_mut()
+            .expect("timers")
+            .push(json!({"number":2}));
+        assert!(!step_5_6(&extra).is_empty());
+    }
+    #[test]
+    fn correction_order_and_the_fresh_conversation_are_checked() {
+        for row in 0..3 {
+            let mut observed = met();
+            observed.documents.get_mut(&Read::MisreadFresh).expect("fresh")["activity"]["rows"][row]["event"]["owner"]
+                ["source"]["position"] = json!(0);
+            assert!(!step_5_6(&observed).is_empty(), "position {row}");
+        }
+        let mut resumed = met();
+        resumed.told[2].history = [resumed.told[0].history.to_vec(), resumed.told[2].history.to_vec()].concat().into();
+        let mut duplicate = met();
+        duplicate.told[2].history = vec![input(MISREAD_CORRECTION), input(MISREAD_CORRECTION)].into();
+        let mut same = met();
+        same.documents.get_mut(&Read::MisreadFresh).expect("fresh")["task"]["chip"]["details"]["owner"]["details"]["attempt"] =
+            json!(1);
+        let mut late_helper = met();
+        late_helper.told.swap(1, 2);
+        let mut completed_helper = met();
+        completed_helper.told[1].history = vec![Message {
+            role: Role::Assistant,
+            parts: Box::new([Part::Text { text: b"already worked".as_slice().into() }]),
+        }]
+        .into();
+        for observed in [resumed, duplicate, same, late_helper, completed_helper] {
+            assert!(!step_5_6(&observed).is_empty());
+        }
+    }
+    #[test]
+    fn cancellation_and_notes_must_be_actual_ordered_tool_results() {
+        for at in 0..7 {
+            let mut observed = met();
+            observed.told.remove(at);
+            assert!(!step_5_6(&observed).is_empty(), "query {at}");
+        }
+        let mut wrong_body = met();
+        for told in &mut wrong_body.told {
+            for part in told.history.iter_mut().flat_map(|message| &mut message.parts) {
+                if let Part::ToolCall { name, arguments, .. } = part
+                    && name.as_ref() == b"note"
+                {
+                    *arguments = serde_json::to_vec(&json!({"scope":{"kind":"project","project":PROJECT},"description":MISREAD_NOTE,"body":"not the rule"})).expect("args").into();
+                }
+            }
+        }
+        assert!(!step_5_6(&wrong_body).is_empty());
+        let mut wrote_after = met();
+        wrote_after.told.swap(4, 5);
+        assert!(!step_5_6(&wrote_after).is_empty());
+    }
+    #[test]
+    fn an_open_subtree_or_any_change_to_main_fails() {
+        let mut open = met();
+        open.documents.get_mut(&Read::MisreadHelperEnded).expect("helper")["activity"]["rows"][0]["event"]["owner"]["source"]
+            ["line"] = json!({});
+        let mut child = met();
+        child.documents.get_mut(&Read::MisreadHelperEnded).expect("helper")["task"]["delegates"] =
+            json!([{"chip":{"task":3}}]);
+        let mut landed = met();
+        for part in landed.told.last_mut().expect("head read").history.iter_mut().flat_map(|message| &mut message.parts)
+        {
+            if let Part::ToolOutput { id, output, .. } = part
+                && id.as_ref() == b"head"
+            {
+                *output = b"1111111111111111111111111111111111111111".as_slice().into();
+            }
+        }
+        for observed in [open, child, landed] {
+            assert!(!step_5_6(&observed).is_empty());
         }
     }
 }
