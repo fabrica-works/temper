@@ -676,12 +676,15 @@ keeps (`../protocol/configuration.md`, section 2).
     step's heading is the page's level-1 heading.
   - *Whether it shows:* at its Welcome step, the page decides once each
     time it opens, when its facts are in. The first run is over
-    when an account of the `accounts` document is usable whose LLM
-    provider is not the demo's (4.8), and a forge other than the
+    when a model is usable, and a forge other than the
     demo's (`application.demo.forge`) is connected in the `forges`
     watch's rows; for a person whose role does not hold the
     deployment's forges (above), the forges are not theirs to set up,
-    and the account alone decides. Its facts are in once the demo's
+    and the model alone decides. A model is usable, with no demo, when the
+    `accounts` document says so, its `usable`, which counts the
+    configured model too (jig's `client/domain/contract.md`, 5.1); and
+    with a demo, when an account of that document is usable whose LLM
+    provider is not the demo's (4.8). Its facts are in once the demo's
     read has answered, a demo or none, the `accounts` document is
     delivered, its accounts as far as it shows them, and, where the
     person's role holds the forges, the `forges` watch has delivered
@@ -1393,8 +1396,9 @@ of each (`../draft/first-run.md`, 3.6).
     `ConnectModel` and `ConnectForge`, a chat's page and the demo's
     start among them, above their chatbars;
   - *the setup strip,* in the demo's banner's place, while the demo has
-    not started and the person has no usable account or no connected
-    forge (`../draft/first-run.md`, 2.3), the welcome's facts in and
+    not started and no model is usable (3.5, The welcome) or
+    no forge of the person's is connected (`../draft/first-run.md`,
+    2.3), the welcome's facts in and
     its first run not over (3.5, The welcome): a region named "Setup",
     its words and links (5.6), on the same pages. "Not started" is the
     demo's read answering not started, or none (4.8);

@@ -103,3 +103,35 @@ fn a_first_run_welcome_without_a_demo() {
         d::pages::welcome::decision(root.person())
     );
 }
+
+#[test]
+fn a_configured_model_hides_the_banner_and_the_strips_model_half() {
+    let (mut front, mut root) = accounts::welcome_fixture(fixtures::SEED);
+    let person = root.person();
+    assert!(person.demo_answered());
+    assert!(person.demo().is_none());
+    let document = d::pages::accounts::document(person.client()).expect("accounts delivered");
+    assert!(document.usable, "the configured model is usable");
+    assert!(!document.accounts.iter().any(|line| d::forge::demo::usable_account(line, None)));
+    assert_eq!(d::pages::welcome::decision(person), Some(false), "the forge is not connected");
+    accounts::event(&mut front, &mut root, d::Event::Went { place: Place::Address(Address::Chats) }.into());
+    let setup = d::forge::listed::setup(root.person()).expect("forge setup remains");
+    assert!(setup.forge);
+    assert!(!setup.model);
+    let limits = fixtures::domain_limits();
+    let words = fixtures::phrasebooks(&limits);
+    let bounds = fixtures::view_bounds(&limits, &words);
+    let mut view = temper_client_view::View::new(&bounds, &limits, words, fixtures::FORGE);
+    temper_client_view::build(&mut view, root.person(), fixtures::NOW, &mut Queue::with_capacity(bounds.tree.patches));
+    let nodes = view.tree().nodes();
+    assert!(!nodes.iter().any(|node| node.name.as_deref() == Some(b"Agents need an LLM account to run.")));
+    assert!(!nodes.iter().any(|node| node.name.as_deref() == Some(b"temper has no model yet.")));
+    assert!(nodes.iter().any(|node| node.name.as_deref() == Some(b"temper has no forge yet.")));
+    front.engine.send(temper_engine_domain::Event::Forge(Box::new(temper_engine_domain_forge::Event::Connection {
+        forge: 1,
+        state: temper_engine_domain_forge::Connection::Connected { id: 1, login: b"bot".as_slice().into() },
+    })));
+    accounts::settle(&mut front, &mut root);
+    assert_eq!(d::pages::welcome::decision(root.person()), Some(true));
+    assert!(d::forge::listed::setup(root.person()).is_none());
+}

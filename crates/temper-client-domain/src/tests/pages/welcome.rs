@@ -427,3 +427,29 @@ fn the_playground_forge_shows_while_the_forge_half_holds() {
     rows(&mut root, watch, 3);
     assert!(forge::listed::playground(&root).is_none());
 }
+
+#[test]
+fn without_a_demo_model_usable_reads_the_documents_usable() {
+    for (document_usable, line_usable) in [(true, false), (false, true), (false, false), (true, true)] {
+        let (mut root, _, accounts, _) = opened(false, Step::Model { way: None });
+        answer(&mut root, false);
+        let mut document = demo::accounts(Some(18), line_usable, false);
+        document.usable = document_usable;
+        deliver(&mut root, accounts, c::Delivery::OwnerAccounts(Box::new(document)));
+        assert_eq!(pages::welcome::model_usable(&root), Some(document_usable));
+    }
+}
+
+#[test]
+fn with_a_demo_model_usable_reads_other_providers_lines() {
+    for (provider, document_usable, line_usable, expected) in
+        [(18, true, false, false), (18, false, true, true), (17, true, true, false)]
+    {
+        let (mut root, _, accounts, _) = opened(false, Step::Model { way: None });
+        answer(&mut root, true);
+        let mut document = demo::accounts(Some(provider), line_usable, false);
+        document.usable = document_usable;
+        deliver(&mut root, accounts, c::Delivery::OwnerAccounts(Box::new(document)));
+        assert_eq!(pages::welcome::model_usable(&root), Some(expected));
+    }
+}

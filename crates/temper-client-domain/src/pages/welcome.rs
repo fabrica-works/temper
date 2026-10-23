@@ -50,9 +50,8 @@ pub fn decision(root: &Domain) -> Option<bool> {
     }
 }
 
-/// The welcome and setup strip use the same account facts, including an ended watch.
+/// The welcome and setup strip use the same model facts, including an ended watch.
 #[must_use]
-#[expect(clippy::manual_map, reason = "step code matches optional facts without closures")]
 pub fn model_usable(root: &Domain) -> Option<bool> {
     let document = root.client().document(accounts::handle())?;
     let accounts = if document.state == State::Ended {
@@ -62,18 +61,16 @@ pub fn model_usable(root: &Domain) -> Option<bool> {
     } else {
         return None;
     };
-    let demo = root.forge().demo();
-    let provider = match demo {
-        Some(demo) => Some(demo.provider),
-        None => None,
+    let Some(accounts) = accounts else { return Some(false) };
+    let provider = match root.forge().demo() {
+        Some(demo) => demo.provider,
+        None => return Some(accounts.usable),
     };
     let mut model = false;
-    if let Some(accounts) = accounts {
-        for line in &accounts.accounts {
-            if forge::demo::usable_account(line, provider) {
-                model = true;
-                break;
-            }
+    for line in &accounts.accounts {
+        if forge::demo::usable_account(line, Some(provider)) {
+            model = true;
+            break;
         }
     }
     Some(model)
