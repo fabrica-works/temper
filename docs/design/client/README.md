@@ -1138,7 +1138,9 @@ for its kind, its user's login and its installations. Its nodes:
   carried in its refusals, 6 since the first repository (`SetUp`'s
   fields and the row's `first`), 7 since the demo's state (the demo's
   read's `state` and `StartDemo`), 8 since a sign-in's return
-  (`Return`, section 8), moved as
+  (`Return`, section 8), 9 since connecting a GitHub App (`Connect`,
+  `Install`, `ForgeRefusal`), 10 since the forges row's installations
+  and last connect's end, moved as
   `../protocol/README.md`, section 9 says: at most once in a plan, at
   its first landing that changes one of these records, and shared by
   plans that run at once. A request, an outcome, a read, a subject or a
@@ -1295,7 +1297,17 @@ for its kind, its user's login and its installations. Its nodes:
   `first`: none, or the set up's org, name and `SetUpProject` with its
   state, `FirstState`: making; made, with the repository's id (u64);
   or failed, with its step, `CreateStep`: admin, org, repository (its
-  bot's access with it) or file (`../protocol/setup.md`, 6.7); and its
+  bot's access with it) or file (`../protocol/setup.md`, 6.7); its
+  installations, `installations`, on GitHub, at most
+  `INSTALLATIONS` (64, the configuration's `forges.installations` at
+  most it) in id order, empty on Forgejo, each
+  `Installation`: its id (u64), its account, none until the forge has
+  heard it or its id (u64) and login (a byte string bounded as
+  `Adopt`'s), whether it is suspended and whether it is a stray, never
+  accepted through temper's link (booleans); its last connect's end,
+  `ended`: none, or `ConnectStopped`, why the run of a `Connect` or an
+  `Install` stopped, text of at most 256 bytes, in the setup host's
+  words (`forge.md`, 5.4); and its
   offer, the forge domain's (`../domain/forge.md`, 4.1): offered, not
   under the box, or not offered, which is what "Set up a Forgejo here", "Set up again"
   and the commands to run by hand follow (`forge.md`, 5.4). The read of the forges, the

@@ -327,11 +327,23 @@ temper-engine-domain-forge              the connector's top: resources and holds
   (`../client/forge.md`, 5.4): the connector makes its document, one
   row per configured forge in number order, but an ended one (below),
   each its number, kind, mode, connection as the routing last told it,
-  and offer, all its own
+  offer, first repository, on GitHub its installations as the routing
+  last told each (`Event::Installation`: its id, its account when
+  heard, suspended, stray), in id order, and its last connect's end:
+  none, or the reason a `Connect`'s or an `Install`'s run stopped with
+  (`ConnectEnded`, `InstallAnswered`), held until the forge's next
+  connect or install is admitted or it connects; all its own
   (nothing is added where it is encoded), and
-  marks the subject at each connection it is told and at `BoxClosed`, so that a watch
+  marks the subject at each connection, installation and connect's end
+  it is told and at `BoxClosed`, so that a watch
   follows a set up through its steps and a connect to its end. Nothing
-  of it is kept.
+  of it is kept. A restart starts every row with no connect's end, and
+  with the installations the forge's records accept (its `Accepted`
+  ids), each told by the setup host at the restored connect, its
+  account none, neither suspended nor stray, since the component's
+  first read tells only those not accepted or changed (skein's
+  `forge-connection.md`, 4.4); the account is filled from the first
+  `GitToken` minted for it (5.3 there), and changes follow as before.
 - **The demo's forge, ended** (`../protocol/setup.md`, 8.4): the
   connector's own state, not the routing's. It holds the demo's `Demo`
   record as it restores it and writes it, and the demo's forge is ended

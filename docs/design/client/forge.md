@@ -415,7 +415,8 @@ and `connect-forge.html`.
   (`README.md`, 5.6). PROJECT is a project as the banner names it
   (`README.md`, 5.1).
 - **What the row carries today** (`README.md`, 4.6): its number, kind,
-  mode, connection, offer and its first repository. Until it carries
+  mode, connection, offer, its first repository, on GitHub its
+  installations, and its last connect's end. Until it carries
   its `web` address and the repositories adopted on it, each with its
   project (a growth of the `forges` subject's row, and `CLIENT_VERSION`
   with it), the summary is "forge N · KIND", another Forgejo is named
@@ -426,9 +427,20 @@ and `connect-forge.html`.
   a link to `ConnectForge` at it, while it sets up or connects, an
   owned forge's restart words when stopped, and, connected, "Adopt a
   repository", a link to `Adopt { project }` for the project the person
-  is in. Its Access and Runs lines, its load, GitHub's App and
-  installations, and the actions that carry a pasted value wait on
-  their own work (`../STATUS.md`).
+  is in. On GitHub it holds, connected, the App's line (below, "On
+  GitHub, temper's App"), each installation by its account's login, or
+  "installation ID" while the forge has not heard its account, with
+  "suspended" and "uninstalled at the next reconcile" where they hold,
+  never yet "all repositories" or "selected repositories" nor a link to
+  the installation's page, which wait on the forge hearing an
+  installation's selection (skein's installation events carry none);
+  and "Install on another account", which sends `Install` with `back`,
+  the Forges page's address, once an installation is accepted, or
+  "Install on GitHub" before (the actions' table, below). Every row
+  holds its last connect's line where it has one (the row's table,
+  below). Its Access and Runs lines, its load, the App's setup URL, the
+  `Lacking` line, and the actions that carry a pasted value but
+  Connect wait on their own work (`../STATUS.md`).
 - **The playground's forge,** the fake the demo names, follows under
   the level-2 heading "The playground", folded, while the demo's forge
   half holds (`README.md`, 4.8): "Playground forge · the playground’s,
@@ -481,11 +493,38 @@ and `connect-forge.html`.
     events temper’s guide lists." (the client knows no address of its
     own to print), its fields "App id" and "Private key" and its
     button, "Connect the App"; then "A pasted value is sent once and
-    shown nowhere, then or after." Its install is Connecting's, as for
-    temper's App. Until GitHub's connect (the FORGE requests'
-    `Connect`, `README.md`, section 8), "Connect GitHub" on Choose and
-    this button are disabled, and each card ends "Connecting GitHub
-    from temper is not available yet.";
+    shown nowhere, then or after." "App id" is a line of digits, the
+    App's id as GitHub shows it; "Private key" is a secret field of
+    several lines, the PEM file's text as GitHub gives it. "Connect the
+    App" sends `Connect { forge, how: GitHubApp { id } }`, the key its
+    carried value, a bundle of one `Pasted` item, the text with one
+    final line feed taken off (`../protocol/credentials.md`, 2.2), and
+    empties the key's field as it leaves (below, a pasted value). The
+    page's own refusals, before anything is sent, the fields kept: a
+    field empty, "Required."; an id that is not a number from 1 to
+    2^64 − 1, "An App's id is a number, as GitHub shows it on the App's
+    page."; the bundle past 4 KiB, as below. Answered connecting, the
+    flow follows the row: Connecting while the run holds the forge,
+    then, connected, Connecting's install (below); a run that stopped
+    leaves the row not connected with its last connect's line (the
+    row's table, below) shown under the button, the key asked for
+    again. Refused, the refusal shows under the button, the id kept:
+    `role`, "Only the deployment's owner connects a forge."; `no such
+    forge`, "No forge N is configured."; `not taken`, "Forge N does not
+    take an App."; `connected`, "GitHub is connected already."; `busy`,
+    "temper is busy with forge N: try again when it ends."; `no key`,
+    "The key did not reach temper: paste it again."; unknown past the
+    retention, "It is not known whether the App was connected: see
+    Forges.". Its install is Connecting's, as for temper's App. Until
+    the manifest's way (the FORGE requests' `Connect` with
+    `GitHubManifest`, `README.md`, section 8), "Connect GitHub" on
+    Choose is disabled, and its card ends "Connecting GitHub through
+    temper’s own App is not available yet: use an App of your own."
+    The terminal shell has no secret field of several lines: its
+    Details for an App of your own say, in place of the fields and the
+    button, "Paste the key on this page in a browser, or run temper
+    ctl forge-connect N github-app ID FILE, FILE the key's file,
+    readable by you alone." (`tools.md`, 5.5);
   - *Forgejo on this machine,* under the box: "temper box downloads
     Forgejo and its runner, starts them, and makes your first
     repository, with a README and a CI workflow. No restart."; the set
@@ -550,9 +589,22 @@ and `connect-forge.html`.
   on GitHub, under your account, and installed nowhere yet. Install
   it, and choose the repositories temper may use." and "Install on
   GitHub", which sends `Install` and takes the tab to GitHub's install
-  page, as Connect GitHub does. The person meets it only by coming
+  page, as Connect GitHub does; with `back`, the flow's own address,
+  so that the setup route sends the tab back to it, where the accepted
+  installation shows Ready. The person meets it only by coming
   back to temper before installing: GitHub's redirect takes the tab
-  from the App's form straight to that page. A connect whose App is
+  from the App's form straight to that page. An App of the person's
+  own meets it always, since its connect has no redirect: its words
+  are "SLUG is connected to temper, and installed nowhere yet. Install
+  it, and choose the repositories temper may use.", since the client
+  cannot tell an App made from temper's manifest from one pasted (the
+  two end in the same records, `../protocol/credentials.md`, 2.1), and
+  the manifest's words wait for the manifest's way. SLUG is the
+  connected login without its `[bot]` (the App's bot user's login is
+  its slug and `[bot]`). The link `Install` answers is where the tab
+  goes, as 5.4's last paragraph says; refused, its refusal shows under
+  the button in `ForgeRefusal`'s words (Details, above, and `not
+  connected`, "Connect the App first."). A connect whose App is
   not made yet shows nowhere: its tab is GitHub's, no run holds the
   forge, and Connect GitHub again draws a fresh state, the first
   ending unused (9.1).
@@ -574,7 +626,11 @@ and `connect-forge.html`.
   or one a restart has dropped): "FORGE is
   connected", "Connected as LOGIN.", "Adopt a repository", a link to
   `Adopt { project }`, and the Forges line.
-- **Ready, on GitHub,** starts with the repository to start in, while
+- **Ready, on GitHub,** until the picker's `Reachable` is built, is
+  Ready's with no first repository (above): "GitHub is connected",
+  "Connected as LOGIN.", the App's line of the row (below), "Adopt a
+  repository", a link to `Adopt { project }`, and the Forges line.
+  With the picker, it starts with the repository to start in, while
   none of the forge's is adopted: "Choose a repository to start in",
   "SLUG is installed on ACCOUNT, with all its repositories, N." or
   "…, with N repositories you chose.", then the repositories of its
@@ -617,15 +673,25 @@ says:
   | connected | "Connected as LOGIN", the user the records hold: the bot's on Forgejo, the App's on GitHub; its id on an Account line |
   | stopped | "Stopped: WHY", the component's reason in words (its key or token refused, a user other than its own, an access it finds invalid, a refusal that asking again would not mend), with Replace where offered; an owned forge says "Restart temper box: its preparation mends it"; the engine and every other forge run on |
 
-  A connect that ends otherwise is said on the row until the next one:
-  refused (the person's role, the forge's kind or mode, "busy": the
-  forge's one writing run is taken, or `setup.runs` runs are running),
+  A connect that ends otherwise is said on the row until the next one,
+  its last connect's line, "The last connect stopped: WHY": a run of a
+  `Connect` or an `Install` that stopped, WHY the setup host's reason
+  in words, at most 256 bytes, kept by the forge domain in memory per
+  forge until that forge's next connect or install starts or it
+  connects, and dropped by a restart. A refusal before any run (the
+  person's role, the forge's kind or mode, "busy": the forge's one
+  writing run is taken, or `setup.runs` runs are running) is its
+  request's outcome, shown by the page or the tool that sent it, and
+  never on the row. The reasons a run stops with include
   "the pasted value changed", "the API token and the git token answer as
   LOGIN and LOGIN", "LOGIN is not temper's bot: add `temper:bot` to its
   full name on Forgejo" (5.5), the forge unreachable, a `Manifest` or an
   `Install` that stopped, its failure said here and never in its answer
   (`README.md`, section 8), or "interrupted; paste again" after a
-  restart. A GitHub App lacking what temper needs connects all the same
+  restart, once the connect's own record is kept; until then a restart
+  drops a running connect unsaid, its carried value erased at start
+  (`../protocol/credentials.md`, 2.2), and the forge reads as its
+  records say. A GitHub App lacking what temper needs connects all the same
   (the setup's host's `Lacking` is done): the row says it beside
   "Connected as LOGIN", each permission and event named (5.5), until the
   forge's next check of the App ends: a paste's (a connect or a Replace)
@@ -661,7 +727,9 @@ says:
   box`, and it is kept in temper's data directory. Until signing in
   through temper, the card names the `person_password` file's path,
   never the password (`../protocol/setup.md`, 6.5).
-- **On GitHub, temper's App:** its slug, and its installations, each
+- **On GitHub, temper's App:** a line labelled "temper’s App", "SLUG ·
+  INSTALLATIONS", INSTALLATIONS each installation's words joined by
+  ", ", or "installed nowhere yet" with none: its slug, and its installations, each
   with its account's login, "all repositories" or "selected
   repositories" (linked to the installation's page, 5.5), "suspended"
   while GitHub suspends it, and a stray, an installation never accepted
