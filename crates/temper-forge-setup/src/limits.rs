@@ -48,6 +48,8 @@ impl Host {
     #[must_use]
     pub fn plan(&self) -> Limits {
         Limits {
+            files: 1,
+            file_bytes: 4096,
             orgs: self.orgs,
             reachable: self.reachable,
             repositories: self.repositories,
@@ -102,6 +104,8 @@ pub fn small() -> Limits {
     // Legacy command default; checked startup supplies forge.client.repositories.
     let repositories = 2;
     Limits {
+        files: 1,
+        file_bytes: 4096,
         orgs: 8,
         reachable: 8, // temper-10 supplies picker.page.
         repositories,

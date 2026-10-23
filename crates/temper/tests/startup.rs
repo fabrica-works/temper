@@ -1222,6 +1222,12 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // Three new codec u32 bounds grow the engine workers component
             // by 8 B after padding, retained in Service's engine option.
             + 8
+            // Skein 604189fe: measured setup host 1,194,381,869 -> 1,194,638,301 B;
+            // local lifecycle map 2,336 -> 2,424 B; staged Plan map 1,280 -> 1,632 B;
+            // forge connection heap +192 B. Checked grows 80 -> 88 B and is
+            // already counted by size_of above. Service and worker stay fixed.
+            // Total engine delta: 256,432 + 88 + 352 + 192 + 8 = 257,072 B.
+            + 256_432 + 88 + 352 + 192
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1361,6 +1367,10 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // inline worker-link/engine-codec layout to this engine, and the same
     // (4470 - 64) fact bytes, (4470 / 25 - 64 / 25) * 32 frame slots,
     // 3 received + 2 * 3 transient ask bytes and 8 B link layout to its worker.
+    // Skein 604189fe: setup host 1,194,800,488 -> 1,194,801,984 B (+1,496);
+    // local lifecycle map +88 B; staged Plan map +352 B; forge connection
+    // heap +96 B; Checked 80 -> 88 B (+8). Total engine +2,040 B;
+    // Service and worker stay fixed.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);

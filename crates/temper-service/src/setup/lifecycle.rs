@@ -86,6 +86,10 @@ impl FileStep {
     }
 }
 #[derive(Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "bounded inline local state; Create adds two u32 bounds to its retained Limits"
+)]
 pub(super) enum Reconcile {
     GitHub,
     Local(Local),
@@ -189,6 +193,7 @@ pub(crate) fn stopped_connection(engine: &mut crate::engine::Engine, forge: u16)
 }
 pub(super) fn kind(plan: &host::Plan) -> Kind {
     match plan {
+        host::Plan::Create { .. } => unreachable!("temper sends Create from the first-repository work, not yet"),
         host::Plan::Manifest { .. } => Kind::Manifest,
         host::Plan::Convert { .. } => Kind::Convert,
         host::Plan::Install { .. } => Kind::Install,
@@ -301,6 +306,9 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
                     .push(crate::Note::ForgeLacking { number: forge, names: super::diagnostics::names(&lacking) });
             }
             root::SetupOutcome::Done
+        }
+        reconcile::Outcome::Created { .. } => {
+            unreachable!("temper sends Create from the first-repository work, not yet")
         }
         reconcile::Outcome::Nothing => root::SetupOutcome::Done,
         reconcile::Outcome::Identity { .. } | reconcile::Outcome::Reachable { .. } => {

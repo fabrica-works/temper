@@ -63,6 +63,7 @@ impl Refused {
                     Stage::Token => "token",
                     Stage::Org => "org",
                     Stage::Repository => "repository",
+                    Stage::File => "file",
                 };
                 let why = match failure.why {
                     Why::KeyForm => "key unusable".into(),
