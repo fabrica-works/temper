@@ -881,6 +881,7 @@ impl Domain {
 pub const fn max_out(l: &Limits) -> u32 {
     // At most one panel mark accompanies each previously bounded output:
     // a saved change, or a read completion whose CI verdict changed.
+    // A demo start can also finish every bounded waiting application together.
     l.output.saturating_mul(2).saturating_add(l.applications)
 }
 

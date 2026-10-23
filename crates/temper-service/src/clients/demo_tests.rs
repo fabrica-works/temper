@@ -61,7 +61,7 @@ fn unreadable_empty_and_oversize_demo_keys_carry_nothing() {
         Err(crate::HandoverUnread::Kernel(2)),
         Ok(None),
         Ok(Some(skein_lib::Secret::new(Box::new([])))),
-        Ok(Some(skein_lib::Secret::new(vec![b'x'; 4097].into_boxed_slice()))),
+        Ok(Some(skein_lib::Secret::new(Box::new([b'x'; 4097])))),
     ] {
         let mut service = fixtures::demo_service();
         let engine = service.engine.as_mut().unwrap();
@@ -72,14 +72,14 @@ fn unreadable_empty_and_oversize_demo_keys_carry_nothing() {
         service.handover_read(read.forge, read.run, answer);
         let engine = service.engine.as_mut().unwrap();
         engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
-        assert!(matches!(
-            engine.events.pop(),
-            Some(root::Event::Party(root::PartyInput::Application {
-                request: temper_engine_domain_forge::Ask::StartDemo,
-                carried: None,
-                ..
-            }))
-        ));
+        let Some(root::Event::Party(root::PartyInput::Application {
+            request: temper_engine_domain_forge::Ask::StartDemo,
+            carried: None,
+            ..
+        })) = engine.events.pop()
+        else {
+            panic!("start without a carried value")
+        };
         assert!(engine.clients.demo_carries.is_empty());
     }
 }

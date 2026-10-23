@@ -92,7 +92,7 @@ impl Clients {
     ) {
         let value = match answer {
             Ok(Some(value)) if !value.expose().is_empty() && value.expose().len() <= 4096 => Some(value),
-            Ok(Some(_)) | Ok(None) | Err(_) => None,
+            Ok(Some(_) | None) | Err(_) => None,
         };
         if let Some(value) = value {
             if let Some(root::Event::Party(root::PartyInput::Application { carried, .. })) =
@@ -356,7 +356,10 @@ impl Clients {
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
     ) {
-        while !self.demo_ready.is_empty() && events.room() > 0 && (self.starting.is_none() || self.early.room() > 0) {
+        for _ in 0..self.demo_ready.len() {
+            if events.room() == 0 || (self.starting.is_some() && self.early.room() == 0) {
+                break;
+            }
             let value = self.demo_ready.pop().expect("ready demo start");
             self.root(value, events);
         }
@@ -386,13 +389,11 @@ impl Clients {
                 kit::Request::Application(value) => {
                     match crate::family::to_root(value, forges, demo, &temper_client_protocol_wire::v1::CEILINGS) {
                         Ok(mut value) => {
-                            if matches!(
-                                &value,
-                                root::Event::Party(root::PartyInput::Application {
-                                    request: temper_engine_domain_forge::Ask::StartDemo,
-                                    ..
-                                })
-                            ) && let Some(demo) = demo
+                            if let root::Event::Party(root::PartyInput::Application {
+                                request: temper_engine_domain_forge::Ask::StartDemo,
+                                ..
+                            }) = &value
+                                && let Some(demo) = demo
                             {
                                 if let root::Event::Party(root::PartyInput::Application { carried, .. }) = &mut value
                                     && let Some(carried) = carried.take()
@@ -675,8 +676,11 @@ impl Clients {
         self.advance_secrets(store);
     }
     fn advance_secrets(&mut self, store: &mut crate::store::Store) {
-        while self.secrets.room() > 0 {
-            let Some(request) = self.demo_carries.pop() else { break };
+        for _ in 0..self.demo_carries.len() {
+            if self.secrets.room() == 0 {
+                break;
+            }
+            let request = self.demo_carries.pop().expect("pending demo carries");
             self.secrets.push(request);
         }
         for _ in 0..self.secrets.len() {

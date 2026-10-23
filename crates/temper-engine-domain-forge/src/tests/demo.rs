@@ -46,10 +46,14 @@ fn demo_first_start_saves_running_and_only_asks_a_dormant_group_under_the_box() 
             let mut d = configured(under_box);
             outputs(&mut d, Event::Connection { forge: 1, state: connection.clone() });
             let sent = start(&mut d, 1);
-            assert!(matches!(
+            assert_eq!(
                 sent.first(),
-                Some(Request::Save { record: Stored::Demo(Demo { forge: 1, state: DemoState::Running }), .. })
-            ));
+                Some(&Request::Save {
+                    read_afresh: None,
+                    release: None,
+                    record: Stored::Demo(Demo { forge: 1, state: DemoState::Running }),
+                })
+            );
             let asks = group_asks(&sent);
             assert_eq!(asks, usize::from(under_box && connection == Connection::NotConnected));
             assert!(sent.contains(&Request::DemoStart { request: Token::new(1) }));
@@ -86,13 +90,23 @@ fn simultaneous_demo_starts_share_the_answer_and_bound_their_waiters() {
 fn demo_restore_asks_only_for_a_running_dormant_group_and_makes_no_act() {
     for under_box in [false, true] {
         for state in [DemoState::Running, DemoState::Ended] {
-            let mut d = configured(under_box);
-            outputs(&mut d, Event::Restore { record: Stored::Demo(Demo { forge: 1, state }) });
-            let sent = outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
-            assert_eq!(group_asks(&sent), usize::from(under_box && state == DemoState::Running));
-            assert!(!makes_act(&sent));
-            assert_eq!(d.demo_state(), Some(state));
-            assert_eq!(d.application_answer(Token::new(101)), None);
+            for connection in [
+                Connection::NotConnected,
+                Connection::Connecting,
+                Connection::Connected { id: 7, login: b"temper".as_slice().into() },
+            ] {
+                let mut d = configured(under_box);
+                outputs(&mut d, Event::Connection { forge: 1, state: connection.clone() });
+                outputs(&mut d, Event::Restore { record: Stored::Demo(Demo { forge: 1, state }) });
+                let sent = outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+                assert_eq!(
+                    group_asks(&sent),
+                    usize::from(under_box && state == DemoState::Running && connection == Connection::NotConnected)
+                );
+                assert!(!makes_act(&sent));
+                assert_eq!(d.demo_state(), Some(state));
+                assert_eq!(d.application_answer(Token::new(101)), None);
+            }
         }
     }
 }
@@ -100,7 +114,7 @@ fn demo_restore_asks_only_for_a_running_dormant_group_and_makes_no_act() {
 fn group_asks(sent: &[Request]) -> usize {
     let mut count = 0_usize;
     for request in sent {
-        if matches!(request, Request::SetUp { .. }) {
+        if let Request::SetUp { .. } = request {
             count = count.checked_add(1).unwrap();
         }
     }
@@ -108,7 +122,7 @@ fn group_asks(sent: &[Request]) -> usize {
 }
 fn saved(sent: &[Request]) -> bool {
     for request in sent {
-        if matches!(request, Request::Save { .. }) {
+        if let Request::Save { .. } = request {
             return true;
         }
     }
@@ -116,7 +130,7 @@ fn saved(sent: &[Request]) -> bool {
 }
 fn makes_act(sent: &[Request]) -> bool {
     for request in sent {
-        if matches!(request, Request::DemoStart { .. }) {
+        if let Request::DemoStart { .. } = request {
             return true;
         }
     }

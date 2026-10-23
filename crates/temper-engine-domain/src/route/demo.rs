@@ -19,7 +19,7 @@ pub(crate) struct Start {
     pub phase: Phase,
     pub until: Time,
 }
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub(crate) enum Phase {
     Waiting,
     Account,
@@ -52,7 +52,7 @@ pub(crate) fn start(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decis
 
 fn begin(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision) {
     let Some(start) = &mut domain.demo_start else { return };
-    if !matches!(start.phase, Phase::Waiting) {
+    if start.phase != Phase::Waiting {
         return;
     }
     start.phase = Phase::Account;
@@ -94,11 +94,12 @@ pub(crate) fn progress(domain: &mut Domain, env: &Env<Limits>, _decision: &mut D
     let Some(start) = &domain.demo_start else { return };
     let demo = domain.forge.demo().expect("offered demo");
     let connection = domain.forge.connection(demo.adoption.forge);
-    if !matches!(connection, forge::Connection::Connected { .. }) && env.now >= start.until {
+    let connected = connected(&connection);
+    if !connected && env.now >= start.until {
         finish(domain, forge::StartAnswer::Failed(forge::StartFailure::NotConnected));
         return;
     }
-    if !matches!(start.phase, Phase::Connecting) || !matches!(connection, forge::Connection::Connected { .. }) {
+    if start.phase != Phase::Connecting || !connected {
         return;
     }
     if domain.forge.demo_adopted() {
@@ -134,18 +135,23 @@ pub(crate) fn reply(
     reply: people::Reply,
 ) {
     let Some((request, phase)) = domain.demo_reply.take() else { return };
-    if !matches!(&domain.demo_start, Some(start) if start.request == request) {
+    if !active(domain, request) {
         begin(domain, env, decision);
         return;
     }
-    if matches!(phase, Phase::Account)
-        && matches!(reply, people::Reply::Outcome(people::Outcome::AccountKeyKept { .. }))
-    {
+    let kept = match reply {
+        people::Reply::Outcome(people::Outcome::AccountKeyKept { .. }) => true,
+        people::Reply::Outcome(_)
+        | people::Reply::SignedIn { .. }
+        | people::Reply::SignedOut
+        | people::Reply::Again(_)
+        | people::Reply::Refused(_) => false,
+    };
+    if phase == Phase::Account && kept {
         domain.demo_start.as_mut().expect("active start").phase = Phase::Connecting;
         progress(domain, env, decision);
     } else {
-        let why =
-            if matches!(phase, Phase::Account) { forge::StartFailure::Account } else { forge::StartFailure::Adoption };
+        let why = if phase == Phase::Account { forge::StartFailure::Account } else { forge::StartFailure::Adoption };
         finish(domain, forge::StartAnswer::Failed(why));
     }
 }
@@ -157,26 +163,54 @@ pub(crate) fn adopted(
     outcome: Option<forge::Answered>,
 ) {
     let Some((request, _)) = domain.demo_reply.take() else { return };
-    if !matches!(&domain.demo_start, Some(start) if start.request == request) {
+    if !active(domain, request) {
         begin(domain, env, decision);
         return;
     }
-    let answer = if matches!(outcome, Some(forge::Answered::Adopt(forge::ApplicationOutcome::Adopted(_)))) {
-        forge::StartAnswer::Running
-    } else {
-        forge::StartAnswer::Failed(forge::StartFailure::Adoption)
+    let answer = match outcome {
+        Some(forge::Answered::Adopt(forge::ApplicationOutcome::Adopted(_))) => forge::StartAnswer::Running,
+        Some(
+            forge::Answered::Adopt(
+                forge::ApplicationOutcome::CoreRefused(_) | forge::ApplicationOutcome::ForgeRefused(_),
+            )
+            | forge::Answered::SetUp(_)
+            | forge::Answered::StartDemo(_),
+        )
+        | None => forge::StartAnswer::Failed(forge::StartFailure::Adoption),
     };
     finish(domain, answer);
 }
 
 pub(crate) fn connection(domain: &mut Domain, forge: u16, why: &[u8]) {
-    if domain.demo_start.is_some() && matches!(domain.forge.demo(), Some(demo) if demo.adoption.forge == forge) {
+    if domain.demo_start.is_some()
+        && let Some(demo) = domain.forge.demo()
+        && demo.adoption.forge == forge
+    {
         finish(
             domain,
             forge::StartAnswer::Failed(forge::StartFailure::Group {
                 why: why.get(..why.len().min(256)).expect("bounded reason").into(),
             }),
         );
+    }
+}
+
+fn active(domain: &Domain, request: Token) -> bool {
+    match &domain.demo_start {
+        Some(start) => start.request == request,
+        None => false,
+    }
+}
+
+pub(crate) fn connected(connection: &forge::Connection) -> bool {
+    match connection {
+        forge::Connection::Connected { .. } => true,
+        forge::Connection::Connecting
+        | forge::Connection::NotConnected
+        | forge::Connection::NotSetUp
+        | forge::Connection::SettingUp { .. }
+        | forge::Connection::SetUpFailed { .. }
+        | forge::Connection::Stopped { .. } => false,
     }
 }
 

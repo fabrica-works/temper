@@ -13,26 +13,34 @@ fn config(under_box: bool) -> engine::Config {
         Some(forge::DemoConfig { provider: 1, adoption: fixtures::adoption(1), deadline: Duration::from_secs(10) });
     config
 }
-fn driver(connected: bool, under_box: bool) -> Driver {
-    let mut d = Driver::configured(Store::new(), [config(under_box), config(under_box)], &fixtures::forge_limits());
+fn driver(connected: bool, under_box: bool) -> (Driver, u64) {
+    let mut limits = fixtures::forge_limits();
+    // Two starts, one account reply awaiting reclaim, and the adoption's admission.
+    limits.people.pending = 4;
+    limits.journal.writes += 4;
+    limits.journal.deliveries += 4;
+    limits.journal.held += 12;
+    let store = fixtures::first_start_over(Store::new(), config(under_box), &limits);
+    let mut d = Driver::cold(store, config(under_box), &limits);
     d.forge = Some(ForgeStand::new());
     d.settle();
     d.sign_in();
     d.settle();
     if connected {
-        connection(&mut d, forge::Connection::Connected { id: 7, login: b"temper".as_slice().into() });
+        connection(&mut d, forge::Connection::Connected { id: 1, login: b"temper".as_slice().into() });
     }
+    let sign_in = d.session();
     d.delivered.clear();
-    d
+    (d, sign_in)
 }
 fn connection(d: &mut Driver, state: forge::Connection) {
     d.send(engine::Event::Forge(Box::new(forge::Event::Connection { forge: 1, state })));
     d.settle();
 }
-fn start(d: &mut Driver, number: u8, carry: bool) {
+fn start(d: &mut Driver, sign_in: u64, number: u8, carry: bool) {
     d.send(engine::Event::Party(engine::PartyInput::Application {
         reply_to: ReplyTo::new(Token::new(u64::from(number))),
-        sign_in: d.session(),
+        sign_in,
         key: [number; 16],
         digest: [9; 32],
         scope: people::ApplicationScope::Project(999),
@@ -44,10 +52,11 @@ fn start(d: &mut Driver, number: u8, carry: bool) {
 fn answers(d: &Driver) -> Vec<Option<forge::Answered>> {
     d.delivered
         .iter()
-        .filter_map(|delivery| match delivery {
-            Delivery::Application { outcome, .. } => Some(outcome.clone()),
-            _ => None,
-        })
+        .filter_map(
+            |delivery| {
+                if let Delivery::Application { outcome, .. } = delivery { Some(outcome.clone()) } else { None }
+            },
+        )
         .collect()
 }
 fn keeps(d: &Driver) -> usize {
@@ -60,12 +69,13 @@ fn keeps(d: &Driver) -> usize {
 
 #[test]
 fn demo_start_adds_the_deployments_account_and_adopts_the_repository_once() {
-    let mut d = driver(true, false);
-    start(&mut d, 81, true);
+    let (mut d, sign_in) = driver(true, false);
+    start(&mut d, sign_in, 81, true);
     assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::Running))]);
     assert_eq!(keeps(&d), 1);
-    assert!(d.store.rows.values().any(|record| matches!(record, engine::Record::Forge(forge::Stored::Repository(row))
-        if row.project == 1 && row.owner.as_ref() == b"org" && row.name.as_ref() == b"repo")));
+    assert!(d.store.rows.values().any(|record| matches!(record, engine::Record::Forge { row }
+        if matches!(row.as_ref(), forge::Stored::Repository(row)
+            if row.project == 1 && row.owner.as_ref() == b"org" && row.name.as_ref() == b"repo"))));
     assert!(d.store.rows.values().any(|record| matches!(
         record,
         engine::Record::Core(core::Record::Accounts(accounts::Stored::Account {
@@ -74,33 +84,33 @@ fn demo_start_adds_the_deployments_account_and_adopts_the_repository_once() {
             ..
         }))
     )));
-    let calls = d.forge.as_ref().unwrap().calls;
+    let calls = d.forge.as_ref().expect("fake forge").calls;
     d.delivered.clear();
-    start(&mut d, 82, true);
+    start(&mut d, sign_in, 82, true);
     assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::Running))]);
-    assert_eq!((keeps(&d), d.forge.as_ref().unwrap().calls), (1, calls));
+    assert_eq!((keeps(&d), d.forge.as_ref().expect("fake forge").calls), (1, calls));
     assert!(matches!(d.delivered.first(), Some(Delivery::CarriedUnused { number: 82 })));
 }
 
 #[test]
 fn demo_start_fails_when_its_account_is_refused_or_the_key_is_missing() {
     for carry in [false, true] {
-        let mut d = driver(true, false);
+        let (mut d, sign_in) = driver(true, false);
         d.protocol.key_failure = Some(accounts::KeyFailure::NotStored);
-        start(&mut d, 81, carry);
+        start(&mut d, sign_in, 81, carry);
         assert_eq!(
             answers(&d),
             [Some(forge::Answered::StartDemo(forge::StartAnswer::Failed(forge::StartFailure::Account)))]
         );
-        assert_eq!(d.forge.as_ref().unwrap().calls, 0);
+        assert_eq!(d.forge.as_ref().expect("fake forge").calls, 0);
     }
 }
 
 #[test]
 fn demo_start_fails_when_its_adoption_is_refused() {
-    let mut d = driver(true, false);
-    d.forge = Some(ForgeStand::with(&[]));
-    start(&mut d, 81, true);
+    let (mut d, sign_in) = driver(true, false);
+    d.forge = Some(ForgeStand::with(&[(b"org", b"another", 3)]));
+    start(&mut d, sign_in, 81, true);
     assert_eq!(
         answers(&d),
         [Some(forge::Answered::StartDemo(forge::StartAnswer::Failed(forge::StartFailure::Adoption)))]
@@ -110,8 +120,8 @@ fn demo_start_fails_when_its_adoption_is_refused() {
 
 #[test]
 fn demo_start_names_the_groups_failure_and_truncates_its_reason() {
-    let mut d = driver(false, true);
-    start(&mut d, 81, true);
+    let (mut d, sign_in) = driver(false, true);
+    start(&mut d, sign_in, 81, true);
     assert!(answers(&d).is_empty());
     assert!(d.immediate.iter().any(|request| matches!(request, engine::Request::SetUp { forge: 1, .. })));
     connection(&mut d, forge::Connection::SetUpFailed { why: vec![b'x'; 300].into_boxed_slice() });
@@ -125,8 +135,8 @@ fn demo_start_names_the_groups_failure_and_truncates_its_reason() {
 
 #[test]
 fn demo_start_waits_for_connection_until_the_configured_deadline() {
-    let mut d = driver(false, false);
-    start(&mut d, 81, true);
+    let (mut d, sign_in) = driver(false, false);
+    start(&mut d, sign_in, 81, true);
     assert!(answers(&d).is_empty());
     d.fire_at(Duration::from_secs(10));
     d.settle();
@@ -138,45 +148,47 @@ fn demo_start_waits_for_connection_until_the_configured_deadline() {
 
 #[test]
 fn demo_restart_asks_the_group_makes_no_act_and_forgets_the_start_answer() {
-    let mut d = driver(true, true);
-    start(&mut d, 81, true);
+    let (mut d, sign_in) = driver(true, true);
+    start(&mut d, sign_in, 81, true);
     let old_keeps = keeps(&d);
-    let old_calls = d.forge.as_ref().unwrap().calls;
-    d.root = engine::Domain::new(config(true), &d.env.limits).unwrap();
+    let old_calls = d.forge.as_ref().expect("fake forge").calls;
+    d.root = engine::Domain::new(config(true), &d.env.limits).expect("valid demo config");
     d.immediate.clear();
     d.delivered.clear();
     d.send(engine::Event::Restart);
     d.settle();
     assert!(d.immediate.iter().any(|request| matches!(request, engine::Request::SetUp { forge: 1, .. })));
-    assert_eq!((keeps(&d), d.forge.as_ref().unwrap().calls), (old_keeps, old_calls));
+    assert_eq!((keeps(&d), d.forge.as_ref().expect("fake forge").calls), (old_keeps, old_calls));
     d.sign_in();
     d.settle();
+    let sign_in = d.session();
     d.delivered.clear();
-    start(&mut d, 81, true);
+    start(&mut d, sign_in, 81, true);
     assert_eq!(answers(&d), [None]);
 }
 
 #[test]
 fn demo_start_skips_an_existing_account_but_still_adopts() {
-    let mut d = driver(false, false);
-    start(&mut d, 81, true);
+    let (mut d, sign_in) = driver(false, false);
+    start(&mut d, sign_in, 81, true);
     d.fire_at(Duration::from_secs(10));
     d.settle();
-    connection(&mut d, forge::Connection::Connected { id: 7, login: b"temper".as_slice().into() });
+    connection(&mut d, forge::Connection::Connected { id: 1, login: b"temper".as_slice().into() });
     d.delivered.clear();
-    start(&mut d, 82, true);
+    start(&mut d, sign_in, 82, true);
     assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::Running))]);
     assert_eq!(keeps(&d), 1);
     assert!(d.delivered.iter().any(|delivery| matches!(delivery, Delivery::CarriedUnused { number: 82 })));
-    assert!(d.store.rows.values().any(|row| matches!(row, engine::Record::Forge(forge::Stored::Repository(_)))));
+    assert!(d.store.rows.values().any(|record| matches!(record, engine::Record::Forge { row }
+        if matches!(row.as_ref(), forge::Stored::Repository(_)))));
 }
 
 #[test]
 fn demo_start_skips_an_existing_repository_but_still_adds_the_account() {
-    let mut d = driver(true, false);
+    let (mut d, sign_in) = driver(true, false);
     d.send(engine::Event::Party(engine::PartyInput::Application {
         reply_to: ReplyTo::new(Token::new(80)),
-        sign_in: d.session(),
+        sign_in,
         key: [80; 16],
         digest: [8; 32],
         scope: people::ApplicationScope::Project(1),
@@ -184,21 +196,21 @@ fn demo_start_skips_an_existing_repository_but_still_adds_the_account() {
         carried: None,
     }));
     d.settle();
-    let calls = d.forge.as_ref().unwrap().calls;
+    let calls = d.forge.as_ref().expect("fake forge").calls;
     d.delivered.clear();
-    start(&mut d, 81, true);
+    start(&mut d, sign_in, 81, true);
     assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::Running))]);
     assert_eq!(keeps(&d), 1);
-    assert_eq!(d.forge.as_ref().unwrap().calls, calls);
+    assert_eq!(d.forge.as_ref().expect("fake forge").calls, calls);
 }
 
 #[test]
 fn simultaneous_demo_starts_share_one_pair_of_acts_and_return_unused_keys() {
-    let mut d = driver(false, false);
-    start(&mut d, 81, true);
-    start(&mut d, 82, true);
+    let (mut d, sign_in) = driver(false, false);
+    start(&mut d, sign_in, 81, true);
+    start(&mut d, sign_in, 82, true);
     assert!(answers(&d).is_empty());
-    connection(&mut d, forge::Connection::Connected { id: 7, login: b"temper".as_slice().into() });
+    connection(&mut d, forge::Connection::Connected { id: 1, login: b"temper".as_slice().into() });
     assert_eq!(answers(&d), vec![Some(forge::Answered::StartDemo(forge::StartAnswer::Running)); 2]);
     assert_eq!(keeps(&d), 1);
     assert!(d.delivered.iter().any(|delivery| matches!(delivery, Delivery::CarriedUnused { number: 82 })));
@@ -206,16 +218,13 @@ fn simultaneous_demo_starts_share_one_pair_of_acts_and_return_unused_keys() {
 
 #[test]
 fn a_busy_box_link_fails_the_demo_start_with_the_groups_reason() {
-    let mut d = driver(false, true);
-    start(&mut d, 81, true);
+    let (mut d, sign_in) = driver(false, true);
+    start(&mut d, sign_in, 81, true);
     let request = d
         .immediate
         .iter()
-        .find_map(|request| match request {
-            engine::Request::SetUp { request, .. } => Some(*request),
-            _ => None,
-        })
-        .unwrap();
+        .find_map(|request| if let engine::Request::SetUp { request, .. } = request { Some(*request) } else { None })
+        .expect("demo group ask");
     d.send(engine::Event::Forge(Box::new(forge::Event::SetUpAnswered {
         forge: 1,
         request,

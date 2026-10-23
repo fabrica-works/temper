@@ -23,7 +23,9 @@ impl DemoConfig {
 }
 impl Domain {
     pub fn configure_demo(&mut self, demo: Option<DemoConfig>) {
-        assert!(!matches!(&demo, Some(demo) if !demo.within()), "bounded demo configuration");
+        if let Some(demo) = &demo {
+            assert!(demo.within(), "bounded demo configuration");
+        }
         self.demo = demo;
     }
     #[must_use]
@@ -53,7 +55,18 @@ impl Domain {
 
 fn needs_group(d: &Domain) -> bool {
     let Some(demo) = &d.demo else { return false };
-    d.under_box && !matches!(d.connection(demo.adoption.forge), Connection::Connected { .. } | Connection::Connecting)
+    d.under_box && needs_connection(&d.connection(demo.adoption.forge))
+}
+
+fn needs_connection(connection: &Connection) -> bool {
+    match connection {
+        Connection::Connected { .. } | Connection::Connecting => false,
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::SetUpFailed { .. }
+        | Connection::Stopped { .. } => true,
+    }
 }
 
 pub(crate) fn start(d: &mut Domain, request: Token, token: Token, out: &mut Queue<Request>) {

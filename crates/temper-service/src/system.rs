@@ -89,7 +89,6 @@ impl Service {
     #[expect(clippy::too_many_arguments, reason = "startup supplies runtime facts before the domain is built")]
     #[expect(
         clippy::too_many_lines,
-        clippy::manual_map,
         reason = "one startup constructs the service; explicit matches follow the strict subset"
     )]
     pub(crate) fn prepared(

@@ -1142,7 +1142,7 @@ fn demo_read_tracks_not_started_running_and_ended() {
         };
         let kit::Event::Application(kit::FromApplication::Read { record, .. }) = *answer else { panic!("demo read") };
         let got = match record {
-            Some(record) => Some(*wire::decode_demo_answer(&record, &w::CEILINGS).unwrap().state()),
+            Some(record) => Some(wire::decode_demo_answer(&record, &w::CEILINGS).unwrap().state().clone()),
             None => None,
         };
         assert_eq!(got, expected);

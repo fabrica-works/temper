@@ -966,7 +966,9 @@ pub fn refused(mut config: Config, limits: &Limits) -> Box<[Refused]> {
         refused.push(Refused::Forges).expect("counted refusals");
         return refused.into_boxed();
     };
-    if matches!(&config.demo, Some(demo) if !demo.within()) {
+    if let Some(demo) = &config.demo
+        && !demo.within()
+    {
         refused.push(Refused::Forges).expect("counted refusals");
     }
     let deployment = match policy_translate::build_landing(
