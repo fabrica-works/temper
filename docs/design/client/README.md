@@ -739,10 +739,14 @@ keeps (`../protocol/configuration.md`, section 2).
     *Ready* names the forge and the model as set up or under way, under
     "Almost ready": a list of "Forge: FORGE, connected as LOGIN" or
     "Forge: FORGE · CONNECTION" (with its "Each step"), or "Forge: none
-    yet" with "Connect a forge", to the Forge step; "Model: ACCOUNT",
-    the first usable account's heading (5.5, An account), or, while
+    yet" with "Connect a forge", to the Forge step; while a model is
+    usable, as *Whether it shows* says (the one test Ready and the
+    setup strip share), "Model: ACCOUNT", the first usable account's
+    heading (5.5, An account), or "Model: MODEL" where no account row
+    is usable (the configured model), MODEL a new chat's as the
+    composer's line names it (5.5); or, while
     a sign-in of the person's is under way on the `accounts` document
-    and no account is usable, "Model: PROVIDER · signing in", PROVIDER
+    and no model is usable, "Model: PROVIDER · signing in", PROVIDER
     its LLM provider's name (5.5), with no act, so that a person come
     back from the sign-in reads it as under way; or "Model: none yet"
     with "Connect a model", to the Model step; and no model line until
@@ -1463,7 +1467,8 @@ of each (`../draft/first-run.md`, 3.6).
     name, the person's name and "Sign out" alone (3.5, The welcome);
   - *the accounts' banner,* while no account the person's work may use
     is usable (the `accounts` watch; jig's
-    `client/domain/contract.md`, 7.1): its words and three buttons
+    `client/domain/contract.md`, 7.1): a region named "LLM account",
+    its words and three buttons
     (5.5), on every page but the accounts page, `ConnectModel` and
     `Welcome`;
   - *the demo's banner,* while either of the demo's halves holds
@@ -1971,8 +1976,8 @@ the cues the demo's, copied in:
   yet."; for a person whose role does not hold the deployment's forges,
   the model alone); a set up under way (5.1); then "Continue setting
   up", to `Welcome` at its step: Forge while no forge of the person's
-  sets up, connects or is connected, else Model while no account is
-  usable, else Ready; and "Try the playground" while no forge of the
+  sets up, connects or is connected, else Model while no model is
+  usable (3.5, The welcome, Whether it shows), else Ready; and "Try the playground" while no forge of the
   person's is connected and the demo is answered. With no usable account, a composer's
   line is "No model yet · Connect a model", and it does not send (5.5).
 - **Not drawn:** the mockup's placeholder, "Try a suggested request…",
