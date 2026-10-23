@@ -59,6 +59,9 @@ pub fn to_root(
                         },
                     }));
                 }
+                w::Request::StartDemo => {
+                    return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable { to: reply_to })));
+                }
                 w::Request::Adopt(value) => value,
             };
             let a = request.into_parts();
@@ -106,6 +109,7 @@ pub fn to_root(
                 let record = w::DemoAnswer::new(
                     limits,
                     w::DemoAnswerParts {
+                        state: w::DemoState::Running,
                         project: demo.project,
                         forge: demo.forge,
                         provider: demo.provider,

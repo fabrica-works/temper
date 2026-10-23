@@ -390,6 +390,7 @@ fn demo(root: &mut Domain, w: World, read: Token, out: &mut Queue<Request>) {
         let value = v1::DemoAnswer::new(
             &v1::CEILINGS,
             v1::DemoAnswerParts {
+                state: v1::DemoState::Running,
                 project: PROJECT,
                 forge: 1,
                 provider: 17,

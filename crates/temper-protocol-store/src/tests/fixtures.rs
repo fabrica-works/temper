@@ -138,7 +138,7 @@ fn client_key(random: &mut Rng) -> skein_forge_client::Key {
 }
 pub fn key(random: &mut Rng) -> top::Key {
     let number = random.next_u64();
-    match random.below(17) {
+    match random.below(18) {
         0 => top::Key::Call(top::NamedCall {
             task: number,
             attempt: random.next_u64(),
@@ -160,7 +160,8 @@ pub fn key(random: &mut Rng) -> top::Key {
         13 => top::Key::Issue(number),
         14 => top::Key::Release(number),
         15 => top::Key::Application(number),
-        _ => top::Key::Writer(u16::try_from(random.below(65_536)).expect("u16")),
+        16 => top::Key::Writer(u16::try_from(random.below(65_536)).expect("u16")),
+        _ => top::Key::Demo(u16::try_from(random.below(65_536)).expect("u16")),
     }
 }
 pub fn core_keys() -> [jig_domain_core::Key; 4] {
@@ -517,7 +518,7 @@ pub fn answers_without_item_pieces() -> [skein_forge::api::Answer; 19] {
         Answer::Located { repository: 27 },
     ]
 }
-pub fn encoded(value: &crate::v5::Error) -> Box<[u8]> {
+pub fn encoded(value: &crate::v6::Error) -> Box<[u8]> {
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("measured error length"));
     value.encode(&mut writer).expect("measured room");
     writer.finish()
@@ -569,13 +570,13 @@ pub fn item_answers() -> [skein_forge::api::Answer; 3] {
         Answer::Reviews { reviews: Box::new([review(), review()]), more: true },
     ]
 }
-pub fn encoded_row(row: &crate::v5::Row) -> Box<[u8]> {
+pub fn encoded_row(row: &crate::v6::Row) -> Box<[u8]> {
     let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).expect("measured row length"));
     row.encode(&mut writer).expect("measured room");
     writer.finish()
 }
-pub fn item_piece_row(items: Box<[u8]>) -> crate::v5::Row {
-    use crate::v5 as w;
+pub fn item_piece_row(items: Box<[u8]>) -> crate::v6::Row {
+    use crate::v6 as w;
     let answer = w::Answer::Items(
         w::ItemsAnswer::new(&w::CEILINGS, w::ItemsAnswerParts { items, more: false, now: 1 }).expect("piece ceiling"),
     );

@@ -42,7 +42,7 @@ pub const fn owner(number: u16) -> Option<Owner> {
     }
 }
 /// Every record's version, served by both ends (client/README.md, 4.6).
-pub const CLIENT_VERSION: u32 = 6;
+pub const CLIENT_VERSION: u32 = 7;
 
 /// The deployment's maximum number of forges (client/README.md, 4.6).
 pub const FORGES: u32 = 16;
@@ -76,6 +76,7 @@ pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
     let limits = v1::Limits {
         forges_forges: FORGES,
         set_up_failed_why: SET_UP_WHY_BYTES,
+        group_failed_why: SET_UP_WHY_BYTES,
         connected_login: bounds.field_bytes,
         stopped_reason: bounds.field_bytes,
         pull_address: ADDRESS_BYTES,

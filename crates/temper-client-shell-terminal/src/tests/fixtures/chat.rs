@@ -300,6 +300,7 @@ fn demo_answer() -> Box<[u8]> {
         &w::DemoAnswer::new(
             &wire_limits(),
             w::DemoAnswerParts {
+                state: w::DemoState::Running,
                 project: 1,
                 forge: 1,
                 provider: 3,

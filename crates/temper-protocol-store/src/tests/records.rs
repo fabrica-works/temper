@@ -1,5 +1,5 @@
 use super::fixtures;
-use crate::{records, v5};
+use crate::{records, v6};
 use temper_engine_domain_forge as forge;
 
 #[test]
@@ -54,7 +54,7 @@ fn bounds_take_each_limit_from_its_source() {
 #[test]
 fn bounds_refuse_sources_past_schema_ceilings() {
     let mut larger = fixtures::LIMITS;
-    larger.name_bytes = v5::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
+    larger.name_bytes = v6::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
     assert_eq!(crate::bounds(&larger), None);
 }
 
@@ -659,21 +659,21 @@ fn every_application_outcome_preserves_its_complete_record() {
     assert!(
         jig_protocol_store::people_v8::Refusal::worst_case_bytes(&jig_protocol_store::people_v8::CEILINGS)
             .expect("bounded facts")
-            <= u64::from(v5::CEILINGS.core_refused_refusal)
+            <= u64::from(v6::CEILINGS.core_refused_refusal)
     );
 }
 #[test]
 fn application_decoding_refuses_malformed_refusal_facts() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for refusal in [Box::from([255]), Box::from([2]), Box::from([9, 0])] {
-        let value = v5::CoreRefused::new(&v5::CEILINGS, v5::CoreRefusedParts { refusal }).expect("small piece");
-        let application = v5::Application::new(
-            &v5::CEILINGS,
-            v5::ApplicationParts { token: 9, until: 10, outcome: v5::ApplicationOutcome::CoreRefused(value) },
+        let value = v6::CoreRefused::new(&v6::CEILINGS, v6::CoreRefusedParts { refusal }).expect("small piece");
+        let application = v6::Application::new(
+            &v6::CEILINGS,
+            v6::ApplicationParts { token: 9, until: 10, outcome: v6::ApplicationOutcome::CoreRefused(value) },
         )
         .expect("application");
         let row =
-            v5::Row::new(&v5::CEILINGS, v5::RowParts { value: v5::Value::Application(application) }).expect("row");
+            v6::Row::new(&v6::CEILINGS, v6::RowParts { value: v6::Value::Application(application) }).expect("row");
         assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable));
     }
 }
@@ -712,14 +712,14 @@ fn a_job_steps_name_past_its_limit_fails_to_decode() {
 }
 
 #[test]
-fn forge_writers_round_trip_with_the_v5_golden_bytes() {
+fn forge_writers_round_trip_with_the_v6_golden_bytes() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for (forge, author) in [(0, 1), (1, 42), (u16::MAX, u64::MAX)] {
         let row = forge::Stored::Writer(skein_forge_client::Writer { forge, author });
         let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).expect("writer key");
         let bytes = records::encode(&row);
         assert_eq!(bytes.len(), 13); // Row version, family, forge, author.
-        assert_eq!(&bytes[..3], &[0, 5, 16]);
+        assert_eq!(&bytes[..3], &[0, 6, 16]);
         assert_eq!(records::row(&key, &bytes, &bounds), Ok(row));
         if forge == u16::MAX {
             let mut golden = [255; 11];
@@ -729,4 +729,23 @@ fn forge_writers_round_trip_with_the_v5_golden_bytes() {
     }
     let zero = forge::Stored::Writer(skein_forge_client::Writer { forge: 1, author: 0 });
     assert_eq!(records::decode(&records::encode(&zero), &bounds), Err(crate::Undecodable));
+}
+
+#[test]
+fn demo_states_round_trip_and_refuse_a_mismatched_key() {
+    let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
+    for forge in [0, 1, u16::MAX] {
+        for state in [forge::DemoState::Running, forge::DemoState::Ended] {
+            let row = forge::Stored::Demo(forge::Demo { forge, state });
+            let key = crate::keys::encode(&forge::Key::Demo(forge), u32::MAX).expect("demo key");
+            let bytes = records::encode(&row);
+            assert_eq!(bytes.len(), 6);
+            assert_eq!(&bytes[..3], &[0, 6, 17]);
+            assert_eq!(records::row(&key, &bytes, &bounds), Ok(row));
+            let other = crate::keys::encode(&forge::Key::Demo(forge ^ 1), u32::MAX).expect("other key");
+            assert_eq!(records::row(&other, &bytes, &bounds), Err(crate::Undecodable));
+            let other = crate::keys::encode(&forge::Key::Writer(forge), u32::MAX).expect("other family");
+            assert_eq!(records::row(&other, &bytes, &bounds), Err(crate::Undecodable));
+        }
+    }
 }

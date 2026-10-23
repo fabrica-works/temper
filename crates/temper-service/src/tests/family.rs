@@ -194,6 +194,7 @@ fn the_demo_read_answers_the_configured_demo() {
     let expected = w::DemoAnswer::new(
         &w::CEILINGS,
         w::DemoAnswerParts {
+            state: w::DemoState::Running,
             project: 1,
             forge: 2,
             provider: 3,
@@ -1099,4 +1100,21 @@ fn new_project_and_invalid_setup_refusals_translate_to_the_wire() {
         };
         assert_eq!(value.why(), &wire);
     }
+}
+
+#[test]
+fn demo_start_is_undecodable_until_routed() {
+    let record = w::Requesting::new(&w::CEILINGS, w::RequestingParts { request: w::Request::StartDemo }).unwrap();
+    let Err(answer) = family::to_root(
+        exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&record)),
+        &[],
+        None,
+        &w::CEILINGS,
+    ) else {
+        panic!("unrouted start is undecodable")
+    };
+    let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *answer else {
+        panic!("undecodable reply")
+    };
+    assert_eq!(to, REPLY);
 }

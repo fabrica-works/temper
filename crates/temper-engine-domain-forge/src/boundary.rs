@@ -554,6 +554,8 @@ pub enum Stored {
     },
     /// A forge's writer, kept before any restored effect (domain/forge.md, 4.1).
     Writer(skein_forge_client::Writer),
+    /// The demo's state, kept by its forge (protocol/setup.md, 8.4): no record is not started.
+    Demo(Demo),
 }
 /// A bounded connector payload awaiting an authority holder's decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -571,10 +573,16 @@ pub enum Key {
     Repository(skein_forge::api::Repository),
     Hold(Name),
     Names(u64),
-    Subscription { task: u64, topic: Topic },
+    Subscription {
+        task: u64,
+        topic: Topic,
+    },
     BranchHead(Name),
     PullState(Name),
-    Ci { repository: skein_forge::api::Repository, head: skein_forge::api::Commit },
+    Ci {
+        repository: skein_forge::api::Repository,
+        head: skein_forge::api::Commit,
+    },
     Landed(skein_forge::api::Commit),
     Entry(u64),
     Client(skein_forge_client::Key),
@@ -583,6 +591,8 @@ pub enum Key {
     Release(u64),
     Application(u64),
     Writer(u16),
+    /// The demo's forge, application.demo.forge.
+    Demo(u16),
 }
 /// A completed phase of the connector's restart contract.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1088,4 +1098,17 @@ pub enum Request {
     RestartDone {
         stage: RestartStage,
     },
+}
+
+/// The demo's durable state (protocol/setup.md, 8.4).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Demo {
+    pub forge: u16,
+    pub state: DemoState,
+}
+/// No record is not started.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DemoState {
+    Running,
+    Ended,
 }

@@ -61,6 +61,7 @@ fn limits_take_each_bound_from_its_source_field() {
         v1::Limits {
             forges_forges: crate::FORGES,
             set_up_failed_why: crate::SET_UP_WHY_BYTES,
+            group_failed_why: crate::SET_UP_WHY_BYTES,
             connected_login: 16,
             stopped_reason: 16,
             pull_address: crate::ADDRESS_BYTES,
@@ -120,6 +121,7 @@ fn the_demo_read_and_answer_round_trip_with_nonempty_cues() {
         let answer = v1::DemoAnswer::new(
             &limits,
             v1::DemoAnswerParts {
+                state: v1::DemoState::Running,
                 project: 7,
                 forge: crate::FORGE,
                 provider: 3,
@@ -156,6 +158,7 @@ fn demo_cues_obey_their_count_and_text_bounds() {
         let answer = v1::DemoAnswer::new(
             &limits,
             v1::DemoAnswerParts {
+                state: v1::DemoState::Running,
                 project: 7,
                 forge: crate::FORGE,
                 provider: 3,
@@ -250,6 +253,7 @@ fn change_panel_bounds_accept_at_and_refuse_one_past() {
 fn requesting_round_trips_and_refuses_trailing_and_version_three_adopt_bytes() {
     let limits = fixtures::limits();
     for request in [
+        v1::Request::StartDemo,
         v1::Request::Adopt(fixtures::adopt()),
         v1::Request::SetUp(
             v1::SetUp::new(
@@ -510,4 +514,104 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
             }
         }
     }
+}
+
+#[test]
+fn demo_start_outcomes_round_trip_at_each_boundary() {
+    let limits = v1::CEILINGS;
+    let mut outcomes = List::with_capacity(8);
+    for outcome in [
+        v1::Outcome::Running,
+        v1::Outcome::StartRefused(
+            v1::StartRefused::new(&limits, v1::StartRefusedParts { why: v1::StartRefusal::NotOffered })
+                .expect("refusal"),
+        ),
+    ] {
+        outcomes.push(outcome).expect("outcome room");
+    }
+    for why in [v1::StartFailure::Account, v1::StartFailure::Adoption, v1::StartFailure::NotConnected] {
+        outcomes
+            .push(v1::Outcome::StartFailed(
+                v1::StartFailed::new(&limits, v1::StartFailedParts { why }).expect("failure"),
+            ))
+            .expect("outcome room");
+    }
+    for length in [0, 1, 256] {
+        let group = v1::GroupFailed::new(&limits, v1::GroupFailedParts { why: skein_lib::bytes::zeroed(length) })
+            .expect("bounded why");
+        outcomes
+            .push(v1::Outcome::StartFailed(
+                v1::StartFailed::new(&limits, v1::StartFailedParts { why: v1::StartFailure::Group(group) })
+                    .expect("group failure"),
+            ))
+            .expect("outcome room");
+    }
+    for outcome in outcomes.into_boxed() {
+        let record = v1::Answer::new(&limits, v1::AnswerParts { outcome }).expect("answer");
+        let bytes = crate::answer(&record);
+        let mut reader = Reader::new(&bytes);
+        assert_eq!(v1::Answer::decode(&limits, &mut reader), Ok(record));
+        assert!(reader.is_empty());
+    }
+    v1::GroupFailed::new(&limits, v1::GroupFailedParts { why: skein_lib::bytes::zeroed(257) })
+        .expect_err("past ceiling");
+    let group =
+        v1::GroupFailed::new(&limits, v1::GroupFailedParts { why: skein_lib::bytes::zeroed(256) }).expect("ceiling");
+    let record = v1::Answer::new(
+        &limits,
+        v1::AnswerParts {
+            outcome: v1::Outcome::StartFailed(
+                v1::StartFailed::new(&limits, v1::StartFailedParts { why: v1::StartFailure::Group(group) })
+                    .expect("failure"),
+            ),
+        },
+    )
+    .expect("answer");
+    let bytes = crate::answer(&record);
+    // Version (2), Outcome (1), StartFailure (1), then WHY's u32 length.
+    let mut writer = skein_lib::Writer::new(bytes.len().checked_add(1).expect("extra byte"));
+    writer.put(&bytes[..4]).expect("header");
+    writer.put(&257_u32.to_be_bytes()).expect("length");
+    writer.put(&bytes[8..]).expect("why");
+    writer.put(b"x").expect("extra byte");
+    let bytes = writer.finish();
+    v1::Answer::decode(&limits, &mut Reader::new(&bytes)).expect_err("past ceiling on decode");
+}
+
+#[test]
+fn demo_states_round_trip_at_smallest_and_ceiling() {
+    use skein_lib::List;
+    let limits = v1::CEILINGS;
+    for state in [v1::DemoState::NotStarted, v1::DemoState::Running] {
+        for full in [false, true] {
+            let mut cues = List::with_capacity(limits.demo_answer_cues);
+            if full {
+                for _ in 0..limits.demo_answer_cues {
+                    cues.push(skein_lib::bytes::zeroed(
+                        usize::try_from(limits.demo_answer_cues_item).expect("ceiling"),
+                    ))
+                    .expect("cue room");
+                }
+            }
+            let field = if full { usize::try_from(limits.demo_answer_owner).expect("ceiling") } else { 0 };
+            let record = v1::DemoAnswer::new(
+                &limits,
+                v1::DemoAnswerParts {
+                    project: if full { u32::MAX } else { 0 },
+                    forge: if full { u16::MAX } else { 0 },
+                    provider: if full { u32::MAX } else { 0 },
+                    owner: skein_lib::bytes::zeroed(field),
+                    name: skein_lib::bytes::zeroed(field),
+                    state: state.clone(),
+                    cues,
+                },
+            )
+            .expect("demo answer");
+            let bytes = crate::demo_answer(&record);
+            assert_eq!(crate::decode_demo_answer(&bytes, &limits), Some(record));
+        }
+    }
+    let record =
+        v1::Requesting::new(&limits, v1::RequestingParts { request: v1::Request::StartDemo }).expect("start request");
+    assert_eq!(crate::decode_requesting(&crate::requesting(&record), &limits), Some(record));
 }

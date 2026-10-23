@@ -129,6 +129,7 @@ pub fn request(
     let limits = forge::wire_limits(&crate::app::limits().forge).expect("wire bounds");
     let mut reader = skein_lib::Reader::new(&ask.bytes);
     let a = (match v1::Requesting::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts().request {
+        v1::Request::StartDemo => panic!("client sends no demo start yet"),
         v1::Request::Adopt(adopt) => adopt,
         v1::Request::SetUp(set_up) => {
             assert!(reader.is_empty(), "whole setup request");

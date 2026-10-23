@@ -218,6 +218,7 @@ pub fn stored_key(row: &Stored) -> Key {
         Stored::Release(row) => Key::Release(row.task),
         Stored::Application { token, .. } => Key::Application(*token),
         Stored::Writer(row) => Key::Writer(row.forge),
+        Stored::Demo(row) => Key::Demo(row.forge),
     }
 }
 /// Checked payload bytes of one connector record for its parent's store page.
@@ -366,7 +367,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         }
         Stored::BranchHead(row) => name(&row.name),
         Stored::PullState(row) => name(&row.name),
-        Stored::Ci(_) | Stored::Landed { .. } | Stored::Writer(_) => Some(0),
+        Stored::Ci(_) | Stored::Landed { .. } | Stored::Writer(_) | Stored::Demo(_) => Some(0),
         Stored::ProposedEffect(row) => {
             let resource = match &row.resource {
                 What::Branch(branch) => {

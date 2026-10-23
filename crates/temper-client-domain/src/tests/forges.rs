@@ -372,3 +372,23 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
         }
     }
 }
+
+#[test]
+fn demo_start_outcomes_fit_neither_adopt_nor_setup() {
+    let link =
+        jig_client_protocol_link::Limits::new(fixtures::limits().client.domain, fixtures::limits().client.exchanges)
+            .unwrap();
+    for outcome in [
+        w::Outcome::Running,
+        w::Outcome::StartRefused(
+            w::StartRefused::new(&limits(), w::StartRefusedParts { why: w::StartRefusal::NotOffered }).unwrap(),
+        ),
+        w::Outcome::StartFailed(
+            w::StartFailed::new(&limits(), w::StartFailedParts { why: w::StartFailure::Account }).unwrap(),
+        ),
+    ] {
+        let record = answer(outcome);
+        assert_eq!(family::set_up_answer(&record, &limits()), None);
+        assert_eq!(family::answer(&record, &limits(), &link), None);
+    }
+}

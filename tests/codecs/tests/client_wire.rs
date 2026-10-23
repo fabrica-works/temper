@@ -20,7 +20,7 @@ fn a_core_refusal_carries_jigs_refusal_bytes_unchanged() {
 }
 
 #[test]
-fn version_six_request_answer_and_forges_goldens_round_trip() {
+fn version_seven_request_answer_and_forges_goldens_round_trip() {
     use temper_client_protocol_wire as wire;
     for bytes in [
         include_bytes!("../../../crates/temper-client-protocol-wire/golden/v1/record_requesting_smallest.bin")
@@ -65,9 +65,9 @@ fn first(state: v1::FirstState) -> v1::FirstRepository {
     .expect("record within schema ceilings")
 }
 #[test]
-fn setup_and_every_first_repository_state_round_trip_at_version_six() {
+fn setup_and_every_first_repository_state_round_trip_at_version_seven() {
     use temper_client_protocol_wire as wire;
-    assert_eq!(wire::CLIENT_VERSION, 6);
+    assert_eq!(wire::CLIENT_VERSION, 7);
     for project in [
         project(),
         v1::SetUpProject::New(
@@ -213,4 +213,107 @@ fn first_repository_names_are_bounded_at_construction_and_decode() {
             assert_eq!(v1::FirstRepository::new(&v1::CEILINGS, parts).is_ok(), size == 1024);
         }
     }
+}
+
+#[test]
+fn demo_start_outcomes_round_trip_at_each_boundary() {
+    let limits = v1::CEILINGS;
+    let mut outcomes = skein_lib::List::with_capacity(8);
+    for outcome in [
+        v1::Outcome::Running,
+        v1::Outcome::StartRefused(
+            v1::StartRefused::new(&limits, v1::StartRefusedParts { why: v1::StartRefusal::NotOffered })
+                .expect("refusal"),
+        ),
+    ] {
+        outcomes.push(outcome).expect("outcome room");
+    }
+    for why in [v1::StartFailure::Account, v1::StartFailure::Adoption, v1::StartFailure::NotConnected] {
+        outcomes
+            .push(v1::Outcome::StartFailed(
+                v1::StartFailed::new(&limits, v1::StartFailedParts { why }).expect("failure"),
+            ))
+            .expect("outcome room");
+    }
+    for length in [0, 1, 256] {
+        let group = v1::GroupFailed::new(&limits, v1::GroupFailedParts { why: skein_lib::bytes::zeroed(length) })
+            .expect("bounded why");
+        outcomes
+            .push(v1::Outcome::StartFailed(
+                v1::StartFailed::new(&limits, v1::StartFailedParts { why: v1::StartFailure::Group(group) })
+                    .expect("group failure"),
+            ))
+            .expect("outcome room");
+    }
+    for outcome in outcomes.into_boxed() {
+        let record = v1::Answer::new(&limits, v1::AnswerParts { outcome }).expect("answer");
+        let bytes = temper_client_protocol_wire::answer(&record);
+        let mut reader = Reader::new(&bytes);
+        assert_eq!(v1::Answer::decode(&limits, &mut reader), Ok(record));
+        assert!(reader.is_empty());
+    }
+    v1::GroupFailed::new(&limits, v1::GroupFailedParts { why: skein_lib::bytes::zeroed(257) })
+        .expect_err("past ceiling");
+    let group =
+        v1::GroupFailed::new(&limits, v1::GroupFailedParts { why: skein_lib::bytes::zeroed(256) }).expect("ceiling");
+    let record = v1::Answer::new(
+        &limits,
+        v1::AnswerParts {
+            outcome: v1::Outcome::StartFailed(
+                v1::StartFailed::new(&limits, v1::StartFailedParts { why: v1::StartFailure::Group(group) })
+                    .expect("failure"),
+            ),
+        },
+    )
+    .expect("answer");
+    let bytes = temper_client_protocol_wire::answer(&record);
+    // Version (2), Outcome (1), StartFailure (1), then WHY's u32 length.
+    let mut writer = skein_lib::Writer::new(bytes.len().checked_add(1).expect("extra byte"));
+    writer.put(&bytes[..4]).expect("header");
+    writer.put(&257_u32.to_be_bytes()).expect("length");
+    writer.put(&bytes[8..]).expect("why");
+    writer.put(b"x").expect("extra byte");
+    let bytes = writer.finish();
+    v1::Answer::decode(&limits, &mut Reader::new(&bytes)).expect_err("past ceiling on decode");
+}
+
+#[test]
+fn demo_states_round_trip_at_smallest_and_ceiling() {
+    use skein_lib::List;
+    let limits = v1::CEILINGS;
+    for state in [v1::DemoState::NotStarted, v1::DemoState::Running] {
+        for full in [false, true] {
+            let mut cues = List::with_capacity(limits.demo_answer_cues);
+            if full {
+                for _ in 0..limits.demo_answer_cues {
+                    cues.push(skein_lib::bytes::zeroed(
+                        usize::try_from(limits.demo_answer_cues_item).expect("ceiling"),
+                    ))
+                    .expect("cue room");
+                }
+            }
+            let field = if full { usize::try_from(limits.demo_answer_owner).expect("ceiling") } else { 0 };
+            let record = v1::DemoAnswer::new(
+                &limits,
+                v1::DemoAnswerParts {
+                    project: if full { u32::MAX } else { 0 },
+                    forge: if full { u16::MAX } else { 0 },
+                    provider: if full { u32::MAX } else { 0 },
+                    owner: skein_lib::bytes::zeroed(field),
+                    name: skein_lib::bytes::zeroed(field),
+                    state: state.clone(),
+                    cues,
+                },
+            )
+            .expect("demo answer");
+            let bytes = temper_client_protocol_wire::demo_answer(&record);
+            assert_eq!(temper_client_protocol_wire::decode_demo_answer(&bytes, &limits), Some(record));
+        }
+    }
+    let record =
+        v1::Requesting::new(&limits, v1::RequestingParts { request: v1::Request::StartDemo }).expect("start request");
+    assert_eq!(
+        temper_client_protocol_wire::decode_requesting(&temper_client_protocol_wire::requesting(&record), &limits),
+        Some(record)
+    );
 }

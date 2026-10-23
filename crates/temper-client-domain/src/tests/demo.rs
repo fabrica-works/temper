@@ -16,6 +16,7 @@ pub(super) fn answer(cue: &[u8]) -> Box<[u8]> {
         &w::DemoAnswer::new(
             &w::CEILINGS,
             w::DemoAnswerParts {
+                state: w::DemoState::Running,
                 project: f::PROJECT,
                 forge: wire::FORGE,
                 provider: PROVIDER,

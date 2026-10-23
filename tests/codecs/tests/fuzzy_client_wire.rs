@@ -36,6 +36,33 @@ fn client_wire_decoders_never_panic_and_reencode_the_same() {
     let mut rng = Rng::new(0x7e3d_0302);
     let goldens = temper_codecs_world::goldens("crates/temper-client-protocol-wire/golden/v1");
     for _ in 0..2_000 {
+        let request = v1::Requesting::new(&v1::CEILINGS, v1::RequestingParts { request: v1::Request::StartDemo })
+            .expect("start request");
+        requesting(&temper_client_protocol_wire::requesting(&request));
+        let why = match rng.below(4) {
+            0 => v1::StartFailure::Group(
+                v1::GroupFailed::new(
+                    &v1::CEILINGS,
+                    v1::GroupFailedParts { why: temper_codecs_world::drawn(&mut rng, 256).into_boxed_slice() },
+                )
+                .expect("bounded why"),
+            ),
+            1 => v1::StartFailure::Account,
+            2 => v1::StartFailure::Adoption,
+            _ => v1::StartFailure::NotConnected,
+        };
+        let record = v1::Answer::new(
+            &v1::CEILINGS,
+            v1::AnswerParts {
+                outcome: v1::Outcome::StartFailed(
+                    v1::StartFailed::new(&v1::CEILINGS, v1::StartFailedParts { why }).expect("failure"),
+                ),
+            },
+        )
+        .expect("answer");
+        let encoded = temper_client_protocol_wire::answer(&record);
+        answer(&encoded);
+        answer(&temper_codecs_world::mutated(&mut rng, &encoded));
         let bytes = temper_codecs_world::drawn(&mut rng, 512);
         for decode in decoders {
             decode(&bytes);

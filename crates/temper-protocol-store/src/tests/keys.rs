@@ -46,7 +46,7 @@ fn a_key_decoder_refuses_each_malformed_key() {
     }
     branch.tag(0);
     for (name, bytes) in [
-        ("family tag", Box::from([17])),
+        ("family tag", Box::from([18])),
         ("What tag", what.finish().expect("small key")),
         ("forge width", forge.finish().expect("small key")),
         ("trailing byte", trailing.finish().expect("small key")),
@@ -115,5 +115,22 @@ fn writer_keys_follow_application_and_take_every_forge_number() {
     }
     let mut too_wide = skein_kv::KeyWriter::new(u32::MAX);
     too_wide.tag(16).u64(65_536);
+    assert_eq!(keys::decode(&too_wide.finish().expect("small key"), &fixtures::LIMITS), None);
+}
+
+#[test]
+fn demo_keys_follow_writer_and_take_every_forge_number() {
+    use temper_engine_domain_forge::Key;
+    let previous = keys::encode(&Key::Writer(u16::MAX), u32::MAX).expect("writer key");
+    for forge in [0, 1, u16::MAX] {
+        let key = Key::Demo(forge);
+        let bytes = keys::encode(&key, u32::MAX).expect("demo key");
+        assert_eq!(bytes[0], 17);
+        assert_eq!(bytes.len(), 9);
+        assert_eq!(keys::decode(&bytes, &fixtures::LIMITS), Some(key));
+        assert!(bytes > previous);
+    }
+    let mut too_wide = skein_kv::KeyWriter::new(u32::MAX);
+    too_wide.tag(17).u64(65_536);
     assert_eq!(keys::decode(&too_wide.finish().expect("small key"), &fixtures::LIMITS), None);
 }

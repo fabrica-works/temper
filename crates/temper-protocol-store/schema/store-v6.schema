@@ -1,4 +1,4 @@
-family temper-store 5
+family temper-store 6
 
 # 04.2: values the families share (protocol/store.md, 2 and 3).
 record Repository { forge: u16 repository: u32 }
@@ -182,5 +182,9 @@ enum ApplicationOutcome { adopted: ApplicationAdopted, core_refused: CoreRefused
 record Application { token: u64 until: u64 outcome: ApplicationOutcome }
 # Family 16: each forge's writer, before restored effects (protocol/store.md, 2).
 record ForgeWriter { forge: u16 author: u64 }
-enum Value { call: Call, proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, client: ClientRow, change: boxed ChangeRow, issue: boxed IssueRow, release: ReleaseRow, application: Application, writer: ForgeWriter }
+
+# Family 17: the demo's state (protocol/store.md, 2; protocol/setup.md, 8.4).
+enum DemoState { running, ended }
+record Demo { forge: u16 state: DemoState }
+enum Value { call: Call, proposed_effect: ProposedEffect, repository: Adopted, hold: Hold, names: Names, subscription: Subscriber, branch_head: BranchHead, pull_state: PullState, ci: CiState, landed: Landed, entry: EntryRow, client: ClientRow, change: boxed ChangeRow, issue: boxed IssueRow, release: ReleaseRow, application: Application, writer: ForgeWriter, demo: Demo }
 versioned record Row { value: Value }

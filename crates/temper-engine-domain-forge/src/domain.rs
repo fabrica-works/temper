@@ -3894,6 +3894,7 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
                 .insert(entry.number, Outboxed { entry, held, handoff: Handoff::Handed })
                 .expect("restored entry within limits");
         }
+        Stored::Demo(_) => {} // T1 will retain the demo state on restore.
         Stored::Writer(row) => {
             let mut discarded = Queue::with_capacity(env.limits.output);
             child(

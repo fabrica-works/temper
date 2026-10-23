@@ -1392,6 +1392,7 @@ fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Tok
     let answer = w::DemoAnswer::new(
         &w::CEILINGS,
         w::DemoAnswerParts {
+            state: w::DemoState::Running,
             project,
             forge: wire::FORGE,
             provider: 17,

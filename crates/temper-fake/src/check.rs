@@ -135,7 +135,8 @@ pub fn evidence(forge: u16, rows: &[(Box<[u8]>, Box<[u8]>)], limits: &d::Limits)
                     }
                 }
             }
-            d::Stored::Call { .. }
+            d::Stored::Demo(_)
+            | d::Stored::Call { .. }
             | d::Stored::ProposedEffect(_)
             | d::Stored::Hold(_)
             | d::Stored::Names { .. }
