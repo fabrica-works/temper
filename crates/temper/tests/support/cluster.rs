@@ -137,9 +137,7 @@ impl Cluster {
         let directory = self.dir(member).parent().expect("scratch").join(name);
         private_directory(&directory);
         assert!(
-            self.bindings
-                .insert(format!("proc.{name}.dir"), directory.to_str().expect("member path").into())
-                .is_none(),
+            self.bindings.insert(format!("proc.{name}.dir"), directory.to_str().expect("member path").into()).is_none(),
             "duplicate binding {name}"
         );
         spec["name"] = name.into();
