@@ -303,8 +303,8 @@ keeps (`../protocol/configuration.md`, section 2).
 
 | Address | Mockup | Shows | Watches and reads | Acts |
 |---|---|---|---|---|
-| `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back |
-| `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
+| `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies); "+ New chat", a link to the Chats page's start (`/chats?at=start`) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept ("Accept"), reject with a reason, answer, release, leave held, take, hand back |
+| `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat" and its button "Start chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
 | `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the context line, only in the demo's project while the demo is running (4.8, 5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it (a `delegate` or a `change`), or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the placeholder "Message T6…", T6 the chat's number, shown while it is empty and never its name, and the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree of its delegates, live and ended, with their counts and its filter, each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a goal's or a procedure's ended delegates, a page read once and again on a change | a goal's plan's filter (5.8); as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
@@ -313,7 +313,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Forges` | `forges.html` | the person's forges, each row folded until opened: its connection, its mode and access, on GitHub temper's App and its installations, a connect under way and how the last ended, its load; then the playground's forge, folded, while the demo's forge half holds; "+ Add a forge", to `ConnectForge` (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect a stopped forge; replace a key or tokens; install on another account; new repository; forget the admin's token; set up again (section 8) |
 | `ConnectForge { forge }` | `connect-forge.html` | connecting one more forge, `forge` the choice it is at: Choose, Details, Setting up and Ready, which ends on the work it adopted (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect; connect as its admin; set up a Forgejo here (section 8) |
 | `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `ConnectModel`'s acts |
-| `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's, each row folded until opened: its LLM provider and display name, its holder, its deciding source's state and its line (5.5, An account's line); opened, that state's words and acts, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), what it pays for, the runs using it, the tasks waiting for it and its acts; the checks under way, and how the last ended; then the playground's account, folded, while the demo's model half holds; "+ Connect a model", to `ConnectModel` | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in again or add a key from a state's acts, as `ConnectModel`'s ways; sign a source out; add a key to an account; replace a key; remove a source or an account; check a program's login again; move an account, or a source, up or down; resume a limited source |
+| `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's, each row folded until opened: its LLM provider and display name, its holder, its deciding source's state and its line (5.5, An account's line); opened, that state's words and acts, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), what it pays for, the runs using it and the tasks waiting for it (facts jig gives the deployment's accounts alone for now, so a person's own leave them out: 5.5) and its acts; the checks under way, and how the last ended; then the playground's account, folded, while the demo's model half holds; "+ Connect a model", to `ConnectModel` | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in again or add a key from a state's acts, as `ConnectModel`'s ways; sign a source out; add a key to an account; replace a key; remove a source or an account; check a program's login again; move an account, or a source, up or down; resume a limited source |
 | `ConnectModel { way }` | `connect-model.html` | connecting one more LLM account, `way` the way it is at, or none at Choose: Choose, a card for each way its providers offer (5.5, The ways); Signing in, at the provider, for a sign-in, or Details, a way's field, for a key or a program's login; and Ready, the account made, or how the sign-in ended (5.5, A sign-in) | `accounts`; `me`'s LLM providers | sign in with an LLM provider; add a key as an account of its own; declare a program's login |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
@@ -324,9 +324,11 @@ keeps (`../protocol/configuration.md`, section 2).
   each card temper's own (section 1).
 - **A chat's chatbar** (`chat.html`): its level-1
   heading "TN · TITLE", the chat's task number and its title (a
-  chat's first message); its status; then "Scripted model" while the
-  demo's model half holds and the chat is in the demo's project (5.6),
-  its spend, and its acts.
+  chat's first message); its status; its spend; and its acts. Nothing
+  of the composer's line (5.5) is repeated there, neither its model nor
+  its effort, nor the mockup's template, charter, host kind and budget:
+  the composer's line says what the next run uses (the user's pick,
+  10-23).
 - **A conversation's turns** are named "You" when the turn is the
   person's own, "Temper" when it is the agent's, and by the party's
   name otherwise (`chat.html`), on every page that draws a
@@ -406,8 +408,9 @@ keeps (`../protocol/configuration.md`, section 2).
     its task's card where the call that made it is not in the window
     (5.7), drawn on the agent's side, never under "You";
   - *its end,* once the chat has ended, after the conversation: one
-    line, "Ended" and the time it ended ("Ended 21:05", 5.12's
-    clock), then, for a report, " · its report, “REPORT”", the
+    line, "Closed" and the time it ended ("Closed 21:05", 5.12's
+    clock), the status's word (3.5's chats), then, for a report,
+    " · its report, “REPORT”", the
     report's words whole; a failed chat's line is "Failed", its time
     and its reason ("Failed 21:05 · REASON"); a chat cancelled by the
     party that requested it was closed, and its line is "Closed" and its
@@ -421,13 +424,16 @@ keeps (`../protocol/configuration.md`, section 2).
   lines by last activity and the ended page's by when each ended,
   merged newest first, a tie by the lower number first. "All", "Live"
   and "Closed", three buttons, the chosen one pressed, filter it in
-  the page, reading nothing; "All" when the page opens. Under "All" or
+  the page, reading nothing; the filter is in the page's address
+  (`browser.md`, 2.3), "/chats?state=live", a filter chosen a move, as
+  the inbox's. Under "All" or
   "Closed", while an older page of ended chats remains, "More closed
   chats" reads it, in place of the last. With no line to show it says
   "No chats yet.", or under a filter "No live chats." or "No closed
   chats.". A line is the chat's number, "TN", a link to its page, then
-  its title, its status (the chatbar's, and "Closed" for a chat its
-  requester closed, "Ended" for any other ended chat, jig's word), its
+  its title, its status (the chatbar's: one word for one state in
+  both places, and "Closed" for every ended chat, as the filter says
+  it; the user's pick, 10-23), its
   spend as its chatbar says it, and "1
   delegate" or "N delegates" while it has live ones, and when it
   ended or was last active, as 5.12's ago ("1 h 28 min ago").
@@ -438,8 +444,13 @@ keeps (`../protocol/configuration.md`, section 2).
   new", or "0"; "2+" and "2+ new" where the inbox's document says its
   list was cut (jig's `more`, an owner inbox's next page, a filtered
   page's `cut`), so that a count never says less than there is; with
-  none, "Nothing needs you." or "No updates.". Its filters sit in the
-  first heading's row: the projects, each a button; the kinds in one
+  none, "Nothing needs you." or "No updates.". Its first heading's
+  row holds "+ New chat", a link to the Chats page's start
+  (`/chats?at=start`, its text area focused: no act of its own), then
+  its filters: the projects, each a button, while the person has two
+  projects or more (with one, the banner's project says it; the
+  user's pick, 10-23, until skein-ui has a menu and the three filters
+  become menus); the kinds in one
   disclosure, folded until the person opens it, holding "All kinds"
   and each kind, the chosen one pressed, and named "Kind" while every
   kind is shown, "Kind · Question" once one is chosen, in the word its
@@ -529,7 +540,10 @@ keeps (`../protocol/configuration.md`, section 2).
     account), its summary its deciding source's state in words and the
     account's line (5.5, An account's line). Opened: the state's words
     and acts (5.5, Each state); its sources in order, each with its kind
-    and state in words; "Pays for", "Used by" and "Waiting for it"; and
+    and state in words; "Pays for", and on the deployment's accounts
+    "Used by" and "Waiting for it", whose facts jig gives the
+    deployment's accounts alone for now (a person's own leave them
+    out, and its line its use: the user's pick, 10-23); and
     the account's acts: sign a source out, add a key to the account,
     replace or remove a key, remove the account, resume a source, move
     the account or a source, check a program's login again;
@@ -1522,7 +1536,9 @@ of each (`../draft/first-run.md`, 3.6).
     `jig-client`'s `Link` states ("Signed out", "Connecting" while
     starting, "Live", "Offline", "Out of date"), and "Behind" while a
     page's watch reopens; the person's name and "Sign out"; all but
-    temper's name in one disclosure, "Menu", which a browser folds
+    temper's name (text, not a link: the navigation's Inbox and Chats
+    lead home; the user's pick, 10-23) in one disclosure, "Menu",
+    which a browser folds
     behind its ☰ at phone width alone (`browser.md`, 2.5) and the
     terminal and the fake person find whole; on `Welcome`, temper's
     name, the person's name and "Sign out" alone (3.5, The welcome);
@@ -1699,7 +1715,9 @@ unloaded, before amber for one limited; current on `Accounts` and
 `ConnectModel`; both whatever the project. With no project chosen, the
 project's entries are not offered. The mockups' "Tasks", a list of a
 project's tasks, and "Workers", the deployment's hosts, are not in the
-client (section 11). "Adopt
+navigation (the user's pick, 10-23): the Board covers what a task list
+is for, and the hosts are the operator's, through the engine's
+configuration. "Adopt
 a repository" and "Forges" are offered whatever the person's role: the
 engine judges each, and a refusal says why, since the client never
 computes what a party may do.
@@ -2228,7 +2246,8 @@ or difference of their amounts (jig's `client/domain/contract.md`,
 - **Its filter:** after the counts, on a line of its own, "All" and
   "Live only", two buttons, the chosen one pressed, as the chats
   list's (3.5); they filter the plan in the page, reading nothing, and
-  "All" is chosen when the page opens. "Live only" leaves out the ended
+  are in the goal's address (`browser.md`, 2.3), "/tasks/9?state=live",
+  a filter chosen a move, as the chats list's. "Live only" leaves out the ended
   rows and the more line; the live rows, their folds and held cards
   stay, and the read goes on under either. The filter is drawn from the
   page's start, before the read answers.
@@ -3839,7 +3858,8 @@ own tests:
   and note scopes, which jig supplies as codes and patterns, not
   words. Default: not on the goal's page.
 - **A goal's page against its mockup** (5.8), each a default the user
-  may change:
+  may change; the plan's columns, "Wakes on", "Input" and "Writes" the
+  user's picks (10-23), settled for now:
   - the deadline: the budget's card's "Deadline", "None" when it has
     none, and not the header's;
   - the plan's columns: no heads, the spend "N spent" in its row;

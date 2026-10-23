@@ -209,10 +209,10 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   | Page | Path |
   |---|---|
   | `Inbox { filter }` | `/`, and its filter's query |
-  | `Chats` | `/chats` |
+  | `Chats { filter, start }` | `/chats`, and its filter's and start's query |
   | `Accounts` | `/accounts` |
   | `Chat { task }` | `/chats/<task>` |
-  | `Task { task }` | `/tasks/<task>` |
+  | `Task { task, filter }` | `/tasks/<task>`, and its plan's filter's query |
   | `Adopt { project }` | `/projects/<project>/adopt` |
   | `Welcome { step }` | `/welcome`, and its step's query |
   | `Forges` | `/forges` |
@@ -236,12 +236,27 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   or edited link opens the inbox less filtered, never refused, and its
   address is replaced with the printed one. It reads numbers, not the
   person's projects: a project the person isn't in shows an empty
-  inbox, which "All projects" undoes. The inbox's filter, the
-  welcome's step, `ConnectForge`'s choice and `ConnectModel`'s way
-  (below) alone are in an address: the chats list's
-  and a goal's plan's are the page's, "All" at each open (section 5),
-  and another page's query is dropped,
-  `/chats/7?x=1` replaced with `/chats/7`.
+  inbox, which "All projects" undoes. The inbox's filter, the chats
+  list's and a goal's plan's (below), the welcome's step,
+  `ConnectForge`'s choice and `ConnectModel`'s way (below) alone are in
+  an address, and another page's query is dropped, `/chats/7?x=1`
+  replaced with `/chats/7`.
+- **The chats list's and a goal's plan's filters are their queries,**
+  as the inbox's (the user's pick, 10-23): none for "All", so that
+  `/chats` is the list whole; `?state=live` for "Live" and
+  `?state=closed` for "Closed"; a goal's `/tasks/<task>?state=live`
+  for its plan's "Live only" (`README.md`, 5.8). A `state` that
+  doesn't read as one of the page's, `/tasks/9?state=closed` among
+  them, or a field of another name, is dropped, and the address
+  replaced with the printed one. A filter chosen is a move (below).
+- **The chats' start is `?at=start`,** as the welcome's step is
+  `?at=`: `/chats?at=start` is the Chats page
+  with the focus in its start's text area ("Start a chat", or the
+  demo's start's while the demo's start is drawn in its place), the
+  address the inbox's "+ New chat" links to (`README.md`, 3.5's
+  inbox); with a filter, `state` comes first,
+  `/chats?state=live&at=start`. Every other `/chats` leaves the focus
+  on its heading, as any move does.
 - **The welcome's step is its query:** none for its first step,
   Welcome, so that `/welcome` is the welcome; `?at=forge`, `?at=model`
   and `?at=ready` for the others (`README.md`, 3.5, The welcome). As
@@ -714,9 +729,6 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   party's kept work, and kept work dropped at start, which the terminal
   says in lines of its own. Default: not shown; the small store lives
   as long as its tab, of one person.
-- **The other pages' filters in their address:** the chats list's
-  "All", "Live" and "Closed", and a goal's plan's. Default: not in the
-  address; a reload shows "All" (2.3). The inbox's is in its address.
 - **A bundle built apart, embedded:** `TEMPER_BUNDLE=DIR`, a bundle's
   directory embedded in place of building one, so that one wasm32
   build serves binaries for several hosts and a machine without the
