@@ -1019,7 +1019,11 @@ worker (`../draft/reference-case.md`).
   description, the case's workers named ws, s1 and s2, its fixture
   applied to the engine's and the workers' documents, its acts by real
   `temper ctl`, and its oracle over what the processes observed
-  (`../domain/testing.md`, 2.6): 4.1's opener on ws and s1.
+  (`../domain/testing.md`, 2.6): 4.1's opener then 4.3's two-hour
+  check on ws, s1 and s2, s2 started by its act, the check's turn held
+  on the fake LLM until every worker holds a run; and 4.6's restarted
+  workstation, ws stopped under the director's waiting chat and started
+  again on its own directories.
 
 ### 15.7 Later
 

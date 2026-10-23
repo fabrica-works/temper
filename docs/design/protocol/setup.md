@@ -1766,8 +1766,25 @@ them as it does any Forgejo.
   | `key` | an absolute path | the key's file, which the fake writes (below) |
   | `tls` | `{"root"}`, or null for plaintext | `root` an absolute path: the test root's file, which the fake writes (below) |
   | `models` | a list of `{"name", "window", "output"}` | 1 to 8, each as a provider's model's members are (configuration.md, section 2) |
-  | `cued` | a list of `{"cue", "turns"}` | at most 8, as `llm.asked` is; each cue looked for in the system text (skein's `fake-llm.md`, 2.4) |
-  | `asked`, `otherwise` | as `llm.asked` and `llm.otherwise` | the same |
+  | `cued` | a list of `{"cue", "turns"}`, each with `inputs` optional | at most 8, as `llm.asked` is; each cue looked for in the system text (skein's `fake-llm.md`, 2.4) |
+  | `asked`, `otherwise` | as `llm.asked` and `llm.otherwise`, each of `asked` with `inputs` optional | the same |
+  | `control` | an address, jig's format, optional | a socket address on loopback, port 0 for the kernel's; required when a turn holds a piece |
+
+  A script's `inputs` are its turn rules (skein's `fake-llm.md`, 2.4):
+  a list of `{"cue", "turn"}`, 1 to 16, in the order they are tried,
+  `cue` text of at most 256 bytes, empty in the last rule and only
+  there, and `turn` the index of one of the script's turns; without
+  them, the script counts its replies as before. A turn's lines may
+  also be `{"pieces"}`, here alone and never in a deployment's
+  document: 1 to 8 pieces, each `{"text", "hold"}`, `text` non-empty
+  and `hold` a name of 1 to 64 bytes or null (skein's `fake-llm.md`,
+  2.2). The fake releases a hold by its `control`, a listener of its
+  own beside the provider's: `POST /release/NAME` answers 204 once the
+  release is the domain's event, whether or not a reply is held at
+  that name, and any other request 404. A document whose turns hold a
+  piece and that names no `control` is refused at the start, naming
+  it, since nothing could release the hold (skein's `fake-llm.md`,
+  2.2).
 
   The forge's:
 
