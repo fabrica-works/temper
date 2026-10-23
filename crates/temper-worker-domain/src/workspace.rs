@@ -67,9 +67,9 @@ pub(crate) struct Items {
     workstream: u64,
     spec: Option<wire::Workspace>,
     save: Option<Box<[u8]>>,
-    tags: Box<[u32]>,
+    tags: Box<[u64]>,
     from_saved: Box<[bool]>,
-    landed: Map<u32, [u8; 32]>,
+    landed: Map<u64, [u8; 32]>,
     saved: Option<Box<[wire::SavedRepository]>>,
     delivery: Option<agent::Delivery>,
     preparation: Option<wire::Preparation>,
@@ -407,7 +407,21 @@ pub(crate) fn wrote(domain: &mut Domain, env: &Env<Limits>, client: Token, outco
     let items = record.items;
     let landings = translate::landings(outcome, repositories);
     let next = domain.items.get_mut(&items).expect("workspace items live until the answer");
-    let done = if push {
+    let done = record_written(next, items, landings, push);
+    let mut then = Then::NOTHING;
+    let state = mem::replace(&mut record.state, State::Closed);
+    record.state = match state {
+        State::Ready { hold, directory, asked: Some(owner) } => written(hold, directory, owner, done, &mut then),
+        State::Ready { asked: None, .. } | State::Preparing { .. } | State::Releasing | State::Closed => {
+            unreachable!("a push or a save ends once, as the workspace stays held")
+        }
+    };
+    follow(domain, env, id, then);
+}
+
+/// Keep feedback by deployment tag before the host is told the write ended.
+fn record_written(next: &mut Items, items: Token, landings: Box<[wire::Landing]>, push: bool) -> Written {
+    if push {
         let mut changed = false;
         for (index, landing) in landings.iter().enumerate() {
             match landing {
@@ -428,7 +442,7 @@ pub(crate) fn wrote(domain: &mut Domain, env: &Env<Limits>, client: Token, outco
         let outcome = translate::delivery_outcome(&translate::summarize(landings));
         Written::Delivered(host::Delivery { outcome, left: items, changed })
     } else {
-        let mut saved = List::with_capacity(repositories);
+        let mut saved = List::with_capacity(u32::try_from(next.tags.len()).expect("checked item count"));
         for (index, landing) in landings.into_iter().enumerate() {
             let tag = *next.tags.get(index).expect("every item has a tag");
             let from_saved = *next.from_saved.get(index).expect("every item has a start");
@@ -436,16 +450,7 @@ pub(crate) fn wrote(domain: &mut Domain, env: &Env<Limits>, client: Token, outco
         }
         next.saved = Some(saved.into_boxed());
         Written::Saved(items)
-    };
-    let mut then = Then::NOTHING;
-    let state = mem::replace(&mut record.state, State::Closed);
-    record.state = match state {
-        State::Ready { hold, directory, asked: Some(owner) } => written(hold, directory, owner, done, &mut then),
-        State::Ready { asked: None, .. } | State::Preparing { .. } | State::Releasing | State::Closed => {
-            unreachable!("a push or a save ends once, as the workspace stays held")
-        }
-    };
-    follow(domain, env, id, then);
+    }
 }
 
 /// The checkout released the workspace of `client`: nothing touches it.
@@ -599,4 +604,65 @@ pub(crate) fn directories(domain: &mut Domain, workspace: Token) -> (Token, Box<
         roots.get_mut(conflicts.repository).expect("known repository").conflicts = conflicts.files;
     }
     (directory, roots.into_boxed())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::fixtures;
+
+    #[test]
+    fn a_workspace_keeps_two_forges_repositories_with_one_id() {
+        let limits = fixtures::limits();
+        let mut domain = Domain::new(&limits);
+        let tags = [temper_engine_domain_forge::tag(1, 1), temper_engine_domain_forge::tag(3, 1)];
+        let mut items = fixtures::items(&[b"playground", b"work"]);
+        for (repository, tag) in items.repositories.iter_mut().zip(tags) {
+            repository.tag = tag;
+        }
+        let assignment = stage(&mut domain, fixtures::assignment(true, Box::new([])), items, None).expect("room");
+        let workspace = assignment.assignment.workspace.expect("a workspace");
+        let commits = [[2; 32], [4; 32]];
+        for push in [true, false] {
+            let next = domain.items.get_mut(&workspace.items).expect("retained workspace");
+            let written = record_written(
+                next,
+                workspace.items,
+                Box::new([wire::Landing::Landed { commit: commits[0] }, wire::Landing::Landed { commit: commits[1] }]),
+                push,
+            );
+            match written {
+                Written::Delivered(delivery) => {
+                    assert!(push);
+                    assert_eq!(delivery.left, workspace.items);
+                    assert!(delivery.changed);
+                }
+                Written::Saved(at) => {
+                    assert!(!push);
+                    assert_eq!(at, workspace.items);
+                }
+            }
+        }
+        let answer = host::Answer {
+            read: None,
+            refused: Box::new([]),
+            turns: 0,
+            spent: 0,
+            ending: host::Ending::Parked {
+                work: host::Work { left: Some(workspace.items), saved: Some(workspace.items) },
+            },
+        };
+        let (work, preparation) = parts(&domain, &answer);
+        assert_eq!(preparation, None);
+        assert_eq!(
+            work.landed.as_ref(),
+            &[wire::Landed { tag: tags[0], commit: commits[0] }, wire::Landed { tag: tags[1], commit: commits[1] }]
+        );
+        let saved = work.saved.expect("both repositories saved");
+        assert_eq!(saved.len(), 2);
+        for (index, repository) in saved.iter().enumerate() {
+            assert_eq!(repository.tag, tags[index]);
+            assert_eq!(repository.landing, wire::Landing::Landed { commit: commits[index] });
+        }
+    }
 }

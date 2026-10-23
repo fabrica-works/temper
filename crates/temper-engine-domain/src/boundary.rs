@@ -38,7 +38,7 @@ pub struct Assignment {
     /// Whole unread words offered to this attempt, oldest first, at most the run's inbox.
     pub messages: Box<[tasks::Word]>,
     /// Writable repository tags whose workspace starts at the task's saved-work branch.
-    pub saved: Box<[u32]>,
+    pub saved: Box<[u64]>,
     /// The task holding the workspace, whose runs may reuse it: the hub's workstream.
     pub workstream: u64,
     /// Concrete forge checkouts and their claimed writer branches.
@@ -95,7 +95,7 @@ pub enum ForgeStart {
 /// One adopted repository translated for the worker's workspace.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ForgeRepository {
-    pub tag: u32,
+    pub tag: u64,
     pub provider: skein_forge::api::Repository,
     pub name: Box<[u8]>,
     pub host: Box<[u8]>,
@@ -303,7 +303,7 @@ pub enum Link {
 pub struct Parts {
     /// Full set of repository tags with saved work after this terminal, when the worker made
     /// a save; absent preserves the previous set.
-    pub saved: Option<Box<[u32]>>,
+    pub saved: Option<Box<[u64]>>,
     /// Last heads actually pushed by the worker, indexed by deployment repository tag.
     pub pushed: Box<[forge::Pushed]>,
     /// A permanent failure to prepare, naming its repository by tag.
@@ -322,9 +322,9 @@ impl Parts {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Preparation {
     /// The forge lacks what the assignment names for this repository.
-    Missing { tag: u32, missing: Missing },
+    Missing { tag: u64, missing: Missing },
     /// The forge refused this repository's identity.
-    Refused { tag: u32 },
+    Refused { tag: u64 },
 }
 
 /// What the forge lacks for a preparation (protocol/channel.md, 5).

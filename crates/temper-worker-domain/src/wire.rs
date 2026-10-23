@@ -23,7 +23,7 @@ pub struct Workspace {
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Repository {
     /// Deployment repository name, echoed in landed work.
-    pub tag: u32,
+    pub tag: u64,
     /// The directory it sits in, side by side with the workspace's others
     /// (`domain/worker.md`, section 5), and what the agent calls it: one path
     /// component, unique within the workspace.
@@ -142,7 +142,7 @@ pub struct Work {
 /// One repository's save, named by tag with how its checkout started.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SavedRepository {
-    pub tag: u32,
+    pub tag: u64,
     pub from_saved: bool,
     pub landing: Landing,
 }
@@ -151,7 +151,7 @@ pub struct SavedRepository {
 /// the last commit landed there.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Landed {
-    pub tag: u32,
+    pub tag: u64,
     pub commit: [u8; 32],
 }
 
@@ -165,10 +165,10 @@ pub enum Preparation {
     Transient,
     /// The forge does not have what the assignment names for the repository
     /// named by `tag`: permanent until someone makes it.
-    Missing { tag: u32, missing: Missing },
+    Missing { tag: u64, missing: Missing },
     /// The forge refused the identity of the repository named by `tag`:
     /// permanent until the identity's credentials or permissions change.
-    Refused { tag: u32 },
+    Refused { tag: u64 },
 }
 
 /// What the forge does not have.

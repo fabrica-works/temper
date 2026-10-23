@@ -114,7 +114,7 @@ pub fn step_4_1(forge: SocketAddr) -> Box<[Script]> {
     let design = json!({"batch":[{
         "executor":{"kind":"procedure","connector":1,"code":2},
         "spec":{"words":DESIGN_SPEC,"parameters":[
-            {"name":1,"kind":"resource","connector":1,"resource":crate::forge::ID},
+            {"name":1,"kind":"resource","connector":1,"resource":temper_engine_domain_forge::tag(1, crate::forge::ID)},
             {"name":2,"kind":"bytes","value":"main"}]},
         "contract":{"kind":"change","connector":1,"change_kind":1,"words":128},
         "authority":{"tools":1,"grants":grants(forge, &[2,3,4,10,11,12]),

@@ -188,7 +188,7 @@ fn a_hold_and_writer_slot_are_exclusive_until_answered() {
         &[Request::Taken { task: 8, resource: name.clone(), by: 7 }]
     );
     outputs(&mut d, Event::Claim { task: 9, attempt: 1, writes: Box::new([name.clone()]), holders: Box::new([7]) });
-    let reported = [Pushed { tag: name.repository, commit: [2; 32] }];
+    let reported = [Pushed { tag: tag(name.forge, name.repository), commit: [2; 32] }];
     assert_eq!(d.reported_heads(&LIMITS, 9, 1, &reported).as_ref(), &[(name.clone(), [2; 32])]);
     assert!(d.reported_heads(&LIMITS, 9, 2, &reported).is_empty(), "another attempt cannot report this writer");
     assert!(d.reported_heads(&LIMITS, 8, 1, &reported).is_empty(), "the holder cannot report its child's writer");
@@ -1476,4 +1476,61 @@ fn first_repository_tells_mark_made_failed_and_retry_and_ignore_absent_intents()
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::SetUpFailed { why: b"file".as_slice().into() } });
     outputs(&mut d, setup_application(1, Token::new(93), Token::new(94)));
     assert_eq!(d.forges().rows[0].first.as_ref().unwrap().state, FirstState::Making);
+}
+
+#[test]
+fn a_tag_round_trips_its_pair_at_each_halfs_bound() {
+    assert_eq!(tag(1, 1), 4_294_967_297);
+    assert_eq!(tag(3, 1), 12_884_901_889);
+    assert_eq!(tag(u16::MAX, u32::MAX), 0x0000_ffff_ffff_ffff);
+    for forge in [0, u16::MAX] {
+        for repository in [0, u32::MAX] {
+            assert_eq!(untag(tag(forge, repository)), Some((forge, repository)));
+        }
+    }
+    assert_eq!(untag(0x0001_0000_0000_0000), None, "bit 48 is outside the forge identity");
+    assert_eq!(untag(u64::MAX), None);
+}
+
+#[test]
+fn two_forges_repositories_with_one_id_resolve_apart() {
+    let mut d = domain();
+    for forge in [1, 3] {
+        let mut repository = adopted();
+        repository.provider.forge = forge;
+        repository.home = forge == 1;
+        outputs(&mut d, Event::Restore { record: Stored::Repository(repository.clone()) });
+        assert_eq!(d.repository_tag(5, tag(forge, REPO.repository)), Some(&repository));
+    }
+    for forge in [1, 3] {
+        let provider = skein_forge::api::Repository { forge, repository: REPO.repository };
+        assert_eq!(d.repository_tag(5, tag(forge, REPO.repository)).expect("adopted repository").provider, provider);
+        assert_eq!(d.repository_tag(6, tag(forge, REPO.repository)), None, "another project");
+    }
+    assert_eq!(d.repository_tag(5, u64::from(REPO.repository)), None, "a bare forge-local id");
+    assert_eq!(d.repository_tag(5, 0x0001_0001_0000_0002), None, "invalid forge width");
+}
+
+#[test]
+fn pushed_heads_match_their_own_forge_only() {
+    let mut d = domain();
+    for forge in [1, 3] {
+        let mut repository = adopted();
+        repository.provider.forge = forge;
+        repository.home = forge == 1;
+        outputs(&mut d, Event::Restore { record: Stored::Repository(repository) });
+        let mut name = branch();
+        name.forge = forge;
+        outputs(&mut d, Event::Hold { task: 7, resource: name.clone(), from: None });
+        outputs(&mut d, Event::Claim { task: 9, attempt: 1, writes: Box::new([name]), holders: Box::new([7]) });
+    }
+    for forge in [1, 3] {
+        let mut expected = branch();
+        expected.forge = forge;
+        assert_eq!(
+            d.reported_heads(&LIMITS, 9, 1, &[Pushed { tag: tag(forge, REPO.repository), commit: [2; 32] }]).as_ref(),
+            &[(expected, [2; 32])]
+        );
+    }
+    assert!(d.reported_heads(&LIMITS, 9, 1, &[Pushed { tag: 0x0001_0001_0000_0002, commit: [2; 32] }]).is_empty());
 }

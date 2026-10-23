@@ -3,7 +3,7 @@
 //! 7).
 
 mod entrance;
-mod fixtures;
+pub(crate) mod fixtures;
 mod harness;
 mod lifecycle;
 mod limits;

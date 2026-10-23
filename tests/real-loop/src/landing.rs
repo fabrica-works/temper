@@ -167,7 +167,8 @@ pub fn scripts(forge: SocketAddr, repository: u64, readme: &[u8]) -> Box<[skein_
         tokens: 20,
     };
     let grant = |kind| json!({"connector":1,"kind":kind,"segments":["forge",forge.to_string()],"terminal":"open","last":"acme"});
-    let delegate = json!({"batch":[{"executor":{"kind":"procedure","connector":1,"code":2},"spec":{"words":"@coding Fix","parameters":[{"name":1,"kind":"resource","connector":1,"resource":repository},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":1,"change_kind":1,"words":128},"authority":{"tools":1,"grants":[grant(2),grant(3),grant(4),grant(10),grant(11),grant(12)],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":4,"depth":2},"budget":{"spend":10},"notes":0}}]});
+    let repository = u32::try_from(repository).expect("forge-local repository id fits u32");
+    let delegate = json!({"batch":[{"executor":{"kind":"procedure","connector":1,"code":2},"spec":{"words":"@coding Fix","parameters":[{"name":1,"kind":"resource","connector":1,"resource":temper_engine_domain_forge::tag(1, repository)},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":1,"change_kind":1,"words":128},"authority":{"tools":1,"grants":[grant(2),grant(3),grant(4),grant(10),grant(11),grant(12)],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":4,"depth":2},"budget":{"spend":10},"notes":0}}]});
     let original = std::str::from_utf8(readme).expect("README UTF-8");
     let changed = format!("{original}{}", std::str::from_utf8(EDIT).expect("edit UTF-8"));
     Box::new([

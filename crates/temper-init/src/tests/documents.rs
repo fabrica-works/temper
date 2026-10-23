@@ -263,6 +263,7 @@ fn demo(port: u16) -> Value {
     })
 }
 
+// The template delegates playground/widget: forge 1, repository 1, tag 4294967297.
 fn csv_chat() -> Value {
     json!([
         scripted_turn(json!([
@@ -270,7 +271,7 @@ fn csv_chat() -> Value {
             {"call": "delegate", "arguments": {"batch": [{
                 "executor": {"kind": "procedure", "connector": 1, "code": 2},
                 "spec": {"words": "Export widget's table as CSV", "parameters": [
-                    {"name": 1, "kind": "resource", "connector": 1, "resource": 1},
+                    {"name": 1, "kind": "resource", "connector": 1, "resource": 4_294_967_297_u64},
                     {"name": 2, "kind": "bytes", "value": "main"}
                 ]},
                 "contract": {"kind": "change", "connector": 1, "change_kind": 1, "words": 128},

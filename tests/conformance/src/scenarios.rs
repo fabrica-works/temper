@@ -676,7 +676,10 @@ pub(crate) fn change(world: &mut World, completion: u32) -> Result<(), Violation
                             tasks::Parameter::Resource {
                                 name: 1,
                                 connector: 0,
-                                resource: u64::from(temper_engine_forge_world::REPO.repository),
+                                resource: temper_engine_domain_forge::tag(
+                                    temper_engine_forge_world::REPO.forge,
+                                    temper_engine_forge_world::REPO.repository,
+                                ),
                             },
                             tasks::Parameter::Bytes { name: 2, value: b"main".as_slice().into() },
                             tasks::Parameter::Bytes { name: 6, value: b"file".as_slice().into() },

@@ -126,7 +126,7 @@ pub fn items(names: &[&[u8]]) -> wire::Workspace {
     for (tag, name) in names.iter().enumerate() {
         let repository = wire::Repository {
             git: None,
-            tag: u32::try_from(tag).expect("a few names"),
+            tag: u64::try_from(tag).expect("a few names"),
             name: Box::from(*name),
             remote: Box::from(&b"org/app"[..]),
             start: wire::Start::Base { branch: Box::from(&b"main"[..]) },

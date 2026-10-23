@@ -18,7 +18,7 @@ pub fn limits() -> v1::Limits {
     crate::limits(&BOUNDS).expect("test bounds within ceilings")
 }
 
-pub fn repository_parts(tag: u32, remote: Box<[u8]>) -> v1::RepositoryParts {
+pub fn repository_parts(tag: u64, remote: Box<[u8]>) -> v1::RepositoryParts {
     let limits = limits();
     let branch = v1::Branch::new(&limits, v1::BranchParts { branch: Box::from(&b"main"[..]) }).expect("base branch");
     let writable =
@@ -40,9 +40,11 @@ pub fn items(count: u32) -> v1::ItemsParts {
     let limits = limits();
     let mut repositories = List::with_capacity(count);
     for tag in 0..count {
-        let repository =
-            v1::Repository::new(&limits, repository_parts(tag, Box::from(&b"https://forge/acme/shop.git"[..])))
-                .expect("repository");
+        let repository = v1::Repository::new(
+            &limits,
+            repository_parts(u64::from(tag), Box::from(&b"https://forge/acme/shop.git"[..])),
+        )
+        .expect("repository");
         repositories.push(repository).expect("counted room");
     }
     v1::ItemsParts { repositories, save: None }

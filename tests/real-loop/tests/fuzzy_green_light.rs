@@ -115,7 +115,7 @@ fn scripts(forge: SocketAddr) -> Box<[Script]> {
     let change = json!({"batch":[{
         "executor":{"kind":"procedure","connector":1,"code":2},
         "spec":{"words":CHANGE_SPEC,"parameters":[
-            {"name":1,"kind":"resource","connector":1,"resource":u64::from(forge::ID)},
+            {"name":1,"kind":"resource","connector":1,"resource":temper_engine_domain_forge::tag(1, forge::ID)},
             {"name":2,"kind":"bytes","value":"main"}]},
         "contract":{"kind":"change","connector":1,"change_kind":1,"words":128},
         "authority":{"tools":1,"grants":grants,

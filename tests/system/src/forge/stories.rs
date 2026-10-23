@@ -6,7 +6,7 @@ use smith_agent_world::{Job, World as Agent};
 use smith_domain_run as run;
 use temper_engine_smith::ChangeResource;
 
-const DELEGATE: &[u8] = br#"{"batch":[{"executor":{"kind":"procedure","connector":0,"code":2},"spec":{"words":"@coding Small fix","parameters":[{"name":1,"kind":"resource","connector":0,"resource":2},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":0,"change_kind":1,"words":32},"authority":{"tools":1,"grants":[{"connector":0,"kind":2,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"},{"connector":0,"kind":3,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"},{"connector":0,"kind":4,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"}],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":2,"depth":1},"budget":{"spend":20},"notes":0}}]}"#;
+const DELEGATE: &[u8] = br#"{"batch":[{"executor":{"kind":"procedure","connector":0,"code":2},"spec":{"words":"@coding Small fix","parameters":[{"name":1,"kind":"resource","connector":0,"resource":4294967298},{"name":2,"kind":"bytes","value":"main"}]},"contract":{"kind":"change","connector":0,"change_kind":1,"words":32},"authority":{"tools":1,"grants":[{"connector":0,"kind":2,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"},{"connector":0,"kind":3,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"},{"connector":0,"kind":4,"segments":["forge","forge.example","org"],"terminal":"open","last":"repo"}],"delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":2,"depth":1},"budget":{"spend":20},"notes":0}}]}"#;
 
 fn chat_script() -> Script {
     let call = |name: &[u8], arguments: &[u8]| Turn {
@@ -188,8 +188,16 @@ fn a_small_fix_made_in_a_smith_chat_lands_through_the_fake_forge() {
     let pushed = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
         .expect("worker pushed its branch");
     assert!(pushed > 1);
-    let producer_agent =
-        run_smith(&mut world, &producer, agent, Some(ChangeResource { connector: 0, kind: 2, resource: 2 }));
+    let producer_agent = run_smith(
+        &mut world,
+        &producer,
+        agent,
+        Some(ChangeResource {
+            connector: 0,
+            kind: 2,
+            resource: forge_top::tag(forge_world::REPO.forge, forge_world::REPO.repository),
+        }),
+    );
     assert!(matches!(
         producer_agent.answer(),
         run::Answer::Accepted { outcome: run::outcome::Declared::Change(_), .. }
@@ -247,7 +255,11 @@ fn a_smith_change_with_failed_ci_is_repaired_reviewed_and_landed() {
         &mut world,
         &producer,
         smith_world::agent_for(&producer, None, Job::Coding),
-        Some(ChangeResource { connector: 0, kind: 2, resource: 2 }),
+        Some(ChangeResource {
+            connector: 0,
+            kind: 2,
+            resource: forge_top::tag(forge_world::REPO.forge, forge_world::REPO.repository),
+        }),
     );
     assert!(matches!(
         producer_agent.answer(),
@@ -309,7 +321,11 @@ fn a_smith_change_with_failed_ci_is_repaired_reviewed_and_landed() {
         &mut world,
         &repair,
         smith_world::scripted_coding_agent_for(&repair, repair_script()),
-        Some(ChangeResource { connector: 0, kind: 2, resource: 2 }),
+        Some(ChangeResource {
+            connector: 0,
+            kind: 2,
+            resource: forge_top::tag(forge_world::REPO.forge, forge_world::REPO.repository),
+        }),
     );
     assert!(
         matches!(repair_agent.answer(), run::Answer::Accepted { outcome: run::outcome::Declared::Change(_), .. }),

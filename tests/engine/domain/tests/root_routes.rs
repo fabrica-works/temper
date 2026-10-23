@@ -4193,16 +4193,23 @@ fn moving_a_proposer_rechecks_its_decision_holder() {
 #[test]
 fn saved_work_reaches_the_next_attempt() {
     let (mut driver, first) = Driver::chat();
-    let parts = engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]), preparation: None };
+    let parts = engine::Parts {
+        saved: Some(Box::new([temper_engine_domain_forge::tag(1, 3)])),
+        pushed: Box::new([]),
+        preparation: None,
+    };
     driver.answer(Token::new(7), first.task, first.attempt, 0, tasks::End::Parked, parts);
     driver.settle();
     assert_eq!(
         live(&driver, first.task).saved.as_ref(),
-        [tasks::SavedResource { connector: 0, path: Box::new([Box::from(3u32.to_be_bytes())]) }]
+        [tasks::SavedResource {
+            connector: 0,
+            path: Box::new([Box::from(1_u16.to_be_bytes()), Box::from(3_u32.to_be_bytes())])
+        }]
     );
     driver.say(first.task, 49);
     let second = driver.last_assignment();
-    assert_eq!(second.saved.as_ref(), [3]);
+    assert_eq!(second.saved.as_ref(), [temper_engine_domain_forge::tag(1, 3)]);
     assert!(second.attempt > first.attempt);
 }
 

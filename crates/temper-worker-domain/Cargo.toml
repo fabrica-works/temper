@@ -13,6 +13,7 @@ jig-domain-host.workspace = true
 smith-host-domain.workspace = true
 
 [dev-dependencies]
+temper-engine-domain-forge.workspace = true
 smith-domain-run.workspace = true
 smith-domain-session.workspace = true
 

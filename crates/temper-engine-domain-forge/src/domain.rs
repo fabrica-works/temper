@@ -729,7 +729,7 @@ impl Domain {
                 continue;
             }
             for reported in pushed {
-                if reported.tag == name.repository {
+                if untag(reported.tag) == Some((name.forge, name.repository)) {
                     names.push((name.clone(), reported.commit)).expect("claimed writer destinations are bounded");
                     break;
                 }
@@ -762,17 +762,10 @@ impl Domain {
 
     /// Resolve a deployment-wide saved repository tag within its project.
     #[must_use]
-    pub fn repository_tag(&self, project: u32, tag: u32) -> Option<&Repository> {
-        let mut found = None;
-        for (_, repository) in &self.repositories {
-            if repository.project == project && repository.provider.repository == tag {
-                if found.is_some() {
-                    return None;
-                }
-                found = Some(repository);
-            }
-        }
-        found
+    pub fn repository_tag(&self, project: u32, tag: u64) -> Option<&Repository> {
+        let (forge, repository) = untag(tag)?;
+        let adopted = self.repository(skein_forge::api::Repository { forge, repository })?;
+        if adopted.project == project { Some(adopted) } else { None }
     }
 
     /// This project's explicitly selected home repository, when adopted.
@@ -4149,4 +4142,23 @@ fn setup_characters(name: &[u8]) -> bool {
         }
     }
     true
+}
+
+/// Pack a repository's complete forge identity (domain/forge.md, section 4).
+#[must_use]
+pub const fn tag(forge: u16, repository: u32) -> u64 {
+    let [forge_high, forge_low] = forge.to_be_bytes();
+    let [one, two, three, four] = repository.to_be_bytes();
+    u64::from_be_bytes([0, 0, forge_high, forge_low, one, two, three, four])
+}
+
+/// Decode a repository tag, rejecting bits outside the forge identity's width.
+#[must_use]
+pub const fn untag(tag: u64) -> Option<(u16, u32)> {
+    let [high, low, forge_high, forge_low, one, two, three, four] = tag.to_be_bytes();
+    if high != 0 || low != 0 {
+        None
+    } else {
+        Some((u16::from_be_bytes([forge_high, forge_low]), u32::from_be_bytes([one, two, three, four])))
+    }
 }

@@ -61,7 +61,7 @@ pub fn limits() -> engine::Limits {
         contract_choices: 1,
         charters: 1,
         authority_grants: 1,
-        authority_segments: 1,
+        authority_segments: 2,
         authority_bytes: 32,
         executor_kinds: 1,
         retries: tasks::Retries {

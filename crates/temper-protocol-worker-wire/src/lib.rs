@@ -11,7 +11,7 @@ use alloc::boxed::Box;
 use skein_lib::{Secret, Writer};
 
 /// The application's channel payload version (protocol/channel.md, section 3).
-pub const PAYLOAD_VERSION: u32 = 3;
+pub const PAYLOAD_VERSION: u32 = 4;
 
 /// Domain bounds shared by both sides of the channel (protocol/channel.md,
 /// section 8).

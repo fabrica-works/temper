@@ -365,7 +365,7 @@ pub enum ReleaseEnding {
 /// The last head pushed in one repository by a hosted attempt.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Pushed {
-    pub tag: u32,
+    pub tag: u64,
     pub commit: skein_forge::api::Commit,
 }
 /// A run or connector effect occupying one writer slot.

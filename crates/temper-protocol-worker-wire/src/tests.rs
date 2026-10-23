@@ -97,7 +97,7 @@ fn largest_parts_are_the_generated_worst_cases() {
     assert_eq!(u64::from(sizes.saved), v1::Saved::worst_case_bytes(&limits).expect("saved"));
     assert_eq!(u64::from(sizes.resource), v1::Preparation::worst_case_bytes(&limits).expect("preparation"));
     assert_eq!(u64::from(sizes.grant), v1::Identity::worst_case_bytes(&limits).expect("identity"));
-    assert_eq!(sizes, crate::Largest { items: 8619, left: 76, saved: 1076, resource: 6, grant: 233 });
+    assert_eq!(sizes, crate::Largest { items: 8627, left: 84, saved: 1084, resource: 10, grant: 233 });
 }
 
 #[test]

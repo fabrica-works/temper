@@ -896,7 +896,10 @@ fn change_world_in(
                             tasks::Parameter::Resource {
                                 name: 1,
                                 connector: 0,
-                                resource: u64::from(forge_world::REPO.repository),
+                                resource: temper_engine_domain_forge::tag(
+                                    forge_world::REPO.forge,
+                                    forge_world::REPO.repository,
+                                ),
                             },
                             tasks::Parameter::Bytes { name: 2, value: Box::from(&b"main"[..]) },
                             tasks::Parameter::Bytes { name: 6, value: Box::from(&b"file"[..]) },
@@ -990,7 +993,7 @@ fn a_merge_asked_while_kept_is_refused_naming_the_pending() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: b"pushed".as_slice().into(),
             },
             cancel_delegates: false,
@@ -1131,7 +1134,7 @@ fn a_pushed_change_is_recovered_before_its_worker_reports_the_head() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1188,7 +1191,7 @@ fn a_change_whose_ci_never_reports_is_stalled_and_held() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1249,7 +1252,7 @@ fn check_gate_landing(no_ci: bool, owner_gate: bool) {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1340,7 +1343,7 @@ fn check_gate_repair(no_ci: bool) {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1396,7 +1399,7 @@ fn check_gate_repair(no_ci: bool) {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"repaired"[..]),
             },
             cancel_delegates: false,
@@ -1482,7 +1485,7 @@ fn failed_ci_repair(
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1590,7 +1593,7 @@ fn failed_ci_with_delayed_brief() -> (World, u64, u64) {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1754,7 +1757,7 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1809,7 +1812,7 @@ fn a_conflicting_update_is_resolved_from_a_merge_in_progress() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"resolved"[..]),
             },
             cancel_delegates: false,
@@ -1857,7 +1860,7 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -1959,7 +1962,7 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -2019,7 +2022,7 @@ fn an_approval_carries_over_a_clean_update_and_is_asked_again_after_a_repair() {
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"repaired"[..]),
             },
             cancel_delegates: false,
@@ -2118,7 +2121,7 @@ fn a_worker_frozen_past_its_grace_resumes_with_a_push_in_hand_and_lands_nothing_
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -2200,7 +2203,7 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -2247,7 +2250,7 @@ fn a_broken_landing_branch_gets_one_deployment_repair_before_waiting_changes_lan
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"repaired"[..]),
             },
             cancel_delegates: false,
@@ -2527,7 +2530,7 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         first.attempt,
         0,
         tasks::End::Parked,
-        engine::Parts { saved: Some(Box::new([3])), pushed: Box::new([]), preparation: None },
+        engine::Parts { saved: Some(Box::new([forge_top::tag(1, 3)])), pushed: Box::new([]), preparation: None },
     );
     world.send(event);
     for _ in 0..30 {
@@ -2547,8 +2550,8 @@ fn a_saved_repository_tag_becomes_a_concrete_checkout_in_the_next_attempt() {
         }
     }
     let second = world.assigned.get(1).expect("saved task reassigned");
-    assert_eq!(second.saved.as_ref(), [3]);
-    assert!(second.workspace.repositories.iter().any(|repository| repository.tag == 3
+    assert_eq!(second.saved.as_ref(), [forge_top::tag(1, 3)]);
+    assert!(second.workspace.repositories.iter().any(|repository| repository.tag == forge_top::tag(1, 3)
         && matches!(repository.start, engine::ForgeStart::Saved(ref branch)
             if branch.as_ref() == b"temper/1/s1")));
 }
@@ -3307,7 +3310,7 @@ fn a_tracked_goals_changes_install_landing_and_current_head_ci_topics_without_ag
             result: tasks::TaskResult::Change {
                 connector: 0,
                 kind: 2,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,
@@ -3315,7 +3318,7 @@ fn a_tracked_goals_changes_install_landing_and_current_head_ci_topics_without_ag
         engine::Parts {
             saved: None,
             pushed: Box::new([forge_top::Pushed {
-                tag: forge_world::REPO.repository,
+                tag: forge_top::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 commit: translate::commit(pushed),
             }]),
             preparation: None,

@@ -64,7 +64,7 @@ fn start(start: wire::Start) -> checkout::Start {
 
 /// Why a prepare failed, as the host tells the engine: a retry may work, or
 /// what the forge lacks or refused, for which repository.
-pub(crate) fn failure(failure: checkout::Failure, tags: &[u32]) -> wire::Preparation {
+pub(crate) fn failure(failure: checkout::Failure, tags: &[u64]) -> wire::Preparation {
     match failure {
         checkout::Failure::Transient => wire::Preparation::Transient,
         checkout::Failure::Missing { repository, missing } => {

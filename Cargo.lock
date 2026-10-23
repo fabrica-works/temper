@@ -3001,6 +3001,7 @@ dependencies = [
  "temper-client-shell-terminal",
  "temper-client-tools",
  "temper-engine-domain",
+ "temper-engine-domain-forge",
  "temper-fake-git",
  "temper-fake-git-hosted",
  "temper-github-app",
@@ -3138,6 +3139,7 @@ dependencies = [
  "smith-domain-run",
  "smith-domain-session",
  "smith-host-domain",
+ "temper-engine-domain-forge",
  "temper-worker-domain-checkout",
 ]
 

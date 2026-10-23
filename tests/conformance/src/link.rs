@@ -82,7 +82,10 @@ pub(crate) fn worker_event(peers: &mut Peers, up: workers::Up) -> engine::Event 
             };
             let mut pushed: Box<[forge::Pushed]> = Box::new([]);
             if let Some(commit) = peers.reported.get(&task) {
-                pushed = Box::new([forge::Pushed { tag: 2, commit: *commit }]);
+                pushed = Box::new([forge::Pushed {
+                    tag: forge::tag(temper_engine_forge_world::REPO.forge, temper_engine_forge_world::REPO.repository),
+                    commit: *commit,
+                }]);
             }
             if matches!(end, tasks::End::Finished { .. })
                 && let Some(commit) = peers.produced.get(&task)
@@ -91,12 +94,18 @@ pub(crate) fn worker_event(peers: &mut Peers, up: workers::Up) -> engine::Event 
                     result: tasks::TaskResult::Change {
                         connector: 0,
                         kind: 2,
-                        resource: u64::from(temper_engine_forge_world::REPO.repository),
+                        resource: temper_engine_domain_forge::tag(
+                            temper_engine_forge_world::REPO.forge,
+                            temper_engine_forge_world::REPO.repository,
+                        ),
                         words: b"pushed".as_slice().into(),
                     },
                     cancel_delegates: false,
                 };
-                pushed = Box::new([forge::Pushed { tag: 2, commit: *commit }]);
+                pushed = Box::new([forge::Pushed {
+                    tag: forge::tag(temper_engine_forge_world::REPO.forge, temper_engine_forge_world::REPO.repository),
+                    commit: *commit,
+                }]);
             }
             let parts = engine::Parts { saved: None, pushed, preparation: None };
             peers.protocol.answer(Token::new(channel), task, attempt, spent, end, parts)

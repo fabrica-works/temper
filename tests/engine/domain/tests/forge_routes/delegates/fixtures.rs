@@ -22,7 +22,7 @@ pub(super) fn answer_producer(world: &mut World, producer: &engine::Assignment) 
             result: tasks::TaskResult::Change {
                 connector: CONNECTOR,
                 kind: CHANGE_KIND,
-                resource: u64::from(forge_world::REPO.repository),
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
                 words: Box::from(&b"pushed"[..]),
             },
             cancel_delegates: false,

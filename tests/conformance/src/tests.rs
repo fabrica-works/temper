@@ -26,5 +26,11 @@ fn a_worker_reports_its_unchanged_push_head_after_an_engine_restart() {
     let engine::Event::Worker(engine::WorkerInput::Link { link: engine::Link::Up { parts, .. }, .. }) = event else {
         panic!("worker answer reaches the engine");
     };
-    assert_eq!(parts.pushed, Box::new([forge::Pushed { tag: 2, commit: HEAD }]) as Box<[forge::Pushed]>);
+    assert_eq!(
+        parts.pushed,
+        Box::new([forge::Pushed {
+            tag: forge::tag(temper_engine_forge_world::REPO.forge, temper_engine_forge_world::REPO.repository),
+            commit: HEAD
+        }]) as Box<[forge::Pushed]>
+    );
 }

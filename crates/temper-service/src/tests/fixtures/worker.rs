@@ -4,7 +4,7 @@ pub fn one_repository() -> wire::Workspace {
     wire::Workspace {
         repositories: Box::new([wire::Repository {
             git: None,
-            tag: 3,
+            tag: temper_engine_domain_forge::tag(1, 3),
             name: b"app".as_slice().into(),
             remote: b"https://forge.example/acme/app.git".as_slice().into(),
             start: wire::Start::Base { branch: b"main".as_slice().into() },

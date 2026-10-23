@@ -843,7 +843,7 @@
           "hub.turn_queue_bytes": 8316352
         }
       },
-      "memory_bytes": 3363266628203
+      "memory_bytes": 3363266628493
     }
   ],
   "application": {
@@ -1031,7 +1031,7 @@
                                 "name": 1,
                                 "kind": "resource",
                                 "connector": 1,
-                                "resource": 1
+                                "resource": 4294967297
                               },
                               {
                                 "name": 2,
@@ -1125,7 +1125,7 @@
                   }
                 ],
                 "finish": "tool_calls",
-                "tokens": 259
+                "tokens": 262
               },
               {
                 "lines": [

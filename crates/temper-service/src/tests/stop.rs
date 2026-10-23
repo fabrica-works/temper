@@ -118,3 +118,10 @@ fn non_format_open_refusals_keep_the_deployment_problem() {
         refused(why, Stop::Start(problems));
     }
 }
+
+#[test]
+fn a_store_with_bare_repository_tags_refuses_at_startup() {
+    let wanted = temper_protocol_store::STORE_VERSION;
+    assert_eq!(wanted, 6);
+    refused(OpenRefusal::Format { family: Family::Application, found: 5, wanted }, Stop::StoreVersion);
+}

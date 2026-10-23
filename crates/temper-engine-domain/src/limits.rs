@@ -350,7 +350,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                         u64::from(limits.tasks.tasks)
                             .checked_mul(u64::from(limits.tasks.message_bytes).checked_add(32)?)?,
                     )?
-                    .checked_add(u64::from(limits.tasks.saved_resources).checked_mul(4)?)?
+                    .checked_add(u64::from(limits.tasks.saved_resources).checked_mul(8)?)?
                     .checked_add(u64::from(limits.journal.run_bytes))?
                     .checked_add(u64::from(limits.journal.transcript_bytes))?
                     .checked_add(List::<Box<[u8]>>::worst_case(limits.journal.transcript_bytes)?)?
@@ -535,7 +535,15 @@ pub(crate) fn row_bound(limits: &Limits) -> Option<u64> {
         u64::from(tasks.result_bytes).checked_mul(3)?,
         u64::from(tasks.inbox_bytes),
         u64::from(tasks.inbox_messages).checked_mul(u64::try_from(size_of::<tasks::Word>()).ok()?)?,
-        u64::from(tasks.saved_resources).checked_mul(4)?,
+        // Saved names own their path segments and bytes, including the forge/repository pair.
+        u64::from(tasks.saved_resources).checked_mul(
+            u64::try_from(size_of::<tasks::SavedResource>())
+                .ok()?
+                .checked_add(
+                    u64::from(tasks.authority_segments).checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?,
+                )?
+                .checked_add(u64::from(tasks.authority_bytes))?,
+        )?,
         u64::from(tasks.parameters).checked_mul(u64::try_from(size_of::<tasks::Parameter>()).ok()?)?,
         u64::from(tasks.inputs)
             .checked_add(u64::from(tasks.dependencies).checked_mul(2)?)?

@@ -14,24 +14,31 @@ use jig_domain_core::connector::{EffectDescription, EffectForm, Recovery};
 mod tests;
 
 /// Translate the worker's connector-specific saved tags at the root boundary.
-pub(crate) fn saved_resources(connector: u16, tags: &[u32]) -> Option<Box<[tasks::SavedResource]>> {
+pub(crate) fn saved_resources(connector: u16, tags: &[u64]) -> Option<Box<[tasks::SavedResource]>> {
     let mut resources = List::with_capacity(u32::try_from(tags.len()).ok()?);
     for tag in tags {
-        resources.push(tasks::SavedResource { connector, path: Box::new([Box::from(tag.to_be_bytes())]) }).ok()?;
+        let (forge, repository) = forge::untag(*tag)?;
+        resources
+            .push(tasks::SavedResource {
+                connector,
+                path: Box::new([Box::from(forge.to_be_bytes()), Box::from(repository.to_be_bytes())]),
+            })
+            .ok()?;
     }
     Some(resources.into_boxed())
 }
 
 /// Return the forge's resource tags from task-owned generic saved names.
-pub(crate) fn saved_tags(resources: &[tasks::SavedResource], connector: u16) -> Option<Box<[u32]>> {
+pub(crate) fn saved_tags(resources: &[tasks::SavedResource], connector: u16) -> Option<Box<[u64]>> {
     let mut tags = List::with_capacity(u32::try_from(resources.len()).ok()?);
     for resource in resources {
         if resource.connector != connector {
             continue;
         }
-        let [repository] = resource.path.as_ref() else { return None };
-        let [one, two, three, four] = repository.as_ref() else { return None };
-        tags.push(u32::from_be_bytes([*one, *two, *three, *four])).ok()?;
+        let [forge, repository] = resource.path.as_ref() else { return None };
+        let forge = u16::from_be_bytes(forge.as_ref().try_into().ok()?);
+        let repository = u32::from_be_bytes(repository.as_ref().try_into().ok()?);
+        tags.push(forge::tag(forge, repository)).ok()?;
     }
     Some(tags.into_boxed())
 }
@@ -708,7 +715,7 @@ pub(crate) fn task_holdings(
                 tasks::Parameter::Resource { name: 1, connector, resource }
                     if *connector == domain.config.forge_connector =>
                 {
-                    repository = domain.forge.repository_tag(project, u32::try_from(*resource).ok()?);
+                    repository = domain.forge.repository_tag(project, *resource);
                 }
                 tasks::Parameter::Bytes { name: 3, value } => chosen = Some(value.clone()),
                 tasks::Parameter::Number { .. }
@@ -737,7 +744,7 @@ pub(crate) fn task_holdings(
         if let tasks::Parameter::Resource { connector, resource, .. } = parameter
             && *connector == domain.config.forge_connector
         {
-            let repository = domain.forge.repository_tag(project, u32::try_from(*resource).ok()?)?;
+            let repository = domain.forge.repository_tag(project, *resource)?;
             include_repository(&mut selected, repository)?;
         }
     }
@@ -908,10 +915,8 @@ fn change_topic(domain: &Domain, task: &tasks::TaskRecord) -> Option<forge::Topi
             tasks::Parameter::Resource { name: 1, connector, resource }
                 if *connector == domain.config.forge_connector =>
             {
-                if let Ok(tag) = u32::try_from(*resource) {
-                    let repository = domain.forge.repository_tag(task.project, tag)?;
-                    provider = Some(repository.provider);
-                }
+                let repository = domain.forge.repository_tag(task.project, *resource)?;
+                provider = Some(repository.provider);
             }
             tasks::Parameter::Bytes { name: 2, value } => branch = Some(value.clone()),
             tasks::Parameter::Resource { .. } | tasks::Parameter::Bytes { .. } | tasks::Parameter::Number { .. } => {}
@@ -1194,13 +1199,14 @@ pub(crate) fn run_workspace(
     if let Some(repository) = adopted {
         include_repository(&mut selected, repository)?;
     }
+    let saved = saved_tags(&context.saved, domain.config.forge_connector)?;
     if inherited.is_none() {
         for parameter in &context.spec.parameters {
             match parameter {
                 tasks::Parameter::Resource { connector, resource, .. }
                     if *connector == domain.config.forge_connector =>
                 {
-                    let repository = domain.forge.repository_tag(context.project, u32::try_from(*resource).ok()?)?;
+                    let repository = domain.forge.repository_tag(context.project, *resource)?;
                     if repository.project != context.project {
                         return None;
                     }
@@ -1211,7 +1217,6 @@ pub(crate) fn run_workspace(
                 | tasks::Parameter::Bytes { .. } => {}
             }
         }
-        let saved = saved_tags(&context.saved, domain.config.forge_connector)?;
         for tag in &saved {
             let Some(repository) = domain.forge.repository_tag(context.project, *tag) else {
                 if adopted.is_some() {
@@ -1235,10 +1240,7 @@ pub(crate) fn run_workspace(
     let mut own_holds = List::with_capacity(env.limits.forge.resources_per_task);
     let mut key = context.task;
     for repository in &selected {
-        let saved = context.saved.contains(&tasks::SavedResource {
-            connector: domain.config.forge_connector,
-            path: Box::new([Box::from(repository.provider.repository.to_be_bytes())]),
-        });
+        let saved = saved.contains(&forge::tag(repository.provider.forge, repository.provider.repository));
         let run_branch = tree_branch(repository, root, b'r', context.task, None, env.limits.forge.name_bytes)?;
         let saved_branch = if saved {
             Some(tree_branch(repository, root, b's', context.task, None, env.limits.forge.name_bytes)?)
@@ -1333,7 +1335,7 @@ pub(crate) fn run_workspace(
         let provider = item.provider;
         repositories
             .push(ForgeRepository {
-                tag: provider.repository,
+                tag: forge::tag(provider.forge, provider.repository),
                 provider,
                 name: item.name,
                 host: item.host,
@@ -1525,8 +1527,7 @@ pub(crate) fn start_change(domain: &mut Domain, env: &Env<Limits>, context: &tas
                 if *connector != domain.config.forge_connector {
                     return false;
                 }
-                let Ok(tag) = u32::try_from(*resource) else { return false };
-                let Some(repository) = domain.forge.repository_tag(context.project, tag) else { return false };
+                let Some(repository) = domain.forge.repository_tag(context.project, *resource) else { return false };
                 provider = Some(repository.provider);
             }
             tasks::Parameter::Bytes { name: 2, value } => base = Some(value.clone()),
@@ -1721,7 +1722,7 @@ fn change_delegate(
         .push(tasks::Parameter::Resource {
             name: 1,
             connector: domain.config.forge_connector,
-            resource: u64::from(row.repository.repository),
+            resource: forge::tag(row.repository.forge, row.repository.repository),
         })
         .ok()?;
     parameters.push(tasks::Parameter::Bytes { name: 2, value: row.base.clone() }).ok()?;
@@ -1846,7 +1847,7 @@ fn start_queue_repair(domain: &mut Domain, env: &Env<Limits>, task: u64) -> bool
             tasks::Parameter::Resource {
                 name: 1,
                 connector: domain.config.forge_connector,
-                resource: u64::from(provider.repository),
+                resource: forge::tag(provider.forge, provider.repository),
             },
             tasks::Parameter::Bytes { name: 2, value: base },
             tasks::Parameter::Number { name: 5, value: u64::try_from(i32::MAX).expect("positive priority") },

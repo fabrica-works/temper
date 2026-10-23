@@ -19,7 +19,7 @@ fn a_workspace_reaches_items_with_each_remote_made_from_its_base() {
             .unwrap()
             .into_parts();
         let first = items.repositories.into_boxed().into_iter().next().unwrap().into_parts();
-        assert_eq!(first.tag, 7, "{base:?}");
+        assert_eq!(first.tag, temper_engine_domain_forge::tag(1, 7), "{base:?}");
         assert_eq!(first.remote.as_ref(), remote, "{base:?}");
         assert_eq!(first.git, None, "a forge without its own program uses the worker's git");
         assert_eq!(items.save, None, "{base:?}");
@@ -136,15 +136,17 @@ fn a_workspace_past_the_wire_bound_or_without_a_forge_is_refused() {
 fn the_heads_a_run_landed_reach_the_roots_pushed_heads() {
     let limits = fixtures::wire_limits();
     let mut landed = List::with_capacity(2);
-    for (tag, commit) in [(7, [3; 32]), (9, [4; 32])] {
+    for (tag, commit) in
+        [(temper_engine_domain_forge::tag(1, 1), [3; 32]), (temper_engine_domain_forge::tag(3, 1), [4; 32])]
+    {
         landed.push(wire::Landed::new(&limits, wire::LandedParts { tag, commit }).unwrap()).unwrap();
     }
     let left = wire::Left::new(&limits, wire::LeftParts { landed }).unwrap();
     assert_eq!(
         translate::parts(Some(left), None, None).pushed.as_ref(),
         &[
-            temper_engine_domain_forge::Pushed { tag: 7, commit: [3; 32] },
-            temper_engine_domain_forge::Pushed { tag: 9, commit: [4; 32] },
+            temper_engine_domain_forge::Pushed { tag: temper_engine_domain_forge::tag(1, 1), commit: [3; 32] },
+            temper_engine_domain_forge::Pushed { tag: temper_engine_domain_forge::tag(3, 1), commit: [4; 32] },
         ]
     );
 }
@@ -177,7 +179,7 @@ fn a_save_names_each_repository_with_saved_work_after_it() {
     let limits = fixtures::wire_limits();
     let landed = wire::Landing::Landed(wire::Commit::new(&limits, wire::CommitParts { commit: [3; 32] }).unwrap());
     for (from_saved, landing, expected) in [
-        (false, landed.clone(), &[7_u32][..]),
+        (false, landed.clone(), &[7_u64][..]),
         (true, landed, &[7][..]),
         (false, wire::Landing::Unchanged, &[][..]),
         (true, wire::Landing::Unchanged, &[7][..]),

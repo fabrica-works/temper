@@ -535,10 +535,10 @@ pub fn get(service: &mut crate::Service, key: jig_domain_core::Key) -> Option<ji
 pub fn wire_limits() -> temper_protocol_worker_wire::v1::Limits {
     crate::translate::limits(&limits::profile(limits::Profile::Small)).unwrap()
 }
-pub fn repository(tag: u32, owner: &[u8], name: &[u8]) -> temper_engine_domain::ForgeRepository {
+pub fn repository(repository: u32, owner: &[u8], name: &[u8]) -> temper_engine_domain::ForgeRepository {
     temper_engine_domain::ForgeRepository {
-        tag,
-        provider: skein_forge::api::Repository { forge: 1, repository: tag },
+        tag: temper_engine_domain_forge::tag(1, repository),
+        provider: skein_forge::api::Repository { forge: 1, repository },
         name: name.into(),
         host: b"forge.example".as_slice().into(),
         owner: owner.into(),

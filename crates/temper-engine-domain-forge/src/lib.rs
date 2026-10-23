@@ -33,7 +33,7 @@ mod tests;
 mod topics;
 pub use boundary::*;
 pub use brief::{HOME_SECTION_BYTES, hex, home_access_reason};
-pub use domain::{Domain, fire, max_out, resume, step, writer};
+pub use domain::{Domain, fire, max_out, resume, step, tag, untag, writer};
 pub use gates::{GateCandidate, GateLast, GatePattern, GatePolicy, GateTemplate};
 pub use judge::{Criterion, Freshness as JudgeFreshness, Judges, Reviewer, Verdict as JudgeVerdict};
 pub use limits::{BOT_LOGIN_SUFFIX, Limits, STOPPED_TEXT_BYTES, connection_worst_case, worst_case};
