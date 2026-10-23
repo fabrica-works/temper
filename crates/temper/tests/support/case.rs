@@ -897,7 +897,7 @@ fn describe(step: &calls::Step) -> String {
         Step::Terminal(_) => "Terminal".into(),
         Step::ReleaseHold { name } => format!("ReleaseHold {}", String::from_utf8_lossy(name)),
         Step::Advance => "Advance".into(),
-        Step::Push { .. } => panic!("Push unsupported"),
+        Step::Push { path, .. } => format!("Push {}", String::from_utf8_lossy(path)),
         Step::AddWorker { name } => format!("AddWorker {name}"),
         Step::StopWorker { name } => format!("StopWorker {name}"),
         Step::StartWorker { name } => format!("StartWorker {name}"),
