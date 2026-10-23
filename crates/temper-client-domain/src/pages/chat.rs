@@ -20,7 +20,7 @@ pub struct Chat {
     pub document: Handle,
     pub activity: Handle,
     pub run: Option<Handle>,
-    current_run: Option<c::RunState>,
+    current_run: Option<Box<c::RunState>>,
     pub next: u64,
     pub thread: Thread,
     rows: u32,
@@ -185,13 +185,13 @@ impl Chat {
         match latest(client, handle) {
             Some(Latest::Jig(c::Delivery::RunState(run))) => {
                 self.thread.run(run, client.text(handle).or(run.writing.as_ref()));
-                self.current_run = Some(c::RunState {
+                self.current_run = Some(Box::new(c::RunState {
                     task: run.task,
                     attempt: run.attempt,
                     committed_turn: run.committed_turn,
                     writing: None,
                     call: run.call.clone(),
-                });
+                }));
             }
             Some(Latest::Jig(c::Delivery::Run(text))) => {
                 let fallback = c::RunState {
@@ -201,7 +201,7 @@ impl Chat {
                     writing: None,
                     call: None,
                 };
-                self.thread.run(self.current_run.as_ref().unwrap_or(&fallback), client.text(handle));
+                self.thread.run(self.current_run.as_deref().unwrap_or(&fallback), client.text(handle));
             }
             _ => {}
         }
@@ -701,8 +701,8 @@ pub fn thread_limits(limits: &Limits) -> jig_client::thread::Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     jig_client::thread::worst_case(&thread_limits(limits))?
-        // The latest run state keeps no writing; its inline call owns three bounded texts.
-        .checked_add(u64::try_from(size_of::<Option<c::RunState>>()).ok()?)?
+        // The latest run state, boxed off the root's pages, keeps no writing; its call owns three bounded texts.
+        .checked_add(u64::try_from(size_of::<c::RunState>()).ok()?)?
         .checked_add(u64::from(limits.client.domain.text).checked_mul(3)?)?
         .checked_add(List::<(Key, Sending)>::worst_case(4)?)?
         .checked_add(u64::from(limits.client.domain.text))?
