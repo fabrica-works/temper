@@ -132,7 +132,7 @@ impl World {
             if with_change {
                 // One adoption, three chat creations and two Says survive the restart cut.
                 limits.people.requests = 6;
-                // Adoption stories fill the shipped 128-byte Task section.
+                // Adoption stories ask in 128 bytes of words.
                 limits.people.words = 128;
                 limits.tasks.message_bytes = 128;
                 limits.call_records = 4;
@@ -301,6 +301,9 @@ impl World {
             }
             if let Some(brief) = brief {
                 limits.brief = brief;
+                // A shipped brief brings its own room: results hold it, forge sections read it.
+                limits.journal.result_bytes = limits.journal.result_bytes.max(brief.brief_bytes);
+                limits.forge.brief_bytes = limits.forge.brief_bytes.max(brief.read_bytes);
             }
             limits.notes.scopes = 3 + limits.authority.grants;
             (config, limits)
@@ -2397,8 +2400,8 @@ fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
     let small = temper_service::limits::profile(temper_service::limits::Profile::Small);
     let mut world =
         World::configured_brief(true, true, false, 1000, paths::Gate::default(), None, Some(small.root.brief));
-    assert_eq!(world.env.limits.brief.budgets.task, 128);
-    assert_eq!(world.env.limits.brief.brief_bytes, 384);
+    assert_eq!(world.env.limits.brief.budgets.task, 4608);
+    assert_eq!(world.env.limits.brief.brief_bytes, 5376);
     world.sign_in();
     world.send(protocol::hello_slots(Token::new(7), 2, Box::new([])));
     let mut chats = Vec::new();
@@ -2406,7 +2409,10 @@ fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
         let ask = adoption_chat(&world);
         let assignment = assigned_chat(&mut world, key, ask);
         assert!(live_task(&world, assignment.task).holdings.is_empty(), "no home exists to hold");
-        assert_eq!(task_brief(&assignment).len(), 128, "full task section before adoption");
+        assert!(
+            task_brief(&assignment).windows(128).any(|words| words == [b'x'; 128]),
+            "the whole task text before adoption"
+        );
         assert!(
             !assignment
                 .sections
@@ -2435,7 +2441,7 @@ fn a_chat_made_before_its_home_was_adopted_reads_the_home_and_says_why() {
         assert_eq!(home.provider, forge_world::REPO);
         assert_eq!(home.push, None);
         assert_eq!(task_brief(&assignment), task_brief(chat), "the person's task text is unchanged");
-        assert_eq!(task_brief(&assignment).len(), 128, "full shipped task budget");
+        assert!(task_brief(&assignment).windows(128).any(|words| words == [b'x'; 128]), "the whole task text, uncut");
         let home_sections: Vec<_> = assignment
             .sections
             .iter()

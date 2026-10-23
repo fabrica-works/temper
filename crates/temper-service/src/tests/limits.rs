@@ -116,6 +116,16 @@ fn the_small_profile_passes_each_domains_worst_case() {
 }
 
 #[test]
+fn a_brief_holds_a_whole_task_specification() {
+    let settings = fixtures::engine();
+    let brief = settings.limits.root.brief;
+    let spec = settings.jig.limits.core.tasks.spec_bytes;
+    // The contract and requester lines follow the words in the task section.
+    assert!(brief.budgets.task >= spec + 512, "task section {} for specs of {spec}", brief.budgets.task);
+    assert!(brief.read_bytes >= brief.budgets.task && brief.brief_bytes >= brief.budgets.task);
+}
+
+#[test]
 fn the_root_limits_take_jigs_children_and_temper_own() {
     let settings = fixtures::engine();
     let root = limits::engine(&settings.jig.limits, &settings.limits).expect("coherent root limits");

@@ -159,8 +159,8 @@ const FORGE: forge::Limits = forge::Limits {
     judge_criteria: 8,
     // Forge brief sections gathering at once, from the engine forge world fixture.
     brief_sections: 32,
-    // Bytes of one gathered forge section, from the engine forge world fixture.
-    brief_bytes: 4096,
+    // Bytes of one gathered forge section: at least the root's brief.read_bytes.
+    brief_bytes: 4608,
     // Forge client calls, retries and outbox room.
     client: CLIENT,
     issue_policy: temper_engine_domain_forge_issues::Limits {
@@ -228,8 +228,8 @@ const ROOT: Root = Root {
         deliveries: 512,
         // At least row_bound, including forge.client.answer_bytes: the root's worst case.
         transcript_bytes: 65_536,
-        // At least jig small people.words: the root's worst case.
-        result_bytes: 2048,
+        // At least brief.brief_bytes and jig small people.words: the root's worst case.
+        result_bytes: 8192,
         // Run charter carrier in the root's worst case; jig small core.run_bytes.
         run_bytes: 16_384,
     },
@@ -254,11 +254,12 @@ const ROOT: Root = Root {
         sections: 3,
         // Parts per section, from the root world.
         parts: 2,
-        // One section's read bytes, from the root world.
-        read_bytes: 256,
+        // One section's read bytes: at least the task section's.
+        read_bytes: 4608,
         budgets: engine::BriefBudgets {
-            // Task section's bytes, from the root world.
-            task: 128,
+            // Task section's bytes: a whole jig small spec (4096) with its contract and
+            // requester lines, so an agent always reads all of what it was asked.
+            task: 4608,
             // Dependencies section's bytes, from the root world.
             dependencies: 128,
             // CI section's bytes, from the root world.
@@ -274,8 +275,8 @@ const ROOT: Root = Root {
             // Notes section's bytes, from the root world.
             notes: 64,
         },
-        // Assembled brief bytes, from the root world.
-        brief_bytes: 384,
+        // Assembled brief bytes: the task section and room for the others.
+        brief_bytes: 5376,
         // Time for a gather, from the root world.
         gather: Duration::from_secs(1),
     },
