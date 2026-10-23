@@ -7,6 +7,10 @@ use skein_lib::Duration;
 use skein_world::{Referee, real};
 use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf};
 
+/// forge-setup's first repository goes into a project of its own, made after
+/// project 1 (tools.md 5.5): work/hello is project 2's.
+const FIRST_PROJECT: &str = "2";
+
 /// The model side: processes a story adds beside the box and ctl.
 #[expect(
     clippy::large_enum_variant,
@@ -234,7 +238,15 @@ impl Reply {
             self.phase = ReplyPhase::Snapshot;
         } else {
             for parent in ["1", "2"] {
-                calls.push(Step::Run(Call::new(&["tasks", "--project", "1", "--parent", parent, "--ended", "--json"])));
+                calls.push(Step::Run(Call::new(&[
+                    "tasks",
+                    "--project",
+                    FIRST_PROJECT,
+                    "--parent",
+                    parent,
+                    "--ended",
+                    "--json",
+                ])));
             }
             if !self.first {
                 // The six queued reads end with task 4, which must be unknown.
@@ -242,7 +254,7 @@ impl Reply {
                 for args in [
                     &["close", "1", "--key", "close-plan", "--json"][..],
                     &["wait", "task", "1", "--until", "ended", "--timeout", "60s", "--json"],
-                    &["tasks", "--project", "1", "--json"],
+                    &["tasks", "--project", FIRST_PROJECT, "--json"],
                     &["task", "4", "--json"],
                 ] {
                     calls.push(Step::Run(Call::new(args)));
@@ -394,7 +406,7 @@ fn change_steps(
         steps.push(Step::Run(Call::new(&[
             "chat",
             "--project",
-            "1",
+            FIRST_PROJECT,
             "--model",
             "gpt-6-luna",
             "--key",
@@ -540,7 +552,7 @@ pub fn assert_forgejo_setup(
             made["forges"].as_array().expect("forges rows").iter().find(|row| row["number"] == 3).expect("forge 3");
         eprintln!("{run} first repository read: {}", row["first"]);
         assert_eq!(row["first"]["state"], "made");
-        assert_eq!(row["first"]["project"]["existing"], 1);
+        assert_eq!(row["first"]["project"]["new"], "hello");
         assert_eq!(row["first"]["org"], "work");
         assert_eq!(row["first"]["repository"], "hello");
         assert_eq!(row["first"]["id"], 1, "the script tags forge 3, repository 1");
@@ -1113,7 +1125,14 @@ impl LiveJudge<'_> {
                     forge["first"]["org"] == "work" && forge["first"]["repository"] == "hello",
                     "first repository is work/hello",
                 )?;
-                self.tasks.project = forge["first"]["project"]["existing"].as_u64().ok_or("first project missing")?;
+                let made = forge["first"]["project"]["new"].as_str().ok_or("first project missing")?;
+                self.tasks.project = live_json(&calls.ends()[7])?["projects"]
+                    .as_array()
+                    .ok_or("person's projects missing")?
+                    .iter()
+                    .find(|row| row["name"]["bytes"] == made)
+                    .and_then(|row| row["project"].as_u64())
+                    .ok_or("made first project missing")?;
             }
         }
         self.token = Some(token);
