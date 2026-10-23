@@ -508,6 +508,13 @@ private, never edited by hand:
   `[oauth2]`: `JWT_SECRET`; each drawn once, at the first preparation,
   and kept in `state`;
 - `[service]`: `DISABLE_REGISTRATION`; `[mailer]`: off;
+- when the forge signs its people in through temper, named by
+  `application.sign_in.forges` (`sign-in.md`, 9.7): `[oauth2_client]`
+  `ENABLE_AUTO_REGISTRATION = true`, `USERNAME = preferred_username` and
+  `ACCOUNT_LINKING = login`, and `[service]`
+  `ALLOW_ONLY_EXTERNAL_REGISTRATION = true` (`sign-in.md`, 9.4). The
+  source itself is not the preparation's: it is added by the command
+  `temper forge sign-in` prints, as for a managed Forgejo (6.8);
 - `[webhook]`: `ALLOWED_HOST_LIST` the webhooks' listener's IP address,
   when one is configured, and Forgejo's default otherwise, which refuses
   loopback;
@@ -850,6 +857,44 @@ its own for any other host.
 - **Its code:** the intent in `temper-engine-domain-forge`; `Create`'s
   start and its end in `temper-service`'s setup; the starter workflow's
   bytes and the plan's limits in `temper-forge-setup`.
+
+### 6.8 Signing in through temper
+
+`temper forge sign-in [DIRECTORIES] FORGE`, for a Forgejo of
+`application.sign_in.forges` (`sign-in.md`, section 9), managed or
+owned, on temper's host, before `temper serve`:
+
+1. **The provider's key,** when its file, `engine.clients.provider.key`,
+   is missing: `openssl genpkey -algorithm RSA -pkeyopt
+   rsa_keygen_bits:3072`, run with umask 077 into a file beside the
+   key's and renamed over it, so the key is PKCS#8 PEM, mode 0600 and
+   the service's own user's. It is never printed, copied or logged; a
+   key there is left as it is. No `openssl` on the `PATH` refuses the
+   command, naming it.
+2. **The forge's client secret,** when its file, the forge's client's
+   `secret`, is missing: 32 bytes of the system's randomness in
+   base64url, written whole and private (section 3). A secret there is
+   left as it is.
+3. **It prints,** never running them: the `add-oauth` command
+   (`sign-in.md`, 9.5) with the client's id, the secret file's absolute
+   path in `--secret "$(cat PATH)"`, never the secret's bytes, and the
+   discovery document's URL at the public origin, or the listener's with
+   none; for an owned Forgejo, with the binary and its `--work-path` and
+   `--config`; and Forgejo's settings of `sign-in.md`, 9.4, which an owned
+   Forgejo's `app.ini` already holds (6.2), and a managed one's owner
+   writes.
+
+Then `temper serve`, and the printed command, once, on Forgejo's host.
+
+- **Printed for an owned Forgejo too, not run** (with o/sign-in,
+  2026-10-23), for two reasons: `add-oauth` fetches temper's discovery
+  document at once and adds no source when temper does not answer, and
+  the preparation runs before `temper serve` (6.3, 7.2); and `add-oauth`
+  takes its client secret only as an argument, where the preparation
+  puts no secret (6.3). A source added by Forgejo's command line while
+  Forgejo runs works at once, so the order costs a person nothing.
+- **Its code:** the command in `temper`'s `forge.rs`; the key's and the
+  secret's making, and the printed bytes, in `temper-forge-setup`.
 
 ## 7. The box: wiring only
 

@@ -4,10 +4,12 @@ Provisional, 2026-10-23. How people sign in to a deployment that people
 reach at a name of its own, over HTTPS behind a TLS proxy: its public
 address, its members, and Google's sign-in on the clients' listener,
 which ends in jig's `Mint` (jig's `protocol/client.md`, section 8). The
-printed link stays for recovery. temper knows nothing of one deployment:
-every name here is an example, temper at `https://temper.example.com`.
-temper as Forgejo's sign-in provider is still `../draft/sign-in.md`,
-section 5.
+printed link stays for recovery. And temper as the OpenID provider of
+the deployment's Forgejo, through jig's provider (jig's
+`protocol/client.md`, section 18), so that a member signed in to temper
+opens Forgejo signed in (section 9). temper knows nothing of one
+deployment: every name here is an example, temper at
+`https://temper.example.com`, Forgejo at `https://git.example.com`.
 
 ## 1. In one page
 
@@ -41,6 +43,22 @@ section 5.
   so the link and Google sign in the same person.
 - **No real Google in any test:** `skein-fake-oauth` stands in, its
   addresses given by the configuration's `endpoints` (3.1).
+- **temper is Forgejo's OpenID provider** (section 9): Forgejo has an
+  authentication source named `temper`, so its sign-in bounces through
+  temper, which answers at once for a member signed in. "Open Forgejo ↗"
+  starts that sign-in, so a member signed in to temper opens Forgejo
+  signed in, with no click. jig holds the codes and tokens and skein's
+  issuer writes the documents; temper serves the routes and the page.
+- **The authorization is the client's** (9.3): jig's cookie is strict,
+  so `/oauth/authorize` is temper's page, which sends jig's `Authorize`
+  by `Transport` and replaces its address with Forgejo's callback.
+- **Forgejo's account is named by the login:** `preferred_username`,
+  with `sub` the identity, `<provider>:<address>`, which outlives the
+  store (9.4).
+- **The source is added on Forgejo's host by a printed command** (9.5;
+  `setup.md`, 6.8), for a managed Forgejo and an owned one alike.
+- **No single sign-out** (9.6): the signed-out page says that Forgejo
+  keeps its own sign-in.
 
 ## 2. The deployment
 
@@ -330,8 +348,9 @@ its sockets tagged as the server's are.
   the page's origin (`location.origin`) at start and gives the view
   both at construction; a page whose origin is not `http` or `https`
   offers no way. Further facts of a
-  signed-out page come as further `temper-` metas made the same way
-  (stage 2: the forge's name, for "to continue to").
+  signed-out page come as further `temper-` metas made the same way:
+  the forges that sign in through temper, for "to continue to" and the
+  signed-out note (9.3).
 - **The signed-out main** (`../client/README.md`, 5.1), in the browser
   with a way: temper's mark, the level-1 heading "Sign in", and a link
   for each way, "Continue with Google" to
@@ -369,7 +388,228 @@ its sockets tagged as the server's are.
   return answers a member's check, not the expired page.
 - **No real-loop story.**
 
-## 9. Open questions
+## 9. temper as Forgejo's OpenID provider
+
+A Forgejo of the deployment's signs its people in through temper: its
+authentication source `temper` is an OpenID Connect client of jig's
+provider (jig's `protocol/client.md`, section 18), whose codes and
+access tokens jig holds and whose documents and tokens skein's issuer
+writes (skein's `oauth-issuer.md`). temper serves the routes, builds
+the issuer at start, and draws the authorization's page.
+
+### 9.1 What a person sees
+
+- **From temper:** on the Forges page, a Forgejo that signs in through
+  temper has "Open Forgejo ↗" (`../client/forge.md`, 5.4), to
+  Forgejo's own route that starts a sign-in with the temper source,
+  `ROOT/user/oauth2/temper`, in a new tab. Forgejo sends the browser to
+  temper's `/oauth/authorize`, temper answers at once, and Forgejo opens
+  signed in. No click.
+- **At Forgejo first:** Forgejo's sign-in page offers "Sign in with
+  temper". Signed in to temper, one click; signed out, temper's sign-in
+  page says "to continue to" the forge, Google follows, then Forgejo,
+  signed in.
+- **The first time,** Forgejo makes the member's account, named by
+  their login (9.4); an account already there by that name or address
+  is linked once, by its password.
+
+### 9.2 The routes
+
+On the clients' listener, after what jig's mapping claims, beside
+Google's (4.1). The issuer is the public origin (2.2), or
+`http://<listener>` with none; each URL below is the issuer's.
+
+| Route | What it is | Answered by |
+|---|---|---|
+| `GET /.well-known/openid-configuration` | the discovery document: the issuer, the endpoints below, the code flow alone, PKCE S256, RS256, the scopes and the claims | the issuer's bytes, taken once at start |
+| `GET /oauth/keys` | the key set, its `kid` the key's | the issuer's bytes, taken once at start |
+| `GET /oauth/authorize` | the authorization: temper's page, as every other `GET` (9.3) | the bundle |
+| `POST /oauth/token` | the code's exchange, from Forgejo's server: the client by Basic or by its secret in the body, the verifier | jig's `Redeem` with the request's `Authorization`, `Content-Type` and body, answered `Redeemed` |
+| `GET /oauth/userinfo` | the claims, for the access token as Bearer | jig's `Claims` with the request's `Authorization`, answered `Claimed` |
+
+- **Each answer jig gives is sent as it is:** its status, its body,
+  `Content-Type: application/json`, `Cache-Control: no-store`, and
+  `WWW-Authenticate` from its challenge, when there is one. The discovery
+  document and the key set are `application/json`, cacheable.
+- **The token's body** is read within the issuer's request bound (jig's
+  `provider_limits`); past it, `413` and nothing sent to jig.
+- **Any other method** on the four is `405`. **With no provider**
+  (`engine.clients.provider` `null`), the four answer not found, and
+  `/oauth/authorize` is the page, whose `Authorize` jig refuses
+  `no_provider`.
+- **The issuer is built at start** by jig's
+  `jig_protocol_config::clients::provider_issuer`, from jig's
+  `engine.clients.provider`, its key's and its clients' secrets' files
+  read privately by temper's startup (`configuration.md`, section 6),
+  and the URLs above; it goes to jig's clients' component in its
+  settings. A key or a client the helper refuses refuses the start at
+  its path.
+- **What Forgejo 17's client does,** and the routes meet (its goth
+  v1.82.0): it always sends a PKCE challenge, S256, and its verifier at
+  the exchange; it authenticates at the token endpoint by Basic first,
+  and by its secret in the body when that fails; it calls the userinfo
+  endpoint by `GET` with the access token as Bearer, and requires its
+  `sub` to be the ID token's. It verifies no signature of the ID token:
+  it takes the token straight from the token endpoint, authenticated by
+  its secret.
+- **The signing algorithm is RS256 alone,** by the key jig's
+  configuration names (9.7): `skein_tls::sign_rs256` signs it, its
+  signatures replay byte for byte in the worlds, and skein's client, the
+  issuer's peer in its world, verifies RS256.
+
+### 9.3 The authorization
+
+jig's cookie is `SameSite=Strict` and its `Path` is jig's prefix (jig's
+`protocol/client.md`, 17.3), so a request to `/oauth/authorize` never
+carries it, and a navigation that started on another site (Forgejo's
+redirect) would not carry it anywhere. So the authorization is decided
+by the client, not by a route:
+
+1. `GET /oauth/authorize?QUERY` is answered with temper's page. The
+   client root's routing reads the address as a place of its own,
+   `Authorize { query }`, `QUERY` as the address carried it
+   (`../client/README.md`, 5.1; `../client/browser.md`, 2.3).
+2. The client signs in by `Transport`: its exchanges are same-origin,
+   started by temper's page, so the cookie goes with them whatever site
+   the navigation came from.
+3. It sends jig's `Authorize { query }` (`POST /jig/v1/authorize`), and
+   draws the answer:
+
+| jig's answer | The page |
+|---|---|
+| *go*, an address | "Continuing to Forgejo…", with "Signed in as PERSON · ADDRESS. FORGE opens in a moment, signed in as LOGIN."; the page replaces its address with jig's, so the back button never returns to the authorization |
+| *signed out* | the sign-in page (section 7), under its "Sign in" the line "to continue to **FORGE**", its `then` the authorization's address, so Google's return lands back at step 1 |
+| refused *unknown client* or *unknown redirect* | "This sign-in can’t continue": "The site that sent you here asked temper to send you back to an address temper doesn’t know. Nothing was sent anywhere.", and "Back to sign in"; no address is followed |
+| refused *malformed*, *no provider* or *not a person* | the same heading, its paragraph open (section 10) |
+| *not ready* or *busy* | "temper couldn’t sign you in just now": "It is starting or stopping, or signing many people in at once. Nothing was kept: try again in a moment." |
+
+- **FORGE** is the forge as the client names it (`../client/forge.md`,
+  5.4): "Forgejo at HOST", or "Forgejo on this machine" for an owned
+  one, of the forge whose client is the query's `client_id`; a
+  `client_id` that names no forge's is "Forgejo". PERSON, ADDRESS and
+  LOGIN are the signer's, as the client knows them.
+- **The page's facts:** temper-service inserts, beside the
+  `temper-sign-in` meta (section 7), one `<meta
+  name="temper-forge-sign-in" content="NUMBER CLIENT ROOT MODE">` for
+  each forge of `sign_in.forges` (9.7): its number, its client's id, its
+  `git` URL and `owned` or `other`, space-separated, attribute-escaped.
+  The web shell gives them to the view with the ways; the signed-out
+  note and "to continue to" read them, as "Open Forgejo ↗" reads the
+  forge's row.
+- **No consent page:** the clients are the deployment's, configured by
+  its owners.
+
+### 9.4 The claims, and Forgejo's account
+
+- **`sub`:** the identity, Google's provider number, `:`, and the
+  member's address as configured, `2:sam@example.com`. It outlives the
+  store: a deployment started afresh gives Forgejo the same `sub` for the
+  same member, never a party's number, which a fresh store would give to
+  someone else.
+- **`preferred_username`:** the member's login. **`email`:** the
+  member's address, verified, for Google's provider is one of jig's
+  `addresses`. **`name`:** the member's name as minted. No `nickname`.
+- **Forgejo's settings,** in its `app.ini` (`setup.md`, 6.2 and 6.8):
+  - `[oauth2_client] ENABLE_AUTO_REGISTRATION = true` and `USERNAME =
+    preferred_username`, which Forgejo 17 takes (a value it does not
+    take is logged and read as `nickname`): a member's first sign-in
+    makes their account, named by their login;
+  - `ACCOUNT_LINKING = login`, Forgejo's default: an account that
+    already exists with that name or address is linked once, by its
+    password. Not `auto`, which links by a matching name or address
+    alone;
+  - `[service] ALLOW_ONLY_EXTERNAL_REGISTRATION = true`, beside
+    `DISABLE_REGISTRATION`, so that no one registers on Forgejo's own
+    form and the temper source registers its members. `ENABLE_INTERNAL_SIGNIN
+    = false`, once the source works, makes it Forgejo's only sign-in on
+    the web; its admin keeps Forgejo's command line, and temper's bot its
+    tokens.
+
+### 9.5 The source on Forgejo
+
+Forgejo's API has no route for authentication sources (Forgejo 17), so
+the source is added on Forgejo's host, by its command line:
+
+```
+forgejo admin auth add-oauth --name temper --provider openidConnect \
+  --key forgejo --secret "$(cat CLIENT_SECRET_FILE)" \
+  --auto-discover-url https://temper.example.com/.well-known/openid-configuration
+```
+
+`temper forge sign-in` prints it, for a managed Forgejo and an owned one
+alike (`setup.md`, 6.8). The name `temper` is the callback's path
+segment, so it is fixed. `add-oauth` fetches the discovery document at
+once and adds no source when it does not answer, so temper serves
+before it runs.
+
+### 9.6 Signing out
+
+- **Signing out of temper ends temper's sign-in only.** Forgejo keeps
+  its own session, and Google its own. While a forge signs its people in
+  through temper, the signed-out page says so, under its "Sign in": "You
+  signed out. FORGE keeps its own sign-in: sign out there too.", one
+  line for each such forge.
+- **Signing out of Forgejo** ends Forgejo's session; its next sign-in
+  bounces through temper, and a member still signed in to temper is
+  signed in again at once.
+- **No single sign-out:** Forgejo 17 takes no signal from its provider:
+  no back-channel, front-channel or session-management logout, and no
+  RP-initiated one (it parses the discovery document's
+  `end_session_endpoint` and never uses it); its own sign-out is local.
+
+### 9.7 The configuration
+
+jig's `engine.clients.provider` (jig's `protocol/configuration.md`,
+section 3), and temper's `application.sign_in.forges`:
+
+```
+"engine": {"clients": {"provider": {
+  "key": "provider.key",
+  "clients": [{"id": "forgejo", "secret": "forgejo-client.secret",
+               "redirect_uri": "https://git.example.com/user/oauth2/temper/callback"}],
+  "addresses": [2]}}},
+"application": {"sign_in": {..., "forges": [{"forge": 1, "client": "forgejo"}]}}
+```
+
+- **The key:** an RSA key of 3072 bits, PKCS#8 PEM, mode 0600, the
+  service's own user, made on its host by `temper forge sign-in`
+  (`setup.md`, 6.8) with `openssl genpkey`, never copied, printed or
+  logged; jig's start refuses any other. A key replaced is a file
+  replaced; its key set's `kid` names it anew.
+- **`sign_in.forges`:** a list, absent for none (`configuration.md`,
+  section 3): each `{"forge", "client"}`, `forge` a Forgejo of `forges`,
+  `client` one of the provider's clients, whose `redirect_uri` is exactly
+  the forge's `git` URL's `/user/oauth2/temper/callback`; each forge and
+  each client at most once. Otherwise the start is refused at its path.
+  With a provider and no `sign_in.forges`, nothing of temper's names
+  the provider's clients.
+
+### 9.8 Testing
+
+- **The sign-in world** (section 8) gains the provider: Google's
+  sign-in, then the page's `Authorize`, the token by Basic and by the
+  body, and the userinfo, with the same `sub` and `preferred_username`;
+  the discovery document and the key set at their routes; `405`; not
+  found with no provider; a token's body past its bound. jig's own
+  refusals are its world's, not repeated.
+- **The view's tests:** the `Authorize` place's pages for each answer,
+  "to continue to", the signed-out note, and "Open Forgejo ↗" with its
+  line. **The client's domain:** the address read as `Authorize`, each
+  of jig's answers.
+- **Step tests:** `sign_in.forges`' checks; the metas' bytes;
+  `temper forge sign-in`'s printed bytes and the files it makes.
+- **One process-tier story** (`../domain/testing.md`, 2.6): skein's
+  throwaway Forgejo, the temper source added by the printed command, a
+  scripted client with a cookie jar that signs in to temper through the
+  fake Google and then to Forgejo through temper, and Forgejo's API
+  naming the member's account by their login. It proves the claims and
+  Forgejo's settings, which no fake can.
+- **The browser tier, one story** (`../client/browser.md`, section 4):
+  jig's strict cookie absent from a navigation that started on another
+  site and present on the page's own exchanges, so the `Authorize` place
+  answers *go*.
+
+## 10. Open questions
 
 - **A deployment's own sign-in page.** Default: stock. Later, perhaps a
   name and a line in the configuration, or a template of the owner's.
@@ -380,3 +620,20 @@ its sockets tagged as the server's are.
   addresses alone.
 - **A terminal sign-in for a member who is not the owner:** a device
   code's flow. Default: the browser alone.
+- **The authorization's refusals without words:** *malformed*, *no
+  provider* and *not a person* (9.3). Default, until words are chosen:
+  the heading "This sign-in can’t continue" with no paragraph.
+- **Owners as Forgejo's admins.** Forgejo's source can make admins of a
+  group claim (`--admin-group`) and map groups onto teams
+  (`--group-team-map`). Default: none; Forgejo's admins are made on
+  Forgejo.
+- **The person's forge identity.** With temper as Forgejo's provider,
+  temper knows each member's Forgejo account by construction: the way
+  to a person's approval posted as the person (`../README.md`, section
+  8) and to "the forge as people's sign-in provider", turned around
+  (`../client/README.md`, section 11).
+- **The provider's key's rotation.** Default: a key replaced is a file
+  replaced and a restart; Forgejo verifies no signature, so nothing of
+  Forgejo's changes.
+- **Single sign-out** waits for Forgejo to take a logout from its
+  provider (9.6).
