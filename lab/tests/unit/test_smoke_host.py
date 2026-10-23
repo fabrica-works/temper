@@ -168,7 +168,7 @@ class Collection(unittest.TestCase):
             run.stopped_check = lambda: calls.extend(['stopped-copy', 'promises'])
             run.finish = lambda: calls
             with patch.object(host.native, 'Host', return_value=types.SimpleNamespace(root='/owned-canary')):
-                self.assertEqual(run.run(), ['live-observations', 'live-end-state-objects',
+                self.assertEqual(run.run(admitted=lambda: calls.append('admitted')), ['admitted', 'live-observations', 'live-end-state-objects',
                     'reverse-stop-and-await-empty', 'stopped-copy', 'promises'])
 
 

@@ -194,8 +194,7 @@ class Run:
         self.host, self.link, self.public = None, None, None
         self.interrupted, self.cleaning = None, False
         self.order = draws.start_order(args.seed, {p['name']: p.get('after', []) for p in exp['processes']})
-        self.schedule = dict(start_order=self.order, faults=[], draws={
-            f'start-order.{i}': draws.draw(args.seed, f'start-order.{i}') for i in range(len(self.order))})
+        self.schedule = dict(start_order=[], faults=[], draws={})
         subject, subject_path = cli._subject(lab, key['subject'])
         exp_path = lab.root / 'store/experiments' / key['experiment']
         self.known = {'experiment': str(exp_path), 'source': str(subject_path / 'source'),
@@ -576,7 +575,7 @@ class Run:
             self.lab.remove_live(self.base + '/live.json')
         return record
 
-    def run(self):
+    def run(self, admitted=None):
         parent, leaf = self.lab._parent(self.base, create=True)
         try:
             os.mkdir(leaf, 0o700, dir_fd=parent)
@@ -597,10 +596,15 @@ class Run:
             try:
                 self.host = native.Host(self.args.unit, '/usr/bin/systemctl', self.cost)
                 self.event('containment', cgroup=str(self.host.root), controllers=['memory', 'pids'])
+                if admitted is not None:
+                    admitted()
                 for name in self.order:
                     definition = next(p for p in self.exp['processes'] if p['name'] == name)
                     deadline = time.monotonic() + self.cost['ready_seconds']
+                    label = 'start-order.' + str(len(self.schedule['start_order']))
+                    self.schedule['draws'][label] = draws.draw(self.args.seed, label)
                     identity = self.start_child('processes', definition, deadline=deadline)
+                    self.schedule['start_order'].append(name)
                     if not self.wait(lambda: self.records[name]['ready_ms'] is not None, deadline):
                         self.bounds.append(dict(name='ready_seconds', who=name))
                         self.failures.append(checks.failure('bound/ready_seconds/' + name, 'bound', 'readiness deadline passed'))
@@ -665,7 +669,7 @@ def main(argv=None):
             os.pwrite(lock_fd, (args.unit + '\n').encode('ascii'), 0)
             os.fsync(lock_fd)
             run = Run(lab, args, exp, key, key_path, attempt)
-            record = run.run()
+            record = run.run(admitted=lambda: print('admitted', flush=True))
             print(json.dumps(dict(run=record['run'], outcome=record['outcome'],
                                   cgroup=str(run.host.root) if run.host else '')))
             if run.interrupted is not None:

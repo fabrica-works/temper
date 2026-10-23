@@ -35,6 +35,8 @@ def launch(args, native, store, host_digest, runner_digest):
     buffers = {1: bytearray(), 2: bytearray()}
     completed = False
     status, cause = None, 'unit not completed'
+    admitted = False
+    admission_deadline = time.monotonic() + 120
     try:
         process = subprocess.Popen(command, env=native.manager_environment(), stdin=subprocess.DEVNULL,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -46,7 +48,11 @@ def launch(args, native, store, host_digest, runner_digest):
         for fd in streams:
             poller.register(fd, select.POLLIN | select.POLLHUP)
         while streams or process.poll() is None:
-            for fd, _event in poller.poll():
+            remaining = None if admitted else admission_deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise TimeoutError('unit admission exceeded ready_seconds')
+            timeout = None if remaining is None else max(1, int(remaining * 1000))
+            for fd, _event in poller.poll(timeout):
                 if fd == wake_r:
                     os.read(wake_r, 4096)
                     while received:
@@ -60,6 +66,7 @@ def launch(args, native, store, host_digest, runner_digest):
                     chunk = os.read(fd, 65536)
                     if chunk:
                         buffers[streams[fd]].extend(chunk)
+                        admitted = bytes(buffers[1]).startswith(b'admitted\n')
                     else:
                         poller.unregister(fd)
                         del streams[fd]
@@ -74,7 +81,7 @@ def launch(args, native, store, host_digest, runner_digest):
         # Worker stdout has one nonsecret JSON summary. Never expose arbitrary
         # manager diagnostics/tracebacks to the attended terminal.
         try:
-            summary = json.loads(buffers[1])
+            summary = json.loads(bytes(buffers[1]).removeprefix(b'admitted\n'))
             if set(summary) != {'run', 'outcome', 'cgroup'}:
                 raise ValueError
             if summary['cgroup']:
@@ -101,12 +108,14 @@ def launch(args, native, store, host_digest, runner_digest):
             except native.CapabilityError:
                 pass
             if process.poll() is None:
+                # The owned launcher must not outlive an aborted bootstrap.
+                signal.pidfd_send_signal(pidfd, signal.SIGKILL)
                 process.wait(timeout=20)
         # Retain a cause even if native unit completion failed after run.json
         # was published. This transport result never edits prior evidence.
         try:
             with store.open_lab(args.lab) as lab, lab.lock():
-                result = f'exit={status if status is not None else 4}\ncleanup_confirmed={completed}\ncause={cause}\n'
+                result = f'exit={status if completed and status is not None else 4}\ncleanup_confirmed={completed}\ncause={cause}\n'
                 lab.write_once('transport/' + unit + '/result', result.encode('utf-8'))
         except (OSError, RuntimeError, ValueError):
             print('attended host: transport result publication unavailable', file=sys.stderr)
