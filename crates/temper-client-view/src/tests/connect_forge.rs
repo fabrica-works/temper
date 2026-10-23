@@ -294,18 +294,18 @@ fn a_forge_under_way_is_no_choice_in_the_welcome() {
     );
 }
 #[test]
-fn the_model_step_shows_the_set_up_under_way() {
+fn the_model_step_follows_the_persons_forge() {
     let mut forges = rows(w::Connection::Connecting, w::Offer::Offered);
-    // The other forge is fully ready, so Model follows the owned forge still connecting.
+    // Model follows the person's forge, even with another forge still connecting.
     *forges.get_mut(0).unwrap() = github_rows(true).get(0).unwrap().clone();
     let root = f::forge_root(Address::Welcome { step: Step::Model { way: None } }, forges);
     let view = f::page_view(&root);
-    node(view.tree(), Role::Paragraph, "Forgejo on this machine · Connecting".as_bytes());
+    node(view.tree(), Role::Paragraph, "GitHub · no repository chosen yet".as_bytes());
     node(view.tree(), Role::Disclosure, b"Each step");
     node(view.tree(), Role::Heading { level: 1 }, b"Connect a model");
     assert_eq!(
         view.tree().nodes().iter().filter(|n| n.role == Role::Status && n.name.as_deref() == Some(b"done")).count(),
-        3
+        4
     );
 }
 #[test]
@@ -458,7 +458,7 @@ fn answer(root: &mut d::Domain, attempt: skein_lib::Token, outcome: w::Outcome) 
         },
     );
 }
-fn first_rows(connection: w::Connection, state: w::FirstState) -> List<w::ForgeRow> {
+pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> List<w::ForgeRow> {
     let first = w::FirstRepository::new(
         &w::CEILINGS,
         w::FirstRepositoryParts {
@@ -491,7 +491,11 @@ fn first_rows(connection: w::Connection, state: w::FirstState) -> List<w::ForgeR
     .unwrap();
     rows
 }
-fn deliver(root: &mut d::Domain, watch: skein_lib::Token, rows: List<w::ForgeRow>) -> skein_lib::Queue<d::Request> {
+pub(super) fn deliver(
+    root: &mut d::Domain,
+    watch: skein_lib::Token,
+    rows: List<w::ForgeRow>,
+) -> skein_lib::Queue<d::Request> {
     drive(
         root,
         d::Event::Client {
@@ -510,7 +514,7 @@ fn deliver(root: &mut d::Domain, watch: skein_lib::Token, rows: List<w::ForgeRow
         },
     )
 }
-fn made() -> w::FirstState {
+pub(super) fn made() -> w::FirstState {
     w::FirstState::Made(w::Made::new(&w::CEILINGS, w::MadeParts { id: 42 }).unwrap())
 }
 fn has_state(tree: &skein_ui::Tree, role: Role, name: &[u8], state: State) -> bool {

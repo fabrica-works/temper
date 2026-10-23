@@ -120,11 +120,8 @@ pub(crate) fn main(
             crate::forge::connect::welcome(b, root, w, bindings, forge, forge_choice);
         }
         Step::Model { .. } => {
-            if let Some(row) = temper_client_domain::forge::connect::underway_forge(root.forges(), root.forge().demo())
-            {
-                crate::forge::connect::status(b, root, w, row, false);
-                crate::forge::connect::first_line(b, root, w, row);
-                crate::forge::connect::each_step(b, w, row);
+            if let Some(row) = crate::forge::connect::personal(root) {
+                crate::forge::connect::welcome_line(b, root, w, row);
             }
             text(b, w, Role::Heading { level: 1 }, Word::WelcomeModelTitle);
             paragraph(b, w, Word::WelcomeModelLead, look::WELCOME_LEAD);

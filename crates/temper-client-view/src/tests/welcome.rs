@@ -3,9 +3,148 @@
     clippy::disallowed_types,
     reason = "test assertions inspect semantic trees and their bound controls"
 )]
+use super::connect_forge as forge;
 use super::fixtures as f;
 use skein_ui::{Act, Role, State};
 use temper_client_domain::{self as d, Address, Step, pages};
+use temper_client_protocol_wire::v1 as w;
+
+const HERE: u16 = 3;
+fn model_view(rows: skein_lib::List<w::ForgeRow>) -> crate::View {
+    f::page_view(&f::forge_root(Address::Welcome { step: Step::Model { way: None } }, rows))
+}
+fn before_model(tree: &skein_ui::Tree) -> &[skein_ui::Node] {
+    let main = tree.nodes().iter().position(|n| n.role == Role::Main).expect("welcome's main");
+    let heading = node(tree, Role::Heading { level: 1 }, "Connect a model");
+    let heading = tree.nodes().iter().position(|n| n.id == heading).unwrap();
+    &tree.nodes()[main..heading]
+}
+fn model_forge_line(tree: &skein_ui::Tree) -> Option<&skein_ui::Node> {
+    before_model(tree).iter().find(|n| n.role == Role::Paragraph)
+}
+fn line_before_model(tree: &skein_ui::Tree, expected: &str) -> skein_ui::NodeId {
+    let line = model_forge_line(tree).expect("forge line before Model's heading");
+    assert_eq!(line.name.as_deref(), Some(expected.as_bytes()));
+    assert_eq!(before_model(tree).iter().filter(|n| n.role == Role::Paragraph).count(), 1);
+    line.id
+}
+fn each_step(tree: &skein_ui::Tree, shown: bool) {
+    assert_eq!(f::find(tree, Role::Disclosure, b"Each step").is_some(), shown);
+}
+
+#[test]
+fn model_without_a_persons_forge_has_no_line() {
+    let view = model_view(skein_lib::List::with_capacity(0));
+    assert!(model_forge_line(view.tree()).is_none());
+    each_step(view.tree(), false);
+}
+
+#[test]
+fn model_names_the_new_project_while_forgejo_sets_up() {
+    let (mut root, watch) = f::forge_root_watch(
+        Address::Welcome { step: Step::Forge { forge: None } },
+        forge::rows(w::Connection::NotSetUp, w::Offer::Offered),
+    );
+    for action in [d::forge::Act::SetupNew { new: true }, d::forge::Act::SetUp { forge: HERE }] {
+        f::root_event(&mut root, d::Event::Act { action: d::Action::Forge(action) });
+    }
+    // The setup request supplies the names until the watch's row carries them.
+    forge::deliver(
+        &mut root,
+        watch,
+        forge::rows(
+            w::Connection::SettingUp(w::SettingUp::new(&w::CEILINGS, w::SettingUpParts { step: None }).unwrap()),
+            w::Offer::Offered,
+        ),
+    );
+    f::root_event(
+        &mut root,
+        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model { way: None } }) },
+    );
+    let view = f::page_view(&root);
+    line_before_model(view.tree(), "Forgejo on this machine · Setting up · work/hello, into the new project hello");
+    each_step(view.tree(), true);
+}
+
+#[test]
+fn model_ticks_the_first_repository_made_in_its_project() {
+    let view = model_view(forge::first_rows(forge::connected(), forge::made()));
+    let line = line_before_model(view.tree(), "Forgejo on this machine · work/hello, in Shop");
+    let line = view.tree().nodes().iter().find(|n| n.id == line).unwrap();
+    assert!(line.styles.as_slice().contains(&crate::look::FLOW_DONE));
+    each_step(view.tree(), false);
+}
+
+#[test]
+fn model_says_github_has_no_repository_chosen_yet() {
+    let view = model_view(forge::github_rows(true));
+    line_before_model(view.tree(), "GitHub · no repository chosen yet");
+    each_step(view.tree(), true);
+}
+
+#[test]
+fn model_keeps_github_connecting_until_an_installation_is_accepted() {
+    let view = model_view(forge::github_rows(false));
+    line_before_model(view.tree(), "GitHub · Connecting: installed nowhere yet");
+    each_step(view.tree(), true);
+}
+
+#[test]
+fn model_says_which_setup_failed_and_keeps_its_steps() {
+    let view = model_view(forge::rows(
+        w::Connection::SetUpFailed(
+            w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into() }).unwrap(),
+        ),
+        w::Offer::Offered,
+    ));
+    let line = line_before_model(view.tree(), "Forgejo on this machine · Set up failed: fetch failed");
+    let line = view.tree().nodes().iter().find(|n| n.id == line).unwrap();
+    assert!(!line.styles.as_slice().contains(&crate::look::FLOW_DONE));
+    each_step(view.tree(), true);
+}
+
+#[test]
+fn model_names_the_failed_first_repository_step() {
+    for (step, connection, failed) in [
+        (
+            w::CreateStep::Admin,
+            "Forgejo on this machine · Set up failed: checking the admin's token · work/hello, into Shop",
+            "Making work/hello failed: checking the admin's token",
+        ),
+        (
+            w::CreateStep::Org,
+            "Forgejo on this machine · Set up failed: making the organization · work/hello, into Shop",
+            "Making work/hello failed: making the organization",
+        ),
+        (
+            w::CreateStep::Repository,
+            "Forgejo on this machine · Set up failed: making the repository · work/hello, into Shop",
+            "Making work/hello failed: making the repository",
+        ),
+        (
+            w::CreateStep::File,
+            "Forgejo on this machine · Set up failed: adding the starter workflow · work/hello, into Shop",
+            "Making work/hello failed: adding the starter workflow",
+        ),
+    ] {
+        let view = model_view(forge::first_rows(
+            forge::connected(),
+            w::FirstState::Failed(w::CreateFailed::new(&w::CEILINGS, w::CreateFailedParts { step }).unwrap()),
+        ));
+        line_before_model(view.tree(), connection);
+        each_step(view.tree(), true);
+        forge::words_in_order(view.tree(), &[failed, "failed"]);
+        node(view.tree(), Role::Status, "failed");
+    }
+}
+
+#[test]
+fn model_keeps_steps_while_the_first_repository_is_making() {
+    let view = model_view(forge::first_rows(forge::connected(), w::FirstState::Making));
+    line_before_model(view.tree(), "Forgejo on this machine · Connected as temper (42) · work/hello, into Shop");
+    each_step(view.tree(), true);
+    node(view.tree(), Role::Status, "under way");
+}
 
 fn node(tree: &skein_ui::Tree, role: Role, name: &str) -> skein_ui::NodeId {
     f::find(tree, role, name.as_bytes()).unwrap_or_else(|| panic!("missing {role:?}: {name}"))
