@@ -305,7 +305,7 @@ keeps (`../protocol/configuration.md`, section 2).
 |---|---|---|---|---|
 | `Inbox` (home) | `inbox.html` | what needs the person, across projects, filtered by project, kind and goal (its root): proposals, questions, held tasks, person tasks; then updates (results, replies) | `inbox` with its filters; the `proposal` or `task` an entry's card needs | accept, reject with a reason, answer, release, leave held, take, hand back |
 | `Chats` | `chats.html`; the demo's start at the first run's first step, which `first-run.html` opens | a composer to start a chat, under the level-2 heading "Start a chat", its line and its chooser (5.5) above its text area "Start a chat", with the hint "temper · Enter to start · Shift+Enter for newline"; in the demo's project while the demo's model half holds, the demo's start in a chat's frame, with its suggested requests (4.8, 5.6); the person's chats as one list, "Your chats", live and ended together, newest first, under All, Live or Closed (below), each with its number and title, its status, spend and live delegates | `tasks{query}`: requester the person, the chat label, its live group by last activity, its ended pages by when each ended; the demo, from the forge's side (4.8) | start a chat, from the composer or a suggested request; choose the list's filter; more closed chats |
-| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the context line, only in the demo's project while the demo is answered (5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the placeholder "Message T6…", T6 the chat's number, shown while it is empty and never its name, and the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
+| `Chat { task }` | `chat.html` | its chatbar: its number and title, its status, its spend and acts; after it, the context line, only in the demo's project while the demo is running (4.8, 5.6); the conversation (below): its request, the agent's words with its calls folded, the person's words, provisional text, and its end once it has ended; each task it delegated as that task's card, at the call that made it, or else at the result it sent back, or else after the conversation while it runs (5.7); the proposals waiting in its subtree, each at the call that made it where its turn names it, and after the conversation otherwise (jig's `client/domain/objects.md`, section 10); its status and spend; Stop and Close; the composer, while the chat lives: its line and its chooser (5.5), its text area "Message" with the placeholder "Message T6…", T6 the chat's number, shown while it is empty and never its name, and the hint "Enter to send · Shift+Enter for newline", and "Send", then a message's refusal or failure, if any: a message or the chat's start accepted draws no status of its own, neither at the conversation's end nor in the composer, since the conversation shows its words, "Being sent", then "Sent" (below); while Message is not offered, its line and chooser alone; an ended chat draws no composer and no composer's line | `task`, `activity` a page at a time, older pages while its window has room (5.4), `run` while one is live; each `proposal` its `task` names; each delegated `task` its calls, results and live delegates name, up to the domain's `reads` (5.7) | message, stop, close, accept or reject a proposal in place |
 | `Board { project }` | `board.html` | the project's goals in priority order, live, waiting and recently ended, with their progress, spend and deadlines; what needs the person; "Set a goal" | `tasks{query}`: the project, tracked, by priority; ended, by ended at | set a goal, reorder goals |
 | `Task { task }` | `task.html` | a goal: its header, what was asked and the result it gives, its result once ended, its plan as a tree of its delegates, live and ended, with their counts and its filter, each task's state, spend and dependencies, its latest activity and history, its budget and authority (5.8), with Amend, Stop and Cancel (5.11); a change: its header and "View on forge ↗", its steps, its step's line, its hold, its tasks live and ended, its gates at its head and its bounds (5.10); an agent's task: its lineage, its brief, its run's heading, its conversation as a chat's, its result once ended and its plan's held cards (5.9), with Amend, Stop and its composer (5.11); either's own held card while it is held | `task`, `tree`, `activity` a page at a time, older pages on an agent's task's "Older"; `run` while one is live; a change's panel, through the forge's side (`forge.md`, 9.2); a goal's or a procedure's ended delegates, a page read once and again on a change | a goal's plan's filter (5.8); as its document offers them (5.11): on a goal amend, stop, cancel; on an agent's task message, amend, stop; release its own held task or one of its plan |
 | `Changes { project }` | `changes.html` | the forge's changes and landing queues (`forge.md`, section 3) | the forge's, through the forge's side (4.2) | the forge's |
@@ -665,15 +665,13 @@ keeps (`../protocol/configuration.md`, section 2).
     nothing in it: no demo, no account, no forge, so that the page
     never waits on a read that will not answer.
     Over, the page moves on to the chats page, its address replacing
-    the welcome's, so that back does not return to it; once the demo
-    has a state of the engine's (`../draft/first-run.md`, 2.3), a
-    running demo is the person's choice made, and the page moves on the
-    same way. Otherwise it shows its step, and until its facts are in,
+    the welcome's, so that back does not return to it; a running demo
+    (4.8) is the person's choice made, and the page moves on the same
+    way. Otherwise it shows its step, and until its facts are in,
     its heading alone. Its other steps never move on of their own.
   - *"Try the playground"* opens the chats page in the demo's project,
-    as choosing that project does; once the demo has a state of the
-    engine's, after asking the engine to start the playground while it
-    has not started.
+    as choosing that project does, after sending `StartDemo` while the
+    demo has not started (4.8).
     *"Set up temper"* opens its Forge step.
   - *Forge* is `ConnectForge`'s Choose and Details (`forge.md`, 5.4),
     its choice in the welcome's address (`browser.md`, 2.3), "‹ All
@@ -1089,7 +1087,8 @@ for its kind, its user's login and its installations. Its nodes:
   2 since the demo's read, 3 since a change's panel, 4 since a forge's
   set up and the deployment's forges, 5 since jig's client wire 13
   carried in its refusals, 6 since the first repository (`SetUp`'s
-  fields and the row's `first`), moved as
+  fields and the row's `first`), 7 since the demo's state (the demo's
+  read's `state` and `StartDemo`), moved as
   `../protocol/README.md`, section 9 says: at most once in a plan, at
   its first landing that changes one of these records, and shared by
   plans that run at once. A request, an outcome, a read, a subject or a
@@ -1101,8 +1100,8 @@ for its kind, its user's login and its installations. Its nodes:
   is out of date for the forge (4.4), and its kept adoption is dropped
   as kept work at start (6.6; jig's `protocol/client.md`, section 10).
 - **The request, `Requesting`:** which of the family's requests it is,
-  `Request`, as `Reading` names a read: `adopt`, `Adopt`, or `set_up`,
-  `SetUp` (below). Each is answered by the family's one record,
+  `Request`, as `Reading` names a read: `adopt`, `Adopt`, `set_up`,
+  `SetUp`, or `start_demo`, `StartDemo` (below). Each is answered by the family's one record,
   `Answer`, whose outcome is one of either request's (below); the client
   refuses as undecodable an outcome that does not fit the request it
   sent.
@@ -1151,20 +1150,32 @@ for its kind, its user's login and its installations. Its nodes:
   `name_bytes`, or a new project's name empty or past it; or *unknown*, its
   outcome no longer held (section 8), the same unknown as an
   adoption's. A refusal at admission is jig's answer, as for `Adopt`.
+- **`StartDemo`:** of the deployment's scope (section 8), with no
+  fields: the demo is the document's (`../protocol/setup.md`, 8.4).
+  Its outcome, `Answer`'s: *running*, the demo's record running, its
+  model's account kept and its repository adopted; *start refused*,
+  not offered (no demo, or the demo ended); *start failed*, with why,
+  `StartFailure`: the group's failure, with the box's `WHY` (a byte
+  string of at most `box.line_bytes`), the account refused, the
+  adoption refused, or the forge not connected in time; or *unknown*,
+  its outcome no longer held (section 8), as `SetUp`'s. A refusal at
+  admission is jig's answer, as for `Adopt`.
 - **The small store's record of a pending request** is `jig-client`'s
   kept request, its request encoded by this crate as the family's bytes
   at `CLIENT_VERSION` (jig's `protocol/client.md`, section 10).
 - **The FORGE requests and their outcomes:** `Connect`, `Install`,
-  `Replace`, `Forget`, `SetUp` and `Reachable`, beside `Adopt` (section
-  8).
+  `Replace`, `Forget`, `SetUp`, `StartDemo` and `Reachable`, beside
+  `Adopt` (section 8).
 - **The demo's read, `Demo`:** of the deployment's scope, with no
-  fields, and no subject: what it answers changes only with the
-  configuration, which changes only at a restart. Its answer is none,
-  for a deployment without the demo, or the demo: its project (u32);
-  its forge's number (u16); its model's LLM provider (u32); its
-  repository's owner and name (byte strings, bounded as `Adopt`'s);
-  and its cues, at most 8, each 1 to 256 bytes of text, in the
-  configuration's order (section 8). On the wire it is `Reading`'s
+  fields, and no subject: what it answers changes with the
+  configuration, at a restart, and with the demo's state, which moves
+  to running only by a start (4.8). Its answer is none, for a
+  deployment without the demo or whose demo ended, or the demo: its
+  project (u32); its forge's number (u16); its model's LLM provider
+  (u32); its repository's owner and name (byte strings, bounded as
+  `Adopt`'s); its state, `DemoState`, not started or running
+  (`../protocol/setup.md`, 8.4); and its cues, at most 8, each 1 to
+  256 bytes of text, in the configuration's order (section 8). On the wire it is `Reading`'s
   `demo`, `Reading` naming which of the family's reads a read is, and
   its answer `DemoAnswer`; none is the read's empty answer.
 - **A change's panel, the subject `change`** (`forge.md`, 9.2): of a
@@ -1264,15 +1275,24 @@ A first run's deployment is a demo, on a demo model and a demo forge
 of each (`../draft/first-run.md`, 3.6).
 
 - **Read once a link is live.** The forge's side reads `Demo` (4.6)
-  when the link first becomes live, and again each time it becomes
-  live after it was not. It keeps the last answer, and drops the
-  answer of a read it has replaced. None, and no answer yet, both
-  mean no demo is shown.
-- **The model's half** holds while the demo is answered and no account
+  when the link first becomes live, again each time it becomes live
+  after it was not, and again once a start it sent is answered. It
+  keeps the last answer, and drops the answer of a read it has
+  replaced. None, and no answer yet, both mean no demo is shown.
+- **Started when chosen** (`../protocol/setup.md`, 8.4): the demo's
+  state is the engine's, not started or running, and ended answers
+  none. "Try the playground", the welcome's and the setup strip's,
+  sends `StartDemo` while the demo has not started, one start at a
+  time, held by the forge's side across pages. While it is out, or
+  once it failed, the side holds the demo as running, the demo's start
+  saying the start is under way, its suggestions waiting, or why it
+  failed, with "Try again", which sends a start under a new key (5.6).
+  Answered running, or unknown, the side reads the demo again.
+- **The model's half** holds while the demo is running (above) and no account
   of the `accounts` document, the one the accounts' banner keeps (5.1),
   of an LLM provider other than the demo's is usable. While that
   document is not delivered, or is cut, the half does not hold.
-- **The forge's half** holds while the demo is answered and the
+- **The forge's half** holds while the demo is running (above) and the
   deployment's part (`forge.md`, 5.4) shows no forge connected but the
   demo's. That part is read only for a person whose role holds the
   deployment's forges (3.5); for any other person, and while the part
@@ -1287,9 +1307,10 @@ of each (`../draft/first-run.md`, 3.6).
   demo's start, on the chats page, while the model's half holds and
   the person is in the demo's project (3.5); the context line, on the
   demo's start and on a chat's page in the demo's project, while the
-  demo is answered. Each is worded in 5.6. Nothing hides them but
+  demo is running. Each is worded in 5.6. Nothing hides them but
   their halves (section 11).
-- **State:** the last answer, the pending read's key, at most one, and
+- **State:** the last answer, the pending read's key, at most one, the
+  start's key while it is out, at most one, and its failure, and
   whether the link was live at the last pass. Bounded by the record's
   bounds (4.6).
 
@@ -1343,9 +1364,8 @@ of each (`../draft/first-run.md`, 3.6).
     not started and the person has no usable account or no connected
     forge (`../draft/first-run.md`, 2.3), the welcome's facts in and
     its first run not over (3.5, The welcome): a region named "Setup",
-    its words and links (5.6), on the same pages. Until the demo has a
-    state of the engine's (4.8), "not started" is the demo's read
-    answering none;
+    its words and links (5.6), on the same pages. "Not started" is the
+    demo's read answering not started, or none (4.8);
   - in either, *a set up under way:* while a forge of the person's sets
     up or connects, "FORGE · CONNECTION", its name and its connection's
     words, and "View", a link to `ConnectForge` at it (`forge.md`,
@@ -1754,7 +1774,12 @@ the cues the demo's, copied in:
   heading "Chats" (`first-run.html`, the first run's first step): a
   chatbar, "New
   chat", the status "Ready", and "Scripted model", under the frame's
-  banner (5.1); the context line; the level-1 heading "What shall we change?"; "Try a request in
+  banner (5.1); while its start is out (4.8), the status "Starting"
+  and its suggestions disabled; once the start failed, the status "Not
+  started", and under its lead "The playground did not start: WHY."
+  with "Try again", WHY "its fakes did not start (BOX'S WHY)", "the
+  scripted model's account was refused", "OWNER/NAME was not adopted"
+  or "Playground forge did not connect"; the context line; the level-1 heading "What shall we change?"; "Try a request in
   OWNER/NAME. Follow the task from its branch to a landed change."; a
   list named "Suggested requests" of one button per suggested request,
   the demo's `llm.asked` cues in order and never its `llm.cued`
@@ -2942,6 +2967,7 @@ does for the client:
   | `Replace { forge, value }` | a new App key, or a new API token, git token or both | `Paste` with the kept App id, or `Check` against the kept user: it must answer as the forge's user; the old is erased once the new is kept | connecting |
   | `Forget { forge }` | none | the admin's token erased; a managed forge becomes connected (`../protocol/credentials.md`) | forgotten |
   | `SetUp { forge }` | none | an owned forge not set up, or whose set up failed, whose setup says `"start": "asked"`: the routing asks the box for the forge's group, `start FORGE` on its pipe (`../protocol/setup.md`, 7.1), refused "not under the box" without a pipe and "busy" while a group starts; at the box's `started`, its handover taken, then reconciled and connected (`../protocol/forge.md`, 2.2) | setting up |
+  | `StartDemo` | the demo model's key, `llm.key`'s bytes, which the routing reads from the file at each start and carries as a pasted value | the demo's start (`../protocol/setup.md`, 8.4): the record written running when none, the box asked for the demo's group, then the demo model's account added and its repository adopted in the person's name, each unless done; refused "not offered" with no demo or one ended | running, once both are done; start failed, naming why |
   | `Reachable { forge, installation?, page }` | none | on every kind, the setup's host's `Reachable { forge, installation?, page }` plan (skein's `forge-setup.md`, 4.8; `../domain/forge.md`, what the picker offers): on GitHub one accepted installation's repositories, `GET /installation/repositories` paged by number on a token minted for the page; on a connected Forgejo what the API token can push to; on a managed or owned Forgejo every repository the site admin can see by id ascending, read on the admin's token, which stays the setup's host's (`../protocol/forge.md`, the setup's host) | a page, `{ rows, more }`: at most `picker.page` rows on every forge, clipped to the forge's own page cap, each the repository's id, its owner's id and login, its name and whether it is private; `more` set when the page is full |
 
   Names in a carried value's braces are its bundle's items
@@ -3066,12 +3092,23 @@ does for the client:
   that made it, released once that decision's commit is durable, and
   the routing encodes it, building the pull request's address from
   that forge's configured `web` and its kind (`forge.md`, 9.2).
-- **The demo's read** (4.6, 4.8) is answered by the routing from the
-  configuration alone, without the root, to any signed-in party:
-  none while `application.demo` is null, and otherwise its `project`,
-  its `forge`, its `llm.provider`, that fake forge's `fake.owner` and
-  its first of `fake.repositories`, and its `llm.asked` cues in order
-  (`../protocol/setup.md`, 8.4).
+- **The demo's read** (4.6, 4.8) is answered by the root's forge
+  connector, to any signed-in party, from the configuration and the
+  demo's record (`../protocol/store.md`, section 2): none while
+  `application.demo` is null or the record says ended, and otherwise
+  its `project`, its `forge`, its `llm.provider`, that fake forge's
+  `fake.owner` and its first of `fake.repositories`, its state, not
+  started with no record and running with one, and its `llm.asked`
+  cues in order (`../protocol/setup.md`, 8.4).
+- **The demo's start, answered** (`../protocol/setup.md`, 8.4): the
+  root admits `StartDemo` by key, of the deployment's scope, as
+  `SetUp`; the forge connector answers once the start's acts are done,
+  or at the first that fails, and holds its answer in memory alone, as
+  `SetUp`'s: the latest start's, under its request's token, the same
+  key sent again while it is held answering the same outcome; after a
+  restart, the key answers unknown. A start while another is under
+  way takes that one's answer. The course is the forge's row and the
+  `accounts` document's; the answer says only how it ended.
 
 ## 10. Testing
 

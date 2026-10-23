@@ -568,6 +568,7 @@ area lands with its stories (section 11).
    | `forge-replace F FILE` | replaces what a person pasted: on GitHub, FILE the App's new key; on a connected Forgejo, a tokens file naming `api`, `git` or both; it must answer as the forge's user, and the old is erased once the new is kept | `Replace { forge, value }` | |
    | `forge-forget F` | erases a managed forge's admin's token; the forge is connected, its bot and tokens kept | `Forget { forge }` | |
    | `forge-setup F [--org O] [--repository R] [--project P]` | sets up an owned Forgejo here, under the box, with its first repository: the box fetches its binaries, prepares it and starts Forgejo and its runner, then temper takes its handover, makes `O/R` (default `work/hello`) with the starter workflow, and connects (`../protocol/setup.md`, 6.5 and 6.7); prints `setting up`, waits as `wait forges --until made:F` does, then adopts `O/R` into project P, a project's number or name (default 1), as `adopt --project P --forge F --owner O --name R --landing main` would, as P's home unless P already has one, under the same sign-in and with the key `first-repository-F`, so that the call run again adopts nothing twice; prints the adoption and exits 0. Refused, exit 2: "not offered" (the forge is not an owned one whose setup says `"start": "asked"`, or it is set up, setting up or connecting), "busy" (the box is setting up another forge), "a new project" (P names no project: a new one waits on jig's projects at runtime), "invalid" (O or R not a name Forgejo takes, or O, R or P's name empty or too long), or, without the box, "not under the box", with the commands to run (`../client/forge.md`, 5.4). Set up failed, or its first repository failed, exit 1, naming the step | `SetUp { forge, org, repository, project }`; then `Adopt` | |
+   | `demo-start` | starts the playground, the demo (`../protocol/setup.md`, 8.4): the box starts its fakes, and the engine adds the demo model's account and adopts its repository into its project, in the caller's name; waits for the answer, then prints `running` and exits 0, the same when it already runs. Refused, exit 2: "not offered" (no demo, or the demo ended). Start failed, exit 1, naming why: the fakes did not start (the box's why), the account refused, the adoption refused, or the forge not connected in time; run again, it makes what is not done | `StartDemo` | |
    | `repositories F [--installation I] [--page N]` | the picker's page N, from 1 (`README.md`, 4.4): a line per row, `OWNER/NAME`, `private` where it is, and `R/U`, its repository id and owner id for `adopt --ids`; then the call that reads page N plus one while more follow, or that none do. `--installation I` is an accepted installation's id, as `forges` prints it, GitHub alone | `Reachable { forge, installation?, page }` | |
 
    - **`forges`' text,** one line per forge, in number order: `forge N
@@ -1138,13 +1139,11 @@ directory of the QA harness's:
   removing its directory: the harness's, never a tool's.
 
 A person's first run is the box's demo (`../protocol/setup.md`, 8.4),
-whose seed, `temper fake seed`, makes the harness's calls as `temper
-ctl` children, DIRECTORY `demo/client` in the data directory: `sign-in
--` with serve's first link; `add-key` of the demo model's key,
-`--deployment --key demo-llm`; `wait accounts --until usable` and `wait
-forges --until settled`; `adopt` of the demo's repository into project
-1, `--key demo-adopt`; and `sign-out`. Each first reads whether it is
-done, since a key is free again past the engine's retention (section 7).
+its fakes dormant until the person chooses the playground; the engine
+then adds the demo model's account and adopts its repository itself. A
+harness does as the person does: `sign-in -` with serve's first link,
+then `demo-start` (5.5, area 6), which answers once the playground is
+ready.
 
 ## 11. Testing
 
@@ -1212,7 +1211,9 @@ commands; `forge-setup` on an asked owned forge, answered `setting up`,
 then `wait forges --until settled` following the routing's told states,
 setting up at each step to not connected, and to set up failed with its
 why; a `forge-setup` of the same forge while it sets up, not offered,
-and of another asked forge while one sets up, busy. After each, no pasted value in DIRECTORY's store or
+and of another asked forge while one sets up, busy; `demo-start`
+answered `running`, run again answered the same, adding and adopting
+nothing twice, and refused "not offered" with no demo. After each, no pasted value in DIRECTORY's store or
 in any document the tools print.
 
 ### 11.3 The real loop

@@ -54,10 +54,10 @@ section 16; connecting GitHub, section 17.
   three commands, `temper forge fetch`, `temper forge prepare` and
   `temper forge run` (section 6). No command writes the records.
 - **`temper box` is wiring only.** It runs a configuration's steps in
-  order (the demo's fakes, fetch, prepare, Forgejo, its runner, `temper
-  serve`, the demo's seed), restarts what exits, and stops them in
-  reverse order. An owned forge's steps may wait, dormant, until the
-  client asks for them over a pipe to `temper serve` (7.1). It names no
+  order (the fakes, fetch, prepare, Forgejo, its runner, `temper
+  serve`), restarts what exits, and stops them in reverse order. An
+  owned forge's steps, and the demo's fakes, may wait, dormant, until
+  the client asks for them over a pipe to `temper serve` (7.1). It names no
   Forgejo request and nothing of setup but its steps. systemd, QA's
   environments or a test arrange the same commands another way (section
   7).
@@ -67,11 +67,11 @@ section 16; connecting GitHub, section 17.
   model's key; no account and no credential, which are the client's.
   `temper box` runs it first on an empty configuration directory (8.2,
   8.3).
-- **A first run is a demo** (8.4): the default document runs a fake LLM
-  and a fake forge as the box's steps, and a seed that adds the demo
-  model's key and adopts the demo repository through temper's client
-  tools, as a person would, before the person's sign-in link is
-  printed. Real backends are added from the client beside it: GitHub
+- **A first run is a demo** (8.4): the default document's fake LLM and
+  fake forge are the box's steps, dormant until the person chooses the
+  playground; the engine's start of the demo then asks for them, adds
+  the demo model's key and adopts the demo repository, as the person
+  would. Real backends are added from the client beside it: GitHub
   and an owned Forgejo are in the default document, so connecting
   either needs no restart, and the owned one's steps wait until the
   client asks for its setup (8.3, 7.1).
@@ -858,15 +858,15 @@ temper box
 ├── temper fake llm DIRS              long, with the demo (8.4)
 ├── temper forge prepare DIRS 1       once, per fake forge: its handover
 ├── temper fake forge DIRS 1          long, per fake forge (8.4)
+│                                     the demo's forge's two and the fake LLM, the demo's group: asked (below)
 ├── temper forge fetch DIRS 3         once, per owned forge whose binaries are fetched (6.6)
 ├── temper forge prepare DIRS 3       once, per owned forge
 ├── forgejo web                       long: temper forge run DIRS 3 forgejo
 ├── forgejo-runner daemon             long: temper forge run DIRS 3 runner
 │                                     these, the forge's group: here, or asked (below)
-├── temper serve DIRS --box           long: its own tree (README.md, section 4); its setup
+└── temper serve DIRS --box           long: its own tree (README.md, section 4); its setup
 │                                     host takes each handover and reconciles (section 5);
 │                                     fds 3 and 4 its pipe to the box (below)
-└── temper fake seed DIRS             link, with the demo: serve's first line on its stdin (8.4)
 ```
 
 - **An empty configuration directory,** absent or with no entry, is
@@ -889,6 +889,14 @@ temper box
   dormant again. At its start the box looks for each asked group's
   record; one it cannot look at is named on its stderr, and its group
   stays dormant.
+- **The demo's group,** the fake LLM, then the demo forge's preparation
+  and its fake forge (`application.demo.forge`, 8.4), is always asked,
+  and writes no record: the demo's state is the engine's alone (8.4),
+  so a box started again runs it only when `temper serve` asks, which
+  serve does at the person's choice and at each of its starts while the
+  demo runs. Its `started` follows its long steps' start, as the steps'
+  order takes them (7.2). A fake forge other than the demo's runs in its
+  place, unasked.
 - **The pipe,** two of them, made again at each spawn of `temper
   serve`: its fd 3, serve to box, and its fd 4, box to serve. `--box`
   tells `temper serve` to adopt them, and a serve given `--box` whose
@@ -899,9 +907,9 @@ temper box
 
   | Line | From | Says |
   |---|---|---|
-  | `start FORGE` | serve, at the client's ask (6.5) | start the forge's group |
+  | `start FORGE` | serve, at the client's ask (6.5); the demo's, at the playground's start and at serve's start while the demo runs (8.4) | start the forge's group |
   | `step FORGE STEP` | the box | the group's step `fetch`, `prepare` or `run` is starting, for the client's row (`../client/forge.md`, 5.4) |
-  | `started FORGE` | the box | the group's long steps are started, Forgejo answers, and its record is written; the engine then takes the handover and reconciles (6.5) |
+  | `started FORGE` | the box | the group's long steps are started, Forgejo answers, and its record is written, the demo's group writing none; the engine then takes the handover and reconciles (6.5) |
   | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step by its name, as the box's stderr prefixes it (7.2), such as `prepare 3 exited 1`: `<step> exited <code>`, `<step> killed by signal <n>`, `<step> did not start`, or `record not written`, cut to fit the line's bound, and holds no secret; a step's own lines are on the box's stderr (7.2) |
 
   One ask at a time: a `start` for another forge while a group starts,
@@ -920,10 +928,10 @@ temper box
 - **A group's failure** before `started` answers `failed`, and the group
   is dormant again, to be asked again; the box runs on. Once started,
   its long steps are restarted, and given up on, as 7.2 says.
-- **The default document's steps** are the demo's: the fake LLM, the
-  fake forge's preparation and the fake forge, `temper serve` and the
-  seed; and forge 3's group, dormant until the client asks for it
-  (8.3).
+- **The default document's steps:** `temper serve` alone runs at the
+  start; the demo's group is dormant until the person chooses the
+  playground (8.4), and forge 3's until the client asks for it (8.3).
+  No step is a link: serve's first line is the person's.
 
 ### 7.2 What it does
 
@@ -982,8 +990,9 @@ temper box
   closes, the pipe's lines and the groups' records out), hosted on
   skein-io.
 - **The steps in groups:** `Steps { always, asked }`, `always` the steps
-  run in order, and `asked` a list of `Group { forge, before, steps }`,
-  each dormant until asked (7.1). `before` is its place in the order:
+  run in order, and `asked` a list of `Group { forge, before, steps, recorded }`,
+  each dormant until asked (7.1), `recorded` whether its `started`
+  writes the box's record: an owned forge's does, the demo's does not. `before` is its place in the order:
   the index in `always` it runs just before (its length puts it last).
   Each step carries its `Stage`, whose word its `step` lines carry. The
   machine's step tests drive a group from dormant to `started`, and to
@@ -991,8 +1000,9 @@ temper box
 - **The binary hands it the steps.** `temper box` resolves its three
   directories, runs `temper init` when the configuration directory is
   empty (7.1), checks the document as section 8 says, asks `temper-fake`
-  for its steps, `temper-forge-setup`'s with the demo's around them
-  (8.4), and gives them to `temper-box`, an asked forge's group apart.
+  for its steps, `temper-forge-setup`'s with the fakes' before them
+  and the demo's group among the asked (8.4), and gives them to
+  `temper-box`, each asked group apart.
 - **Checked:** a boundary test fails the gate when `temper-box` depends
   on a crate named `temper-*` but `temper-forge-setup`, or names an item
   of it but `steps`, `Steps`, `Group`, `Stage`, `Step` and its `Kind`.
@@ -1017,7 +1027,7 @@ running its commands, and the client names them (6.5).
 - **the QA loop's cluster** (`../draft/qa-loop.md`, sections 4 and 11): the same
   `temper fake llm` and `temper fake forge` programs, with the loop's
   additions (deliveries, git and TLS with skein's test root; 8.4), beside
-  `temper serve`, and a seed through `temper ctl`;
+  `temper serve`, and the demo's start through `temper ctl`;
 - **a container image** whose entry point is `temper box`, every process
   of its tree ending with the container.
 
@@ -1119,8 +1129,8 @@ running its commands, and the client names them (6.5).
   or fake forge's handover (section 3). Under the box, with `--box`, it
   adopts the box's pipe, over which it asks for an owned forge's steps
   whose `start` is `"asked"` (7.1).
-- **`application.demo`,** the demo's fake LLM and seed, or null for none
-  (8.4).
+- **`application.demo`,** the demo's fake LLM, forge and project, or
+  null for none (8.4).
 - **An owned example** ships for a person, a test or QA's host to start
   from (8.1).
 - **`temper init`** writes a deployment that starts (8.2), with the
@@ -1395,7 +1405,7 @@ directory is empty (7.1).
   no store. The engine's first start makes its store; accounts, forges
   and repositories are the client's (credentials.md, section 3;
   `../client/forge.md`), and the demo's account and repository the
-  seed's, through the client's protocol (8.4).
+  demo's start's (8.4).
 - **Its code:** `temper-init`, step code (section 11): given the facts
   above, git's path or none and the person's login among them, the three
   directories, the secret's 32 bytes and the demo key's 32 bytes, it
@@ -1511,19 +1521,21 @@ defaults for a person's real work are open (section 16).
   among them; two literals of `temper-init`'s checked by its tests the
   same way.
 - **`application.demo`,** the demo's (8.4).
-- **Its box's steps:** the fake LLM, forge 1's preparation and its fake,
-  `temper serve` and the seed (7.1); and forge 3's group, dormant until
-  the client asks for it: its fetch, its preparation, Forgejo's web and
+- **Its box's steps:** `temper serve`; the demo's group, the fake LLM,
+  forge 1's preparation and its fake, dormant until the person chooses
+  the playground (7.1, 8.4); and forge 3's group, dormant until the
+  client asks for it: its fetch, its preparation, Forgejo's web and
   the runner's daemon; the engine takes the handover and reconciles
   (6.5).
 
 ### 8.4 The demo
 
 A person's first run is a demo (`../draft/first-run.md`, 3.5, 3.6 and
-5, step 3): the box runs a fake LLM and a fake Forgejo from temper's
-own binary, the engine sets itself up on the fake as on an owned one,
-and a seed adds the demo model's key and adopts the demo's repository
-through the client's protocol. Its bar: one suggested request landed
+5, step 3): once the person chooses the playground, the box runs a
+fake LLM and a fake Forgejo from temper's own binary, the engine sets
+itself up on the fake as on an owned one, and adds the demo model's
+key and adopts the demo's repository itself (the demo's start, below).
+Its bar: one suggested request landed
 end to end on the demo model, by the engine's own loop with nothing
 staged. The chat delegates a change on `playground/widget`; its coding agent
 edits a file; the worker commits and pushes the branch with `temper
@@ -1557,7 +1569,7 @@ them as it does any Forgejo.
   | `llm.otherwise` | a list of turns | 1 to 8 |
   | `forge` | u16 | the `forge` of one fake `setup` entry (section 8) |
   | `project` | u32 | the number of one of `engine.projects` (configuration.md, section 2) |
-  | `client` | a data path | a private directory (section 3), unique among the document's directories |
+  | `client` | a data path | a private directory (section 3), unique among the document's directories; read and unused since the seed went (the demo's start, below), until the document's next change removes it |
 
   The scripts, `asked`, `cued` and `otherwise` together, fit skein's fake LLM's
   `script_bytes` (skein's `fake-llm.md`), which `temper-fake` sets.
@@ -1715,7 +1727,8 @@ them as it does any Forgejo.
   no git smart HTTP; it keeps no state across its starts.
 - **The fake's start-time adoption,** in `temper serve`'s setup host:
   after the records' load, the root's restore, the handover and
-  reconcile (6.5), one `Adopt { forge, repository }` for each of
+  reconcile (6.5), the demo's forge's at its group's `started` (7.1),
+  one `Adopt { forge, repository }` for each of
   `fake.repositories` not already adopted, numbered from 1 in the list's
   order as the fake numbers them. A repository restored by the root is
   already adopted: reconcile checks its access, and start-time adoption
@@ -1725,8 +1738,8 @@ them as it does any Forgejo.
   makes the bot a collaborator with write and the repository's hook; the
   forge connects from records once they all end done. A stop leaves the
   forge not connected, named by its step; the engine and every other
-  forge run on. The seed's adoption retries until the forge is
-  connected. `temper forge fetch` and `run` refuse a fake, "it is fake,
+  forge run on. The demo's start adopts the repository into the
+  project once the forge is connected (below). `temper forge fetch` and `run` refuse a fake, "it is fake,
   not owned".
 - **Its deliveries follow the setup's hooks** (skein's `fake-forge.md`,
   section 4): each event goes to each hook a repository's setup holds
@@ -1856,48 +1869,68 @@ them as it does any Forgejo.
   handover the fake wrote, and starts `temper serve`.
 - **`temper serve`** takes the fake's handover and reconciles from
   records (6.5), runs its start-time adoption from those records, then
-  connects (8.4).
-- **`temper fake seed DIRS`,** a link step: `temper ctl` calls
-  (`../client/tools.md`, section 10), each a child of the binary's own
-  run, its DIRECTORY the demo's `client`. A call is the person's own
-  tool, at its own exit statuses and lines, so the seed holds no client
-  and reads only what each call prints. Its acts, in order, each reading
-  first and done when it finds itself done:
-  1. sign in with the link on its stdin, serve's first line;
-  2. add the demo model's key, `llm.key`, as the deployment's account of
-     `llm.provider`, its idempotency key `demo-llm`;
-  3. wait until that account is usable, and until every forge is
-     settled; until `temper ctl` serves `wait forges`
-     (`../client/tools.md`, 5.4), until the account alone, and act 4
-     waits for the forge;
-  4. adopt `fake.repositories`' first into `project`, from `forge`, the
-     owner's, on its `landing`, its idempotency key `demo-adopt`. Until
-     act 3 waits for the forge, an adoption refused because the forge
-     has not yet connected (`temper ctl adopt`'s exit 2, the forge did
-     not answer) is made again every 250 ms, each under the next key,
-     `demo-adopt-2`, `demo-adopt-3` and on, until the setup's deadline
-     (`setup.deadline_ms`), the first refusal named on its stderr. The
-     act walks its keys in that order whatever their answers' age: a
-     key whose answer is the adoption, made now or recorded, ends the
-     act; one whose answer is that refusal moves to the next; any other
-     answer fails the step. So on a second box on the same directories
-     the first box's keys replay its refusals, then its adoption, and
-     the act ends at that key, adopting nothing again;
-  5. sign out;
-  6. present the link's secret again: it is refused as spent, and
-     serve writes a fresh link to its stdout, the box's, which is the
-     person's (7.2).
+  connects (8.4): under the box, the demo's forge once its group has
+  started (7.1).
+- **The demo's state** is the engine's, one record of temper's store,
+  `Demo`, keyed by the demo's forge (`store.md`, section 2): none, *not
+  started*; *running*, from the person's choice of the playground; and
+  *ended*, for good, once real backends replace the demo
+  (`../draft/first-run.md`, 2.3), written by the demo's end, which is
+  not yet built. Nothing else holds it: the box keeps no record of the
+  demo's group (7.1), and the client reads it with the demo
+  (`../client/README.md`, 4.8). Each start of the engine reads it, so a
+  restart and the moment of the choice look alike: running, the box
+  link asks for the demo's group at serve's first link, as the start
+  below does, and the group's `started` takes the handover and
+  reconciles (6.5); not started or ended, the demo's fakes stay
+  dormant. `temper fake seed`, a link step that made the start's acts
+  through `temper ctl` calls, goes with it.
+- **The demo's start,** the client's `StartDemo`
+  (`../client/README.md`, 4.6 and section 8), of the deployment's
+  scope, admitted as `SetUp` is. The forge connector reads the record:
+  with no demo, or one ended, it refuses, *not offered*. Otherwise, in
+  one decision, it writes *running* when the record is none and, unless
+  the demo's forge is connected or connecting, asks for the demo's
+  group (`start FORGE`, 7.1), which the box link holds while another
+  group starts and sends once that one answers; without a pipe it asks
+  nothing, the fakes being the runner's (7.4). Then it
+  makes the seed's acts itself, each reading first and done when it
+  finds itself done:
+  1. the demo model's key, `llm.key`'s bytes less a final newline, as
+     the deployment's account of `llm.provider`, unless the deployment
+     holds an account of that provider. The service reads the file at
+     each start and carries its bytes as a pasted value's
+     (`../client/README.md`, section 8); a start that adds no account
+     leaves the value unused, erased before the answer;
+  2. once the demo's forge is connected, `fake.repositories`' first
+     adopted into `project`, from `forge`, the fake's `owner`, on its
+     `landing`, with the adoption form's defaults
+     (`../client/README.md`, 4.4), unless the project has it.
 
-  It exits 0. A seed that fails, at any act, makes the box give up,
-  naming it (7.2).
-- **A restart** of the box starts the fakes afresh: the preparation
-  draws a new handover, the engine's start takes it and reconciles,
-  which makes the bot, its tokens and each adopted repository's access
-  again (5.3, step 6), and the seed finds its acts done but the sign-in
-  and the link. The fake seeds its repositories the same at every
-  start, so a worker's clone of one still matches it; a branch an agent
-  pushed is lost with the fake's state, and the engine's records of it
-  outlive it, until the fake keeps its state across starts (below).
+  Each act is the person's own request, as the client would send it,
+  admitted by the root under their sign-in and a key derived from the
+  start's: transitional, as the first repository's adoption is (6.7),
+  until jig carries a deployment owner's acts (section 15). The start
+  is answered once both are done, *running*, or at the first that
+  fails, *start failed*, naming why: the group's `failed` with its
+  `WHY`, the account's refusal, the adoption's refusal, or the forge
+  not connected within `setup.deadline_ms` of the start. A start while
+  the demo runs makes what is not done, and is answered the same: a
+  second start, or a start that failed, sent again, adds and adopts
+  nothing twice. A start while another is under way waits for it and
+  takes its answer. The answer is kept in memory alone, as `SetUp`'s
+  is (`../client/README.md`, section 8): the same key while it is held
+  answers the same outcome, and after a restart, unknown.
+- **A restart** of the box starts no fake until serve asks: serve's
+  start reads the demo running and asks for its group (above), its
+  preparation draws a new handover, and the engine takes it at
+  `started` and reconciles, which makes the bot, its tokens and each
+  adopted repository's access again (5.3, step 6). The account and the
+  adoption are jig's records and stay; no act is made again. The fake
+  seeds its repositories the same at every start, so a worker's clone
+  of one still matches it; a branch an agent pushed is lost with the
+  fake's state, and the engine's records of it outlive it, until the
+  fake keeps its state across starts (below).
 - **`temper fake forge check DIRS N OBSERVATIONS STORE`,** no step: the
   QA loop's check of the fake forge's promises (`../qa.md`, 8.3),
   skein's judge (skein's `fake-forge.md`, 2.5) over forge N's
@@ -2000,9 +2033,8 @@ them as it does any Forgejo.
 - **Its code:** `temper-fake`, step code (section 11): the member's
   types and checks; the fake LLM's and the fake forge's configurations
   and seeds, from the deployment's document or from one of their own;
-  `steps`, the box's steps for the document; and the seed's plan, its
-  acts as `temper ctl` calls with what each reads to find itself done.
-  It names no host. Its dependencies:
+  `steps`, the box's steps for the document, the demo's group among
+  the asked. It names no host. Its dependencies:
   `temper-forge-setup`, `skein-fake-forge-domain`,
   `skein-fake-forge-protocol`, `skein-fake-llm-domain`,
   `skein-fake-llm-protocol`, `skein-llm`, `skein-http`, `skein-forge`,
@@ -2014,8 +2046,7 @@ them as it does any Forgejo.
   fixtures also name `skein-forge-client`,
   `temper-engine-domain-forge-change` and
   `temper-engine-domain-forge-issues`. The binary's
-  `crates/temper/src/fake.rs` hosts the peers and the seed on
-  skein-shell, the seed's calls as children of `temper ctl`, reads the
+  `crates/temper/src/fake.rs` hosts the peers on skein-shell, reads the
   check's files and opens the store's copy at the limits
   `temper-service`'s `startup::store_limits` derives from the document,
   and `temper fake git` is `temper-fake-git`'s core on the real file
@@ -2041,7 +2072,7 @@ them as it does any Forgejo.
 | the webhooks' secret | Forgejo, every mode | the person, pasted; reconcile, drawn | the `WebhookSecret` record | the webhooks' listener; Forgejo's hooks |
 | a GitHub App's key | GitHub | GitHub, at the manifest's conversion; the person, pasted as PEM | the `AppKey` record, DER; a PEM never | the forge component, for its tokens; the setup host, while a plan runs |
 | an installation's token; a GitHub git token | GitHub | the forge component, from the App's key | memory alone | the forge component; git |
-| the demo model's key | the demo | `temper init`, random (8.2), or the fake LLM from its seed in a document's form (8.4) | `demo/llm.key`, or the document's `key` | the fake LLM, its one credential; the seed, which adds it as the deployment's account (8.4) |
+| the demo model's key | the demo | `temper init`, random (8.2), or the fake LLM from its seed in a document's form (8.4) | `demo/llm.key`, or the document's `key` | the fake LLM, its one credential; the service, which carries it at the demo's start for the deployment's account (8.4) |
 
 - **Every credential the engine holds is a record** in jig's secrets'
   store (credentials.md, the records), written by the setup host's
@@ -2162,7 +2193,7 @@ temper-init                  step code: the default document and the files tempe
 │                              the facts the binary finds (8.2, 8.3); reads, writes and binds nothing
 └── skein-lib, skein-json
 temper-fake                  step code: the demo's member, its types and checks; the fakes'
-│                              configurations and seeds; the box's steps; the seed's plan (8.4).
+│                              configurations and seeds; the box's steps (8.4).
 │                              Names no host
 ├── temper-forge-setup
 ├── skein-fake-forge-domain, skein-fake-forge-protocol, skein-fake-llm-domain, skein-fake-peers
@@ -2172,7 +2203,7 @@ temper-fake-git              ordinary Rust: the fake git program's core, temper 
 ├── skein-fake-checkout, skein-fake-forge-domain, skein-fake-forge-protocol, skein-fake-peers
 └── skein-lib, skein-io, skein-http, skein-json
 temper                       the binary: temper forge fetch|prepare|run, temper box, temper init,
-                               temper fake llm|forge|git|seed
+                               temper fake llm|forge|git
 ```
 
 - **The engine runs the setup host** in its protocol layer (5.1):
@@ -2243,8 +2274,8 @@ relies on.
   without the demo.
 - **The demo,** in temper-fake: each bound of `application.demo`
   refused, naming its path; the fakes' configurations and seeds from
-  the default document; the seed's plan, each act skipped when what it
-  reads finds it done, and the link's second presenting last.
+  the default document; `steps` with the demo's group asked and
+  unrecorded.
 - **The box's machine:** the order; a restart after its once steps; the
   backoff and the cap; the stop's order, and `temper serve`'s second
   signal; a link step started on its long step's first line, given it
@@ -2270,7 +2301,9 @@ relies on.
   forge answered by its own lines, an ask while stopping, a record not
   written, a forge with no group `not asked`, and a started one
   `started`; a start with the record
-  running the group as an always group; a line past `box.line_bytes`
+  running the group as an always group; an unrecorded group, the
+  demo's, answering `started` with no record written, and dormant again
+  at the box's next start until asked; a line past `box.line_bytes`
   refused; `temper serve` restarted with a pipe afresh, an answer meant
   for the exited one dropped.
 - **The setup host's handover at runtime** (5.1), in temper-service's
@@ -2288,6 +2321,20 @@ relies on.
   actual host/socket terminal events and io settlement complete it.
   Events and counts establish the order, with no sleeps, new harness,
   unbounded queue or timeout change.
+- **The demo's state and start** (8.4), in the engine's domain world
+  (`tests/engine/domain`) and the forge connector's tests: no record,
+  not started, the demo read answering it; a start writing running and
+  asking for the demo's group in one decision, the box link holding it
+  while another group starts; the account added unless the deployment
+  holds one of the provider, the value left unused otherwise; the
+  adoption once the forge connects, unless the project has it; the
+  answer, running, once both are done, and start failed at the first
+  that fails, the forge not connected by `setup.deadline_ms` among them;
+  a second start while running answered the same, adding and adopting
+  nothing twice; the same key answered from memory, and unknown after a
+  restart; a restart while running asking for the group again and
+  making no act; refused, not offered, with no demo or one ended; and
+  in temper-service's step tests, a start carrying `llm.key`'s bytes.
 - **The fake's start-time adoption** (8.4), in temper-service's step
   tests: after handover and reconcile, one `Adopt` for each seeded
   repository not already restored, in order, with the deployment's
@@ -2398,7 +2445,9 @@ it checks of this document:
   serving; a stop leaving no process it started.
 - **A first run,** a test of its own: `temper box` on three empty
   scratch directories writes the configuration (8.2), says so, and
-  prints one sign-in link, which signs the owner in; the demo forge is
+  prints one sign-in link, which signs the owner in, the demo's fakes
+  dormant; the owner starts the demo with `temper ctl demo-start`
+  (`../client/tools.md`, 5.5), answered once the demo forge is
   connected and `playground/widget` adopted into project 1. The owner sends
   "Add CSV export to widget" to the project's chat, which runs on the
   demo model with no pick (8.3); the chat's last message says the
@@ -2412,9 +2461,9 @@ it checks of this document:
   `tests/real-loop/tests/forge.rs`'s
   `a_forge_delivery_is_accepted_by_the_engines_listener`; its secret's
   matching is checked by the step tests. A second box on the same
-  directories signs in again, its seed finding its acts done, and its
-  clone holds the seeded head, since the fake keeps no state across
-  its starts.
+  directories finds the demo running, starts its fakes at serve's ask
+  with no act made again, and its clone holds the seeded head, since
+  the fake keeps no state across its starts.
 - **A first run set up for real,** a test of its own: `temper box` on
   three empty scratch directories, with the binaries `TEMPER_FORGEJO`
   and `TEMPER_FORGEJO_RUNNER` name placed where the fetch looks,
@@ -2450,7 +2499,9 @@ Each is intended; what it needs is named with it.
   forge's org needing an owner. A new project, named in the form,
   waits on jig's projects at runtime (MakeProject); until jig carries
   acts by a deployment owner (projects at runtime and a follow-up act
-  on `SetUp`'s admission), adoption is the client's. Projects are
+  on `SetUp`'s admission), adoption is the client's, and the demo's
+  start makes its acts in the name of the person who chose the
+  playground (8.4). Projects are
   seeded at the first start only (configuration.md, section 3; jig's
   `domain/core.md`, 6.1), so adoption goes to an existing project, the
   template's project 1, "Default". The set up's intent is kept in

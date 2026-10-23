@@ -84,6 +84,7 @@ section 7).
 | 14 | `Release` | `Release(u64)`: the task | a closing task's release | `tasks` |
 | 15 | `Application` | `Application(u64)`: the people child's token for the request | a keyed adoption's outcome, or a keyed outcome of the FORGE family, kept until its retention ends (jig's `domain/connectors.md`, 5.5: a connector keeps its keyed requests' outcomes durably); an outcome carrying a link is kept in memory alone, until its state's life ends (`setup.state_life_ms` after `Done`; `../client/README.md`, section 8) | `applications` |
 | 16 | `Writer` | `Writer(forge)`: the forge's number | the forge's writer, given at runtime from its connect's user (skein's `forge-client.md`, 7.1; credentials.md, section 5), restored at start so that restored effects never meet `Forbidden` | the configured `forges` |
+| 17 | `Demo` | `Demo(forge)`: the demo's forge, `application.demo.forge` | the demo's state: running, from the person's choice of the playground, or ended, for good; no row is not started (setup.md, 8.4). Written at the demo's start and at its end, never erased | one row: the configured demo's |
 
 - **Loaded:** every family at the forge's restart step, and never
   otherwise. No party reads them: the engine serves none of the forge's
@@ -145,7 +146,14 @@ section 7).
   The routing gives it to jig's component, whose format row records it;
   a store written with another refuses to open, saying so (jig's
   `protocol/store.md`, 5.2 and 5.3).
-- **`STORE_VERSION` is 3,** with the `Writer` family, tag 16,
+- **`STORE_VERSION` is 6,** with the `Demo` family, tag 17,
+  `Key::Demo(forge)` (section 2), its row `{ forge, state }`, the
+  state running or ended: the demo's state, the engine's alone
+  (setup.md, 8.4), shaped so that its end adds nothing to it. 4 and 5
+  changed records in place, 5 jig's exceeded holds in the client's
+  refusals. The move from 5 to 6 breaks the stored format as each move
+  does: a store written at 5 refuses to open, saying so.
+- **`STORE_VERSION` 3** came with the `Writer` family, tag 16,
   `Key::Writer(forge)` (section 2): each forge's writer, given at
   runtime, kept by skein's forge client as its own record (skein's
   `forge-client.md`, 7.1), and not secret (credentials.md, 2.1). The

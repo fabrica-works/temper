@@ -110,13 +110,12 @@ Forgejo and model).
   runs while the person adds a model. Ready ends on the new project.
   Each step offers Later, and "Try the playground" stays offered until
   a forge of the person's connects.
-- **The demo starts only when chosen.** Its state is the engine's: not
-  started, running, ended. The fakes become asked groups of the box,
-  started on the engine's ask; the engine sets the demo up itself, the
-  demo model's account and `playground/widget` adopted into the project, as
-  forgejo-setup's M4 makes and adopts an owned forge's first
-  repository. The seed (3.6) and its link step go: serve's first link
-  is the person's.
+- **The demo starts only when chosen:** adopted (first-run-ux's M3),
+  its state in `../protocol/setup.md`, 8.4, and `../protocol/store.md`,
+  section 2, the box's asked demo group in setup.md 7.1, and the
+  client's start in `../client/README.md`, 3.5, 4.6, 4.8 and section 8.
+  The seed (3.6) and its link step go: serve's first link is the
+  person's.
 - **The demo ends for good.** The person's first usable model ends the
   demo model's account. Their first connected forge, other than the
   demo's (`application.demo.forge`, never every fake), ends the demo:
@@ -248,12 +247,11 @@ experience; good defaults for a person's real work are open (section 8).
 
 - **The repository** is the fake forge's seed: `playground/widget`, a few
   files and a check workflow the fake's CI answers.
-- **Adoption is the client's,** never configuration's: repositories are
-  never configured (configuration.md, section 8). Once `temper serve`
-  is up, the box runs one client tool, `temper ctl` (`../client/tools.md`),
-  which adds the demo model's key and adopts `demo/widget` into project
-  1, as the real loop's stories do (`../domain/testing.md`, 2.4). Run
-  again, each act finds itself done.
+- **Adoption is the demo's start's,** never configuration's:
+  repositories are never configured (configuration.md, section 8). The
+  engine adds the demo model's key and adopts `playground/widget` at
+  the person's choice (2.3; setup.md, 8.4), where the box's seed once
+  ran `temper ctl` to do it.
 
 ### 3.7 `temper forge fetch`
 
@@ -319,8 +317,8 @@ experience; good defaults for a person's real work are open (section 8).
    box's pipe, the handover at runtime, and the client's banner and
    wording.
 5. **The welcome and the demo's end** (2.3): the demo's state in the
-   engine, the fakes asked, the seed's acts in the engine, `stop` on
-   the pipe, the welcome and its wizard in the client, and the
+   engine, the fakes asked and the seed's acts in the engine (designed:
+   setup.md, 7.1 and 8.4), `stop` on the pipe, the welcome and its wizard in the client, and the
    playground's words in the fake's scripts, `temper init`'s document
    and the client.
 
