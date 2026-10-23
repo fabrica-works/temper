@@ -79,18 +79,22 @@ Before a run, join and review these contracts:
   `process.rs::a_mixed_document_exits_1_naming_its_path` currently supply only
   LLM/worker captures; configuration's memory match also only knows the old
   four members. No reader or caller was edited or tested by QA.
-- **Host interface, host owned:** the inspected `temper-host` draft's
-  `host.py::contract` still requires a `proc.engine.ready.link` capture and
-  sign-in stdin template, and expects a bare clients endpoint for story.
-  This assembly supplies no link capture/template and supplies the complete
-  public origin. `Run.line`/`mark_ready` must count only declared public
-  readiness while privately retaining the link. `start_child` already
-  injects sign-in from memory; its story argument normalization must accept
-  the complete public origin. `collect_live` already appends the actual
-  D/E/R flags above and `stopped_check` requires engine/all trees empty.
-  Its causal completion claim still needs review against the producer's
-  settled-effects/observation-flush contract: story exit plus a checkpoint
-  without that implication is insufficient. Keep unknown if unproven.
+- **Host interface, joined:** `host.py::contract` accepts this manifest's
+  absent stdin and public readiness only; it refuses link captures and
+  placeholders. `Run.line`/`mark_ready` count the three declared engine
+  listeners independently of the private stdout link. Startup requires both
+  within the same ready120 deadline, in either stream order. The link's
+  exact loopback origin must match clients; malformed, incomplete, repeated
+  or missing links fail with cleanup. `start_child` delivers it once from
+  memory through the sign-in pipe and discards it, with null stdin evidence.
+  The story's full public origin is validated without prefixing or stripping
+  paths. No link capture or placeholder is published. `collect_live` appends
+  the actual D/E/R flags above and `stopped_check` requires engine/all trees
+  empty. The causal boundary relies on the fixed story's validated terminal
+  wait/tree read, jig's settled delegates/effects lifecycle, and the selected
+  fake writer's flush-before-reply contract. A checkpoint or story exit
+  alone is insufficient; missing proof must stay unknown. Parent review of
+  that argument and the case-2 contracts remains required before a run.
 - **Page owners:** canonical byte-copy assertions in
   `lab/tests/unit/test_cluster_web.py::FilesTests` will need routing to
   `lab/cluster-web/{agent.json,llm.json,chat.txt,engine.json,w1.json,w2.json,experiment.json}`
@@ -112,5 +116,6 @@ facts, startup, configuration admission or the product story.
 
 Neither owner lands before reciprocal cluster/reader diff review. After
 those joins, the parent rechecks and lands through `land`, then runs the
-three attended S seeds. This task performs targeted Python checks only;
-there is no build, gate, real run, landing, paid driver or campaign.
+three attended S seeds. Assembly verification above performed targeted
+Python checks only. The host join separately prepares a release binary for
+review, without a gate, real run, landing, paid driver or campaign.

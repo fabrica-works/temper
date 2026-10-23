@@ -77,6 +77,14 @@ def contract(exp, settings):
             if name == 'forge':
                 argv += ['--observations', '{proc.forge.dir}/observations.jsonl']
         require(process['argv'] == argv, 'S process argv differs from the approved cluster contract')
+        if name == 'engine':
+            ready = [dict(stream='stderr', prefix='listening ' + listener + ' ', capture=listener)
+                     for listener in ('clients', 'workers', 'webhooks')]
+        elif name in ('w1', 'w2'):
+            ready = [dict(stream='stderr', prefix='linked ' + name + ' ', capture='engine')]
+        else:
+            ready = [dict(stream='stdout', prefix='listening ', capture='address')]
+        require(process['ready'] == ready, 'S requires only the declared public readiness rules')
     require([c['name'] for c in exp['collect']] == ['observations', 'store'], 'S collection order differs')
     require({c['name'] for c in exp['checks']} == {'end-state', 'promises'}, 'S checks differ')
     require('client' in exp['dirs'], 'S client directory missing')
@@ -86,12 +94,13 @@ def contract(exp, settings):
             'S requires approved ready120/command240/stop20 calibration')
     for group in ('processes', 'actions', 'collect', 'checks'):
         for item in exp[group]:
+            require('stdin' not in item, 'S declares no stdin; sign-in uses only the private host pipe')
             script = (group, item['name']) in (('actions', 'story'), ('checks', 'end-state'))
             require(item['env'] == {} or script and item['env'] == {'PATH': '/usr/bin:/bin'},
                     'S environment must be empty except explicit script PATH')
     signin = exp['actions'][0]
     require(signin['argv'] == ['{artifact.temper}', 'ctl', '{dir.client}', 'sign-in', '-']
-            and signin.get('stdin') == '{proc.engine.ready.link}\n', 'S sign-in declaration differs')
+            and 'stdin' not in signin, 'S sign-in declaration differs')
     prefix = ['{artifact.temper}', 'ctl', '{dir.client}']
     require(exp['actions'][1]['argv'] == prefix + ['add-key', '1', '{proc.llm.dir}/llm.key',
             '--deployment', '--key', 'lab-llm'], 'S add-key declaration differs')
@@ -103,14 +112,11 @@ def contract(exp, settings):
     require(exp['actions'][4]['argv'] == prefix + ['adopt', '--project', '1', '--forge', '1',
             '--owner', 'fake', '--name', 'widget', '--landing', 'main', '--key', 'lab-adopt'],
             'S adopt declaration differs')
-    require(all('stdin' not in a and 'await' not in a for a in exp['actions'][1:]),
-            'only private sign-in has stdin; no additional action await protocol')
-    for member, text, _phase, _process, _executable in experiment.template_uses(exp, {}):
-        if '{proc.engine.ready.link}' in text:
-            require(member == 'actions.0.stdin', 'credential placeholder permitted only for sign-in stdin')
+    require(all('await' not in a for a in exp['actions']), 'S has no action await protocol')
+    require('proc.engine.ready.link' not in json.dumps(exp), 'S has no credential placeholders')
     require(exp['actions'][-1]['argv'] == ['/bin/sh', '{experiment}/smoke/story',
-            '{artifact.temper}', '{dir.client}', '{proc.engine.ready.clients}'],
-            'story must use the public clients endpoint (host normalizes it to an origin)')
+            '{artifact.temper}', '{dir.client}', 'http://{proc.engine.ready.clients}/'],
+            'story must use the complete public clients origin')
     observations, copied = exp['collect']
     require(observations['argv'] == ['/bin/cp', '{proc.forge.dir}/observations.jsonl',
             '{collect.dir}/observations.jsonl'] and observations['scan'] == [], 'S observations copy differs')
@@ -125,10 +131,6 @@ def contract(exp, settings):
             '{proc.engine.dir}/config', '--data', '{proc.engine.dir}/data', '--cache',
             '{proc.engine.dir}/cache', '1', '{collected.observations}/observations.jsonl', '{collected.store}'],
             'S promises must read stopped engine configuration and copied store')
-    require(all('stdin' not in c for g in ('collect', 'checks') for c in exp[g]), 'S collectors/checks have no stdin')
-    links = [(p['name'], r) for p in exp['processes'] for r in p['ready'] if r.get('capture') == 'link']
-    require(links == [('engine', {'stream': 'stdout', 'prefix': 'http://', 'capture': 'link'})],
-            'S requires exactly one private engine link readiness rule')
 
 
 def prepare(lab, args):
@@ -246,7 +248,10 @@ class Run:
         require(cli._runner_digest() == self.key['lab']['runner'], 'selected runner changed')
         # A public endpoint is sufficient for the wrapper; no synthetic link.
         if name == 'story' and group == 'actions':
-            argv[-1] = origin('http://' + argv[-1])
+            try:
+                origin(argv[-1])
+            except ValueError:
+                raise Halt('story requires an exact public loopback origin') from None
         env = {k: self.render(v) for k, v in definition['env'].items()}
         if argv[0] in ('/bin/sh',) or argv[0].endswith('/checks/end-state'):
             env = {'PATH': '/usr/bin:/bin'}
@@ -302,15 +307,13 @@ class Run:
         record = item['record']
         name = record['name']
         if secret is not None:
-            if name == 'engine' and record['group'] == 'processes' and stream == 'stdout' and complete:
+            if name == 'engine' and record['group'] == 'processes' and stream == 'stdout':
                 require(self.public is None, 'engine emitted more than one sign-in line')
                 try:
                     self.link, self.public = credential(secret)
                 except ValueError:
                     raise Halt('engine emitted a malformed sign-in line') from None
-                record['captures']['link'] = self.public
-                item['ready'].add(('stdout', 'http://', 'link'))
-                self.mark_ready(item)
+                self.match_origin(item)
             return
         if not complete or record['group'] != 'processes' or record['ready_ms'] is not None:
             return
@@ -329,12 +332,24 @@ class Run:
         name = record['name']
         if len(item['ready']) == len(item['definition']['ready']) and record['ready_ms'] is None:
             if name == 'engine':
-                require(origin('http://' + record['captures']['clients']) == self.public,
-                        'engine public client endpoint differs from private link origin')
+                self.match_origin(item)
             record['ready_ms'] = self.ms()
             for capture, value in record['captures'].items():
                 self.known[f'proc.{name}.ready.{capture}'] = value
             self.event('ready', name=name, captures=record['captures'])
+
+    def match_origin(self, item):
+        clients = item['record']['captures'].get('clients')
+        if clients is not None:
+            try:
+                public = origin('http://' + clients + '/')
+            except ValueError:
+                raise Halt('engine public client endpoint is invalid') from None
+            require(self.public is None or public == self.public,
+                    'engine public client endpoint differs from private link origin')
+
+    def startup_ready(self, name):
+        return self.records[name]['ready_ms'] is not None and (name != 'engine' or self.link is not None)
 
     def output(self, identity, stream):
         child, item = self.host.children[identity], self.items[identity]
@@ -605,7 +620,10 @@ class Run:
                     self.schedule['draws'][label] = draws.draw(self.args.seed, label)
                     identity = self.start_child('processes', definition, deadline=deadline)
                     self.schedule['start_order'].append(name)
-                    if not self.wait(lambda: self.records[name]['ready_ms'] is not None, deadline):
+                    # Public readiness is recorded independently. Bootstrap must
+                    # also arrive within this same ready120 window, in either
+                    # stream order; no second wait or deadline is introduced.
+                    if not self.wait(lambda: self.startup_ready(name), deadline):
                         self.bounds.append(dict(name='ready_seconds', who=name))
                         self.failures.append(checks.failure('bound/ready_seconds/' + name, 'bound', 'readiness deadline passed'))
                         raise Halt('readiness deadline passed')
