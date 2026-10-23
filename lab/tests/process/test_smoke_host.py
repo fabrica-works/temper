@@ -24,7 +24,19 @@ sys.path.insert(0, str(ROOT))
 spec = importlib.util.spec_from_file_location('smoke_host', ROOT / 'host.py')
 host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
-host.bind_skein(Path('/home/free/src/rust/skein'))
+spec = importlib.util.spec_from_file_location('skein_source', ROOT.parent / 'skein_source.py')
+skein_source = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(skein_source)
+# The test finds the pinned skein; its children run without cargo, so they are handed it
+# (--skein), and the emitting children (one argument) never bind the runner.
+if '--skein' in sys.argv:
+    SKEIN = Path(sys.argv[sys.argv.index('--skein') + 1])
+elif __name__ == '__main__' and len(sys.argv) == 2:
+    SKEIN = None
+else:
+    SKEIN = skein_source.root()
+if SKEIN is not None:
+    host.bind_skein(SKEIN)
 
 
 def synthetic_link():
@@ -242,7 +254,7 @@ class NativeCanaries(unittest.TestCase):
         except (OSError, subprocess.SubprocessError, host.native.CapabilityError):
             self.skipTest('delegated systemd user manager unavailable')
         with tempfile.TemporaryDirectory() as directory:
-            args = types.SimpleNamespace(host_file=SCRIPT, skein=Path('/home/free/src/rust/skein'),
+            args = types.SimpleNamespace(host_file=SCRIPT, skein=SKEIN,
                 lab=Path(directory) / 'lab', experiment=Path(directory), subject='native-canary', seed='1')
             output = io.StringIO()
             with redirect_stdout(output):
@@ -268,7 +280,7 @@ class NativeCanaries(unittest.TestCase):
                     '--property=Delegate=yes', '--property=KillMode=control-group',
                     '--property=TimeoutStartSec=120', '--property=TimeoutStopSec=20',
                     '/usr/bin/env', '-i', 'PATH=/usr/bin:/bin', os.path.realpath(sys.executable),
-                    '-I', '-B', str(SCRIPT), '--worker', unit, directory]
+                    '-I', '-B', str(SCRIPT), '--worker', unit, directory, '--skein', str(SKEIN)]
             try:
                 result = subprocess.run(argv, env=host.native.manager_environment(), stdin=subprocess.DEVNULL,
                                         capture_output=True, timeout=240)
@@ -302,7 +314,7 @@ def bootstrap_canary():
 if __name__ == '__main__':
     if '--unit' in sys.argv:
         sys.exit(bootstrap_canary())
-    if len(sys.argv) == 4 and sys.argv[1] == '--worker':
+    if len(sys.argv) == 6 and sys.argv[1] == '--worker':
         sys.exit(worker(sys.argv[2], sys.argv[3]))
     if len(sys.argv) == 2 and (sys.argv[1].startswith(('--emit-', '--stop-')) or sys.argv[1] in ('--consume', '--idle', '--early-exit', '--failure')):
         sys.exit(emit(sys.argv[1]))

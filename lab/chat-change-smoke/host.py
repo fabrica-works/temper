@@ -5,6 +5,7 @@ One poll loop owns every child's IO and lifecycle; runner.host owns cgroups.
 CLI: host --skein SOURCE --lab PRIVATE_TMP_LAB --experiment DIRECTORY
           --subject sha256:... --seed DECIMAL
 One explicit seed per invocation. No retries, driver, faults or campaign.
+SOURCE is the pinned skein's root: --skein "$(lab/skein-source)".
 """
 import argparse
 from datetime import datetime, timezone

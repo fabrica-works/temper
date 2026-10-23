@@ -15,7 +15,10 @@ sys.path.insert(0, str(ROOT))
 spec = importlib.util.spec_from_file_location('smoke_host', ROOT / 'host.py')
 host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
-host.bind_skein(Path('/home/free/src/rust/skein'))
+spec = importlib.util.spec_from_file_location('skein_source', ROOT.parent / 'skein_source.py')
+skein_source = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(skein_source)
+host.bind_skein(skein_source.root())
 from _host_output import Output, credential, origin
 from test_ctl_output import transcript
 
