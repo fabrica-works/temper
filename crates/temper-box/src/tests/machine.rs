@@ -328,7 +328,7 @@ fn asked_groups_follow_their_chains_records_failures_and_stop() {
         &[
             (I(Exited { step: 1, exit: Exit::Code(7) }), &[Close { step: 1 }]),
             (I(Ask { forge: 4 }), &[failed(4, Why::Busy)]),
-            (I(Ask { forge: 3 }), &[failed(3, Why::Busy)]),
+            (I(Ask { forge: 3 }), &[]),
             (I(Closed { step: 1 }), &[failed(3, Why::Exited { step: 1, exit: Exit::Code(7) })]),
             (I(Ask { forge: 3 }), &[Spawn { step: 1 }, progress(1)]),
         ],
@@ -1012,7 +1012,8 @@ fn group_stop_refusals_cover_dormant_starting_failing_closing_unknown_and_box_st
     rig.input(Input::NotStarted { step: 1 });
     assert_eq!(&*rig.orders(), &[Order::Close { step: 0 }]);
     failed(&mut rig, Input::Stop { forge: 1 }, 1, Why::Busy);
-    failed(&mut rig, Input::Ask { forge: 1 }, 1, Why::Busy);
+    rig.input(Input::Ask { forge: 1 });
+    assert!(rig.orders().is_empty(), "the failing forge waits for its own failure line");
     rig.closed(0);
     rig.orders();
     start_stoppable(&mut rig, false);

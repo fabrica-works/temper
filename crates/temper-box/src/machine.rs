@@ -509,13 +509,18 @@ impl Machine {
             None => false,
         }
     }
-    fn refused(&self, forge: u16, orders: &mut Queue<Order>) -> bool {
+    fn refused(&self, forge: u16, stop: bool, orders: &mut Queue<Order>) -> bool {
         let mut why = None;
         if self.outcome.is_some() {
             why = Some(Why::Stopping);
         } else {
             for group in &self.groups {
-                if let Status::Stopping | Status::Failing { .. } = group.status {
+                let busy = match group.status {
+                    Status::Stopping => true,
+                    Status::Failing { .. } => stop || group.forge != forge,
+                    Status::Dormant | Status::Starting | Status::Recording { .. } | Status::Started => false,
+                };
+                if busy {
                     why = Some(Why::Busy);
                     break;
                 }
@@ -532,7 +537,7 @@ impl Machine {
         }
     }
     fn ask(&mut self, forge: u16, orders: &mut Queue<Order>) {
-        if self.refused(forge, orders) {
+        if self.refused(forge, false, orders) {
             return;
         }
         let index = self.group(forge).expect("checked group");
@@ -555,7 +560,7 @@ impl Machine {
         self.advance_group(index, Some(first), orders);
     }
     fn stop_group(&mut self, now: Time, forge: u16, orders: &mut Queue<Order>) {
-        if self.refused(forge, orders) {
+        if self.refused(forge, true, orders) {
             return;
         }
         for group in 0..self.groups.len() {

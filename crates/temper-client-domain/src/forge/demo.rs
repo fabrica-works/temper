@@ -1,7 +1,7 @@
 //! The deployment's demo read and its two independent halves (client/README.md, 4.8).
 use super::{Demo, Limits, Request, Side, family, wire_limits};
 use alloc::boxed::Box;
-use jig_client::{Handle, Link, Readable, Readout, Told, contract as c};
+use jig_client::{Client, Handle, Latest, Link, Readable, Readout, Told, contract as c};
 use skein_lib::{Queue, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 
@@ -16,6 +16,7 @@ pub(super) struct State {
     pub failure: Option<StartFailure>,
     pub sent: bool,
     pub removed: bool,
+    pub removal: Option<(Handle, u32)>,
     pub model_ended: bool,
     pub forge_ended: bool,
 }
@@ -35,6 +36,7 @@ impl State {
             failure: None,
             sent: false,
             removed: false,
+            removal: None,
             model_ended: false,
             forge_ended: false,
         }
@@ -167,7 +169,17 @@ pub fn usable_account(line: &c::OwnerAccountLine, demo_provider: Option<u32>) ->
 
 /// Observe positive evidence of an end; unavailable or cut documents are not ends.
 /// Session latches keep a lost credential from bringing the model half back.
-pub(crate) fn progress(side: &mut Side, accounts: Option<&c::OwnerAccounts>, out: &mut Queue<Request>) {
+pub(crate) fn progress(
+    side: &mut Side,
+    accounts: Option<&c::OwnerAccounts>,
+    client: &Client,
+    out: &mut Queue<Request>,
+) {
+    observe_end(side, accounts, client, out);
+    remove(side, client, out);
+}
+
+fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Client, out: &mut Queue<Request>) {
     let Some(demo) = side.demo.answer.as_ref() else { return };
     if demo.state != DemoState::Running {
         return;
@@ -191,30 +203,16 @@ pub(crate) fn progress(side: &mut Side, accounts: Option<&c::OwnerAccounts>, out
     }
     let reread = forge_ended && !side.demo.forge_ended;
     let changed = (model_ended && !side.demo.model_ended) || reread;
+    let first_end = !side.demo.model_ended && !side.demo.forge_ended && (model_ended || forge_ended);
     side.demo.model_ended |= model_ended;
     side.demo.forge_ended |= forge_ended;
-    if !side.demo.removed
-        && (side.demo.model_ended || side.demo.forge_ended)
-        && let Some(accounts) = accounts
-    {
-        for line in &accounts.accounts {
-            if line.provider == Some(demo.provider) && line.holder == c::OwnerAccountHolder::Deployment {
-                side.serial = side.serial.checked_add(1).expect("forge request serial fits");
-                side.demo.removed = true;
-                // No pending page operation owns this key: every outcome is dropped.
-                out.push(Request::Client {
-                    asked: jig_client::Event::Send {
-                        key: jig_client::Key { asker: crate::owner::Owner::Forge.asker(), number: side.serial },
-                        name: None,
-                        request: jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
-                            holder: c::AccountHolder::Deployment,
-                            change: c::AccountChange::Remove { account: line.number },
-                        })),
-                    },
-                });
-                break;
-            }
-        }
+    if first_end && !side.demo.removed && side.demo.removal.is_none() && owner(client) {
+        side.serial = side.serial.checked_add(1).expect("forge handles fit");
+        let handle = Handle { asker: crate::owner::Owner::Forge.asker(), number: side.serial };
+        side.demo.removal = Some((handle, demo.provider));
+        out.push(Request::Client {
+            asked: jig_client::Event::Watch { handle, subject: jig_client::Watchable::Jig(c::Subject::Deployment) },
+        });
     }
     if reread {
         read(side, out);
@@ -222,6 +220,45 @@ pub(crate) fn progress(side: &mut Side, accounts: Option<&c::OwnerAccounts>, out
     if changed {
         side.changed();
     }
+}
+
+fn owner(client: &Client) -> bool {
+    let Some(document) = client.document(super::me::handle()) else { return false };
+    if document.state != jig_client::State::Live {
+        return false;
+    }
+    let Some(Latest::Jig(c::Delivery::Me(me))) = document.latest else { return false };
+    me.deployment_role == Some(c::HeldRole::Owner)
+}
+
+/// The end holds this watch even when the forge's reread has already answered none.
+fn remove(side: &mut Side, client: &Client, out: &mut Queue<Request>) {
+    let Some((handle, provider)) = side.demo.removal else { return };
+    let Some(document) = client.document(handle) else { return };
+    if document.state != jig_client::State::Live {
+        return;
+    }
+    let Some(Latest::Jig(c::Delivery::OwnerDeployment(deployment))) = document.latest else { return };
+    for account in &deployment.accounts {
+        if account.provider == Some(provider) && account.holder == c::OwnerAccountHolder::Deployment {
+            side.serial = side.serial.checked_add(1).expect("forge request serial fits");
+            side.demo.removed = true;
+            // No pending page operation owns this key: every outcome is dropped.
+            out.push(Request::Client {
+                asked: jig_client::Event::Send {
+                    key: jig_client::Key { asker: crate::owner::Owner::Forge.asker(), number: side.serial },
+                    name: None,
+                    request: jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
+                        holder: c::AccountHolder::Deployment,
+                        change: c::AccountChange::Remove { account: account.number },
+                    })),
+                },
+            });
+            break;
+        }
+    }
+    side.demo.removal = None;
+    out.push(Request::Client { asked: jig_client::Event::Unwatch { handle } });
 }
 
 fn read(side: &mut Side, out: &mut Queue<Request>) {

@@ -567,6 +567,7 @@ fn a_pipe_stop_closes_only_its_group_keeps_the_record_and_can_be_started_again()
         harness.run_until_idle();
     }
     assert_eq!(&*harness.reply_bytes(), b"stopped 3\n");
+    assert!(Harness::contains(&harness.stderr(), b"box: forge 3's group stopped\n"));
     assert_eq!(harness.spawn_times(b"serve").len(), 1);
     assert_eq!(harness.spawn_times(b"forgejo 3").len(), 1);
     let root = harness.machine.reopen_root(0);
@@ -583,4 +584,29 @@ fn a_pipe_stop_closes_only_its_group_keeps_the_record_and_can_be_started_again()
     harness.sim.assert_quiescent(harness.pid);
     harness.sim.assert_no_open_fds(harness.pid);
     assert_eq!(harness.machine.open_handles(), 0);
+}
+
+#[test]
+fn a_group_stop_is_reported_on_stderr_after_the_control_pipe_closes() {
+    let mut steps = grouped_steps();
+    steps.asked.get_mut(0).unwrap().forge = 1;
+    let mut harness = Harness::grouped(steps, &[], true);
+    harness.run_until_idle();
+    harness.ask(b"start 1\n");
+    harness.run_until_idle();
+    harness.replies.clear();
+    harness.ask(b"stop 1\n");
+    harness.run_until_idle();
+    assert!(harness.stderr().is_empty(), "the group has not closed");
+    let serve = harness.hosted.get(harness.serve_index()).unwrap().pid;
+    let forge = harness.hosted.get(harness.child_index(b"forgejo 3")).unwrap().pid;
+    harness.sim.finish_service(serve, Exit::Code(1));
+    harness.sim.finish_service(forge, Exit::Code(0));
+    harness.run_until_idle();
+    assert!(harness.reply_bytes().is_empty(), "the old control pipe has closed");
+    assert_eq!(&*harness.stderr(), b"box: forge 1's group stopped\n");
+    harness.terminate();
+    assert_eq!(harness.run_to_end(), Exit::Code(0));
+    harness.sim.assert_quiescent(harness.pid);
+    harness.sim.assert_no_open_fds(harness.pid);
 }
