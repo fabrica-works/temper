@@ -187,6 +187,7 @@ pub(crate) fn run_forge(
     scratch: &skein_scratch::Scratch,
     fixture: forge::Fixture,
     scripts: Scripts,
+    rules: Option<Rules>,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
 ) -> skein_world::real::Outcome<Proc> {
     let state = std::rc::Rc::new(std::cell::RefCell::new(None));
@@ -206,7 +207,7 @@ pub(crate) fn run_forge(
         Proc::Llm(Box::new(Llm {
             peer: llm::peer(llm::scripted(Box::new([]))).expect("deferred peer"),
             scripts: Some(scripts),
-            rules: None,
+            rules,
             cue: false,
             release: None,
             released: None,

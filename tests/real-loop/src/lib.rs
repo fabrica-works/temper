@@ -136,7 +136,20 @@ pub fn run_forge(
     steps: impl FnOnce() -> Vec<calls::Step>,
 ) -> Ran {
     let scratch = Scratch::new("real-forge");
-    let outcome = world::run_forge(&scratch, fixture, scripts, steps);
+    let outcome = world::run_forge(&scratch, fixture, scripts, None, steps);
+    checked(Ran { outcome: Outcome::Forge(outcome), scratch })
+}
+
+/// Run a forge story whose scripts pick each turn by their input rules (skein's fake-llm.md, 2.4).
+#[must_use]
+pub fn run_forge_by_input(
+    fixture: forge::Fixture,
+    scripts: fn(std::net::SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]>,
+    rules: fn() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]>,
+    steps: impl FnOnce() -> Vec<calls::Step>,
+) -> Ran {
+    let scratch = Scratch::new("real-forge");
+    let outcome = world::run_forge(&scratch, fixture, scripts, Some(rules), steps);
     checked(Ran { outcome: Outcome::Forge(outcome), scratch })
 }
 

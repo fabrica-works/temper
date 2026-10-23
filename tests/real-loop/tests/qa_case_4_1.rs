@@ -69,7 +69,7 @@ fn extra_design_turn(scripts: &mut [Script], tool: &[u8], arguments: &Value) {
 }
 
 fn story(scripts: fn(SocketAddr) -> Box<[Script]>) -> Ran {
-    temper_real_loop_world::run_forge(case::fixture(), scripts, acts::step_4_1)
+    temper_real_loop_world::run_forge_by_input(case::fixture(), scripts, case::scripts::step_4_1_rules, acts::step_4_1)
 }
 
 fn misses(ran: &Ran, expected: &[(Promise, &str)]) {
@@ -168,11 +168,16 @@ fn a_failed_document_act_cannot_silently_pass() {
         .iter()
         .find_map(|&(read, call)| (read == acts::Read::DesignEnded).then_some(call))
         .expect("design read position");
-    let ran = temper_real_loop_world::run_forge(case::fixture(), case::scripts::step_4_1, || {
-        let mut steps = acts::step_4_1();
-        steps[design_read] = calls::call(D1, argv!["task", calls::number(ABSENT_TASK), "--json"]);
-        steps
-    });
+    let ran = temper_real_loop_world::run_forge_by_input(
+        case::fixture(),
+        case::scripts::step_4_1,
+        case::scripts::step_4_1_rules,
+        || {
+            let mut steps = acts::step_4_1();
+            steps[design_read] = calls::call(D1, argv!["task", calls::number(ABSENT_TASK), "--json"]);
+            steps
+        },
+    );
     let failed = &ran.calls()[design_read];
     println!(
         "document act: exit {:?}, stdout {}, stderr {}",
