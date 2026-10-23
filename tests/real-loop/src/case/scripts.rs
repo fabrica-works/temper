@@ -397,3 +397,60 @@ pub fn step_4_6(_forge: SocketAddr) -> Box<[Script]> {
         },
     ])
 }
+
+// Act 2, step 5.1 (domain/testing.md, 5.3)
+#[must_use]
+pub fn step_5_1(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        RULES, RULES_ANSWERED, RULES_DELEGATED, RULES_REPORT, SCOPE, SCOPE_ANSWER, SCOPE_ASKED, SCOPE_QUESTION,
+        SCOPE_QUESTION_HOLD, SCOPE_QUESTION_NUMBER, SCOPE_REPORT, SCOPE_SPEC,
+    };
+    use skein_fake_llm_domain::api::Piece;
+    let mut question = call(b"message", &json!({"target":RULES,"form":"question","words":SCOPE_QUESTION}));
+    let mut lines = vec![Line::Pieces {
+        pieces: Box::new([Piece {
+            text: b"Ask x3's scope after the director is held.".as_slice().into(),
+            hold: Some(SCOPE_QUESTION_HOLD.into()),
+        }]),
+    }];
+    lines.extend(question.lines);
+    question.lines = lines.into();
+    Box::new([
+        Script {
+            cue: super::Agent::Rules.cue().into(),
+            turns: Box::new([
+                owner(SCOPE_SPEC, false),
+                wait(RULES_DELEGATED),
+                call(
+                    b"message",
+                    &json!({"target":SCOPE,"form":"answer","question":SCOPE_QUESTION_NUMBER,"words":SCOPE_ANSWER}),
+                ),
+                wait(RULES_ANSWERED),
+                report(RULES_REPORT),
+            ]),
+        },
+        Script {
+            cue: super::Agent::Scope.cue().into(),
+            turns: Box::new([question, wait(SCOPE_ASKED), report(SCOPE_REPORT)]),
+        },
+    ])
+}
+
+#[must_use]
+pub fn step_5_1_rules() -> Box<[Box<[Rule]>]> {
+    // The trial with counted turns delegated again after Release: the fresh
+    // conversation resets its assistant count. Select only the director by
+    // fresh input; A retains its counted conversation across its parked wait.
+    let director = [
+        (super::SCOPE_REPORT, 4),
+        (CROSSED, 4),
+        (super::SCOPE_QUESTION, 2),
+        (MESSAGE, 3),
+        (DELEGATED, 1),
+        (DELIVERY, 1),
+        (BEGIN, 0),
+        ("", 1),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    Box::new([Box::new(director), Box::new([])])
+}

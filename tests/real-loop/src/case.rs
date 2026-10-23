@@ -96,11 +96,15 @@ pub enum Agent {
     Hang,
     /// A's next phase, asking that director for its direction.
     Phase,
+    Rules,
+    Scope,
 }
 impl Agent {
     #[must_use]
     pub fn cue(self) -> &'static [u8] {
         match self {
+            Self::Rules => b"@case_rules",
+            Self::Scope => b"@case_scope",
             Self::Hang => b"@case_hang",
             Self::Phase => b"@case_phase",
             Self::Check => b"@case_check",
@@ -303,5 +307,44 @@ pub fn fixture_4_6() -> forge::Fixture {
             landing::admit(value);
         },
         setup: forge::fixture().setup,
+    }
+}
+
+// Act 2, step 5.1 (domain/testing.md, 5.3)
+pub const RULES: u64 = 1;
+pub const SCOPE: u64 = 2;
+pub const SCOPE_QUESTION_NUMBER: u64 = 2;
+pub const RULES_HOLD_REVISION: u64 = 1;
+pub const RULES_PERSON: &str = "@case_rules Delegate A to ask about x3's scope and wait for its report.";
+pub const SCOPE_SPEC: &str = "@case_scope Own x3's scope; ask the director and report on its answer.";
+pub const SCOPE_QUESTION: &str = "What is x3's scope in the next milestone?";
+pub const SCOPE_ANSWER: &str = "x3 owns the next milestone's design and its defined end.";
+pub const RULES_DELEGATED: &str = "A owns the scope question.";
+pub const RULES_ANSWERED: &str = "A has its scope answer.";
+pub const SCOPE_ASKED: &str = "The scope question awaits the director.";
+pub const SCOPE_REPORT: &str = "x3's scope has its direction.";
+pub const RULES_REPORT: &str = "A reported x3's scope under the new process.";
+pub const SCOPE_QUESTION_HOLD: &[u8] = b"case-scope-question";
+pub const RULES_FILE: &str = "AGENTS.md";
+pub const DROPPED_RULE: &str = "Owners check shared version numbers before they land.";
+pub const OLD_RULES: &str = "# Process\n\nOwners check shared version numbers before they land.\n";
+pub const NEW_RULES: &str = "# Process\n\nAn owner takes one mission, at most four milestones, then stops.\nMilestones take 2-3 hours under a 4-hour cap, with a sub-owner each.\nThe plan comes first. Start a fresh session at each milestone's end.\nRun a QA pass beside the next milestone.\n";
+
+#[must_use]
+pub fn fixture_5_1() -> forge::Fixture {
+    forge::Fixture {
+        setup: || {
+            let mut setup = (forge::fixture().setup)();
+            let mut tree = setup.tree.into_vec();
+            tree.push(api::File { path: RULES_FILE.as_bytes().into(), content: OLD_RULES.as_bytes().into() });
+            setup.tree = tree.into_boxed_slice();
+            setup
+        },
+        configure: |value, agent, forge| {
+            (fixture_placed().configure)(value, agent, forge);
+            value["engine"]["charters"][1]["resume"] = false.into();
+            value["application"]["landing"]["projects"] = json!([]);
+            landing::admit(value);
+        },
     }
 }

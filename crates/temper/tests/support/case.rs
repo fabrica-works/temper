@@ -601,6 +601,7 @@ impl Judge {
             }
             Step::FixtureReady => panic!("FixtureReady unsupported"),
             Step::Advance => panic!("Advance unsupported"),
+            Step::Push { .. } => panic!("Push unsupported"),
             Step::ReleaseHold { .. } => panic!("ReleaseHold unsupported"),
             Step::Probe { .. } => panic!("Probe unsupported"),
             Step::Release { .. } => panic!("Release unsupported"),
@@ -896,6 +897,7 @@ fn describe(step: &calls::Step) -> String {
         Step::Terminal(_) => "Terminal".into(),
         Step::ReleaseHold { name } => format!("ReleaseHold {}", String::from_utf8_lossy(name)),
         Step::Advance => "Advance".into(),
+        Step::Push { .. } => panic!("Push unsupported"),
         Step::AddWorker { name } => format!("AddWorker {name}"),
         Step::StopWorker { name } => format!("StopWorker {name}"),
         Step::StartWorker { name } => format!("StartWorker {name}"),

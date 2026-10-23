@@ -36,6 +36,11 @@ pub enum Read {
     HangActivityOlder,
     /// The oldest director activity page.
     HangActivityFirst,
+    RulesWaiting,
+    RulesHeld,
+    RulesQuestionWaiting,
+    ScopeEnded,
+    RulesEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -287,5 +292,65 @@ pub fn step_4_6(base: usize) -> Vec<calls::Step> {
         ),
         // The ended chat is the cheapest event proving its retry cannot use ws.
         calls::start_worker("ws"),
+    ]
+}
+
+// Act 2, step 5.1 (domain/testing.md, 5.3)
+const RULES_ENDED: usize = 3;
+pub const READS_5_1: &[(Read, usize)] = &[
+    (Read::RulesWaiting, 5),
+    (Read::RulesHeld, 7),
+    (Read::RulesQuestionWaiting, 8),
+    (Read::RulesEnded, RULES_ENDED),
+    (Read::ScopeEnded, 11),
+];
+
+#[must_use]
+pub fn step_5_1() -> Vec<calls::Step> {
+    use super::{
+        NEW_RULES, RULES, RULES_FILE, RULES_HOLD_REVISION, RULES_PERSON, SCOPE, SCOPE_QUESTION, SCOPE_QUESTION_HOLD,
+    };
+    vec![
+        sign_in(D1),
+        call(
+            D1,
+            argv![
+                "adopt",
+                "--project",
+                number(PROJECT),
+                "--owner",
+                "acme",
+                "--name",
+                "app",
+                "--landing",
+                "main",
+                "--role",
+                "context",
+                "--no-home",
+                "--key",
+                "rules-kit"
+            ],
+        ),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "rules", RULES_PERSON]),
+        // Keep the ended watch across Stop and Release instead of polling the
+        // full task document through the director's answer and both reports.
+        start(D1, argv!["wait", "task", number(RULES), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(RULES), "--until", "replied"]),
+        calls::until(D1, argv!["task", number(RULES), "--json"], b"\"work\":\"waiting\"", b"\"phase\":\"running\""),
+        call(D1, argv!["stop", number(RULES), "--key", "rules-stop"]),
+        calls::until(D1, argv!["task", number(RULES), "--json"], b"\"stopped_by\"", b"\"phase\":\"running\""),
+        calls::release_hold(SCOPE_QUESTION_HOLD),
+        calls::until(
+            D1,
+            argv!["task", number(RULES), "--activity", "32", "--json"],
+            SCOPE_QUESTION.as_bytes(),
+            b"\"stopped_by\"",
+        ),
+        // A must park before the answer: its next run then fetches main's guide.
+        call(D1, argv!["wait", "task", number(SCOPE), "--until", "phase:idle"]),
+        calls::push(RULES_FILE.as_bytes(), NEW_RULES.as_bytes()),
+        call(D1, argv!["release", number(RULES), "--hold", number(RULES_HOLD_REVISION), "--key", "rules-release"]),
+        join(RULES_ENDED),
+        call(D1, argv!["task", number(SCOPE), "--json"]),
     ]
 }

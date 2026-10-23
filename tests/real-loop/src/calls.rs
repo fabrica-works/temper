@@ -31,6 +31,11 @@ pub enum Step {
     /// A person at the hosted terminal.
     Terminal(crate::terminal::Act),
     Advance,
+    /// Commit the person's named file on the fake forge's main.
+    Push {
+        path: &'static [u8],
+        words: &'static [u8],
+    },
     /// Release a fake LLM hold through its owner in the loop.
     ReleaseHold {
         name: &'static [u8],
@@ -107,6 +112,10 @@ pub fn start_worker(name: &'static str) -> Step {
 #[must_use]
 pub fn release_hold(name: &'static [u8]) -> Step {
     Step::ReleaseHold { name }
+}
+#[must_use]
+pub fn push(path: &'static [u8], words: &'static [u8]) -> Step {
+    Step::Push { path, words }
 }
 #[must_use]
 pub fn advance() -> Step {
@@ -289,6 +298,7 @@ impl Caller {
             | Step::StartWorker { .. }
             | Step::AddWorker { .. }
             | Step::Advance
+            | Step::Push { .. }
             | Step::SignIn { .. }
             | Step::SameParty { .. }
             | Step::Kill { .. }
@@ -319,6 +329,9 @@ impl Caller {
     }
     pub(crate) fn advancing(&self) -> bool {
         matches!(self.steps.get(self.next), Some(Step::Advance))
+    }
+    pub(crate) fn pushing(&self) -> Option<(&'static [u8], &'static [u8])> {
+        if let Some(Step::Push { path, words }) = self.steps.get(self.next) { Some((*path, *words)) } else { None }
     }
     pub(crate) fn held_index(&self) -> usize {
         self.steps[..self.next].iter().filter(|step| matches!(step, Step::Held { .. })).count()
@@ -417,6 +430,7 @@ impl Caller {
             | Step::StartWorker { .. }
             | Step::AddWorker { .. }
             | Step::Advance
+            | Step::Push { .. }
             | Step::Join { .. }
             | Step::Watching { .. }
             | Step::Held { .. }
@@ -673,6 +687,16 @@ impl Caller {
             &mut self.submissions,
         )
     }
+    fn watch_call(&mut self, call: usize) -> bool {
+        assert!(self.running[call].as_ref().is_some_and(|r| r.started), "started watch call");
+        self.watching = Some(call);
+        if !self.watched {
+            return false;
+        }
+        self.watching = None;
+        self.watched = false;
+        true
+    }
     fn advance(&mut self, now: Time) {
         if matches!(self.steps.get(self.next), Some(Step::Held { .. })) && self.held.get() {
             // Issue the following kill in this pass, before the hosted caller's next turn.
@@ -692,8 +716,12 @@ impl Caller {
             Step::FixtureReady => self.fixture_ready(),
             Step::AddWorker { .. } if !self.added.replace(false) => return,
             Step::StopWorker { .. } | Step::StartWorker { .. } if !self.worker_ready.replace(false) => return,
-            Step::Advance if !self.advanced.get() => return,
-            Step::StopWorker { .. } | Step::StartWorker { .. } | Step::AddWorker { .. } | Step::Advance => {}
+            Step::Advance | Step::Push { .. } if !self.advanced.get() => return,
+            Step::StopWorker { .. }
+            | Step::StartWorker { .. }
+            | Step::AddWorker { .. }
+            | Step::Advance
+            | Step::Push { .. } => {}
             Step::ReleaseHold { .. } => {
                 if !self.hold_released.replace(false) {
                     return;
@@ -721,13 +749,9 @@ impl Caller {
                 }
             }
             Step::Watching { call } => {
-                assert!(self.running[*call].as_ref().is_some_and(|r| r.started), "started watch call");
-                self.watching = Some(*call);
-                if !self.watched {
+                if !self.watch_call(*call) {
                     return;
                 }
-                self.watching = None;
-                self.watched = false;
             }
             Step::Join { call } => {
                 if self.running[*call].is_some() {
@@ -781,7 +805,7 @@ impl Caller {
             Some(Step::Terminal(act)) => self.terminal.ready(act, self.links.get()),
             Some(Step::FixtureReady) => self.running.iter().all(Option::is_none),
             Some(Step::StopWorker { .. } | Step::StartWorker { .. }) => self.worker_ready.get(),
-            Some(Step::Advance) => self.advanced.get(),
+            Some(Step::Advance | Step::Push { .. }) => self.advanced.get(),
             Some(Step::ReleaseHold { .. }) => self.hold_released.get(),
             Some(Step::AddWorker { .. }) => self.added.get(),
             Some(Step::Held { .. }) => self.held.get(),

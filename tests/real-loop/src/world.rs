@@ -420,13 +420,13 @@ impl Referee<Proc> for Judge {
             {
                 state.hand_hooks(hooks);
             }
-            if caller.advancing() && state.hooked && !state.moved {
-                state.advance(now, skein_shell::Clock::new().now().wall);
-            }
+            person_push(now, caller, state, &mut service.seen);
             service.seen.collect(forge, &state.handle);
-            caller
-                .advanced
-                .set(state.moved && !service.seen.deliveries().is_empty() && !service.seen.responses().is_empty());
+            caller.advanced.set(
+                state.moved
+                    && (caller.pushing().is_some()
+                        || !service.seen.deliveries().is_empty() && !service.seen.responses().is_empty()),
+            );
             if service.is_empty() {
                 forge.shutdown();
             }
@@ -510,6 +510,7 @@ impl Referee<Proc> for Judge {
             (forge.address().is_some() && service.forge_address.is_none())
                 || (service.hooks.is_some() && !state.hooked)
                 || (caller.advancing() && state.hooked && !state.moved)
+                || (caller.pushing().is_some() && !state.moved)
                 || (caller.advancing()
                     && !caller.advanced.get()
                     && (!forge.observations().is_empty() || !service.seen.responses().is_empty()))
@@ -561,6 +562,18 @@ impl Referee<Proc> for Judge {
     }
     fn passed(&self) -> bool {
         self.finished
+    }
+}
+
+fn person_push(now: Time, caller: &Caller, state: &mut forge::State, seen: &mut forge::Seen) {
+    if caller.advancing() && state.hooked && !state.moved {
+        state.advance(now, skein_shell::Clock::new().now().wall);
+    }
+    if let Some((path, words)) = caller.pushing()
+        && !state.moved
+    {
+        state.push(now, skein_shell::Clock::new().now().wall, path, words);
+        seen.pushed(&state.handle);
     }
 }
 

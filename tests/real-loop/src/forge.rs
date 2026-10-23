@@ -92,6 +92,25 @@ impl Seen {
     pub fn observations(&self) -> &[domain::Observation] {
         &self.observations
     }
+    /// Freeze main after the person's push, including a story with no merge.
+    pub(crate) fn pushed(&mut self, handle: &Rc<RefCell<Forge>>) {
+        let forge = handle.borrow();
+        let api::Answer::Commit(main) = forge
+            .domain
+            .inspect(&forge.config, b"acme/app", &api::Read::Branch { branch: b"main".as_slice().into() })
+            .expect("pushed main head")
+        else {
+            panic!("main commit")
+        };
+        self.main = forge
+            .domain
+            .object(main)
+            .expect("pushed main object")
+            .tree
+            .iter()
+            .map(|(path, bytes)| (path.to_vec(), bytes.to_vec()))
+            .collect();
+    }
     pub(crate) fn collect(&mut self, peer: &Peer, handle: &Rc<RefCell<Forge>>) {
         self.deliveries = peer
             .observations()
@@ -190,9 +209,12 @@ impl State {
         self.hooked = true;
     }
     pub(crate) fn advance(&mut self, now: Time, wall: Wall) {
+        self.push(now, wall, b"conflict.txt", b"other\n");
+    }
+    pub(crate) fn push(&mut self, now: Time, wall: Wall, path: &[u8], words: &[u8]) {
         let mut forge = self.handle.borrow_mut();
         let env = Env { now, wall, limits: forge.config };
-        domain::advance(&mut forge.domain, &env, b"acme/app", b"main", b"conflict.txt", b"other\n", OTHER)
+        domain::advance(&mut forge.domain, &env, b"acme/app", b"main", path, words, OTHER)
             .expect("another party's push");
         self.moved = true;
     }
