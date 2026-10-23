@@ -347,3 +347,91 @@ fn required_head_checks_ignore_a_failed_non_required_row() {
     fixtures::answer(&mut d, call, Ok(Answer::Checks(Box::new([lint, rows[0].clone()]))));
     merge_after_base_reads(&mut d);
 }
+
+fn named_pull_verdict(number: u64) -> Box<[Request]> {
+    use skein_forge::api::{Answer, Ci, Kind, Op, Read, State, Summary};
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    let mut row = fixtures::opening_row();
+    row.pull = Some(1);
+    outputs(&mut d, Event::Change { row: row.clone() });
+    // Another change in the same repository must not wake with this pull.
+    row.task = LATER_CHANGE;
+    row.change.task = LATER_CHANGE;
+    row.pull = Some(2);
+    row.branch = Box::from(LATER_BRANCH);
+    outputs(&mut d, Event::Change { row });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(
+        &mut d,
+        Event::Names {
+            task: fixtures::CHANGE,
+            resources: Box::new([Name { forge: REPO.forge, repository: REPO.repository, what: What::Pull(number) }]),
+        },
+    );
+    let mut seen = skein_lib::List::with_capacity(max_out(&LIMITS).checked_mul(4).expect("four bounded output passes"));
+    // At most a repository listing, the item, and the pull itself.
+    for _ in 0_u32..3 {
+        let (call, op) = fixtures::next_call(&mut d);
+        if op == Op::Read(Read::Pull { number }) {
+            let mut pull = fixtures::open_pull();
+            pull.number = number;
+            pull.ci = Ci::Passed;
+            for request in fixtures::answer(&mut d, call, Ok(Answer::Pull(pull))) {
+                seen.push(request).expect("four bounded output passes");
+            }
+            for request in ready(&mut d) {
+                seen.push(request).expect("four bounded output passes");
+            }
+            return seen.into_boxed();
+        }
+        let answer = if let Op::Read(Read::Items { .. }) = op {
+            Answer::Items { items: Box::new([]), more: false, now: env().now }
+        } else {
+            let Op::Read(Read::Item { number: read_number, .. }) = op else { panic!("{op:?}") };
+            assert_eq!(read_number, number);
+            Answer::Item {
+                item: Summary {
+                    labels: Box::new([]),
+                    number,
+                    kind: Kind::Pull,
+                    state: State::Open,
+                    author: 7,
+                    key: None,
+                    title: Box::new([]),
+                    body: Box::new([]),
+                    updated: env().now,
+                },
+                comments: Box::new([]),
+                more: false,
+            }
+        };
+        for request in fixtures::answer(&mut d, call, Ok(answer)) {
+            seen.push(request).expect("four bounded output passes");
+        }
+    }
+    panic!("the named pull must be read");
+}
+
+#[test]
+fn a_named_pulls_ci_changed_wakes_only_its_own_change() {
+    let seen = named_pull_verdict(1);
+    let mut wakes = 0_u32;
+    for request in &seen {
+        if let Request::WakeProcedure { task } = request {
+            assert_eq!(*task, fixtures::CHANGE, "CI Changed: {seen:?}");
+            wakes += 1;
+        }
+    }
+    assert_eq!(wakes, 1, "one owning change wakes: {seen:?}");
+}
+
+#[test]
+fn a_named_pulls_changed_without_an_owning_change_wakes_nothing() {
+    let seen = named_pull_verdict(99);
+    for request in &seen {
+        if let Request::WakeProcedure { .. } = request {
+            panic!("unowned Changed: {seen:?}");
+        }
+    }
+}

@@ -1509,6 +1509,27 @@ fn describe_change_effect(
     })
 }
 
+/// Once a pull is known its keep supplies the base and CI, within the same two names.
+fn watch_change_pull(domain: &mut Domain, env: &Env<Limits>, row: &forge::ChangeRow) {
+    let Some(number) = row.pull else { return };
+    let Some(parts) = branch_parts(&row.branch, env.limits.forge.name_bytes) else { return };
+    let resources = Box::new([
+        forge::Name {
+            forge: row.repository.forge,
+            repository: row.repository.repository,
+            what: forge::What::Branch(parts),
+        },
+        forge::Name {
+            forge: row.repository.forge,
+            repository: row.repository.repository,
+            what: forge::What::Pull(number),
+        },
+    ]);
+    if domain.forge.names(row.task) != Some(resources.as_slice()) {
+        domain.work.push(Work::Forge(forge::Event::Names { task: row.task, resources }));
+    }
+}
+
 /// Register the connector's procedure beside the task's first due step.
 /// Parameter 1 names a project-unique repository tag, 2 the base,
 /// 3 an optional already-pushed branch, 4 the pull body, and 5 priority.
@@ -2155,6 +2176,10 @@ pub(crate) fn outputs(
                 super::applications::finished(domain, request, Err(why));
             }
             forge::Request::WakeProcedure { task } => {
+                // A restored change also repairs names saved before its pull was known.
+                if let Some(row) = domain.forge.change(task).cloned() {
+                    watch_change_pull(domain, env, &row);
+                }
                 domain.work.push(Work::Tasks(tasks::Event::WakeProcedure { task }));
             }
             forge::Request::Resource { project, name, role, hold } => {
@@ -2219,6 +2244,10 @@ pub(crate) fn outputs(
                 }));
             }
             forge::Request::Save { record, release, read_afresh } => {
+                // Both opening and finding a pull save the change with its number.
+                if let forge::Stored::Change(row) = &record {
+                    watch_change_pull(domain, env, row);
+                }
                 if let Some(name) = read_afresh
                     && let Some(resource) = hub_name(domain.config.forge_connector, &name, &env.limits.tasks)
                 {

@@ -243,3 +243,150 @@ fn writable_repositories_exclude_an_ended_forge() {
     assert_eq!(repositories.len(), 1);
     assert_eq!(repositories[0].provider.forge, 3);
 }
+
+fn change_row(pull: Option<u64>) -> super::forge::ChangeRow {
+    use super::{forge, forge_change as change};
+    forge::ChangeRow {
+        task: 7,
+        repository: skein_forge::api::Repository { forge: 3, repository: 1 },
+        branch: Box::from(b"temper/7".as_slice()),
+        base: Box::from(b"main".as_slice()),
+        title: Box::from(b"Change".as_slice()),
+        body: Box::new([]),
+        priority: 0,
+        change: change::Change {
+            task: 7,
+            state: change::State::Producing { requested: false },
+            gates: Box::new([]),
+            clean: Box::new([]),
+            repairs: 0,
+            resolutions: 0,
+            updates: 0,
+            since: skein_lib::Wall::from_nanos(0),
+            ready_since: None,
+            owns_turn: false,
+            last_head: None,
+        },
+        pull,
+        pending: None,
+        effect: change::EffectResult::None,
+        delegate: None,
+        delegate_status: change::Status::Unknown,
+        verdicts: Box::new([]),
+        gate_remarks: Box::new([]),
+        drift: None,
+        base_repair: false,
+        queue_repair: None,
+        queue_repairs: 0,
+    }
+}
+
+fn change_names(pull: Option<u64>) -> Box<[super::forge::Name]> {
+    use super::forge::{Name, What};
+    Box::new([
+        Name {
+            forge: 3,
+            repository: 1,
+            what: What::Branch(Box::new([Box::from(b"temper".as_slice()), Box::from(b"7".as_slice())])),
+        },
+        Name {
+            forge: 3,
+            repository: 1,
+            what: match pull {
+                Some(number) => What::Pull(number),
+                None => What::Branch(Box::new([Box::from(b"main".as_slice())])),
+            },
+        },
+    ])
+}
+
+#[test]
+fn a_changes_saved_pull_replaces_its_base_watch_within_two_names() {
+    use super::{Decision, Work, forge};
+    let (mut domain, mut env) = two_forges();
+    env.limits.forge.resources_per_task = 2;
+    let forge_env = skein_lib::Env { now: env.now, wall: env.wall, limits: env.limits.forge };
+    let mut out = skein_lib::Queue::with_capacity(forge::max_out(&env.limits.forge));
+    forge::step(
+        &mut domain.forge,
+        &forge_env,
+        forge::Event::Restore { record: forge::Stored::Names { task: 7, resources: change_names(None) } },
+        &mut out,
+    );
+    forge::step(
+        &mut domain.forge,
+        &forge_env,
+        forge::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic },
+        &mut out,
+    );
+    while let Some(request) = out.pop() {
+        drop(request);
+    }
+    let mut decision = Decision::new(&env.limits.journal);
+    for pull in [None, Some(23)] {
+        out.push(forge::Request::Save {
+            record: forge::Stored::Change(change_row(pull)),
+            release: None,
+            read_afresh: None,
+        });
+        super::outputs(&mut domain, &env, &mut decision, &mut out);
+        if pull.is_none() {
+            assert!(domain.work.is_empty(), "before the pull, keep branch and base");
+        }
+    }
+    let Some(Work::Forge(event @ forge::Event::Names { .. })) = domain.work.pop() else {
+        panic!("name the known pull")
+    };
+    let forge::Event::Names { task, resources } = &event else { panic!("pull watch") };
+    assert_eq!(*task, 7);
+    assert_eq!(*resources, change_names(Some(23)));
+    forge::step(&mut domain.forge, &forge_env, event, &mut out);
+    assert_eq!(domain.forge.names(7), Some(change_names(Some(23)).as_ref()));
+    assert!(domain.work.is_empty(), "the branch's hold needs no change");
+}
+
+#[test]
+fn a_restored_changes_wake_names_its_known_pull_again() {
+    use super::{Decision, Work, forge};
+    let (mut domain, mut env) = two_forges();
+    env.limits.forge.resources_per_task = 2;
+    let forge_env = skein_lib::Env { now: env.now, wall: env.wall, limits: env.limits.forge };
+    let mut out = skein_lib::Queue::with_capacity(forge::max_out(&env.limits.forge));
+    // An old store, or a restart between saving the pull and saving its names.
+    for record in
+        [forge::Stored::Change(change_row(Some(23))), forge::Stored::Names { task: 7, resources: change_names(None) }]
+    {
+        forge::step(&mut domain.forge, &forge_env, forge::Event::Restore { record }, &mut out);
+    }
+    forge::step(
+        &mut domain.forge,
+        &forge_env,
+        forge::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic },
+        &mut out,
+    );
+    while let Some(request) = out.pop() {
+        drop(request);
+    }
+    out.push(forge::Request::WakeProcedure { task: 7 });
+    let mut decision = Decision::new(&env.limits.journal);
+    super::outputs(&mut domain, &env, &mut decision, &mut out);
+    let Some(Work::Forge(event @ forge::Event::Names { .. })) = domain.work.pop() else { panic!("restore pull watch") };
+    let forge::Event::Names { task, resources } = &event else { panic!("pull watch") };
+    assert_eq!(*task, 7);
+    assert_eq!(*resources, change_names(Some(23)));
+    forge::step(&mut domain.forge, &forge_env, event, &mut out);
+    let Some(Work::Tasks(super::tasks::Event::WakeProcedure { task: 7 })) = domain.work.pop() else {
+        panic!("wake the change's procedure")
+    };
+    assert!(domain.work.is_empty());
+    // Later wakes preserve the established watch's polling cadence.
+    for _ in 0..out.len() {
+        drop(out.pop());
+    }
+    out.push(forge::Request::WakeProcedure { task: 7 });
+    super::outputs(&mut domain, &env, &mut decision, &mut out);
+    let Some(Work::Tasks(super::tasks::Event::WakeProcedure { task: 7 })) = domain.work.pop() else {
+        panic!("wake the change's procedure")
+    };
+    assert!(domain.work.is_empty());
+}

@@ -3844,6 +3844,7 @@ fn pull_changed(
     let mut changed = List::with_capacity(env.limits.changes);
     for (_, row) in &d.changes {
         if row.repository == resource.repository && row.pull == Some(pull.number) {
+            d.procedure_wakes.insert(row.task, true).expect("one pending wake per change");
             let change = if row.base != pull.base {
                 Some(crate::DriftChange::Retargeted {
                     number: pull.number,
