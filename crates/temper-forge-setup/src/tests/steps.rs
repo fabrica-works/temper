@@ -48,7 +48,7 @@ fn a_managed_and_an_owned_forge_run_the_design_tree() {
     }
 }
 #[test]
-fn a_fake_forge_keeps_its_reconcile_without_process_steps() {
+fn a_fake_forge_reconciles_in_serve_without_external_steps() {
     names(
         &fixtures::fake_setup(),
         &[
@@ -56,7 +56,6 @@ fn a_fake_forge_keeps_its_reconcile_without_process_steps() {
             (b"forgejo 2", Kind::Long),
             (b"runner 2", Kind::Long),
             (b"reconcile 1", Kind::Once),
-            (b"reconcile 3", Kind::Once),
             (b"serve", Kind::Long),
         ],
     );

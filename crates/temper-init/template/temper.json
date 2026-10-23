@@ -240,7 +240,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85584104265958,
+    "memory_bytes": 85584104286230,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -849,12 +849,7 @@
         },
         "transport": "plaintext",
         "git": "$forge_git",
-        "web": null,
-        "api_token": "demo/forge/api_token",
-        "user": {
-          "file": "demo/forge/user"
-        },
-        "webhook_secret": "demo/forge/webhook_secret"
+        "web": null
       },
       {
         "number": 2,
@@ -885,7 +880,6 @@
       {
         "number": 2,
         "forge": 1,
-        "token": "demo/forge/git_token",
         "login": "temper",
         "author": {
           "name": "Temper",

@@ -766,6 +766,7 @@ fn first_run(restart: bool) {
         .zip(&paths)
         .flat_map(|(flag, path)| [flag.into(), path.display().to_string()])
         .collect();
+    let mut bot = None;
     for (run, person, key) in [
         (
             "first",
@@ -795,7 +796,7 @@ fn first_run(restart: bool) {
             &client,
             person,
             BOX_DEADLINE,
-            || demo_main(&paths[0], &paths[1], &client, run == "first"),
+            || demo_bot(&paths[0], &client),
         );
         eprintln!("{run} run: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
         let stderr = String::from_utf8_lossy(&ended.stderr);
@@ -805,8 +806,12 @@ fn first_run(restart: bool) {
         let wrote = format!("box: wrote the configuration, {}\n", paths[0].join("temper.json").display());
         assert_eq!(stderr.contains(&wrote), run == "first", "{run}: {stderr}");
         assert_demo_streams(&ended.stdout, &ended.stderr, key);
-        if run == "second" {
-            assert_eq!(ended.checked, fake_forge_commit_id(DEMO_SEEDED_HEAD_COUNT), "a restarted fake holds the seed");
+        if let Some(previous) = bot {
+            assert_eq!(ended.checked, previous, "the restarted fake connects as the same bot");
+        }
+        bot = Some(ended.checked);
+        for name in ["admin_token", "api_token", "git_token", "user", "webhook_secret"] {
+            assert!(!paths[1].join("demo/forge").join(name).exists(), "{run}: no demo/forge/{name}");
         }
     }
     scratch.remove();
@@ -833,7 +838,7 @@ fn assert_demo_streams(stdout: &[u8], stderr: &[u8], key: &[u8]) {
         remaining = after;
         assert_eq!(stderr.matches(&expected).count(), 1, "one act: {expected}");
     }
-    let steps = ["fake llm: ", "prepare 1: ", "fake forge 1: ", "reconcile 1: ", "serve: ", "seed: ", "box: "];
+    let steps = ["fake llm: ", "prepare 1: ", "fake forge 1: ", "serve: ", "seed: ", "box: "];
     let bundle = std::path::Path::new(env!("CARGO_BIN_EXE_temper"))
         .parent()
         .expect("binary parent")
@@ -847,109 +852,32 @@ fn assert_demo_streams(stdout: &[u8], stderr: &[u8], key: &[u8]) {
         );
     }
 }
-// forge_seed gives repository 1 the counted head 1 at every fake start.
-const DEMO_SEEDED_HEAD_COUNT: u64 = 1;
-
-/// The demo's main, cloned as the worker clones it, after landing or a fresh fake.
-fn demo_main(config: &std::path::Path, data: &std::path::Path, root: &std::path::Path, landed: bool) -> String {
-    use std::{fs, os::unix::ffi::OsStrExt, process::Command};
-    use temper_worker_protocol_git::invocation::{self, Command as GitCommand};
+// The worker's clone, push and delivery-driven landing are proved by demo_change.
+// The fake's private git route requires authentication, so this observer uses
+// the client's public forge row instead of reading temper's bot credentials.
+fn demo_bot(config: &std::path::Path, root: &std::path::Path) -> u64 {
+    // NativeClient keeps the token; ctl also needs the public endpoint address.
     let document: serde_json::Value =
-        serde_json::from_slice(&fs::read(config.join("temper.json")).expect("written configuration")).expect("JSON");
-    let forge = &document["application"]["forges"][0];
-    let address: std::net::SocketAddr =
-        forge["api"]["socket"].as_str().expect("chosen forge address").parse().expect("loopback");
-    let token = fs::read_to_string(data.join("demo/forge/api_token")).expect("reconcile's API token");
-    let user =
-        support::owned::answer(address.port(), "/api/v1/user", Some(token.trim())).expect("reconciled bot answers");
-    assert_eq!(user["login"], "temper", "reconcile made and authenticated forge 1's bot before serve");
-    let branch = support::owned::answer(address.port(), "/api/v1/repos/demo/widget/branches/main", Some(token.trim()))
-        .expect("main's API head");
-    let head = branch["commit"]["id"].as_str().expect("landing head").to_string();
-    let seeded = fake_forge_commit_id(DEMO_SEEDED_HEAD_COUNT);
-    if landed {
-        assert_ne!(head, seeded, "the change moved main");
-        let compared = support::owned::answer(
-            address.port(),
-            &format!("/api/v1/repos/demo/widget/compare/{seeded}...{head}"),
-            Some(token.trim()),
-        )
-        .expect("seed to main comparison");
-        assert_eq!(compared["total_commits"], 1, "one commit past the seed: {compared}");
-        assert_eq!(compared["commits"], serde_json::json!([{"sha": head}]), "only the landed commit");
-    }
-    let identity = temper_worker_protocol_git::Identity {
-        token: skein_lib::Secret::new(
-            fs::read(data.join("demo/forge/git_token")).expect("reconcile's git token").into_boxed_slice(),
-        ),
-        login: b"temper".as_slice().into(),
-        name: b"Temper".as_slice().into(),
-        email: b"temper@localhost".as_slice().into(),
-    };
-    let remote = format!("{}/demo/widget.git", forge["git"].as_str().expect("demo git URL"));
-    let clone = GitCommand::Clone { remote: remote.as_bytes().into(), directory: b"widget".as_slice().into() };
-    for (operation, kind, at) in [
-        (clone, temper_worker_domain_checkout::git::Kind::Clone, root.to_path_buf()),
-        (
-            GitCommand::CheckOut { commit: invocation::object(head.as_bytes()).expect("API object id") },
-            temper_worker_domain_checkout::git::Kind::CheckOut,
-            root.join("widget"),
-        ),
-    ] {
-        let mut command = Command::new(data.join("demo/bin/git"));
-        command
-            .env_clear()
-            .current_dir(at)
-            .args(invocation::arguments(&operation).iter().map(|word| std::ffi::OsStr::from_bytes(word)));
-        for entry in invocation::environment(root.as_os_str().as_bytes(), Some(kind), Some(&identity)) {
-            let split = entry.iter().position(|b| *b == b'=').expect("environment entry");
-            command.env(std::ffi::OsStr::from_bytes(&entry[..split]), std::ffi::OsStr::from_bytes(&entry[split + 1..]));
-        }
-        let cloned = command.output().expect("demo's git link");
-        assert!(cloned.status.success(), "git: {}", String::from_utf8_lossy(&cloned.stderr));
-    }
-    let checkout = root.join("widget");
-    for (path, bytes) in temper_fake::forge::FILES {
-        let expected = if landed && path == b"src/main.rs" {
-            let script = document["application"]["demo"]["llm"]["cued"]
-                .as_array()
-                .expect("demo scripts")
-                .iter()
-                .find(|script| script["cue"] == "Export widget's table as CSV")
-                .expect("coding script");
-            let edit = &script["turns"][1]["lines"][0]["arguments"]["edits"][0];
-            let old = edit["old"].as_str().expect("old main");
-            let new = edit["new"].as_str().expect("new main");
-            let seed = std::str::from_utf8(bytes).expect("seeded source");
-            assert_eq!(seed.matches(old).count(), 1, "one coding edit in the seed");
-            seed.replacen(old, new, 1).into_bytes()
-        } else {
-            bytes.to_vec()
-        };
-        assert_eq!(fs::read(checkout.join(std::ffi::OsStr::from_bytes(path))).expect("cloned demo file"), expected);
-    }
-    assert_eq!(fs::read(checkout.join(".git/temper-remote")).expect("cloned remote"), remote.as_bytes());
-    let count = u64::from_le_bytes(
-        fs::read(checkout.join(".git/temper-head")).expect("cloned head").try_into().expect("counted id"),
-    );
-    assert_eq!(fake_forge_commit_id(count), head, "clone holds the API's landing head");
-    let admin_token = fs::read_to_string(data.join("demo/forge/admin_token")).expect("preparation's handover token");
-    let hooks = support::owned::answer(address.port(), "/api/v1/repos/demo/widget/hooks", Some(admin_token.trim()))
-        .expect("the handover's admin can read repository hooks");
-    let hooks = hooks.as_array().expect("repository hooks");
-    assert_eq!(hooks.len(), 1, "one hook for demo/widget");
-    let listener: std::net::SocketAddr = document["application"]["webhooks"]["listener"]["socket"]
-        .as_str()
-        .expect("chosen webhooks address")
-        .parse()
-        .expect("loopback");
-    assert_eq!(hooks[0]["config"]["url"], format!("http://127.0.0.1:{}/hooks/1", listener.port()));
-    head
-}
-
-fn fake_forge_commit_id(count: u64) -> String {
-    String::from_utf8(skein_forge::forgejo::id::write(&skein_fake_forge_protocol::routes::object(count)).into_vec())
-        .expect("fake commit hex")
+        serde_json::from_slice(&std::fs::read(config.join("temper.json")).expect("written configuration"))
+            .expect("JSON");
+    let address = document["application"]["clients"]["listener"]["socket"].as_str().expect("client address");
+    support::write_private(&root.join("private/address"), format!("http://{address}\n").as_bytes());
+    let private = root.join("private");
+    let call = support::ctl::Call::bare(&[private.to_str().expect("client path"), "forges"]);
+    let ended = support::ctl::alone(root, call);
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
+    let stdout = String::from_utf8(ended.stdout).expect("forges row");
+    let id = stdout
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("forge 1 · Forgejo · fake · Connected as temper (")?
+                .strip_suffix(')')?
+                .parse::<u64>()
+                .ok()
+        })
+        .expect("forge 1 is Connected as temper");
+    assert_ne!(id, 0);
+    id
 }
 
 // protocol/README.md, 15.6: the description's first process stories.

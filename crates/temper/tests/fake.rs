@@ -348,6 +348,7 @@ fn refused_deployment_start(root: &Path) {
                 },
             ),
             "managed" => {
+                config = support::configuration::old_form_check_document(&dir);
                 config["application"]["setup"][0]["mode"] = json!({"managed":{"admin_token":"admin_token"}});
                 config["application"]["setup"][0]["orgs"] = json!(["acme"]);
             }
@@ -559,9 +560,18 @@ fn prepared_forge(directory: &Path) -> (SocketAddr, std::path::PathBuf, Vec<u8>)
     (listen, path, token)
 }
 #[test]
-fn the_prepared_fake_reconciles_twice_before_it_stops() {
+fn the_old_form_prepared_fake_reconciles_twice_before_it_stops() {
     let scratch = support::Scratch::new("fake_forge_reconcile");
     let (_, path, token) = prepared_forge(scratch.path());
+    // temper-15 retains the explicit file-writing reconcile command.
+    let mut config = support::configuration::old_form_check_document(scratch.path());
+    let prepared: Value =
+        serde_json::from_slice(&fs::read(scratch.path().join("temper.json")).expect("prepared document"))
+            .expect("prepared JSON");
+    config["application"]["forges"][0]["api"] = prepared["application"]["forges"][0]["api"].clone();
+    config["application"]["forges"][0]["git"] = prepared["application"]["forges"][0]["git"].clone();
+    config["application"]["setup"] = prepared["application"]["setup"].clone();
+    document(&scratch.path().join("temper.json"), &config);
     let mut command = deployment_command("forge", scratch.path());
     command.arg("1");
     let run = Running::command(command, None);
@@ -1199,7 +1209,7 @@ fn seed_demo(name: &str) -> (support::Scratch, Running, Running, SeedServe) {
     config["application"]["forges"][0]["git"] = json!(format!("http://{forge_listen}"));
     config["application"]["setup"][0]["mode"]["fake"]["listen"] = json!({"socket":forge_listen.to_string()});
     document(&dir.join("temper.json"), &config);
-    // Serve still reads Forgejo's private files before starting (temper-15).
+    // Preparation leaves only the handover, taken by serve before its records reconcile.
     let prepared = support::owned::prepare(dir, 1);
     assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
     let mut command = deployment_command("forge", dir);
@@ -1209,14 +1219,6 @@ fn seed_demo(name: &str) -> (support::Scratch, Running, Running, SeedServe) {
     config["application"]["forges"][0]["git"] = json!(format!("http://{}", forge.address));
     config["application"]["setup"][0]["mode"]["fake"]["listen"] = json!({"socket":forge.address.to_string()});
     document(&dir.join("temper.json"), &config);
-    let reconciled = Command::new(env!("CARGO_BIN_EXE_temper"))
-        .env_clear()
-        .args(["forge", "reconcile"])
-        .args(support::configuration::flags(dir))
-        .arg("1")
-        .output()
-        .expect("reconciled fake");
-    assert_eq!(reconciled.status.code(), Some(0), "{}", String::from_utf8_lossy(&reconciled.stderr));
     fs::create_dir(dir.join("demo")).expect("demo directory");
     support::write_private(
         &dir.join("demo/llm.key"),
@@ -1299,6 +1301,9 @@ fn seed_runs_fresh_then_finds_the_deployment_key() {
         assert_eq!(output.status.code(), Some(code), "{name}: {}", String::from_utf8_lossy(&output.stderr));
         assert!(output.stdout.is_empty(), "{name}");
         assert_eq!(output.stderr, expected.as_bytes(), "{name}");
+    }
+    for name in ["admin_token", "api_token", "git_token", "user", "webhook_secret"] {
+        assert!(!dir.join("forge-1").join(name).exists(), "no forge credential file {name}");
     }
     serve.stop();
     llm.stop();

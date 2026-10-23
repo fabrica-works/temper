@@ -224,6 +224,7 @@ fn note_line(note: temper_service::Note) -> String {
                     let action = match plan {
                         SetupPlan::Reconcile => "reconciling",
                         SetupPlan::TakeOver => "taking the handover",
+                        SetupPlan::Adopt => "adopting",
                     };
                     format!("{action} stopped at {:?}: {reason}", step.stage)
                 }

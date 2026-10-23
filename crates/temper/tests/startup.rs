@@ -1173,6 +1173,8 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // withdrawn values and their account-id capacity are gone (wire v5).
             + 4_578_373_384
             + socket_growth
+            // Records-only fake adoption: optional file access and local repository count add 88 B.
+            + 88
             // Jig's deployment roster adds 7,288 B per small core, across 3,076 roots/handoffs.
             + 3_076 * 7_288
             // The sign-in adds token and issuer trust, at the shell's admitted root bounds.
@@ -1307,6 +1309,7 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // the worker's credential slots already cover its identity, so it does not grow.
     // Records-only forge 3 adds 4 B of checked admission; its asked legacy
     // files were already absent, so there is no credential release here.
+    // Records-only fake startup and its adoption state add 20,272 B; worker unchanged.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);

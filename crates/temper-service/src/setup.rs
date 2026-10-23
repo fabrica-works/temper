@@ -111,7 +111,7 @@ pub(crate) fn worst_case(
         .checked_add(Map::<u16, ()>::worst_case(l.forges)?)? // lifecycle.deleting
         .checked_add(Map::<u16, &'static [u8]>::worst_case(l.forges)?)? // unserved
         .checked_add(Map::<u16, lifecycle::Adoption>::worst_case(l.forges)?)?
-        // Each fake holds the handover and its files' access until adoption ends (protocol/setup.md, 8.4).
+        // temper-15: an old-form fake holds its handover and file access until adoption ends.
         .checked_add(
             u64::from(
                 40_u32
@@ -411,7 +411,11 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                 match need {
                     host::Need::Read(item) => {
                         let item = item_record(item);
-                        let value = match (engine.setup.lifecycle.adoptions.get(&forge), item) {
+                        let files = match engine.setup.lifecycle.adoptions.get(&forge) {
+                            Some(adoption) => adoption.files.as_ref(),
+                            None => None,
+                        };
+                        let value = match (files, item) {
                             (Some(adoption), Item::AdminToken) => Some(adoption.admin_token.expose()),
                             (Some(adoption), Item::WebhookSecret) => match &adoption.access.webhook_secret {
                                 Some(secret) => Some(secret.expose()),

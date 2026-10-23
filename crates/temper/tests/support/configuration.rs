@@ -82,9 +82,9 @@ pub fn fake_entry(entry: &mut serde_json::Value, listen: &str) {
     }});
 }
 
-/// A deployment whose forge 1 is the demo's fake, without creating its files.
+/// temper-15: the explicit old-form fake and managed command fixtures, without creating files.
 #[must_use]
-pub fn check_document(directory: &Path) -> serde_json::Value {
+pub fn old_form_check_document(directory: &Path) -> serde_json::Value {
     let (_, bytes) = documents(directory, "/fixture/temper");
     let mut value: serde_json::Value = serde_json::from_slice(&bytes).expect("deployment JSON");
     value["application"]["setup"] = serde_json::json!([{
@@ -94,6 +94,20 @@ pub fn check_document(directory: &Path) -> serde_json::Value {
     value["application"]["forges"][0]["api_token"] = "forge-1/api_token".into();
     value["application"]["forges"][0]["user"] = serde_json::json!({"file":"forge-1/user"});
     value["application"]["identities"][0]["token"] = "forge-1/git_token".into();
+    value
+}
+
+/// The fake starts from records; its identity joins the forge explicitly.
+#[must_use]
+pub fn check_document(directory: &Path) -> serde_json::Value {
+    let mut value = old_form_check_document(directory);
+    let forge = value["application"]["forges"][0].as_object_mut().expect("forge");
+    for member in ["api_token", "user", "webhook_secret", "identity"] {
+        forge.remove(member);
+    }
+    let identity = value["application"]["identities"][0].as_object_mut().expect("identity");
+    identity.remove("token");
+    identity.insert("forge".into(), 1.into());
     value
 }
 

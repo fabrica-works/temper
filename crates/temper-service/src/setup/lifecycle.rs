@@ -36,11 +36,16 @@ pub(super) struct Run {
 pub(super) struct Adoption {
     pub(super) next: NonZeroU64,
     pub(super) repositories: u64,
+    pub(super) files: Option<AdoptionFiles>,
+}
+#[derive(Debug)]
+pub(super) struct AdoptionFiles {
     pub(super) admin_token: Secret,
     pub(super) access: connection::Access,
 }
 #[derive(Debug)]
 pub(super) struct Local {
+    pub(super) repositories: u64,
     pub(super) pending: bool,
     pub(super) restored: bool,
     pub(super) limits: skein_forge_setup::limits::Limits,
@@ -268,7 +273,10 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
                 .expect("next repository");
         } else {
             let adoption = engine.setup.lifecycle.adoptions.remove(&forge).expect("last adoption");
-            crate::forge::connect(engine, forge, Ok(crate::forge::Start::Adopted(adoption.access)));
+            match adoption.files {
+                Some(files) => crate::forge::connect(engine, forge, Ok(crate::forge::Start::Adopted(files.access))),
+                None => connect_local(engine, forge),
+            }
         }
     }
     if kind == Kind::Convert {
@@ -306,10 +314,18 @@ pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure:
     if run.kind == Kind::Adopt {
         engine.setup.lifecycle.adoptions.remove(&run.forge);
     }
-    if run.kind == Kind::LocalReconcile || run.kind == Kind::LocalTakeOver {
+    if run.kind == Kind::LocalReconcile
+        || run.kind == Kind::LocalTakeOver
+        || run.kind == Kind::Adopt && engine.setup.lifecycle.local(run.forge).is_some()
+    {
         let forge = run.forge;
-        let plan =
-            if run.kind == Kind::LocalTakeOver { crate::SetupPlan::TakeOver } else { crate::SetupPlan::Reconcile };
+        let plan = if run.kind == Kind::LocalTakeOver {
+            crate::SetupPlan::TakeOver
+        } else if run.kind == Kind::Adopt {
+            crate::SetupPlan::Adopt
+        } else {
+            crate::SetupPlan::Reconcile
+        };
         engine.setup.runs.remove(&token);
         local_stopped(
             engine,
@@ -350,7 +366,7 @@ pub(super) fn kept(engine: &mut crate::engine::Engine, purpose: Purpose) {
     match purpose {
         Purpose::LocalOrigin(run) => {
             let active = engine.setup.runs.remove(&run).expect("reconcile waits for Origin Kept");
-            connect_local(engine, active.forge);
+            adopt_local(engine, active.forge);
         }
         Purpose::Host(run) => engine.setup.down(host::Request::Answer { run, answer: host::Answer::Written }),
         Purpose::Origin(run) => {
@@ -533,11 +549,10 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
         if busy(engine, *forge) {
             continue;
         }
-        if let Some(adoption) = engine.setup.lifecycle.adoptions.get(forge) {
-            if engine.setup.runs.len() == engine.setup.env.limits.runs {
+        if engine.setup.lifecycle.adoptions.contains_key(forge) {
+            let Some(repository) = adoption_repository(engine, *forge) else {
                 continue;
-            }
-            let repository = adoption.next;
+            };
             let run = next_run(&mut engine.setup.lifecycle);
             if !engine.setup.served.contains_key(forge) {
                 let reason = *engine.setup.unserved.get(forge).expect("configured setup exclusion");
@@ -757,6 +772,39 @@ fn records_failed(engine: &mut crate::engine::Engine, forge: u16, why: records::
     }
     engine.notes.push(crate::Note::ForgeNotConnected { number: forge, why });
 }
+fn adoption_repository(engine: &mut crate::engine::Engine, forge: u16) -> Option<NonZeroU64> {
+    if engine.setup.runs.len() == engine.setup.env.limits.runs {
+        return None;
+    }
+    let adoption = engine.setup.lifecycle.adoptions.get(&forge).expect("pending adoption");
+    if adoption.files.is_some() {
+        return Some(adoption.next);
+    }
+    let adopted = engine.domain.adopted_ids(forge);
+    for id in adoption.next.get()..=adoption.repositories {
+        if !adopted.contains(&id) {
+            let next = NonZeroU64::new(id).expect("seeded repository");
+            engine.setup.lifecycle.adoptions.get_mut(&forge).expect("local adoption").next = next;
+            return Some(next);
+        }
+    }
+    engine.setup.lifecycle.adoptions.remove(&forge);
+    connect_local(engine, forge);
+    None
+}
+fn adopt_local(engine: &mut crate::engine::Engine, forge: u16) {
+    let repositories = engine.setup.lifecycle.local(forge).expect("reconciled local").repositories;
+    if repositories == 0 {
+        connect_local(engine, forge);
+        return;
+    }
+    engine
+        .setup
+        .lifecycle
+        .adoptions
+        .insert(forge, Adoption { next: NonZeroU64::new(1).expect("first repository"), repositories, files: None })
+        .expect("one adoption per local fake");
+}
 pub(super) fn connect_local(engine: &mut crate::engine::Engine, forge: u16) {
     let expected = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api);
     let rows = engine.forge_records.rows.forge(forge).expect("reconciled records");
@@ -806,6 +854,7 @@ fn local_failure(forge: u16, why: &crate::SetupStopped) -> Box<[u8]> {
             let action = match plan {
                 crate::SetupPlan::TakeOver => "taking the handover",
                 crate::SetupPlan::Reconcile => "reconciling",
+                crate::SetupPlan::Adopt => "adopting",
             };
             alloc::format!("{action}: {:?}: {:?}", step.stage, step.why).into_bytes().into_boxed_slice()
         }

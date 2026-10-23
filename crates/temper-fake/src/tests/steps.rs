@@ -64,11 +64,6 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         &["forge", "reconcile", "--config", "C", "--data", "D", "--cache", "K", "1"],
         Kind::Once,
     );
-    let reconcile2 = command(
-        "reconcile 2",
-        &["forge", "reconcile", "--config", "C", "--data", "D", "--cache", "K", "2"],
-        Kind::Once,
-    );
     let serve = command("serve", &["serve", "--config", "C", "--data", "D", "--cache", "K", "--box"], Kind::Long);
     let seed = command("seed", &["fake", "seed", "--config", "C", "--data", "D", "--cache", "K"], Kind::Link);
     let rows = [
@@ -76,23 +71,13 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         (
             "fake",
             document(json!([fake]), false),
-            Steps {
-                always: Box::new([prepare1.clone(), fake1.clone(), reconcile1.clone(), serve.clone()]),
-                asked: Box::new([]),
-            },
+            Steps { always: Box::new([prepare1.clone(), fake1.clone(), serve.clone()]), asked: Box::new([]) },
         ),
         (
             "demo",
             document(json!([fake]), true),
             Steps {
-                always: Box::new([
-                    llm.clone(),
-                    prepare1.clone(),
-                    fake1.clone(),
-                    reconcile1.clone(),
-                    serve.clone(),
-                    seed.clone(),
-                ]),
+                always: Box::new([llm.clone(), prepare1.clone(), fake1.clone(), serve.clone(), seed.clone()]),
                 asked: Box::new([]),
             },
         ),
@@ -107,7 +92,6 @@ fn documents_give_the_box_its_whole_ordered_steps() {
                     prepare2.clone(),
                     forgejo2.clone(),
                     runner2.clone(),
-                    reconcile1.clone(),
                     serve.clone(),
                     seed.clone(),
                 ]),
@@ -124,7 +108,6 @@ fn documents_give_the_box_its_whole_ordered_steps() {
                     fake1.clone(),
                     prepare2.clone(),
                     forgejo2.clone(),
-                    reconcile1.clone(),
                     serve.clone(),
                     seed.clone(),
                 ]),
@@ -135,7 +118,7 @@ fn documents_give_the_box_its_whole_ordered_steps() {
             "asked",
             document(json!([fake, asked]), true),
             Steps {
-                always: Box::new([llm, prepare1.clone(), fake1.clone(), reconcile1.clone(), serve.clone(), seed]),
+                always: Box::new([llm, prepare1.clone(), fake1.clone(), serve.clone(), seed]),
                 asked: Box::new([Group {
                     forge: 2,
                     before: 3,
@@ -150,10 +133,7 @@ fn documents_give_the_box_its_whole_ordered_steps() {
         (
             "two fakes in document order",
             document(json!([second_fake, fake]), false),
-            Steps {
-                always: Box::new([prepare2, fake2, prepare1, fake1, reconcile2, reconcile1.clone(), serve.clone()]),
-                asked: Box::new([]),
-            },
+            Steps { always: Box::new([prepare2, fake2, prepare1, fake1, serve.clone()]), asked: Box::new([]) },
         ),
         (
             "managed unchanged",

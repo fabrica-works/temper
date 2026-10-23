@@ -77,6 +77,7 @@ pub enum SetupStopped {
 pub enum SetupPlan {
     Reconcile,
     TakeOver,
+    Adopt,
 }
 /// Closed file refusals carry no file contents.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

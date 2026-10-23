@@ -3,7 +3,7 @@ use crate::tests::configuration;
 use std::{fs, os::unix::ffi::OsStrExt};
 
 #[test]
-fn reconcile_adopts_no_repositories() {
+fn old_form_reconcile_adopts_no_repositories() {
     let directory = std::env::temp_dir().join(format!("temper-reconcile-settings-{}", std::process::id()));
     fs::create_dir(&directory).expect("settings scratch");
     let directories = jig_protocol_config::Directories::given(
@@ -13,7 +13,7 @@ fn reconcile_adopts_no_repositories() {
     )
     .expect("fixture directories");
     for fake in [true, false] {
-        let mut value = configuration::check_document(&directory);
+        let mut value = configuration::old_form_check_document(&directory);
         value["application"]["webhooks"] = serde_json::Value::Null;
         let entry = &mut value["application"]["setup"][0];
         if fake {

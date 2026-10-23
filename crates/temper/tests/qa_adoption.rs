@@ -7,7 +7,7 @@ use skein_io::kernel::Exit;
 use skein_lib::Duration;
 
 #[test]
-fn init_names_a_fixed_listener_and_the_demo_secret() {
+fn init_names_a_fixed_listener_and_a_records_only_demo() {
     let scratch = support::Scratch::startup("qa-adoption-init");
     let flags = support::configuration::flags(scratch.path());
     let output = Command::new(env!("CARGO_BIN_EXE_temper")).arg("init").args(&flags).output().expect("run init");
@@ -29,21 +29,8 @@ fn init_names_a_fixed_listener_and_the_demo_secret() {
     assert_ne!(listener.port(), 0, "Adopt needs the document's fixed hook address");
     let forges = document["application"]["forges"].as_array().expect("forges");
     let demo = forges.iter().find(|forge| forge["number"] == 1).expect("demo forge");
-    assert_eq!(demo["webhook_secret"], "demo/forge/webhook_secret");
-    let credentials = scratch.path().join("credentials");
-    fs::create_dir(&credentials).expect("fixture directory");
-    support::configuration(&credentials, &support::Forge::Unreached);
-    let forge_directory = scratch.path().join("demo/forge");
-    fs::create_dir(&forge_directory).expect("fake directory");
-    fs::set_permissions(&forge_directory, fs::Permissions::from_mode(0o700)).expect("private fake directory");
-    for (record, file) in [("api-token", "api_token"), ("git-token", "git_token"), ("user", "user")] {
-        fs::copy(credentials.join(format!("secrets/forge-1.{record}")), forge_directory.join(file))
-            .expect("files the box's reconcile supplies");
-    }
-    for file in ["admin_token", "webhook_secret"] {
-        let path = forge_directory.join(file);
-        fs::write(&path, b"0123456789abcdef0123456789abcdef01234567").expect("box's secret file");
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private secret file");
+    for member in ["api_token", "user", "webhook_secret"] {
+        assert!(demo.get(member).is_none(), "no file member {member}");
     }
     temper::envelope_in(&support::configuration::directories(scratch.path()), &bytes)
         .unwrap_or_else(|why| panic!("serve must accept init's wiring: {why}"));
@@ -51,11 +38,11 @@ fn init_names_a_fixed_listener_and_the_demo_secret() {
 }
 
 #[test]
-fn fake_prepare_keeps_its_handover_for_serve() {
+fn old_form_fake_prepare_keeps_its_handover_for_serve() {
     let scratch = support::Scratch::startup("qa-adoption-handover");
     support::configuration(scratch.path(), &support::Forge::Unreached);
     let flags = support::configuration::flags(scratch.path());
-    let document = support::configuration::check_document(scratch.path());
+    let document = support::configuration::old_form_check_document(scratch.path());
     let document_path = flags
         .iter()
         .map(PathBuf::from)
@@ -120,12 +107,12 @@ fn occupied_defaults_still_give_adopt_a_distinct_fixed_listener() {
         assert!(!(8367..=8371).contains(&address.port()), "occupied default reused: {address}");
         assert!(!addresses[..index].contains(address), "two listeners share {address}");
     }
-    assert_eq!(app["forges"][0]["webhook_secret"], "demo/forge/webhook_secret");
+    assert!(app["forges"][0].get("webhook_secret").is_none());
     scratch.remove();
 }
 
 #[test]
-fn malformed_handovers_are_named_without_printing_their_value() {
+fn old_form_malformed_handovers_are_named_without_printing_their_value() {
     for (name, token) in [
         ("short", "0123456789abcdef0123456789abcdef0123456"),
         ("long", "0123456789abcdef0123456789abcdef012345678"),
@@ -134,7 +121,7 @@ fn malformed_handovers_are_named_without_printing_their_value() {
     ] {
         let scratch = support::Scratch::startup(&format!("qa-adoption-invalid-{name}"));
         support::configuration(scratch.path(), &support::Forge::Unreached);
-        let document = support::configuration::check_document(scratch.path());
+        let document = support::configuration::old_form_check_document(scratch.path());
         fs::write(scratch.path().join("temper.json"), serde_json::to_vec(&document).expect("JSON"))
             .expect("fake document");
         let directory = scratch.path().join("forge-1");
@@ -159,10 +146,10 @@ fn malformed_handovers_are_named_without_printing_their_value() {
 }
 
 #[test]
-fn a_handover_in_the_wrong_form_is_refused_naming_its_path() {
+fn an_old_form_handover_in_the_wrong_form_is_refused_naming_its_path() {
     let scratch = support::Scratch::startup("qa-adoption-invalid-form-path");
     support::configuration(scratch.path(), &support::Forge::Unreached);
-    let document = support::configuration::check_document(scratch.path());
+    let document = support::configuration::old_form_check_document(scratch.path());
     fs::write(scratch.path().join("temper.json"), serde_json::to_vec(&document).expect("JSON")).expect("fake document");
     let directory = scratch.path().join("forge-1");
     fs::create_dir(&directory).expect("fake directory");
@@ -182,10 +169,10 @@ fn a_handover_in_the_wrong_form_is_refused_naming_its_path() {
 }
 
 #[test]
-fn missing_handover_is_refused_before_a_fake_connects() {
+fn old_form_missing_handover_is_refused_before_a_fake_connects() {
     let scratch = support::Scratch::startup("qa-adoption-missing-handover");
     support::configuration(scratch.path(), &support::Forge::Unreached);
-    let document = support::configuration::check_document(scratch.path());
+    let document = support::configuration::old_form_check_document(scratch.path());
     fs::write(scratch.path().join("temper.json"), serde_json::to_vec(&document).expect("JSON")).expect("fake document");
     let directory = scratch.path().join("forge-1");
     fs::create_dir(&directory).expect("fake directory");
@@ -203,8 +190,8 @@ fn missing_handover_is_refused_before_a_fake_connects() {
 }
 
 #[test]
-fn a_running_box_hooks_every_seeded_repository_with_the_named_secret() {
-    // A running box is needed to cross preparation, serve's Adopt and the fake's hook API.
+fn a_running_box_adopts_every_seeded_repository_before_connecting() {
+    // The hook's URL and recorded secret are checked at the protocol peer in setup_adoption.rs.
     let scratch = support::Scratch::startup("qa-adoption-all-repositories");
     let flags = support::configuration::flags(scratch.path());
     let output = Command::new(env!("CARGO_BIN_EXE_temper")).arg("init").args(&flags).output().expect("run init");
@@ -216,19 +203,6 @@ fn a_running_box_hooks_every_seeded_repository_with_the_named_secret() {
         .expect("fake repositories")
         .push(serde_json::json!({"name": "gadget", "landing": "main"}));
     fs::write(&path, serde_json::to_vec(&document).expect("JSON")).expect("two-repository document");
-    let forge_address: std::net::SocketAddr = document["application"]["forges"][0]["api"]["socket"]
-        .as_str()
-        .expect("API socket")
-        .parse()
-        .expect("API address");
-    let listener = document["application"]["webhooks"]["listener"]["socket"].as_str().expect("listener");
-    let secret_directory = scratch.path().join("demo/forge");
-    fs::create_dir(&secret_directory).expect("forge directory");
-    fs::set_permissions(&secret_directory, fs::Permissions::from_mode(0o700)).expect("private directory");
-    let secret = "0123456789abcdef0123456789abcdef01234567";
-    let secret_path = secret_directory.join("webhook_secret");
-    fs::write(&secret_path, secret).expect("named secret");
-    fs::set_permissions(&secret_path, fs::Permissions::from_mode(0o600)).expect("private secret");
     let client = scratch.path().join("qa-client");
     fs::create_dir(&client).expect("client directory");
     fs::set_permissions(&client, fs::Permissions::from_mode(0o700)).expect("private client directory");
@@ -236,39 +210,32 @@ fn a_running_box_hooks_every_seeded_repository_with_the_named_secret() {
         scratch.path(),
         flags.into_iter().map(|flag| flag.into_string().expect("flag")).collect(),
         &client,
-        support::person::demo_chat(1, b"QA adoption probe", b"demo model", b"The demo changes nothing."),
-        Duration::from_secs(30),
+        support::person::demo_change(),
+        Duration::from_secs(90),
         || {
-            let token = fs::read_to_string(secret_directory.join("admin_token")).expect("handover");
-            ["widget", "gadget"].map(|repository| {
-                support::owned::answer(
-                    forge_address.port(),
-                    &format!("/api/v1/repos/demo/{repository}/hooks"),
-                    Some(token.trim_end()),
-                )
-                .expect("read repository hooks")
-            })
+            let address = document["application"]["clients"]["listener"]["socket"].as_str().expect("client address");
+            support::write_private(&client.join("private/address"), format!("http://{address}\n").as_bytes());
+            support::ctl::alone(
+                &client,
+                support::ctl::Call::bare(&[client.join("private").to_str().expect("client path"), "forges"]),
+            )
         },
     );
     assert!(outcome.finished, "{}", String::from_utf8_lossy(&outcome.stderr));
     assert_eq!(outcome.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&outcome.stderr));
     assert_eq!(outcome.left.as_deref(), Some([].as_slice()));
-    for hooks in &outcome.checked {
-        let hooks = hooks.as_array().expect("hook list");
-        assert_eq!(hooks.len(), 1, "one hook for each fake entry repository");
-        assert_eq!(hooks[0]["config"]["url"], format!("http://{listener}/hooks/1"));
-        // The fake never sends a hook's secret in a reply (skein-fake-forge-protocol setup/hooks.rs); signed deliveries
-        // are the secret's evidence, in the process tier's story.
-        assert_eq!(hooks[0]["config"]["secret"], serde_json::Value::Null, "the secret stays unsent");
-        assert_eq!(hooks[0]["active"], true);
+    assert_eq!(outcome.checked.exit, Some(Exit::Code(0)));
+    assert!(
+        String::from_utf8_lossy(&outcome.checked.stdout).contains("forge 1 · Forgejo · fake · Connected as temper (")
+    );
+    for name in ["admin_token", "api_token", "git_token", "user", "webhook_secret"] {
+        assert!(!scratch.path().join("demo/forge").join(name).exists(), "no credential file {name}");
     }
-    assert_eq!(fs::read_to_string(&secret_path).expect("secret survives"), secret);
-    assert!(secret_directory.join("admin_token").is_file(), "serve leaves the handover");
     scratch.remove();
 }
 
 #[test]
-fn one_sided_hook_wiring_is_refused_before_a_fake_connects() {
+fn old_form_one_sided_hook_wiring_is_refused_before_a_fake_connects() {
     // A setup entry's forge names its secret exactly when the deployment has a listener (temper-forge-setup's members
     // check, and serve's webhooks check), so 8.4's "else none and no hook" is never reached from a valid document.
     for (name, listener, named_secret, refusal) in [
@@ -285,6 +252,11 @@ fn one_sided_hook_wiring_is_refused_before_a_fake_connects() {
         let path = scratch.path().join("temper.json");
         let mut document: serde_json::Value =
             serde_json::from_slice(&fs::read(&path).expect("document")).expect("JSON");
+        // temper-15: only the explicit old form pairs a listener with a file secret.
+        document["application"]["forges"][0]["api_token"] = "demo/forge/api_token".into();
+        document["application"]["forges"][0]["user"] = serde_json::json!({"file":"demo/forge/user"});
+        document["application"]["forges"][0]["webhook_secret"] = "demo/forge/webhook_secret".into();
+        document["application"]["identities"][1]["token"] = "demo/forge/git_token".into();
         if !listener {
             document["application"]["webhooks"] = serde_json::Value::Null;
         }
@@ -317,9 +289,8 @@ fn the_default_box_prepares_adopts_and_hands_over_the_link() {
     assert!(support::printed_link(&outcome.stdout).is_some(), "seed must finish and hand over the sign-in link");
     assert_eq!(outcome.left.as_deref(), Some([].as_slice()));
     let directory = scratch.path().join("demo/forge");
-    assert!(directory.join("admin_token").is_file(), "serve leaves prepare's handover");
-    assert!(directory.join("api_token").is_file(), "reconcile's API access remains in its file");
-    assert!(directory.join("git_token").is_file(), "reconcile's git access remains in its file");
-    assert!(directory.join("webhook_secret").is_file(), "reconcile supplies the named secret");
+    for name in ["admin_token", "api_token", "git_token", "user", "webhook_secret"] {
+        assert!(!directory.join(name).exists(), "no credential file {name}");
+    }
     scratch.remove();
 }

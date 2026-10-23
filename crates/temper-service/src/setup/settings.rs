@@ -176,7 +176,9 @@ pub(crate) fn prepare(
     local_starts(config, &mut layer)?;
     // temper-15 removes the old file access and fake handover/adoption branch.
     for setup in &config.setup {
-        if let Mode::Fake(fake) = &setup.entry.mode {
+        if !config.records_only.contains(&setup.entry.forge)
+            && let Mode::Fake(fake) = &setup.entry.mode
+        {
             for index in 0..forges.forges.len() {
                 let forge = forges.forges.get_mut(index).expect("configured forge");
                 if forge.number == setup.entry.forge {
@@ -191,8 +193,10 @@ pub(crate) fn prepare(
                             super::lifecycle::Adoption {
                                 next: core::num::NonZeroU64::new(1).expect("first repository"),
                                 repositories: u64::try_from(fake.repositories.len()).expect("checked repositories"),
-                                admin_token: setup.handover.as_ref().expect("checked fake handover").clone(),
-                                access: forge.access.take().expect("fake access from files"),
+                                files: Some(super::lifecycle::AdoptionFiles {
+                                    admin_token: setup.handover.as_ref().expect("checked fake handover").clone(),
+                                    access: forge.access.take().expect("fake access from files"),
+                                }),
                             },
                         )
                         .expect("one adoption per fake forge");
@@ -225,6 +229,10 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> R
         let identity = joined.expect("checked identity");
         let login = &setup.entry.bot.login;
         let local = super::lifecycle::Local {
+            repositories: match &setup.entry.mode {
+                Mode::Fake(fake) => u64::try_from(fake.repositories.len()).expect("checked repositories"),
+                Mode::Owned(_) | Mode::Managed { .. } => 0,
+            },
             pending: true,
             handover: setup.handover.clone(),
             path: temper_forge_setup::place::Place { directory: setup.entry.directory.clone(), user: Box::new([]) }

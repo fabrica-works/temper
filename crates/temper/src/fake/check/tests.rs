@@ -320,10 +320,10 @@ fn verb() {
     let document = crate::tests::configuration::check_document(&root);
     let mut no_entry = document.clone();
     no_entry["application"]["setup"] = serde_json::json!([]);
-    let mut managed = document.clone();
+    let mut managed = crate::tests::configuration::old_form_check_document(&root);
     managed["application"]["setup"][0]["orgs"] = serde_json::json!(["demo"]);
     managed["application"]["setup"][0]["mode"] = serde_json::json!({"managed":{"admin_token":"admin_token"}});
-    let mut owned = document.clone();
+    let mut owned = crate::tests::configuration::old_form_check_document(&root);
     owned["application"]["setup"][0]["orgs"] = serde_json::json!(["demo"]);
     owned["application"]["setup"][0]["mode"] = serde_json::json!({"owned":{
         "forgejo":"/fixture/forgejo", "runner":null, "listen":{"socket":"127.0.0.1:9"},

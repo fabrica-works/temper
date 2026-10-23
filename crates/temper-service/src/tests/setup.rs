@@ -817,7 +817,7 @@ fn kept_record(store: &mut crate::store::Store, forge: u16, item: Item, bytes: &
     assert_eq!(found, owner);
 }
 fn local_store(token: bool) -> crate::store::Store {
-    use temper_engine_domain_forge::{Kinds, Protection, Repository, Role, Stored};
+    use temper_engine_domain_forge::Stored;
     let mut store = fixtures::records_store();
     if token {
         kept_record(&mut store, 1, Item::AdminToken, b"test-admin");
@@ -827,7 +827,20 @@ fn local_store(token: bool) -> crate::store::Store {
     {
         kept_record(&mut store, 1, item, value);
     }
-    let row = Repository {
+    let row = local_repository();
+    fixtures::commit(
+        &mut store,
+        1,
+        Box::new([root::Write::Save(root::Record::Forge { row: Box::new(Stored::Repository(row)) })]),
+    );
+    let Some(StoreEvent::Committed { number: 1, .. }) = store.above.pop() else {
+        panic!("durable repository");
+    };
+    store
+}
+fn local_repository() -> domain::Repository {
+    use temper_engine_domain_forge::{Kinds, Protection, Repository, Role};
+    Repository {
         project: 1,
         home: true,
         provider: skein_forge::api::Repository { forge: 1, repository: 41 },
@@ -856,16 +869,7 @@ fn local_store(token: bool) -> crate::store::Store {
             squash: true,
             rebase: false,
         },
-    };
-    fixtures::commit(
-        &mut store,
-        1,
-        Box::new([root::Write::Save(root::Record::Forge { row: Box::new(Stored::Repository(row)) })]),
-    );
-    let Some(StoreEvent::Committed { number: 1, .. }) = store.above.pop() else {
-        panic!("durable repository");
-    };
-    store
+    }
 }
 fn local_service(config: crate::settings::Engine, store: crate::store::Store) -> crate::Service {
     let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
