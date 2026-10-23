@@ -106,11 +106,17 @@ pub enum Agent {
     H1Coder,
     Shape,
     Mover,
+    Plan,
+    Planner,
+    Subowner,
 }
 impl Agent {
     #[must_use]
     pub fn cue(self) -> &'static [u8] {
         match self {
+            Self::Plan => b"@case_plan_director",
+            Self::Planner => b"@case_planner",
+            Self::Subowner => b"@case_subowner",
             Self::Shape => b"@case_shape",
             Self::Mover => b"@case_mover",
             Self::Rules => b"@case_rules",
@@ -484,5 +490,54 @@ pub fn fixture_5_2() -> forge::Fixture {
             value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
             landing::admit(value);
         },
+    }
+}
+
+// Act 2, step 5.5 (domain/testing.md, 5.3)
+pub const PLAN_DIRECTOR: u64 = 1;
+pub const PLANNER: u64 = 2;
+pub const SUBOWNER: u64 = 3;
+pub const PLAN_QUESTION_NUMBER: u64 = 2;
+pub const PLAN_ANSWER_NUMBER: u64 = 3;
+pub const PLAN_NOTE_NUMBER: u64 = 1;
+pub const A_DEADLINE: u64 = 4_102_444_800_000_000_000;
+pub const A1_DEADLINE: u64 = A_DEADLINE - 14_400_000_000_000;
+pub const PLAN_ANSWER_PENDING: &str = "Wait for A's first run to park before answering.";
+pub const PLAN_ANSWER_HOLD: &[u8] = b"case-5-5-answer";
+pub const PLAN_PERSON: &str = "@case_plan_director Give A the mission's deadline and answer its plan.";
+pub const PLANNER_SPEC: &str =
+    "@case_planner Plan the nearer mission, ask the director, and delegate M1's sub-owner after its green light.";
+pub const SUBOWNER_SPEC: &str =
+    "@case_subowner Own M1 under its deadline; try to delegate a helper and report the refusal.";
+pub const PLAN_NOTE: &str = "Export's nearer mission";
+pub const PLAN_WORDS: &str = "A nearer end: this mission ends at the end-to-end story; the rest of Export is a later mission. M1: the path through app and kit's fake. M2: the rest of the story. Each takes 2 to 3 hours. May I use B's files?";
+pub const PLAN_ANSWER: &str =
+    "Green light: the nearer end, M1 and M2 approved; every ask granted, including B's files.";
+pub const SUBOWNER_REFUSAL: &str = "Authority needs proposal: authority ceiling; ";
+pub const SUBOWNER_REPORT: &str = "M1's sub-owner could not delegate its own helper.";
+pub const PLANNER_REPORT: &str = "The recalled plan started M1's sub-owner under its deadline; it could not delegate.";
+pub const PLAN_REPORT: &str = "A's answered plan and M1's sub-owner have reported.";
+
+#[must_use]
+pub fn fixture_5_5() -> forge::Fixture {
+    forge::Fixture {
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            let mut owner = value["engine"]["charters"][0].clone();
+            owner["number"] = 2.into();
+            owner["resume"] = false.into();
+            value["engine"]["charters"].as_array_mut().expect("charters").push(owner);
+            value["engine"]["limits"]["overrides"]["tasks.charters"] = 2.into();
+            let mut kinds = value["engine"]["rules"]["ceiling"]["delegation"]["kinds"].clone();
+            kinds.as_array_mut().expect("kinds").push(json!({"kind":"charter","number":2}));
+            value["engine"]["rules"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["delegation"]["kinds"] = kinds.clone();
+                project["policy"]["roles"][0]["authority"]["delegation"]["kinds"] = kinds.clone();
+            }
+            value["application"]["landing"]["projects"] = json!([]);
+            landing::admit(value);
+        },
+        ..fixture()
     }
 }
