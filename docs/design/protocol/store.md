@@ -148,7 +148,9 @@ section 7).
   The routing gives it to jig's component, whose format row records it;
   a store written with another refuses to open, saying so (jig's
   `protocol/store.md`, 5.2 and 5.3).
-- **`STORE_VERSION` is 9,** with people v12 refusal bytes embedded in application outcomes.
+- **`STORE_VERSION` is 10,** with the demo end's durable acts, family 19
+  (below). Version 9 came with people v12 refusal bytes embedded in
+  application outcomes.
   Version 8 came with the `Binding` family, tag 18,
   `Key::Binding(address)` (section 2), its row `{ address, subject }`: the
   folded member address and its first Google subject (`sign-in.md`,
@@ -170,9 +172,8 @@ section 7).
   2), its row `{ key, act }`, the act `Close { project, task }` or
   `RemoveAccount { account }`: the grace and the reason are the end's
   constants and the document's, read again at each send, so they are
-  not stored. Its code takes the family number and the next
-  `STORE_VERSION` after main's at its landing's last rebase (19 once
-  `Binding` has taken 18); none is reserved.
+  not stored. Version 10 adds family 19 after `Binding`, family 18;
+  a store written at 9 refuses to open, saying so.
 - **`STORE_VERSION` 6** came with the `Demo` family, tag 17,
   `Key::Demo(forge)` (section 2), its row `{ forge, state }`, the
   state running or ended: the demo's state, the engine's alone

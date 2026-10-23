@@ -1,4 +1,4 @@
-//! The runtime-30 merge queue is durable at v9 in place (protocol/store.md, 4).
+//! The runtime-30 merge queue is durable at v10 in place (protocol/store.md, 4).
 #[path = "support/store.rs"]
 mod fixture;
 use skein_forge::api::{Answer, Repository, Write};
@@ -25,15 +25,15 @@ fn entry(queued: bool) -> Stored {
     }
 }
 #[test]
-fn queued_and_unqueued_entries_have_v9_golden_bytes_and_round_trip() {
+fn queued_and_unqueued_entries_have_v10_golden_bytes_and_round_trip() {
     let bounds = temper_protocol_store::bounds(&fixture::LIMITS).expect("fixture bounds");
-    assert_eq!(STORE_VERSION, 9);
+    assert_eq!(STORE_VERSION, 10);
     for queued in [false, true] {
         let value = entry(queued);
         let bytes = records::encode(&value);
         let name = if queued { "merge-queued.bin" } else { "merge-unqueued.bin" };
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../crates/temper-protocol-store/golden/v9")
+            .join("../../crates/temper-protocol-store/golden/v10")
             .join(name);
         if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
             std::fs::write(&path, &bytes).expect("write queue golden");
@@ -56,7 +56,7 @@ fn queued_effect_outcomes_and_merge_answers_round_trip_durably() {
 }
 
 #[test]
-fn not_installed_call_and_application_reasons_round_trip_distinctly_at_v9() {
+fn not_installed_call_and_application_reasons_round_trip_distinctly_at_v10() {
     use temper_engine_domain_forge::{AdoptionRefusal, ApplicationOutcome};
     let bounds = temper_protocol_store::bounds(&fixture::LIMITS).expect("fixture bounds");
     for value in [
@@ -71,7 +71,7 @@ fn not_installed_call_and_application_reasons_round_trip_distinctly_at_v9() {
         },
     ] {
         let bytes = records::encode(&value);
-        assert_eq!(STORE_VERSION, 9);
+        assert_eq!(STORE_VERSION, 10);
         assert_eq!(records::decode(&bytes, &bounds), Ok(value));
     }
 }

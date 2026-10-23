@@ -6,6 +6,8 @@ use temper_engine_domain_forge as forge;
 
 /// The `Binding` family's byte, taken at landing as a version is (protocol/store.md, 2).
 pub const BINDING: u8 = 18;
+/// The `DemoAct` family's byte (protocol/setup.md, 8.4).
+pub const DEMO_ACT: u8 = 19;
 
 fn write_name(writer: &mut KeyWriter, name: &forge::Name) {
     writer.u64(u64::from(name.forge)).u64(u64::from(name.repository));
@@ -144,6 +146,9 @@ pub fn encode(key: &forge::Key, limit: u32) -> Option<Box<[u8]>> {
             }
             writer.tag(BINDING).bytes(address);
         }
+        forge::Key::DemoAct(key) => {
+            writer.tag(DEMO_ACT).bytes(key);
+        }
         forge::Key::Demo(forge) => {
             writer.tag(17).u64(u64::from(*forge));
         }
@@ -181,6 +186,7 @@ pub fn decode(bytes: &[u8], limits: &forge::Limits) -> Option<forge::Key> {
         14 => forge::Key::Release(reader.u64()?),
         15 => forge::Key::Application(reader.u64()?),
         16 => forge::Key::Writer(u16::try_from(reader.u64()?).ok()?),
+        DEMO_ACT => forge::Key::DemoAct(reader.bytes()?.as_ref().try_into().ok()?),
         17 => forge::Key::Demo(u16::try_from(reader.u64()?).ok()?),
         BINDING => {
             let address = reader.bytes()?;

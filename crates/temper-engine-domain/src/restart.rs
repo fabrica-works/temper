@@ -342,6 +342,7 @@ pub(crate) fn restart_request(
             jig_domain_core::RestartStep::Open => {
                 let request = domain.core.restart_done(step);
                 assert_eq!(request, jig_domain_core::RestartRequest::Idle, "decisions open once");
+                domain.work.push(Work::Forge(forge::Event::SendDemoActs));
                 for _ in 0..domain.limits.tasks.tasks {
                     let Some(context) = domain.core.take_due() else { break };
                     domain.work.push(Work::Activate(context));

@@ -630,6 +630,8 @@ pub enum Stored {
         address: Box<[u8]>,
         subject: Box<[u8]>,
     },
+    /// An end act awaiting a saved answer (protocol/setup.md, 8.4).
+    DemoAct(DemoAct),
 }
 /// A bounded connector payload awaiting an authority holder's decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -668,6 +670,7 @@ pub enum Key {
     /// The demo's forge, application.demo.forge.
     Demo(u16),
     Binding(Box<[u8]>),
+    DemoAct([u8; 16]),
 }
 /// A completed phase of the connector's restart contract.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -739,6 +742,14 @@ pub enum Event {
         address: Box<[u8]>,
         subject: Box<[u8]>,
     },
+    DemoActs {
+        acts: Box<[DemoAct]>,
+    },
+    DemoActAnswered {
+        key: [u8; 16],
+        keep: bool,
+    },
+    SendDemoActs,
     DemoAnswered {
         answer: StartAnswer,
     },
@@ -1032,6 +1043,9 @@ pub enum Request {
         request: Token,
         answer: BindAnswer,
     },
+    /// Select the live chats and deployment account in this decision.
+    ListDemoActs,
+    SendDemoAct(DemoAct),
     /// Stop the ended demo's box group; no request waits for its answer.
     StopGroup {
         forge: u16,
@@ -1268,4 +1282,15 @@ pub enum BindAnswer {
     Another,
     /// Every binding row is taken: rows outlive their members (protocol/sign-in.md, 5).
     Full,
+}
+/// The end's selection, kept before asking the core (protocol/store.md, 2).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct DemoAct {
+    pub key: [u8; 16],
+    pub act: DemoActKind,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DemoActKind {
+    Close { project: u32, task: u64 },
+    RemoveAccount { account: u32 },
 }

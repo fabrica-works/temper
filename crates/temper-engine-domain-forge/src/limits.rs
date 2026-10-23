@@ -88,7 +88,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     {
         return None;
     }
-    l.output.checked_mul(2)?.checked_add(l.applications)?;
+    l.output.checked_mul(2)?.checked_add(l.applications)?.checked_add(demo_act_bound(l)?.checked_mul(2)?)?;
     let names =
         u64::from(l.tasks).checked_mul(u64::from(l.resources_per_task))?.checked_mul(u64::from(l.name_bytes))?;
     let goal_tasks = u64::from(l.subscriptions).checked_mul(u64::from(l.issue_policy.plan_items))?.checked_mul(8)?;
@@ -101,6 +101,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     Map::<Box<[u8]>, Box<[u8]>>::worst_case(l.bindings)?
         .checked_add(u64::from(l.bindings).checked_mul(254 + 255)?)?
         .checked_add(crate::adoption::worst_case(l)?)?
+        .checked_add(Map::<[u8; 16], crate::DemoActKind>::worst_case(demo_act_bound(l)?)?)?
         .checked_add(crate::connect::worst_case(l.applications)?)?
         .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
         .checked_add(Map::<skein_lib::Token, crate::StartAnswer>::worst_case(l.applications)?)?
@@ -241,4 +242,10 @@ pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -
         )?)?
         .checked_add(Map::<(u16, u64), crate::Installation>::worst_case(count)?)?
         .checked_add(u64::from(count).checked_mul(u64::from(name_bytes))?)
+}
+
+/// One close per live task and the demo provider's deployment account.
+#[must_use]
+pub const fn demo_act_bound(l: &Limits) -> Option<u32> {
+    l.tasks.checked_add(1)
 }

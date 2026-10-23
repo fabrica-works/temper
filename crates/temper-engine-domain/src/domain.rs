@@ -54,6 +54,8 @@ pub struct Domain {
     pub(crate) demo_contexts: Map<Token, crate::route::demo::Context>,
     pub(crate) demo_start: Option<crate::route::demo::Start>,
     pub(crate) demo_reply: Option<(Token, crate::route::demo::Phase)>,
+    pub(crate) demo_act_replies: Map<Token, forge::DemoAct>,
+    pub(crate) next_demo_act_reply: u64,
     pub(crate) next_application_owner: u64,
     pub(crate) returns: Map<Token, (Time, Wall)>,
     pub(crate) adoption_restore: Map<Token, Option<forge::Repository>>,
@@ -317,6 +319,8 @@ impl Domain {
             demo_contexts: Map::with_capacity(limits.forge.applications),
             demo_start: None,
             demo_reply: None,
+            demo_act_replies: Map::with_capacity(forge::demo_act_bound(&limits.forge).expect("validated act bound")),
+            next_demo_act_reply: 1,
             next_application_owner: 1,
             returns: Map::with_capacity(limits.people.requests),
             adoption_restore: Map::with_capacity(limits.forge.adoptions),
@@ -817,12 +821,18 @@ pub(crate) fn step_released(domain: &mut Domain, env: &Env<Limits>, released: Re
         out.push(Request::ToChild(released));
         return;
     };
-    released_into(domain, env, released, out);
+    released_into(domain, env, &mut decision, released, out);
     route_into(domain, env, &mut decision);
     close(domain, env, decision, out);
 }
 
-fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, out: &mut Queue<Request>) {
+fn released_into(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    decision: &mut Decision,
+    released: Released,
+    out: &mut Queue<Request>,
+) {
     match released.0 {
         Delivery::ProjectMade { project: _ } => {
             // jig's domain/engine.md, "a project made": the root hears it after commit.
@@ -831,6 +841,7 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
             // Repositories/homes arise on adoption, panels on watching, and the demo
             // still names its configured project. None needs an empty-project row.
         }
+        Delivery::DemoActed { to, outcome } => crate::route::demo::end_acted(domain, env, decision, to, outcome),
         Delivery::ForgeCommitted { entry } => {
             domain.work.push(Work::Forge(forge::Event::Committed { entry }));
         }
@@ -868,7 +879,8 @@ fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, ou
                 out,
             );
         }
-        delivery @ (Delivery::Host(_)
+        delivery @ (Delivery::DemoNote { .. }
+        | Delivery::Host(_)
         | Delivery::Link { .. }
         | Delivery::ForgeCall { .. }
         | Delivery::Bound { .. }

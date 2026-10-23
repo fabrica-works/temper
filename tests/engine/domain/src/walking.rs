@@ -856,7 +856,9 @@ impl World {
                 .referee
                 .result(&self.store.rows, person, task, &words)
                 .expect("committed result reaches person once"),
-            Delivery::Host(_)
+            Delivery::DemoActed { .. }
+            | Delivery::DemoNote { .. }
+            | Delivery::Host(_)
             | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Bound { .. }

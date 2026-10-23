@@ -310,6 +310,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::EraseCarried { .. }
         | Request::SetUp { .. }
         | Request::Bound { .. }
+        | Request::ListDemoActs
+        | Request::SendDemoAct(_)
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
     };
@@ -372,6 +374,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::EraseCarried { .. }
         | Request::SetUp { .. }
         | Request::Bound { .. }
+        | Request::ListDemoActs
+        | Request::SendDemoAct(_)
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
     };
@@ -434,6 +438,8 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::EraseCarried { .. }
         | Request::SetUp { .. }
         | Request::Bound { .. }
+        | Request::ListDemoActs
+        | Request::SendDemoAct(_)
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),
     }

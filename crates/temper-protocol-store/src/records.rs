@@ -1,5 +1,5 @@
 //! Total translations between durable domain rows and generated records.
-use crate::{Bounds, Undecodable, v9 as w};
+use crate::{Bounds, Undecodable, v10 as w};
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 use temper_engine_domain_forge as d;
@@ -38,6 +38,23 @@ pub fn encode(value: &d::Stored) -> Box<[u8]> {
         d::Stored::Binding { address, subject } => w::Value::Binding(
             w::Binding::new(&w::CEILINGS, w::BindingParts { address: address.clone(), subject: subject.clone() })
                 .expect(FITS),
+        ),
+        d::Stored::DemoAct(row) => w::Value::DemoAct(
+            w::DemoAct::new(
+                &w::CEILINGS,
+                w::DemoActParts {
+                    key: row.key,
+                    act: match row.act {
+                        d::DemoActKind::Close { project, task } => w::DemoActKind::Close(
+                            w::DemoClose::new(&w::CEILINGS, w::DemoCloseParts { project, task }).expect(FITS),
+                        ),
+                        d::DemoActKind::RemoveAccount { account } => w::DemoActKind::RemoveAccount(
+                            w::DemoRemoveAccount::new(&w::CEILINGS, w::DemoRemoveAccountParts { account }).expect(FITS),
+                        ),
+                    },
+                },
+            )
+            .expect(FITS),
         ),
         d::Stored::Demo(value) => w::Value::Demo(
             w::Demo::new(
@@ -79,6 +96,20 @@ pub fn decode(bytes: &[u8], bounds: &Bounds) -> Result<d::Stored, Undecodable> {
                 return Err(Undecodable);
             }
             d::Stored::Binding { address, subject }
+        }
+        w::Value::DemoAct(row) => {
+            let w::DemoActParts { key, act } = row.into_parts();
+            let act = match act {
+                w::DemoActKind::Close(row) => {
+                    let w::DemoCloseParts { project, task } = row.into_parts();
+                    d::DemoActKind::Close { project, task }
+                }
+                w::DemoActKind::RemoveAccount(row) => {
+                    let w::DemoRemoveAccountParts { account } = row.into_parts();
+                    d::DemoActKind::RemoveAccount { account }
+                }
+            };
+            d::Stored::DemoAct(d::DemoAct { key, act })
         }
         w::Value::Demo(value) => {
             let w::DemoParts { forge, state } = value.into_parts();

@@ -725,6 +725,7 @@ pub struct Released(pub(crate) Delivery);
 pub(crate) fn delivery_output(delivery: Delivery) -> Request {
     match delivery {
         delivery @ (Delivery::ProjectMade { .. }
+        | Delivery::DemoActed { .. }
         | Delivery::ForgeCommitted { .. }
         | Delivery::Fleet(_)
         | Delivery::Relay { .. }
@@ -736,7 +737,8 @@ pub(crate) fn delivery_output(delivery: Delivery) -> Request {
         | Delivery::Assigned { .. }
         | Delivery::Refuse { .. }
         | Delivery::TurnBusy { .. }) => Request::Worker(WorkerRequest::Deliver(delivery)),
-        delivery @ (Delivery::Forges { .. }
+        delivery @ (Delivery::DemoNote { .. }
+        | Delivery::Forges { .. }
         | Delivery::Panel { .. }
         | Delivery::Application { .. }
         | Delivery::WebReply { .. }

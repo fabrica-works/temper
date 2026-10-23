@@ -849,7 +849,9 @@ impl World {
             }
             // A live notice to the requester, with no reply right.
             Delivery::Result { .. } => {}
-            other @ (Delivery::Host(_)
+            other @ (Delivery::DemoActed { .. }
+            | Delivery::DemoNote { .. }
+            | Delivery::Host(_)
             | Delivery::Procedure { .. }
             | Delivery::Forges { .. }
             | Delivery::Panel { .. }

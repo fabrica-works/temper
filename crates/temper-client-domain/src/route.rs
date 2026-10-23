@@ -190,7 +190,6 @@ fn forge_me(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: 
     if consumed {
         forge::forges::configure(&mut root.forge, env.limits.forge, &mut child);
     }
-    forge::demo::configure(&mut root.forge, env.limits.forge, &mut child);
     route_forge(root, env, &mut child, out);
     consumed
 }

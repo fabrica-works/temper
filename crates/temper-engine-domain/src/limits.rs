@@ -211,7 +211,10 @@ pub(crate) fn route_decision(domain: &mut Domain, limits: &Limits) -> Option<Dec
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "one checked sum of the root's bounded participating state")]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.brief.parts == 0 || limits.brief.gather == skein_lib::Duration::ZERO {
+    if limits.forge.tasks < limits.tasks.tasks
+        || limits.brief.parts == 0
+        || limits.brief.gather == skein_lib::Duration::ZERO
+    {
         return None;
     }
     let brief_fetches = limits.brief.briefs.checked_mul(limits.brief.sections)?.checked_mul(2)?;
@@ -279,6 +282,16 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(1)?;
     bytes = bytes.checked_add(returns.checked_mul(512)?)?;
     bytes = bytes.checked_add(Queue::<Fact>::worst_case(FACTS)?)?;
+    bytes = bytes.checked_add(Map::<Token, forge::DemoAct>::worst_case(forge::demo_act_bound(&limits.forge)?)?)?;
+    bytes = bytes.checked_add(returns.checked_mul(256)?)?;
+    // The root selects into one owned event, while the forge takes that selection.
+    bytes = bytes.checked_add(
+        u64::from(forge::demo_act_bound(&limits.forge)?)
+            .checked_mul(u64::try_from(size_of::<forge::DemoAct>()).ok()?)?
+            .checked_mul(2)?,
+    )?;
+    bytes = bytes
+        .checked_add(u64::from(limits.tasks.tasks).checked_mul(u64::try_from(size_of::<tasks::ViewTask>()).ok()?)?)?;
     bytes = bytes.checked_add(Map::<Token, crate::route::demo::Context>::worst_case(limits.forge.applications)?)?;
     let effects = limits.call_records.checked_add(limits.tasks.tasks)?;
     let brief_fetches = limits.brief.briefs.checked_mul(limits.brief.sections)?.checked_mul(2)?;

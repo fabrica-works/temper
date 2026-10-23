@@ -115,10 +115,7 @@ impl Side {
     }
     #[must_use]
     pub const fn demo_starting(&self) -> bool {
-        match &self.demo.start {
-            Some(start) => !start.silent,
-            None => false,
-        }
+        self.demo.start.is_some()
     }
     #[must_use]
     pub const fn demo_failure(&self) -> Option<&demo::StartFailure> {
@@ -230,7 +227,7 @@ fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
         Act::ConnectManifest { forge, back } => github::manifest(side, limits, forge, back, out),
         Act::ConnectApp { forge } => github::send(side, limits, forge, None, out),
         Act::Install { forge, back } => github::send(side, limits, forge, Some(back), out),
-        Act::StartDemo => demo::start(side, limits, false, out),
+        Act::StartDemo => demo::start(side, limits, out),
         Act::SetUp { forge } => forges::set_up(side, limits, forge, out),
         Act::SetupWrite { field, text } => forges::write(side, limits, field, text),
         Act::StartIn { forge } => forges::retry_start(side, limits, forge, out),

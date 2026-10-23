@@ -1,5 +1,6 @@
 {
   "engine": {
+    "acts": [{"connector": 1, "may": ["close", "remove_account"]}],
     "limits": {
       "profile": "small",
       "overrides": {
@@ -244,7 +245,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 443787126927850,
+    "memory_bytes": 443792444660942,
     "rules": {
       "ceiling": {
         "tools": 1,

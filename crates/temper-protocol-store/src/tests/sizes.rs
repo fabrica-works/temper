@@ -7,7 +7,7 @@ fn the_application_sizes_are_the_largest_key_and_row() {
     // Change's eight remarks each hold 4096 bytes; the complete row is 35403.
     assert_eq!(
         application(&fixtures::LIMITS),
-        Some(jig_protocol_store::sizes::Application { version: 9, key: 403, value: 35_403 })
+        Some(jig_protocol_store::sizes::Application { version: 10, key: 403, value: 35_403 })
     );
 }
 #[test]
@@ -44,13 +44,13 @@ fn a_row_whose_key_disagrees_with_its_record_is_undecodable() {
     assert_eq!(records::row(&key, &[], &bounds), Err(Undecodable), "malformed value");
 }
 #[test]
-fn the_store_version_is_nine() {
-    assert_eq!(crate::STORE_VERSION, 9);
+fn the_store_version_is_ten() {
+    assert_eq!(crate::STORE_VERSION, 10);
 }
 
 #[test]
 fn demo_row_sizes_fit_the_existing_application_ceiling() {
-    use crate::v9 as w;
+    use crate::v10 as w;
     assert_eq!(w::Demo::worst_case_bytes(&w::CEILINGS), Some(3));
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for state in [forge::DemoState::Running, forge::DemoState::Ended] {

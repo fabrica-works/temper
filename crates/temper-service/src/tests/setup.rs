@@ -1707,6 +1707,16 @@ fn the_demo_waits_for_started_only_under_the_box_even_with_retained_access() {
 
 fn demo_config() -> crate::settings::Engine {
     let mut config = local_config(true, true);
+    config.jig.limits.core.people.act_grants = 1;
+    config.jig.acts = Box::new([jig_domain_people::ActGrant {
+        connector: 1,
+        may: Box::new([
+            jig_domain_people::ActKind::Close,
+            jig_domain_people::ActKind::AddKey,
+            jig_domain_people::ActKind::RemoveAccount,
+            jig_domain_people::ActKind::Adopt,
+        ]),
+    }]);
     config.demo = Some(crate::settings::Demo {
         project: 1,
         forge: 1,

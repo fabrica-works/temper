@@ -1,6 +1,7 @@
 //! The forge connector reads the record: with no demo, or one ended, it
 //! refuses, *not offered* (protocol/setup.md, 8.4).
 use crate::{Connection, Demo, DemoConfig, DemoState, Domain, Request, StartAnswer, Stored};
+use alloc::boxed::Box;
 use skein_lib::{Queue, Token};
 
 impl DemoConfig {
@@ -146,8 +147,31 @@ pub(crate) fn connected(d: &mut Domain, forge: u16, out: &mut Queue<Request>) {
         release: None,
         record: Stored::Demo(Demo { forge: demo_forge, state: DemoState::Ended }),
     });
+    if ran {
+        out.push(Request::ListDemoActs);
+    }
     if ran && d.under_box {
         out.push(Request::StopGroup { forge: demo_forge });
     }
     answered(d, StartAnswer::NotOffered, out);
+}
+
+pub(crate) fn acts(d: &mut Domain, acts: Box<[crate::DemoAct]>, out: &mut Queue<Request>) {
+    for row in acts {
+        d.demo_acts.insert(row.key, row.act).expect("end selection fits tasks plus one");
+        out.push(Request::Save { read_afresh: None, release: None, record: Stored::DemoAct(row) });
+    }
+    send_acts(d, out);
+}
+
+pub(crate) fn send_acts(d: &Domain, out: &mut Queue<Request>) {
+    for (key, act) in &d.demo_acts {
+        out.push(Request::SendDemoAct(crate::DemoAct { key: *key, act: *act }));
+    }
+}
+
+pub(crate) fn act_answered(d: &mut Domain, key: [u8; 16], keep: bool, out: &mut Queue<Request>) {
+    if !keep && d.demo_acts.remove(&key).is_some() {
+        out.push(Request::Erase { key: crate::Key::DemoAct(key) });
+    }
 }

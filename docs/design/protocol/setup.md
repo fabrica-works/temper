@@ -1404,7 +1404,7 @@ runs it (section 7).
   SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'
   ```
 
-  At these pins the engine requires 645,702,088,694,424 bytes and the worker
+  At these pins the engine requires 646,061,993,993,576 bytes and the worker
   3,380,142,268,295 bytes. Ordinary runs fail on drift and never write the
   example. Program declarations survive startup; runnable program grants
   still wait for smith's program backend and jig's program sources.
@@ -1596,9 +1596,9 @@ defaults for a person's real work are open (section 16).
   the document names neither (configuration.md, 13.4); `temper init`
   writes no `engine.policies`, `engine.rules` or `application.landing`.
 - **Its acts:** `engine.acts` (jig's `protocol/configuration.md`,
-  section 3) grants the forge connector, 1, exactly the acts the demo
-  makes (8.4), `{"connector": 1, "may": ["close", "add_key",
-  "remove_account", "adopt"]}`, and no other connector any. The
+  section 3) grants the forge connector, 1, the demo end's acts
+  (8.4), `{"connector": 1, "may": ["close", "remove_account"]}`,
+  and no other connector any. The
   document's first owner, whom the grant needs, is its `owners`' first.
   A document written before the grant still serves: `temper serve`
   starts on it, and only the demo's acts are refused, *not offered*.
@@ -2866,7 +2866,7 @@ Each is intended; what it needs is named with it.
 - **The owned example's agent, sized for a person's work.** Default: the
   process tier's profile (8.1), sized for the live tier's stories.
 - **The owned example's `memory_bytes`** are `small`'s worst cases with
-  its strings at their bounds (8.1): 645,702,088,694,424 bytes for the
+  its strings at their bounds (8.1): 646,061,993,993,576 bytes for the
   engine and 3,380,142,268,295 for the worker, more than any machine
   has, so the start's check bounds nothing a person's machine holds.
   Default: as the example states them; which terms of the worst cases

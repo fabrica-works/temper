@@ -234,3 +234,186 @@ pub(crate) fn done(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
         domain.demo_start = None;
     }
 }
+
+fn end_key(number: u64, purpose: &[u8]) -> [u8; 16] {
+    let mut hash = skein_lib::sha256::Sha256::new();
+    hash.update(b"temper demo end\0");
+    hash.update(&number.to_be_bytes());
+    hash.update(purpose);
+    hash.finish().get(..16).expect("digest prefix").try_into().expect("16-byte key")
+}
+
+/// Selection is read once, before any act changes the core, in the end's decision.
+pub(crate) fn list_end_acts(domain: &mut Domain) {
+    let demo = domain.forge.demo().expect("running configured demo");
+    let mut acts = skein_lib::List::with_capacity(forge::demo_act_bound(&domain.limits.forge).expect("act bound"));
+    for task in domain.core.tasks.view_tasks() {
+        let row = domain.core.tasks.task(task.number).expect("live task row");
+        let live = match row.phase {
+            jig_domain_tasks::Phase::Waiting
+            | jig_domain_tasks::Phase::Active(_)
+            | jig_domain_tasks::Phase::Held { .. } => true,
+            jig_domain_tasks::Phase::Closing(_) | jig_domain_tasks::Phase::Ended(_) => false,
+        };
+        if row.project == demo.adoption.project && live && domain.core.conversation_requester(row).is_some() {
+            acts.push(forge::DemoAct {
+                key: end_key(row.number, b"close"),
+                act: forge::DemoActKind::Close { project: row.project, task: row.number },
+            })
+            .expect("one close per task");
+        }
+    }
+    for fact in &domain.core.accounts.account_views() {
+        if let Some(account) = domain.core.accounts.account(fact.account)
+            && account.provider() == demo.provider
+            && account.holder() == jig_domain_accounts::Holder::Deployment
+        {
+            acts.push(forge::DemoAct {
+                key: end_key(u64::from(fact.account), b"remove"),
+                act: forge::DemoActKind::RemoveAccount { account: fact.account },
+            })
+            .expect("one deployment account per provider");
+            break;
+        }
+    }
+    domain.work.push(Work::Forge(forge::Event::DemoActs { acts: acts.into_boxed() }));
+}
+
+pub(crate) fn send_end_act(domain: &mut Domain, row: forge::DemoAct) {
+    let token = Token::new(domain.next_demo_act_reply);
+    domain.next_demo_act_reply = domain.next_demo_act_reply.checked_add(1).expect("demo act reply sequence");
+    domain.demo_act_replies.insert(token, row).expect("one reply per kept demo act");
+    let act = match row.act {
+        forge::DemoActKind::Close { project, task } => {
+            let mut grace = None;
+            for template in &domain.core.settings.templates {
+                if template.flags.conversation {
+                    grace = template.grace;
+                    break;
+                }
+            }
+            people::Act::Close { project, task, grace, reason: b"Ended with the playground".as_slice().into() }
+        }
+        forge::DemoActKind::RemoveAccount { account } => people::Act::RemoveAccount { account },
+    };
+    domain.work.push(Work::Core(core::Event::Act {
+        reply_to: ReplyTo::new(token),
+        connector: domain.config.forge_connector,
+        key: row.key,
+        act: Box::new(act),
+        carried: None,
+    }));
+}
+
+pub(crate) fn end_acted(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    decision: &mut Decision,
+    to: ReplyTo,
+    outcome: people::Outcome,
+) {
+    let row = domain.demo_act_replies.remove(&to.into_token()).expect("demo end act reply");
+    let (keep, why) = match &outcome {
+        people::Outcome::Again(_) => (true, None),
+        people::Outcome::Refused(people::Refusal::NotOffered) => (
+            true,
+            Some(match row.act {
+                forge::DemoActKind::Close { .. } => "the forge connector is not granted close (engine.acts)",
+                forge::DemoActKind::RemoveAccount { .. } => {
+                    "the forge connector is not granted remove_account (engine.acts)"
+                }
+            }),
+        ),
+        people::Outcome::Refused(people::Refusal::Role { held: None }) => (true, Some("no first owner configured")),
+        people::Outcome::Refused(people::Refusal::Unknown | people::Refusal::Ended { .. })
+        | people::Outcome::Compound { .. }
+        | people::Outcome::AccountRemoved { .. } => (false, None),
+        people::Outcome::Refused(why) | people::Outcome::CompoundRefused { why, .. } => {
+            (false, Some(refusal_name(why)))
+        }
+        people::Outcome::Renamed { .. }
+        | people::Outcome::ProjectMade { .. }
+        | people::Outcome::Created { .. }
+        | people::Outcome::MarkedSeen { .. }
+        | people::Outcome::Applied { .. }
+        | people::Outcome::SignedOut
+        | people::Outcome::NoteEdited { .. }
+        | people::Outcome::ServiceMade { .. }
+        | people::Outcome::Adopted { .. }
+        | people::Outcome::Proposed { .. }
+        | people::Outcome::Withdrawn { .. }
+        | people::Outcome::Stopped { .. }
+        | people::Outcome::Cancelled { .. }
+        | people::Outcome::Released { .. }
+        | people::Outcome::PersonTaken { .. }
+        | people::Outcome::PersonHandedBack { .. }
+        | people::Outcome::PersonAnswered { .. }
+        | people::Outcome::Moved { .. }
+        | people::Outcome::ProposalDecided { .. }
+        | people::Outcome::Said { .. }
+        | people::Outcome::QuestionAnswered { .. }
+        | people::Outcome::Amended { .. }
+        | people::Outcome::RolesSet { .. }
+        | people::Outcome::PolicyChanged { .. }
+        | people::Outcome::PoolSet { .. }
+        | people::Outcome::EscalationDecided { .. }
+        | people::Outcome::AccountSignInStarted { .. }
+        | people::Outcome::AccountSignedOut { .. }
+        | people::Outcome::AccountKeyKept { .. }
+        | people::Outcome::AccountProgramDeclared { .. }
+        | people::Outcome::AccountChanged => unreachable!("close or remove account answer"),
+    };
+    if let Some(why) = why {
+        let line = end_note(row.act, why.as_bytes());
+        emit(decision, &env.limits, Delivery::DemoNote { line });
+    }
+    domain.work.push(Work::Forge(forge::Event::DemoActAnswered { key: row.key, keep }));
+}
+
+fn refusal_name(why: &people::Refusal) -> &'static str {
+    use people::Refusal;
+    match why {
+        Refusal::NameTaken => "NameTaken",
+        Refusal::NotWellFormed { why: people::Malformed::Name(_), .. } => "Name",
+        Refusal::Circle { .. } => "Circle",
+        Refusal::Dependency { .. } => "Dependency",
+        Refusal::Kept { .. } => "Kept",
+        Refusal::Account { .. } => "Account",
+        Refusal::NotWellFormed { .. } => "NotWellFormed",
+        Refusal::Role { .. } => "Role",
+        Refusal::Authority { .. } => "Authority",
+        Refusal::Limit { .. } => "Limit",
+        Refusal::Moved { .. } => "Moved",
+        Refusal::Ended { .. } => "Ended",
+        Refusal::Taken { .. } => "Taken",
+        Refusal::NotWaiting => "NotWaiting",
+        Refusal::NoFurther => "NoFurther",
+        Refusal::Unknown => "Unknown",
+        Refusal::NotOffered => "NotOffered",
+        Refusal::Provider => "Provider",
+        Refusal::KeyConflict => "KeyConflict",
+        Refusal::NoEscalationHolder => "NoEscalationHolder",
+        Refusal::Llm { .. } => "Llm",
+    }
+}
+
+fn end_note(act: forge::DemoActKind, why: &[u8]) -> Box<[u8]> {
+    let (subject, number, action) = match act {
+        forge::DemoActKind::Close { task, .. } => (b"chat ".as_slice(), task, b" not closed: ".as_slice()),
+        forge::DemoActKind::RemoveAccount { account } => {
+            (b"account ".as_slice(), u64::from(account), b" not removed: ".as_slice())
+        }
+    };
+    let number = super::forge_route::decimal(number);
+    let parts = [b"demo end: ".as_slice(), subject, number.as_ref(), action, why];
+    let mut length = 0_usize;
+    for part in parts {
+        length = length.checked_add(part.len()).expect("bounded demo diagnostic");
+    }
+    assert!(length <= 256, "bounded secret-free diagnostic");
+    let mut writer = skein_lib::Writer::new(length);
+    for part in parts {
+        writer.put(part).expect("measured diagnostic");
+    }
+    writer.finish()
+}

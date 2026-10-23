@@ -35,6 +35,11 @@ pub fn demo_application() -> Box<[u8]> {
 pub fn demo_document() -> Box<[u8]> {
     core::str::from_utf8(&document())
         .unwrap()
+        .replacen(
+            "\"engine\":{",
+            "\"engine\":{\"acts\":[{\"connector\":1,\"may\":[\"close\",\"add_key\",\"remove_account\",\"adopt\"]}],",
+            1,
+        )
         .replace("\"setup\":[]", DEMO_SETUP)
         .replace("\"demo\":null", DEMO)
         .into_bytes()

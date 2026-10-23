@@ -231,7 +231,7 @@ pub(crate) fn claim_names(
     Some(names.into_boxed())
 }
 
-fn decimal(number: u64) -> Box<[u8]> {
+pub(super) fn decimal(number: u64) -> Box<[u8]> {
     let mut digits = List::with_capacity(20);
     let mut value = number;
     for _ in 0_u32..20_u32 {
@@ -2127,6 +2127,8 @@ pub(crate) fn outputs(
             forge::Request::Bound { request, answer } => {
                 emit(decision, &env.limits, Delivery::Bound { request, answer });
             }
+            forge::Request::ListDemoActs => super::demo::list_end_acts(domain),
+            forge::Request::SendDemoAct(row) => super::demo::send_end_act(domain, row),
             forge::Request::DemoStart { request } => super::demo::start(domain, env, decision, request),
             forge::Request::StopGroup { forge } => {
                 assert!(super::now(domain, Request::StopGroup { forge }), "demo stop door reserved");

@@ -98,6 +98,9 @@ pub fn root(
         limits.journal.held = 1024;
     }
 
+    // The demo's end may select every live task (temper's `worst_case`).
+    limits.forge.tasks = limits.tasks.tasks;
+
     // The core's inbox census and waiting entries cover every live task
     // (jig's core `worst_case`).
     limits.people.inbox_tasks = limits.tasks.tasks * 2;

@@ -96,7 +96,9 @@ fn an_unusable_git_stops_the_service_naming_its_program() {
 #[test]
 fn a_socket_workers_bind_announces_its_bound_address_once() {
     let mut service = fixtures::started();
-    service.notes().push(crate::Note::ForgeUnconfigured { number: 1 });
+    for _ in 0..service.notes().capacity() {
+        service.notes().push(crate::Note::ForgeUnconfigured { number: 1 });
+    }
     assert_eq!(service.notes().room(), 0, "forge diagnostics occupy their whole queue");
     let addr = ([127, 0, 0, 1], 41733).into();
     service.told.push(skein_io::Event::Listening {
