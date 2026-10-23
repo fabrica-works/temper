@@ -305,6 +305,15 @@ fn check(own: &temper_forge_setup::limits::Host) -> Result<(), Problems> {
         for place in [Some(why.place), why.other].into_iter().flatten() {
             use skein_forge_setup::given::Place;
             let name = match place {
+                Place::FilesLimit | Place::FileBytesLimit => {
+                    unreachable!("temper fixes files and file_bytes above zero")
+                }
+                Place::CreateOrg
+                | Place::CreateRepository
+                | Place::Files
+                | Place::FilePath(_)
+                | Place::FileContent(_)
+                | Place::Plan => unreachable!("temper sends Create from the first-repository work, not yet"),
                 Place::Backoff => b"setup.backoff_ms".as_slice(),
                 Place::BackoffMax => b"setup.backoff_max_ms",
                 Place::Deadline => b"setup.deadline_ms",

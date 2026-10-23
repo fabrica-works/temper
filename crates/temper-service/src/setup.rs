@@ -303,6 +303,7 @@ impl Layer {
 /// Name the forge before gating, including plans whose connected path is staged later.
 fn forge(plan: &host::Plan) -> u16 {
     match plan {
+        host::Plan::Create { .. } => unreachable!("temper sends Create from the first-repository work, not yet"),
         host::Plan::Manifest { forge, .. }
         | host::Plan::Convert { forge, .. }
         | host::Plan::Install { forge }
@@ -362,6 +363,7 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
 }
 fn matches_app_plan(plan: &host::Plan) -> bool {
     match plan {
+        host::Plan::Create { .. } => unreachable!("temper sends Create from the first-repository work, not yet"),
         host::Plan::Manifest { .. } | host::Plan::Convert { .. } => true,
         host::Plan::Install { .. }
         | host::Plan::Accept { .. }
