@@ -53,6 +53,94 @@ fn leaving_a_chat_unwatches_its_task_activity_and_run() {
     f.chat.leave(&mut f.out);
     assert_eq!(f::handles(&mut f.out).as_ref(), [f.chat.document, f.chat.activity, f.chat.run.expect("run")]);
 }
+fn open_run(f: &mut f::Fixture) -> skein_lib::Token {
+    let mut emitted = Queue::with_capacity(OUTPUTS);
+    while let Some(Request::Client(event)) = f.out.pop() {
+        f.client.step(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH, event, &mut emitted);
+    }
+    while let Some(request) = emitted.pop() {
+        if let jig_client::Request::Down {
+            down: jig_client::Down::Open { watch, subject: Watchable::Jig(c::Subject::Run { .. }) },
+        } = request
+        {
+            return watch;
+        }
+    }
+    panic!("run opened")
+}
+fn run_text(from: u32, bytes: &[u8]) -> c::RunText {
+    let length = u32::try_from(bytes.len()).unwrap();
+    c::RunText {
+        attempt: f::ATTEMPT,
+        began: Some(skein_lib::Wall::EPOCH),
+        turn: c::ProvisionalTurnName { attempt: f::ATTEMPT, number: u32::try_from(f::POSITION).unwrap(), retry: 0 },
+        from,
+        through: from.checked_add(length).unwrap(),
+        text: c::Text::new(Box::from(bytes), length).unwrap(),
+        cut: false,
+        call: None,
+    }
+}
+fn run_delivery(f: &mut f::Fixture, watch: skein_lib::Token, delivery: c::Delivery) {
+    f.client.step(
+        skein_lib::Time::ZERO,
+        skein_lib::Wall::EPOCH,
+        Event::Up { up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(delivery) } },
+        &mut Queue::with_capacity(OUTPUTS),
+    );
+    let handle = f.chat.run.expect("run watched");
+    for told in [Told::Changed { handle }, Told::Text { handle }] {
+        assert!(f.chat.told(&f.client, told, &mut f.out));
+    }
+}
+fn run_state(writing: Option<c::RunText>) -> c::Delivery {
+    c::Delivery::RunState(Box::new(c::RunState {
+        task: f::TASK,
+        attempt: Some(f::ATTEMPT),
+        committed_turn: 0,
+        writing,
+        call: None,
+    }))
+}
+#[test]
+fn a_chats_stream_suffix_extends_its_provisional_turn_until_committed() {
+    let mut f = f::opened();
+    let watch = open_run(&mut f);
+    run_delivery(&mut f, watch, run_state(Some(run_text(0, b"The answer"))));
+    assert_eq!(f.chat.thread.live.get(0).expect("provisional prefix").text.bytes(), b"The answer");
+    run_delivery(&mut f, watch, c::Delivery::Run(Box::new(run_text(10, b" is forty-two."))));
+    let handle = f.chat.run.unwrap();
+    assert_eq!(f.client.text(handle).unwrap().text.bytes(), b"The answer is forty-two.");
+    assert_eq!(f.chat.thread.live.get(0).expect("whole provisional turn").text.bytes(), b"The answer is forty-two.");
+
+    let mut blocks = skein_lib::List::with_capacity(1);
+    blocks.push(c::Block::Text(fixtures::acts::text(b"The answer is forty-two."))).unwrap();
+    f::activity_blocks(&mut f, c::Speaker::Assistant, blocks, f::POSITION);
+    assert!(f.chat.thread.live.is_empty(), "the committed turn replaces the provisional turn");
+    let lines = f.chat.thread.lines();
+    let [jig_client::thread::Line::Turn { turn, .. }] = lines.as_slice() else { panic!("one committed turn") };
+    assert_eq!(
+        turn.messages.get(0).unwrap().blocks.as_slice(),
+        [c::Block::Text(fixtures::acts::text(b"The answer is forty-two."))]
+    );
+}
+#[test]
+fn a_chats_first_stream_text_follows_a_state_without_writing() {
+    let mut f = f::opened();
+    let watch = open_run(&mut f);
+    run_delivery(&mut f, watch, run_state(None));
+    assert!(f.chat.thread.live.is_empty());
+    run_delivery(&mut f, watch, c::Delivery::Run(Box::new(run_text(0, b"The answer"))));
+    assert_eq!(f.chat.thread.live.get(0).expect("first provisional turn").text.bytes(), b"The answer");
+}
+#[test]
+fn a_chats_stream_can_arrive_before_its_first_run_state() {
+    let mut f = f::opened();
+    let watch = open_run(&mut f);
+    run_delivery(&mut f, watch, c::Delivery::Run(Box::new(run_text(0, b"The answer"))));
+    assert_eq!(f.chat.thread.attempt, Some(f::ATTEMPT));
+    assert_eq!(f.chat.thread.live.get(0).expect("first provisional turn").text.bytes(), b"The answer");
+}
 #[test]
 fn stop_sends_one_stop_and_shows_it_pending_until_answered() {
     let mut f = f::opened();
