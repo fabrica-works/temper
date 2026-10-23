@@ -782,7 +782,7 @@ fn cached_binary_fingerprint(path: &std::path::Path) -> (u64, [u8; 32]) {
 }
 
 #[test]
-#[ignore = "the shipped dark-theme script's finish is rejected as an unknown tool by the pinned jig/smith Open chat"]
+#[ignore = "the shipped dark-theme script calls finish, which the pinned jig/smith requester-ended chat does not offer"]
 fn a_first_run_answers_on_the_demo_and_a_second_finds_it_running() {
     first_run(true);
 }
