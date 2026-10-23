@@ -553,8 +553,11 @@ keeps (`../protocol/configuration.md`, section 2).
     deployment's forges (above), the forges are not theirs to set up,
     and the account alone decides. Its facts are in once the demo's
     read has answered, a demo or none, the `accounts` document is
-    delivered and not cut, and, where the person's role holds the
-    forges, the `forges` watch has delivered its rows or been refused.
+    delivered, its accounts as far as it shows them, and, where the
+    person's role holds the forges, the `forges` watch has delivered
+    its rows. A read refused, failed, ended or not served is in, with
+    nothing in it: no demo, no account, no forge, so that the page
+    never waits on a read that will not answer.
     Over, the page moves on to the chats page, its address replacing
     the welcome's, so that back does not return to it; once the demo
     has a state of the engine's (`../draft/first-run.md`, 2.3), a
