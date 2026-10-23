@@ -12,7 +12,7 @@ static HEAP: skein_world::domain::heap::Counting = skein_world::domain::heap::Co
 
 mod result;
 mod resume;
-mod resume_fixture;
+pub(super) mod resume_fixture;
 mod setup;
 
 const LIMITS: Limits =
@@ -572,6 +572,7 @@ fn held_assignment() -> crate::Assignment {
         task: 1,
         attempt: 1,
         conversation: 1,
+        live: jig_domain_host::LiveAsk::NONE,
         charter: 1,
         run: Box::new(crate::RunCharter {
             ended_by: jig_domain_tasks::EndedBy::Result,
@@ -705,4 +706,51 @@ fn a_program_sign_out_counts_its_retained_worker_failures() {
     }));
     let expected = size_of::<people::AccountHostFailure>() + name.len();
     assert_eq!(crate::record_bytes(&row), Some(u64::try_from(expected).expect("bounded owned bytes")));
+}
+
+#[test]
+fn a_conversations_prepared_text_ask_reaches_its_assignment() {
+    use crate::boundary::PreparedWorkspace;
+    use crate::route::forge_route::RunWorkspace;
+    use jig_domain_core as core;
+
+    let (mut domain, env) = resume_fixture::root();
+    let fixture = held_assignment();
+    domain.brief_sections.insert(fixture.task, Box::new([])).unwrap();
+    domain
+        .run_workspaces
+        .insert(
+            fixture.task,
+            PreparedWorkspace {
+                workspace: RunWorkspace {
+                    workspace: crate::ForgeWorkspace { repositories: Box::new([]) },
+                    workstream: fixture.task,
+                    writes: Box::new([]),
+                    names: Box::new([]),
+                    own_holds: Box::new([]),
+                },
+                claim_names: Box::new([]),
+            },
+        )
+        .unwrap();
+    let mut requests = Queue::with_capacity(1);
+    requests.push(core::Request::Now(Box::new(core::Now::RunPrepared {
+        task: fixture.task,
+        attempt: fixture.attempt,
+        conversation: fixture.conversation,
+        live: core::LiveAsk { text: true, reasoning: false, input: false },
+        charter: fixture.charter,
+        run: fixture.run,
+        messages: Box::new([]),
+        saved: Box::new([]),
+        transcript: Box::new([]),
+        answered: Box::new([]),
+        grants: Box::new([]),
+    })));
+    let mut decision = Decision::new(&env.limits.journal);
+    crate::route::route_core_requests(&mut domain, &env, &mut decision, core::Requests::Out(requests));
+    let assignment = domain.assignments.get(&fixture.task).expect("prepared assignment");
+    assert!(assignment.live.text);
+    assert!(!assignment.live.reasoning);
+    assert!(!assignment.live.input);
 }

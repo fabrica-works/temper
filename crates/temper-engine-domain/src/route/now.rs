@@ -182,6 +182,7 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             task,
             attempt,
             conversation,
+            live,
             charter,
             run,
             messages,
@@ -190,8 +191,19 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             answered,
             grants,
         } => {
-            let prepared =
-                Prepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants };
+            let prepared = Prepared {
+                task,
+                attempt,
+                conversation,
+                live,
+                charter,
+                run,
+                messages,
+                saved,
+                transcript,
+                answered,
+                grants,
+            };
             run_prepared(domain, env, prepared);
         }
         core::Now::DropAssignment { task } => drop(domain.assignments.remove(&task)),
@@ -302,6 +314,7 @@ struct Prepared {
     task: u64,
     attempt: u64,
     conversation: u64,
+    live: core::LiveAsk,
     charter: u32,
     run: Box<core::RunCharter>,
     messages: Box<[tasks::Word]>,
@@ -312,7 +325,7 @@ struct Prepared {
 }
 
 fn run_prepared(domain: &mut Domain, env: &Env<Limits>, prepared: Prepared) {
-    let Prepared { task, attempt, conversation, charter, run, messages, saved, transcript, answered, grants } =
+    let Prepared { task, attempt, conversation, live, charter, run, messages, saved, transcript, answered, grants } =
         prepared;
     let sections = domain.brief_sections.remove(&task).expect("prepared brief sections");
     let PreparedWorkspace { workspace, claim_names } =
@@ -328,6 +341,7 @@ fn run_prepared(domain: &mut Domain, env: &Env<Limits>, prepared: Prepared) {
         task,
         attempt,
         conversation,
+        live: jig_domain_host::LiveAsk { text: live.text, reasoning: live.reasoning, input: live.input },
         charter,
         run,
         sections,

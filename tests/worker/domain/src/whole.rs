@@ -180,6 +180,7 @@ impl World {
             host::LinkUp::Activity { run, attempt, .. } => assert_eq!((*run, *attempt), (RUN, ATTEMPT)),
             host::LinkUp::Logins { .. }
             | host::LinkUp::SignedOut { .. }
+            | host::LinkUp::Piece { .. }
             | host::LinkUp::Turn { .. }
             | host::LinkUp::Call { .. }
             | host::LinkUp::Unauthorized { .. }
@@ -310,6 +311,7 @@ impl World {
             answered: Box::new([]),
             assignment: host::RunAssignment {
                 identity: [9; 16],
+                live: host::LiveAsk::NONE,
                 run: RUN,
                 attempt: ATTEMPT,
                 workspace: Some(host::Workspace { workstream: WORKSTREAM, items: Token::new(0) }),

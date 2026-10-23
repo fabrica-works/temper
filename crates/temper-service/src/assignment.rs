@@ -55,6 +55,7 @@ pub fn down(
                 messages: messages(&assignment.messages),
                 assignment: host::RunAssignment {
                     identity,
+                    live: assignment.live,
                     run: Token::new(assignment.task),
                     attempt: Token::new(assignment.attempt),
                     workspace,
