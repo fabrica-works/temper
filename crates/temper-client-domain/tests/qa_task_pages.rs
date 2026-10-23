@@ -73,9 +73,9 @@ mod tests {
         projects
             .push(MeProject {
                 project: 1,
-                name: Some(DocumentText::complete(
+                name: DocumentText::complete(
                     contract::Text::new(skein_lib::bytes::copy_of(project_name), 32).expect("name fits"),
-                )),
+                ),
                 role: HeldRole::Policy { role: 1 },
                 pool: None,
                 templates: List::with_capacity(0),
@@ -85,7 +85,7 @@ mod tests {
             .expect("one project");
         let mut second = projects.as_slice()[0].clone();
         second.project = 2;
-        second.name = Some(DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits")));
+        second.name = DocumentText::complete(contract::Text::new(Box::from(*b"Second"), 32).expect("name fits"));
         projects.push(second).expect("second project");
         Me {
             providers: List::with_capacity(0),
@@ -111,7 +111,7 @@ mod tests {
     fn document() -> c::Task {
         let mut parts = jig_client_test_records::task_record().into_parts();
         parts.chip = jig_client_test_records::owner_waiting_chip_record();
-        let record = jig_client_protocol_wire::v14::Task::new(&jig_client_protocol_wire::v14::CEILINGS, parts)
+        let record = jig_client_protocol_wire::v15::Task::new(&jig_client_protocol_wire::v15::CEILINGS, parts)
             .expect("checked task record");
         let limits = domain_limits();
         let link =

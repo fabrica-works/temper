@@ -707,7 +707,12 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
             | jig_domain_people::Stored::ReadResults { .. }
             | jig_domain_people::Stored::EndedRead { .. }
             | jig_domain_people::Stored::ReadConversation { .. } => Some(0),
-            jig_domain_people::Stored::Policy { value, .. } => jig_domain_people::policy_bytes(value),
+            jig_domain_people::Stored::Policy { name, value, .. } => {
+                jig_domain_people::policy_bytes(value)?.checked_add(u64::try_from(name.len()).ok()?)
+            }
+            jig_domain_people::Stored::Acted { .. } => {
+                unreachable!("the current application grants no deployment acts")
+            }
         },
     }
 }

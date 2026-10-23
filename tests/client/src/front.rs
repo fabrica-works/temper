@@ -242,7 +242,7 @@ impl Joint {
         let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
             let mut config = walking::config(seed);
             let rules = config.core.authority.rules().clone();
-            let mut policy = config.core.authority.policy(1).expect("fixture project").clone();
+            let mut policy = config.core.seed_projects[0].policy.policy.clone();
             policy.roles[0].authority.budget.spend = 150;
             let mut domain =
                 jig_domain_authority::Domain::new(rules, *config.core.authority.limits()).expect("goal authority");
@@ -253,7 +253,9 @@ impl Joint {
                 &mut out,
             );
             assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
-            config.core.authority = domain;
+            config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+            config.core.authority = jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+                .expect("configured authority");
             let mut engine_limits = engine_limits();
             engine_limits.fleet.slots = 2;
             engine_limits.fleet.attempts = 4;
@@ -270,7 +272,7 @@ impl Joint {
             let mut config = walking::config(seed);
             let mut rules = config.core.authority.rules().clone();
             rules.ceiling.delegation.depth = 2;
-            let mut policy = config.core.authority.policy(fixtures::QUESTION_PROJECT).expect("fixture project").clone();
+            let mut policy = config.core.seed_projects[0].policy.policy.clone();
             policy.ceiling.delegation.depth = 2;
             policy.roles[0].authority.delegation.depth = 2;
             let mut domain =
@@ -282,7 +284,9 @@ impl Joint {
                 &mut out,
             );
             assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: fixtures::QUESTION_PROJECT }));
-            config.core.authority = domain;
+            config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+            config.core.authority = jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+                .expect("configured authority");
             let mut engine_limits = engine_limits();
             engine_limits.tasks.inbox_bytes = 512;
             engine_limits.fleet.slots = 2;
@@ -303,7 +307,7 @@ impl Joint {
             let mut rules = config.core.authority.rules().clone();
             rules.ceiling.delegation.tasks = tasks;
             rules.ceiling.delegation.depth = 2;
-            let mut policy = config.core.authority.policy(fixtures::QUESTION_PROJECT).expect("fixture project").clone();
+            let mut policy = config.core.seed_projects[0].policy.policy.clone();
             policy.ceiling.delegation.tasks = tasks;
             policy.ceiling.delegation.depth = 2;
             policy.roles[0].authority.delegation.tasks = tasks;
@@ -318,7 +322,9 @@ impl Joint {
                 &mut out,
             );
             assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: fixtures::QUESTION_PROJECT }));
-            config.core.authority = domain;
+            config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+            config.core.authority = jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+                .expect("configured authority");
             let mut engine_limits = engine_limits();
             engine_limits.tasks.tasks = tasks;
             engine_limits.tasks.project_tasks = tasks;
@@ -353,11 +359,11 @@ impl Joint {
         const POLICY_OUT: u32 = a::POLICY_MAX_OUT;
         let mut config = walking::config(seed);
         config.core.connectors = Box::new([1]);
-        for role in config.core.permission_roles.get_mut(&PROJECT).expect("project permissions").iter_mut() {
+        for role in &mut config.core.seed_projects[0].policy.permissions {
             role.connector = 1;
         }
         let mut rules = config.core.authority.rules().clone();
-        let mut policy = config.core.authority.policy(PROJECT).expect("project").clone();
+        let mut policy = config.core.seed_projects[0].policy.policy.clone();
         let kinds: Box<[a::Executor]> = Box::new([a::Executor::Procedure(PROCEDURE)]);
         rules.ceiling.delegation.kinds.clone_from(&kinds);
         policy.ceiling.delegation.kinds.clone_from(&kinds);
@@ -368,7 +374,9 @@ impl Joint {
         let mut out = skein_lib::Queue::with_capacity(POLICY_OUT);
         a::step(&mut domain, a::Event::Policy { project: PROJECT, policy }, &mut out);
         assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: PROJECT }));
-        config.core.authority = domain;
+        config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+        config.core.authority =
+            jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("configured authority");
         let mut engine_limits = engine_limits();
         engine_limits.authority = authority_limits;
         (config, engine_limits)
@@ -420,7 +428,7 @@ impl Joint {
             config.landing.deployment.clone_from(&landing);
             assert!(config.landing.projects.insert(1, landing).is_ok());
             let mut rules = config.core.authority.rules().clone();
-            let mut policy = config.core.authority.policy(1).expect("project").clone();
+            let mut policy = config.core.seed_projects[0].policy.policy.clone();
             rules.ceiling.delegation.kinds = Box::new([a::Executor::Charter(1), a::Executor::Procedure(2)]);
             rules.ceiling.delegation.depth = 2;
             // This pushed-branch path needs read, push, open, land and its goal's issue.
@@ -490,7 +498,9 @@ impl Joint {
             let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
             a::step(&mut domain, a::Event::Policy { project: 1, policy }, &mut out);
             assert_eq!(out.pop(), Some(a::PolicyFact::Added { project: 1 }));
-            config.core.authority = domain;
+            config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+            config.core.authority = jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits())
+                .expect("configured authority");
             (config, limits)
         });
         Self::with_engine(seed, limits, Store::new(), [bootstrap, config], &engine_limits, SLOTS)

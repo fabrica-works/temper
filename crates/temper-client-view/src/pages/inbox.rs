@@ -136,11 +136,7 @@ fn filters(b: &mut Builder, root: &Domain, filter: Filter, words: &Words, bindin
     );
     if let Some(me) = root.pages().me(root.client()) {
         for project in &me.projects {
-            let fallback = words.say(Word::Project, &[Hole::Number(u64::from(project.project))]);
-            let name = match &project.name {
-                Some(name) => name.bytes(),
-                None => &fallback,
-            };
+            let name = project.name.bytes();
             filter_control(
                 b,
                 bindings,
@@ -250,10 +246,8 @@ fn entry(
         let mut name = fallback.as_ref();
         if let Some(me) = root.pages().me(root.client()) {
             for entry in &me.projects {
-                if entry.project == project
-                    && let Some(value) = &entry.name
-                {
-                    name = value.bytes();
+                if entry.project == project {
+                    name = entry.name.bytes();
                 }
             }
         }

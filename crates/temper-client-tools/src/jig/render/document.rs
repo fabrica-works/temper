@@ -113,10 +113,8 @@ fn me_text(me: &Me, book: &Phrasebook, limits: &Limits, out: &mut Text) {
     for project in &me.projects {
         out.put(b"  ");
         out.number(u64::from(project.project));
-        if let Some(name) = &project.name {
-            out.put(b" \xc2\xb7 ");
-            out.words(name.bytes());
-        }
+        out.put(b" \xc2\xb7 ");
+        out.words(project.name.bytes());
         out.put(b" \xc2\xb7 ");
         role(project.role, out);
         if let Some(pool) = &project.pool {
@@ -266,10 +264,8 @@ fn requester(value: OwnerRequester, me: Option<&Me>, out: &mut Text) {
 fn project(number: u32, me: Option<&Me>, out: &mut Text) {
     if let Some(me) = me {
         for project in &me.projects {
-            if project.project == number
-                && let Some(name) = &project.name
-            {
-                out.words(name.bytes());
+            if project.project == number {
+                out.words(project.name.bytes());
                 return;
             }
         }

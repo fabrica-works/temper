@@ -142,11 +142,9 @@ fn config(settings: Settings) -> engine::Config {
             identity: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
         },
     ]);
-    let mut policy = config.core.authority.policy(1).expect("configured project").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.roles[0].requests = authority::Requests(1 | 4 | if settings.policy { 256 } else { 0 });
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+    config.core.seed_projects[0].policy.policy = policy;
     config
 }
 
@@ -221,6 +219,7 @@ impl World {
                         | people::Stored::ReadConversation { .. }
                         | people::Stored::EndedRead { .. }
                         | people::Stored::Roles { .. }
+                        | people::Stored::Acted { .. }
                         | people::Stored::Policy { .. }
                         | people::Stored::Answer { .. },
                     )

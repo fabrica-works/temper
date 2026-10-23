@@ -246,7 +246,7 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
     let mut config = config(seed);
     let mut authority =
         authority::Domain::new(config.core.authority.rules().clone(), limits.authority).expect("larger policy room");
-    let mut policy = config.core.authority.policy(1).expect("configured project").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     let owner = policy.roles[0].clone();
     let mut maintainer = owner.clone();
     maintainer.number = 1;
@@ -263,7 +263,9 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    config.core.authority = authority;
+    config.core.seed_projects[0].policy.policy = authority.policy(1).expect("configured seed policy").clone();
+    config.core.authority = jig_domain_authority::Domain::new(authority.rules().clone(), *authority.limits())
+        .expect("configured authority");
     (config, limits)
 }
 
@@ -3297,11 +3299,9 @@ fn restored_unreported_claim_spends_no_try_without_committed_work() {
 fn administration_config(seed: u64) -> engine::Config {
     use jig_domain_authority as authority;
     let mut config = config(seed);
-    let mut policy = config.core.authority.policy(1).expect("actual project").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.roles[0].requests = authority::Requests(1 | 4 | 256);
-    let mut findings = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut config.core.authority, authority::Event::Policy { project: 1, policy }, &mut findings);
-    assert_eq!(findings.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+    config.core.seed_projects[0].policy.policy = policy;
     config
 }
 
@@ -3361,7 +3361,7 @@ fn a_policy_change_applies_to_later_decisions_only() {
     }
     assert!(matches!(
         driver.store.rows.get(&Key::Core(jig_domain_core::Key::People(people::Key::Policy(1)))),
-        Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { project: 1, value }))) if value.roles[0].period_spend == 50
+        Some(Record::Core(jig_domain_core::Record::People(people::Stored::Policy { project: 1, value, .. }))) if value.roles[0].period_spend == 50
     ));
     assert_eq!(live(&driver, 1).authority, first, "existing task keeps its grant");
     let mut restarted =

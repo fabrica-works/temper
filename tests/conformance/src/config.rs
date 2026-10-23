@@ -170,7 +170,7 @@ pub fn root(
     rules.ceiling.delegation.kinds = Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(2)]);
     rules.ceiling.delegation.tasks = 12;
     rules.ceiling.delegation.depth = 3;
-    let mut policy = config.core.authority.policy(1).expect("walking project").clone();
+    let mut policy = config.core.seed_projects[0].policy.policy.clone();
     policy.ceiling.tools = rules.ceiling.tools;
     policy.ceiling.grants.clone_from(&rules.ceiling.grants);
     policy.ceiling.delegation = rules.ceiling.delegation.clone();
@@ -197,7 +197,9 @@ pub fn root(
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut facts);
     assert_eq!(facts.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     // A chat's authority is its role's, one level shallower (jig a2616181).
-    config.core.authority = domain;
+    config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+    config.core.authority =
+        jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("configured authority");
     let landing: Box<[engine::LandingRule]> = Box::new([engine::LandingRule {
         connector: 0,
         kind: 4,

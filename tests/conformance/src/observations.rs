@@ -86,7 +86,7 @@ pub fn policy(
 ) -> r::Policy {
     let (config, _) = super::config::root(seed, scenario, story);
     let rules = config.core.authority.rules();
-    let project = config.core.authority.policy(1).expect("configured project");
+    let project = &config.core.seed_projects[0].policy.policy;
     r::Policy {
         deployment: jig_core_world::observations::scope(&rules.ceiling),
         projects: BTreeMap::from([(1, jig_core_world::observations::scope(&project.ceiling))]),

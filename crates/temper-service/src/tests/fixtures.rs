@@ -280,6 +280,7 @@ pub fn commit(store: &mut crate::store::Store, number: u64, writes: Box<[temper_
     all.push(temper_engine_domain::Write::Save(temper_engine_domain::Record::Core(jig_domain_core::Record::Core(
         jig_domain_core::CoreRecord::Deployment(jig_domain_core::Deployment {
             id: [19; 16],
+            projects: 0,
             tasks: 0,
             people: 0,
             sign_ins: 0,
@@ -433,6 +434,7 @@ fn start_with_worker(
     let mut configured = skein_lib::List::with_capacity(u32::try_from(projects.len()).unwrap());
     for (number, budget) in projects {
         let mut project = jig_protocol_config::Project {
+            name: project_name(*number),
             number: *number,
             roles: first.roles.clone(),
             templates: first.templates.clone(),
@@ -956,4 +958,9 @@ pub fn owned_setup(forge: u16) -> settings::Setup {
         },
         handover: None,
     }
+}
+
+#[expect(clippy::disallowed_macros, reason = "test fixture supplies unique numbered project names")]
+fn project_name(number: u32) -> Box<str> {
+    alloc::format!("Project {number}").into_boxed_str()
 }
