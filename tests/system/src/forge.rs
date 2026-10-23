@@ -395,6 +395,7 @@ impl World {
                 },
                 engine::Request::Account(_)
                 | engine::Request::SetUpGroup { .. }
+                | engine::Request::StopGroup { .. }
                 | engine::Request::SetUp { .. }
                 | engine::Request::Return { .. }
                 | engine::Request::Setup { .. }

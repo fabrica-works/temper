@@ -1727,7 +1727,7 @@ fn restored_ended_demo_without_box_skips_setup_adoption_connect_and_handover() {
         .insert(1, lifecycle::Adoption { next: core::num::NonZeroU64::new(1).unwrap(), repositories: 2, files: None })
         .unwrap();
     assert!(!engine.setup.lifecycle.ready(&engine.setup.runs, engine.setup.env.limits.runs, &engine.domain));
-    for _ in 0..4 {
+    for _ in 0_u8..4 {
         advance(engine);
     }
     assert!(engine.setup.runs.is_empty());
