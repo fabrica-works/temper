@@ -862,6 +862,134 @@ fn a_release_waits_for_its_lost_writers_reread_even_after_restart() {
     }
 }
 
+/// Restart rebuilds the fresh read from the durable lost writer alone.
+fn restarted_lost_writer() -> Domain {
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(
+        &mut d,
+        Event::Restore {
+            record: Stored::Hold(Hold {
+                name: run_branch(b"7"),
+                task: 7,
+                writer: Some(Writer::Lost { task: 9, attempt: 1 }),
+                drift: None,
+            }),
+        },
+    );
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    d
+}
+
+#[test]
+fn a_lost_writers_read_answered_not_connected_is_asked_again_when_its_forge_connects() {
+    for result in [
+        Err(skein_forge::api::Error::Missing),
+        Ok(skein_forge::api::Answer::Commit([2; 32])),
+        Err(skein_forge::api::Error::Refused),
+    ] {
+        let mut d = restarted_lost_writer();
+        let waiting = fixtures::answer_next(&mut d, Err(skein_forge::api::Error::NotConnected));
+        assert!(!waiting.contains(&Request::Refused { task: 9 }));
+        assert_eq!(d.hold(&run_branch(b"7")).unwrap().writer, Some(Writer::Lost { task: 9, attempt: 1 }));
+        assert!(!d.is_ready(), "a connection wait has no ready work");
+        assert!(ready(&mut d).is_empty(), "nothing asked while disconnected");
+        outputs(
+            &mut d,
+            Event::Connection { forge: 1, state: Connection::Connected { id: 7, login: Box::from(b"bot".as_slice()) } },
+        );
+        assert!(d.is_ready());
+        assert!(ready(&mut d).is_empty(), "resume first admits the waiting read");
+        let (call, op) = fixtures::next_call(&mut d);
+        assert_eq!(
+            op,
+            skein_forge::api::Op::Read(skein_forge::api::Read::Branch { branch: Box::from(b"temper/7".as_slice()) })
+        );
+        assert_eq!(d.hold(&run_branch(b"7")).unwrap().writer, Some(Writer::Lost { task: 9, attempt: 1 }));
+        let refused = result == Err(skein_forge::api::Error::Refused);
+        let answered = fixtures::answer(&mut d, call, result);
+        assert_eq!(answered.contains(&Request::Refused { task: 9 }), refused);
+        assert_eq!(d.hold(&run_branch(b"7")).unwrap().writer.is_some(), refused);
+    }
+}
+
+#[test]
+fn a_release_waits_for_its_lost_writers_read_until_its_forge_connects() {
+    let mut d = restarted_lost_writer();
+    fixtures::answer_next(&mut d, Err(skein_forge::api::Error::NotConnected));
+    let closing = outputs(&mut d, Event::Release { task: 7, root: 7, ending: ReleaseEnding::Cancelled, entry: 20 });
+    assert!(!closing.contains(&Request::ReleaseFailed { task: 7 }));
+    assert!(!closing.contains(&Request::Released { task: 7 }));
+    assert!(outputs(&mut d, Event::ContinueRelease { task: 7, entry: 20 }).is_empty());
+    assert!(!d.is_ready());
+    outputs(
+        &mut d,
+        Event::Connection { forge: 1, state: Connection::Connected { id: 7, login: Box::from(b"bot".as_slice()) } },
+    );
+    assert!(ready(&mut d).is_empty(), "resume first admits the waiting read");
+    let answered = fixtures::answer_next(&mut d, Err(skein_forge::api::Error::Missing));
+    assert!(!answered.contains(&Request::ReleaseFailed { task: 7 }));
+    assert!(answered.contains(&Request::ContinueRelease { task: 7 }));
+    let deleting = outputs(&mut d, Event::ContinueRelease { task: 7, entry: 20 });
+    let mut enqueued = false;
+    for request in &deleting {
+        if let Request::Save { record: Stored::Entry { entry, .. }, .. } = request {
+            assert_eq!(entry.task, 7);
+            assert_eq!(
+                entry.effect.write,
+                skein_forge::api::Write::DeleteBranch { branch: Box::from(b"temper/7".as_slice()) }
+            );
+            enqueued = true;
+        }
+    }
+    assert!(enqueued, "release enqueues its branch deletion");
+    outputs(&mut d, Event::Committed { entry: 20 });
+    // The outbox looks for this cleanup effect before making it.
+    fixtures::answer_next(
+        &mut d,
+        Ok(skein_forge::api::Answer::Items { items: Box::new([]), more: false, now: env().now }),
+    );
+    let (call, op) = fixtures::next_call(&mut d);
+    assert_eq!(
+        op,
+        skein_forge::api::Op::Write(skein_forge::api::Write::DeleteBranch {
+            branch: Box::from(b"temper/7".as_slice())
+        })
+    );
+    let deleted = fixtures::answer(&mut d, call, Ok(skein_forge::api::Answer::Done));
+    assert!(deleted.contains(&Request::ContinueRelease { task: 7 }));
+    assert!(outputs(&mut d, Event::ContinueRelease { task: 7, entry: 21 }).contains(&Request::Released { task: 7 }));
+    assert!(d.hold(&run_branch(b"7")).is_none());
+}
+
+#[test]
+fn another_forges_connection_does_not_ask_a_lost_writers_read_again() {
+    let mut d = restarted_lost_writer();
+    fixtures::answer_next(&mut d, Err(skein_forge::api::Error::NotConnected));
+    outputs(
+        &mut d,
+        Event::Connection { forge: 2, state: Connection::Connected { id: 8, login: Box::from(b"other".as_slice()) } },
+    );
+    assert!(!d.is_ready());
+    assert!(ready(&mut d).is_empty());
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::Connecting });
+    assert!(!d.is_ready());
+    assert!(ready(&mut d).is_empty());
+    outputs(
+        &mut d,
+        Event::Connection { forge: 1, state: Connection::Connected { id: 7, login: Box::from(b"bot".as_slice()) } },
+    );
+    assert!(d.is_ready(), "its own forge's connection makes the read ready");
+    assert!(ready(&mut d).is_empty(), "resume first admits the waiting read");
+    let (_, op) = fixtures::next_call(&mut d);
+    assert_eq!(
+        op,
+        skein_forge::api::Op::Read(skein_forge::api::Read::Branch { branch: Box::from(b"temper/7".as_slice()) })
+    );
+}
+
 #[test]
 fn a_release_waits_while_its_lost_writer_is_waiting_for_read_room() {
     let mut d = four_writers();

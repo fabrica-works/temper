@@ -25,8 +25,13 @@ pub(crate) struct PendingLost {
     attempt: u64,
     name: Name,
     comparison: Option<(skein_forge::api::Commit, skein_forge::api::Commit)>,
-    /// Its read is with the client; false while it waits for a call slot.
-    asked: bool,
+    state: LostReadState,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum LostReadState {
+    Asked,
+    WaitingForRoom,
+    WaitingForConnection,
 }
 /// One fresh verdict read for a commit with live CI subscribers.
 #[derive(Debug)]
@@ -612,7 +617,7 @@ impl Domain {
     fn lost_waiting(&self) -> bool {
         let mut waiting = false;
         for (_, pending) in &self.lost {
-            waiting |= !pending.asked;
+            waiting |= pending.state == LostReadState::WaitingForRoom;
         }
         waiting
     }
@@ -924,6 +929,17 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                         writer(d, env, skein_forge_client::Writer { forge, author: *id }, out),
                         "same forge writer"
                     );
+                    // A restart's NotConnected narrows nothing (domain/forge.md,
+                    // 16). Resume these reads as client call room becomes free.
+                    let mut waiting = List::with_capacity(env.limits.holds);
+                    for (owner, pending) in &d.lost {
+                        if pending.name.forge == forge && pending.state == LostReadState::WaitingForConnection {
+                            waiting.push(*owner).expect("lost reads bounded by holds");
+                        }
+                    }
+                    for owner in &waiting {
+                        d.lost.get_mut(owner).expect("collected lost read").state = LostReadState::WaitingForRoom;
+                    }
                 }
                 crate::Connection::NotConnected
                 | crate::Connection::NotSetUp
@@ -1722,7 +1738,10 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
         d.sequence = sequence;
         let owner = Token::new(sequence | (1_u64 << 62));
         if d.lost
-            .insert(owner, PendingLost { task, attempt, name: name.clone(), comparison: None, asked: true })
+            .insert(
+                owner,
+                PendingLost { task, attempt, name: name.clone(), comparison: None, state: LostReadState::Asked },
+            )
             .is_err()
         {
             lost_release(d, name, true, out);
@@ -1738,13 +1757,13 @@ fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Qu
 fn ask_lost_again(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut waiting = None;
     for (owner, pending) in &d.lost {
-        if !pending.asked && waiting.is_none() {
+        if pending.state == LostReadState::WaitingForRoom && waiting.is_none() {
             waiting = Some(*owner);
         }
     }
     let Some(owner) = waiting else { return };
     let pending = d.lost.get_mut(&owner).expect("found above");
-    pending.asked = true;
+    pending.state = LostReadState::Asked;
     let comparison = pending.comparison;
     let Some(resource) = to_client(&pending.name, &env.limits) else { return };
     let read = match (comparison, resource.what) {
@@ -1770,11 +1789,16 @@ fn lost_read(
     out: &mut Queue<Request>,
 ) {
     let Some(mut pending) = d.lost.remove(&owner) else { return };
-    // The client had no call slot for this read. The writer slot is freed
-    // only once the branch is read afresh (jig's domain/tasks.md, 6.3), so
-    // the read waits and is asked again when a slot frees (`resume`).
-    if result == Err(skein_forge::api::Error::Busy) {
-        pending.asked = false;
+    // The writer slot is freed only once the branch is read afresh (jig's
+    // domain/tasks.md, 6.3). Busy waits for call room; NotConnected waits
+    // for this forge's connection (domain/forge.md, 16), without ready work.
+    let waiting = match result {
+        Err(skein_forge::api::Error::Busy) => Some(LostReadState::WaitingForRoom),
+        Err(skein_forge::api::Error::NotConnected) => Some(LostReadState::WaitingForConnection),
+        Ok(_) | Err(_) => None,
+    };
+    if let Some(state) = waiting {
+        pending.state = state;
         d.lost.insert(owner, pending).expect("the read keeps its own lost slot");
         return;
     }
