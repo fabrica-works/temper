@@ -36,11 +36,17 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 - **Served by temper's server, from one origin.** `temper-service` serves
   the page and the bundle on its clients' listener (skein's `ui-web.md`,
   4.4), beside jig's clients' component under `/jig` (`README.md`,
-  section 8), from the directory its configuration names, with jig's
-  example guards and the page's policy, which is temper's: a strict
-  content security policy, no frames, no CORS (jig's
-  `protocol/browser.md`, 12.1 and 12.2). A configuration that names no
-  bundle serves no browser, and the terminal works as before (2.2).
+  section 8), from the bundle the binary holds or a directory its
+  configuration names, with jig's example guards and the page's policy,
+  which is temper's: a strict content security policy, no frames, no
+  CORS (jig's `protocol/browser.md`, 12.1 and 12.2). A binary built
+  without its browser serves the page for no bundle, and the terminal
+  works as before (2.2).
+- **The bundle is in the binary.** A plain `cargo build` (or `cargo
+  build --release`, or `cargo install --git`) makes a `temper` that
+  holds its bundle, so that running it is the whole install. The
+  machine's builds, temper's gate and its agents, build without it
+  (`TEMPER_BUNDLE=none`), as fast as before (2.6).
 - **Signed in by the printed link,** opened in a browser on the engine's
   machine: jig's sign-in part spends it, the credential is the
   mapping's cookie, and a reload signs in again by it (2.4).
@@ -140,18 +146,18 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
      route, which the mapping leaves to the page, answered with the
      page's policy and `Referrer-Policy: no-referrer` (jig's
      `protocol/browser.md`, 12.1 and 12.2);
-  2. with no bundle configured, a `GET` of any other path but under
-     `/bundle/` and `/robots.txt`, the printed link's route among them,
-     answers `200` temper's page for no bundle, every other request
-     not found, as `README.md`, section 8 says. The page is fixed HTML
-     in the binary, under the page's policy, with no script, style or
-     picture: the level-1 heading "temper", then "This temper serves
-     no browser client: its configuration names no bundle
-     (application.clients.bundle).", "Open the link in a terminal with
-     temper open DIRECTORY LINK." and "To serve the browser, install
-     temper with scripts/install.sh, or build a bundle with
-     scripts/bundle.sh, name its directory in application.clients.bundle,
-     and restart temper." (`../protocol/setup.md`, 8.2);
+  2. with no bundle, the configuration naming none (`null`) and the
+     binary built without its own (2.6), a `GET` of any other path but
+     under `/bundle/` and `/robots.txt`, the printed link's route among
+     them, answers `200` temper's page for no bundle, every other
+     request not found, as `README.md`, section 8 says. The page is
+     fixed HTML in the binary, under the page's policy, with no script,
+     style or picture: the level-1 heading "temper", then "This temper
+     was built without its browser client.", "Open the link in a
+     terminal with temper open DIRECTORY LINK." and "To serve the
+     browser, build temper with the wasm32-unknown-unknown target, or
+     name a bundle's directory in application.clients.bundle, and
+     restart temper." (`../protocol/setup.md`, 8.2);
   3. a request other than `GET`: `405`;
   4. `/bundle/<digest>/…`: the bundle's files, immutable; any other path
      under `/bundle/`: not found;
@@ -178,16 +184,22 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   jig's browser header refused.
 - **The bundle** is skein's bundler's output (skein's `ui-web.md`,
   section 4): the shell's module, skein's stylesheet and temper's
-  (2.5). `scripts/bundle.sh` builds it, from the module built for
-  wasm32, into a directory it prints. `application.clients.bundle`
-  names that directory, or is `null` for none
-  (`../protocol/configuration.md`, section 3). `temper serve` reads it
-  at start, whole, into memory, within the limits `clients.bundle_files`
-  and `clients.bundle_bytes` (`../protocol/configuration.md`, section
-  7), and refuses the start past them, or when the directory holds no
-  bundle (its page and its digest's directory). A new bundle is served
+  (2.5). temper's build embeds it in the binary (2.6);
+  `scripts/bundle.sh` builds one apart, from the module built for
+  wasm32, into a directory it prints. `application.clients.bundle` is
+  `null` for the binary's own, or names a directory, whose bundle is
+  served in place of the binary's (`../protocol/configuration.md`,
+  section 3). `temper serve` makes it, at start, whole, into memory,
+  within the limits `clients.bundle_files` and `clients.bundle_bytes`
+  (`../protocol/configuration.md`, section 7), and refuses the start
+  past them, or when it is no bundle (its page and its digest's
+  directory), by one code for both: a directory's files read, or the
+  binary's, already in memory, copied (2.6). A new bundle is served
   after a restart; a tab on the old one is answered not found for its
-  files, and a reload loads the new (skein's `ui-web.md`, 4.4).
+  files, and a reload loads the new (skein's `ui-web.md`, 4.4). A page
+  from the binary's own bundle always speaks its engine's records, so a
+  client out of date (`README.md`, 5.1) comes only from a binary
+  replaced under an open tab, or from a directory configured.
 
 ### 2.3 Addresses
 
@@ -376,6 +388,144 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   conversation, a log, keeps its end in view while the person has not
   scrolled away (skein's `ui-web.md`, section 7).
 
+### 2.6 The bundle in the binary
+
+The `temper` binary holds its bundle, so that `temper box` and `temper
+serve` serve the browser with nothing beside the binary, and `cargo
+build` in a checkout makes that binary. It is a person's convenience:
+the machine's builds keep building the way that serves their work,
+without it.
+
+- **One file.** The binary holds the bundle: the shell's module, its
+  glue, and the stylesheets and files skein's bundler puts beside them
+  (2.2, 2.5). Running it is the whole install: no directory beside it,
+  no `scripts/bundle.sh` step.
+- **A plain `cargo build` makes it.** `cargo build`, then
+  `./target/debug/temper box`, serves the browser; so do `cargo build
+  --release` and `cargo install --git` of temper's repository.
+- **A crate of its own embeds it,** `temper-client-bundle`, ordinary
+  Rust with its own `[lints]` table, as tools have, which `temper`
+  depends on. Its library is data: the bundle's files, each its path
+  from the bundle's root (`index.html`, then `<digest>/…`) and its
+  bytes by `include_bytes!`, in a directory read's order, and the
+  digest, both written by its build script into `OUT_DIR`. A build
+  without the embed has no files and no digest. The include sits in a
+  small crate, not in `temper`'s, because a build script that runs
+  makes its package build again, and `temper`'s is the slowest to
+  build; `main.rs` gets no package of its own, since `temper` builds
+  again after a client edit anyway (the terminal shell shares the
+  client's crates), and its integration tests run the binary by
+  `CARGO_BIN_EXE_temper`.
+- **Its build script,** unless `TEMPER_BUNDLE` is `none`, takes
+  `scripts/bundle.sh`'s steps with the cargo running it (`CARGO`), from
+  the workspace's root, into the nested build's directory (below):
+  1. `build --locked --target wasm32-unknown-unknown -p
+     temper-client-shell-web`, with the module's profile (below);
+  2. `build --locked --release -p skein-ui-bundle`: the bundler,
+     always optimized, as skein's `ui-web.md`, 4.1 asks of a tool;
+  3. the bundler, with `scripts/bundle.sh`'s inputs (the name, the
+     prefix `/bundle/`, `temper.css`, `task-pages.css`, the shell's
+     `files/` and the noscript words), into its `OUT_DIR`;
+  4. the list of the bundle's files, written into `OUT_DIR` for the
+     library's include.
+  It has no build dependencies: the bundler is built by the nested
+  cargo and run, never compiled into the script, so a build without the
+  embed compiles a script of `std` alone, and nothing of the bundler is
+  ever linked into `temper` (skein's `ui.md`: "never linked into a
+  service or a module"). One `Cargo.lock` still locks the bundler's
+  `wasm-bindgen-cli-support` with the module's macros (skein's
+  `ui-web.md`, 4.1). The script's logic (the dep-info's read, the
+  nested commands, the bundle's directory read into its list) is plain
+  functions, which the crate's tests take on samples.
+- **The nested build's directory** is `<target>/bundle/`, `<target>`
+  the outer build's, found as the nearest ancestor of `OUT_DIR` holding
+  cargo's `CACHEDIR.TAG`. The outer cargo holds its own directory's
+  lock while build scripts run, so a nested build there would wait on
+  it forever. It is one directory, not one under each `OUT_DIR`, so
+  that a check, a clippy run, a build and a test build of `temper`
+  reuse one module and one bundler, and a build after a change is
+  incremental. Under `cargo clippy`, cargo builds a member's build
+  script apart, so the first clippy run and the first build after a
+  change each bundle once; the second finds the module built. A build
+  without the embed never makes the directory.
+- **None of the outer build's flags or wrappers:** the nested cargo
+  runs without `CARGO_ENCODED_RUSTFLAGS` and `RUSTFLAGS` (the host's
+  flags, not wasm32's), `RUSTC_WORKSPACE_WRAPPER` and `CLIPPY_ARGS`
+  (which `cargo clippy` sets, and which would make a module of another
+  fingerprint, built again at each switch between clippy and build),
+  with `CARGO_TARGET_DIR` set anew. It keeps the jobserver
+  (`CARGO_MAKEFLAGS`), so that its jobs count within the outer build's.
+  Its stdout goes to the script's stderr, since cargo reads the
+  script's stdout.
+- **Rebuilt only when what it is made from changes,** each by
+  `cargo:rerun-if-changed`: each source file the nested build's dep-info
+  names (the `.d` cargo writes beside the module: every path package
+  the module is built from, temper's client crates and, when a local
+  jig or skein is patched in, theirs); each of those packages'
+  `Cargo.toml`, the workspace's `Cargo.toml` and `Cargo.lock`, which
+  pins the git dependencies; the shell's stylesheets and its `files/`;
+  and `TEMPER_BUNDLE`, by `cargo:rerun-if-env-changed`. The first run
+  has no dep-info yet, and runs regardless. An edit elsewhere never
+  runs the script, and a build that does not include `temper` (a
+  domain's tests, the client crates' own) never runs it.
+- **The module's profile:** a dev build embeds a dev module, as
+  `scripts/bundle.sh` makes; a release build embeds one built with
+  `web`, the profile skein's `ui-web.md`, 4.1 names for an
+  application's release module, which temper's workspace defines as
+  skein's does. The script maps cargo's `PROFILE`, `debug` or
+  `release`, to `dev` and `web`.
+- **`TEMPER_BUNDLE`:** unset or `embed`, the embed; `none`, no nested
+  build and no bundle; any other value fails the build, naming the two.
+  `embed` is for a build whose environment says `none` and wants the
+  browser this once. The machine's builds set `none`: the gate's and
+  the agents' (`docs/development/workflow.md`), a machine without the
+  target, an editor's own (rust-analyzer runs build scripts at its
+  start). Such a binary serves the page for no bundle (2.2).
+- **The embed needs the wasm32 target.** Before any nested build, the
+  script asks rustc for the target's library directory
+  (`--print target-libdir`); without it, the build fails with one
+  message: `temper-client-bundle: the browser's bundle needs the
+  wasm32-unknown-unknown target: add it (rustup target add
+  wasm32-unknown-unknown), or build without the browser
+  (TEMPER_BUNDLE=none)`. Never a binary without its browser in
+  silence. temper ships no `rust-toolchain.toml` naming the target: it
+  would set the channel for every rustup user, which temper does not
+  set (`rust-version` alone).
+- **Offline:** the nested build may download crates only wasm32 uses,
+  as any first build of the target does; an offline build runs `cargo
+  fetch` first, which fetches for every target.
+- **Served as a directory's is.** At start, `application.clients.bundle`
+  `null` takes the binary's bundle: its files, already in the binary,
+  are made into `temper-service`'s `Bundle` (its page, its digest, its
+  files by path with their types from the closed list, its `ETag`) by
+  the same code as a directory's read, given files in memory in place
+  of a directory, so the same checks hold: the closed list, each path's
+  bound, one digest directory, and `clients.bundle_files` and
+  `clients.bundle_bytes`, a start past them refused naming the limit
+  (`application.clients.bundle: the binary's bundle: <path>: <why>`).
+  The copy is held as a read one is, within what the profile's worst
+  case already counts for the bundle, so the memory account does not
+  change. `temper-service` adopts a bundle, wherever the binary got it.
+  A directory configured is read as before, and the binary's is unused.
+- **`scripts/bundle.sh` stays,** for a bundle built apart: the browser
+  tier's, which turns on `loopback-navigation` (4.3) and so is never
+  the binary's, and a developer's. `scripts/install.sh PREFIX`
+  installs the binary alone, built with `--release --locked`, and
+  prints its path.
+- **Tested in both builds.** Every suite passes with and without the
+  embed, and the gate runs them under `none`. The build script's logic
+  is tested on samples in its crate; the in-memory read on fixture
+  files beside the directory's read, the same `Bundle` and the same
+  refusals; and a start with `bundle` `null` expects what its build
+  holds, which `temper`'s crate says (`temper::bundle::OWN`, the
+  binary's digest or none): the page for no bundle under `none`,
+  otherwise the bundle's page at `/` and its files under
+  `/bundle/<digest>/` (`../domain/testing.md`, 2.6). The page for no
+  bundle stays proved where it is built, in `temper-service`. The embed
+  itself is a person's build, which fails loudly when its steps do; a
+  change to it checks it with `TEMPER_BUNDLE=embed heavy cargo nextest
+  run -p temper`, which the gate does not run.
+
 ## 4. The browser tier
 
 - **The driver is skein's.** `skein-browser` (skein's `browser.md`) runs
@@ -496,8 +646,9 @@ to the page, and the page come back, a new client, drawing the end.
 - **The bundle the gate builds** turns on skein-ui-web's
   `loopback-navigation` (`scripts/bundle.sh --loopback`), so that the
   round trip (4.2) can send its tab to the fake issuer on plaintext
-  loopback; `scripts/install.sh`'s bundle never does (skein's
-  `ui-web.md`, section 10).
+  loopback; the binary's bundle never does (skein's `ui-web.md`,
+  section 10). The tier names that bundle in its configuration, so it
+  runs alike over a binary built with or without its own (2.6).
 - **A guide: at most 12 tests, and about 120 seconds** (60 seconds before
   the user's doubling of 10-22, provisional) on the slowest of the machines
   that run temper's gate. Past it, a story moves to a world or goes, and the
@@ -554,9 +705,27 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
 - **The other pages' filters in their address:** the chats list's
   "All", "Live" and "Closed", and a goal's plan's. Default: not in the
   address; a reload shows "All" (2.3). The inbox's is in its address.
-- **The bundle in the binary,** so that `temper serve` needs no
-  directory. Default: a directory the configuration names (2.2);
-  `../draft/bundle-in-binary.md` drafts the binary's own.
+- **A bundle built apart, embedded:** `TEMPER_BUNDLE=DIR`, a bundle's
+  directory embedded in place of building one, so that one wasm32
+  build serves binaries for several hosts and a machine without the
+  target can still make a whole binary. Default: none; it waits for
+  the release pipeline (2.6).
+- **Served from the binary's bytes,** with no copy at start: a `Bundle`
+  that borrows. Default: copied (2.6), until a bundle whose copy
+  matters.
+- **The embed's steps, skein's for every application:** the nested
+  build, its directory, its environment and what reruns it are nothing
+  of temper's. Default: temper's crate, until a second application
+  embeds its bundle (jig's reference application, or skein's example),
+  when they move to a small crate of skein's that a build script
+  depends on (skein's `ui-web.md`, section 15).
+- **A binary to download:** where release binaries are built, for
+  which targets and C library (a static musl build, or a floor of
+  glibc), and where they are published. Default: none; temper's
+  binary is whole (2.6), not shipped.
+- **A switch to serve no browser** from a binary that has one, such as
+  `clients.bundle` `false`. Default: none until a deployment asks: the
+  browser is reached only by a printed link, as the terminal is.
 - **A dark palette,** following the system's preference as
   `skein-ui.css` does. Default: light only (2.5).
 - **Other browsers** than Chromium are `skein-browser`'s question

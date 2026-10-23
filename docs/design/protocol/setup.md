@@ -1383,15 +1383,13 @@ directory is empty (7.1).
     `admin`), or is the bot's, `temper-admin` or `work`, the login is
     `person`, and init says so: forge 3 waits dormant, so the person's
     login is never a reason the first run does not start;
-  - *the bundle,* `<the binary's directory>/../share/temper/bundle` when
-    it holds `index.html`: `clients.bundle`; else `null`, and init says
-    the browser is not served. That directory is where
-    `scripts/install.sh PREFIX` puts the bundle, beside the binary it
-    installs at `PREFIX/bin/temper`: a temper installed so starts its
-    first run with the browser. Without one, the link still signs in a
-    terminal (`temper open`), and a browser that opens it is answered
-    the clients' listener's page for no bundle (`../client/browser.md`,
-    2.2), never a bare `404`;
+  - *the bundle:* none to find. `clients.bundle` is always `null`, the
+    binary's own (`../client/browser.md`, 2.6): a temper built with its
+    browser starts its first run with it. From a binary built without
+    one (`TEMPER_BUNDLE=none`), init says the browser is not served;
+    the link still signs in a terminal (`temper open`), and a browser
+    that opens it is answered the clients' listener's page for no
+    bundle (`../client/browser.md`, 2.2), never a bare `404`;
   - *the clients' listener's port:* 8367, when a socket binds
     `127.0.0.1:8367`, else the port the kernel assigns to a bind of port
     0; the port written fixed, as a GitHub forge requires
@@ -1407,8 +1405,9 @@ directory is empty (7.1).
     hook's address from the document at its start (5.3); a listener
     bound to port 0, its hooks given the address it reports, is later.
 - **What it says,** on stderr: `init: wrote <path>` for each file;
-  `init: no bundle at <path>: the browser is not served` when there is
-  none; `init: no git on PATH: a real forge's repositories need git
+  `init: this temper has no browser (built with TEMPER_BUNDLE=none):
+  the browser is not served` from a binary built without its bundle;
+  `init: no git on PATH: a real forge's repositories need git
   2.41 or later, set as workers[].git` when there is none; `init:
   LOGIN cannot be a Forgejo login: forge 3's person is person` when
   the login falls back (above); `init: uid UID has no login in
@@ -1436,8 +1435,8 @@ directory is empty (7.1).
   crate tests, on scratch directories, check that the document init writes
   passes configuration.md, section 8, as `temper serve` checks it, with
   the agent's configuration it writes, at the fixed ports and at kernel's
-  ports, the five always distinct, with and without `claude`, a bundle and
-  git; each refusal writing nothing, the person's fallback login among
+  ports, the five always distinct, with and without `claude` and git,
+  `clients.bundle` always `null`; each refusal writing nothing, the person's fallback login among
   them; the files' modes; and the link's target. A box on a fresh init,
   among those tests, reaches `temper serve`'s sign-in link with forge 3
   dormant: no `forge-3` directory and nothing in the cache. The process
@@ -2507,8 +2506,10 @@ it checks of this document:
   link on its stdout; Forgejo killed and restarted, with the engine still
   serving; a stop leaving no process it started.
 - **A first run,** a test of its own: `temper box` on three empty
-  scratch directories writes the configuration (8.2), says so, and
-  prints one sign-in link, which signs the owner in, the demo's fakes
+  scratch directories writes the configuration (8.2), says so (init's
+  line for no browser among its lines only from a binary built without
+  one: the test checks the build it runs in, `../client/browser.md`,
+  2.6), and prints one sign-in link, which signs the owner in, the demo's fakes
   dormant; the owner starts the demo with `temper ctl demo-start`
   (`../client/tools.md`, 5.5), answered once the demo forge is
   connected and `playground/widget` adopted into project 1. The owner sends

@@ -740,6 +740,12 @@ and 10).
   sign-in pending across a restart is not here: its return is never
   kept, and skein's listener tier shows a sign-in started again with
   none answered by the fixed page (skein's `oauth.md`, 6.5).
+- **The build it runs in.** The tier runs the binary its build made,
+  with or without its browser (`TEMPER_BUNDLE`; ../client/browser.md,
+  2.6), and passes in both: where a start with `clients.bundle` `null`
+  shows the browser (init's line for no browser, the page at `/`), the
+  test expects what the binary holds, as `temper::bundle::OWN` says,
+  never one build's answer alone.
 - **Its endings.** The crash is the tier's one deliberate kill. It
   proves what a crash of every process keeps on disk, the page cache
   surviving it, not what a power loss does, which the one-process world

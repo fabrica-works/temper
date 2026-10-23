@@ -3031,9 +3031,10 @@ does for the client:
   to jig's component, which says whether it claims it (jig's clients'
   listener claims `/jig/...`); then to temper's forge routes,
   `/forges/...` (the routes, below); then to the browser's page and
-  bundle, when the configuration names a bundle, or else to the page
-  for no bundle (`browser.md`, 2.2). Every other path is answered not
-  found.
+  bundle, the binary's own or the one the configuration names, or else,
+  from a binary built without its own and a configuration naming none,
+  to the page for no bundle (`browser.md`, 2.2 and 2.6). Every other
+  path is answered not found.
 - **The routes,** temper's beside jig's: a GitHub connect's browser
   steps, `GET /forges/N/github/manifest`, `redirect` and `setup`, N the
   forge's number, each the setup's host's run for the state its query
