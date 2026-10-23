@@ -570,3 +570,198 @@ mod steps;
 mod github;
 
 mod observations;
+
+fn piece_turn(pieces: Value) -> Value {
+    json!({"lines":[{"pieces":pieces}],"finish":"stop","tokens":1})
+}
+#[test]
+fn standalone_pieces_and_control() {
+    for hold in [Value::Null, json!("x"), json!("x".repeat(64))] {
+        let mut doc = llm_document();
+        doc["control"] = json!({"socket":"[::1]:0"});
+        doc["otherwise"] =
+            json!([piece_turn(json!((0..8).map(|_| json!({"text":"delta","hold":hold})).collect::<Vec<_>>()))]);
+        let checked = llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
+        assert_eq!(checked.control(), Some("[::1]:0".parse().unwrap()));
+        let d = crate::read::document(&serde_json::to_vec(&doc["otherwise"][0]).unwrap()).unwrap();
+        let turn = turn::into_skein(turn::Turn::read_pieces(&d, 0, &Path::root(), true).unwrap());
+        let api::Line::Pieces { pieces } = &turn.lines[0] else { panic!("pieces preserved") };
+        assert_eq!(pieces.len(), 8);
+        assert_eq!(pieces[0].text.as_ref(), b"delta");
+        assert_eq!(pieces[0].hold.as_deref(), hold.as_str().map(str::as_bytes));
+    }
+    let mut doc = llm_document();
+    doc["otherwise"] = json!([piece_turn(json!([{"text":"delta","hold":null}]))]);
+    llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
+    doc["control"] = json!({"socket":"127.0.0.1:0"});
+    doc["otherwise"] = json!(["no holds"]);
+    llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
+}
+#[test]
+fn pieces_refuse_each_bound() {
+    for (pieces, expected) in [
+        (json!([]), "otherwise[0].lines[0].pieces: must be non-empty\n"),
+        (
+            json!((0..9).map(|_| json!({"text":"x","hold":null})).collect::<Vec<_>>()),
+            "otherwise[0].lines[0].pieces: past its bound\n",
+        ),
+        (json!([{"text":"","hold":null}]), "otherwise[0].lines[0].pieces[0].text: must be non-empty\n"),
+        (json!([{"text":"x","hold":""}]), "otherwise[0].lines[0].pieces[0].hold: must be non-empty\n"),
+        (json!([{"text":"x","hold":"h".repeat(65)}]), "otherwise[0].lines[0].pieces[0].hold: past its bound\n"),
+    ] {
+        let mut doc = llm_document();
+        doc["otherwise"] = json!([piece_turn(pieces)]);
+        assert_eq!(
+            llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap_err().line().as_ref(),
+            expected.as_bytes()
+        );
+    }
+}
+#[test]
+fn holds_require_loopback_control() {
+    for member in ["otherwise", "cued", "asked"] {
+        let mut doc = llm_document();
+        let turns = json!([piece_turn(json!([{"text":"held","hold":"gate"}]))]);
+        doc[member] = if member == "otherwise" { turns } else { json!([{"cue":"cue","turns":turns}]) };
+        assert_eq!(
+            llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap_err().line().as_ref(),
+            b"control: required when a piece has a hold\n"
+        );
+    }
+    let mut doc = llm_document();
+    doc["control"] = json!({"socket":"192.0.2.1:0"});
+    assert_eq!(
+        llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap_err().line().as_ref(),
+        b"control: must be a loopback socket address\n"
+    );
+}
+#[test]
+fn deployment_refuses_pieces_with_a_hold() {
+    let mut doc = demo::fixture();
+    doc["application"]["demo"]["llm"]["otherwise"] = json!([piece_turn(json!([{"text":"held","hold":"gate"}]))]);
+    assert_eq!(
+        demo::read(&doc).unwrap_err().line().as_ref(),
+        b"application.demo.llm.otherwise[0].lines[0].pieces: unknown member\n"
+    );
+}
+
+// A byte-side driver honours the reused HTTP machine's stream demands; no io or clock.
+fn control_request(request: &[u8], release_queued: bool) -> (Vec<u8>, Option<Vec<u8>>) {
+    use skein_lib::stream::{Down, Read, Up};
+    let mut exchange = llm::control::Exchange::new();
+    let mut offset = 0_usize;
+    let mut response = Vec::new();
+    let mut release = None;
+    for _ in 0..256 {
+        exchange.advance(Time::ZERO, Wall::EPOCH);
+        if let Some(name) = exchange.release() {
+            release = Some(name.to_vec());
+            exchange.released(release_queued);
+        }
+        while let Some(down) = exchange.pop() {
+            match down {
+                Down::Demand { room, .. } if room > 0 => exchange.up(Time::ZERO, Wall::EPOCH, Up::Room),
+                Down::Demand { read: Read::Scan { max, .. }, .. } => {
+                    let rest = &request[offset..];
+                    if rest.is_empty() {
+                        exchange.up(Time::ZERO, Wall::EPOCH, Up::End);
+                    } else {
+                        let count = rest
+                            .iter()
+                            .position(|b| *b == b'\n')
+                            .map_or(rest.len(), |i| i.checked_add(1).expect("request line bound"))
+                            .min(usize::try_from(max).unwrap());
+                        exchange.up(Time::ZERO, Wall::EPOCH, Up::Bytes(rest[..count].into()));
+                        offset = offset.checked_add(count).expect("bounded request offset");
+                    }
+                }
+                Down::Demand { read: Read::Nothing, .. } => {}
+                Down::Send(bytes) => response.extend_from_slice(&bytes),
+                other @ (Down::Demand { .. } | Down::Finish) => panic!("bodyless request: {other:?}"),
+            }
+        }
+        if exchange.done() {
+            return (response, release);
+        }
+    }
+    panic!("control exchange did not settle");
+}
+#[test]
+fn control_routes_releases_and_refusals() {
+    for (method, target, queued, status, name) in [
+        ("POST", "/release/gate", true, 204, Some(b"gate".as_slice())),
+        ("POST", "/release/gate", false, 400, Some(b"gate".as_slice())),
+        ("POST", "/release/", true, 400, None),
+        ("GET", "/", true, 404, None),
+        ("WHATEVER", "/", true, 404, None),
+        ("POST", "/elsewhere", true, 404, None),
+    ] {
+        let (response, release) =
+            control_request(format!("{method} {target} HTTP/1.1\r\nHost: localhost\r\n\r\n").as_bytes(), queued);
+        assert!(response.starts_with(format!("HTTP/1.1 {status} ").as_bytes()), "{response:?}");
+        assert_eq!(release.as_deref(), name);
+    }
+    for size in [64, 65] {
+        let (response, release) = control_request(
+            format!("POST /release/{} HTTP/1.1\r\nHost: localhost\r\n\r\n", "h".repeat(size)).as_bytes(),
+            true,
+        );
+        let status = if size == 64 { 204 } else { 400 };
+        assert!(response.starts_with(format!("HTTP/1.1 {status} ").as_bytes()));
+        assert_eq!(release.is_some(), size == 64);
+    }
+}
+#[test]
+fn control_refuses_malformed_heads_and_bodies() {
+    for request in [
+        b"POST /release/gate HTTP/1.1\r\n\r\n".to_vec(),
+        b"POST /release/gate HTTP/1.1\r\nHost: localhost\r\nBad header\r\n\r\n".to_vec(),
+        b"POST /release/gate HTTP/1.0\r\n\r\n".to_vec(),
+        b"POST /release/gate HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1\r\n\r\nx".to_vec(),
+        b"POST /release/gate HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n".to_vec(),
+        b"POST /release/gate HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nExpect: 100-continue\r\n\r\n"
+            .to_vec(),
+        b"POST /release/gate HTTP/1.1\r\n".to_vec(),
+        format!("POST /release/gate HTTP/1.1\r\nHost: localhost\r\nX: {}\r\n\r\n", "x".repeat(1024)).into_bytes(),
+    ] {
+        let (response, release) = control_request(&request, true);
+        assert!(response.starts_with(b"HTTP/1.1 400 ") || response.starts_with(b"HTTP/1.0 400 "), "{response:?}");
+        assert_eq!(release, None);
+        assert!(response.windows(b"Connection: close".len()).any(|part| part == b"Connection: close"));
+    }
+}
+
+#[test]
+fn control_head_bound() {
+    let head = "POST /release/gate HTTP/1.1\r\nHost: localhost\r\nX: ";
+    let ending = "\r\n\r\n";
+    let padding = 1024 - head.len() - ending.len();
+    for (extra, status) in [(0, 204), (1, 400)] {
+        let request = format!("{head}{}{ending}", "x".repeat(padding + extra));
+        let (response, name) = control_request(request.as_bytes(), true);
+        assert!(response.starts_with(format!("HTTP/1.1 {status} ").as_bytes()), "{response:?}");
+        assert_eq!(name.is_some(), extra == 0);
+    }
+}
+
+#[test]
+fn control_shutdown_with_a_partial_head() {
+    use skein_lib::stream::{Down, Read, Up};
+    let mut exchange = llm::control::Exchange::new();
+    exchange.advance(Time::ZERO, Wall::EPOCH);
+    assert_eq!(exchange.pop(), Some(Down::Demand { read: Read::Nothing, room: 256 }));
+    exchange.up(Time::ZERO, Wall::EPOCH, Up::Room);
+    let Some(Down::Demand { read: Read::Scan { .. }, room: 0 }) = exchange.pop() else {
+        panic!("reading the request head");
+    };
+    exchange.up(Time::ZERO, Wall::EPOCH, Up::Bytes(b"POST /release/gate HTTP/1.1\r\n".as_slice().into()));
+    let Some(Down::Demand { read: Read::Scan { .. }, room: 0 }) = exchange.pop() else {
+        panic!("reading the request head");
+    };
+    exchange.shutdown();
+    exchange.advance(Time::ZERO, Wall::EPOCH);
+    assert_eq!(exchange.pop(), Some(Down::Demand { read: Read::Nothing, room: 0 }));
+    assert!(exchange.pop().is_none());
+    assert!(exchange.release().is_none());
+    assert!(exchange.done());
+}

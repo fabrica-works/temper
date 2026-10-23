@@ -1,5 +1,6 @@
 //! The deployment and document forms' files and peer loop (protocol/setup.md, 8.4).
 pub(crate) mod check;
+mod control;
 pub mod git;
 pub(crate) mod seed;
 use skein_fake_peers::{forge as forge_peer, llm as llm_peer};
@@ -317,6 +318,7 @@ fn forge_document(source: &Source, seed: u64, created: &mut Created) -> Result<(
 }
 
 fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_shell::Kernel), String> {
+    let mut control_address = None;
     let (peer, shared, observations, writer, buffer) = match arguments.kind {
         Kind::Llm => {
             let configuration = match &arguments.source {
@@ -345,6 +347,7 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
                 }
                 Source::Setup { .. } => unreachable!("LLM has document and demo forms"),
             };
+            control_address = configuration.control;
             let observations = arguments
                 .observations
                 .as_ref()
@@ -380,9 +383,11 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
         }
     };
     let signals = skein_shell::open_termination_signals().map_err(|why| format!("signals: errno {why}"))?;
-    let operations = peer.host().operations().checked_add(2).expect("signal read and cancel");
+    let control = control_address.map(control::Control::new);
+    let operations = host_operations(&peer, control.as_ref());
     let host = Host {
         peer,
+        control,
         shared,
         signals,
         signal: Signal::New,
@@ -445,6 +450,12 @@ impl Peer {
         }
     }
 }
+fn host_operations(peer: &Peer, control: Option<&control::Control>) -> u32 {
+    peer.host()
+        .operations()
+        .checked_add(2 + control.map_or(0, |_| control::Control::operations()))
+        .expect("peer, control and signals")
+}
 // Both own tokens have slot u32::MAX, which io never issues: at skein
 // 9d34791e, crates/skein-io/src/layer.rs:291-303 uses Id::token;
 // crates/skein-lib/src/id.rs:41-44 puts the slot in the high half, and
@@ -466,6 +477,7 @@ enum Cancel {
 }
 struct Host {
     peer: Peer,
+    control: Option<control::Control>,
     shared: Option<Rc<RefCell<forge_peer::Forge>>>,
     signals: Fd,
     signal: Signal,
@@ -494,6 +506,9 @@ impl Host {
         self.failed = true;
         self.stopped = true;
         self.peer.shutdown();
+        if let Some(control) = &mut self.control {
+            control.shutdown();
+        }
         if self.signal == Signal::Reading && self.cancel == Cancel::Idle {
             self.submissions.push(Submit { op: CANCEL_SIGNAL, kind: Op::Cancel { target: SIGNAL } });
             self.cancel = Cancel::Waiting;
@@ -624,7 +639,17 @@ impl Host {
 impl skein_shell::Host for Host {
     fn iterate(&mut self, now: Time, wall: Wall) {
         for _ in 0..self.completions.len() {
-            let complete = self.completions.pop().expect("one pass over completions");
+            let mut complete = self.completions.pop().expect("one pass over completions");
+            if complete.op != SIGNAL && complete.op != CANCEL_SIGNAL && control::owns(complete.op) {
+                let control = self.control.as_mut().expect("control owns its completions");
+                if control.completions.room() == 0 {
+                    self.completions.push(complete);
+                    break;
+                }
+                control::restore(&mut complete);
+                control.completions.push(complete);
+                continue;
+            }
             if complete.op != SIGNAL && complete.op != CANCEL_SIGNAL && self.peer.host_mut().completions().room() == 0 {
                 self.completions.push(complete);
                 break;
@@ -651,6 +676,9 @@ impl skein_shell::Host for Host {
                         }
                         self.stopped = true;
                         self.peer.shutdown();
+                        if let Some(control) = &mut self.control {
+                            control.shutdown();
+                        }
                     }
                     Signal::Closing => self.signal = Signal::Closed,
                     Signal::New | Signal::Close | Signal::Closed => panic!("one own operation"),
@@ -670,20 +698,43 @@ impl skein_shell::Host for Host {
             self.submissions.push(Submit { op: SIGNAL, kind: Op::Close { fd: self.signals } });
             self.signal = Signal::Closing;
         }
+        if let Some(control) = &mut self.control {
+            let Peer::Llm(peer) = &mut self.peer else { unreachable!("only LLM has control") };
+            control.iterate(now, wall, peer);
+            if control.failed && !self.failed {
+                self.fail("control", &"listener failed");
+            }
+        }
         self.peer.host_mut().iterate(now, wall);
         while self.submissions.room() > 0 {
             let Some(submission) = self.peer.host_mut().submissions().pop() else { break };
             self.submissions.push(submission);
         }
         self.peer_submissions = self.peer.host_mut().submissions().len();
+        if let Some(control) = &mut self.control {
+            while self.submissions.room() > 0 {
+                let Some(mut submission) = control.submissions.pop() else { break };
+                control::tag(&mut submission);
+                self.submissions.push(submission);
+            }
+        }
     }
     fn drain(&mut self) {
         if let Some(address) = self.peer.address()
+            && self.control.as_ref().is_none_or(|control| control.address.is_some())
             && let Some(prefix) = self.ready.take()
         {
             let mut stdout = io::stdout();
-            let result =
-                stdout.write_all(&prefix).and_then(|()| writeln!(stdout, "{address}")).and_then(|()| stdout.flush());
+            let result = stdout
+                .write_all(&prefix)
+                .and_then(|()| {
+                    if let Some(control) = &self.control {
+                        writeln!(stdout, "{address} {}", control.address.expect("control bound before ready"))
+                    } else {
+                        writeln!(stdout, "{address}")
+                    }
+                })
+                .and_then(|()| stdout.flush());
             if let Err(why) = result {
                 self.fail("stdout", &why);
             }
@@ -701,19 +752,26 @@ impl skein_shell::Host for Host {
     }
     fn work_pending(&self, now: Time) -> bool {
         self.peer.host().work_pending(now)
+            || self.control.as_ref().is_some_and(|control| control.work_pending(now))
             || self.peer_submissions > 0
             || !self.completions.is_empty()
             || !self.submissions.is_empty()
             || (self.signal == Signal::Close && self.cancel == Cancel::Idle)
     }
     fn next_deadline(&self) -> Option<Time> {
-        self.peer.host().next_deadline()
+        self.peer
+            .host()
+            .next_deadline()
+            .into_iter()
+            .chain(self.control.as_ref().and_then(control::Control::next_deadline))
+            .min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
         self.peer.host().next_policy_deadline()
     }
     fn is_empty(&self) -> bool {
         self.peer.host().is_empty()
+            && self.control.as_ref().is_none_or(control::Control::is_empty)
             && self.signal == Signal::Closed
             && self.cancel == Cancel::Idle
             && self.checkpoint_or_llm()
@@ -722,6 +780,7 @@ impl skein_shell::Host for Host {
     }
     fn worst_case(&self) -> u64 {
         self.peer.host().worst_case()
+            + self.control.as_ref().map_or(0, |_| control::Control::worst_case())
             + List::<u8>::worst_case(self.buffer.capacity()).expect("bounded observation buffer")
             + if self.writer.is_some() { u64::from(limits::OBSERVATION_STATE_BYTES) } else { 0 }
             + self.ready.as_ref().map_or(0, |prefix| u64::try_from(prefix.len()).expect("ready bytes"))
@@ -733,7 +792,7 @@ impl skein_shell::Host for Host {
             + Queue::<Submit>::worst_case(self.submissions.capacity()).expect("queue bound")
     }
     fn operations(&self) -> u32 {
-        self.peer.host().operations().checked_add(2).expect("signal read and cancel")
+        host_operations(&self.peer, self.control.as_ref())
     }
     fn exit(&self) -> Option<Exit> {
         self.is_empty().then_some(Exit::Code(u8::from(self.failed)))

@@ -38,6 +38,7 @@ fn document(path: &Path, value: &Value) {
 struct Running {
     child: Option<Child>,
     address: SocketAddr,
+    control: Option<SocketAddr>,
 }
 impl Running {
     fn start(kind: &str, document: &Path, observations: Option<&Path>) -> Self {
@@ -49,7 +50,8 @@ impl Running {
             command.arg("--observations").arg(path);
         }
         let child = command.spawn().expect("valid fixture");
-        let mut run = Self { child: Some(child), address: "127.0.0.1:0".parse().expect("valid fixture") };
+        let mut run =
+            Self { child: Some(child), address: "127.0.0.1:0".parse().expect("valid fixture"), control: None };
         let mut bytes = Vec::new();
         for _ in 0..128 {
             let mut byte = [0_u8; 1];
@@ -75,7 +77,14 @@ impl Running {
         }
         let line = String::from_utf8(bytes).expect("ready line is UTF-8");
         assert!(line.starts_with("ready "), "ready line: {line}");
-        run.address = line.strip_prefix("ready ").expect("valid fixture").trim_end().parse().expect("valid fixture");
+        let mut addresses = line.strip_prefix("ready ").expect("valid fixture").split_whitespace();
+        run.address = addresses.next().expect("provider address").parse().expect("valid fixture");
+        run.control = addresses.next().map(|address| address.parse::<SocketAddr>().expect("control address"));
+        assert!(addresses.next().is_none(), "ready line has only its listeners");
+        if let Some(control) = run.control {
+            assert!(control.ip().is_loopback());
+            assert_ne!(control.port(), 0);
+        }
         assert!(run.address.ip().is_loopback());
         assert_ne!(run.address.port(), 0);
         run
@@ -1356,5 +1365,81 @@ fn seed_signals_reap_the_tool_waiting_for_serve() {
     serve.stop();
     llm.stop();
     forge.stop();
+    scratch.remove();
+}
+
+#[test]
+fn llm_holds_a_piece_until_control_releases_it() {
+    let scratch = support::Scratch::new("fake_llm_hold");
+    let doc = scratch.path().join("llm.json");
+    let mut value = llm_document(scratch.path(), false);
+    value["control"] = json!({"socket":"127.0.0.1:0"});
+    value["asked"][0]["turns"] = json!([{"lines":[{"pieces":[
+        {"text":"first piece","hold":null}, {"text":"second piece","hold":"gate"}
+    ]}],"finish":"stop","tokens":6}]);
+    document(&doc, &value);
+    let run = Running::start("llm", &doc, None);
+    let control = run.control.expect("control bound before ready");
+    let key = fs::read(scratch.path().join("key")).expect("generated key");
+    let authorization = format!("Bearer {}", std::str::from_utf8(&key).expect("key is hex"));
+    let mut query = stream(run.address);
+    query.write_all(&http("POST", "/v1/responses", &authorization, CHAT)).expect("send query");
+    let mut response = Vec::new();
+    // Read through the first complete delta event, so the assertion observes
+    // the provider's bytes, without a timer or a sleep.
+    for _ in 0..16_384 {
+        let mut byte = [0];
+        query.read_exact(&mut byte).expect("first piece arrives on the open stream");
+        response.push(byte[0]);
+        if response.windows(b"first piece".len()).any(|part| part == b"first piece") && response.ends_with(b"\n\n") {
+            break;
+        }
+    }
+    assert!(response.starts_with(b"HTTP/1.1 200"));
+    assert!(String::from_utf8_lossy(&response).contains("first piece"));
+    assert!(!String::from_utf8_lossy(&response).contains("second piece"));
+    assert!(!String::from_utf8_lossy(&response).contains("response.completed"));
+    let unknown = request(control, "GET", "/", "", b"");
+    assert!(unknown.starts_with(b"HTTP/1.1 404 "));
+    // The control response is an event barrier. A nonblocking read observes
+    // any bytes already delivered and proves the stream has not ended.
+    query.set_nonblocking(true).expect("nonblocking observation");
+    let mut byte = [0];
+    loop {
+        match query.read(&mut byte) {
+            Ok(0) => panic!("held stream ended before its release"),
+            Ok(_) => response.push(byte[0]),
+            Err(why) if why.kind() == std::io::ErrorKind::WouldBlock => break,
+            Err(why) => panic!("held stream: {why}"),
+        }
+    }
+    query.set_nonblocking(false).expect("blocking event reads");
+    assert!(!String::from_utf8_lossy(&response).contains("second piece"));
+    assert!(!String::from_utf8_lossy(&response).contains("response.completed"));
+    let released = request(control, "POST", "/release/gate", "", b"");
+    assert!(released.starts_with(b"HTTP/1.1 204 No Content\r\n"));
+    query.read_to_end(&mut response).expect("released stream completes");
+    let text = String::from_utf8_lossy(&response);
+    assert!(text.contains("second piece"), "{text}");
+    assert!(text.contains("first piecesecond piece"), "{text}");
+    assert_eq!(text.matches("event: response.completed").count(), 1);
+    assert!(request(control, "POST", "/release/gate", "", b"").starts_with(b"HTTP/1.1 204 No Content\r\n"));
+    let mut after = [0];
+    assert_eq!(query.read(&mut after).expect("stream stays complete"), 0);
+    run.stop();
+    scratch.remove();
+}
+#[test]
+fn llm_refuses_a_hold_without_control() {
+    let scratch = support::Scratch::new("fake_llm_hold_refused");
+    let doc = scratch.path().join("llm.json");
+    let mut value = llm_document(scratch.path(), false);
+    value["otherwise"] = json!([{"lines":[{"pieces":[{"text":"held","hold":"gate"}]}],"finish":"stop","tokens":1}]);
+    document(&doc, &value);
+    let output = command("llm", &doc).output().expect("run fake");
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stderr, b"temper fake llm: control: required when a piece has a hold\n");
+    assert!(output.stdout.is_empty());
+    assert!(!scratch.path().join("key").exists(), "refusal creates no outputs");
     scratch.remove();
 }
