@@ -181,6 +181,7 @@ impl ServiceHost {
     pub(crate) fn make_github_app(&mut self, peer: &mut skein_fake_peers::forge::Peer) {
         if let Some(fixture) = self.github
             && !fixture.connected
+            && !fixture.manifest
         {
             self.github_seen.app =
                 Some(crate::github::make_app(peer, self.clients.expect("clients"), &self.path, fixture));

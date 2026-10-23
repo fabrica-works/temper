@@ -102,7 +102,7 @@ pub enum Step {
         early: &'static [u8],
     },
 }
-/// Follow the installation link printed by a completed ctl call.
+/// Follow the installation or manifest link printed by a completed ctl call.
 #[must_use]
 pub fn browse(call: usize) -> Step {
     Step::Browse { call }

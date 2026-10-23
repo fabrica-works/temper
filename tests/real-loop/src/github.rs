@@ -36,6 +36,8 @@ pub(crate) fn protocol_limits() -> skein_fake_forge_protocol::Limits {
 pub struct Fixture {
     /// Seeded App records and acme installation; false exercises a person connecting.
     pub connected: bool,
+    /// Connect through the browser instead of preparing a pasted App.
+    pub manifest: bool,
     /// Seed an unaccepted umbra installation before the person's paste.
     pub old_stray: bool,
     /// The person's App hook, which paste and reconcile may need to repair.
@@ -47,6 +49,7 @@ pub struct Fixture {
 pub fn fixture() -> Fixture {
     Fixture {
         connected: true,
+        manifest: false,
         old_stray: false,
         pasted_hook: b"https://temper-test.invalid/",
         config,
