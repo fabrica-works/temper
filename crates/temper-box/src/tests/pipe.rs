@@ -25,9 +25,12 @@ fn a_bounded_reader_discards_a_long_line_through_its_feed() {
     }
 }
 #[test]
-fn only_a_canonical_start_line_is_known() {
+fn only_canonical_start_and_stop_lines_are_known() {
     for (line, expected) in [
         (b"start 0\n".as_slice(), Command::Start(0)),
+        (b"stop 0\n", Command::Stop(0)),
+        (b"stop 65535\n", Command::Stop(65535)),
+        (b"stop 3\n", Command::Stop(3)),
         (b"start 65535\n", Command::Start(65535)),
         (b"start 3\n", Command::Start(3)),
         (b"start 65536\n", Command::Unknown),
@@ -43,6 +46,15 @@ fn only_a_canonical_start_line_is_known() {
         (b"other 1\n", Command::Unknown),
     ] {
         assert_eq!(pipe::command(line), expected, "{line:?}");
+        if let Some(suffix) = line.strip_prefix(b"start ") {
+            let stopped = joined(&[b"stop ", suffix]);
+            let expected = match expected {
+                Command::Start(forge) => Command::Stop(forge),
+                Command::Unknown => Command::Unknown,
+                Command::Stop(_) => unreachable!(),
+            };
+            assert_eq!(pipe::command(&stopped), expected, "{stopped:?}");
+        }
     }
 }
 #[test]
@@ -55,6 +67,7 @@ fn box_lines_and_failure_words_have_the_wire_spelling_and_bound() {
         assert_eq!(&*pipe::step(3, stage), line);
     }
     assert_eq!(&*pipe::started(65535), b"started 65535\n");
+    assert_eq!(&*pipe::stopped(65535), b"stopped 65535\n");
     for (why, expected) in [
         (pipe::exited(b"prepare 3", Exit::Code(1)), b"prepare 3 exited 1".as_slice()),
         (pipe::exited(b"forgejo 3", Exit::Signal(9)), b"forgejo 3 killed by signal 9"),

@@ -62,7 +62,7 @@ impl Domain {
             return None;
         }
         let answer = self.forge.demo()?;
-        let halves = forge::demo::halves(Some(answer), self.pages.accounts_document(&self.client), self.forges());
+        let halves = forge::demo::current(&self.forge, self.pages.accounts_document(&self.client));
         if halves.model || halves.forge { Some((answer, halves)) } else { None }
     }
 
@@ -89,12 +89,14 @@ impl Domain {
 }
 pub fn step(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     route::event(root, env, event, out);
+    route::demo_progress(root, env, out);
     welcome(root, out);
 }
 pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut client = Queue::with_capacity(jig_client::max_out(&env.limits.client));
     root.client.fire(env.now, env.wall, &mut client);
     route::route_client(root, env, &mut client, out);
+    route::demo_progress(root, env, out);
     welcome(root, out);
 }
 #[must_use]

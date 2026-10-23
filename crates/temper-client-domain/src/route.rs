@@ -280,3 +280,11 @@ fn demo_facts(root: &mut Domain) {
         None => false,
     };
 }
+
+/// Reconcile demo lifecycle after the shared client's account and forge tells.
+pub(crate) fn demo_progress(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
+    forge::demo::progress(&mut root.forge, root.pages.accounts_document(&root.client), &mut child);
+    route_forge(root, env, &mut child, out);
+    demo_facts(root);
+}

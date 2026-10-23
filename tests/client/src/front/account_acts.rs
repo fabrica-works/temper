@@ -91,6 +91,17 @@ pub fn empty_fixture(seed: u64) -> (Joint, Root) {
     }
     (front, root)
 }
+fn demo_providers(config: &mut engine::Config) {
+    // Both providers use this world's restored fake key sources, so Remove
+    // goes through the real account policy. Only their usability is scripted.
+    let demo = config.core.settings.llm_providers.providers[0].clone();
+    let mut other = demo.clone();
+    other.number = PROVIDER + 1;
+    other.name = Box::from(b"Other fake".as_slice());
+    other.models = Box::new([Box::from(b"other-scripted".as_slice())]);
+    other.offers = a::Offers { sign_in: true, key: true, programs: Box::new([]) };
+    config.core.settings.llm_providers.providers = Box::new([demo, other]);
+}
 fn fixture_root(
     seed: u64,
     tools: bool,
@@ -118,6 +129,9 @@ fn fixture_root(
                 offers: a::Offers { sign_in: true, key: true, programs: Box::new([]) },
             }]),
         };
+        if let WelcomeForge::Demo { .. } = forge {
+            demo_providers(&mut config);
+        }
         if tools || program {
             config.core.settings.llm_providers.providers.get_mut(0).expect("fixture provider").offers.programs =
                 Box::new([Box::from(b"claude_code".as_slice())]);

@@ -17,6 +17,7 @@ fn pump(front: &mut Joint, root: &mut Root, event: d::Event) -> usize {
     Temper::step(root, &Env { now, wall: Wall::EPOCH, limits }, event.into(), &mut out);
     let mut replaced = 0;
     for _ in 0..64 {
+        Temper::take(root, &Env { now, wall: Wall::EPOCH, limits }, &mut out);
         while let Some(request) = out.pop() {
             if let d::Request::Show { address, replace } = &request {
                 replaced += usize::from(*replace);
@@ -37,6 +38,7 @@ fn pump(front: &mut Joint, root: &mut Root, event: d::Event) -> usize {
             return replaced;
         }
         for (_, event) in callbacks {
+            front.received(ClientId(0), &event);
             Temper::step(root, &Env { now, wall: Wall::EPOCH, limits }, event, &mut out);
         }
     }
@@ -129,4 +131,82 @@ fn absent_demo_still_has_the_setup_strip() {
     go(&mut front, &mut root, Address::Chats);
     assert!(has(&root, Role::Region, b"Setup"));
     assert!(!has(&root, Role::Region, b"Playground"));
+}
+
+fn add_model(front: &mut Joint, root: &mut Root) {
+    go(
+        front,
+        root,
+        Address::ConnectModel { way: Some(d::ModelWay { provider: accounts::PROVIDER + 1, kind: d::WayKind::Key }) },
+    );
+    pump(front, root, d::Event::AccountKey { value: skein_lib::Secret::new(b"test-private-key".as_slice().into()) });
+    press(front, root, b"Add key");
+    accounts::kept(front);
+    accounts::settle(front, root);
+}
+fn connected(front: &mut Joint, root: &mut Root) {
+    // The scripted engine half has durably ended before delivering the connection.
+    front.demo = None;
+    front.engine.send(temper_engine_domain::Event::Forge(Box::new(temper_engine_domain_forge::Event::Connection {
+        forge: 1,
+        state: temper_engine_domain_forge::Connection::Connected { id: 1, login: b"bot".as_slice().into() },
+    })));
+    accounts::settle(front, root);
+}
+fn demo_account(root: &Root) -> bool {
+    d::pages::accounts::document(root.person().client()).expect("accounts delivered").accounts.iter().any(|line| {
+        line.provider == Some(accounts::PROVIDER) && line.holder == jig_client::contract::OwnerAccountHolder::Deployment
+    })
+}
+#[test]
+fn a_model_connected_removes_the_scripted_account_and_leaves_the_playground_forge_banner() {
+    let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
+    assert!(demo_account(&root));
+    assert!(root.person().demo().expect("running playground").1.model);
+    add_model(&mut front, &mut root);
+    assert!(!demo_account(&root));
+    assert_eq!(front.demo_removals.len(), 1);
+    go(&mut front, &mut root, Address::Accounts);
+    assert!(!has(&root, Role::Heading { level: 2 }, b"Scripted"));
+    let halves = root.person().demo().expect("running playground").1;
+    assert_eq!(halves, d::forge::demo::Halves { model: false, forge: true });
+    go(&mut front, &mut root, Address::Chats);
+    assert!(has(&root, Role::Region, b"Playground"));
+    assert!(has(&root, Role::Paragraph, b"This is the playground: a playground forge."));
+    assert!(!has(&root, Role::Button, b"Connect a model"));
+    assert!(!has(&root, Role::Status, b"Ready"), "no demo start");
+    go(&mut front, &mut root, Address::Forges);
+    assert!(d::forge::listed::playground(root.person()).is_some());
+    assert!(has(&root, Role::Heading { level: 2 }, b"The playground"));
+    connected(&mut front, &mut root);
+    assert_eq!(front.demo_removals.len(), 1, "forge end never repeats removal");
+    assert!(root.person().forge().demo().is_none());
+}
+#[test]
+fn a_forge_connected_clears_the_demo_everywhere_and_welcome_moves_when_a_model_is_usable() {
+    let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
+    assert!(demo_account(&root));
+    go(&mut front, &mut root, Address::Forges);
+    assert!(d::forge::listed::playground(root.person()).is_some());
+    assert!(has(&root, Role::Heading { level: 2 }, b"The playground"));
+    let reads = front.demo_reads;
+    connected(&mut front, &mut root);
+    assert_eq!(front.demo_reads, reads + 1);
+    assert_eq!(front.demo_removals.len(), 1);
+    assert!(!demo_account(&root));
+    assert!(root.person().forge().demo().is_none());
+    assert!(d::forge::listed::playground(root.person()).is_none());
+    assert!(!has(&root, Role::Region, b"Playground"));
+    assert!(!has(&root, Role::Heading { level: 2 }, b"The playground"));
+    go(&mut front, &mut root, Address::Chats);
+    assert!(!has(&root, Role::Region, b"Playground"));
+    assert!(!has(&root, Role::Button, b"Try the playground"));
+    assert!(!has(&root, Role::Status, b"Ready"));
+    // The fixture also has a usable configured model; connect the other fake
+    // account before reopening Welcome, exercising both sources of usable facts.
+    add_model(&mut front, &mut root);
+    assert_eq!(go(&mut front, &mut root, Address::Welcome { step: Step::Welcome }), 1);
+    assert_eq!(root.person().pages().address(), &Address::Chats);
+    assert_eq!(front.demo_starts.len(), 1);
+    assert_eq!(front.demo_removals.len(), 1);
 }

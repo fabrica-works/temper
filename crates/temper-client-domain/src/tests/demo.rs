@@ -457,3 +457,230 @@ fn another_operations_outcome_is_not_a_start_answer() {
     });
     assert!(demo::answer(&value, &f::limits().forge).is_none());
 }
+
+fn up(root: &mut crate::Domain, up: jig_client::Up) -> Queue<crate::Request> {
+    event(root, crate::Event::Client { event: jig_client::Event::Up { up } })
+}
+fn deliver_accounts(
+    root: &mut crate::Domain,
+    watch: skein_lib::Token,
+    document: c::OwnerAccounts,
+) -> Queue<crate::Request> {
+    up(
+        root,
+        jig_client::Up::Watched {
+            watch,
+            event: c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(document))),
+        },
+    )
+}
+fn ending_accounts(demo_account: bool, other_usable: bool) -> c::OwnerAccounts {
+    let mut document = accounts(Some(PROVIDER + 1), other_usable, false);
+    let other = document.accounts.get(0).unwrap().clone();
+    document.accounts = List::with_capacity(2);
+    if demo_account {
+        let mut demo = accounts(Some(PROVIDER), true, false).accounts.get(0).unwrap().clone();
+        demo.number = 42;
+        demo.holder = c::OwnerAccountHolder::Deployment;
+        document.accounts.push(demo).unwrap();
+    }
+    document.accounts.push(other).unwrap();
+    document
+}
+fn ending_root() -> (crate::Domain, skein_lib::Token, skein_lib::Token) {
+    let mut root = crate::unlinked(&f::limits(), f::SEED);
+    let (me, account) = f::start_accounts(&mut root, List::with_capacity(0));
+    let mut frame = f::chats::me();
+    frame.deployment_role = Some(c::HeldRole::Owner);
+    let mut out = up(
+        &mut root,
+        jig_client::Up::Watched { watch: me, event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(frame))) },
+    );
+    let mut forges = None;
+    while let Some(request) = out.pop() {
+        if let crate::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } },
+                },
+        } = request
+        {
+            forges = Some(watch);
+        }
+    }
+    demo::told(&mut root.forge, &Told::Link { link: Link::Offline }, f::limits().forge, &mut Queue::with_capacity(1));
+    let handle = read(&mut root.forge);
+    crate::route::told(
+        &mut root,
+        &f::env(&f::limits()),
+        Told::Page { handle, page: page() },
+        &mut Queue::with_capacity(crate::max_out(&f::limits())),
+    );
+    (root, account, forges.expect("deployment forges"))
+}
+fn forge_rows(root: &mut crate::Domain, watch: skein_lib::Token, connected: bool) -> Queue<crate::Request> {
+    let mut forges = List::with_capacity(1);
+    let connection = if connected {
+        w::Connection::Connected(
+            w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 1, login: b"bot".as_slice().into() }).unwrap(),
+        )
+    } else {
+        w::Connection::Connecting
+    };
+    forges
+        .push(
+            w::ForgeRow::new(
+                &w::CEILINGS,
+                w::ForgeRowParts {
+                    first: None,
+                    number: wire::FORGE + 1,
+                    kind: w::Kind::Forgejo,
+                    mode: w::Mode::Owned,
+                    connection,
+                    offer: w::Offer::NotOffered,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    up(
+        root,
+        jig_client::Up::FamilyDelivered {
+            watch,
+            record: jig_client::Family {
+                family: wire::FORGE,
+                version: wire::CLIENT_VERSION,
+                bytes: wire::forges(&w::Forges::new(&w::CEILINGS, w::ForgesParts { forges }).unwrap()),
+            },
+        },
+    )
+}
+fn removed(out: &mut Queue<crate::Request>) -> List<skein_lib::Token> {
+    let mut attempts = List::with_capacity(4);
+    while let Some(request) = out.pop() {
+        if let crate::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Send { attempt, request: jig_client::Ask::Jig(ask), .. },
+                },
+        } = request
+        {
+            assert_eq!(
+                *ask,
+                c::Ask::AccountChange {
+                    holder: c::AccountHolder::Deployment,
+                    change: c::AccountChange::Remove { account: 42 }
+                }
+            );
+            attempts.push(attempt).unwrap();
+        }
+    }
+    attempts
+}
+#[test]
+fn the_model_end_removes_the_deployment_demo_account_once_and_drops_its_answer() {
+    for answer in [
+        None,
+        Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountRemoved {
+            confirmed: true,
+            failed_hosts: Box::new([]),
+        })))),
+        Some(jig_client::Answered::Jig(c::Answer::Refused {
+            refusal: c::Refusal::Role { held: Some(c::HeldRole::Member) },
+            at: None,
+        })),
+    ] {
+        let (mut root, account, forges) = ending_root();
+        deliver_accounts(&mut root, account, ending_accounts(true, false));
+        forge_rows(&mut root, forges, false);
+        assert!(root.demo().unwrap().1.model);
+        let attempts = removed(&mut deliver_accounts(&mut root, account, ending_accounts(true, true)));
+        assert_eq!(attempts.len(), 1);
+        assert!(!root.demo().unwrap().1.model);
+        let shown = crate::shown(&root);
+        let attempt = *attempts.get(0).unwrap();
+        up(
+            &mut root,
+            jig_client::Up::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer, why: None },
+        );
+        assert_eq!(crate::shown(&root), shown, "cleanup outcome has no view");
+        assert!(removed(&mut deliver_accounts(&mut root, account, ending_accounts(true, false))).is_empty());
+        assert!(!root.demo().unwrap().1.model, "the ended half never returns");
+        assert!(removed(&mut forge_rows(&mut root, forges, true)).is_empty(), "the second end sends no remove");
+    }
+}
+#[test]
+fn the_forge_end_rereads_once_removes_the_account_and_none_clears_the_demo() {
+    let (mut root, account, forges) = ending_root();
+    deliver_accounts(&mut root, account, ending_accounts(true, false));
+    assert!(forge_rows(&mut root, forges, false).is_empty());
+    let mut out = forge_rows(&mut root, forges, true);
+    let mut read = None;
+    let mut remaining = Queue::with_capacity(out.len());
+    while let Some(request) = out.pop() {
+        if let crate::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Read { read: token, what: Readable::Family { record, .. } },
+                },
+        } = &request
+        {
+            assert_eq!(wire::decode_reading(&record.bytes, &w::CEILINGS).unwrap().read(), &w::Read::Demo);
+            assert!(read.replace(*token).is_none());
+        } else {
+            remaining.push(request);
+        }
+    }
+    assert_eq!(removed(&mut remaining).len(), 1);
+    assert!(forge_rows(&mut root, forges, true).is_empty(), "unchanged connected rows never repeat the read");
+    up(
+        &mut root,
+        jig_client::Up::ReadDone {
+            read: read.expect("Demo reread"),
+            result: Readout::Family { family: wire::FORGE, record: None },
+        },
+    );
+    assert!(root.forge().demo().is_none());
+    assert!(root.demo().is_none());
+    assert!(removed(&mut deliver_accounts(&mut root, account, ending_accounts(true, true))).is_empty());
+}
+#[test]
+fn cleanup_needs_a_deployment_account_and_a_running_answer_and_waits_for_delivered_facts() {
+    for case in ["no account", "party account", "none", "not started", "missing", "cut"] {
+        let (mut root, account, _) = ending_root();
+        if case == "none" || case == "not started" {
+            demo::told(
+                &mut root.forge,
+                &Told::Link { link: Link::Offline },
+                f::limits().forge,
+                &mut Queue::with_capacity(1),
+            );
+            let handle = read(&mut root.forge);
+            let page = if case == "none" {
+                Readout::Family { family: wire::FORGE, record: None }
+            } else {
+                let mut parts = wire::decode_demo_answer(&answer(CUE), &w::CEILINGS).unwrap().into_parts();
+                parts.state = w::DemoState::NotStarted;
+                Readout::Family {
+                    family: wire::FORGE,
+                    record: Some(wire::demo_answer(&w::DemoAnswer::new(&w::CEILINGS, parts).unwrap())),
+                }
+            };
+            demo::told(&mut root.forge, &Told::Page { handle, page }, f::limits().forge, &mut Queue::with_capacity(1));
+        }
+        let mut document = ending_accounts(case != "no account", true);
+        if case == "party account" {
+            document.accounts.get_mut(0).unwrap().holder = c::OwnerAccountHolder::Party(f::PARTY);
+        }
+        if case == "cut" {
+            document.cut = true;
+            document.accounts.get_mut(1).unwrap().sources.get_mut(0).unwrap().usable = false;
+        }
+        let mut out = if case == "missing" {
+            event(&mut root, crate::Event::Went { place: crate::Place::Address(crate::Address::Chats) })
+        } else {
+            deliver_accounts(&mut root, account, document)
+        };
+        assert!(removed(&mut out).is_empty(), "{case}");
+    }
+}

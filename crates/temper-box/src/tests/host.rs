@@ -549,3 +549,38 @@ fn an_unrecorded_group_neither_probes_nor_writes_and_waits_at_every_box_start() 
         assert_eq!(harness.machine.open_handles(), 0);
     }
 }
+
+#[test]
+fn a_pipe_stop_closes_only_its_group_keeps_the_record_and_can_be_started_again() {
+    use skein_fake_machine::How;
+    let mut harness = Harness::grouped(grouped_steps(), &[], true);
+    harness.run_until_idle();
+    harness.ask(b"start 3\n");
+    harness.run_until_idle();
+    assert_eq!(&*harness.reply_bytes(), b"step 3 prepare\nstep 3 run\nstarted 3\n");
+    harness.replies.clear();
+    harness.ask(b"stop 3\n");
+    harness.run_until_idle();
+    assert!(harness.reply_bytes().is_empty(), "stubborn group has not closed yet");
+    for _ in 0_u32..2 {
+        harness.sim.advance_to(harness.sim.now().saturating_add(Duration::from_secs(10)));
+        harness.run_until_idle();
+    }
+    assert_eq!(&*harness.reply_bytes(), b"stopped 3\n");
+    assert_eq!(harness.spawn_times(b"serve").len(), 1);
+    assert_eq!(harness.spawn_times(b"forgejo 3").len(), 1);
+    let root = harness.machine.reopen_root(0);
+    let record = harness.machine.open(root, b"box/started/3", How::Read).expect("stop keeps the record");
+    harness.machine.close(record);
+    harness.machine.close(root);
+    harness.replies.clear();
+    harness.ask(b"start 3\n");
+    harness.run_until_idle();
+    assert_eq!(&*harness.reply_bytes(), b"step 3 prepare\nstep 3 run\nstarted 3\n");
+    assert_eq!(harness.spawn_times(b"forgejo 3").len(), 2);
+    harness.terminate();
+    assert_eq!(harness.run_to_end(), Exit::Code(0));
+    harness.sim.assert_quiescent(harness.pid);
+    harness.sim.assert_no_open_fds(harness.pid);
+    assert_eq!(harness.machine.open_handles(), 0);
+}
