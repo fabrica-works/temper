@@ -57,7 +57,7 @@ pub enum Answer {
 pub struct Pending {
     pub forge: u16,
     pub key: Key,
-    pub installing: bool,
+    pub linking: bool,
     pub answer: Option<Answer>,
 }
 pub(crate) fn write(side: &mut Side, text: Box<[u8]>, limits: Limits) {
@@ -91,12 +91,7 @@ pub(crate) fn key(side: &mut Side, value: Secret) {
     side.changed();
 }
 pub(crate) fn send(side: &mut Side, limits: Limits, forge: u16, back: Option<Box<[u8]>>, out: &mut Queue<Request>) {
-    if side.party.is_none() || side.served == Served::OutOfDate {
-        return;
-    }
-    if let Some(pending) = &side.app
-        && pending.answer.is_none()
-    {
+    if !available(side) {
         return;
     }
     let installing = back.is_some();
@@ -136,14 +131,44 @@ pub(crate) fn send(side: &mut Side, limits: Limits, forge: u16, back: Option<Box
             .expect("connect fits"),
         )
     };
-    let record = w::Requesting::new(&bounds, w::RequestingParts { request }).expect("request fits");
+    dispatch(side, &bounds, forge, request, installing, out);
+}
+fn available(side: &Side) -> bool {
+    side.party.is_some()
+        && side.served != Served::OutOfDate
+        && match &side.app {
+            Some(pending) => pending.answer.is_some(),
+            None => true,
+        }
+}
+pub(crate) fn manifest(side: &mut Side, limits: Limits, forge: u16, back: Box<[u8]>, out: &mut Queue<Request>) {
+    if !available(side) {
+        return;
+    }
+    let bounds = super::wire_limits(&limits).expect("checked forge limits");
+    let how = w::How::GithubManifest(
+        w::GitHubManifest::new(&bounds, w::GitHubManifestParts { back: Some(back) })
+            .expect("printed flow address fits"),
+    );
+    let request = w::Request::Connect(w::Connect::new(&bounds, w::ConnectParts { forge, how }).expect("connect fits"));
+    dispatch(side, &bounds, forge, request, true, out);
+}
+fn dispatch(
+    side: &mut Side,
+    bounds: &w::Limits,
+    forge: u16,
+    request: w::Request,
+    linking: bool,
+    out: &mut Queue<Request>,
+) {
+    let record = w::Requesting::new(bounds, w::RequestingParts { request }).expect("request fits");
     let request = Ask::Family {
         scope: c::Scope::Deployment,
         record: Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::requesting(&record) },
     };
     side.serial = side.serial.checked_add(1).expect("forge keys fit");
     let key = Key { asker: crate::owner::Owner::Forge.asker(), number: side.serial };
-    let event = if installing {
+    let event = if linking {
         Event::Send { key, name: None, request }
     } else {
         let value = side.app_form.key.take().expect("validated key");
@@ -157,7 +182,7 @@ pub(crate) fn send(side: &mut Side, limits: Limits, forge: u16, back: Option<Box
         );
         Event::Carry { key, name, request, value }
     };
-    side.app = Some(Pending { forge, key, installing, answer: None });
+    side.app = Some(Pending { forge, key, linking, answer: None });
     out.push(Request::Client { asked: event });
     side.changed();
 }
@@ -195,7 +220,7 @@ pub(crate) fn told(
     if pending.answer.is_some() {
         return true;
     }
-    let answer = decode(outcome, pending.installing, limits).unwrap_or(Answer::Unknown);
+    let answer = decode(outcome, pending.linking, limits).unwrap_or(Answer::Unknown);
     if let Answer::Link(to) = &answer {
         out.push(Request::Leave { to: to.clone() });
     }
@@ -203,7 +228,7 @@ pub(crate) fn told(
     side.changed();
     true
 }
-fn decode(outcome: &Outcome, installing: bool, limits: Limits) -> Option<Answer> {
+fn decode(outcome: &Outcome, linking: bool, limits: Limits) -> Option<Answer> {
     let Outcome::Answered(answer) = outcome else {
         return Some(Answer::Unknown);
     };
@@ -220,7 +245,7 @@ fn decode(outcome: &Outcome, installing: bool, limits: Limits) -> Option<Answer>
             match answer.into_parts().outcome {
                 w::Outcome::Connecting => Some(Answer::Connecting),
                 w::Outcome::ConnectRefused(refusal) => Some(Answer::Refused(refusal.why().clone())),
-                w::Outcome::Link(link) if installing => Some(Answer::Link(link.into_parts().address)),
+                w::Outcome::Link(link) if linking => Some(Answer::Link(link.into_parts().address)),
                 w::Outcome::Unknown => Some(Answer::Unknown),
                 w::Outcome::Adopted(_)
                 | w::Outcome::CoreRefused(_)

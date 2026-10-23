@@ -12,7 +12,7 @@ use skein_lib::{List, Queue, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 const HERE: u16 = 3;
 fn row(number: u16, kind: Kind, mode: Mode, connection: C, offer: Offer) -> Row {
-    Row { number, kind, mode, connection, offer, first: None, installations: Box::new([]), ended: None }
+    Row { app: None, number, kind, mode, connection, offer, first: None, installations: Box::new([]), ended: None }
 }
 fn rows(connection: C) -> State {
     State::Rows(Box::new([row(HERE, Kind::Forgejo, Mode::Owned, connection, Offer::Offered)]))

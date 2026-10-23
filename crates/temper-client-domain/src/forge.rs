@@ -224,6 +224,7 @@ fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::Go { address } => out.push(Request::Show { address }),
         Act::AppWrite { text } => github::write(side, text, limits),
+        Act::ConnectManifest { forge, back } => github::manifest(side, limits, forge, back, out),
         Act::ConnectApp { forge } => github::send(side, limits, forge, None, out),
         Act::Install { forge, back } => github::send(side, limits, forge, Some(back), out),
         Act::StartDemo => demo::start(side, limits, false, out),

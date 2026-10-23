@@ -195,6 +195,7 @@ fn every_connection_decodes_into_the_forges_words() {
             )
             .unwrap();
         let row = Row {
+            app: None,
             installations: Box::new([]),
             ended: None,
             first: None,
@@ -222,6 +223,7 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
+        app: None,
         installations: Box::new([]),
         ended: None,
         first: None,

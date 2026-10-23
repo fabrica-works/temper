@@ -20,6 +20,7 @@ fn row(connection: C) -> Row {
         mode: Mode::Owned,
         offer: Offer::Offered,
         connection,
+        app: None,
     }
 }
 fn record(connection: w::Connection) -> client::Family {

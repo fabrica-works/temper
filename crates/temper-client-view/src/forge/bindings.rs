@@ -13,6 +13,7 @@ pub enum Meaning {
     AppId,
     AppKey,
     ConnectApp(u16),
+    ConnectManifest { forge: u16, back: temper_client_domain::Address },
     Install { forge: u16, back: temper_client_domain::Address },
     SetUp(u16),
     SetupField(forge::forges::SetupField),
@@ -73,6 +74,10 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Ci => Action::Forge(forge::Act::Ci),
                 Meaning::SetUp(forge) => Action::Forge(forge::Act::SetUp { forge }),
                 Meaning::ConnectApp(forge) => Action::Forge(forge::Act::ConnectApp { forge }),
+                Meaning::ConnectManifest { forge, back } => Action::Forge(forge::Act::ConnectManifest {
+                    forge,
+                    back: temper_client_domain::address::print(&back),
+                }),
                 Meaning::Install { forge, back } => {
                     Action::Forge(forge::Act::Install { forge, back: temper_client_domain::address::print(&back) })
                 }
