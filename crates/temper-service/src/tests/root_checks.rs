@@ -136,7 +136,11 @@ fn the_checkouts_repositories_past_the_agents_directories_name_both_limits() {
 #[test]
 fn a_resume_limit_past_a_rows_bytes_refuses_the_start() {
     assert_eq!(
-        &*started(&engine_with(r#""core.resume_bytes":65537"#)),
+        &*started(&fixtures::with(
+            &engine_with(r#""core.resume_bytes":65541,"hub.transcript_bytes":262161"#),
+            b"workers[0].limits.overrides",
+            format!("{{{WORKER_OVERRIDES},\"hub.transcript_bytes\":262161}}").as_bytes(),
+        )),
         b"engine.limits.overrides.core.resume_bytes: must agree with root.journal.transcript_bytes, above 0\n"
     );
 }

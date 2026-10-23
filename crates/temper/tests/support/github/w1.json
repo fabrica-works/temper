@@ -27,18 +27,21 @@
       "limits": {{
         "profile": "small",
         "overrides": {{
-          "hub.slots": 1,
-          "hub.run_calls": 1,
-          "tasks.message_bytes": 4096,
-          "people.words": 512,
           "core.call_answer_bytes": 2048,
           "hub.accounts": 4,
           "hub.event_bytes": 4094,
-          "hub.turns": 1,
           "hub.held": 1,
           "hub.program_sources": 0,
+          "hub.run_calls": 1,
+          "hub.slots": 1,
+          "hub.transcript_bytes": 5312640,
+          "hub.turn_bytes": 1328156,
+          "hub.turn_queue_bytes": 10625248,
+          "hub.turns": 1,
           "link.ping_ms": 100,
-          "link.silence_ms": 1000
+          "link.silence_ms": 1000,
+          "people.words": 512,
+          "tasks.message_bytes": 4096
         }}
       }},
       "memory_bytes": 4503599627370496
@@ -54,12 +57,17 @@
     "limits": {{
       "profile": "small",
       "overrides": {{
+        "checkout.message_bytes": 4096,
         "checkout.name_bytes": 256,
         "checkout.repositories": 2,
-        "checkout.message_bytes": 4096,
         "forge.name_bytes": 64,
         "forge.resources_per_task": 2,
-        "git_component.stdout_bytes": 2048
+        "git_component.stdout_bytes": 2048,
+        "root.journal.transcript_bytes": 1328160,
+        "root.loads.bytes": 1328396,
+        "root.loads.read_bytes": 2656312,
+        "root.loads.reply_bytes": 1328396,
+        "root.loads.transcript_bytes": 1328156
       }}
     }}
   }}

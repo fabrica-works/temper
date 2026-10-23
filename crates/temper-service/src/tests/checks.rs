@@ -757,3 +757,85 @@ fn the_cluster_shapes_accept_both_loopback_families_and_the_whole_v4_range() {
         );
     }
 }
+
+#[test]
+fn each_turn_bound_accepts_equality_and_names_one_byte_short() {
+    const TURN: u32 = 65_536;
+    let mut engine = config::profile(config::Profile::Small);
+    let mut worker = fixtures::worker_settings().jig;
+    let mut own = crate::limits::profile(crate::limits::Profile::Small);
+    let mut agent = fixtures::startup_agent();
+    agent.limits.bodies.turn_body = TURN;
+    let loaded = TURN + u32::try_from(size_of::<temper_engine_domain::Record>()).unwrap();
+    let read = u64::from(TURN)
+        + u64::try_from(size_of::<jig_domain_core::reads::Row>()).unwrap()
+        + u64::try_from(size_of::<jig_domain_core::Record>()).unwrap();
+    let window = u64::from(TURN + 4) * 4;
+    let rows = [
+        ("engine.limits.overrides.hub.turn_bytes", u64::from(TURN), "the agent's largest turn"),
+        ("workers[0].limits.overrides.hub.turn_bytes", u64::from(TURN), "the agent's largest turn"),
+        ("engine.limits.overrides.core.resume_bytes", u64::from(TURN + 4), "the agent's largest turn with its length"),
+        ("application.limits.overrides.root.loads.transcript_bytes", u64::from(TURN), "the agent's largest turn"),
+        (
+            "application.limits.overrides.root.loads.bytes",
+            u64::from(loaded),
+            "the agent's largest turn with a loaded row",
+        ),
+        ("application.limits.overrides.root.loads.read_bytes", read, "the agent's largest turn with a read's row"),
+        ("engine.limits.overrides.hub.transcript_bytes", window, "the engine's resume window"),
+        ("workers[0].limits.overrides.hub.transcript_bytes", window, "the engine's resume window"),
+    ];
+    for (index, (path, needs, of)) in rows.into_iter().enumerate() {
+        engine.core.resume_bytes = TURN + 4;
+        engine.hub.turn_bytes = u64::from(TURN);
+        worker.limits.hub.turn_bytes = u64::from(TURN);
+        engine.hub.transcript_bytes = window;
+        worker.limits.hub.transcript_bytes = window;
+        own.root.loads.transcript_bytes = TURN;
+        own.root.loads.bytes = loaded;
+        own.root.loads.reply_bytes = loaded;
+        own.root.loads.read_bytes = read;
+        let mut found = Problems::empty();
+        checks::turns(Some(&engine), core::slice::from_ref(&worker), &own, Some(&agent), &mut found);
+        assert_eq!(&*lines(&found), b"", "{path} at equality");
+        match index {
+            0 => engine.hub.turn_bytes -= 1,
+            1 => worker.limits.hub.turn_bytes -= 1,
+            2 => engine.core.resume_bytes -= 1,
+            3 => own.root.loads.transcript_bytes -= 1,
+            4 => own.root.loads.bytes -= 1,
+            5 => own.root.loads.read_bytes -= 1,
+            6 => engine.hub.transcript_bytes -= 1,
+            7 => worker.limits.hub.transcript_bytes -= 1,
+            _ => unreachable!("eight turn-bound relations"),
+        }
+        checks::turns(Some(&engine), core::slice::from_ref(&worker), &own, Some(&agent), &mut found);
+        assert_eq!(&*lines(&found), format!("{path}: {} bytes, short of {of}, {needs} bytes\n", needs - 1).as_bytes(),);
+    }
+}
+
+#[test]
+fn turn_checks_use_only_what_each_process_knows() {
+    let engine = config::profile(config::Profile::Small);
+    let own = crate::limits::profile(crate::limits::Profile::Small);
+    let worker = fixtures::worker_settings().jig;
+    let mut agent = fixtures::startup_agent();
+    // The small hub's 262144 bytes hold its 65536-byte resume window exactly.
+    let mut found = Problems::empty();
+    checks::turns(Some(&engine), &[], &own, None, &mut found);
+    assert_eq!(&*lines(&found), b"");
+    let mut short_engine = engine;
+    short_engine.hub.transcript_bytes -= 1;
+    checks::turns(Some(&short_engine), &[], &own, None, &mut found);
+    assert_eq!(&*lines(&found), b"engine.limits.overrides.hub.transcript_bytes: 262143 bytes, short of the engine's resume window, 262144 bytes\n");
+    let mut found = Problems::empty();
+    agent.limits.bodies.turn_body = u32::try_from(worker.limits.hub.turn_bytes).unwrap();
+    checks::turns(None, core::slice::from_ref(&worker), &own, Some(&agent), &mut found);
+    assert_eq!(&*lines(&found), b"");
+    agent.limits.bodies.turn_body += 1;
+    checks::turns(None, core::slice::from_ref(&worker), &own, Some(&agent), &mut found);
+    assert_eq!(
+        &*lines(&found),
+        b"workers[0].limits.overrides.hub.turn_bytes: 65536 bytes, short of the agent's largest turn, 65537 bytes\n"
+    );
+}

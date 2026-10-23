@@ -4,6 +4,8 @@
 //! the forge; `application.clients.bundle` names the bundle; and every relative path is made absolute
 //! under the scratch, as jig's `tests/client-browser` does, since `temper serve` joins paths to its working
 //! directory and the harness starts it in the test's.
+#[path = "../../real-loop/src/turn_bounds.rs"]
+mod turn_bounds;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
 /// A closed loopback port: the forge's and the LLM endpoint's, which no story reaches.
@@ -65,6 +67,7 @@ pub(crate) fn documents(directory: &Path, program: &Path, bundle: &Path) -> (Box
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,
             "checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker-root","git":"/usr/bin/git"}]});
+    turn_bounds::apply(&mut value, turn_bounds::turn_body(&agent));
     absolute_paths(&mut value, directory);
     (
         serde_json::to_vec(&agent).expect("agent JSON").into_boxed_slice(),

@@ -126,6 +126,11 @@ pub fn refusing_world(seed: u64) -> World<Temper, Joint> {
 pub fn world_with_large_turns(seed: u64) -> World<Temper, Joint> {
     world_with(seed, Joint::with_large_turns(seed, &domain_limits()))
 }
+#[must_use]
+pub fn world_with_long_turns(seed: u64) -> World<Temper, Joint> {
+    world_with(seed, Joint::with_long_turns(seed, &domain_limits()))
+}
+
 fn world_with(seed: u64, front: Joint) -> World<Temper, Joint> {
     let mut world = World::new(
         Settings {
@@ -1003,13 +1008,17 @@ pub fn codec_for(limits: &jig_client::DomainLimits) -> jig_protocol_transcript::
 }
 /// Commit smith's session turn through the worker's real turn boundary.
 pub fn large_turn(front: &mut Joint, task: u64) -> (u64, u32) {
+    large_turn_with_opaque(front, task, LARGE_TURN_OPAQUE)
+}
+/// Commit a turn with a separately sized opaque reasoning item.
+pub fn large_turn_with_opaque(front: &mut Joint, task: u64, opaque: usize) -> (u64, u32) {
     use smith_domain_session::llm;
     let assignment = front.engine.last_assignment();
     let mut turn =
         temper_worker_domain_world::protocol::session_turn(FIRST_REPLY_TURN, REPLY_SPEND, LARGE_TURN_TEXT, true);
     for message in &mut turn.messages {
         let mut blocks = message.content.to_vec();
-        blocks.push(llm::Block::Opaque { bytes: vec![0; LARGE_TURN_OPAQUE].into_boxed_slice() });
+        blocks.push(llm::Block::Opaque { bytes: vec![0; opaque].into_boxed_slice() });
         message.content = blocks.into_boxed_slice();
     }
     let body = smith_protocol_channel::encode_turn(

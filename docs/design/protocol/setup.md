@@ -1238,8 +1238,9 @@ runs it (section 7).
   (configuration.md, section 5). Each bound is the least the turn's
   check takes, past jig's small profile's:
   - both hubs, `engine.limits` and the worker's `limits`:
-    `hub.turn_bytes` T; `hub.transcript_bytes` four times the resume
-    window, the window and a box for each turn it can hold;
+    `hub.turn_bytes` T; `hub.transcript_bytes`
+    W + (B − 4) × ⌊W / 4⌋, where W is `core.resume_bytes` and B is
+    `size_of::<Box<[u8]>>()`: the window and a box for each turn it can hold;
     `hub.turn_queue_bytes` 8T, the agent's eight unacknowledged turns
     (the worker's check, above);
   - `engine.limits`: `core.resume_bytes` T + 4, one largest turn with

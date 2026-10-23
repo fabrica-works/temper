@@ -1,5 +1,7 @@
 //! Pure configuration fixtures shared by unit and process tests.
 use std::path::Path;
+#[path = "../../../../tests/real-loop/src/turn_bounds.rs"]
+pub mod turn_bounds;
 #[must_use]
 pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
     let agent = serde_json::json!({
@@ -48,6 +50,7 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,
             "checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker-root","git":"/usr/bin/git"}]});
+    turn_bounds::apply(&mut value, turn_bounds::turn_body(&agent));
     (serde_json::to_vec(&agent).expect("agent JSON"), serde_json::to_vec(&value).expect("deployment JSON"))
 }
 

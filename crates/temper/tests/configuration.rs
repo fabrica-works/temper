@@ -79,16 +79,17 @@ fn the_owned_example_fits_the_native_client() {
     assert_owned_limits(&value["engine"]["limits"]);
 }
 fn assert_owned_limits(limits: &serde_json::Value) {
-    assert_eq!(
-        limits,
-        &serde_json::json!({"profile":"small","overrides":{
-            "authority.segments":8,"tasks.hold_segments":8,"tasks.authority_segments":8,
-            "documents.rows":2,"documents.lines":2,"documents.text_bytes":128,
-            "views.watchers":16,"views.watchers_per_party":16,
-            "authority.grants":12,"tasks.authority_grants":12,"notes.scopes":15,
-            "tasks.authority_bytes":512,"tasks.batch":1
-        }})
-    );
+    let mut expected = serde_json::json!({"engine":{"limits":{"profile":"small","overrides":{
+        "authority.segments":8,"tasks.hold_segments":8,"tasks.authority_segments":8,
+        "documents.rows":2,"documents.lines":2,"documents.text_bytes":128,
+        "views.watchers":16,"views.watchers_per_party":16,
+        "authority.grants":12,"tasks.authority_grants":12,"notes.scopes":15,
+        "tasks.authority_bytes":512,"tasks.batch":1
+    }}}});
+    let agent: serde_json::Value =
+        serde_json::from_slice(include_bytes!("../../../docs/examples/owned/agent.json")).expect("owned agent");
+    support::configuration::turn_bounds::apply(&mut expected, support::configuration::turn_bounds::turn_body(&agent));
+    assert_eq!(limits, &expected["engine"]["limits"]);
 }
 
 #[test]

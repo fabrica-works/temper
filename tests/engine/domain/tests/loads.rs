@@ -4,7 +4,8 @@ use skein_lib::{Queue, Token, Wall};
 use temper_engine_domain::{self as root, Key, Range, Record, TurnRecord};
 use temper_engine_domain_world::store::Store;
 
-const LIMITS: Limits = Limits { loads: 2, rows: 4, bytes: 1024, reply_bytes: 2048, transcript_bytes: 128 };
+const LIMITS: Limits =
+    Limits { read_bytes: 65_536, loads: 2, rows: 4, bytes: 1024, reply_bytes: 2048, transcript_bytes: 128 };
 
 fn row(turn: u32, bytes: usize) -> Record {
     Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(TurnRecord {

@@ -3,19 +3,23 @@
     "limits": {
       "profile": "small",
       "overrides": {
-        "authority.segments": 8,
-        "tasks.hold_segments": 8,
-        "tasks.authority_segments": 8,
-        "documents.rows": 2,
-        "documents.lines": 2,
-        "documents.text_bytes": 128,
-        "views.watchers": 16,
-        "views.watchers_per_party": 16,
         "authority.grants": 12,
-        "tasks.authority_grants": 12,
+        "authority.segments": 8,
+        "core.resume_bytes": 785596,
+        "documents.lines": 2,
+        "documents.rows": 2,
+        "documents.text_bytes": 128,
+        "hub.transcript_bytes": 3142384,
+        "hub.turn_bytes": 785592,
+        "hub.turn_queue_bytes": 6284736,
         "notes.scopes": 15,
         "tasks.authority_bytes": 512,
-        "tasks.batch": 1
+        "tasks.authority_grants": 12,
+        "tasks.authority_segments": 8,
+        "tasks.batch": 1,
+        "tasks.hold_segments": 8,
+        "views.watchers": 16,
+        "views.watchers_per_party": 16
       }
     },
     "llm": {
@@ -240,7 +244,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85584023765814,
+    "memory_bytes": 350116147281550,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -833,10 +837,13 @@
         "profile": "small",
         "overrides": {
           "hub.accounts": 4,
-          "hub.event_bytes": 4096
+          "hub.event_bytes": 4096,
+          "hub.transcript_bytes": 3142384,
+          "hub.turn_bytes": 785592,
+          "hub.turn_queue_bytes": 6284736
         }
       },
-      "memory_bytes": 3266334117547
+      "memory_bytes": 3266374440811
     }
   ],
   "application": {
@@ -1272,8 +1279,13 @@
       "overrides": {
         "checkout.message_bytes": 4098,
         "forge.client.repositories": 3,
+        "forge.output": 82,
         "forge.repositories": 3,
-        "forge.output": 82
+        "root.journal.transcript_bytes": 785596,
+        "root.loads.bytes": 785832,
+        "root.loads.read_bytes": 1571184,
+        "root.loads.reply_bytes": 785832,
+        "root.loads.transcript_bytes": 785592
       }
     },
     "workers": [

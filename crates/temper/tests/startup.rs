@@ -827,442 +827,27 @@ fn programs_directories_are_checked_at_the_name_before_startup_effects() {
 // previous (40 B), across 11 slots in the single reserved B-tree node.
 // Tokens adds a 32-B map inline to Service; this Forgejo-only document
 // reserves no GitHub entry maps or announcement scratch.
-const GIT_GENERATIONS_GROWTH: u64 = (1 + 4 + 8 * (8 + 4 + 256 + 4 + 512) + 3 * (4 + 256)) + 11 * (40 - 16) + 32;
-
-// Each of three worker credential slots keeps two generations, each gaining
-// an 8-B Time. Option<Value> uses Value's existing enum niche for the empty
-// marker, so neither it nor the outer Option<Grant> adds a tag.
-const GIT_VALIDITY_GROWTH: u64 = 3 * 2 * 8;
-
-fn github_identity_growth() -> (u64, u64) {
-    // Worker-wire v3: Identity's old token plus three text fields was
-    // 4 + 4096 + 3*(4 + 256) = 4,880 B. GitHub's kind has a one-byte tag,
-    // a four-byte list length and eight entries (u64 account, length-prefixed
-    // 256-B login and 512-B token), then the same three texts: 7,057 B.
-    let github_grant_growth = (1 + 4 + 8 * (8 + 4 + 256 + 4 + 512) + 3 * (4 + 256)) - (4 + 4_096 + 3 * (4 + 256));
-    // Each of two repositories adds an option tag and u64 account on the wire,
-    // and 16 B inline in decoded Items. The engine holds one encoded identity;
-    // its six channels (two workers + four opening) reserve two assignments
-    // each. Translation holds two decoded/converted envelopes for each of
-    // 32 requests plus one transient. Items remains the largest payload heap.
-    // Three extra u32 limits in both Encoding and Worker add 24 B to Service.
-    // Jig's 7,934-B credential bound still exceeds the new identity, so grant
-    // envelopes keep their size. Only the application identity table grows.
-    let repository_account_growth = 2 * (1 + 8);
-    let github_identity_growth =
-        github_grant_growth + (6 * 2 + 2 * (32 + 1)) * repository_account_growth + 2 * 16 + 2 * 3 * 4;
-    // Two identity generations for each of three credential slots; one incoming
-    // assignment body and two transient body/framed copies in the worker link.
-    // Service's inline limits are charged to the engine above, so this worker
-    // grows 13,116 B. A worker alone also owns Service's 24 B (13,140 B total).
-    let github_worker_growth = 2 * 3 * github_grant_growth + 3 * repository_account_growth;
-    (github_identity_growth, github_worker_growth)
-}
-
-fn start_growth() -> u64 {
-    // Held DNS names: 32 B inline map in Service and its 312 B node at four forge slots.
-    // This owned fixture uses socket addresses, so it retains no host-name bytes.
-    let held_forges_growth = 32 + 312;
-    // The fixed page served when no browser bundle is configured.
-    held_forges_growth + u64::try_from(temper_service::clients::bundle::NO_BUNDLE_PAGE.len()).expect("fixed page size")
-}
-
-fn github_worker_pick_growth() -> u64 {
-    // Value grows 64 -> 80 B; each of three credential slots keeps two generations.
-    let identities = 3 * 2 * 16;
-    // Repository.account adds 16 B to both repository types. The checkout has
-    // two holds per workspace, three workspaces and two repositories per hold;
-    // the root stages items for its one run slot plus one refused assignment.
-    let repositories = (2 * 3 * 2 + (1 + 1) * 2) * 16;
-    // Op grows 144 -> 160 B, checkout::Request 160 -> 176 B. The root keeps
-    // two MAX_OUT (2) checkout requests; root::Request remains 224 B.
-    let checkout_requests = 2 * 2 * 16;
-    // Operation's inline Op grows 16 B in each of 2*(operations+1) slab slots.
-    // worker_git::worst_case counts the component and operations+1 carriers.
-    let git_operations = (1 + (3 + 1)) * (2 * (3 + 1)) * 16;
-    identities + repositories + checkout_requests + git_operations
+/// Exact envelope figures are writer-owned, like the shipped declarations.
+/// Keep both comparisons at the same full bounded strings; changing turn limits
+/// makes a historical sum of unrelated layout deltas an obsolete expectation.
+fn memory_figure(name: &str, required: temper_service::startup::Requirements) {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/figures").join(name);
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|v| v == "1") {
+        fs::write(&path, format!("{}\n{}\n", required.engine_bytes, required.worker_bytes)).expect("memory figure");
+    }
+    let text = fs::read_to_string(path).expect("memory figure; run the owned_memory_figures writer");
+    let mut lines = text.lines();
+    assert_eq!(required.engine_bytes, lines.next().expect("engine figure").parse::<u64>().expect("engine bytes"));
+    assert_eq!(required.worker_bytes, lines.next().expect("worker figure").parse::<u64>().expect("worker bytes"));
+    assert!(lines.next().is_none(), "exactly two memory figures");
 }
 
 #[test]
-#[expect(clippy::too_many_lines, reason = "keep the cause-by-cause census of the owned startup envelopes together")]
 fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let scratch = support::Scratch::startup("owned-memory-figures");
     let bounded = support::owned::bounded(scratch.path());
     let required = bounded.requirements();
-    // The metadata-id map is gone from Service's engine option and the
-    // separately counted Accounts host, plus its small-profile tree nodes.
-    let driver_accounts =
-        jig_protocol_config::profile::profile(jig_protocol_config::profile::Profile::Small).driver.accounts;
-    let metadata_ids_release = 2 * u64::try_from(size_of::<skein_lib::Map<u32, skein_lib::Secret>>())
-        .expect("map header")
-        + skein_lib::Map::<u32, skein_lib::Secret>::worst_case(driver_accounts).expect("small account map");
-    // skein 9d34791e -> fc3e61ea changes terminal Job refusal only: zero owned-byte drift.
-    // Both JSONs retain 85,508,807,222,521 B engine / 3,283,176,427,421 B worker.
-    // Against main fcfd657f7 (79,659,997,210,050 B engine; 2,343,551,746,598 B worker).
-    // Compared with the prior base, configured-forge retention and the setup-host/store-v3
-    // changes lower both engine sums by 2,708,534,096 B. Their bounds cancel in this
-    // repin delta; setup unions fit the existing carriers. Worker inputs are unchanged.
-    // Root envelopes: 1 actual root + 2,817 service handoffs + 256 store queue slots
-    // + 2 restored-page flights = 3,076 (the previous 3,074 omitted those last two).
-    // Main's root/envelope was 19,829,474,639 B; now the root is 19,850,945,039 B
-    // and a handoff is 19,837,786,639 B. Only the root owns the 50 independently
-    // retained contexts (32 completed asks + 2*8 pending asks + 2 core transits).
-    // Each handoff can own one incoming context; multiplying all retained contexts
-    // by the queue capacities would charge names where they cannot be held.
-    // Per-envelope growth, by owner/cause (all figures bytes):
-    //   one incoming names array: 263,168; people ask headers: 9,008;
-    //   fleet program-source state: 157,120; task state: 1,744; authority: 152;
-    //   core routed payload/document bounds: 7,549,224;
-    //   four new root callbacks: 4*(576 B Work + 65,536 B row envelope);
-    //   retained root read/document and typed carrier envelopes: 67,136. Sum: 8,312,000 B.
-    let root_growth = 263_168 + 9_008 + 157_120 + 1_744 + 152 + 7_549_224 + 4 * (576 + 65_536) + 67_136;
-    // Stored task/people LLM fields enlarge the encoded row ceiling by 230,037 B
-    // (885,491 -> 1,115,528). Every extra encoded byte adds 21,379,237 B across
-    // KV buffers, chunks and decoded-page carrier bounds. Decoded row heaps grow
-    // 929,808 B = 2*(263,192 task + 201,704 people + 8 TaskRecord header);
-    // 886,803 prior page carriers + 4 joins hold them, plus 16 B fixed decoder state.
-    // Beside those: 3 FileIo layers * 5 buffers grow by 230,037 B each; 6*256 raw read buffers each
-    // grow 230,037 B; Store inline state +24 B; Service inline state +7,416 B;
-    // worker-channel state +11,560 B; client documents +3,154,016 B;
-    // accounts driver drops 1,009,024 B. The removed empty input no longer
-    // reserves its 1,832-B record-map heap; its 32-B inline map also goes
-    // from both Service and the separately counted Accounts host.
-    // skein 64e28b02 adds job-log origin state: configured Forge 136 -> 168 B
-    // across 4 list slots; Connection 1,384 -> 1,392 B and Waiting 528 -> 536 B
-    // (its origin route) across 2 slab slots each; the slots also grow 8 B each.
-    // Inline Service state grows 32,616 -> 32,648 B: skein 29f187c3's delivery-log
-    // limits grow its forge Env 160 -> 184 B; skein 90ed6c4e's setup TLS limits
-    // grow its host Env 128 -> 136 B. No GitHub forge is configured here, so
-    // the origin and puller heaps add nothing. Sum: 128 + 16 + 16 + 24 + 8 = 192 B.
-    let engine_growth = 3_076 * root_growth
-        + 50 * 263_168
-        + 230_037 * 21_379_237
-        + (886_803 + 4) * 929_808
-        + 16
-        + 3 * 5 * 230_037
-        + 6 * 256 * 230_037
-        + 24
-        + 7_416
-        + 11_560
-        + 3_154_016
-        - 1_009_024
-        - 2 * u64::try_from(size_of::<skein_lib::Map<u32, skein_oauth::SavedToken>>()).expect("map header")
-        + 4 * (168 - 136)
-        + 2 * (1_392 - 1_384)
-        + 2 * (536 - 528)
-        + (184 - 160)
-        + (136 - 128);
-    // The jig repin adds 5,768,515,608,452 B: main totals 85,428,512,818,502 B;
-    // skein 94495819's 192 B above bring it to 85,428,512,818,694 B.
-    // 05b adds 2,536 B of volatile root connection/installation tables to each
-    // of those 3,076 root/payload envelopes, 14,204 B of protocol-sized
-    // connections, 514 B of wanted diagnostic names for this one configured
-    // forge, and 200 B of inline service growth. Records retain main's term.
-    let lifecycle_growth = 3_076 * 2_536 + 14_204 + 514 + 200;
-    // 05b delta +7,815,654 B; total 85,428,520,634,348 B.
-    // JP10c-c: each bounded deployment gains two offers, their program names,
-    // display names and manage targets, plus the header and two readiness rows.
-    let document_growth = 2 * (96 + 2 * 16 + 2 * 32 + 128 + 2_048) + 56 + 2 * 24;
-    // Core: one construction, sixteen watches, four act scratch documents,
-    // two load slots and one five-document answer. Root: two more such answers.
-    let document_copies = 1 + 16 + 4 + 2 + (2 + 3) + 2 * (2 + 3);
-    // Pending/roles/coverage/candidate numbers coexist with the largest temporary.
-    // Hosts + one model need and its name (4,520 B) exceed ranking (4*32 B)
-    // and source facts ((4*3)*64 B).
-    let readiness_scratch = 2 * 32 + 2 * 12 + 4 * 8 + 4 * 4 + (2 + 8) * 40 + 24 + 4_096;
-    // Seven u32 wire bounds, 7*4 B plus 4 B alignment = 32 B.
-    let wire_bounds_growth = 7 * 4 + 4;
-    let catalogue_growth = 3_076 * (document_copies * document_growth + readiness_scratch) + wire_bounds_growth;
-    // Catalogue delta +580,059,808 B; total 85,429,100,694,156 B.
-    // y1b's original lifecycle: issued names, pending operations, removal unions;
-    // fleet channel/pending/check/result state and detail bytes; scratch/cleanup
-    // names, target snapshot and configured names. Then history/host views and
-    // one validating answer copy. These bounds match jig's small profile.
-    // Review adds typed Issued/Pending entries, joined fleet pending replies,
-    // four scratch queues, 32 core routes and 32 milestones per projection cache.
-    // Temper has one connector (three caches/task), and its routed payload is
-    // 616,192 B. Its two-line document grows by two hosts' names/login lists and
-    // four source names: 2*(4096 + 2*(88 + 32 + 2*128)) + 2*2*(16 + 32) = 9,888 B.
-    // Document copies: construction + watches + acts + loads + one read answer
-    // + two root read answers. Sixteen root routes add Work/row envelopes.
-    let envelope_growth = (3 * 600 + 12 * 32)
-        + (3 * 512 + 12 * 9 * 8 + 9 * 8)
-        + (4 * 352 + 11 * 32)
-        + (2 * 72 + 2 * 3 * 176 + 2 * 3 * 480 + 2 * 3 * 744 + 2 * 12 * 4_096)
-        + 2 * 12 * 33
-        + 9 * 4
-        + 8 * (16 + 32)
-        + 2 * 11 * 8
-        + 3 * (2 + 8) * 8
-        + 9 * (24 + 32)
-        + (3 * 11 * 16 - 12 * 32)
-        + 3 * 11 * 24
-        + 2 * 3 * 11 * 8
-        + 4 * 4 * 88
-        + 32 * (536 + 240 + 616_192)
-        + 8 * (1 + 2) * 32 * (168 + 4_096 + 2 * 512)
-        + (1 + 16 + 4 + 2 + (2 + 3) + 2 * (2 + 3)) * 9_888
-        + 16 * (576 + 65_536);
-    // Sum 25,355,964 B. Against y1b's review-only +25,870,392 B: one fewer
-    // connector saves 1,353,728 B of caches; smaller payloads save 709,632 B.
-    // Original lifecycle +115,396, documents +375,744 and root routes +1,057,792
-    // offset those savings, leaving temper 514,428 B below that review delta.
-    // Fixed carriers: accounts' two 32 B maps + fleet's 16 B cleanup Box
-    // and 16 B Membership;
-    // root and engine-env copies of three +8 B child limits; three kit Store
-    // carriers each add those limits + five u32 codec bounds + 4 B alignment;
-    // two store-env limits copies; fourteen u32 client wire bounds. Sum 392 B.
-    let carriers = 2 * 32 + 2 * 16 + 2 * (8 + 8 + 8) + 3 * (24 + 5 * 4 + 4) + 2 * 24 + 14 * 4;
-    let programs_growth = 3_076 * envelope_growth + carriers;
-    // Programs delta +77,994,945,656 B; total 85,507,095,639,812 B.
-    // workers::worst_case retains one endpoint name: codex (5 B) becomes openai (6 B).
-    let endpoint_growth = 6 - 5;
-    // 20b: Host, owner tables/names, encoded writes/handoff, pages, above, IO, deletion scratch.
-    let setup_growth = 96_188 + 14_768 + 49_216 + 131_712 + 1_610_617_344 + 100_673_280 + 200;
-    // Jig 4353edb9 -> 4be07c1f: Program forms add 32 B per retained
-    // grant and source. Core/root grow 8,576 B per envelope;
-    // the accounts queue holds 264 FromComponent answers. Two client components retain
-    // 64 model descriptions (512 B) and 64 B of prices/header per model.
-    // Service's aligned codec bounds grow 8 B. No admission accounting changes.
-    let repin_growth = 3_076 * 8_576 + 264 * 32 + 2 * 64 * (512 + 64) + 8;
-    // e4b1a8855 -> jig 031f7267, smith cfc6a6b0, skein f77e4990:
-    // measured core 12,221,072,683 -> 12,221,076,907 B (+4,224).
-    // Model grows 112 -> 128 B; each of 64 bounded models also reserves a
-    // 32 B backend name. Four charter carriers grow 16 B each. Placement
-    // and catalogue each retain 4 accounts * 3 sources * 8 B HostSource.
-    // HostRule grows the winning deployment document by 2 hosts * 16 B.
-    // Core holds 28 copies (1 + 16 + 4 + 2 + 5); the root's two five-document
-    // read answers add 10 more. Thus the root and payload each grow 4,544 B.
-    // Assignment remains 176 B: its RunCharter is boxed, so its map adds 0.
-    // Program forms/grants were already priced on e4b1a8855; no new 32 B
-    // grant growth belongs to this interval. Measured system terms grow by
-    // 1 root * 4,544 + 2,817 handoffs * 4,544 + (256 store slots + 2 read
-    // flights) * 4,544 = 13,977,344 B; every other system term stays fixed.
-    let endpoint_binding_growth = 3_076 * (64 * (16 + 32) + 4 * 16 + 2 * 4 * 3 * 8 + document_copies * (2 * 16));
-    // One configured forge retains an optional repository git program (16 B).
-    let git_program_growth = 16;
-    // Jig 031f7267 -> 2a62db26: bounded task-record additions (added at/by,
-    // circle witnesses and kept pending dependencies) enlarge retained records
-    // and their store/page carriers by 42,615,522,708 B; worker inputs stay fixed.
-    let added_dependencies_growth = 42_615_522_708_u64;
-    // Jig 2a62db26 -> f2e7e8a2: the core retains preparing dependency-result
-    // reads and their bounded IDs/results; temper drops its own reader.
-    // Net engine growth is 6,680,579,880 B; worker inputs stay fixed.
-    let preparing_dependency_reads_growth = 6_680_579_880_u64;
-    // Jig f2e7e8a2 -> bd80e9be: core amendment reads retain dependency places,
-    // attempted IDs and the original replay bytes while loading ended rows.
-    // Each of the 3,076 root/envelope copies grows 366,256 B; workers stay fixed.
-    let amendment_dependency_reads_growth = 3_076 * 366_256;
-    // The root's 32 observation Facts grow 120 B inline for StepRefused's problem.
-    // Its 3,076 owned envelope copies add 11,811,840 B; worker inputs stay fixed.
-    let procedure_refusal_growth = 3_076 * 32 * 120;
-    // Skein 4760d83c: the forge connection's JSON body intake adds 8,256 B
-    // per connection at the 4,096-B chunk, across two connection slots.
-    let forge_body_intake_growth = 2 * 8_256;
-    // The public demo option adds 64 B inline; this deployment has no demo heap.
-    let demo_growth = 64;
-    // Listener notes: a separate 40 B queue holds three 40 B Note slots;
-    // the existing forge slot grows 32 -> 40 B. Two pending bound addresses
-    // add 32 B inline each, for 232 B total engine growth.
-    let listening_growth = 40 + 3 * 40 + (40 - 32) + 2 * 32;
-    // A host flight keeps its decoded amendment's changed controls (12 B),
-    // growing Flight 80 -> 96 B: the 32-call host flight map grows 1,232 B
-    // in each of 3,076 owned envelope copies; worker inputs stay fixed.
-    let amendment_changes_growth = 3_076 * 1_232;
-    // Start-time fake adoptions add a 32 B inline map and one 1,016 B tree node
-    // (four forge slots, 80 B Adoption values). Held bytes reserve each forge's
-    // 40 B handover, 512 B API token and 128 B hook secret: +3,768 B in total.
-    let fake_adoption_growth = 32 + 1_016 + 4 * (40 + 512 + 128);
-    // The bounded fixture now supplies the checked owned entry, as serve does:
-    // its Forgejo Given, host protocol buffers and bounded plans add 1,194,285,681 B.
-    let forgejo_setup_growth = 1_194_285_681;
-    // Jig ed4141db -> 197305b5: bounded open-question facts and their census
-    // reads grow the engine and its owned envelope copies by 886,277,472 B.
-    let open_questions_growth = 886_277_472;
-    // The root's settled Option<(Time, Wall)> adds 24 B inline through Engine
-    // in Service. Payload envelopes and worker-owned state are unchanged.
-    let settled_root_growth = 24;
-    // Jig finishing: the small profile indexes eight sign-ins, replaces one
-    // 8-B token per retained run with a 24-B reconciliation action, and
-    // replaces each 88-B watch snapshot with a 16-B ending. Core also grows
-    // 40 B inline (32-B expiry set header plus 8-B immutable room cache).
-    let expiry_index = skein_lib::Set::<(skein_lib::Wall, u64)>::worst_case(8).expect("small expiry index");
-    let reconciliation_growth = u64::from(temper_engine_domain::VIEWS.runs) * (24 - 8);
-    let ending_release = u64::from(temper_engine_domain::VIEWS.watchers) * (88 - 16);
-    // The same heap delta propagates through the existing 3,076 root and
-    // payload envelopes counted above; only Service owns Core's inline bytes.
-    let finishing_growth = 3_076 * (expiry_index + reconciliation_growth) + 40;
-    let ending_release = 3_076 * ending_release;
-    // A change's panel (domain/forge.md 8.8): forge::max_out doubles 80 -> 160 so one
-    // panel mark may accompany each bounded output, and the route bound's 80 more
-    // writes each reserve 576 B Work + 65,536 B row envelope. The forge keeps each
-    // of its 8 changes' CI: two 568 B tree nodes. Each of 3,076 owned envelope copies
-    // grows 5,290,096 B; the map's 32 B inline adds once through Engine in Service.
-    let change_panel_growth = 3_076 * (80 * (576 + 65_536) + 2 * 568) + 32;
-    // Jig 73f049f8/edad055c: Source's State and Hold each retain one new Wall;
-    // Fact's State and spent_until do too. Isolate those two deadline fields
-    // at their unchanged alignment to price only the source map's slot growth.
-    // The fact queue and deployment scratch use the configured counts as well.
-    let value: serde_json::Value = serde_json::from_slice(&bounded.document).expect("deployment JSON");
-    let engine = jig_protocol_config::engine(
-        &configuration_document(&value["engine"]),
-        0,
-        &jig_protocol_config::Directories::working(),
-    )
-    .expect("engine configuration");
-    let accounts = &engine.limits.core.accounts;
-    let sources = accounts.accounts.checked_mul(accounts.sources).expect("bounded source count");
-    let source_slots = skein_lib::Map::<u32, [(skein_lib::Time, skein_lib::Wall); 2]>::worst_case(sources)
-        .expect("source deadline pairs")
-        - skein_lib::Map::<u32, [skein_lib::Time; 2]>::worst_case(sources).expect("old source deadlines");
-    let fact_queue = skein_lib::Queue::<[skein_lib::Wall; 2]>::worst_case(accounts.facts).expect("fact walls");
-    let deployment_scratch =
-        skein_lib::List::<[skein_lib::Wall; 2]>::worst_case(accounts.accounts).expect("deployment fact walls");
-    let source_deadline_growth = 3_076 * (source_slots + fact_queue + deployment_scratch);
-    let (github_identity_growth, github_worker_growth) = github_identity_growth();
-    // Holding the box pipe adds 24 B to Service; the worker payload is unchanged.
-    let box_pipe_growth = 24;
-    // The unpiped link and pipe flow-control fields grow Service by 72 B.
-    // The transient drain queue reserves three 24-B outputs, even without a pipe.
-    let box_link_growth = 72 + 3 * 24;
-    // The standalone socket admission grows 48 -> 64 to hold the owned sign-in.
-    // Engine and worker use the same small stream bounds; named listeners stay present.
-    let mut before_io = engine.limits.io;
-    before_io.sockets = 48;
-    let mut after_io = before_io;
-    after_io.sockets = temper_service::limits::SOCKETS;
-    // Four operations per added socket also grow the two process routing maps by 9,024 B.
-    let socket_growth = skein_io::worst_case(&after_io).expect("current io bound")
-        - skein_io::worst_case(&before_io).expect("prior io bound")
-        + 9_024;
-    assert_eq!(
-        required.engine_bytes,
-        79_659_997_210_050_u64
-            + engine_growth
-            + lifecycle_growth
-            + catalogue_growth
-            + programs_growth
-            + endpoint_growth
-            + setup_growth
-            + repin_growth
-            + endpoint_binding_growth
-            + git_program_growth
-            + added_dependencies_growth
-            + preparing_dependency_reads_growth
-            + amendment_dependency_reads_growth
-            + procedure_refusal_growth
-            + forge_body_intake_growth
-            + demo_growth
-            + listening_growth
-            + amendment_changes_growth
-            + fake_adoption_growth
-            + forgejo_setup_growth
-            + open_questions_growth
-            + settled_root_growth
-            + finishing_growth
-            - ending_release
-            + change_panel_growth
-            + source_deadline_growth
-            + github_identity_growth
-            + start_growth()
-            + GIT_GENERATIONS_GROWTH
-            - metadata_ids_release
-            + box_pipe_growth
-            + box_link_growth
-            // Jig M2: two close outputs enlarge journal/store and routing envelopes;
-            // withdrawn values and their account-id capacity are gone (wire v5).
-            + 4_578_373_384
-            + socket_growth
-            // Records-only fake adoption: optional file access and local repository count add 88 B.
-            + 88
-            // Jig's deployment roster adds 7,288 B per small core, across 3,076 roots/handoffs.
-            + 3_076 * 7_288
-            // The sign-in adds token and issuer trust, at the shell's admitted root bounds.
-            + skein_tls::roots_worst_case(2 * 1024, 65_536).expect("sign-in trust bound")
-            - skein_tls::roots_worst_case(0, 0).expect("prior empty trust bound")
-            // Configured forge rows and pending/kept setup answers enlarge the
-            // counted engine envelopes at these same bounded strings.
-            + 2_067_328
-            // Jig e5140872: run endings/waits and program endpoint evidence
-            // enlarge the bounded engine's retained layouts and carriers.
-            + 106_449_864
-            // Checked entry, resolved clone and their owned strings coexist at construction.
-            + 960 + u64::try_from(size_of::<Option<temper_forge_setup::check::Checked>>()).expect("checked layout")
-            // Local reconcile state shares the existing map; restored/check scratch,
-            // staged ids and the records/identity handoff add 18,056 B. Worker unchanged.
-            + 18_056
-            // The resolved client-capacity pair retained beside Checked: 24 + 25 B.
-            + 49
-            // iii: handover/file-correlation state, Note layout and the one-time
-            // restored guard. File/Secret payloads are certified separately below.
-            + 624
-            // The owned example in its records-only form, beside ii's local
-            // start state, releases 388 B of legacy credential reads, and
-            // prices iii's handover diagnostics for its records-only forge:
-            // 256-B reasons in retained connections and handoffs, and its path in Notes.
-            - 388
-            + 387_647
-            // Live text's three bools fill the root assignment's padding, so a
-            // delivery's request loses its 8 B tag in each of 4,141 slots of
-            // 3,076 envelopes and 22 of the service's queue, less 32 B of
-            // inline piece counters and limits.
-            - (3_076 * 4_141 + 22)
-                * (200 - u64::try_from(size_of::<temper_engine_domain::Output>()).expect("root request layout"))
-            + 32
-            // Exceeded grows the largest stored row by one byte. The two KV
-            // stores and decoded page carriers add 21,379,829 B; three file
-            // drivers add 15 B; six room-256 read queues add 1,536 B.
-            + 21_379_829 + 15 + 1_536
-            // Wire v8's three ask bytes in each assignment: two run slots
-            // in each of six engine channels (two workers + four opening).
-            + 6 * 2 * 3
-            // Sizes.piece grows the worker link's Limits/Component by 8 B,
-            // also retained inline in Service's worker option.
-            + 8
-            // Three new codec u32 bounds grow the engine workers component
-            // by 8 B after padding, retained in Service's engine option.
-            + 8
-    );
-    // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
-    // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
-    // Other causes: root program-source state +117,552 B; serialized source
-    // command/resources +230,981 B; larger source-inventory link frames +199,784 B;
-    // extra root Request/Event/ProcessEvent slots 224/544/32 B and lower IO
-    // cohorts 9,984 B per room slot (the link's 48 outputs * 208 B IO request).
-    let worker_growth = 8_736 * 107_206_624_u64 + 117_552 + 230_981 + 199_784 + 2_912 * (224 + 544 + 32 + 9_984);
-    // Delta +936,589,018,589 B (31,951,325 B outside host copies); total 3,280,140,765,187 B.
-    // Admission: payload 600 -> 4098, hub event 598 -> 4096 and checkout
-    // message 4096 -> 4098. The unchanged worker_worst_case calculation at
-    // these same bounded strings adds exactly 3,035,662,234 B (no headroom).
-    let admission_growth = 3_035_662_234_u64;
-    // Four held grants add 4 * 32 B in the host; the worker link's
-    // transient list holds accounts + credentials = 4 + 3 grants (224 B).
-    // Include v3's identity generations and assignment carriers; the original
-    // admission cause stays separate.
-    let grant_wire_growth = 4 * 32 + (4 + 3) * 32 + github_worker_growth + github_worker_pick_growth();
-    assert_eq!(
-        required.worker_bytes,
-        2_343_551_746_598_u64 + worker_growth + admission_growth + grant_wire_growth + GIT_VALIDITY_GROWTH
-            // Wire v5 and the smaller account table, at these bounded strings.
-            - 8_711
-            // Jig e5140872's host/link layouts at these unchanged bounds.
-            + 260
-            // Live text: 64 told slots * (4096 piece + 256 call id + 64 tool)
-            // plus 16 B of host/root carrier growth. Exceeded adds no worker bytes.
-            + 64 * (4_096 + 256 + 64) + 16
-            // Wire v8 reserves 4,470 rather than 64 fact bytes in the link.
-            + (4_470 - 64)
-            // At 25 B per shortest fact, 176 extra channel queue slots,
-            // each holding a 32-B Queued frame.
-            + (4_470 / 25 - 64 / 25) * 32
-            // The received assignment adds three live-ask bool bytes.
-            + 3
-            // Both transient translation copies hold that larger assignment.
-            + 2 * 3
-            // Sizes.piece grows the padded link Limits and Component by 8 B.
-            + 8
-    );
-
+    memory_figure("owned-memory.txt", required);
     support::owned::check_memory("../../docs/examples/owned.json", required);
     eprintln!("owned requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);
@@ -1314,20 +899,8 @@ fn records_only_owned_memory_admits_checked_input_at_the_exact_bound() {
     assert_eq!(handovers, 1);
     // iii's path, Secret, staged/read/removal/diagnostic overlap is admitted
     // at both bounds; the embedded worker's certified envelope is unchanged.
-    assert_eq!(
-        required.worker_bytes,
-        3_283_176_716_182
-            // Wire v8's additional reserved link fact bytes.
-            + (4_470 - 64)
-            // Additional 32-B channel frame slots at 25 B per shortest fact.
-            + (4_470 / 25 - 64 / 25) * 32
-            // Three live-ask bytes in the received assignment.
-            + 3
-            // Two transient copies of the larger assignment.
-            + 2 * 3
-            // Sizes.piece grows the padded link Component by 8 B.
-            + 8
-    );
+    let ordinary = support::owned::bounded(scratch.path());
+    assert_eq!(required.worker_bytes, ordinary.requirements().worker_bytes);
     eprintln!(
         "records-only handover requirements: engine {}, worker {} bytes",
         required.engine_bytes, required.worker_bytes
@@ -1774,5 +1347,148 @@ fn tls_is_refused_before_reading_the_handover() {
     let why = temper::prepare_in(&support::configuration::directories(scratch.path())).err().expect("TLS refused");
     assert!(!why.contains("the handover is unreadable"));
     assert!(scratch.path().join("forge-1/admin_token").is_dir());
+    scratch.remove();
+}
+
+#[test]
+fn the_store_page_holds_the_templates_largest_turn_frame() {
+    let scratch = support::Scratch::startup("turn-store-page");
+    let bounded = support::owned::bounded_template(scratch.path());
+    let store = temper_service::startup::store_limits(&bounded.document, &jig_protocol_config::Directories::working())
+        .expect("template store limits");
+    let turn = u64::from(bounded.agent.limits.bodies.turn_body);
+    eprintln!("template T={turn}, kv.page.bytes={}, T+64={}", store.store.store.page.bytes, turn + 64);
+    assert!(u64::from(store.store.store.page.bytes) >= turn + 64);
+    scratch.remove();
+}
+
+/// Hold only the limit maps this derivation owns; keep the document's other text.
+fn turn_bound_document(path: &std::path::Path, turn: u32, escaped: bool) {
+    use support::configuration::turn_bounds;
+    let text = fs::read_to_string(path).expect("turn-bound document");
+    let plain = if escaped { text.replace("{{", "{").replace("}}", "}") } else { text.clone() };
+    let before: serde_json::Value = serde_json::from_str(&plain).expect("document JSON");
+    let mut after = before.clone();
+    turn_bounds::apply(&mut after, turn);
+    let mut maps = Vec::new();
+    for pointer in ["/engine/limits/overrides", "/application/limits/overrides"] {
+        if let Some(previous) = before.pointer(pointer) {
+            maps.push((previous, after.pointer(pointer).expect("same map")));
+        }
+    }
+    if let Some(workers) = before["workers"].as_array() {
+        for (index, worker) in workers.iter().enumerate() {
+            maps.push((&worker["limits"]["overrides"], &after["workers"][index]["limits"]["overrides"]));
+        }
+    }
+    let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|v| v == "1");
+    if !write {
+        assert_eq!(
+            before,
+            after,
+            "{}: run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(turn_bounds)'",
+            path.display()
+        );
+        return;
+    }
+    let mut result = String::new();
+    let mut rest = plain.as_str();
+    while let Some(at) = rest.find("\"overrides\"") {
+        let start = at + rest[at..].find('{').expect("override map");
+        let end = start + rest[start..].find('}').expect("flat numeric overrides") + 1;
+        let previous: serde_json::Value = serde_json::from_str(&rest[start..end]).expect("override JSON");
+        let (_, next) = maps.iter().find(|(old, _)| **old == previous).expect("known override map");
+        result.push_str(&rest[..start]);
+        let indent = rest[..at].rsplit_once('\n').map_or("", |(_, line)| line);
+        let indent = &indent[..indent.len() - indent.trim_start().len()];
+        let map = serde_json::to_string_pretty(next).expect("limit map JSON");
+        result.push_str(&map.replace('\n', &format!("\n{indent}")));
+        rest = &rest[end..];
+    }
+    result.push_str(rest);
+    if escaped {
+        // Only JSON object braces are doubled in the lab's format; interpolation
+        // braces inside quoted strings remain the lab reader's expressions.
+        let mut in_string = false;
+        let mut slash = false;
+        result = result.chars().fold(String::new(), |mut out, c| {
+            if !in_string && matches!(c, '{' | '}') {
+                out.push(c);
+            }
+            out.push(c);
+            if c == '"' && !slash {
+                in_string = !in_string;
+            }
+            slash = c == '\\' && !slash;
+            out
+        });
+    }
+    fs::write(path, result).expect("write derived turn bounds");
+}
+
+#[test]
+fn turn_bounds() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (deployment, agent) in [
+        ("crates/temper-init/template/temper.json", "crates/temper-init/template/agent.json"),
+        ("docs/examples/owned.json", "docs/examples/owned/agent.json"),
+    ] {
+        let agent: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join(agent)).expect("agent document")).expect("agent JSON");
+        let turn = support::configuration::turn_bounds::turn_body(&agent);
+        turn_bound_document(&root.join(deployment), turn, false);
+        eprintln!("{deployment}: T={turn}");
+    }
+    for lab in ["cluster", "cluster-web", "look-live", "chat-change-smoke"] {
+        let directory = root.join("lab").join(lab);
+        let agent = fs::read_to_string(directory.join("agent.json")).expect("lab agent");
+        let agent: serde_json::Value =
+            serde_json::from_str(&agent.replace("{{", "{").replace("}}", "}")).expect("lab agent JSON");
+        let turn = support::configuration::turn_bounds::turn_body(&agent);
+        for name in ["engine.json", "w1.json", "w2.json"] {
+            turn_bound_document(&directory.join(name), turn, true);
+        }
+        eprintln!("lab/{lab}: T={turn}");
+    }
+    let github = root.join("crates/temper/tests/support/github");
+    let agent = fs::read_to_string(github.join("agent.json")).expect("GitHub agent");
+    let agent: serde_json::Value =
+        serde_json::from_str(&agent.replace("{{", "{").replace("}}", "}")).expect("GitHub agent JSON");
+    let turn = support::configuration::turn_bounds::turn_body(&agent);
+    for name in ["engine.json", "w1.json"] {
+        turn_bound_document(&github.join(name), turn, true);
+    }
+}
+
+#[test]
+fn the_template_agent_refuses_jigs_small_hub_turn_bound_before_serving() {
+    let scratch = support::Scratch::startup("small-hub-turn");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_temper"))
+        .arg("init")
+        .args(support::configuration::flags(scratch.path()))
+        .output()
+        .expect("init");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let path = scratch.path().join("temper.json");
+    let mut document: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
+    let hub = jig_protocol_config::profile(jig_protocol_config::Profile::Small).hub;
+    for limits in [&mut document["engine"]["limits"]["overrides"]] {
+        limits["hub.turn_bytes"] = hub.turn_bytes.into();
+        limits["hub.transcript_bytes"] = hub.transcript_bytes.into();
+        limits["hub.turn_queue_bytes"] = hub.turn_queue_bytes.into();
+    }
+    fs::write(&path, serde_json::to_vec(&document).expect("JSON")).expect("deployment");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_temper"))
+        .arg("serve")
+        .args(support::configuration::flags(scratch.path()))
+        .output()
+        .expect("serve");
+    let agent: serde_json::Value =
+        serde_json::from_slice(&fs::read(scratch.path().join("agent.json")).expect("agent")).expect("agent JSON");
+    let turn = support::configuration::turn_bounds::turn_body(&agent);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).lines().find(|line| line.starts_with("temper serve:")).expect("startup problem").starts_with(&format!(
+        "temper serve: engine.limits.overrides.hub.turn_bytes: 65536 bytes, short of the agent's largest turn, {turn} bytes"
+    )), "{}", String::from_utf8_lossy(&output.stderr));
     scratch.remove();
 }

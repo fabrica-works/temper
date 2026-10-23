@@ -5,6 +5,8 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::Path,
 };
+#[path = "turn_bounds.rs"]
+pub mod turn_bounds;
 /// A second key the fake LLM peer accepts, for the accounts' stories.
 pub const SECOND_KEY: &[u8] = b"real-loop-second-llm-key";
 pub const TOKEN: &[u8] = jig_channel_world::fixtures::TOKEN;
@@ -63,6 +65,7 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,
             "checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker-root","git":"/usr/bin/git"}]});
+    turn_bounds::apply(&mut value, turn_bounds::turn_body(&agent));
     (agent, value)
 }
 

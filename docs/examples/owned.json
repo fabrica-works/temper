@@ -3,19 +3,23 @@
     "limits": {
       "profile": "small",
       "overrides": {
-        "authority.segments": 8,
-        "tasks.hold_segments": 8,
-        "tasks.authority_segments": 8,
-        "documents.rows": 2,
-        "documents.lines": 2,
-        "documents.text_bytes": 128,
-        "views.watchers": 16,
-        "views.watchers_per_party": 16,
         "authority.grants": 12,
-        "tasks.authority_grants": 12,
+        "authority.segments": 8,
+        "core.resume_bytes": 1336098,
+        "documents.lines": 2,
+        "documents.rows": 2,
+        "documents.text_bytes": 128,
+        "hub.transcript_bytes": 5344386,
+        "hub.turn_bytes": 1336094,
+        "hub.turn_queue_bytes": 10688752,
         "notes.scopes": 15,
         "tasks.authority_bytes": 512,
-        "tasks.batch": 1
+        "tasks.authority_grants": 12,
+        "tasks.authority_segments": 8,
+        "tasks.batch": 1,
+        "tasks.hold_segments": 8,
+        "views.watchers": 16,
+        "views.watchers_per_party": 16
       }
     },
     "llm": {
@@ -208,7 +212,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85582706855535,
+    "memory_bytes": 552354823892123,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -841,10 +845,13 @@
         "profile": "small",
         "overrides": {
           "hub.accounts": 4,
-          "hub.event_bytes": 4096
+          "hub.event_bytes": 4096,
+          "hub.transcript_bytes": 5344386,
+          "hub.turn_bytes": 1336094,
+          "hub.turn_queue_bytes": 10688752
         }
       },
-      "memory_bytes": 3283176726237
+      "memory_bytes": 3283247877557
     }
   ],
   "application": {
@@ -955,7 +962,12 @@
     "limits": {
       "profile": "small",
       "overrides": {
-        "checkout.message_bytes": 4098
+        "checkout.message_bytes": 4098,
+        "root.journal.transcript_bytes": 1336098,
+        "root.loads.bytes": 1336334,
+        "root.loads.read_bytes": 2672188,
+        "root.loads.reply_bytes": 1336334,
+        "root.loads.transcript_bytes": 1336094
       }
     },
     "workers": [

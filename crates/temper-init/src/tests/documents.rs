@@ -106,6 +106,22 @@ fn the_default_is_the_owned_example_so_edited() {
             "{row}"
         );
         let mut expected = owned.clone();
+        // The startup turn_bounds writer holds these to each document's own
+        // agent; init adds a demo endpoint, so smith derives a different T.
+        let template = parse(include_bytes!("../../template/temper.json"));
+        for pointer in ["/engine/limits/overrides", "/workers/0/limits/overrides", "/application/limits/overrides"] {
+            for (name, bytes) in template.pointer(pointer).expect("template overrides").as_object().expect("limit map")
+            {
+                if name.starts_with("hub.turn")
+                    || name == "hub.transcript_bytes"
+                    || name == "core.resume_bytes"
+                    || name.starts_with("root.loads.")
+                    || name == "root.journal.transcript_bytes"
+                {
+                    expected.pointer_mut(pointer).expect("owned overrides")[name] = bytes.clone();
+                }
+            }
+        }
         assert_eq!(replace_org_patterns(&mut expected), 40, "{row}");
         expected["application"]["limits"]["overrides"]["forge.client.repositories"] = json!(3_u32);
         expected["application"]["limits"]["overrides"]["forge.repositories"] = json!(3_u32);

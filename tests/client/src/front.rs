@@ -207,22 +207,29 @@ impl Joint {
     #[must_use]
     pub fn with_large_turns(seed: u64, limits: &client::Limits) -> Self {
         let profile = temper_service::limits::profile(temper_service::limits::Profile::Small).root;
+        Self::with_turn_bytes(seed, limits, profile.journal.transcript_bytes, profile.loads.read_bytes)
+    }
+    /// A committed turn past jig small's cap, with a configured whole-read allowance.
+    #[must_use]
+    pub fn with_long_turns(seed: u64, limits: &client::Limits) -> Self {
+        Self::with_turn_bytes(seed, limits, 131_072, 262_144)
+    }
+    fn with_turn_bytes(seed: u64, limits: &client::Limits, bytes: u32, read_bytes: u64) -> Self {
         let mut engine_limits = engine_limits();
-        // tools.md, 11.2: preserve the profile's byte bounds for the large turn.
-        engine_limits.journal.transcript_bytes = profile.journal.transcript_bytes;
-        engine_limits.loads.bytes = profile.loads.bytes;
-        engine_limits.loads.reply_bytes = profile.loads.reply_bytes;
-        engine_limits.loads.transcript_bytes = profile.loads.transcript_bytes;
+        engine_limits.journal.transcript_bytes = bytes;
+        engine_limits.loads.bytes = bytes;
+        engine_limits.loads.reply_bytes = bytes;
+        engine_limits.loads.transcript_bytes = bytes;
+        engine_limits.loads.read_bytes = read_bytes;
         Self::with_engine(
             seed,
             limits,
-            Store::with_transcript_bytes(profile.journal.transcript_bytes),
+            Store::with_transcript_bytes(bytes),
             [walking::config(seed), walking::config(seed)],
             &engine_limits,
             1,
         )
     }
-    /// A chat's allotment leaves pool funding for the goal it proposes.
     #[must_use]
     pub fn with_goal_proposals(seed: u64, limits: client::Limits) -> Self {
         let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {

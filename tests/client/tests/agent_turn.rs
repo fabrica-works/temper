@@ -44,3 +44,22 @@ fn a_large_turn_is_read_whole_by_its_parts() {
     // session_turn sequence 1 emits b' ' + 1, one byte for each text position.
     assert_eq!(text, vec![b'!'; fixtures::LARGE_TURN_TEXT]);
 }
+
+#[test]
+fn a_turn_past_64_kib_commits_and_is_read_whole_with_the_configured_allowance() {
+    let mut world = fixtures::world_with_long_turns(fixtures::SEED);
+    let task = fixtures::chat(world.front(), b"Hello");
+    let (attempt, number) = fixtures::large_turn_with_opaque(world.front(), task, 65_536);
+    let (single, _) = fixtures::turn_row_costs(world.front(), task);
+    let bound = world.front().engine.env.limits.loads.read_bytes;
+    assert!(single > 65_536, "the stored read crosses the old cap");
+    assert!(single <= bound, "the configured read holds the complete row");
+    let agent = fixtures::agent(&mut world);
+    let (text, reads) = fixtures::read_whole(
+        &mut world,
+        agent,
+        &[b"turn", task.to_string().as_bytes(), format!("{attempt}.{number}").as_bytes()],
+    );
+    assert_eq!(reads, TURN_READS);
+    assert_eq!(text, vec![b'!'; fixtures::LARGE_TURN_TEXT]);
+}

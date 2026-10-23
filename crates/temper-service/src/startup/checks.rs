@@ -405,6 +405,107 @@ pub fn grants(engine: &config::Engine, worker: &config::Limits, agent: &settings
 fn worker_limit(member: &[u8]) -> Path {
     at(0, Path::root().member(b"workers")).member(b"limits").member(b"overrides").member(member)
 }
+/// The resume window as jig's hub counts it, excluding answered calls
+/// (jig's domain/hosts.md; hosted.rs, conversation_fits).
+fn resume_window(bytes: u32) -> Option<u64> {
+    let bytes = u64::from(bytes);
+    let carrier = u64::try_from(size_of::<alloc::boxed::Box<[u8]>>()).ok()?;
+    bytes.checked_add(carrier.checked_sub(4)?.checked_mul(bytes / 4)?)
+}
+fn short(problems: &mut Problems, path: Path, bytes: u64, of: &'static [u8], needs: Option<u64>) {
+    match needs {
+        Some(needs) if bytes < needs => problems.push(path, What::Short { bytes, of, needs }),
+        Some(_) => {}
+        None => problems.push(path, What::Jig(config::What::Bound)),
+    }
+}
+/// Each process checks the turn bounds its own document can know
+/// (protocol/configuration.md, 7). A worker alone knows only its turn cap.
+pub fn turns(
+    engine: Option<&config::Limits>,
+    workers: &[config::Worker],
+    own_limits: &limits::Limits,
+    agent: Option<&settings::Agent>,
+    problems: &mut Problems,
+) {
+    let engine_path = Path::root().member(b"engine").member(b"limits").member(b"overrides");
+    if let Some(agent) = agent {
+        let turn = u64::from(agent.limits.bodies.turn_body);
+        if let Some(engine) = engine {
+            short(
+                problems,
+                engine_path.member(b"hub.turn_bytes"),
+                engine.hub.turn_bytes,
+                b"the agent's largest turn",
+                Some(turn),
+            );
+            short(
+                problems,
+                engine_path.member(b"core.resume_bytes"),
+                u64::from(engine.core.resume_bytes),
+                b"the agent's largest turn with its length",
+                turn.checked_add(4),
+            );
+            let loads = &own_limits.root.loads;
+            short(
+                problems,
+                own(b"root.loads.transcript_bytes"),
+                u64::from(loads.transcript_bytes),
+                b"the agent's largest turn",
+                Some(turn),
+            );
+            short(
+                problems,
+                own(b"root.loads.bytes"),
+                u64::from(loads.bytes),
+                b"the agent's largest turn with a loaded row",
+                turn.checked_add(u64::try_from(size_of::<domain::Record>()).expect("record slot")),
+            );
+            // jig's reads::vocabulary::row_bytes charges size_of::<Row>() and
+            // record_bytes charges size_of::<Record>() even for a Turn. Both
+            // types are public; owner, ancestor and linked evidence is extra.
+            let row = u64::try_from(size_of::<jig_domain_core::reads::Row>()).expect("read row slot");
+            let record = u64::try_from(size_of::<jig_domain_core::Record>()).expect("read record carrier");
+            short(
+                problems,
+                own(b"root.loads.read_bytes"),
+                loads.read_bytes,
+                b"the agent's largest turn with a read's row",
+                turn.checked_add(row.checked_add(record).expect("read row carriers")),
+            );
+        }
+        for (index, worker) in workers.iter().enumerate() {
+            let path = at(index, Path::root().member(b"workers")).member(b"limits").member(b"overrides");
+            short(
+                problems,
+                path.member(b"hub.turn_bytes"),
+                worker.limits.hub.turn_bytes,
+                b"the agent's largest turn",
+                Some(turn),
+            );
+        }
+    }
+    if let Some(engine) = engine {
+        let window = resume_window(engine.core.resume_bytes);
+        short(
+            problems,
+            engine_path.member(b"hub.transcript_bytes"),
+            engine.hub.transcript_bytes,
+            b"the engine's resume window",
+            window,
+        );
+        for (index, worker) in workers.iter().enumerate() {
+            let path = at(index, Path::root().member(b"workers")).member(b"limits").member(b"overrides");
+            short(
+                problems,
+                path.member(b"hub.transcript_bytes"),
+                worker.limits.hub.transcript_bytes,
+                b"the engine's resume window",
+                window,
+            );
+        }
+    }
+}
 /// The worker's rules against the agent's configuration, each naming both
 /// limits (temper-worker-domain's `worst_case`).
 pub fn worker(limits: &worker_domain::Limits, problems: &mut Problems) {

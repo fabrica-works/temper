@@ -18,6 +18,7 @@ pub enum What {
     Override(limits::Refused),
     Against { other: &'static [u8] },
     Past { bytes: u64, bound: u64 },
+    Short { bytes: u64, of: &'static [u8], needs: u64 },
     Within { bytes: u64, limit: &'static [u8], bound: u64 },
     Agent,
     Admission { why: jig_domain_fleet::AgentShortfall, offered: u64, required: u64 },
@@ -93,7 +94,7 @@ fn words(what: What) -> &'static [u8] {
         What::Override(limits::Refused::Unknown) => b"no limit of temper's has this name",
         What::Override(limits::Refused::Range) => b"outside its type",
         What::Against { .. } => b"must agree with ",
-        What::Past { .. } | What::Within { .. } | What::Admission { .. } => b"",
+        What::Past { .. } | What::Within { .. } | What::Short { .. } | What::Admission { .. } => b"",
         What::Redirect(_) => b"fixed port conflicts with ",
         What::Adapter => b"program adapter not declared in the agent's programs",
         What::Agent => b"not in the agent's configuration under the same name",
@@ -236,6 +237,14 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
                 put(writer, &mut length, measuring, Decimal::of(bytes).as_bytes());
                 put(writer, &mut length, measuring, b" bytes, past its bound of ");
                 put(writer, &mut length, measuring, Decimal::of(bound).as_bytes());
+            }
+            What::Short { bytes, of, needs } => {
+                put(writer, &mut length, measuring, Decimal::of(bytes).as_bytes());
+                put(writer, &mut length, measuring, b" bytes, short of ");
+                put(writer, &mut length, measuring, of);
+                put(writer, &mut length, measuring, b", ");
+                put(writer, &mut length, measuring, Decimal::of(needs).as_bytes());
+                put(writer, &mut length, measuring, b" bytes");
             }
             What::Within { bytes, limit, bound } => {
                 put(writer, &mut length, measuring, Decimal::of(bytes).as_bytes());

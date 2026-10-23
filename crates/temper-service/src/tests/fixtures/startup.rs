@@ -68,7 +68,11 @@ pub fn document() -> Box<[u8]> {
 "memory_bytes":1152921504606846976}],"application":"#);
     document.extend_from_slice(core::str::from_utf8(APPLICATION).unwrap().replace("\"overrides\":{}", "\"overrides\":{\"checkout.name_bytes\":600,\"checkout.repositories\":4,\"git_component.stdout_bytes\":2048,\"forge.name_bytes\":256,\"forge.resources_per_task\":4}").as_bytes());
     document.extend_from_slice(b"}");
-    document.into_boxed_slice()
+    let document = document.into_boxed_slice();
+    let document = with(&document, b"engine.limits.overrides", engine_turn_limits().as_bytes());
+    let document = with(&document, b"workers[0].limits.overrides", worker_turn_limits().as_bytes());
+    // Retain the checkout bounds alongside the turn-derived application bounds.
+    with(&document, b"application.limits.overrides", br#"{"checkout.name_bytes":600,"checkout.repositories":4,"git_component.stdout_bytes":2048,"forge.name_bytes":256,"forge.resources_per_task":4}"#)
 }
 pub fn parsed() -> skein_json::Document {
     jig_protocol_config::document(
@@ -121,8 +125,59 @@ pub fn startup_agent() -> settings::Agent {
     agent
 }
 
+// Whole-map edits in unrelated startup stories inherit this fixture's turn
+// allowances. An explicitly supplied key still wins, including a short bound.
+fn turn_limits(path: &[u8], json: &[u8]) -> Box<[u8]> {
+    let turn = super::agent().limits.bodies.turn_body;
+    let window = u64::from(turn + 4) * 4;
+    let loaded = turn + u32::try_from(size_of::<temper_engine_domain::Record>()).unwrap();
+    let keys: &[(&str, u64)] = if path == b"engine.limits.overrides" {
+        &[
+            ("hub.turn_bytes", u64::from(turn)),
+            ("hub.transcript_bytes", window),
+            ("hub.turn_queue_bytes", u64::from(turn) * 8),
+            ("core.resume_bytes", u64::from(turn + 4)),
+        ]
+    } else if path == b"workers[0].limits.overrides" {
+        &[
+            ("hub.turn_bytes", u64::from(turn)),
+            ("hub.transcript_bytes", window),
+            ("hub.turn_queue_bytes", u64::from(turn) * 8),
+        ]
+    } else if path == b"application.limits.overrides" {
+        &[
+            ("root.journal.transcript_bytes", u64::from(turn + 4)),
+            ("root.loads.transcript_bytes", u64::from(turn)),
+            ("root.loads.bytes", u64::from(loaded)),
+            ("root.loads.reply_bytes", u64::from(loaded)),
+            ("root.loads.read_bytes", u64::from(turn) * 2),
+        ]
+    } else {
+        return json.into();
+    };
+    let mut text = core::str::from_utf8(json).unwrap().trim().trim_end_matches('}').to_string();
+    for (key, value) in keys {
+        if !text.contains(&format!("\"{key}\"")) {
+            if text.trim() != "{" {
+                text.push(',');
+            }
+            text.push_str(&format!("\"{key}\":{value}"));
+        }
+    }
+    text.push('}');
+    text.into_bytes().into_boxed_slice()
+}
+fn engine_turn_limits() -> String {
+    let document = core::str::from_utf8(super::ENGINE).unwrap();
+    let start = document.find("\"overrides\":").unwrap() + "\"overrides\":".len();
+    document[start..start + document[start..].find('}').unwrap() + 1].to_string()
+}
+fn worker_turn_limits() -> String {
+    r#"{"hub.slots":1,"hub.run_calls":1,"tasks.run_inbox":2,"hub.turns":1,"tasks.message_bytes":512,"people.words":512,"core.call_answer_bytes":2048}"#.into()
+}
 /// Replace a member, including indexed lists, in a parsed configuration.
 pub fn with(input: &[u8], path: &[u8], json: &[u8]) -> Box<[u8]> {
+    let json = turn_limits(path, json);
     use jig_protocol_config::{self as config, read};
     let document =
         config::document(input, &config::DocumentLimits { bytes: 1_048_576, tokens: 16_384, depth: 32 }).unwrap();
@@ -179,7 +234,7 @@ pub fn with(input: &[u8], path: &[u8], json: &[u8]) -> Box<[u8]> {
         }
     }
     let mut result = input[..start.unwrap()].to_vec();
-    result.extend_from_slice(json);
+    result.extend_from_slice(&json);
     result.extend_from_slice(&input[end.unwrap_or(input.len())..]);
     result.into_boxed_slice()
 }

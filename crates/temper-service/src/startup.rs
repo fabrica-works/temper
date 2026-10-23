@@ -587,6 +587,7 @@ fn checked_start(
         application::git_programs(&mut resolved.forges, &setup.setup);
     }
     let own = &parsed.application.limits;
+    checks::turns(Some(&parsed.engine.limits), &parsed.workers, own, agent, &mut problems);
     let remote = u32::try_from(checks::longest_remote(&resolved.forges, own.forge.name_bytes).unwrap_or(u64::MAX)).ok();
     let engine_bounds = temper_protocol_worker_wire::Bounds {
         repositories: own.forge.resources_per_task,
@@ -872,6 +873,7 @@ fn check_worker_part(part: &WorkerPart, files: &settings::Files, agent: &setting
         }
     }
     checks::worker(&crate::worker_settings::root_limits(&part.worker, agent, &part.limits), &mut problems);
+    checks::turns(None, core::slice::from_ref(&part.worker.jig), &part.limits, Some(agent), &mut problems);
     if !problems.is_empty() {
         return Err(problems);
     }

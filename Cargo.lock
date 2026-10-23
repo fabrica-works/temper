@@ -2349,6 +2349,8 @@ dependencies = [
  "skein-tls-world",
  "skein-ui",
  "skein-ui-bundle",
+ "smith-agent-shell",
+ "temper-engine-domain",
 ]
 
 [[package]]
