@@ -11,14 +11,15 @@ use std::{fs, path::Path};
 #[must_use]
 pub fn llm(config: &Path) -> CtlLlm {
     let config = config.to_path_buf();
+    let [address] = super::free_addresses(&[]);
     CtlLlm {
-        peer: super::fake_llm(scripts()),
+        peer: super::fake_llm_at(address, scripts()),
         on_link: Box::new(move || {
             // The box starts on empty directories. Only its generated agent's
             // endpoint moves, before any run: the template and demo stay shipped.
             let path = config.join("agent.json");
             let mut agent: Value = serde_json::from_slice(&fs::read(&path).expect("initialized agent")).expect("JSON");
-            agent["endpoints"][0]["address"] = "127.0.0.1:34443".into();
+            agent["endpoints"][0]["address"] = address.to_string().into();
             agent["endpoints"][0]["server_name"] = "skein.test".into();
             agent["endpoints"][0]["trust_der"] = json!(config.join("root.der"));
             write_private(&config.join("root.der"), skein_tls_world::pki::ROOT);
