@@ -79,7 +79,6 @@ pub(crate) fn main(
         }
         b.close();
         b.close();
-        crate::frame::demo_banner(b, root, words, bindings);
         context(b, root, task.project, words);
         b.open(Role::Slot);
         b.style(look::THREAD);

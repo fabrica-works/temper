@@ -9,13 +9,13 @@ Menu:
     [5] Accounts
   * Pat
   [6] Sign out
-New chat
-* Ready
-Scripted model
 Playground:
   This is the playground: a scripted model and a playground forge.
   [7] Connect a model
   [-] Connect a forge (disabled)
+New chat
+* Ready
+Scripted model
 demo · playground/widget on Playground forge
 Signed in as the deployment’s owner
 What shall we change?

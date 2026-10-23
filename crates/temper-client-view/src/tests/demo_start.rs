@@ -4,7 +4,7 @@ use skein_ui::Role;
 use temper_client_domain::Address;
 
 #[test]
-fn the_start_draws_its_chatbar_banner_context_and_invitation_before_the_composer() {
+fn the_start_draws_the_frame_banner_before_its_chatbar_context_and_invitation() {
     let root = f::demo_root(Address::Chats, f::PROJECT, true);
     let view = f::page_view(&root);
     let nodes = view.tree().nodes();
@@ -35,10 +35,12 @@ fn the_start_draws_its_chatbar_banner_context_and_invitation_before_the_composer
     assert_eq!(paragraphs, 2, "project and sign-in");
     let mut after = 0;
     for (role, name) in [
-        (Role::Paragraph, b"New chat".as_slice()),
+        (Role::Banner, b"".as_slice()),
+        (Role::Region, b"Playground"),
+        (Role::Main, b""),
+        (Role::Paragraph, b"New chat"),
         (Role::Status, b"Ready"),
         (Role::Paragraph, b"Scripted model"),
-        (Role::Region, b"Playground"),
         (Role::Paragraph, "Shop · acme/shop on Playground forge".as_bytes()),
         (Role::Paragraph, b"Signed in as Pat"),
         (Role::Heading { level: 1 }, b"What shall we change?"),
@@ -52,7 +54,9 @@ fn the_start_draws_its_chatbar_banner_context_and_invitation_before_the_composer
     ] {
         let mut found = None;
         for (index, node) in nodes.iter().enumerate() {
-            let matches = if role == Role::Paragraph {
+            let matches = if role == Role::Banner || role == Role::Main {
+                true
+            } else if role == Role::Paragraph {
                 f::node_text(view.tree(), index).as_ref() == name
             } else {
                 node.name.as_deref() == Some(name)
@@ -150,7 +154,7 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
 }
 
 #[test]
-fn a_chats_context_follows_the_banner_only_in_the_demo_project_even_without_its_model() {
+fn a_chats_context_follows_the_chatbar_only_in_the_demo_project_even_without_its_model() {
     for (row, project, model, demo, shown) in [
         ("demo", f::PROJECT, true, true, true),
         ("forge alone", f::PROJECT, false, true, true),
@@ -159,11 +163,11 @@ fn a_chats_context_follows_the_banner_only_in_the_demo_project_even_without_its_
     ] {
         let root = if demo { f::demo_root(Address::Chat { task: 1 }, project, model) } else { f::chat::chat_root() };
         let view = f::page_view(&root);
-        let mut banner = None;
+        let mut chatbar = None;
         let mut context = None;
         for (index, node) in view.tree().nodes().iter().enumerate() {
-            if node.role == Role::Region && node.name.as_deref() == Some(b"Playground") {
-                banner = Some(index);
+            if node.styles.as_slice().contains(&crate::look::CHATBAR) {
+                chatbar = Some(index);
             }
             if node.styles.as_slice().contains(&crate::look::CONTEXT) {
                 context = Some(index);
@@ -171,8 +175,12 @@ fn a_chats_context_follows_the_banner_only_in_the_demo_project_even_without_its_
         }
         assert_eq!(context.is_some(), shown, "{row}");
         if shown {
-            let banner = banner.unwrap();
-            assert_eq!(context.unwrap(), banner + usize::try_from(view.tree().nodes()[banner].size).unwrap(), "{row}");
+            let chatbar = chatbar.unwrap();
+            assert_eq!(
+                context.unwrap(),
+                chatbar + usize::try_from(view.tree().nodes()[chatbar].size).unwrap(),
+                "{row}"
+            );
         }
     }
 }

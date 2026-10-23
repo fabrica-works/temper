@@ -68,7 +68,6 @@ impl View {
         &self.limits
     }
 }
-#[expect(clippy::too_many_lines, reason = "the root composes each page under its shared frame")]
 pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>) {
     let shown = temper_client_domain::shown(root).checked_add(view.accounts.revision()).expect("view revisions fit");
     let shown = shown.checked_add(view.clock_revision).expect("view clock revisions fit");
@@ -94,17 +93,6 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
     builder.open(Role::Page);
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
     match root.pages().address() {
-        temper_client_domain::Address::Welcome { .. } | temper_client_domain::Address::Chat { .. } => {}
-        temper_client_domain::Address::Chats if crate::pages::chats::demo_start(root).is_some() => {}
-        temper_client_domain::Address::Chats
-        | temper_client_domain::Address::Inbox { .. }
-        | temper_client_domain::Address::Task { .. }
-        | temper_client_domain::Address::Adopt { .. }
-        | temper_client_domain::Address::Accounts => {
-            crate::frame::demo_banner(&mut builder, root, &view.forge_words, &mut view.pages);
-        }
-    }
-    match root.pages().address() {
         temper_client_domain::Address::Welcome { .. } => {}
         temper_client_domain::Address::Accounts
         | temper_client_domain::Address::Chats
@@ -113,6 +101,7 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
         | temper_client_domain::Address::Inbox { .. }
         | temper_client_domain::Address::Adopt { .. } => {
             crate::choice::banner(&mut builder, root, &view.forge_words, &mut view.pages);
+            crate::frame::demo_banner(&mut builder, root, &view.forge_words, &mut view.pages);
         }
     }
     if let Some(word) = crate::frame::unavailable(root) {

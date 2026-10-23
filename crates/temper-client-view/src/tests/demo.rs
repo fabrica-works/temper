@@ -3,14 +3,17 @@ use skein_ui::{Role, State};
 use temper_client_domain::{Action, Address, Event, pages::Act};
 #[test]
 fn the_demo_banner_follows_the_frame_on_work_pages() {
-    for (row, address, demo, shown) in [
-        ("other project chats", Address::Chats, true, true),
-        ("inbox", Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, true, true),
-        ("task", Address::Task { task: 9 }, true, true),
-        ("accounts", Address::Accounts, true, false),
-        ("no demo", Address::Chats, false, false),
+    for (row, address, project, demo, shown) in [
+        ("other project chats", Address::Chats, f::SECOND_PROJECT, true, true),
+        ("demo start", Address::Chats, f::PROJECT, true, true),
+        ("chat", Address::Chat { task: 1 }, f::PROJECT, true, true),
+        ("inbox", Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, f::SECOND_PROJECT, true, true),
+        ("task", Address::Task { task: 9 }, f::SECOND_PROJECT, true, true),
+        ("accounts", Address::Accounts, f::PROJECT, true, false),
+        ("welcome", Address::Welcome { step: temper_client_domain::Step::Welcome }, f::PROJECT, true, false),
+        ("no demo", Address::Chats, f::PROJECT, false, false),
     ] {
-        let root = if demo { f::demo_root(address, f::SECOND_PROJECT, true) } else { f::chats_root() };
+        let root = if demo { f::demo_root(address, project, true) } else { f::chats_root() };
         let mut view = f::page_view(&root);
         assert_eq!(f::find(view.tree(), Role::Region, b"Playground").is_some(), shown, "{row}");
         if shown {
@@ -163,7 +166,7 @@ fn a_forge_only_banner_keeps_its_disabled_connect_without_a_model_link() {
     assert_eq!(crate::act(&mut view, button, skein_ui::Act::Press), None);
 }
 #[test]
-fn a_chats_banner_follows_its_chatbar_in_every_project() {
+fn a_chats_banner_precedes_main_and_its_chatbar_in_every_project() {
     for (row, project, model, label) in [
         ("demo project", f::PROJECT, true, true),
         ("another project", f::SECOND_PROJECT, true, false),
@@ -172,11 +175,15 @@ fn a_chats_banner_follows_its_chatbar_in_every_project() {
         let root = f::demo_root(Address::Chat { task: 1 }, project, model);
         let view = f::page_view(&root);
         let nodes = view.tree().nodes();
+        let mut banner = None;
         let mut main = None;
         let mut chatbar = None;
         let mut demo = None;
         let mut thread = None;
         for (index, node) in nodes.iter().enumerate() {
+            if node.role == Role::Banner {
+                banner = Some(index);
+            }
             if node.role == Role::Main {
                 main = Some(index);
             }
@@ -190,10 +197,10 @@ fn a_chats_banner_follows_its_chatbar_in_every_project() {
                 demo = Some(index);
             }
         }
-        assert!(main.unwrap() < chatbar.unwrap() && chatbar.unwrap() < demo.unwrap(), "{row}");
-        // The next sibling after the chatbar is the one demo region.
-        assert_eq!(demo.unwrap(), chatbar.unwrap() + usize::try_from(nodes[chatbar.unwrap()].size).unwrap(), "{row}");
-        assert!(demo.unwrap() < thread.unwrap(), "{row}");
+        assert!(banner.unwrap() < demo.unwrap() && demo.unwrap() < main.unwrap(), "{row}");
+        // The playground is a frame sibling before Main, never inside it.
+        assert_eq!(main.unwrap(), demo.unwrap() + usize::try_from(nodes[demo.unwrap()].size).unwrap(), "{row}");
+        assert!(main.unwrap() < chatbar.unwrap() && chatbar.unwrap() < thread.unwrap(), "{row}");
         assert!(f::find(view.tree(), Role::Heading { level: 1 }, "T1 · Ship the update".as_bytes()).is_some(), "{row}");
         assert_eq!(f::find(view.tree(), Role::Paragraph, b"Scripted model").is_some(), label, "{row}");
     }
@@ -335,4 +342,52 @@ fn the_playground_account_heading_uses_its_delivered_provider_number() {
         f::find(view.tree(), Role::Heading { level: 3 }, b"Playground API key \xc2\xb7 held by the deployment")
             .is_some()
     );
+}
+
+#[test]
+fn the_accounts_banner_precedes_the_playground_when_both_show() {
+    for address in [Address::Chats, Address::Chat { task: 1 }] {
+        let (mut root, _, _, _, watch) =
+            f::root_at_with_demo(address, &f::domain_limits(), b"Shop", Some((f::PROJECT, true)));
+        let mut doc = temper_client_domain::pages::accounts::document(root.client()).unwrap().clone();
+        doc.usable = false;
+        f::root_event(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch: watch.unwrap(),
+                        event: jig_client::contract::WatchEvent::Delivered(
+                            jig_client::contract::Delivery::OwnerAccounts(Box::new(doc)),
+                        ),
+                    },
+                },
+            },
+        );
+        let view = f::page_view(&root);
+        let nodes = view.tree().nodes();
+        let mut frame = None;
+        let mut accounts = None;
+        let mut playground = None;
+        let mut main = None;
+        for (index, node) in nodes.iter().enumerate() {
+            if node.role == Role::Banner {
+                frame = Some(index);
+            }
+            if node.name.as_deref() == Some(b"Agents need an LLM account to run.") {
+                accounts = Some(index);
+            }
+            if node.role == Role::Region && node.name.as_deref() == Some(b"Playground") {
+                playground = Some(index);
+            }
+            if node.role == Role::Main {
+                main = Some(index);
+            }
+        }
+        assert!(
+            frame.unwrap() < accounts.unwrap()
+                && accounts.unwrap() < playground.unwrap()
+                && playground.unwrap() < main.unwrap()
+        );
+    }
 }

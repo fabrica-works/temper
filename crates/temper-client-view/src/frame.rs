@@ -268,10 +268,18 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     builder.close();
 }
 
-/// The demo's one banner, drawn by the frame or after a page's chatbar.
+/// The demo's one banner, after the accounts' banner and before the page and its chatbar (client/README.md, 5.1).
 pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
-    if unavailable(root).is_some() || *root.pages().address() == Address::Accounts {
+    if unavailable(root).is_some() {
         return;
+    }
+    match root.pages().address() {
+        Address::Accounts | Address::Welcome { .. } => return,
+        Address::Chats
+        | Address::Chat { .. }
+        | Address::Task { .. }
+        | Address::Inbox { .. }
+        | Address::Adopt { .. } => {}
     }
     let Some((_, halves)) = root.demo() else { return };
     b.open(Role::Region);

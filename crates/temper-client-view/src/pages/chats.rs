@@ -196,7 +196,6 @@ fn start(
     text(b, Role::Paragraph, &words.say(Word::DemoModelName, &[]));
     b.close();
     b.close();
-    crate::frame::demo_banner(b, root, words, bindings);
     if let Some(project) = root.pages().project() {
         super::chat::context(b, root, project, words);
     }
