@@ -5,6 +5,10 @@ task-solo-T3
 accounts-solo
 welcome-first-run-0
 chats-first-run-1
+connect-forge-first-run-6
+forges-first-run-7
+connect-forge-choose
+chats-setup-strip
 adoption
 adoption-filled
 adoption-refused

@@ -6,10 +6,16 @@ use temper_client_domain::{self as d, Address, Choice, Step, pages};
 use temper_client_protocol_wire::v1 as w;
 const HERE: u16 = 3;
 const GITHUB: u16 = 2;
-fn row(number: u16, kind: w::Kind, mode: w::Mode, connection: w::Connection, offer: w::Offer) -> w::ForgeRow {
+pub(super) fn row(
+    number: u16,
+    kind: w::Kind,
+    mode: w::Mode,
+    connection: w::Connection,
+    offer: w::Offer,
+) -> w::ForgeRow {
     w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap()
 }
-fn rows(connection: w::Connection, offer: w::Offer) -> List<w::ForgeRow> {
+pub(super) fn rows(connection: w::Connection, offer: w::Offer) -> List<w::ForgeRow> {
     let mut rows = List::with_capacity(2);
     rows.push(row(GITHUB, w::Kind::Github, w::Mode::Managed, w::Connection::NotConnected, w::Offer::NotOffered))
         .unwrap();
@@ -22,7 +28,7 @@ fn root(choice: Option<Choice>, connection: w::Connection, offer: w::Offer) -> d
 fn here(connection: w::Connection) -> d::Domain {
     root(Some(Choice::Forge(HERE)), connection, w::Offer::Offered)
 }
-fn connected() -> w::Connection {
+pub(super) fn connected() -> w::Connection {
     w::Connection::Connected(
         w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 42, login: b"temper".as_slice().into() }).unwrap(),
     )
@@ -35,7 +41,7 @@ fn press(root: &d::Domain, role: Role, name: &[u8]) -> d::Action {
     let id = node(view.tree(), role, name);
     crate::act(&mut view, id, Act::Press).expect("bound control")
 }
-fn words_in_order(tree: &skein_ui::Tree, phrases: &[&str]) {
+pub(super) fn words_in_order(tree: &skein_ui::Tree, phrases: &[&str]) {
     let bytes = f::text(tree);
     let words = String::from_utf8_lossy(&bytes);
     let mut remaining = words.as_ref();
@@ -97,7 +103,7 @@ fn github_details_draw_both_ways_disabled_and_say_not_available_yet() {
             "Create an App and install it on your account or organization. Choose selected repositories.",
             "Connect an App of your own",
             "Its id, and its private key as GitHub gives it.",
-            "On GitHub, set the App’s setup URL to http://LISTENER/forges/2/github/setup, and give it the permissions and events temper’s guide lists.",
+            "On GitHub, set the App’s setup URL to temper’s address followed by /forges/2/github/setup, and give it the permissions and events temper’s guide lists.",
             "A pasted value is sent once and shown nowhere, then or after.",
             "Connecting GitHub from temper is not available yet.",
         ],

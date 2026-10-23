@@ -151,20 +151,18 @@ fn the_demo_banner_is_absent_when_the_link_is_unavailable() {
 }
 
 #[test]
-fn a_forge_only_banner_keeps_its_disabled_connect_without_a_model_link() {
+fn a_forge_only_banner_links_to_connect_without_a_model_link() {
     let root = f::demo_root(Address::Chats, f::PROJECT, false);
     let mut view = f::page_view(&root);
     assert!(f::find(view.tree(), Role::Paragraph, b"This is the playground: a playground forge.").is_some());
     assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
-    let button = f::find(view.tree(), Role::Button, b"Connect a forge").unwrap();
-    for node in view.tree().nodes() {
-        if node.name.as_deref() == Some(b"Connect a forge") {
-            assert_eq!(node.states.as_slice(), [State::Disabled]);
-            assert!(node.binding.is_none());
-        }
-    }
-    assert_eq!(crate::act(&mut view, button, skein_ui::Act::Press), None);
+    let link = f::find(view.tree(), Role::Link, b"Connect a forge").unwrap();
+    assert_eq!(
+        crate::act(&mut view, link, skein_ui::Act::Press),
+        Some(Action::Pages(Act::Go { address: Address::ConnectForge { forge: None } }))
+    );
 }
+
 #[test]
 fn a_chats_banner_precedes_main_and_its_chatbar_in_every_project() {
     for (row, project, model, label) in [

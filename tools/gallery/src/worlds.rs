@@ -205,7 +205,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
         }
     }
     assert!(out.is_empty(), "world fixture settles");
-    if matches_demo(w) {
+    if matches!(w, FirstRun { step: 0..=4 }) {
         assert!(root.demo().expect("answered demo").1.model);
     }
     root
@@ -222,7 +222,7 @@ fn forges_watched(root: &mut Domain, world: World, watch: Token, out: &mut Queue
 fn forges(world: World) -> Box<[u8]> {
     use temper_client_protocol_wire::{self as wire, v1 as w};
     let limits = temper_client_domain::forge::wire_limits(&limits().forge).expect("wire limits");
-    let mut rows = List::with_capacity(1);
+    let mut rows = List::with_capacity(3);
     if matches_demo(world) {
         rows.push(
             w::ForgeRow::new(
@@ -241,6 +241,46 @@ fn forges(world: World) -> Box<[u8]> {
             .expect("demo forge"),
         )
         .expect("one forge");
+    }
+    if let FirstRun { step } = world {
+        rows.push(
+            w::ForgeRow::new(
+                &limits,
+                w::ForgeRowParts {
+                    number: 2,
+                    kind: w::Kind::Github,
+                    mode: w::Mode::Managed,
+                    connection: w::Connection::NotConnected,
+                    offer: w::Offer::NotOffered,
+                },
+            )
+            .expect("GitHub choice"),
+        )
+        .expect("forge row");
+        let connection = match step {
+            6 => w::Connection::SettingUp(
+                w::SettingUp::new(&limits, w::SettingUpParts { step: Some(w::SetUpStep::Prepare) }).expect("preparing"),
+            ),
+            7 => w::Connection::Connected(
+                w::Connected::new(&limits, w::ConnectedParts { id: 2, login: b"temper".as_slice().into() })
+                    .expect("connected"),
+            ),
+            _ => w::Connection::NotSetUp,
+        };
+        rows.push(
+            w::ForgeRow::new(
+                &limits,
+                w::ForgeRowParts {
+                    number: 3,
+                    kind: w::Kind::Forgejo,
+                    mode: w::Mode::Owned,
+                    connection,
+                    offer: w::Offer::Offered,
+                },
+            )
+            .expect("owned Forgejo"),
+        )
+        .expect("forge row");
     }
     wire::forges(&w::Forges::new(&limits, w::ForgesParts { forges: rows }).expect("gallery forges"))
 }
@@ -1715,16 +1755,19 @@ fn accounts(w: World) -> c::OwnerAccounts {
                 place: 1,
                 uses: None,
                 plan: false,
-                provider: Some(17),
-                provider_name: Some(doc("Playground")),
+                provider: Some(if matches!(w, FirstRun { step: 5..=7 }) { 18 } else { 17 }),
+                provider_name: Some(doc(if matches!(w, FirstRun { step: 5..=7 }) { "OpenAI" } else { "Playground" })),
                 manage_usage: None,
-                display: doc("Scripted model"),
+                display: doc(if matches!(w, FirstRun { step: 5..=7 }) { "ChatGPT" } else { "Scripted model" }),
                 holder: c::OwnerAccountHolder::Party(73),
                 sources,
                 cut: false,
             })
             .expect("account");
         }
+    }
+    if w == World::Bare {
+        rows.clear();
     }
     let mut hosts = List::with_capacity(2);
     if w == Reference || w == Solo {
@@ -2209,6 +2252,8 @@ pub(super) fn now(w: World) -> Wall {
             3 => 4,
             4 => 6,
             5 => 15,
+            6 => 16,
+            7 => 19,
             _ => unreachable!("mockup first-run step"),
         },
         Reference | Solo | World::Bare => 0,

@@ -54,7 +54,7 @@ fn each_fixture_page_prints_as_its_golden_file() {
         ("every_role", fixtures::every_role()),
         ("control_text", fixtures::control_text()),
     ] {
-        let print = fixtures::print(&tree);
+        let print = fixtures::print(&fixtures::golden_frame(&tree));
         if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some() {
             std::fs::write(fixtures::golden(name), print.text.as_slice()).expect("write golden file");
         }
@@ -115,4 +115,13 @@ fn account_sign_in_links_print_the_target() {
     let print = fixtures::print(&builder.finish());
     let expected = b"Open the sign-in page <https://issuer.example/visit>";
     assert!(print.text.as_slice().windows(expected.len()).any(|part| part == expected));
+}
+
+#[test]
+fn the_first_run_prints_forges_and_the_banners_connect_link() {
+    let print = fixtures::print(&fixtures::chat::first_run());
+    let text = String::from_utf8_lossy(print.text.as_slice());
+    assert!(text.contains("] Forges\n"));
+    assert!(text.contains("] Connect a forge\n"));
+    assert!(!text.contains("Connect a forge (disabled)"));
 }

@@ -288,3 +288,81 @@ fn an_out_of_date_link_unwatches_the_forges() {
     assert!(root.client().document(forges::handle()).is_none());
     let State::Unknown = root.forges() else { panic!("forges cleared") };
 }
+
+#[test]
+fn the_forges_page_lists_the_persons_forges_not_fakes_or_the_demos() {
+    use forge::listed;
+    let demo = forge::family::demo(&demo::answer(b"title"), &w::CEILINGS).unwrap();
+    let connections = [
+        C::NotConnected,
+        C::NotSetUp,
+        C::SettingUp { step: None },
+        C::SetUpFailed { why: Box::default() },
+        C::Connecting,
+        C::Connected { id: 42, login: Box::default() },
+        C::Stopped { reason: Box::default() },
+    ];
+    for connection in connections {
+        let expected = match connection {
+            C::NotConnected | C::NotSetUp => false,
+            C::SettingUp { .. } | C::SetUpFailed { .. } | C::Connecting | C::Connected { .. } | C::Stopped { .. } => {
+                true
+            }
+        };
+        let candidate = row(HERE, Kind::Forgejo, Mode::Owned, connection, Offer::Offered);
+        assert_eq!(listed::personal(&candidate, Some(&demo)), expected);
+        let mut fake = candidate.clone();
+        fake.mode = Mode::Fake;
+        assert!(!listed::personal(&fake, None));
+        fake.mode = Mode::Owned;
+        fake.number = demo.forge;
+        assert!(!listed::personal(&fake, Some(&demo)));
+    }
+    let state = State::Rows(Box::new([
+        row(demo.forge, Kind::Forgejo, Mode::Connected, C::Connecting, Offer::NotOffered),
+        row(2, Kind::GitHub, Mode::Managed, C::Connecting, Offer::NotOffered),
+        row(3, Kind::Forgejo, Mode::Fake, C::Connecting, Offer::NotOffered),
+        row(4, Kind::Forgejo, Mode::Owned, C::NotSetUp, Offer::Offered),
+        row(5, Kind::Forgejo, Mode::Owned, C::Stopped { reason: Box::default() }, Offer::Offered),
+    ]));
+    let listed = listed::rows(&state, Some(&demo));
+    assert_eq!(listed.len(), 2_u32);
+    assert_eq!(listed.as_slice()[0].number, 2_u16);
+    assert_eq!(listed.as_slice()[1].number, 5_u16);
+    assert!(listed::rows(&State::Unknown, None).is_empty());
+    assert!(listed::rows(&State::Ended, None).is_empty());
+}
+#[test]
+fn the_dot_is_red_for_a_forge_that_needs_the_person_else_amber_while_one_sets_up() {
+    use forge::listed::{self, Dot};
+    for (connection, expected) in [
+        (C::NotSetUp, Dot::None),
+        (C::Connected { id: 42, login: Box::default() }, Dot::None),
+        (C::Connecting, Dot::Amber),
+        (C::SettingUp { step: None }, Dot::Amber),
+        (C::SetUpFailed { why: Box::default() }, Dot::Red),
+        (C::Stopped { reason: Box::default() }, Dot::Red),
+    ] {
+        assert_eq!(listed::dot(&rows(connection), None), expected);
+    }
+    for connections in
+        [[C::Connecting, C::Stopped { reason: Box::default() }], [C::Stopped { reason: Box::default() }, C::Connecting]]
+    {
+        let state = State::Rows(Box::new([
+            row(2, Kind::GitHub, Mode::Managed, connections[0].clone(), Offer::NotOffered),
+            row(HERE, Kind::Forgejo, Mode::Owned, connections[1].clone(), Offer::Offered),
+        ]));
+        assert_eq!(listed::dot(&state, None), Dot::Red);
+        assert_eq!(
+            connect::underway_forge(&state, None).unwrap().number,
+            if connections[0] == C::Connecting { 2 } else { HERE }
+        );
+    }
+    let demo = forge::family::demo(&demo::answer(b"title"), &w::CEILINGS).unwrap();
+    let state = State::Rows(Box::new([
+        row(demo.forge, Kind::GitHub, Mode::Managed, C::Connecting, Offer::NotOffered),
+        row(HERE, Kind::Forgejo, Mode::Fake, C::Stopped { reason: Box::default() }, Offer::NotOffered),
+    ]));
+    assert_eq!(listed::dot(&state, Some(&demo)), Dot::None);
+    assert!(connect::underway_forge(&state, Some(&demo)).is_none());
+}

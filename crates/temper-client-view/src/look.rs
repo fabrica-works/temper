@@ -241,6 +241,12 @@ pub const NAV_LIMITED: Style = Style { owner: owner(), token: 117 };
 pub const CONNECT_FORGE: Style = Style { owner: owner(), token: 118 };
 /// A configuration entry or terminal command.
 pub const FLOW_CODE: Style = Style { owner: owner(), token: 119 };
+/// The Forges page (client/forge.md, 5.4).
+pub const FORGES: Style = Style { owner: owner(), token: 120 };
+/// A forge's row on the Forges page (client/forge.md, 5.4).
+pub const FORGE_ROW: Style = Style { owner: owner(), token: 121 };
+/// The setup strip (client/README.md, 5.1, 5.6).
+pub const SETUP_STRIP: Style = Style { owner: owner(), token: 122 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -366,6 +372,9 @@ pub const NAMES: Names<'static> = Names {
         b"temper-nav-limited",
         b"temper-connect-forge",
         b"temper-flow-code",
+        b"temper-forges",
+        b"temper-forge-row",
+        b"temper-setup-strip",
     ],
     regions: &[b"temper-link"],
 };

@@ -867,3 +867,23 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-flow-card > button:disabled { cursor: default; opacity: .55; }
 .temper-connect-forge > a { color: var(--temper-accent-dark); text-decoration: underline; text-underline-offset: 3px; }
 .temper-flow-card input, .temper-flow-card textarea { display: block; width: 100%; margin: 4px 0 12px; padding: 6px 8px; border: 1px solid var(--temper-line); border-radius: 5px; background: var(--temper-paper); }
+
+/* T2: the Forges page, setup strip and navigation dot (client/forge.md, 5.4). */
+.temper-forges { max-width: 1060px; }
+.temper-forges > h2 { margin-top: 26px; }
+.temper-forges > p { color: var(--temper-muted); font-size: 11px; }
+.temper-forges > a { display: inline-block; margin: 8px 0 16px; border: 1px solid #ddd6cb; border-radius: 5px; padding: 5px 10px; background: var(--temper-paper); font-size: 11px; }
+.temper-forge-row { margin: 12px 0; border: 1px solid var(--temper-line); border-radius: 6px; background: var(--temper-paper); }
+.temper-forge-row > summary { display: grid; gap: 5px; position: relative; padding: 18px 20px 18px 38px; cursor: pointer; list-style: none; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.temper-forge-row > summary::-webkit-details-marker { display: none; }
+.temper-forge-row > summary::before { content: '›'; position: absolute; left: 18px; top: 18px; transition: transform .15s; }
+.temper-forge-row[open] > summary::before { transform: rotate(90deg); }
+.temper-forge-row > summary > [id^="skein-ui-description-"] { display: block; font-size: 10px; font-weight: 400; color: var(--temper-muted); }
+.temper-forge-row > :nth-child(2) { border-top: 1px solid var(--temper-line); }
+.temper-forge-row > :not(summary) { margin: 0; padding: 10px 20px; }
+.temper-forge-row dt { font-size: 10px; color: var(--temper-muted); }
+.temper-forge-row dd { margin: 0; font-size: 11px; }
+.temper-forge-row > a { display: inline-block; color: var(--temper-accent-dark); font-size: 11px; }
+.temper-setup-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px; padding: 10px 24px; background: var(--temper-amber-pale); border-bottom: 1px solid var(--temper-line); font-size: 11px; }
+.temper-setup-strip > p { margin: 0; }
+.temper-setup-strip > a { color: var(--temper-accent-dark); font-weight: 700; }

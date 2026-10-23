@@ -6,6 +6,7 @@ use skein_ui::{Builder, Role, phrases::Hole};
 use temper_client_domain::forge::words::{self as shared, ResourceWord as Word};
 pub mod bindings;
 pub(crate) mod connect;
+pub(crate) mod forges;
 pub mod page;
 pub mod words;
 fn path_text(builder: &mut Builder, path: &[Box<[u8]>], words: &Words) {

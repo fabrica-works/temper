@@ -245,7 +245,14 @@ fn elsewhere(b: &mut Builder, root: &Domain, w: &Words) {
     }
     b.close();
 }
-fn setup_control(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, number: u16, word: Word) {
+pub(crate) fn setup_control(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut ForgeBindings,
+    number: u16,
+    word: Word,
+) {
     let pending = match root.forge().set_up() {
         Some(last) => last.progress.is_some(),
         None => false,
