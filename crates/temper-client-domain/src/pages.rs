@@ -274,7 +274,6 @@ impl Pages {
 pub fn me_handle() -> Handle {
     Handle { asker: Owner::Pages.asker(), number: 0 }
 }
-#[expect(clippy::too_many_lines, reason = "one exhaustive page event router followed by watch configuration")]
 pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Started => started(pages, out),
@@ -291,9 +290,7 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         }
         Event::Left => {
             pages.accounts.leave(out);
-            if let Some(mut welcome) = pages.welcome.take() {
-                welcome.leave(out);
-            }
+            pages.welcome = None;
             pages.accounts_open = false;
         }
         Event::Act { act: Act::Choice(act) } => choice::act(pages, client, act, out),
@@ -364,13 +361,6 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             None => false,
         };
     pages.accounts.configure(owner, &mut pages.next, out);
-    let owner = match accounts::current_me(client) {
-        Some(me) => me.deployment_role == Some(jig_client::contract::HeldRole::Owner),
-        None => false,
-    };
-    if let Some(welcome) = &mut pages.welcome {
-        welcome.configure(owner, &mut pages.next, out);
-    }
     let me = pages.me(client);
     if let Some(chats) = &mut pages.chats {
         chats.configure(me, pages.project, &env.limits, out);
@@ -400,9 +390,7 @@ fn told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>
 fn started(pages: &mut Pages, out: &mut Queue<Request>) {
     pages.accounts.leave(out);
     pages.accounts_open = false;
-    if let Some(mut welcome) = pages.welcome.take() {
-        welcome.leave(out);
-    }
+    pages.welcome = None;
     pages.address = Address::Inbox { filter: crate::address::Filter::ALL };
     pages.project = None;
     if !pages.watching {
@@ -465,11 +453,9 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
         pages.accounts.leave(out);
         pages.accounts_open =
             address == Address::Accounts || address == (Address::Welcome { step: crate::Step::Model });
-        if let Some(mut welcome) = pages.welcome.take() {
-            welcome.leave(out);
-        }
+        pages.welcome = None;
         if let Address::Welcome { .. } = address {
-            pages.welcome = Some(welcome::Welcome::new(env.limits.forge));
+            pages.welcome = Some(welcome::Welcome::new());
         }
         if let Some(inbox) = pages.inbox.take() {
             pages.next = inbox.leave(out);
@@ -534,11 +520,6 @@ fn open_result(pages: &mut Pages, task: u64, through: u64, out: &mut Queue<Reque
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
-    if let Some(welcome) = &mut pages.welcome
-        && welcome.told(client, &told, out)
-    {
-        return true;
-    }
     if pages.accounts.told(client, &told) {
         return true;
     }

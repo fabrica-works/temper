@@ -1,6 +1,7 @@
 //! The forge's adoption form, demo read, panel watch and receiving state.
 use skein_lib::{Env, Queue, Time};
 pub mod change;
+pub mod connect;
 pub mod demo;
 pub mod family;
 pub mod forges;
@@ -37,6 +38,9 @@ pub enum Request {
 #[derive(Debug)]
 pub struct Side {
     demo: demo::State,
+    forges: forges::State,
+    forges_open: bool,
+    set_up: Option<forges::SetUp>,
     panel: Option<panel::Panel>,
     address: Option<Address>,
     served: Served,
@@ -52,6 +56,9 @@ impl Side {
     pub fn new(_limits: &Limits, seed: u64) -> Side {
         Side {
             demo: demo::State::new(),
+            forges: forges::State::Unknown,
+            forges_open: false,
+            set_up: None,
             panel: None,
             address: None,
             served: Served::Unknown,
@@ -86,6 +93,14 @@ impl Side {
     #[must_use]
     pub const fn panel(&self) -> Option<&panel::Panel> {
         self.panel.as_ref()
+    }
+    #[must_use]
+    pub const fn forges(&self) -> &forges::State {
+        &self.forges
+    }
+    #[must_use]
+    pub const fn set_up(&self) -> Option<&forges::SetUp> {
+        self.set_up.as_ref()
     }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("forge shown count fits");
@@ -155,6 +170,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
 fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::Go { address } => out.push(Request::Show { address }),
+        Act::SetUp { forge } => forges::set_up(side, limits, forge, out),
         Act::Adopt => {
             let Some(_party) = side.party else {
                 return;
@@ -223,7 +239,7 @@ pub const fn shown(side: &Side) -> u64 {
 }
 #[must_use]
 pub const fn max_out(_limits: &Limits) -> u32 {
-    2
+    4
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
@@ -234,6 +250,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     u64::from(limits.field_bytes)
         .checked_mul(6)?
         .checked_add(u64::from(limits.checks).checked_mul(4)?)?
+        .checked_add(forges::worst_case(limits)?)?
+        .checked_add(temper_client_protocol_wire::v1::Answer::worst_case_heap(&wire)?)?
         .checked_add(temper_client_protocol_wire::v1::DemoAnswer::worst_case_heap(&wire)?)?
         .checked_add(u64::try_from(size_of::<jig_client::Handle>()).ok()?)?
         .checked_add(u64::try_from(size_of::<temper_client_protocol_wire::v1::ChangePanel>()).ok()?)?
@@ -242,6 +260,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
 
 fn served(side: &mut Side, served: Served) {
     side.served = served;
+    if served == Served::OutOfDate
+        && let Some(set_up) = &mut side.set_up
+        && set_up.progress.is_some()
+    {
+        set_up.progress = Some(skein_lib::RequestProgress::Parked);
+    }
     if let Some(draft) = &mut side.form {
         draft.served = side.served;
         if side.served == Served::OutOfDate

@@ -48,6 +48,7 @@ pub fn delegation_page(landed: bool) -> skein_ui::Tree {
 pub fn first_run() -> skein_ui::Tree {
     first_run_page(client::Address::Chats, true)
 }
+#[expect(clippy::too_many_lines, reason = "one fixture answers the chat's documents and the session's demo and forges")]
 fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
     use jig_client::contract as c;
     use skein_lib::{Env, List, Queue, Time, Wall};
@@ -67,6 +68,25 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
     for _ in 0..128 {
         let Some(request) = out.pop() else { break };
         let up = match request {
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { record, .. } },
+                    },
+            } if temper_client_protocol_wire::decode_watching(&record.bytes, &wire_limits())
+                .expect("forge watch")
+                .watch()
+                == &temper_client_protocol_wire::v1::Watch::Forges =>
+            {
+                Some(jig_client::Up::FamilyDelivered {
+                    watch,
+                    record: jig_client::Family {
+                        family: temper_client_protocol_wire::FORGE,
+                        version: temper_client_protocol_wire::CLIENT_VERSION,
+                        bytes: demo_forges(),
+                    },
+                })
+            }
             Request::Client {
                 request:
                     jig_client::Request::Down {
@@ -290,4 +310,29 @@ fn demo_answer() -> Box<[u8]> {
         )
         .expect("demo answer fits"),
     )
+}
+
+fn demo_forges() -> Box<[u8]> {
+    use temper_client_protocol_wire::{self as wire, v1 as w};
+    let limits = wire_limits();
+    let mut forges = skein_lib::List::with_capacity(1);
+    forges
+        .push(
+            w::ForgeRow::new(
+                &limits,
+                w::ForgeRowParts {
+                    number: 1,
+                    kind: w::Kind::Forgejo,
+                    mode: w::Mode::Fake,
+                    connection: w::Connection::Connected(
+                        w::Connected::new(&limits, w::ConnectedParts { id: 1, login: b"temper".as_slice().into() })
+                            .expect("demo account"),
+                    ),
+                    offer: w::Offer::NotOffered,
+                },
+            )
+            .expect("demo forge"),
+        )
+        .expect("one demo forge");
+    wire::forges(&w::Forges::new(&limits, w::ForgesParts { forges }).expect("demo forges"))
 }

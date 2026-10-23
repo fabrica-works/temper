@@ -149,6 +149,9 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
             if forge_demo(root, env, &told, out) {
                 return;
             }
+            if forge_forges(root, env, &told, out) {
+                return;
+            }
             if forge_me(root, env, &told, out) {
                 return;
             }
@@ -174,6 +177,9 @@ fn forge_served(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) 
 fn forge_me(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
     let consumed = forge::me::told(&mut root.forge, &root.client, told, &mut child);
+    if consumed {
+        forge::forges::configure(&mut root.forge, env.limits.forge, &mut child);
+    }
     route_forge(root, env, &mut child, out);
     consumed
 }
@@ -209,4 +215,19 @@ fn playground(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let project = demo.project;
     pages(root, env, crate::pages::Event::Act { act: crate::pages::Act::Project { project } }, out);
     out.push(Request::Show { address: Address::Chats, replace: false });
+}
+
+fn forge_forges(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
+    let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
+    let consumed = forge::forges::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child);
+    if consumed
+        && let jig_client::Told::Answered { .. } = told
+        && let Some(last) = root.forge.set_up()
+        && last.answer == Some(forge::forges::SetUpAnswer::Outcome(forge::forges::SetUpOutcome::SettingUp))
+        && let Address::Welcome { step: crate::Step::Forge { .. } } = root.pages.address()
+    {
+        out.push(Request::Show { address: Address::Welcome { step: crate::Step::Model }, replace: false });
+    }
+    route_forge(root, env, &mut child, out);
+    consumed
 }

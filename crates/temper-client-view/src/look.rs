@@ -237,6 +237,10 @@ pub const FLOW_PROGRESS: Style = Style { owner: owner(), token: 115 };
 pub const NAV_NEEDS: Style = Style { owner: owner(), token: 116 };
 /// A navigation entry is limited.
 pub const NAV_LIMITED: Style = Style { owner: owner(), token: 117 };
+/// The forge connection flow's main.
+pub const CONNECT_FORGE: Style = Style { owner: owner(), token: 118 };
+/// A configuration entry or terminal command.
+pub const FLOW_CODE: Style = Style { owner: owner(), token: 119 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -360,6 +364,8 @@ pub const NAMES: Names<'static> = Names {
         b"temper-flow-progress",
         b"temper-nav-needs",
         b"temper-nav-limited",
+        b"temper-connect-forge",
+        b"temper-flow-code",
     ],
     regions: &[b"temper-link"],
 };

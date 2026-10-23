@@ -233,14 +233,16 @@ pub(super) fn root_at_with_demo(
     project_name: &[u8],
     demo: Option<(u32, bool)>,
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
-    root_at_with_activity(address, limits, project_name, demo, None)
+    root_at_with_activity(address, limits, project_name, demo, None, None)
 }
+#[expect(clippy::too_many_lines, reason = "one fixture delivers the page's documents and the session's reads together")]
 fn root_at_with_activity(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],
     demo: Option<(u32, bool)>,
     activity: Option<c::ActivityPage>,
+    forge_rows: Option<List<w::ForgeRow>>,
 ) -> (temper_client_domain::Domain, Token, Option<Token>, Option<Token>, Option<Token>) {
     use jig_client::contract::{Delivery, Subject, WatchEvent};
     use temper_client_domain::{Event, Request};
@@ -255,7 +257,9 @@ fn root_at_with_activity(
     );
     let welcome = match address {
         temper_client_domain::Address::Welcome { .. } => true,
-        temper_client_domain::Address::Chats
+        temper_client_domain::Address::Forges
+        | temper_client_domain::Address::ConnectForge { .. }
+        | temper_client_domain::Address::Chats
         | temper_client_domain::Address::Accounts
         | temper_client_domain::Address::Inbox { .. }
         | temper_client_domain::Address::Adopt { .. }
@@ -317,6 +321,47 @@ fn root_at_with_activity(
         &mut out,
     );
     answer_activity(&mut root, &env, activity_read, activity, &mut out);
+    let mut forges = None;
+    for _ in 0..out.len() {
+        let request = out.pop().expect("counted request");
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } },
+                },
+        } = &request
+        {
+            forges = Some(*watch);
+        }
+        out.push(request);
+    }
+    if let Some(watch) = forges {
+        let rows = match forge_rows {
+            Some(rows) => rows,
+            None => List::with_capacity(0),
+        };
+        let wire_limits = forge::wire_limits(&limits.forge).unwrap();
+        temper_client_domain::step(
+            &mut root,
+            &env,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::FamilyDelivered {
+                        watch,
+                        record: jig_client::Family {
+                            family: wire::FORGE,
+                            version: wire::CLIENT_VERSION,
+                            bytes: wire::forges(
+                                &w::Forges::new(&wire_limits, w::ForgesParts { forges: rows }).unwrap(),
+                            ),
+                        },
+                    },
+                },
+            },
+            &mut out,
+        );
+    }
+
     if demo.is_some() || welcome {
         let mut read = None;
         while let Some(request) = out.pop() {
@@ -862,6 +907,7 @@ pub mod chat {
             b"Shop",
             None,
             activity,
+            None,
         );
         let mut task = fixtures::task::document();
         task.chip.task = TASK;
@@ -1361,4 +1407,30 @@ pub mod panel;
 pub fn welcome_root(step: temper_client_domain::Step, demo: bool) -> temper_client_domain::Domain {
     let address = temper_client_domain::Address::Welcome { step };
     root_at_with_demo(address, &domain_limits(), b"Shop", if demo { Some((PROJECT, true)) } else { None }).0
+}
+
+/// A flow's rows delivered through the session watch.
+pub fn forge_root(address: temper_client_domain::Address, rows: List<w::ForgeRow>) -> temper_client_domain::Domain {
+    forge_root_accounts(address, rows).0
+}
+
+pub fn forge_root_accounts(
+    address: temper_client_domain::Address,
+    rows: List<w::ForgeRow>,
+) -> (temper_client_domain::Domain, Token) {
+    let (root, _, _, _, accounts) = root_at_with_activity(address, &domain_limits(), b"Shop", None, None, Some(rows));
+    (root, accounts.unwrap())
+}
+pub fn welcome_account(root: &mut temper_client_domain::Domain, watch: Token) {
+    root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(demo_accounts(true)))),
+                },
+            },
+        },
+    );
 }

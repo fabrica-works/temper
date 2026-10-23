@@ -18,6 +18,7 @@ use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 pub struct Joint {
     pub engine: Driver,
     pub sign_ins: u32,
+    set_ups: Vec<(u16, Token)>,
     pub answer_runs: bool,
     pub reply_runs: bool,
     pub runs_answered: u32,
@@ -56,6 +57,10 @@ fn engine_limits() -> engine::Limits {
     limits
 }
 impl Joint {
+    #[must_use]
+    pub fn set_ups(&self) -> &[(u16, Token)] {
+        &self.set_ups
+    }
     #[must_use]
     pub fn answers_to_lose(&self) -> u32 {
         self.lose_answers
@@ -446,6 +451,7 @@ impl Joint {
         Joint {
             engine,
             sign_ins: 0,
+            set_ups: Vec::new(),
             answer_runs: false,
             reply_runs: false,
             runs_answered: 0,
@@ -808,8 +814,14 @@ impl Joint {
             }
             self.packet(engine::Request::Party(engine::PartyRequest::Deliver(delivery)));
         }
+        self.immediate();
+    }
+    fn immediate(&mut self) {
         let immediate = std::mem::take(&mut self.engine.immediate);
         for request in immediate {
+            if let engine::Request::SetUp { forge, request } = &request {
+                self.set_ups.push((*forge, *request));
+            }
             self.packet(request);
         }
     }

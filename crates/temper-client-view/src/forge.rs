@@ -5,6 +5,7 @@ use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part};
 use skein_ui::{Builder, Role, phrases::Hole};
 use temper_client_domain::forge::words::{self as shared, ResourceWord as Word};
 pub mod bindings;
+pub(crate) mod connect;
 pub mod page;
 pub mod words;
 fn path_text(builder: &mut Builder, path: &[Box<[u8]>], words: &Words) {

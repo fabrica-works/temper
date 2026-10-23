@@ -41,6 +41,7 @@ pub enum Act {
     Home,
     Ci,
     Adopt,
+    SetUp { forge: u16 },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Typed {

@@ -136,3 +136,5 @@ fn dropped_work_goes_to_the_shell_with_its_count() {
 }
 
 mod change;
+
+mod connect;

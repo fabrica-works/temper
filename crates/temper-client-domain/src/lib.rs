@@ -16,7 +16,7 @@ pub mod limits;
 pub mod owner;
 pub mod pages;
 mod route;
-pub use address::{Address, Place, Step};
+pub use address::{Address, Choice, Place, Step};
 pub use boundary::{Action, Event, Fact, Request};
 pub use domain::{Domain, fire, new, next_deadline, shown, step, take, unlinked};
 pub use limits::{Limits, max_out, worst_case};

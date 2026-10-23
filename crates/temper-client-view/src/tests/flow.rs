@@ -3,7 +3,7 @@ use crate::flow::{self, Mark};
 use skein_ui::{Builder, Role, State};
 #[test]
 fn flow_steps_mark_the_current_one_and_those_before_it_done() {
-    for current in 0..4 {
+    for current in 0_usize..4 {
         let mut b = Builder::new(&f::tree_limits());
         flow::steps(&mut b, &f::words(), &[b"Choose", b"Details", b"Setting up", b"Ready"], current);
         let tree = b.finish();

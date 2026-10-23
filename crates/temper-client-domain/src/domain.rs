@@ -40,7 +40,7 @@ impl Domain {
     #[must_use]
     pub fn demo(&self) -> Option<(&forge::Demo, forge::demo::Halves)> {
         let answer = self.forge.demo()?;
-        let halves = forge::demo::halves(Some(answer), self.pages.accounts_document(&self.client));
+        let halves = forge::demo::halves(Some(answer), self.pages.accounts_document(&self.client), self.forges());
         if halves.model || halves.forge { Some((answer, halves)) } else { None }
     }
 
@@ -51,6 +51,10 @@ impl Domain {
     #[must_use]
     pub const fn client(&self) -> &jig_client::Client {
         &self.client
+    }
+    #[must_use]
+    pub const fn forges(&self) -> &forge::forges::State {
+        self.forge.forges()
     }
     #[must_use]
     pub const fn forge(&self) -> &forge::Side {

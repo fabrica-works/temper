@@ -6,6 +6,8 @@ pub enum Address {
     Inbox { filter: Filter },
     Chats,
     Accounts,
+    Forges,
+    ConnectForge { forge: Option<Choice> },
     Welcome { step: Step },
     Chat { task: u64 },
     Task { task: u64 },
@@ -15,9 +17,15 @@ pub enum Address {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Welcome,
-    Forge,
+    Forge { forge: Option<Choice> },
     Model,
     Ready,
+}
+/// A configured forge, or the instructions for adding a Forgejo elsewhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Choice {
+    Forge(u16),
+    Elsewhere,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Filter {
@@ -50,11 +58,13 @@ pub fn print(address: &Address) -> Box<[u8]> {
         Address::Welcome { step } => {
             return match step {
                 Step::Welcome => b"/welcome".as_slice().into(),
-                Step::Forge => b"/welcome?at=forge".as_slice().into(),
+                Step::Forge { forge } => print_choice(b"/welcome?at=forge", *forge, b"&forge="),
                 Step::Model => b"/welcome?at=model".as_slice().into(),
                 Step::Ready => b"/welcome?at=ready".as_slice().into(),
             };
         }
+        Address::ConnectForge { forge } => return print_choice(b"/forges/connect", *forge, b"?forge="),
+        Address::Forges => (b"forges".as_slice(), None, b"".as_slice()),
         Address::Accounts => (b"accounts".as_slice(), None, b"".as_slice()),
         Address::Chats => (b"chats".as_slice(), None, b"".as_slice()),
         Address::Chat { task } => (b"chats".as_slice(), Some(*task), b"".as_slice()),
@@ -101,6 +111,8 @@ pub fn parse(path: &[u8]) -> Place {
     let (name, rest) = segment(path);
     let (number, tail) = segment(rest);
     let address = match (name, number, tail) {
+        (b"forges", b"", b"") => Address::Forges,
+        (b"forges", b"connect", b"") => Address::ConnectForge { forge: forge_choice(fields) },
         (b"accounts", b"", b"") => Address::Accounts,
         (b"welcome", b"", b"") => Address::Welcome { step: welcome_step(fields) },
         (b"chats", b"", b"") => Address::Chats,
@@ -240,7 +252,7 @@ fn welcome_step(query: &[u8]) -> Step {
             }
             seen = true;
             step = match value {
-                b"forge" => Step::Forge,
+                b"forge" => Step::Forge { forge: forge_choice(query) },
                 b"model" => Step::Model,
                 b"ready" => Step::Ready,
                 _ => Step::Welcome,
@@ -248,4 +260,58 @@ fn welcome_step(query: &[u8]) -> Step {
         }
     }
     step
+}
+
+fn print_choice(base: &[u8], choice: Option<Choice>, separator: &[u8]) -> Box<[u8]> {
+    let Some(choice) = choice else { return base.into() };
+    let digits;
+    let value = match choice {
+        Choice::Forge(number) => {
+            digits = Decimal::of(u64::from(number));
+            digits.as_bytes()
+        }
+        Choice::Elsewhere => b"elsewhere",
+    };
+    let size = base
+        .len()
+        .checked_add(separator.len())
+        .expect("choice path fits")
+        .checked_add(value.len())
+        .expect("choice path fits");
+    let mut out = Writer::new(size);
+    for part in [base, separator, value] {
+        out.put(part).expect("measured choice path");
+    }
+    out.finish()
+}
+fn forge_choice(query: &[u8]) -> Option<Choice> {
+    let mut rest = query;
+    let mut seen = false;
+    let mut choice = None;
+    for _ in 0..query.len() {
+        if rest.is_empty() {
+            break;
+        }
+        let end = skein_lib::bytes::find(rest, b"&").unwrap_or(rest.len());
+        let field = rest.get(..end).expect("separator in query");
+        rest = rest.get(end..).expect("separator in query").strip_prefix(b"&").unwrap_or(b"");
+        if let Some(value) = field.strip_prefix(b"forge=") {
+            if seen {
+                continue;
+            }
+            seen = true;
+            choice = if value == b"elsewhere" {
+                Some(Choice::Elsewhere)
+            } else {
+                match decimal(value) {
+                    Some(value) => match u16::try_from(value) {
+                        Ok(value) => Some(Choice::Forge(value)),
+                        Err(_) => None,
+                    },
+                    None => None,
+                }
+            };
+        }
+    }
+    choice
 }

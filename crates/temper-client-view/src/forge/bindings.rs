@@ -10,6 +10,7 @@ pub enum Meaning {
     Home,
     Ci,
     Adopt,
+    SetUp(u16),
 }
 #[derive(Debug)]
 struct Entry {
@@ -60,6 +61,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Role(role) => Action::Forge(forge::Act::Choose { role }),
                 Meaning::Home => Action::Forge(forge::Act::Home),
                 Meaning::Ci => Action::Forge(forge::Act::Ci),
+                Meaning::SetUp(forge) => Action::Forge(forge::Act::SetUp { forge }),
                 Meaning::Adopt => Action::Forge(forge::Act::Adopt),
                 Meaning::Field(_) => return None,
             }),

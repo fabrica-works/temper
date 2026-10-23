@@ -118,7 +118,7 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         Address::Accounts => ("accounts", None),
         Address::Welcome { .. } => ("welcome", None),
         Address::Task { task } => ("task", Some(task)),
-        Address::Adopt { .. } => return None,
+        Address::Adopt { .. } | Address::ConnectForge { .. } | Address::Forges => return None,
     };
     let task = match task {
         Some(task) => format!("&task=T{task}"),

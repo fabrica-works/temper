@@ -85,15 +85,24 @@ pub struct Halves {
     pub forge: bool,
 }
 #[must_use]
-pub fn halves(answer: Option<&Demo>, accounts: Option<&c::OwnerAccounts>) -> Halves {
-    // Departure: the forge half holds while answered, pending the deployment's
-    // part (client/README.md, 4.8 and section 11).
+pub fn halves(answer: Option<&Demo>, accounts: Option<&c::OwnerAccounts>, forges: &super::forges::State) -> Halves {
     let mut halves = Halves { model: false, forge: false };
-    let (Some(answer), Some(accounts)) = (answer, accounts) else { return halves };
+    let Some(answer) = answer else { return halves };
+    if let super::forges::State::Rows(rows) = forges {
+        halves.forge = true;
+        for row in rows {
+            if row.number != answer.forge
+                && let super::forges::Connection::Connected { .. } = row.connection
+            {
+                halves.forge = false;
+                break;
+            }
+        }
+    }
+    let Some(accounts) = accounts else { return halves };
     if accounts.cut {
         return halves;
     }
-    halves.forge = true;
     for line in &accounts.accounts {
         if (line.provider != Some(answer.provider) && line.cut) || usable_account(line, Some(answer.provider)) {
             return halves;

@@ -127,6 +127,9 @@ impl Limits {
             .checked_add(128)?
             // Welcome steps, cards and foot, plus the shared accounts form.
             .max(account_nodes.checked_add(64)?)
+            // Choice cards: region, heading, body, note and link with text;
+            // the fixed step card also holds fields, snippets or progress.
+            .max(temper_client_domain::forge::forges::ROWS.checked_mul(10)?.checked_add(128)?)
             .checked_add(choices)?
             // The context line splits the repository from its forge suffix.
             .checked_add(1)?
@@ -191,6 +194,9 @@ pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words:
             &domain.accounts,
             domain.client.domain.rows,
         ))?)?
+        .checked_add(skein_lib::List::<temper_client_domain::Choice>::worst_case(
+            temper_client_domain::forge::forges::ROWS.checked_add(1)?,
+        )?)?
         // Transient offered ways and account heading fragments, borrowed from admitted documents.
         .checked_add(skein_lib::List::<temper_client_domain::pages::accounts::Way>::worst_case(
             domain.client.domain.rows.checked_mul(3)?,

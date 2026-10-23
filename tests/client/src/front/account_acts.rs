@@ -15,23 +15,34 @@ pub const PROVIDER: u32 = 17;
 pub const SMALL_ROWS: u32 = 2;
 #[must_use]
 pub fn fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, false, false)
+    fixture_root(seed, false, 2, None, false, WelcomeForge::None)
 }
 #[must_use]
 pub fn plan_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, true, false)
+    fixture_root(seed, false, 2, None, true, WelcomeForge::None)
 }
 #[must_use]
 pub fn tools_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, true, 2, None, false, false)
+    fixture_root(seed, true, 2, None, false, WelcomeForge::None)
 }
 #[must_use]
 pub fn small_rows_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 3, Some(SMALL_ROWS), false, false)
+    fixture_root(seed, false, 3, Some(SMALL_ROWS), false, WelcomeForge::None)
 }
 #[must_use]
 pub fn welcome_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, false, true)
+    fixture_root(seed, false, 2, None, false, WelcomeForge::Connected)
+}
+/// The first-run forge is owned by the box; the test scripts its connection rows.
+#[must_use]
+pub fn forge_fixture(seed: u64) -> (Joint, Root) {
+    fixture_root(seed, false, 2, None, false, WelcomeForge::Owned)
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WelcomeForge {
+    None,
+    Connected,
+    Owned,
 }
 fn fixture_root(
     seed: u64,
@@ -39,8 +50,10 @@ fn fixture_root(
     own_accounts: u32,
     rows: Option<u32>,
     plan: bool,
-    welcome: bool,
+    forge: WelcomeForge,
 ) -> (Joint, Root) {
+    let welcome = forge != WelcomeForge::None;
+    let forge_setup = forge == WelcomeForge::Owned;
     let mut limits = if tools { temper_client_tools::limits::client() } else { fixtures::domain_limits() };
     if let Some(rows) = rows {
         limits.client.domain.rows = rows;
@@ -69,13 +82,18 @@ fn fixture_root(
             config.core.settings.llm_providers.providers.get_mut(0).expect("fixture provider").models =
                 Box::new([Box::from(b"scripted".as_slice()), Box::from(b"effort-model".as_slice())]);
         }
+        config.under_box |= forge_setup;
         if welcome {
             config.core.connectors = Box::new([fixtures::FORGE]);
             config.forges = Box::new([temper_engine_domain_forge::Configured {
                 number: 1,
                 kind: temper_engine_domain_forge::Kind::Forgejo,
-                mode: temper_engine_domain_forge::Mode::Connected,
-                asked: false,
+                mode: if forge_setup {
+                    temper_engine_domain_forge::Mode::Owned
+                } else {
+                    temper_engine_domain_forge::Mode::Connected
+                },
+                asked: forge_setup,
             }]);
         }
         let mut engine_limits = engine_limits();
@@ -98,6 +116,13 @@ fn fixture_root(
         (config, engine_limits)
     });
     let mut front = Joint::with_engine(seed, &limits, Store::new(), [bootstrap, config], &engine_limits, 1);
+    if forge_setup {
+        front.engine.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::Connection {
+            forge: 1,
+            state: temper_engine_domain_forge::Connection::NotSetUp,
+        })));
+        front.engine.settle();
+    }
     front.bind(CLIENT, fixtures::PARTY);
     let mut root = if tools {
         crate::agent::new(seed).0
