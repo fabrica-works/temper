@@ -616,6 +616,10 @@ view draws, never changing a view to suit a sample.
 | `accounts-solo` | the solo world's accounts |
 | `chats-first-run-1` | the first run's first screen: the demo's start |
 | `welcome-first-run-0` | the first run's welcome: its two cards |
+| `connect-forge-first-run-6` | the first run's `ConnectForge` at step 6: Forgejo here setting up, the box preparing |
+| `forges-first-run-7` | the first run's Forges at step 7: Forgejo here connected |
+| `connect-forge-choose` | `ConnectForge`'s Choose: GitHub, Forgejo here and a Forgejo elsewhere |
+| `chats-setup-strip` | the chats with no demo, no usable account and no forge: the setup strip |
 | `adoption` | the adoption form, empty |
 | `adoption-filled` | the adoption form, filled in |
 | `adoption-refused` | the adoption form after a refusal, its alert |
