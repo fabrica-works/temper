@@ -176,17 +176,16 @@
     },
     {
       id: '4', label: '4', hour: 6 / 60, act: 1, title: 'A text-only request',
-      summary: 'Back on the playground’s start, Sam picks “Add a dark theme to widget”. Its script is one turn: an answer in words, then finish with a report, as setup.md 8.4 has it. That ends the chat, so its page has no composer: the README flags this as a likely flaw.',
+      summary: 'Back on the playground’s start, Sam picks “Add a dark theme to widget”. Its script is one turn: an answer in words, then finish, as setup.md 8.4 has it. A chat is ended by its requester, so finish ends only the turn: T4 waits at rest for Sam’s next words, its composer with it, as T1 does.',
       look: [
-        ['chat.html?task=T4', 'T4: answered, then ended, with no composer'],
-        ['chats.html', 'Chats: T1 at rest, T4 ended'],
+        ['chat.html?task=T4', 'T4: answered, at rest, its composer open'],
+        ['chats.html', 'Chats: T1 and T4 at rest'],
       ],
       apply(w, id) {
         w.tasks.T4 = {
           title: DARK, by: 'Sam', template: 'chat', charter: 'chat', requester: 'Sam',
           model: 'Scripted model', account: 'Playground', hostKind: 'workers',
-          phase: 'done', contract: 'report', result: 'The playground changes nothing.',
-          spend: 0, budget: null, made: 5, ended: 5, at: id,
+          phase: 'idle', waitsOn: 'news', wake: { words: true }, spend: 0, budget: null, made: 5, at: id,
         };
         w.transcripts.T1[w.transcripts.T1.length - 2].read = true;
         w.transcripts.T4 = [
@@ -232,7 +231,7 @@
     },
     {
       id: '7', label: '7', hour: 19 / 60, act: 2, title: 'A Forgejo connected',
-      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the playground’s banner is gone. Sam’s first forge is connected, so the playground ends: its forge stops and leaves the Forges page, its open chat ends, and playground/widget leaves Default; what the playground did stays readable.',
+      summary: 'Forgejo and its runner started. temper connected as its bot, made work/hello with a README and a CI workflow, and adopted it into the new project hello; the workflow’s first run passed. The flow ends on the work: Sam opens hello, a project with no chat yet. A real model and a real forge are connected, so the playground’s banner is gone. Sam’s first forge is connected, so the playground ends: its forge stops and leaves the Forges page, its open chats end, and playground/widget leaves Default; what the playground did stays readable.',
       look: [
         ['connect-forge.html?forge=3', 'Connect a forge: ready, and Open hello'],
         ['chats.html?project=hello', 'Chats in hello: no chat yet, no banner'],
@@ -254,8 +253,10 @@
         w.demo.state = 'retired';
         w.forges[0].state = 'retired';
         w.repos.widget.retired = true;
-        Object.assign(w.tasks.T1, { phase: 'done', ended: 19,
-          endedWhy: 'the playground ended when Forgejo on this machine connected' });
+        for (const id of ['T1', 'T4']) {
+          Object.assign(w.tasks[id], { phase: 'done', ended: 19,
+            endedWhy: 'the playground ended when Forgejo on this machine connected' });
+        }
       },
     },
   ];
