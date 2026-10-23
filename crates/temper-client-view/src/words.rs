@@ -16,7 +16,6 @@ pub enum Word {
     AddForge,
     NoForges,
     ForgeSummary,
-    ForgeAccount,
     ForgeAccountLabel,
     ForgeOpenSetup,
     ForgeRestartBox,
@@ -29,7 +28,6 @@ pub enum Word {
     SetupForge,
     SetupModel,
     SetupContinue,
-    ForgeRowConnected,
 
     ForgeSetupUrl,
     ForgeFirstRepository,
@@ -502,16 +500,15 @@ pub enum Word {
 // The flow's three state words (5.2).
 // The Accounts navigation's two state words (5.3).
 // ConnectForge's and the welcome's forge words (client/forge.md, 5.4).
-// The Forges page, navigation dot and setup strip (20 phrases).
-const PHRASES: u32 = 941;
-const ALL: [Word; 460] = [
+// The Forges page, navigation dot and setup strip (18 phrases).
+const PHRASES: u32 = 939;
+const ALL: [Word; 458] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
     Word::AddForge,
     Word::NoForges,
     Word::ForgeSummary,
-    Word::ForgeAccount,
     Word::ForgeAccountLabel,
     Word::ForgeOpenSetup,
     Word::ForgeRestartBox,
@@ -524,7 +521,6 @@ const ALL: [Word; 460] = [
     Word::SetupForge,
     Word::SetupModel,
     Word::SetupContinue,
-    Word::ForgeRowConnected,
     Word::ForgeSetupUrl,
     Word::ForgeFirstRepository,
     Word::ForgeConnectedTitle,
@@ -976,7 +972,6 @@ impl Word {
             Self::AddForge => 1802,
             Self::NoForges => 1803,
             Self::ForgeSummary => 1804,
-            Self::ForgeAccount => 1805,
             Self::ForgeAccountLabel => 1806,
             Self::ForgeOpenSetup => 1807,
             Self::ForgeRestartBox => 1808,
@@ -989,7 +984,6 @@ impl Word {
             Self::SetupForge => 1815,
             Self::SetupModel => 1816,
             Self::SetupContinue => 1817,
-            Self::ForgeRowConnected => 1818,
             Self::ForgeSetupUrl => 1700,
             Self::ForgeFirstRepository => 1701,
             Self::ForgeConnectedTitle => 1703,
@@ -1462,24 +1456,11 @@ pub struct Words {
 // A refusal joins only this closed vocabulary, bounded numbers and a calendar
 // clock: 256 bytes holds its longest three-sentence explanation whole.
 const REFUSAL_BYTES: u32 = 256;
-const FORGE_NAME_BYTES: u32 = 3072; // The wire's 1024-byte login, reason and demo names, after UTF-8 replacement.
-const FORGE_CONNECTION_BYTES: u32 = 3136; // The name or reason plus the connection's fixed words.
 fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32, Invalid> {
-    // Forge byte fields can expand threefold when displayed as UTF-8. The
-    // connection adds its fixed state words before becoming a summary hole.
-    if kind == HoleKind::Name {
-        if word == Word::ForgeSummary && last {
-            return Ok(FORGE_CONNECTION_BYTES);
-        }
-        if [Word::ForgeAccount, Word::ForgeRowConnected, Word::ForgePlaygroundSummary].contains(&word) {
-            return Ok(FORGE_NAME_BYTES);
-        }
-    }
-
     if kind == HoleKind::Name && (word == Word::RefusalSentences || word == Word::WaitRefused) {
         return Ok(REFUSAL_BYTES);
     }
-    if word == Word::DemoRequest || word == Word::DemoRepository {
+    if word == Word::DemoRequest || word == Word::DemoRepository || word == Word::ForgePlaygroundSummary {
         return Ok(temper_client_domain::forge::DEMO_FIELD_BYTES);
     }
     let model_name = joined.min(crate::choice::MODEL_SHOWN);
@@ -1590,7 +1571,7 @@ impl Words {
             segments: 1664,
             text_bytes: 24576,
             // Whole demo requests keep their supplied bound.
-            hole_bytes: joined.max(temper_client_domain::forge::DEMO_FIELD_BYTES).max(FORGE_CONNECTION_BYTES),
+            hole_bytes: joined.max(temper_client_domain::forge::DEMO_FIELD_BYTES),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { book, language: 0, connector, name_bytes: joined })
@@ -1654,8 +1635,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ForgesDescription => (&[b"Each forge temper is connected to, or setting up. Add one to bring its repositories to temper."], &[]),
         Word::AddForge => (&[b"+ Add a forge"], &[]),
         Word::NoForges => (&[b"No forge of yours yet."], &[]),
-        Word::ForgeSummary => (&[b"forge ", b" \xc2\xb7 ", b" \xc2\xb7 ", b""], &[Number, Name, Name]),
-        Word::ForgeAccount => (&[b"", b" \xc2\xb7 user ", b""], &[Name, Number]),
+        Word::ForgeSummary => (&[b"forge ", b" \xc2\xb7 ", b""], &[Number, Name]),
         Word::ForgeAccountLabel => (&[b"Account"], &[]),
         Word::ForgeOpenSetup => (&[b"Open its set-up \xe2\x80\xba"], &[]),
         Word::ForgeRestartBox => (&[b"Restart temper box: its preparation mends it"], &[]),
@@ -1668,7 +1648,6 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::SetupForge => (&[b"temper has no forge yet."], &[]),
         Word::SetupModel => (&[b"temper has no model yet."], &[]),
         Word::SetupContinue => (&[b"Continue setting up"], &[]),
-        Word::ForgeRowConnected => (&[b"Connected as ", b""], &[Name]),
         Word::ForgeSetupUrl => (&[b"On GitHub, set the App\xe2\x80\x99s setup URL to temper\xe2\x80\x99s address followed by /forges/", b"/github/setup, and give it the permissions and events temper\xe2\x80\x99s guide lists."], &[Number]),
         Word::ForgeFirstRepository => (&[b"Its first repository is work/hello, in ", b"; choosing them here comes later."], &[Name]),
         Word::ForgeConnectedTitle => (&[b"", b" is connected"], &[Name]),

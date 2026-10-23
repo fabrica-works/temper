@@ -909,6 +909,22 @@ fn join_words(parts: &[&[u8]]) -> Box<[u8]> {
     }
     out.finish()
 }
+/// A connected row's words on the Forges page, "Connected as LOGIN" (client/forge.md, 5.4).
+#[must_use]
+pub fn forge_connected_as(login: &[u8]) -> Box<[u8]> {
+    join_words(&[b"Connected as ", &lossy(login)])
+}
+/// A connected row's Account line, "LOGIN · user ID" (client/forge.md, 5.4).
+#[must_use]
+pub fn forge_account(login: &[u8], id: u64) -> Box<[u8]> {
+    join_words(&[&lossy(login), b" \xc2\xb7 user ", skein_lib::Decimal::of(id).as_bytes()])
+}
+/// A row's summary, its "forge N · KIND" and its connection's words, joined
+/// here: a login or a reason can outgrow any phrase hole once shown as UTF-8.
+#[must_use]
+pub fn forge_summary(head: &[u8], connection: &[u8]) -> Box<[u8]> {
+    join_words(&[head, b" \xc2\xb7 ", connection])
+}
 #[must_use]
 pub fn forge_connection(row: &super::forges::Row) -> Box<[u8]> {
     use super::forges::{Connection as C, Offer, Step};
@@ -948,9 +964,7 @@ pub const fn forge_set_up_action(row: &super::forges::Row) -> Option<&'static [u
 
 // Keep owned byte strings under the domain's subset while showing invalid UTF-8
 // with the same replacement character as the clients' text shells.
-/// Forge byte fields rendered as UTF-8, with one replacement character per invalid chunk.
-#[must_use]
-pub fn lossy(bytes: &[u8]) -> Box<[u8]> {
+fn lossy(bytes: &[u8]) -> Box<[u8]> {
     let mut size = 0usize;
     for chunk in bytes.utf8_chunks() {
         size = size.checked_add(chunk.valid().len()).expect("bounded forge words");

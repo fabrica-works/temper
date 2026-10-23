@@ -771,8 +771,9 @@ mod memory_literal;
 // The flow's three state words (444 B).
 // The Accounts navigation's two state words (296 B).
 // ConnectForge's and the welcome's forge words, and 128 more phrase segments (11,588 B).
+// The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6978215785;
+const ACCOUNT_BYTES: u64 = 6994600584;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

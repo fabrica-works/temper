@@ -6,13 +6,14 @@ Menu:
     [2] Inbox
     [3] Chats (current)
     [4] Adopt a repository
-    [5] Accounts
+    [5] Forges
+    [6] Accounts
   * Pat
-  [6] Sign out
+  [7] Sign out
 Playground:
   This is the playground: a scripted model and a playground forge.
-  [7] Connect a model
-  [-] Connect a forge (disabled)
+  [8] Connect a model
+  [9] Connect a forge
 New chat
 * Ready
 Scripted model
@@ -21,19 +22,19 @@ Signed in as the deployment’s owner
 What shall we change?
   Try a request in playground/widget. Follow the task from its branch to a landed change.
   Suggested requests:
-    - [8] Add CSV export to widget
-    - [9] Add a dark theme to widget
-    - [10] Fix widget’s empty search state
+    - [10] Add CSV export to widget
+    - [11] Add a dark theme to widget
+    - [12] Fix widget’s empty search state
   The scripted model plays these requests from its script.
 Using Scripted model · Default
 Change model:
-  - [11] Scripted model
-  [12] Reset choice
-[13] Start a chat: (empty) (enter sends)
+  - [13] Scripted model
+  [14] Reset choice
+[15] Start a chat: (empty) (enter sends)
 temper · Enter to start · Shift+Enter for newline
-[14] Start
+[16] Start
 ## Your chats
-[15] All (pressed)
-[16] Live
-[17] Closed
+[17] All (pressed)
+[18] Live
+[19] Closed
 No chats yet.

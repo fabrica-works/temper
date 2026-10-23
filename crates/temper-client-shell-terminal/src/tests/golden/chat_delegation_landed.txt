@@ -6,13 +6,14 @@ Menu:
     [2] Inbox
     [3] Chats (current)
     [4] Adopt a repository
-    [5] Accounts
+    [5] Forges
+    [6] Accounts
   * Pat
-  [6] Sign out
+  [7] Sign out
 Playground:
   This is the playground: a scripted model and a playground forge.
-  [7] Connect a model
-  [-] Connect a forge (disabled)
+  [8] Connect a model
+  [9] Connect a forge
 T1 · Add CSV export to widget:
   * waiting on your words
   Scripted model
@@ -37,7 +38,7 @@ Conversation:
       - Pull request opened (completed)
       - CI passed (completed)
       - Landed (completed)
-    [8] Task 2 ↗
+    [10] Task 2 ↗
   1 tool call:
     wait
     wait
@@ -48,6 +49,6 @@ Conversation:
     wait
     wait
 Using Scripted model · Default
-[9] Message: (empty) (enter sends)
+[11] Message: (empty) (enter sends)
 Enter to send · Shift+Enter for newline
-[10] Send
+[12] Send

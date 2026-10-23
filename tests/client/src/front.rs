@@ -807,10 +807,6 @@ impl Joint {
             self.engine.store.pending
         );
     }
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one drain observes commits and routes scripted deliveries, including forge setup"
-    )]
     fn drain(&mut self) {
         self.settle();
         let commit = self.engine.store.header().commits;
