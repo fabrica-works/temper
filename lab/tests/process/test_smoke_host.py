@@ -100,7 +100,7 @@ def canary_run(lab, unit, case, native_host=None):
     run.schedule = dict(draws={})
     run.start, run.started = time.monotonic(), host.utc()
     run.records, run.commands, run.items = {}, [], {}
-    run.failures, run.undecided, run.errors, run.bounds = [], [], [], []
+    run.failures, run.undecided, run.errors = [], [], []
     run.link = run.public = run.interrupted = None
     run.cleaning = False
     run.mkdir('scratch/engine')

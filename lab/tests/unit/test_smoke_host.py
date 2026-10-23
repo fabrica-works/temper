@@ -153,7 +153,7 @@ class Filtering(unittest.TestCase):
             run.order = ['engine']
             run.cost = dict(ready_seconds=120, command_seconds=240, stop_seconds=20)
             run.schedule = dict(start_order=[], draws={})
-            run.bounds, run.failures, run.errors, run.undecided = [], [], [], []
+            run.failures, run.errors, run.undecided = [], [], []
             run.interrupted = None
             run.start_child = Mock(return_value='proc-engine')
             run.finish = lambda: run.errors
@@ -169,7 +169,7 @@ class Filtering(unittest.TestCase):
                     host.native, 'Host', return_value=types.SimpleNamespace(root='/inert')):
                 errors = run.run()
             self.assertIn('readiness deadline passed', errors[0]['detail'])
-            self.assertEqual(run.bounds, [dict(name='ready_seconds', who='engine')])
+            self.assertEqual([f['signature'] for f in run.failures], ['bound/ready_seconds/engine'])
             run.stop_all.assert_called_once()
             run.collect_live.assert_not_called()
 
@@ -280,7 +280,7 @@ class StopBudgets(unittest.TestCase):
         run.host.kill_tree = Mock(side_effect=lambda identity: child.update(killed=True))
         run.event = Mock()
         run.cost = dict(stop_seconds=20)
-        run.bounds, run.failures = [], []
+        run.failures = []
         run.wait = Mock(return_value=False)
         return run
 
@@ -429,7 +429,9 @@ class Records(unittest.TestCase):
                 run.records = {'engine': dict(name='engine', group='processes',
                     exit=dict(ms=1, stopped=True, killed=False, **ending),
                     memory=dict(bound_bytes=None, peak_bytes=1))}
-                run.failures, run.undecided, run.errors, run.bounds = [], [], [], []
+                run.failures, run.undecided, run.errors = [], [], []
+                run.cost = dict(name='calibration', ready_seconds=120, command_seconds=240, stop_seconds=20,
+                                driver_seconds=240, driver_actions=1, driver_input_tokens=1)
                 run.commands = []
                 run.interrupted = None
                 run.exp = dict(name='smoke')
@@ -453,9 +455,7 @@ class Records(unittest.TestCase):
             run.lab = lab
             run.key = dict(format='lab-key/1', experiment='sha256:' + '1' * 64,
                            subject='sha256:' + '2' * 64, lab=dict(runner='sha256:' + '3' * 64,
-                               python='3.11', programs=[], driver=None, cost=dict(name='calibration',
-                                   ready_seconds=120, command_seconds=240, stop_seconds=20,
-                                   driver_seconds=240, driver_actions=1, driver_input_tokens=1)))
+                               python='3.11', programs=[], driver=None, cost=dict(name='calibration')))
             run.key_path = 'keys/smoke/' + host.canonical.digest(run.key)
             lab.write_once(run.key_path + '/key.json', host.canonical.record_bytes(run.key))
             run.run_id = '20261023T001000000Z-abcdef'
@@ -464,7 +464,9 @@ class Records(unittest.TestCase):
             run.args = types.SimpleNamespace(seed='1', unit='canary-unit')
             run.attempt, run.schedule, run.started = 1, {}, host.utc()
             run.host, run.records, run.commands = None, {}, []
-            run.failures, run.undecided, run.bounds = [], [], []
+            run.failures, run.undecided = [], []
+            run.cost = dict(name='calibration', ready_seconds=120, command_seconds=240, stop_seconds=20,
+                            driver_seconds=240, driver_actions=1, driver_input_tokens=1)
             run.errors = [dict(what='host', detail='CapabilityError')]
             run.interrupted = 'SIGTERM'
             run.ms = lambda: 1

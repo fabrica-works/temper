@@ -192,10 +192,11 @@ class Run:
         self.run_id = now.strftime('%Y%m%dT%H%M%S') + f'{now.microsecond // 1000:03d}Z-' + secrets.token_hex(3)
         self.key_path, self.attempt = key_path, attempt
         self.base = key_path + '/runs/' + self.run_id
-        self.cost = key['lab']['cost']
+        # The key names the class; its values are the settings' at run time (lab.md 6.5).
+        self.cost = cli._runtime_cost(lab, key)
         self.start, self.started = time.monotonic(), utc()
         self.records, self.commands, self.items = {}, [], {}
-        self.failures, self.undecided, self.errors, self.bounds = [], [], [], []
+        self.failures, self.undecided, self.errors = [], [], []
         self.host, self.link, self.public = None, None, None
         self.interrupted, self.cleaning = None, False
         self.order = draws.start_order(args.seed, {p['name']: p.get('after', []) for p in exp['processes']})
@@ -455,7 +456,6 @@ class Run:
         item = self.items[identity]
         if not self.wait(lambda: item['empty'], deadline):
             item['timed_out'] = True
-            self.bounds.append(dict(name='command_seconds', who=definition['name']))
             self.failures.append(checks.failure('bound/command_seconds/' + definition['name'], 'bound', 'command deadline passed'))
             self.stop_child(identity, kill=True)
             raise Halt('command deadline passed')
@@ -488,7 +488,6 @@ class Run:
                 self.event('signal', name=item['record']['name'], signal='SIGTERM', target='first')
         if self.wait(lambda: item['empty'], deadline):
             return
-        self.bounds.append(dict(name='stop_seconds', who=item['record']['name']))
         self.failures.append(checks.failure('bound/stop_seconds/' + item['record']['name'], 'bound', 'stop deadline passed'))
         require(not child['killed'], 'killed tree did not empty; retained for unit cleanup')
         self.host.kill_tree(identity)
@@ -605,7 +604,7 @@ class Run:
                       experiment=self.exp['name'], seed=self.args.seed, attempt=self.attempt, campaign=None,
                       started=self.started, ended=utc(), outcome=result, schedule=self.schedule,
                       processes=self.records, commands=self.commands, driver=None, failures=self.failures,
-                      undecided=self.undecided, errors=self.errors, bounds=self.bounds,
+                      undecided=self.undecided, errors=self.errors, bounds=self.cost,
                       usage=dict(elapsed_ms=self.ms(), longest_ms=None, driver=None, triage=[]),
                       about=dict(host='attended S', unit=self.args.unit, stdin='private sign-in has null stdin evidence',
                                  observation_boundary='settled landed delegate and complete Open root tree plus explicit checkpoint prefix'))
@@ -649,7 +648,6 @@ class Run:
                     # also arrive within this same ready120 window, in either
                     # stream order; no second wait or deadline is introduced.
                     if not self.wait(lambda: self.startup_ready(name), deadline):
-                        self.bounds.append(dict(name='ready_seconds', who=name))
                         self.failures.append(checks.failure('bound/ready_seconds/' + name, 'bound', 'readiness deadline passed'))
                         raise Halt('readiness deadline passed')
                 for action in self.exp['actions']:
