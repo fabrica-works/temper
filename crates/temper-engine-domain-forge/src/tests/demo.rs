@@ -300,3 +300,32 @@ fn closing_the_box_before_the_end_suppresses_stop_and_ended_connections_stay_ine
         assert_eq!(d.demo_state(), Some(DemoState::Ended));
     }
 }
+
+#[test]
+fn a_lost_writers_read_waiting_on_the_ended_demo_forge_is_never_asked_again() {
+    let mut d = configured(true);
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(
+        &mut d,
+        Event::Restore {
+            record: Stored::Hold(Hold {
+                name: run_branch(b"7"),
+                task: 7,
+                writer: Some(Writer::Lost { task: 9, attempt: 1 }),
+                drift: None,
+            }),
+        },
+    );
+    outputs(&mut d, Event::Restore { record: Stored::Demo(Demo { forge: 1, state: DemoState::Running }) });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    fixtures::answer_next(&mut d, Err(skein_forge::api::Error::NotConnected));
+    assert!(!d.is_ready(), "the read waits for the demo forge's connection");
+    connected(&mut d, 2);
+    assert!(d.forge_ended(1));
+    assert!(connected(&mut d, 1).is_empty());
+    assert!(!d.is_ready(), "an ended forge's connection asks no read again");
+    assert!(ready(&mut d).is_empty());
+    assert_eq!(d.hold(&run_branch(b"7")).unwrap().writer, Some(Writer::Lost { task: 9, attempt: 1 }));
+}

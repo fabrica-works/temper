@@ -346,7 +346,8 @@ temper-engine-domain-forge              the connector's top: resources and holds
   forges` names it no more, no offer, so that `SetUp` is refused "not
   offered", nothing in the picker (4.3), and nothing in the setup host's
   scans, which read the same state; the routing's events for it change
-  nothing (`../protocol/forge.md`, 8.1). Its writer stays the forge
+  nothing (`../protocol/forge.md`, 8.1), so that a read waiting on its
+  connection (16) is never asked again. Its writer stays the forge
   client's record, and its rows stay, so that what it did reads as
   before.
 - **A repository ended** is one adopted from an ended forge. Nothing
