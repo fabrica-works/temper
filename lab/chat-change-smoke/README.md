@@ -15,7 +15,12 @@ inherit no environment; scripts use explicit `PATH=/usr/bin:/bin`.
 The fake LLM writes `llm.key` and its test root `root.der` before readiness.
 Engine and agents use TLS dialect 3, server name `skein.test`, trusting that
 root alone. The existing cluster-first/second-chat scripts and their chat
-wait/run windows remain. NOTICE adds chat delegation to procedure 2, coding
+wait/run windows remain. S's manifest runs `smoke/_runtime_llm.py`: after normal
+rendering it derives mode-0600 `llm.s-runtime.json` beside the rendered input,
+then execs the same fake LLM argv with only its document path replaced. Only
+NOTICE root's third `finish` becomes text plus `wait`. The canonical template,
+root delegation and initial reply/wait, coding/review scripts, TLS, seeds,
+readiness and eight-turn budgets remain. NOTICE delegates to procedure 2, coding
 charter 2, exact write/shell/change results and a review at the named head.
 The landing fixture supplies grants, CI/up-to-date/exact-review rules and
 capacities, without its shortened forge polls or rate window. Typed limits
@@ -26,7 +31,22 @@ adopt. Adoption precedes the story's first chat. `tools/ctl` and `smoke/story`
 take `TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN`; the last argument is exactly
 `http://HOST:PORT/`, never a sign-in link or path. The seed's sign-in command
 declares no stored stdin: the host supplies the newline-terminated credential
-through its private pipe. Seed waits200/story220 stay within command240;
+through its private pipe.
+
+The story creates ROOT, waits for its reply, reads its complete live tree
+and ended direct children, and selects exactly one connector-1/kind-2 coding
+procedure. It waits for that CHILD to end and requires the actual owner JSON
+`result.ending.task.done.change`: kind 1, part connector 1, uncut whole merge
+ID. Its requester must be ROOT. It retains this historical evidence even if
+CHILD has left the final complete, unfolded ROOT tree, which must have no
+held descendants and zero live delegates. Partial pages are rejected. No
+model report or process exit alone establishes success.
+
+One absolute 220s story deadline bounds every subprocess and both product
+watches (`replied` for ROOT, `ended` for CHILD), using only time remaining.
+S leaves ROOT Open: Close, Open-run completion and root finalization are
+excluded coverage, owned by close-finish. No story waits for ROOT to end.
+Seed waits200/story220 stay within command240;
 ready120/stop20 and existing service graces and memory declarations stay.
 
 The required evidence order is live observations with an independently
@@ -35,8 +55,8 @@ request/response evidence; confirmed engine exit and empty trees; copied
 `data/state/store`; then the existing `fake forge check` using that copy.
 The manifest lists the commands, while the attended host owns this order.
 The generic runner's collect/check-before-stop path cannot execute this S.
-No checker opens a live store. An ended chat or EOF alone never confirms
-the boundary; absent proof must pass `unknown` to the helper.
+No checker opens a live store. A successful outer exit or EOF alone never
+confirms the boundary; absent proof must pass `unknown` to the helper.
 
 The host appends the helper's existing `--boundary confirmed|unknown`,
 `--deadline-monotonic D`, `--evidence-dir E`, and `--result R` arguments to
@@ -61,7 +81,7 @@ Canonical integration contracts:
   Canonical engine stdout retains its in-memory `http://` link capture for
   the native process harness. S alone removes that capture and keeps its
   attended private pipe; no captured link enters its manifest or evidence.
-  S adds the trusted client seed, story and stopped checks.
+  S adds the trusted client seed, story, runtime LLM adapter and stopped checks.
 - **Roles and capacity:** application charter 2 is coding/review's default;
   chat stories follow the actual chat template's executor, charter 1, whose
   120-second wait/ordinary run assertions remain. Each remote worker's
@@ -83,11 +103,15 @@ Canonical integration contracts:
   The story's full public origin is validated without prefixing or stripping
   paths. No link capture or placeholder is published. `collect_live` appends
   the actual D/E/R flags above and `stopped_check` requires engine/all trees
-  empty. The causal boundary relies on the fixed story's validated terminal
-  wait/tree read, jig's settled delegates/effects lifecycle, and the selected
-  fake writer's flush-before-reply contract. A checkpoint or story exit
-  alone is insufficient; missing proof must stay unknown. Parent review of
-  that argument and the case-2 contracts remains required before a run.
+  empty. `collect_live` rechecks all six retained story records and records
+  ROOT, CHILD and the full merge ID in its boundary event. Its source-based
+  causal argument is `forge_route.rs`'s Finish → release → Settled chain:
+  `continue_release` drains prior effects and deletes owned branches before
+  Released, which maps to task Settled. The runtime root has no subsequent
+  mutating script calls. This delegate settlement, final complete Open tree
+  and the fake writer's flush-before-reply contract establish the pre-stop
+  boundary. A checkpoint or story exit alone is insufficient; missing proof
+  stays unknown. This is a source argument, pending an attended run.
 - **Page copies, joined:** cluster-web inherits all five canonical service
   members and templates, including forge, coding, records-only setup, fake
   git and webhook readiness. It adds its bundle and browser. Look-live
@@ -102,7 +126,14 @@ excluding the forge. Native configuration checks exercise the canonical
 reader's synthetic capture path. These checks do not establish a successful
 product story or prove the host's causal boundary on a real run.
 
-The parent reviews the complete diff and runs the `land` gate before main
-moves. A corrected S experiment and the three attended seeds follow that
-review separately. This integration performs no gate, landing, real lab
-run, paid driver or campaign.
+Focused checks run through `heavy`: `test_ctl_output.py`, `test_smoke_assembly.py`,
+`test_smoke_host.py` and `test_end_state.py` under `lab/tests/unit/`, plus the
+existing native host canaries under `lab/tests/process/` when host changes
+warrant them. They cover typed successful/failed owner results, fast-ended
+discovery, incomplete evidence, shared deadlines, runtime isolation, private
+bootstrap and live collection before stop/store copy/promises. Canonical
+template equality and independent forge content/diff/promise checks remain.
+
+This MVP is committed/pushed as a branch, with no gate, landing, Rust build,
+experiment run, paid driver or campaign. The owner builds the exact-main
+artifact after the listener lands and S freezes.

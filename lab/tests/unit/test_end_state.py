@@ -10,7 +10,7 @@ from pathlib import Path
 EXPERIMENT = Path(__file__).resolve().parents[2] / "chat-change-smoke"
 sys.path.insert(0, str(EXPERIMENT / "checks"))
 from _end_state import _CHANGED, _CONTENT, _NOT_LANDED, _Object, _Status, _decode_objects, _judge, _project_observations
-from test_ctl_output import READ, RESULT, TREE, _ended
+from test_ctl_output import CHILD, ROOT, evidence, _landed
 
 NOTICE = b"Maintained by temper.\n"
 PARENT = {b"README.md": b"widget\n", b"src/a": b"\x00\xff\n"}
@@ -124,12 +124,15 @@ class EndStateTests(unittest.TestCase):
             "P NOTICE=None", "C NOTICE=b'Maintained by temper.\\n'",
         ))
 
-    def test_landed_notice_cannot_make_a_failed_chat_successful(self):
+    def test_landed_notice_cannot_make_a_failed_delegate_successful(self):
         self.assertEqual(judge().status, _Status.PASS)
-        for result in ('result: Failed · broken\n', 'result: Cancelled · stopped\n', 'result: Ended\n'):
-            for tree in (False, True):
-                with self.subTest(result=result, tree=tree), self.assertRaises(ValueError):
-                    _ended(READ.replace(RESULT, result) + (TREE if tree else 'met\n'), 41, tree=tree)
+        for ending in ({'task': {'failed': {'bytes': 'broken', 'cut': False}}},
+                       {'task': {'cancelled': {'reason': {'bytes': 'stopped', 'cut': False}}}},
+                       'deleted'):
+            document = evidence()[3]
+            document['task']['result']['ending'] = ending
+            with self.subTest(ending=ending), self.assertRaises(ValueError):
+                _landed(document, CHILD, ROOT)
 
     def test_known_empty_parent_is_distinct_from_unavailable_parent(self):
         self.assertEqual(judge(objects={

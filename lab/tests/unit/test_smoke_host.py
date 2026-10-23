@@ -17,6 +17,7 @@ host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
 host.bind_skein(Path('/home/free/src/rust/skein'))
 from _host_output import Output, credential, origin
+from test_ctl_output import transcript
 
 LINK = b'http://127.0.0.1:7601/jig/v1/sign-in/link?secret=' + b'A' * 43 + b'\n'
 
@@ -219,6 +220,35 @@ class Collection(unittest.TestCase):
         self.assertEqual(run.undecided[0]['check'], 'promises')
         self.assertIn('check_skipped', calls)
 
+    def test_boundary_requires_rechecked_delegate_evidence_and_zero_loss(self):
+        for story_text, zero_loss, expected in ((transcript(), True, True),
+                ('model says landed\n', True, False), (transcript(), False, False),
+                (transcript().replace('"live_delegates": 0', '"live_delegates": 1'), True, False)):
+            run = host.Run.__new__(host.Run)
+            run.base = 'run'
+            raw = b'{"observations_lost":' + (b'0' if zero_loss else b'1') + b'}\n'
+            run.lab = types.SimpleNamespace(root=Path('/private'), read=lambda path: (
+                raw if path.endswith('observations.jsonl') else story_text.encode()))
+            run.commands = [dict(name='story', exit=dict(status=0, stopped=False, killed=False),
+                output=dict(stdout=dict(path='commands/actions-story/stdout'))), dict(name='observations')]
+            run.exp = dict(collect=[dict(name='observations')], checks=[dict(name='end-state')])
+            run.key = dict(subject='subject', lab=dict(runner='runner'))
+            run.cost = dict(command_seconds=240)
+            run.event, run.write, run.mkdir = Mock(), Mock(), Mock()
+            calls = []
+            run.command = lambda group, definition, **kwargs: calls.append((group, definition, kwargs)) or True
+            run.collect_live()
+            event = run.event.call_args.kwargs
+            self.assertEqual(event['confirmed'], expected)
+            self.assertEqual(event['endpoint'], 'landed coding delegate settled; root Open with zero live delegates')
+            if expected:
+                self.assertEqual(event['settlement']['child'], 42)
+            extra = calls[-1][2]['extra']
+            self.assertEqual(extra[:2], ('--boundary', 'confirmed' if expected else 'unknown'))
+            self.assertEqual(float(extra[3]), calls[-1][2]['deadline'])
+            self.assertEqual(calls[0][0], 'collect')
+            self.assertEqual(calls[-1][0], 'checks')
+
     def test_live_collection_and_end_state_precede_stop(self):
         run = host.Run.__new__(host.Run)
         with tempfile.TemporaryDirectory() as directory, host.store.open_lab(directory + '/lab') as lab:
@@ -310,6 +340,8 @@ class Manifest(unittest.TestCase):
         mutations = [
             lambda e: e.update(driver={}),
             lambda e: e['processes'][0].update(argv=['/usr/bin/true']),
+            lambda e: e['processes'][1]['argv'].__setitem__(3, '/tmp/other.py'),
+            lambda e: e['processes'][1].update(argv=e['processes'][1]['argv'][4:]),
             lambda e: e['actions'].reverse(),
             lambda e: e['actions'][0].update(stdin='credential'),
             lambda e: e['actions'][0].update(stdin='{proc.engine.ready.link}\n'),

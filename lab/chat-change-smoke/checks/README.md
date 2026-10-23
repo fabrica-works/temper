@@ -27,9 +27,13 @@ Decision 278 supplies the launch and observation-read forms. Start the forge
 with `temper fake forge --document F --ready PREFIX --seed N --observations FILE`.
 Its ready stdout is PREFIX, then `127.0.0.1:PORT` and a newline, with no other
 stdout. FILE is the official codec's stream; no reply or delivery of a pass
-is sent before its observations are written. After the attended story, retain
-the observed completion or stopped-writer evidence and the complete checkpoint
-prefix being judged; no polling is needed.
+is sent before its observations are written. After S's attended story, retain
+the coding procedure's successful historical owner result, final complete
+Open root tree with zero live delegates, and the complete checkpoint prefix
+being judged. The host rechecks this evidence before confirming a boundary;
+root completion and Close are excluded. The source-based causal argument is
+that Finish/release/branch cleanup precede the child's Settled event and the
+S runtime root has no later mutating calls. No polling is needed.
 
 The object decoder's authority is **Director280's 23:29Z provisional t18
 contract**, explicitly authorized for this work before landing/diff-check.

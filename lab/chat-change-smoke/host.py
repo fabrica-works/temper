@@ -20,8 +20,9 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _host_output import Output, credential, origin
 from _host_native import launch
+from smoke._ctl_output import proof as story_proof
 
-HOST_FILES = ('host', 'host.py', '_host_output.py', '_host_native.py')
+HOST_FILES = ('host', 'host.py', '_host_output.py', '_host_native.py', 'smoke/_ctl_output.py')
 ACTION_NAMES = ['sign-in', 'add-key', 'usable', 'forge', 'adopt', 'story']
 
 
@@ -76,6 +77,8 @@ def contract(exp, settings):
                     '--ready', 'listening ', '--seed', '{seed.' + name + '}']
             if name == 'forge':
                 argv += ['--observations', '{proc.forge.dir}/observations.jsonl']
+            else:
+                argv = ['/usr/bin/python3', '-I', '-B', '{experiment}/smoke/_runtime_llm.py', *argv]
         require(process['argv'] == argv, 'S process argv differs from the approved cluster contract')
         if name == 'engine':
             ready = [dict(stream='stderr', prefix='listening ' + listener + ' ', capture=listener)
@@ -515,12 +518,20 @@ class Run:
         prefix, zero_loss = checkpoint_prefix(raw)
         self.write('collected/observations/observations.jsonl', prefix)
         story = self.commands[-2]
+        settlement = None
+        try:
+            settlement = story_proof(self.lab.read(self.base + '/' + story['output']['stdout']['path']).decode('utf-8'))
+        except (ValueError, KeyError, TypeError, AttributeError, OSError):
+            pass
         confirmed = (zero_loss and story['name'] == 'story' and story['exit'].get('status') == 0
-                     and not story['exit']['stopped'] and not story['exit']['killed'])
+                     and not story['exit']['stopped'] and not story['exit']['killed']
+                     and settlement is not None)
         self.event('observation_boundary', confirmed=confirmed, loss_zero=zero_loss,
                    command='story', exit=story['exit'], final_read='ctl task --tree',
+                   endpoint='landed coding delegate settled; root Open with zero live delegates',
+                   settlement=settlement,
                    proof=story['output']['stdout'], prefix_bytes=len(prefix), original_bytes=len(raw),
-                   producer='protocol/setup.md 8.4; fake-forge.md 2.4: flush precedes replies; jig domain/tasks.md 1: ended follows settled delegates/effects',
+                   producer='forge_route.rs: Finish then Released/Settled after branch cleanup; fake-forge.md 2.4: flush precedes replies; S runtime root has no later mutating calls',
                    subject=self.key['subject'], runner=self.key['lab']['runner'])
         self.mkdir('collected/end-state')
         deadline = time.monotonic() + self.cost['command_seconds']
@@ -597,7 +608,7 @@ class Run:
                       undecided=self.undecided, errors=self.errors, bounds=self.bounds,
                       usage=dict(elapsed_ms=self.ms(), longest_ms=None, driver=None, triage=[]),
                       about=dict(host='attended S', unit=self.args.unit, stdin='private sign-in has null stdin evidence',
-                                 observation_boundary='causal S terminal read plus explicit checkpoint prefix'))
+                                 observation_boundary='settled landed delegate and complete Open root tree plus explicit checkpoint prefix'))
         self.event('outcome', outcome=result)
         evidence.publish(self.lab, self.key_path, record)
         if self.host is not None and not self.host.children:

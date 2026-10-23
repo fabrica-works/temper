@@ -1,5 +1,10 @@
 """QA fixture contracts; no service startup, credential handoff or store access."""
+import copy
 import json
+import subprocess
+import sys
+import tempfile
+from unittest.mock import patch
 from pathlib import Path
 import re
 import unittest
@@ -7,6 +12,9 @@ import unittest
 LAB = Path(__file__).resolve().parents[2]
 CLUSTER = LAB / 'cluster'
 SMOKE = LAB / 'chat-change-smoke'
+sys.path.insert(0, str(SMOKE / 'smoke'))
+import _runtime_llm
+
 FORGE = '{proc.forge.ready.address}'
 KINDS = [1, 2, 3, 4, 7, 8, 10, 11, 12, 13]
 
@@ -199,17 +207,67 @@ class AssemblyTests(unittest.TestCase):
         self.assertEqual(llm['after'], ['forge'])
         self.assertNotIn('--seed', llm['argv'])
 
-    def test_s_process_contract_adapts_only_fake_seeds_and_private_bootstrap(self):
+    def test_s_process_contract_adapts_fake_seeds_private_bootstrap_and_runtime_llm(self):
         canonical = read(CLUSTER / 'experiment.json')['processes']
         smoke = read(SMOKE / 'experiment.json')['processes']
         for process in canonical:
             if process['name'] == 'forge':
                 process['argv'][process['argv'].index('--seed') + 1] = '{seed.forge}'
             elif process['name'] == 'llm':
-                process['argv'] += ['--seed', '{seed.llm}']
+                process['argv'] = ['/usr/bin/python3', '-I', '-B', '{experiment}/smoke/_runtime_llm.py',
+                                   *process['argv'], '--seed', '{seed.llm}']
             elif process['name'] == 'engine':
                 process['ready'].remove(dict(stream='stdout', prefix='http://', capture='link'))
         self.assertEqual(smoke, canonical)
+
+    def test_runtime_llm_changes_only_notice_result_wake_after_rendering(self):
+        canonical = (CLUSTER / 'llm.json').read_bytes()
+        original = read(SMOKE / 'llm.json')
+        expected = copy.deepcopy(original)
+        notice = next(s for s in expected['cued'] if s['cue'] == _runtime_llm.CUE)
+        notice['turns'][2]['lines'] = [
+            {'text': "The change's task has ended; it says how."}, {'call': 'wait', 'arguments': {}}]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'llm.json'
+            source.write_text(json.dumps(original).replace('{proc.llm.dir}', directory).replace(
+                '{proc.forge.ready.address}', '127.0.0.1:7602'))
+            source_bytes = source.read_bytes()
+            argv = ['/subject/temper', 'fake', 'llm', '--document', str(source),
+                    '--ready', 'listening ', '--seed', '17']
+            with patch.object(_runtime_llm.os, 'execv') as execute:
+                _runtime_llm.main(argv)
+            runtime = source.with_name('llm.s-runtime.json')
+            expected = json.loads(json.dumps(expected).replace('{proc.llm.dir}', directory).replace(
+                '{proc.forge.ready.address}', '127.0.0.1:7602'))
+            self.assertEqual(json.loads(runtime.read_bytes()), expected)
+            self.assertEqual(source.read_bytes(), source_bytes)
+            self.assertEqual(runtime.stat().st_mode & 0o777, 0o600)
+            execute.assert_called_once_with(argv[0], [*argv[:4], str(runtime), *argv[5:]])
+            # Exercise the manifest interpreter/exec boundary with a local
+            # canary, without starting temper, a model or any network peer.
+            runtime.unlink()
+            canary = Path(directory) / 'fake-subject'
+            canary.write_text('#!/usr/bin/python3\nimport json,sys\nfrom pathlib import Path\n'
+                'print(json.dumps([sys.argv[1:],json.loads(Path(sys.argv[4]).read_bytes())]))\n')
+            canary.chmod(0o700)
+            called = subprocess.run(['/usr/bin/python3', '-I', '-B', str(SMOKE / 'smoke/_runtime_llm.py'),
+                str(canary), *argv[1:]], capture_output=True, timeout=5, check=True, env={})
+            recorded_argv, recorded_document = json.loads(called.stdout)
+            self.assertEqual(recorded_argv, ['fake', 'llm', '--document', str(runtime), *argv[5:]])
+            self.assertEqual(recorded_document, expected)
+            self.assertEqual(called.stderr, b'')
+        self.assertEqual((SMOKE / 'llm.json').read_bytes(), canonical)
+        for mutation in ('extra-turn', 'wrong-finish', 'duplicate-cue'):
+            document = read(SMOKE / 'llm.json')
+            notice = next(s for s in document['cued'] if s['cue'] == _runtime_llm.CUE)
+            if mutation == 'extra-turn':
+                notice['turns'].append(notice['turns'][2])
+            elif mutation == 'wrong-finish':
+                notice['turns'][2]['lines'][0]['call'] = 'shell'
+            else:
+                document['cued'].append(copy.deepcopy(notice))
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                _runtime_llm.adapt(document)
 
     def test_s_process_templates_have_ready_predecessors_and_regular_inputs(self):
         exp = read(SMOKE / 'experiment.json')
@@ -245,7 +303,7 @@ class AssemblyTests(unittest.TestCase):
         for action in exp['actions'][2:4]:
             self.assertEqual(action['argv'][-2:], ['--timeout', '200'])
         self.assertEqual(exp['actions'][-1]['argv'][-1], 'http://{proc.engine.ready.clients}/')
-        self.assertIn('--timeout 220', (SMOKE / 'smoke/story').read_text())
+        self.assertIn('STORY_SECONDS = 220', (SMOKE / 'smoke/_story.py').read_text())
         self.assertEqual([c['name'] for c in exp['collect']], ['observations', 'store'])
         end = next(c for c in exp['checks'] if c['name'] == 'end-state')
         self.assertEqual(end['argv'], ['{experiment}/checks/end-state',
