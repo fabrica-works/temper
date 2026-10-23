@@ -1,5 +1,6 @@
 //! Shared configuration fixtures for startup and the process tier.
 pub mod boxed;
+pub mod case;
 pub mod cluster;
 pub mod configuration;
 pub mod ctl;

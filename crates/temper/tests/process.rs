@@ -2033,3 +2033,32 @@ exec "$@"
 fn a_worker_pushes_to_github_by_its_installations_token() {
     support::github::push();
 }
+
+#[test]
+fn the_opener_runs_on_ws_and_s1_as_processes() {
+    use temper_real_loop_world::case::{self, acts, oracle};
+    let steps = acts::step_4_1();
+    let run = support::case::run(
+        &["ws", "s1"],
+        case::fixture_placed(),
+        case::scripts::step_4_1,
+        acts::step_4_1(),
+        &[case::DIRECTOR, case::A, case::CODER, case::REVIEW],
+    );
+    for (at, call) in run.calls().iter().enumerate() {
+        assert_eq!(
+            call.exit,
+            Some(skein_io::kernel::Exit::Code(0)),
+            "call {at}: {}",
+            String::from_utf8_lossy(&call.stderr)
+        );
+    }
+    let observed = run.observed(acts::READS_4_1).with_commands(&steps);
+    oracle::assert_met(&oracle::step_4_1(&observed));
+    assert_eq!(run.placed().get(&case::DIRECTOR).map(String::as_str), Some("ws"));
+    if let Some(worker) = run.placed().get(&case::A) {
+        assert_eq!(worker, "s1");
+    }
+    // Ended tasks retain no observation channel. Coder/reviewer placement is
+    // a named gap when none of the unchanged acts reads them live.
+}

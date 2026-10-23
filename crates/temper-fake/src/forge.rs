@@ -31,6 +31,8 @@ pub struct Ci {
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Repository {
+    pub id: Option<u32>,
+    pub tree: Option<Box<[api::File]>>,
     pub owner: Box<[u8]>,
     pub name: Box<[u8]>,
     pub landing: Box<[u8]>,
@@ -54,6 +56,8 @@ impl Document {
         for repository in &fake.repositories {
             repositories
                 .push(Repository {
+                    id: None,
+                    tree: None,
                     owner: fake.owner.clone(),
                     name: repository.name.clone(),
                     landing: repository.landing.clone(),
@@ -93,6 +97,20 @@ impl Document {
         for (i, at) in items.iter().enumerate() {
             let p = read::index(&p, i);
             let mut o = read::object(&d, *at, &p)?;
+            let id = match o.member(&d, b"id") {
+                Some(at) => {
+                    let id = read::integer(&d, at, u64::from(u32::MAX), &p.member(b"id"))?;
+                    if id == 0 {
+                        return Err(read::why(&p.member(b"id"), b"must be positive"));
+                    }
+                    Some(u32::try_from(id).expect("bounded id"))
+                }
+                None => None,
+            };
+            let tree = match o.member(&d, b"tree") {
+                Some(at) => Some(tree(&d, at, &p.member(b"tree"))?),
+                None => None,
+            };
             let name = read::field(&mut o, &d, b"name", 100, &p)?;
             let landing = read::field(&mut o, &d, b"landing", LIMITS.limits.name_bytes, &p)?;
             let repository_owner = if github.is_some() {
@@ -112,6 +130,12 @@ impl Document {
                 return Err(read::why(&p.member(b"landing"), b"expected a branch name"));
             }
             for prev in &repositories {
+                if prev.id.is_some() != id.is_some() {
+                    return Err(read::why(&p.member(b"id"), b"every repository must give an id, or none"));
+                }
+                if id.is_some() && prev.id == id {
+                    return Err(read::why(&p.member(b"id"), b"must be unique"));
+                }
                 if prev.name == name && prev.owner == repository_owner {
                     return Err(read::why(&p.member(b"name"), b"must be unique"));
                 }
@@ -131,14 +155,16 @@ impl Document {
                     ));
                 }
                 for (seed, _) in FILES {
-                    if path.as_ref() == seed {
+                    if tree.is_none() && path.as_ref() == seed {
                         return Err(read::why(&p.member(b"path"), b"must not name a seed file"));
                     }
                 }
                 read::nonempty(&green, &p.member(b"green"))?;
                 Some(Ci { path, green })
             };
-            repositories.push(Repository { owner: repository_owner, name, landing, ci }).expect("eight repositories");
+            repositories
+                .push(Repository { id, tree, owner: repository_owner, name, landing, ci })
+                .expect("eight repositories");
         }
         if let Some(github) = &github {
             github.check(repositories.as_slice())?;
@@ -169,13 +195,21 @@ impl Document {
         let mut domain = domain::Domain::new(&LIMITS, seed);
         let mut repositories = List::with_capacity(crate::ENTRIES);
         for (i, repository) in self.repositories.iter().enumerate() {
-            let id = u32::try_from(i).expect("eight repositories").checked_add(1).expect("numbered from one");
+            let id = repository
+                .id
+                .unwrap_or(u32::try_from(i).expect("eight repositories").checked_add(1).expect("numbered from one"));
             let full = read::joined(&[&repository.owner, b"/", &repository.name]);
-            let mut tree = List::with_capacity(3);
-            for (path, content) in FILES {
-                tree.push(api::File { path: bytes::copy_of(path), content: bytes::copy_of(content) })
-                    .expect("three seed files");
-            }
+            let tree = match &repository.tree {
+                Some(tree) => tree.clone(),
+                None => {
+                    let mut tree = List::with_capacity(3);
+                    for (path, content) in FILES {
+                        tree.push(api::File { path: bytes::copy_of(path), content: bytes::copy_of(content) })
+                            .expect("three seed files");
+                    }
+                    tree.into_boxed()
+                }
+            };
             domain::repository(
                 &mut domain,
                 &LIMITS,
@@ -183,7 +217,7 @@ impl Document {
                     id,
                     name: full.clone(),
                     default: repository.landing.clone(),
-                    tree: tree.into_boxed(),
+                    tree,
                     labels: Box::new([]),
                     checks: checks(repository.ci.as_ref()),
                     protection: None,
@@ -214,6 +248,30 @@ impl Document {
         };
         (Forge::new(domain, LIMITS), config)
     }
+}
+fn tree(d: &skein_json::Document, at: u32, p: &Path) -> Result<Box<[api::File]>, Refusal> {
+    let items = match jig_protocol_config::read::list(d, at, LIMITS.limits.files) {
+        Ok(items) => items,
+        Err(why) => return Err(read::kind(p, why)),
+    };
+    let mut files = List::<api::File>::with_capacity(items.len());
+    for (i, at) in items.iter().enumerate() {
+        let p = read::index(p, i);
+        let mut o = read::object(d, *at, &p)?;
+        let path = read::field(&mut o, d, b"path", LIMITS.limits.name_bytes, &p)?;
+        let content = read::field(&mut o, d, b"content", LIMITS.limits.content_bytes, &p)?;
+        read::finish(o, d, &p)?;
+        if !relative(&path) {
+            return Err(read::why(&p.member(b"path"), b"expected a relative file path with no . or .. component"));
+        }
+        for prev in &files {
+            if prev.path == path {
+                return Err(read::why(&p.member(b"path"), b"must be unique"));
+            }
+        }
+        files.push(api::File { path, content }).expect("bounded files");
+    }
+    Ok(files.into_boxed())
 }
 /// Makes the setup's one site admin and one token; `all` is Forgejo's every scope.
 pub fn setup(store: &mut forgejo::setup::Store, admin_token: &[u8; 40]) {

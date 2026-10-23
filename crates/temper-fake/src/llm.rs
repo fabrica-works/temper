@@ -1,4 +1,5 @@
 //! The QA model's document and played scripts (protocol/setup.md, 8.4).
+pub mod observations;
 use crate::{Refusal, read, turn};
 use alloc::boxed::Box;
 use core::net::SocketAddr;
@@ -238,5 +239,10 @@ pub const LIMITS: domain::Config = domain::Config {
 
 /// Constructs the checked configuration's peer without io (protocol/setup.md, 8.4).
 pub fn peer(configuration: Configuration) -> Result<skein_fake_peers::llm::Peer, skein_fake_peers::Error> {
-    crate::wire::llm(configuration)
+    crate::wire::llm(configuration, false)
+}
+
+/// Constructs a peer retaining the real loop's bounded outside query records.
+pub fn recording_peer(configuration: Configuration) -> Result<skein_fake_peers::llm::Peer, skein_fake_peers::Error> {
+    crate::wire::llm(configuration, true)
 }

@@ -30,6 +30,7 @@ pub struct Cluster {
     experiment: PathBuf,
     specs: Vec<Value>,
     bindings: BTreeMap<String, String>,
+    prepared: std::collections::BTreeSet<String>,
     /// The settled cgroup preflight's wall time, including its world.
     pub probe_cost: Duration,
 }
@@ -78,7 +79,10 @@ impl Cluster {
         assert_eq!(value["cost"], "temper-m1-calibration");
         assert!(list(&value["dirs"]).is_empty(), "cluster has no run directories");
         let specs = list(&value["processes"]).to_vec();
+        let git = scratch.join("git");
+        std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_temper"), &git).expect("fake git link");
         let mut bindings = BTreeMap::from([
+            ("artifact.git".into(), git.to_str().expect("git path").into()),
             ("artifact.temper".into(), env!("CARGO_BIN_EXE_temper").into()),
             ("experiment".into(), experiment.to_str().expect("experiment path").into()),
         ]);
@@ -95,7 +99,56 @@ impl Cluster {
                 "{name}'s memory bound"
             );
         }
-        Self { experiment, specs, bindings, probe_cost: Duration::ZERO }
+        Self { experiment, specs, bindings, prepared: Default::default(), probe_cost: Duration::ZERO }
+    }
+    /// Rename one member and its template bindings before any files are rendered.
+    pub fn rename(&mut self, member: &str, name: &str) {
+        let index = self.index(member);
+        let old = self.dir(member);
+        let new = old.parent().expect("scratch").join(name);
+        fs::rename(&old, &new).expect("rename member directory");
+        self.bindings.remove(&format!("proc.{member}.dir"));
+        self.bindings.insert(format!("proc.{name}.dir"), new.to_str().expect("member path").into());
+        for spec in &mut self.specs {
+            if spec["name"] == member {
+                spec["name"] = name.into();
+                for ready in spec["ready"].as_array_mut().expect("ready captures") {
+                    if let Some(prefix) = ready["prefix"].as_str() {
+                        ready["prefix"] =
+                            prefix.replace(&format!("linked {member} "), &format!("linked {name} ")).into();
+                    }
+                }
+            }
+            if let Some(after) = spec.get_mut("after").and_then(Value::as_array_mut) {
+                for predecessor in after {
+                    if predecessor == member {
+                        *predecessor = name.into();
+                    }
+                }
+            }
+            // The template sources remain lab's files; argv/env bindings use the new member.
+            for arg in spec["argv"].as_array_mut().expect("argv") {
+                *arg = string(arg).replace(&format!("proc.{member}."), &format!("proc.{name}.")).into();
+            }
+        }
+        // Lab's source templates keep their old member placeholders.
+        self.bindings.insert(format!("proc.{member}.dir"), new.to_str().expect("member path").into());
+        assert_eq!(self.specs[index]["name"], name);
+    }
+    /// Prepare files once; starting this member retains the story's edits.
+    pub fn prepare(&mut self, process: &str) -> PathBuf {
+        assert!(!self.prepared.contains(process), "prepare once");
+        self.render_files(process);
+        self.prepared.insert(process.into());
+        self.dir(process)
+    }
+    /// Opt in to a member's query stream without changing other stories' argv.
+    pub fn record_llm(&mut self) {
+        let i = self.index("llm");
+        self.specs[i]["argv"]
+            .as_array_mut()
+            .expect("argv")
+            .extend([Value::from("--observations"), Value::from("{proc.llm.dir}/observations.jsonl")]);
     }
     /// A story-owned template binding, fixed before rendering any document.
     pub fn bind(&mut self, name: &str, value: &str) {
@@ -155,7 +208,9 @@ impl Cluster {
         }
     }
     fn command(&self, process: &str) -> Command {
-        self.render_files(process);
+        if !self.prepared.contains(process) {
+            self.render_files(process);
+        }
         let spec = &self.specs[self.index(process)];
         let argv: Vec<_> = list(&spec["argv"]).iter().map(|v| self.render(string(v))).collect();
         let (program, arguments) = argv.split_first().expect("cluster argv");
@@ -424,6 +479,12 @@ pub struct Stopped {
     pub stderr: Vec<u8>,
 }
 impl Members {
+    pub fn prepare(&mut self, process: &str) -> PathBuf {
+        self.cluster.prepare(process)
+    }
+    pub fn dir(&self, process: &str) -> PathBuf {
+        self.cluster.dir(process)
+    }
     /// Start these processes and their predecessors, ties in name order.
     pub fn up(&mut self, processes: &[&str]) {
         assert!(!self.stopping, "up before stop");

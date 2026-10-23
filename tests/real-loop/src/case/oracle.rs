@@ -35,6 +35,33 @@ pub struct Kit {
     pub main: BTreeMap<Vec<u8>, Vec<u8>>,
     pub merged_green: bool,
 }
+impl Told {
+    /// The oracle's per-query view, shared with process-tier observation readers.
+    #[must_use]
+    pub fn new(
+        system: &[u8],
+        model: &[u8],
+        credential: Option<u32>,
+        messages: &[skein_fake_llm_domain::api::Message],
+    ) -> Option<Self> {
+        let agent = cued(system)?;
+        let mut words = system.to_vec();
+        words.push(b'\n');
+        for message in messages {
+            for part in &message.parts {
+                use skein_fake_llm_domain::api::Part;
+                match part {
+                    Part::Text { text } | Part::ToolOutput { output: text, .. } => {
+                        words.extend_from_slice(text);
+                        words.push(b'\n');
+                    }
+                    Part::Opaque { .. } | Part::ToolCall { .. } => {}
+                }
+            }
+        }
+        Some(Self { history: messages.into(), agent, words: words.into_boxed_slice(), model: model.into(), credential })
+    }
+}
 impl Observed {
     #[must_use]
     pub fn from_ran(ran: &Ran, reads: &[(Read, usize)]) -> Self {
@@ -51,28 +78,9 @@ impl Observed {
         let mut told = Vec::new();
         for observation in ran.llm() {
             let skein_fake_peers::llm::Observation::Query { query, .. } = observation else { continue };
-            let Some(agent) = cued(&query.system) else { continue };
-            let mut words = query.system.to_vec();
-            words.push(b'\n');
-            for message in &query.messages {
-                for part in &message.parts {
-                    use skein_fake_llm_domain::api::Part;
-                    match part {
-                        Part::Text { text } | Part::ToolOutput { output: text, .. } => {
-                            words.extend_from_slice(text);
-                            words.push(b'\n');
-                        }
-                        Part::Opaque { .. } | Part::ToolCall { .. } => {}
-                    }
-                }
+            if let Some(query) = Told::new(&query.system, &query.model, query.credential, &query.messages) {
+                told.push(query);
             }
-            told.push(Told {
-                history: query.messages.clone(),
-                agent,
-                words: words.into_boxed_slice(),
-                model: query.model.clone(),
-                credential: query.credential,
-            });
         }
         Self {
             documents,

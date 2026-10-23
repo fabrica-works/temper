@@ -34,6 +34,7 @@ pub struct Call {
     arguments: Vec<Box<[u8]>>,
     stdin: Stdin,
     directory: bool,
+    ctl: bool,
 }
 impl Call {
     #[must_use]
@@ -42,11 +43,16 @@ impl Call {
             arguments: arguments.iter().map(|word| word.as_bytes().into()).collect(),
             stdin: Stdin::Nothing,
             directory: true,
+            ctl: true,
         }
     }
     #[must_use]
     pub fn bare(arguments: &[&str]) -> Self {
         Self { directory: false, ..Self::new(arguments) }
+    }
+    /// A one-shot temper subcommand, using the same owned child and pipes.
+    pub fn temper(arguments: &[&str]) -> Self {
+        Self { directory: false, ctl: false, ..Self::new(arguments) }
     }
     #[must_use]
     pub fn sign_in() -> Self {
@@ -56,6 +62,7 @@ impl Call {
 pub enum Step {
     Run(Call),
     Start(Call),
+    Join,
     Until(Call, &'static [u8]),
     Cut,
     Pause,
@@ -256,6 +263,7 @@ pub struct Calls {
     action: Option<Action>,
     started: Option<(Child, usize)>,
     cutting: bool,
+    joining: bool,
     cancelling: bool,
     admission: Admission,
     retry: Option<Time>,
@@ -287,6 +295,9 @@ impl Calls {
         super::printed_link(&self.link).expect("serve printed its link")
     }
     #[must_use]
+    pub fn foreground_idle(&self) -> bool {
+        self.steps.is_empty() && self.child.is_none() && self.action.is_none() && !self.joining && !self.cutting
+    }
     pub fn idle(&self) -> bool {
         self.done()
     }
@@ -334,6 +345,7 @@ impl Calls {
             action: None,
             started: None,
             cutting: false,
+            joining: false,
             cancelling: false,
             admission: Admission::Batch,
             retry: None,
@@ -391,7 +403,7 @@ impl Calls {
         }
     }
     fn start(&mut self, call: Call, started: bool) {
-        let mut args: Vec<Box<[u8]>> = vec![b"ctl".as_slice().into()];
+        let mut args: Vec<Box<[u8]>> = if call.ctl { vec![b"ctl".as_slice().into()] } else { Vec::new() };
         if call.directory {
             args.push(self.client.clone());
         }
@@ -411,6 +423,7 @@ impl Calls {
             let (child, index) = self.started.take().expect("finished started call");
             self.ends[index] = child.ended;
             self.cutting = false;
+            self.joining = false;
         }
         if !self.child.as_ref().is_some_and(Child::finished) {
             return;
@@ -435,7 +448,12 @@ impl Calls {
         }
     }
     fn advance(&mut self, now: Time) {
-        if self.cancelling || self.child.is_some() || self.cutting || self.retry.is_some_and(|retry| retry > now) {
+        if self.cancelling
+            || self.child.is_some()
+            || self.cutting
+            || self.joining
+            || self.retry.is_some_and(|retry| retry > now)
+        {
             return;
         }
         if let Some(Action::Until(call, _)) = &self.action {
@@ -449,6 +467,7 @@ impl Calls {
                 self.start(call, false);
             }
             Some(Step::Start(call)) => self.start(call, true),
+            Some(Step::Join) => self.joining = self.started.is_some(),
             Some(Step::Until(call, bytes)) => {
                 self.action = Some(Action::Until(call.clone(), bytes));
                 self.start(call, false);

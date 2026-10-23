@@ -325,7 +325,7 @@ fn decode(value: &Value) -> Box<[u8]> {
 }
 // The fake's object route is credential-free and does not add a repository git call.
 // Like support/webhooks.rs, the referee makes one bounded request to a separate process.
-fn objects(address: SocketAddr, commit: u64) -> Value {
+pub(super) fn objects(address: SocketAddr, commit: u64) -> Value {
     let within = std::time::Duration::from_secs(10);
     let mut socket = TcpStream::connect_timeout(&address, within).expect("object route");
     socket.set_read_timeout(Some(within)).expect("read bound");
