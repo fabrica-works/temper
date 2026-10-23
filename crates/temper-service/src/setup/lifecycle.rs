@@ -94,6 +94,7 @@ impl FileStep {
     }
 }
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "local state lives inline in the bounded forge map")]
 pub(super) enum Reconcile {
     GitHub,
     Local(Local),
@@ -550,6 +551,7 @@ fn next_run(lifecycle: &mut Lifecycle) -> Token {
     lifecycle.next_run = lifecycle.next_run.checked_add(1).expect("setup run names");
     run
 }
+#[expect(clippy::too_many_lines, reason = "one ordered pass over setup continuations")]
 pub(super) fn advance(engine: &mut crate::engine::Engine) {
     if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() || engine.setup.component.is_none() {
         return;
@@ -880,17 +882,19 @@ fn create_stopped(engine: &mut crate::engine::Engine, token: Token, failure: rec
         | reconcile::Stage::Installation
         | reconcile::Stage::State => unreachable!("host Create stopped outside its stages"),
     };
-    let why = bounded_reason(
-        alloc::format!(
-            "making {}/{}: {:?} ({:?})",
-            core::str::from_utf8(&first.org).expect("admitted ASCII org"),
-            core::str::from_utf8(&first.repository).expect("admitted ASCII repository"),
-            failure.step,
-            failure.why
-        )
-        .into_bytes()
-        .into_boxed_slice(),
-    );
+    let suffix = alloc::format!(": {:?} ({:?})", failure.step, failure.why);
+    let length = first
+        .org
+        .len()
+        .checked_add(first.repository.len())
+        .and_then(|bytes| bytes.checked_add(8))
+        .and_then(|bytes| bytes.checked_add(suffix.len()))
+        .expect("bounded Create diagnostic");
+    let mut why = skein_lib::Writer::new(length);
+    for part in [b"making ".as_slice(), &first.org, b"/", &first.repository, suffix.as_bytes()] {
+        why.put(part).expect("measured Create diagnostic");
+    }
+    let why = bounded_reason(why.finish());
     engine.notes.push(crate::Note::ForgeSetupStopped {
         number: run.forge,
         why: crate::SetupStopped::Stopped {

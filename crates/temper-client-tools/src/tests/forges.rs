@@ -449,6 +449,17 @@ fn made_sends_the_home_adoption_with_its_stable_key_and_prints_its_answer() {
         deliver(&mut root, record_first(w::Connection::Connecting, Some(first_record(w::FirstState::Making))));
         assert!(root.answer(call).is_none());
         deliver(&mut root, record_first(w::Connection::Connecting, Some(first_record(made()))));
+        assert!(root.answer(call).is_none(), "creation precedes the forge's connection");
+        deliver(
+            &mut root,
+            record_first(
+                w::Connection::Connected(
+                    w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 1, login: b"temper".as_slice().into() })
+                        .unwrap(),
+                ),
+                Some(first_record(made())),
+            ),
+        );
         let adopted = root.sent_adoption(call);
         assert_eq!((adopted.project, adopted.forge, adopted.home, adopted.ci), (f::PROJECT, 3, true, true));
         assert_eq!(

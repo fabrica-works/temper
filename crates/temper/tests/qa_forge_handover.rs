@@ -624,7 +624,7 @@ fn asked_prepare_failure_is_visible_and_can_be_asked_again() {
     });
     let client = directory(scratch.path(), "--data").join("qa-failure-client");
     fs::create_dir_all(&client).expect("private client root");
-    let outcome = support::boxed::run_ctl(
+    let outcome = support::boxed::run_ctl_with_exits(
         scratch.path(),
         box_flags(scratch.path()),
         &client,
@@ -639,6 +639,7 @@ fn asked_prepare_failure_is_visible_and_can_be_asked_again() {
         ],
         support::WITHIN,
         || directory(scratch.path(), "--data").join("box/started/1").exists(),
+        &[(1, 1), (4, 1)],
     );
     for (index, call) in outcome.calls.iter().enumerate() {
         if [1, 4].contains(&index) {

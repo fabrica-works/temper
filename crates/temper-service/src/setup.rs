@@ -48,6 +48,7 @@ struct Page {
 // skein host/states.rs:53 spells its 16 random bytes as 32 hex bytes.
 pub(crate) const STATE_TEXT_BYTES: u64 = 32;
 /// Whole host plus the allocations retained by this owner (protocol/forge.md, 2.6).
+#[expect(clippy::too_many_lines, reason = "sum each retained setup owner and transient allocation")]
 pub(crate) fn worst_case(
     config: &crate::settings::Engine,
     forges: &skein_forge_connection::Settings,

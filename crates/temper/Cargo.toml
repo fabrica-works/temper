@@ -51,6 +51,7 @@ skein-fake-forge-domain.workspace = true
 skein-kv.workspace = true
 
 [dev-dependencies]
+jig-client.workspace = true
 skein-fake-oauth.workspace = true
 skein-http.workspace = true
 temper-github-app.workspace = true

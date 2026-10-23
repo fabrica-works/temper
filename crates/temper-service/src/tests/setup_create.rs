@@ -47,7 +47,7 @@ impl Forge {
         store.token(
             bot,
             b"temper-api",
-            if refuse_file { &[b"read:user", b"read:repository"] } else { &[b"read:user", b"write:repository"] },
+            &[b"read:user", b"write:repository"],
             Secret::new(b"test-api".as_slice().into()),
         );
         store.token(
@@ -61,7 +61,7 @@ impl Forge {
         config.latency_max = Duration::ZERO;
         config.limits.repositories = 4;
         config.limits.name_bytes = 512;
-        config.limits.content_bytes = 4096;
+        config.limits.content_bytes = if refuse_file { 128 } else { 4096 };
         Self {
             service,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -76,20 +76,15 @@ impl Forge {
         }
     }
     fn permit_file(&mut self) {
-        let store = self.service.setup_mut();
-        let bot = store.find(b"temper").unwrap().id;
-        store.revoke(b"test-api");
-        store.token(
-            bot,
-            b"temper-api",
-            &[b"read:user", b"write:repository"],
-            Secret::new(b"test-api".as_slice().into()),
-        );
+        self.config.limits.content_bytes = 4096;
     }
     fn turn(&mut self, service: &mut crate::Service) {
+        while service.engine.as_mut().unwrap().notes.pop().is_some() {}
+        self.env.now = self.env.now.checked_add(Duration::from_millis(1)).unwrap();
         let engine = service.engine.as_mut().unwrap();
+        engine.env.now = self.env.now;
         advance(engine);
-        engine.forge.iterate(Time::ZERO, Wall::EPOCH);
+        engine.forge.iterate(self.env.now, Wall::EPOCH);
         for setup in [true, false] {
             let io = if setup { &mut engine.setup.io } else { &mut engine.forge.io };
             let mut pending = Vec::new();
@@ -141,6 +136,7 @@ impl Forge {
                 &mut self.events,
                 &mut self.down,
             );
+            let _head = server.take_head();
             while let Some(down) = self.down.pop() {
                 self.pipe.server_down(down);
             }
@@ -155,6 +151,7 @@ impl Forge {
                     &mut self.down,
                 );
             }
+            let _head = server.take_head();
             if let Some(up) = self.pipe.client_up() {
                 let (owner, setup) = self.socket.unwrap();
                 if setup {
@@ -167,7 +164,7 @@ impl Forge {
                 match event {
                     fake::Event::Domain(event) => {
                         let mut replies = Queue::with_capacity(git::MAX_OUT);
-                        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: self.config };
+                        let env = Env { now: self.env.now, wall: Wall::EPOCH, limits: self.config };
                         git::step(&mut self.git, &env, event, &mut replies);
                         git::fire(&mut self.git, &env, &mut replies);
                         while let Some(reply) = replies.pop() {
@@ -182,6 +179,7 @@ impl Forge {
                                 );
                             }
                         }
+                        let _head = server.take_head();
                         self.git.reclaim();
                     }
                     fake::Event::Close => {
@@ -191,28 +189,19 @@ impl Forge {
                 }
             }
         }
-        while let Some(event) = engine.store.above.pop() {
-            answer(engine, event);
-        }
-        crate::engine::forge_pass(engine);
-        for _ in 0..engine.events.len() {
-            let event = engine.events.pop().unwrap();
-            // These asks are already admitted at the root's routing seam. Their
-            // core application acknowledgements belong to the root's setup tests.
-            if !matches!(&event, root::Event::Forge(event) if matches!(event.as_ref(), domain::Event::SetUpAnswered { .. }))
-            {
-                engine.step(event);
-            }
-        }
         for _ in 0..4 {
             root_turn(engine);
         }
+        self.service.reclaim();
     }
     fn settle(&mut self, service: &mut crate::Service) {
         for _ in 0..20_000 {
             self.turn(service);
             let engine = service.engine.as_ref().unwrap();
-            if engine.setup.runs.is_empty() && self.socket.is_none() && !engine.forge.starts.is_empty() {
+            if engine.setup.runs.is_empty()
+                && matches!(engine.domain.forge_connection(1), domain::Connection::Connected { .. })
+            {
+                self.requests.extend(self.pipe.request_lines().iter().cloned());
                 return;
             }
             if matches!(engine.domain.forge_connection(1), domain::Connection::SetUpFailed { .. })
@@ -222,7 +211,7 @@ impl Forge {
                 return;
             }
         }
-        panic!("local setup did not settle");
+        panic!("local setup did not settle: {:?}", service.engine.as_ref().unwrap().domain.forge_connection(1));
     }
 }
 fn configured(forge: &Forge) -> crate::Service {
@@ -358,7 +347,7 @@ fn a_file_stop_names_the_step_and_a_second_ask_finishes_once() {
     );
     assert_eq!(
         engine.domain.forge_connection(1),
-        domain::Connection::SetUpFailed { why: b"making work/hello: File (Refused(403))".as_slice().into() }
+        domain::Connection::SetUpFailed { why: b"making work/hello: File (Refused(413))".as_slice().into() }
     );
     let readme = forge.git.branch(b"work/hello", b"main").unwrap();
     assert!(forge.git.object(readme).unwrap().tree.get(temper_forge_setup::STARTER_PATH).is_none());
@@ -367,7 +356,9 @@ fn a_file_stop_names_the_step_and_a_second_ask_finishes_once() {
     forge.settle(&mut service);
     assert_eq!(
         service.engine.as_ref().unwrap().domain.forges().rows[0].first.as_ref().unwrap().state,
-        domain::FirstState::Made { id: 1 }
+        domain::FirstState::Made { id: 1 },
+        "{:?}",
+        service.engine.as_ref().unwrap().domain.forge_connection(1)
     );
     assert!(matches!(
         service.engine.as_ref().unwrap().domain.forge_connection(1),
@@ -382,17 +373,17 @@ fn a_file_stop_names_the_step_and_a_second_ask_finishes_once() {
 }
 
 fn root_turn(engine: &mut crate::engine::Engine) {
-    let mut out = Queue::with_capacity(root::max_out(&engine.env.limits));
-    root::release(&mut engine.domain, &engine.env, &mut out);
-    root::release(&mut engine.domain, &engine.env, &mut out);
-    while let Some(request) = out.pop() {
-        crate::route::request(engine, request);
-    }
+    // These asks enter at the setup routing seam; the root's application
+    // acknowledgement is exercised separately in the root setup tests.
+    let mut events = Queue::with_capacity(engine.events.len());
     while let Some(event) = engine.events.pop() {
         if !matches!(&event, root::Event::Forge(event) if matches!(event.as_ref(), domain::Event::SetUpAnswered { .. }))
         {
-            engine.step(event);
+            events.push(event);
         }
     }
-    engine.step(root::Event::Resume);
+    while let Some(event) = events.pop() {
+        engine.events.push(event);
+    }
+    crate::engine::iterate(engine, engine.env.now, Wall::EPOCH);
 }

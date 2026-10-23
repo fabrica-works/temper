@@ -628,7 +628,6 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         steps.extend([
             Step::Run(Call::new(&["wait", "forges", "--until", "settled", "--timeout", "180s"])),
             Step::Run(Call::new(&["forges", "--json"])),
-            Step::Run(Call::new(&["repositories", "3", "--json"])),
             Step::Run(Call::new(&["forges"])),
         ]);
         let clock = skein_shell::Clock::new();
@@ -654,6 +653,9 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
                 let record = fs::metadata(paths[1].join("box/started/3")).expect("started group record");
                 assert!(record.is_file(), "the box kept forge 3's started record");
                 assert_eq!(record.permissions().mode() & 0o777, 0o600, "private started record");
+                if run == "first" {
+                    support::project::assert_first_repository(&client_root, 1);
+                }
                 (address, support::owned::answer(address.port(), "/api/v1/version", None))
             },
         );
@@ -699,7 +701,7 @@ fn assert_forgejo_setup(
             String::from_utf8_lossy(&call.stderr)
         );
     }
-    assert_eq!(calls.len(), if run == "first" { 8 } else { 5 }, "all ctl calls ran: {stderr}");
+    assert_eq!(calls.len(), if run == "first" { 7 } else { 4 }, "all ctl calls ran: {stderr}");
     if run == "first" {
         assert!(
             String::from_utf8_lossy(&calls[1].stdout)
@@ -724,8 +726,6 @@ fn assert_forgejo_setup(
         assert_eq!(row["first"]["project"]["existing"], 1);
         assert_eq!(row["first"]["org"], "work");
         assert_eq!(row["first"]["repository"], "hello");
-        let repositories = support::ctl::json(&calls[6]);
-        assert!(repositories.to_string().contains("hello"), "temper reads the first repository: {repositories}");
         // Preparation is silent on success; Forgejo's startup
         // and the runner's lines reach the box with their step prefixes.
         for step in ["forgejo 3: ", "runner 3: "] {
@@ -739,7 +739,7 @@ fn assert_forgejo_setup(
     }
     let stdout = String::from_utf8_lossy(&calls.last().expect("forges read").stdout);
     let user = stdout.lines().find_map(|line| {
-        line.strip_prefix("forge 3 · Forgejo · owned · Connected as temper (")?.strip_suffix(')')?.parse::<u64>().ok()
+        line.strip_prefix("forge 3 · Forgejo · owned · Connected as temper (")?.split(')').next()?.parse::<u64>().ok()
     });
     assert!(user.is_some_and(|user| user != 0), "{run}: forges row: {stdout}; box: {stderr}");
     let user = user.expect("connected bot's ID");

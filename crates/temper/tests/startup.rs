@@ -1222,6 +1222,13 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // Three new codec u32 bounds grow the engine workers component
             // by 8 B after padding, retained in Service's engine option.
             + 8
+            // First: 840-B map + 2 * 3 * 64-B names in each of 3,076
+            // root/message envelopes, plus the runtime connection map's
+            // 840 + 4 * 3 * 256 B, and its 32-B inline Service map header.
+            + (840 + 2 * 3 * 64) * 3_076 + (840 + 4 * 3 * 256) + 32
+            // Host Create's 1 file / 4,096 bytes, copied given/plan layouts,
+            // local/active intent maps and names: measured setup delta.
+            + 259_144
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1361,6 +1368,9 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // inline worker-link/engine-codec layout to this engine, and the same
     // (4470 - 64) fact bytes, (4470 / 25 - 64 / 25) * 32 frame slots,
     // 3 received + 2 * 3 transient ask bytes and 8 B link layout to its worker.
+    // First has the same 3,768,968 B as the owned example. Its mixed
+    // GitHub/Forgejo host adds 594,712 B for Create's 1 file / 4,096
+    // bytes, copied layouts and local/active intents: 4,363,680 B total.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);
@@ -1613,6 +1623,8 @@ fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
     // Wire v8 adds the embedded worker's five terms above, plus Service's
     // inline worker-link layout (+8 B) and engine codec layout (+8 B),
     // retained even when its engine option is empty.
+    // First adds a 32-B map header inside Service's engine option even
+    // when this process runs only a worker. Create adds no worker heap.
     let figure = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/figures/worker-alone-memory.txt");
     if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
         fs::write(&figure, format!("{}\n", required.worker_bytes)).expect("worker-alone fixture");

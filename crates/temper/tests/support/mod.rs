@@ -14,6 +14,7 @@ pub mod forgejo;
 pub mod live;
 pub mod person;
 pub mod program_login;
+pub mod project;
 pub mod sign_in;
 pub mod sign_in_browser;
 use std::{fs, net::SocketAddr, os::unix::fs::PermissionsExt, path::Path};

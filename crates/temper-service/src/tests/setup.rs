@@ -555,7 +555,8 @@ fn setup_memory_includes_the_whole_host_and_its_owner() {
     )
     .unwrap();
     let pages = 8_u64.checked_mul(u64::from(given.limits.page_bytes)).unwrap();
-    assert_eq!((machines, rows, pages), (630_744, 1_825_634, 131_072));
+    // Create enlarges the shared plan/need carriers: eight runs add 384 B.
+    assert_eq!((machines, rows, pages), (631_128, 1_825_634, 131_072));
     let whole = worst_case(&config, &endpoints, 2).unwrap();
     assert!(whole > host::worst_case(&setup.env.limits, &settings).unwrap());
     assert!(accounted(8, 8, false) > accounted(1, 1, false), "runs/states change the admitted shell price");

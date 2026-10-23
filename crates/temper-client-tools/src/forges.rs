@@ -259,32 +259,8 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
             }
         }
         Told::Answered { key, outcome } => {
-            if let Some(mut adopting) = state.adopting.remove(key) {
-                if adopting.adoption.home
-                    && matches!(outcome, Outcome::Answered(answer) if matches!(temper_client_domain::forge::answer(&env.limits.domain, answer), Some(temper_client_domain::forge::Answer::ForgeRefused(temper_client_domain::forge::Reason::Refused))))
-                {
-                    adopting.adoption.home = false;
-                    let request = temper_client_domain::forge::ask(&adopting.adoption, &env.limits.domain.forge)
-                        .expect("the admitted adoption with only home cleared still encodes");
-                    let mut measure = Text::measure();
-                    measure.put(b"first-repository-additional-");
-                    measure.number(u64::from(adopting.adoption.forge));
-                    let mut text = Text::writing_exact(measure);
-                    text.put(b"first-repository-additional-");
-                    text.number(u64::from(adopting.adoption.forge));
-                    let name =
-                        crate::key::engine(&jig::key::Name::new(&text.finish()).expect("first repository key fits"));
-                    let key = Key {
-                        asker: Owner::Forge.asker(),
-                        number: (u64::from(adopting.called.call_number) << 32u32) | 4,
-                    };
-                    state.adopting.insert(key, adopting);
-                    out.push(Out::Client { event: Event::Send { key, name: Some(name), request } });
-                    return;
-                }
-                let printed =
-                    crate::forge::print(&adopting.adoption, outcome, adopting.called.json, false, &env.limits);
-                finish(adopting.called, printed, out);
+            if let Some(adopting) = state.adopting.remove(key) {
+                adopted(state, env, adopting, outcome, out);
                 return;
             }
             let Some(pending) = state.pending.remove(key) else { return };
@@ -344,6 +320,33 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
         | Told::Text { .. }
         | Told::Page { .. } => {}
     }
+}
+// MeProject does not expose a home, and forge-setup reads only me and forges.
+// A taken home can therefore be discovered only by the adoption's refusal.
+fn adopted(state: &mut Forges, env: &Env<Limits>, mut adopting: Adopting, outcome: &Outcome, out: &mut Queue<Out>) {
+    if adopting.adoption.home && adoption_refused(outcome, &env.limits) {
+        adopting.adoption.home = false;
+        let request = temper_client_domain::forge::ask(&adopting.adoption, &env.limits.domain.forge)
+            .expect("the admitted adoption with only home cleared still encodes");
+        let mut measure = Text::measure();
+        measure.put(b"first-repository-additional-");
+        measure.number(u64::from(adopting.adoption.forge));
+        let mut text = Text::writing_exact(measure);
+        text.put(b"first-repository-additional-");
+        text.number(u64::from(adopting.adoption.forge));
+        let name = crate::key::engine(&jig::key::Name::new(&text.finish()).expect("first repository key fits"));
+        let key = Key { asker: Owner::Forge.asker(), number: (u64::from(adopting.called.call_number) << 32u32) | 4 };
+        state.adopting.insert(key, adopting);
+        out.push(Out::Client { event: Event::Send { key, name: Some(name), request } });
+    } else {
+        let printed = crate::forge::print(&adopting.adoption, outcome, adopting.called.json, false, &env.limits);
+        finish(adopting.called, printed, out);
+    }
+}
+fn adoption_refused(outcome: &Outcome, limits: &Limits) -> bool {
+    let Outcome::Answered(answer) = outcome else { return false };
+    temper_client_domain::forge::answer(&limits.domain, answer)
+        == Some(temper_client_domain::forge::Answer::ForgeRefused(temper_client_domain::forge::Reason::Refused))
 }
 fn rows(client: &Client, handle: Handle, limits: &Limits) -> Option<Box<[Row]>> {
     let Latest::Family(record) = client.document(handle)?.latest? else { return None };
@@ -831,7 +834,10 @@ fn setup_changed(state: &mut Forges, env: &Env<Limits>, handle: Handle, rows: &[
             complete(state, handle, printed, out);
             return;
         }
-        if let Some(First { state: FirstState::Made { .. }, .. }) = &row.first {
+        // Create completes before Connect; Adopt needs the forge able to answer.
+        if let Some(First { state: FirstState::Made { .. }, .. }) = &row.first
+            && let Connection::Connected { .. } = &row.connection
+        {
             let watch = state.watches.remove(&handle).expect("active setup watch");
             out.push(Out::Client { event: Event::Unwatch { handle } });
             let intent = watch.setup.expect("setup intent");
