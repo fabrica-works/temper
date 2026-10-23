@@ -221,6 +221,7 @@ pub fn run(
         first_workers: BTreeMap::new(),
         processed: 0,
         stopped_links: None,
+        admin_token: Vec::new(),
     });
     for root in roots {
         world.spawn(|| root);
@@ -281,6 +282,7 @@ struct Judge {
     first_workers: BTreeMap<u64, String>,
     processed: usize,
     stopped_links: Option<usize>,
+    admin_token: Vec<u8>,
 }
 impl Judge {
     fn mark(&mut self, phase: &'static str, now: Time) {
@@ -316,13 +318,13 @@ impl Judge {
         value["application"]["workers"] = ws["application"]["workers"].clone();
         base(&mut value, &engine_dir.join("config/charters/chat.txt"));
         let forge = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
+        // The fake forge removes its token file when it ends, so the token is read while it runs.
+        let document = read(&self.members.dir("forge").join("forge.json"));
+        self.admin_token =
+            fs::read(document["admin_token"].as_str().expect("admin token file")).expect("fake admin token");
         (self.fixture.configure)(&mut value, &mut agent, forge);
-        if self.late {
-            setup(&mut value, forge, &self.members.dir("forge").join("setup"), &self.git);
-        } else {
-            // Keep the required records-only forge and identity, without adopting a repository.
-            value["application"]["setup"] = json!([]);
-        }
+        // The forge's credential comes from its setup, so 4.6 adopts the fixture's repositories too.
+        setup(&mut value, forge, &self.members.dir("forge").join("setup"), &self.git);
         super::configuration::turn_bounds::apply(&mut value, super::configuration::turn_bounds::turn_body(&agent));
         value["engine"]["hosts"]["listener"] = json!([{"socket":self.hosts.to_string()}]);
         for key in ["fleet.workers", "fleet.attempts"] {
@@ -752,7 +754,8 @@ impl Referee<cluster::Root> for Judge {
                 if self.late {
                     vec!["s2", "s1", "ws", "engine", "llm", "forge"]
                 } else {
-                    vec!["ws", "s2", "s1", "ws", "engine", "llm", "forge"]
+                    // ws's first life by its act, then the cast in reverse start order: ws's second life last started.
+                    vec!["ws", "ws", "s2", "s1", "engine", "llm", "forge"]
                 }
             );
             for worker in ["ws", "s1", "s2"] {
@@ -959,8 +962,7 @@ impl Judge {
 }
 impl Judge {
     fn check_tokens(&self) {
-        let forge = read(&self.members.dir("forge").join("forge.json"));
-        let token = fs::read(forge["admin_token"].as_str().expect("admin token file")).expect("fake admin token");
+        let token = &self.admin_token;
         assert!(!token.is_empty());
         for name in ["ws", "s1", "s2"] {
             let dir = self.members.dir(name);
