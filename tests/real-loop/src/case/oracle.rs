@@ -138,6 +138,9 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::H1Coder,
         Agent::Shape,
         Agent::Mover,
+        Agent::Plan,
+        Agent::Planner,
+        Agent::Subowner,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -2714,6 +2717,526 @@ mod pause_tests {
             ("unordered", unordered),
         ] {
             assert!(!step_5_2(&observed).is_empty(), "{label}");
+        }
+    }
+}
+
+// Act 2, step 5.5 (domain/testing.md, 5.3)
+const PLAN_MESSAGES: Promise = Promise::Must("a question and its answer (exact)");
+const PLAN_DEADLINES: Promise = Promise::Must("a mission and sub-owner carry their deadlines");
+const PLAN_DEPTH: Promise = Promise::Must("a sub-owner cannot start one of its own (exact)");
+const PLAN_FRESH: Promise = Promise::Must("the fresh owner recalls its plan");
+const PLAN_ATTEMPTS: Promise = Promise::Add("one run per task, so there is no old session to stop");
+
+/// Only the carried deadlines are checked; their effect and phase policy stay out.
+#[must_use]
+pub fn step_5_5(observed: &Observed) -> Vec<Miss> {
+    use super::{
+        PLAN_ANSWER, PLAN_DIRECTOR, PLAN_NOTE, PLAN_NOTE_NUMBER, PLAN_REPORT, PLAN_WORDS, PLANNER, PLANNER_REPORT,
+        SUBOWNER, SUBOWNER_REPORT,
+    };
+    let mut misses = Vec::new();
+    for (read, expected, parent, report) in [
+        (Read::PlanEnded, PLAN_DIRECTOR, None, PLAN_REPORT),
+        (Read::PlannerEnded, PLANNER, Some(PLAN_DIRECTOR), PLANNER_REPORT),
+        (Read::SubownerEnded, SUBOWNER, Some(PLANNER), SUBOWNER_REPORT),
+    ] {
+        let task = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "5.5",
+            number(task, "/chip/task") == Some(expected)
+                && number(task, "/project") == Some(PROJECT)
+                && parent.is_none_or(|parent| number(task, "/requester/task") == Some(parent))
+                && text(task, "/chip/phase") == "ended"
+                && text(task, "/result/value/report/bytes") == report,
+            PLAN_MESSAGES,
+            &format!("{read:?} must identify the original ended task and report"),
+        );
+    }
+    plan_authority(observed, &mut misses);
+    plan_messages(observed, &mut misses);
+    let answer_at = observed
+        .told
+        .iter()
+        .position(|told| told.agent == Agent::Planner && user_words(told).any(|words| contains(words, PLAN_ANSWER)));
+    let pending = document(observed, Read::PlanAnswerPending);
+    step_check(
+        &mut misses,
+        "5.5",
+        number(pending, "/task") == Some(PLAN_DIRECTOR)
+            && text(pending, "/writing/text") == super::PLAN_ANSWER_PENDING
+            && pending.pointer("/writing/cut") == Some(&Value::Bool(false)),
+        PLAN_FRESH,
+        "the director's live answer piece must be held until A's first run has parked",
+    );
+    let parked = task_document(observed, Read::PlannerParked);
+    step_check(
+        &mut misses,
+        "5.5",
+        number(parked, "/chip/task") == Some(PLANNER)
+            && text(parked, "/chip/phase") == "idle"
+            && answer_at.is_some_and(|at| plan_fresh(&observed.told[at]))
+            && plan_note_recalled(observed, Agent::Planner, PLAN_NOTE_NUMBER, PLAN_NOTE, PLAN_WORDS)
+            && answer_at.is_some_and(|at| {
+                plan_tool_results(observed, Agent::Planner, b"recall").iter().any(|(recalled, _, _)| *recalled > at)
+            }),
+        PLAN_FRESH,
+        "A must park, start fresh on its answer, and recall its written plan in that run",
+    );
+    step_check(
+        &mut misses,
+        "5.5",
+        plan_attempts(observed, &[Read::PlannerEnded, Read::PlannerEarlier, Read::PlannerFirst], PLANNER, 2),
+        PLAN_ATTEMPTS,
+        "A's complete ordered activity must end each attempt before the next begins",
+    );
+    misses
+}
+
+fn plan_authority(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{A_DEADLINE, A1_DEADLINE, PLANNER, SUBOWNER, SUBOWNER_REFUSAL};
+    let a = task_document(observed, Read::PlannerEnded);
+    let a1 = task_document(observed, Read::SubownerEnded);
+    step_check(
+        misses,
+        "5.5",
+        number(a, "/authority/authority/deadline") == Some(A_DEADLINE)
+            && number(a1, "/authority/authority/deadline") == Some(A1_DEADLINE)
+            && number(a1, "/authority/authority/deadline")
+                .zip(number(a, "/authority/authority/deadline"))
+                .is_some_and(|(child, owner)| child < owner)
+            && number(a, "/priority") == Some(1)
+            && number(a, "/goal") == Some(PLANNER),
+        PLAN_DEADLINES,
+        "A must be tracked at priority 1 and both delegated deadlines must be carried, A1's before A's",
+    );
+    let refused = plan_tool_results(observed, Agent::Subowner, b"delegate");
+    step_check(
+        misses,
+        "5.5",
+        number(a1, "/authority/authority/delegation/depth") == Some(0)
+            && refused.len() == 1
+            && refused.iter().all(|(_, _, output)| contains(output, SUBOWNER_REFUSAL))
+            && number(a1, "/chip/details/owner/details/live_delegates") == Some(0)
+            && a1["delegates"].as_array().is_some_and(Vec::is_empty)
+            && observed.documents.values().all(|doc| number(&doc["task"], "/requester/task") != Some(SUBOWNER)),
+        PLAN_DEPTH,
+        "A1 must hear its delegation refusal, with depth 0 and no child in any read document",
+    );
+}
+
+fn plan_messages(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{PLAN_ANSWER, PLAN_ANSWER_NUMBER, PLAN_DIRECTOR, PLAN_QUESTION_NUMBER, PLAN_WORDS, PLANNER};
+    let questions = plan_tool_results(observed, Agent::Planner, b"message");
+    let answers = plan_tool_results(observed, Agent::Plan, b"message");
+    let question_at = observed
+        .told
+        .iter()
+        .position(|told| told.agent == Agent::Plan && user_words(told).any(|words| contains(words, PLAN_WORDS)));
+    let answer_at = observed
+        .told
+        .iter()
+        .position(|told| told.agent == Agent::Planner && user_words(told).any(|words| contains(words, PLAN_ANSWER)));
+    step_check(
+        misses,
+        "5.5",
+        questions.len() == 1
+            && questions.iter().all(|(_, args, output)| {
+                args["target"] == PLAN_DIRECTOR
+                    && args["form"] == "question"
+                    && args["words"] == PLAN_WORDS
+                    && contains(output, &format!("Message {PLAN_QUESTION_NUMBER} sent"))
+            })
+            && answers.len() == 1
+            && answers.iter().all(|(_, args, output)| {
+                args["target"] == PLANNER
+                    && args["form"] == "answer"
+                    && args["question"] == PLAN_QUESTION_NUMBER
+                    && args["words"] == PLAN_ANSWER
+                    && contains(output, &format!("Message {PLAN_ANSWER_NUMBER} sent"))
+            })
+            && [Read::PlannerEnded, Read::PlannerEarlier, Read::PlannerFirst]
+                .iter()
+                .flat_map(|read| check_activity(observed, *read))
+                .filter(|row| {
+                    number(row, "/line/words/message") == Some(PLAN_ANSWER_NUMBER)
+                        && number(row, "/line/words/by/task") == Some(PLAN_DIRECTOR)
+                        && number(row, "/line/words/kind/answer/question") == Some(PLAN_QUESTION_NUMBER)
+                        && text(row, "/line/words/words") == PLAN_ANSWER
+                })
+                .count()
+                == 1
+            && plan_deliveries(observed, Agent::Plan, PLAN_WORDS) == 1
+            && plan_deliveries(observed, Agent::Planner, PLAN_ANSWER) == 1
+            && question_at.zip(answer_at).is_some_and(|(question, answer)| question < answer),
+        PLAN_MESSAGES,
+        "the numbered plan question and its answer must each be sent and delivered once, in order",
+    );
+}
+
+// Histories repeat earlier turns. Count new user input once within a growing
+// history, and count it again if delivered to another fresh conversation.
+fn plan_deliveries(observed: &Observed, agent: Agent, words: &str) -> usize {
+    use skein_fake_llm_domain::api::{Part, Role};
+    let mut previous: &[skein_fake_llm_domain::api::Message] = &[];
+    let mut count = 0;
+    for told in observed.told.iter().filter(|told| told.agent == agent) {
+        let offset = if told.history.starts_with(previous) { previous.len() } else { 0 };
+        count += told.history[offset..]
+            .iter()
+            .filter(|message| message.role == Role::User)
+            .flat_map(|message| &message.parts)
+            .map(|part| match part {
+                Part::Text { text } | Part::ToolOutput { output: text, .. } => {
+                    calls::occurrences(text, words.as_bytes())
+                }
+                Part::Opaque { .. } | Part::ToolCall { .. } => 0,
+            })
+            .sum::<usize>();
+        previous = &told.history;
+    }
+    count
+}
+
+// Match actual tool outputs to their assistant call identities, never to prose
+// repeating the expected words. A replayed prefix is still one completed call.
+fn plan_tool_results(observed: &Observed, agent: Agent, tool: &[u8]) -> Vec<(usize, Value, Vec<u8>)> {
+    use skein_fake_llm_domain::api::{Part, Role};
+    let mut seen = BTreeSet::new();
+    let mut results = Vec::new();
+    for (at, told) in observed.told.iter().enumerate().filter(|(_, told)| told.agent == agent) {
+        let mut calls = BTreeMap::new();
+        for message in &told.history {
+            for part in &message.parts {
+                match part {
+                    Part::ToolCall { id, name, arguments }
+                        if message.role == Role::Assistant && name.as_ref() == tool =>
+                    {
+                        calls.insert(id.as_ref(), arguments);
+                    }
+                    Part::ToolOutput { id, output, .. } if message.role == Role::User => {
+                        if let Some(arguments) = calls.get(id.as_ref())
+                            && let Ok(args) = serde_json::from_slice(arguments)
+                            && seen.insert(id.to_vec())
+                        {
+                            results.push((at, args, output.to_vec()));
+                        }
+                    }
+                    Part::Text { .. } | Part::Opaque { .. } | Part::ToolCall { .. } | Part::ToolOutput { .. } => {}
+                }
+            }
+        }
+    }
+    results
+}
+
+fn plan_fresh(told: &Told) -> bool {
+    use skein_fake_llm_domain::api::{Part, Role};
+    !told.history.is_empty()
+        && told.history.iter().all(|message| {
+            message.role == Role::User && message.parts.iter().all(|part| matches!(part, Part::Text { .. }))
+        })
+}
+
+fn plan_note_recalled(observed: &Observed, agent: Agent, note: u64, description: &str, body: &str) -> bool {
+    let writes = plan_tool_results(observed, agent, b"note");
+    let recalls = plan_tool_results(observed, agent, b"recall");
+    writes.iter().any(|(written, args, output)| {
+        args["scope"] == serde_json::json!({"kind":"project","project":PROJECT})
+            && args["description"] == description
+            && args["body"] == body
+            && contains(output, &format!("Note {note} revision 1 written"))
+            && recalls.iter().any(|(recalled, args, output)| {
+                written < recalled
+                    && args["kind"] == "name"
+                    && args["name"] == note
+                    && contains(output, &format!("Note {note} revision 1: {description}\n{body}\n"))
+            })
+    })
+}
+
+fn plan_attempts(observed: &Observed, reads: &[Read], task: u64, minimum: usize) -> bool {
+    let rows: Vec<_> = reads.iter().flat_map(|read| check_activity(observed, *read)).collect();
+    let complete = reads.iter().all(|read| pause_activity(observed, *read)["cut"] == false)
+        && reads.last().is_some_and(|read| pause_activity(observed, *read)["before"] == Value::Null)
+        && reads.first().is_some_and(|read| pause_activity(observed, *read)["after"] == Value::Null);
+    let ordered = rows
+        .windows(2)
+        .all(|pair| number(pair[0], "/position").zip(number(pair[1], "/position")).is_some_and(|(new, old)| new > old));
+    let mut open = None;
+    let mut attempts = BTreeSet::new();
+    let mut valid = complete && ordered && !rows.is_empty();
+    for row in rows.iter().rev() {
+        valid &= number(row, "/task") == Some(task);
+        if let Some(began) = row["line"].get("run_began") {
+            valid &= open.is_none();
+            open = number(began, "/attempt");
+            valid &= open.is_some_and(|attempt| attempts.insert(attempt));
+        }
+        if let Some(ended) = row["line"].get("run_ended") {
+            valid &= open.is_some() && open.take() == number(ended, "/attempt");
+        }
+    }
+    valid && open.is_none() && attempts.len() >= minimum
+}
+
+#[cfg(test)]
+mod plan_tests {
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+    use skein_fake_llm_domain::api::{Message, Part, Role};
+
+    fn input(words: &str) -> Message {
+        Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
+    }
+    fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
+        [
+            Message {
+                role: Role::Assistant,
+                parts: Box::new([Part::ToolCall {
+                    id: id.as_bytes().into(),
+                    name: name.as_bytes().into(),
+                    arguments: serde_json::to_vec(args).expect("args").into(),
+                }]),
+            },
+            Message {
+                role: Role::User,
+                parts: Box::new([Part::ToolOutput {
+                    id: id.as_bytes().into(),
+                    output: output.as_bytes().into(),
+                    is_error: false,
+                }]),
+            },
+        ]
+    }
+    fn told(agent: Agent, history: &[Message]) -> Told {
+        Told::new(agent.cue(), b"fake", None, history).expect("agent cue")
+    }
+    fn met() -> Observed {
+        let mut documents = BTreeMap::new();
+        for (read, task, parent, report) in [
+            (Read::PlanEnded, PLAN_DIRECTOR, 0, PLAN_REPORT),
+            (Read::PlannerEnded, PLANNER, PLAN_DIRECTOR, PLANNER_REPORT),
+            (Read::SubownerEnded, SUBOWNER, PLANNER, SUBOWNER_REPORT),
+        ] {
+            documents.insert(read, json!({"task":{
+                "chip":{"task":task,"phase":"ended","details":{"owner":{"details":{"live_delegates":0}}}},
+                "project":PROJECT,"requester":{"task":parent},"priority":1,"goal":PLANNER,"delegates":[],
+                "authority":{"authority":{"deadline":if task == SUBOWNER { A1_DEADLINE } else { A_DEADLINE },"delegation":{"depth":0}}},
+                "result":{"value":{"report":{"bytes":report}}}
+            }}));
+        }
+        documents.insert(Read::PlannerParked, json!({"task":{"chip":{"task":PLANNER,"phase":"idle"}}}));
+        documents.insert(
+            Read::PlanAnswerPending,
+            json!({"task":PLAN_DIRECTOR,
+            "writing":{"text":PLAN_ANSWER_PENDING,"cut":false}}),
+        );
+        let rows: Vec<_> = [
+            json!({"run_ended":{"attempt":2,"end":"finished"}}),
+            json!({"run_began":{"attempt":2}}),
+            json!({"words":{"message":PLAN_ANSWER_NUMBER,"by":{"task":PLAN_DIRECTOR},
+                "kind":{"answer":{"question":PLAN_QUESTION_NUMBER}},"words":PLAN_ANSWER}}),
+            json!({"run_ended":{"attempt":1,"end":"parked"}}),
+            json!({"run_began":{"attempt":1}}),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(at, line)| {
+            json!({"event":{"owner":{"source":{
+                "task":PLANNER,"position":5-at,"line":line
+            }}}})
+        })
+        .collect();
+        documents.get_mut(&Read::PlannerEnded).expect("A")["activity"] =
+            json!({"cut":false,"before":{"value":"older"},"after":null,"rows":rows[..2]});
+        documents.insert(
+            Read::PlannerEarlier,
+            json!({"cut":false,"before":{"value":"first"},"after":{"value":"newer"},"rows":rows[2..4]}),
+        );
+        documents
+            .insert(Read::PlannerFirst, json!({"cut":false,"before":null,"after":{"value":"newer"},"rows":rows[4..]}));
+        let mut opening = tool(
+            "note",
+            "note",
+            &json!({"scope":{"kind":"project","project":PROJECT},
+            "description":PLAN_NOTE,"body":PLAN_WORDS}),
+            "Note 1 revision 1 written",
+        )
+        .to_vec();
+        let noted = told(Agent::Planner, &opening);
+        opening.extend(tool(
+            "question",
+            "message",
+            &json!({"target":PLAN_DIRECTOR,"form":"question","words":PLAN_WORDS}),
+            &format!("Message {PLAN_QUESTION_NUMBER} sent"),
+        ));
+        let mut director = vec![input(PLAN_WORDS)];
+        director.extend(tool(
+            "answer",
+            "message",
+            &json!({"target":PLANNER,"form":"answer","question":PLAN_QUESTION_NUMBER,
+            "words":PLAN_ANSWER}),
+            &format!("Message {PLAN_ANSWER_NUMBER} sent"),
+        ));
+        let mut next = vec![input(PLAN_ANSWER)];
+        let fresh = told(Agent::Planner, &next);
+        next.extend(tool(
+            "recall",
+            "recall",
+            &json!({"kind":"name","name":PLAN_NOTE_NUMBER}),
+            &format!("Note {PLAN_NOTE_NUMBER} revision 1: {PLAN_NOTE}\n{PLAN_WORDS}\n"),
+        ));
+        Observed {
+            documents,
+            commands: Vec::new(),
+            kit: Kit { main: BTreeMap::new(), merged_green: true },
+            told: vec![
+                noted,
+                told(Agent::Planner, &opening),
+                told(Agent::Plan, &director),
+                fresh,
+                told(Agent::Planner, &next),
+                told(Agent::Subowner, &tool("refused", "delegate", &json!({"batch":[{}]}), SUBOWNER_REFUSAL)),
+            ],
+        }
+    }
+    #[test]
+    fn answered_plan_meets_the_checkpoint_and_replayed_prefixes_are_one_delivery() {
+        let mut observed = met();
+        assert_met(&step_5_5(&observed));
+        observed.told.push(observed.told[4].clone());
+        assert_met(&step_5_5(&observed));
+    }
+    #[test]
+    fn every_required_document_field_rejects_a_mutation() {
+        for (read, paths) in [
+            (
+                Read::PlanEnded,
+                vec!["/task/chip/task", "/task/project", "/task/chip/phase", "/task/result/value/report/bytes"],
+            ),
+            (
+                Read::PlannerEnded,
+                vec![
+                    "/task/chip/task",
+                    "/task/project",
+                    "/task/requester/task",
+                    "/task/chip/phase",
+                    "/task/result/value/report/bytes",
+                    "/task/priority",
+                    "/task/goal",
+                    "/task/authority/authority/deadline",
+                    "/activity/cut",
+                    "/activity/after",
+                ],
+            ),
+            (
+                Read::SubownerEnded,
+                vec![
+                    "/task/chip/task",
+                    "/task/project",
+                    "/task/requester/task",
+                    "/task/chip/phase",
+                    "/task/result/value/report/bytes",
+                    "/task/authority/authority/deadline",
+                    "/task/authority/authority/delegation/depth",
+                    "/task/chip/details/owner/details/live_delegates",
+                    "/task/delegates",
+                ],
+            ),
+            (Read::PlannerParked, vec!["/task/chip/task", "/task/chip/phase"]),
+            (
+                Read::PlannerEarlier,
+                vec![
+                    "/cut",
+                    "/rows/0/event/owner/source/line/words/message",
+                    "/rows/0/event/owner/source/line/words/by/task",
+                    "/rows/0/event/owner/source/line/words/kind/answer/question",
+                    "/rows/0/event/owner/source/line/words/words",
+                ],
+            ),
+            (Read::PlannerFirst, vec!["/cut", "/before"]),
+            (Read::PlanAnswerPending, vec!["/task", "/writing/text", "/writing/cut"]),
+        ] {
+            for path in paths {
+                let mut observed = met();
+                let value = observed.documents.get_mut(&read).expect("read").pointer_mut(path).expect("field");
+                *value = if value.is_null() { json!("unexpected cursor") } else { Value::Null };
+                assert!(!step_5_5(&observed).is_empty(), "{read:?}{path}");
+            }
+        }
+        for &(read, _) in acts::READS_5_5 {
+            let mut observed = met();
+            observed.documents.remove(&read);
+            assert!(!step_5_5(&observed).is_empty(), "missing {read:?}");
+        }
+    }
+    #[test]
+    fn missing_duplicate_reordered_or_resumed_messages_fail() {
+        for at in 0..met().told.len() {
+            let mut observed = met();
+            observed.told.remove(at);
+            // The first note result also appears in the opening's growing prefix.
+            if at != 0 {
+                assert!(!step_5_5(&observed).is_empty(), "missing query {at}");
+            }
+        }
+        let mut duplicate = met();
+        duplicate.told[2].history = [duplicate.told[2].history.to_vec(), vec![input(PLAN_WORDS)]].concat().into();
+        let mut duplicate_answer = met();
+        duplicate_answer.told[3].history =
+            [duplicate_answer.told[3].history.to_vec(), vec![input(PLAN_ANSWER)]].concat().into();
+        let mut early = met();
+        early.told.swap(2, 3);
+        let mut resumed = met();
+        resumed.told[3].history = resumed.told[1].history.clone();
+        resumed.told[3].history = [resumed.told[3].history.to_vec(), vec![input(PLAN_ANSWER)]].concat().into();
+        let mut wrong_number = met();
+        if let Part::ToolCall { arguments, .. } = &mut wrong_number.told[2].history[1].parts[0] {
+            *arguments =
+                serde_json::to_vec(&json!({"target":PLANNER,"form":"answer","question":99,"words":PLAN_ANSWER}))
+                    .expect("args")
+                    .into();
+        }
+        for observed in [duplicate, duplicate_answer, early, resumed, wrong_number] {
+            assert!(!step_5_5(&observed).is_empty());
+        }
+    }
+    #[test]
+    fn refusal_must_be_tool_output_and_no_child_may_be_made() {
+        let mut prose = met();
+        prose.told[5].history = vec![input(SUBOWNER_REFUSAL)].into();
+        let mut child = met();
+        child.documents.get_mut(&Read::SubownerEnded).expect("A1")["task"]["delegates"] = json!([{"chip":{"task":4}}]);
+        let mut wrong_parent = met();
+        wrong_parent.documents.get_mut(&Read::PlanEnded).expect("director")["task"]["requester"] =
+            json!({"task":SUBOWNER});
+        let mut forged_output = met();
+        if let Part::ToolOutput { id, .. } = &mut forged_output.told[5].history[1].parts[0] {
+            *id = b"unmatched".as_slice().into();
+        }
+        for observed in [prose, child, wrong_parent, forged_output] {
+            assert!(!step_5_5(&observed).is_empty());
+        }
+    }
+    #[test]
+    fn plan_recall_must_follow_its_write_and_attempts_cannot_overlap() {
+        let mut early = met();
+        early.told.swap(0, 4);
+        early.told[1].history = Box::new([]);
+        let mut overlap = met();
+        overlap.documents.get_mut(&Read::PlannerEarlier).expect("older")["rows"][0]["event"]["owner"]["source"]["line"] =
+            json!({"run_began":{"attempt":2}});
+        let mut unordered = met();
+        unordered.documents.get_mut(&Read::PlannerEarlier).expect("older")["rows"][0]["event"]["owner"]["source"]["position"] =
+            json!(99);
+        let mut unended = met();
+        unended.documents.get_mut(&Read::PlannerEnded).expect("A")["activity"]["rows"][0]["event"]["owner"]["source"]
+            ["line"] = json!({});
+        for observed in [early, overlap, unordered, unended] {
+            assert!(!step_5_5(&observed).is_empty());
         }
     }
 }
