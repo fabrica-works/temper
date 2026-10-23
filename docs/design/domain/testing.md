@@ -834,7 +834,10 @@ and 10).
   access token is as long as a real plan's, 4,096 bytes shaped as a
   JWT, so the bounds it crosses (the accounts' table, the grant, the
   model's request head) are a real one's; the fake LLM peer's request
-  head takes it:
+  head takes it. The peer's replies carry a Content-Type where a plan's
+  route sends none: skein-llm's own world holds that its client takes a
+  reply without one (skein's `tests/llm`, `stream_head.rs`), and no
+  layer above skein-llm sees the header:
   - *signed in, a chat that lasts:* `temper ctl connect 1` prints the
     sign-in's address and the accounts page, a native person's view,
     shows the sign-in under way; the test drives the redirect as a
