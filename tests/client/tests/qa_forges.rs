@@ -55,11 +55,17 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
     )
 }
 fn configured_with(owner: bool, under_box: bool, rows: [forge::Configured; 2]) -> Pages {
+    configured_accounts(owner, under_box, rows, true)
+}
+fn configured_accounts(owner: bool, under_box: bool, rows: [forge::Configured; 2], model: bool) -> Pages {
     let mut world = if owner { f::accounts_world(f::SEED) } else { f::world(f::SEED) };
     let front = world.front();
     let store = std::mem::replace(&mut front.engine.store, Store::new());
     let configs = std::array::from_fn(|_| {
         let mut config = walking::config(f::SEED);
+        if !model {
+            config.core.settings.models = Box::new([]);
+        }
         config.core.connectors = Box::new([temper_client_protocol_wire::FORGE]);
         config.forge.writers = rows
             .iter()
@@ -748,10 +754,29 @@ fn browser_reload_preserves_running_setup_without_resending() {
 }
 
 #[test]
-#[ignore = "question: this world's `accounts` says usable (its configured model), so the banner rightly hides; the strip's model fact reads the account lines and says no model: first-run-ux to settle which fact a usable account is"]
 fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
-    for page in [Address::Chats, f::inbox(), Address::Adopt { project: 1 }, Address::Forges, flow(None)] {
-        let mut world = world();
+    for (page, has_strip) in [
+        (Address::Chats, true),
+        (f::inbox(), true),
+        (Address::Adopt { project: 1 }, true),
+        (Address::Forges, false),
+        (flow(None), false),
+    ] {
+        // No configured model or usable account line: the accounts document is not usable.
+        let mut world = configured_accounts(
+            true,
+            true,
+            [
+                forge::Configured { number: OWNED, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: true },
+                forge::Configured {
+                    number: GITHUB,
+                    kind: forge::Kind::GitHub,
+                    mode: forge::Mode::Connected,
+                    asked: false,
+                },
+            ],
+            false,
+        );
         let client = open(&mut world, page);
         let nodes = world.tree(client).nodes();
         let banner = nodes.iter().position(|node| {
@@ -759,10 +784,10 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
         });
         assert!(banner.is_some(), "README.md 5.1 requires the accounts banner: {}", text(&world, client));
         let strip = nodes.iter().position(|node| node.role == Role::Region && node.name.as_deref() == Some(b"Setup"));
-        assert!(
-            strip.is_none_or(|strip| banner.expect("banner exists") < strip),
-            "accounts banner precedes setup strip"
-        );
+        assert_eq!(strip.is_some(), has_strip, "only eligible pages have a setup strip");
+        if let Some(strip) = strip {
+            assert!(banner.expect("banner exists") < strip, "accounts banner precedes setup strip");
+        }
     }
 }
 
