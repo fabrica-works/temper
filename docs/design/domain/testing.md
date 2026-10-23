@@ -757,6 +757,18 @@ and 10).
   `domain/people.md`, section 3). The browser's cookie on the link route
   is proved in jig, by the mapping's step tests and the clients'
   component's world (jig's `protocol/client.md`, section 14).
+- **A full pool says so,** in one start of `temper serve`, so that each
+  client DIRECTORY's address stays the engine's, with five DIRECTORYs,
+  each a person's own, and the pool of two: two sign-ins fill it, each
+  later link drawn by a refused one; a third, by `ctl sign-in -` and by
+  `temper open`, exits 1 with the full line, its T the earliest
+  sign-in's expiry to the second, and writes no token; one signs out,
+  and the same link signs the third in; a fourth link, full again, its T
+  the next sign-in's; another signs out, and the same `temper open`
+  signs in and prints the inbox (../client/README.md, 6.7; ../client/
+  tools.md, 8.1). The browser's words for full and busy are the view's
+  and the web host's step tests', and its retry, the printed link
+  opened again, is jig's browser story of a spent link sent again.
 - **The server's guards,** a third test, against `temper serve`'s
   clients' listener: jig's one attack story that needs no browser, a
   rebound Host (jig's `protocol/browser.md`, section 15): a request

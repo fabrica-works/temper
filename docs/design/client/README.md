@@ -1472,6 +1472,20 @@ of each (`../draft/first-run.md`, 3.6).
     construction: the terminal's "Signed out." (6.6); the browser's
     "Signed out. To sign in, open a sign-in link `temper serve`
     printed." (`browser.md`, 2.4);
+  - *signed out, the link's sign-in not taken:* while the link's view
+    says why its last sign-in installed nothing and the link stays
+    usable (jig's `client/domain/client.md`, section 12,
+    `not_signed_in`), the paragraph says so in place of the shell's
+    words: full, "All N sign-ins are in use; the earliest ends MOMENT
+    UTC. This link stays usable until it expires: open it again once one
+    ends." (N the deployment's room, MOMENT the earliest saved expiry,
+    its date always beside its clock, "Oct 24, 09:30", as the accounts
+    page says its moments, 5.5: a sign-in's life is a day or more, so a
+    bare clock would name tomorrow's as today's); busy, "temper is busy. This
+    link stays usable until it expires: open it again in a moment."; not
+    ready, "temper is starting or stopping. This link stays usable until
+    it expires: open it again in a moment." A link opened again past its
+    expiry is refused, and `temper serve` prints a fresh one;
   - *out of date,* the engine serving no version of jig's records that
     this client speaks: "This temper is out of date: run the temper the
     engine runs." What is pending stays in the small store (jig's
@@ -2667,7 +2681,8 @@ Its rules:
   (3.5); a card's wait, a span, in the inbox and on a chat's page; an
   update's arrival in the inbox, an ago (3.5). The task pages and the
   accounts page say their moments as their sections do (5.5, 5.8,
-  5.9), in universal time.
+  5.9), in universal time, and so does a full deployment's earliest end
+  (5.1, the pages not about the work).
 - **Fixed in the tests.** The view world, the terminal's goldens and
   the gallery build at a fixed time: the fixtures' `NOW`, and each of
   the gallery's worlds its own (`browser.md`, 7.2). A test of a form
@@ -2709,6 +2724,7 @@ Its rules:
   | DIRECTORY refused | `temper open: DIRECTORY: ` and what skein's io found unsafe or failed |
   | an address given and no token in DIRECTORY | `temper open: not signed in: give the link temper serve printed` |
   | the link refused by the engine | `temper open: the link was refused: use the fresh link temper serve printed` |
+  | the engine's sign-ins full (6.7) | `temper open: all N sign-ins are in use; the earliest ends at T; this link stays usable until it expires` |
 
   A panic aborts the process (fail-stop); the small store and the keys
   make what was pending safe to send again at the next `temper open`.
@@ -2874,11 +2890,21 @@ command.
 
 - **While signing in by the link,** an exchange with no answer, or
   answered not ready (the engine stopping), prints `temper: signing in:
-  no answer from the engine; trying again`, and is made again after a
+  no answer from the engine; trying again`; one answered busy prints
+  `temper: signing in: the engine is busy; trying again`. Either is
+  made again, the same link with the same held credential, after a
   backoff of 250 ms, doubling to 8 s. `q` gives up and exits 0. A
-  refusal (the link spent or expired, or the engine's sign-ins full)
-  exits 1 (6.1); `temper serve` prints a fresh link when a spent one is
-  tried (jig's `protocol/client.md`, section 8).
+  refusal (the link spent or expired) exits 1 (6.1); `temper serve`
+  prints a fresh link when a spent one is tried (jig's
+  `protocol/client.md`, section 8).
+- **The engine's sign-ins full** exits 1 with `temper open: all N
+  sign-ins are in use; the earliest ends at T; this link stays usable
+  until it expires` (6.1), N the deployment's room and T the earliest
+  saved expiry among its sign-ins in universal time to the second,
+  `YYYY-MM-DDTHH:MM:SSZ`. Nothing is written to DIRECTORY, and the link
+  is not spent: the same `temper open DIRECTORY LINK`, once a sign-in
+  has ended and before the link expires, signs in. Full waits for a
+  sign-in to end, hours away, so the terminal does not wait for it.
 - **Once signed in,** the link is `jig-client`'s to judge (jig's
   `client/domain/client.md`, 8.2). The first line says its state, and
   the page is printed again at each change. Requests made meanwhile are
@@ -2953,8 +2979,8 @@ temper's:
   one offered, and `DIRECTORY/token` is not written. A credential the
   engine does not know, or one ended or expired, is no refusal: the
   link signs the person in afresh, and its credential is written. A
-  link refused, or an engine not reached, leaves `DIRECTORY/token` as
-  it was.
+  link refused, answered not ready, busy or full, or an engine not
+  reached, leaves `DIRECTORY/token` as it was.
 - **The bearer credential,** the sign-in's number beside 32 random
   bytes, is `DIRECTORY/token`, a private file (`0o600`), which
   `jig-client-shell-native` writes where the host says, when it says.

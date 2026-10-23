@@ -983,7 +983,24 @@ temper ctl help [TOOL]
   from FILE or stdin and never an argument (section 9), on loopback, and
   writes the token and the address the link names, as `temper open` does
   (`README.md`, section 7). It offers the token DIRECTORY holds, if any,
-  beside the link: a sign-in kept leaves `token` as it was. `sign-out`
+  beside the link: a sign-in kept leaves `token` as it was. Its
+  answers, each exit 1 with one line, and none writing `token` or
+  `address`:
+  - *refused* (the link spent, expired or unknown): `temper ctl: the
+    sign-in link was refused`; `temper serve` prints a fresh link;
+  - *full* (jig's `domain/people.md`, section 3): `temper ctl: all N
+    sign-ins are in use; the earliest ends at T; this link stays usable
+    until it expires`, N the deployment's room and T the earliest saved
+    expiry among its sign-ins in universal time to the second,
+    `YYYY-MM-DDTHH:MM:SSZ`. The link is not spent: the same `sign-in`
+    signs in once a sign-in has ended, before the link expires;
+  - *not ready* and *busy* pass: the call sends the same link again,
+    with the same token, after 100 ms, doubling to 2 s, within its
+    deadline (8.2); past it, after busy, `temper ctl: temper is busy;
+    this link stays usable until it expires`, and after not ready, the
+    deadline's own line.
+
+  `sign-out`
   ends the sign-in, and jig's native shell, keeping none, leaves `token`
   a zero-byte file, which a call reads as no token. Every other tool
   signs in with the token DIRECTORY holds (`SignIn { with: Held }`).
