@@ -36,6 +36,7 @@ pub(crate) struct Layer {
     writes: Map<Token, Write>,
     next_write: u64,
     pages: Queue<Page>,
+    waiting: Queue<Waiting>,
     listener: Box<[u8]>,
     life: Duration,
     value_bytes: u32,
@@ -51,6 +52,15 @@ struct Page {
     forge: u16,
     state: Box<[u8]>,
     bytes: Box<[u8]>,
+    until: Time,
+}
+/// GitHub's setup visit for a forge busy with its one run, held until that run ends (client/forge.md, 9.1).
+struct Waiting {
+    forge: u16,
+    call: Token,
+    installation: core::num::NonZeroU64,
+    state: Box<[u8]>,
+    back: Option<Box<[u8]>>,
     until: Time,
 }
 // skein host/states.rs:53 spells its 16 random bytes as 32 hex bytes.
@@ -191,6 +201,9 @@ pub(crate) fn worst_case(
         // Encoded record, including VERSION; the store's own copy stays in store::worst_case.
         .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(u64::from(writes))?)?
         .checked_add(Queue::<Page>::worst_case(l.states)?)?
+        // Held setup visits: each its state and a back as long as the backs' own.
+        .checked_add(Queue::<Waiting>::worst_case(l.states)?)?
+        .checked_add(u64::from(l.states).checked_mul(STATE_TEXT_BYTES + 512)?)?
         .checked_add(page.checked_mul(u64::from(l.states))?)?
         .checked_add(Queue::<host::Event>::worst_case(above)?)?
         .checked_add(payload.checked_mul(u64::from(above))?)?
@@ -260,6 +273,7 @@ impl Layer {
             writes: Map::with_capacity(limits.runs.checked_add(limits.forges).expect("setup writes")),
             next_write: 1,
             pages: Queue::with_capacity(limits.states),
+            waiting: Queue::with_capacity(limits.states),
             life,
             value_bytes,
             #[cfg(test)]
@@ -301,6 +315,7 @@ impl Layer {
         self.lifecycle.adoptions = Map::with_capacity(self.env.limits.forges);
         self.lifecycle.reconcile = Map::with_capacity(self.env.limits.forges);
         self.pages = Queue::with_capacity(self.env.limits.states);
+        self.waiting = Queue::with_capacity(self.env.limits.states);
         self.backs = Queue::with_capacity(self.env.limits.states);
         self.public = Map::with_capacity(self.env.limits.runs);
         self.staged = Map::with_capacity(self.env.limits.runs);
@@ -317,16 +332,40 @@ impl Layer {
             Some(host) => host.next_deadline(),
             None => None,
         };
-        crate::accounts::earliest(
+        let mut next = crate::accounts::earliest(
             host,
             match self.pages.iter().next() {
                 Some(page) => Some(page.until),
                 None => None,
             },
-        )
+        );
+        for waiting in &self.waiting {
+            next = crate::accounts::earliest(next, Some(waiting.until));
+        }
+        next
     }
     pub(crate) fn work_pending(&self, now: Time) -> bool {
-        !self.above.is_empty() || !self.io.is_empty() || due(self.next_deadline(), now)
+        !self.above.is_empty() || !self.io.is_empty() || due(self.next_deadline(), now) || self.waiting_ready()
+    }
+    fn waiting_ready(&self) -> bool {
+        for waiting in &self.waiting {
+            if !self.busy(waiting.forge) {
+                return true;
+            }
+        }
+        false
+    }
+    /// The forge's one run: a live run of it, or its removal (protocol/setup.md, 6.5).
+    pub(crate) fn busy(&self, forge: u16) -> bool {
+        if self.lifecycle.deleting.contains_key(&forge) {
+            return true;
+        }
+        for (_, run) in &self.runs {
+            if run.forge == forge {
+                return true;
+            }
+        }
+        false
     }
     pub(crate) fn lifecycle_ready(&self, engine: &crate::engine::Engine) -> bool {
         !self.closing

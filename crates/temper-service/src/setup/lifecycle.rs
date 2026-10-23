@@ -105,7 +105,7 @@ pub(super) struct Lifecycle {
     pub(super) adoptions: Map<u16, Adoption>,
     pub(super) reconcile: Map<u16, Reconcile>,
     deleted: Map<(u16, u64), ()>,
-    deleting: Map<u16, ()>,
+    pub(super) deleting: Map<u16, ()>,
     pub(super) installations: Map<(u16, u64), domain::Installation>,
     next_run: u64,
     restored: bool,
@@ -226,10 +226,7 @@ pub(super) fn kind(plan: &host::Plan) -> Kind {
     }
 }
 pub(super) fn busy(engine: &crate::engine::Engine, forge: u16) -> bool {
-    if engine.setup.lifecycle.deleting.contains_key(&forge) {
-        return true;
-    }
-    running(&engine.setup.runs, forge)
+    engine.setup.busy(forge)
 }
 fn running(runs: &Map<Token, Run>, forge: u16) -> bool {
     for (_, run) in runs {

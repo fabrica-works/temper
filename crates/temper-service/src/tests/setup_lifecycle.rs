@@ -1341,3 +1341,33 @@ fn redirect_install_stop_answers_ended_with_the_app_kept() {
     status(&peer, b"410");
     assert_eq!(service.engine.as_ref().unwrap().forge.starts.len(), 1);
 }
+#[test]
+fn a_setup_visit_for_a_busy_forge_waits_for_its_run_then_accepts() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let state = install_link(&mut service, Some(b"/forges?from=manifest"));
+    // The forge's one run, as the reconcile after a manifest's Connected.
+    service.engine.as_mut().unwrap().setup.lifecycle.deleting.insert(1, ()).unwrap();
+    let mut peer = visit(&mut service, b"GET", &setup_target(&state));
+    assert!(peer.received().is_empty(), "the visit waits for the forge's run");
+    assert!(!service.engine.as_ref().unwrap().setup.work_pending(Time::ZERO));
+    service.engine.as_mut().unwrap().setup.lifecycle.deleting.remove(&1).unwrap();
+    assert!(service.engine.as_ref().unwrap().setup.work_pending(Time::ZERO));
+    pump_visit(&mut service, &mut peer);
+    complete_accept(&mut service, &mut peer);
+    status(&peer, b"303");
+    assert!(contains(peer.received(), b"Location: /forges?from=manifest"));
+}
+#[test]
+fn a_setup_visit_held_past_the_states_life_is_ended() {
+    let mut service = service(8, Duration::from_secs(3));
+    app(&mut service);
+    let state = install_link(&mut service, None);
+    service.engine.as_mut().unwrap().setup.lifecycle.deleting.insert(1, ()).unwrap();
+    let mut peer = visit(&mut service, b"GET", &setup_target(&state));
+    assert!(peer.received().is_empty(), "the visit waits for the forge's run");
+    let until = service.engine.as_ref().unwrap().setup.next_deadline().unwrap();
+    service.engine.as_mut().unwrap().env.now = until;
+    pump_visit(&mut service, &mut peer);
+    status(&peer, b"410");
+}

@@ -275,7 +275,24 @@ fn route(engine: &mut Engine, call: Token, head: Call) {
         Some(return_to) => return_to.back,
         None => None,
     };
-    if super::lifecycle::busy(engine, forge)
+    if engine.setup.busy(forge) && engine.setup.waiting.room() > 0 {
+        // The forge's one run, as the reconcile after a manifest's Connected, ends first.
+        let until = engine.env.now.saturating_add(engine.setup.life);
+        let waiting = super::Waiting { forge, call, installation, state, back, until };
+        engine.setup.waiting.push(waiting);
+        return;
+    }
+    accept(engine, call, forge, installation, state, back);
+}
+fn accept(
+    engine: &mut Engine,
+    call: Token,
+    forge: u16,
+    installation: NonZeroU64,
+    state: Box<[u8]>,
+    back: Option<Box<[u8]>>,
+) {
+    if engine.setup.busy(forge)
         || engine.setup.runs.len() == engine.setup.env.limits.runs
         || engine.setup.public.len() == engine.setup.public.capacity()
     {
@@ -377,14 +394,30 @@ fn manifest_visit(engine: &mut Engine, call: Token, forge: u16, route: Route, by
         .expect("staged room");
     super::request(engine, run);
 }
+fn room(engine: &Engine) -> bool {
+    engine.events.room() >= 4
+        && engine.setup.room()
+        && engine.store.room()
+        && engine.forge.room(2)
+        && engine.notes.room() > 0
+}
 pub(super) fn advance(engine: &mut Engine) {
+    for _ in 0..engine.setup.waiting.len() {
+        if !room(engine) {
+            break;
+        }
+        let waiting = engine.setup.waiting.pop().expect("waiting count");
+        if !engine.setup.busy(waiting.forge) {
+            let super::Waiting { forge, call, installation, state, back, .. } = waiting;
+            accept(engine, call, forge, installation, state, back);
+        } else if engine.env.now < waiting.until {
+            engine.setup.waiting.push(waiting);
+        } else {
+            ended(engine, waiting.call, waiting.forge);
+        }
+    }
     for _ in 0..engine.clients.github_calls.len() {
-        if engine.events.room() < 4
-            || !engine.setup.room()
-            || !engine.store.room()
-            || !engine.forge.room(2)
-            || engine.notes.room() == 0
-        {
+        if !room(engine) {
             break;
         }
         let (call, head) = engine.clients.github_calls.pop().expect("route count");

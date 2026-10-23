@@ -1020,6 +1020,15 @@ manifest from it (`../protocol/forge.md`, the setup's host).
     later makes an installation with no state of temper's, a stray
     (`../protocol/setup.md`, 17.4); waiting for it is for later
     (`../draft/github.md`, section 18).
+- **A busy forge holds the visit.** GitHub's setup visit with an
+  installation and a state, for a forge whose one run is live, as the
+  reconcile after the App's `Connected` (`../protocol/setup.md`, 17.5),
+  which an install straight after a manifest's conversion meets, is held,
+  not refused: the routing keeps its call, installation, state and
+  `back`, at most `setup.states` of them, and starts its `Accept` once
+  the forge's run ends. One held past the state's life
+  (`setup.state_life_ms`), or with no room to hold it, is answered `410`
+  as ended.
 - **A visit with no state** to the setup route is GitHub's, after a
   person changed the installation's repositories on GitHub: for an
   installation accepted already it is a refresh, answered `303` to
