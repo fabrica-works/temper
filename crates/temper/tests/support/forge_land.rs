@@ -91,6 +91,12 @@ pub fn plan_scripts(plan: &Plan<'_>) -> Box<[Script]> {
     let text =
         |bytes: &[u8]| Turn { lines: Box::new([Line::Text { text: bytes.into() }]), finish: Finish::Stop, tokens: 20 };
     let chat = &mut scripts[0];
+    chat.turns[0].lines = Box::new([Line::Call {
+        name: b"change".as_slice().into(),
+        arguments: serde_json::to_vec(&serde_json::json!({"words": coding, "repository": "work/hello"}))
+            .expect("change tool JSON")
+            .into_boxed_slice(),
+    }]);
     // An Open chat replies with text and keeps listening (domain/agent.md, 4.6).
     // The first box stops without Close; no finish request or closing turn runs here.
     chat.turns[2] = text(LANDED.as_bytes());
