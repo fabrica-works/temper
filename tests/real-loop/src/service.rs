@@ -119,6 +119,9 @@ impl ServiceHost {
             // and its child plan (skein's forge-setup host admission).
             let runs = temper_service::limits::profile(temper_service::limits::Profile::Small).setup.runs;
             envelope.0 += (3 + 2 * u64::from(runs)) * 4;
+            // Each of the clients' 8 HTTP connections (limits::server) may hold a
+            // manifest page's policy, priced with web twice (temper-service setup.rs).
+            envelope.0 += 2 * 8 * 4;
         } else if fixture.is_some() {
             envelope.0 += 3 * 4;
         } else if cluster.is_some() {
@@ -178,6 +181,7 @@ impl ServiceHost {
     pub(crate) fn make_github_app(&mut self, peer: &mut skein_fake_peers::forge::Peer) {
         if let Some(fixture) = self.github
             && !fixture.connected
+            && !fixture.manifest
         {
             self.github_seen.app =
                 Some(crate::github::make_app(peer, self.clients.expect("clients"), &self.path, fixture));

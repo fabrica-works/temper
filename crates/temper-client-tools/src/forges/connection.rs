@@ -21,26 +21,42 @@ use temper_client_protocol_wire::{self as wire, v1 as w};
 pub(super) struct Pending {
     forge: u16,
     install: bool,
+    manifest: bool,
     called: Option<Called>,
 }
 pub(super) fn owns(call: &jig::call::Call) -> bool {
     let name = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name;
     name == CONNECT.name || name == INSTALL.name
 }
-fn request(forge: u16, app: Option<u64>, limits: &Limits) -> Option<Ask> {
+fn request(forge: u16, app: Option<u64>, manifest: bool, limits: &Limits) -> Option<Ask> {
     let bounds = temper_client_domain::forge::wire_limits(&limits.domain.forge)?;
-    let request = match app {
-        Some(id) => w::Request::Connect(
+    let request = if manifest {
+        w::Request::Connect(
             w::Connect::new(
                 &bounds,
                 w::ConnectParts {
                     forge,
-                    how: w::How::GithubApp(w::GitHubApp::new(&bounds, w::GitHubAppParts { id }).ok()?),
+                    how: w::How::GithubManifest(
+                        w::GitHubManifest::new(&bounds, w::GitHubManifestParts { back: None }).ok()?,
+                    ),
                 },
             )
             .ok()?,
-        ),
-        None => w::Request::Install(w::Install::new(&bounds, w::InstallParts { forge, back: None }).ok()?),
+        )
+    } else {
+        match app {
+            Some(id) => w::Request::Connect(
+                w::Connect::new(
+                    &bounds,
+                    w::ConnectParts {
+                        forge,
+                        how: w::How::GithubApp(w::GitHubApp::new(&bounds, w::GitHubAppParts { id }).ok()?),
+                    },
+                )
+                .ok()?,
+            ),
+            None => w::Request::Install(w::Install::new(&bounds, w::InstallParts { forge, back: None }).ok()?),
+        }
     };
     let record = w::Requesting::new(&bounds, w::RequestingParts { request }).ok()?;
     Some(Ask::Family {
@@ -56,10 +72,10 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
         return;
     }
     if crate::table::TOOLS.get(usize::from(called.call.tool)).expect("parsed tool").name == CONNECT.name
-        && called.call.form != 0
+        && called.call.form > 1
     {
         let printed = render::failure(
-            b"github, forgejo and forgejo-admin are not offered yet; use forge-connect F github-app ID FILE --key NAME",
+            b"forgejo and forgejo-admin are not offered yet; use forge-connect F github --key NAME",
             called.json,
             2,
         );
@@ -67,16 +83,17 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
         return;
     }
     let install = crate::table::TOOLS.get(usize::from(called.call.tool)).expect("parsed tool").name == INSTALL.name;
+    let manifest = !install && called.call.form == 1;
     let forge = u16::try_from(number_arg(&called.call)).expect("checked forge number");
     let app = if install { None } else { number(&called.call, 2) };
     let value = called.value.take();
-    if value.is_some() == install {
+    if value.is_some() != (!install && !manifest) {
         let printed =
             render::failure(b"forge-connect requires a private key file; forge-install takes no value", called.json, 1);
         finish(called, printed, out);
         return;
     }
-    let Some(request) = request(forge, app, &env.limits) else {
+    let Some(request) = request(forge, app, manifest, &env.limits) else {
         let printed = render::failure(b"forge request encoding failed", called.json, 1);
         finish(called, printed, out);
         return;
@@ -97,7 +114,7 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
         }
         None => Event::Send { key, name, request },
     };
-    state.connections.insert(key, Pending { forge, install, called: Some(called) });
+    state.connections.insert(key, Pending { forge, install, manifest, called: Some(called) });
     out.push(Out::Client { event });
 }
 pub(super) fn told(state: &mut Forges, env: &Env<Limits>, told: &Told, out: &mut Queue<Out>) -> bool {
@@ -107,17 +124,17 @@ pub(super) fn told(state: &mut Forges, env: &Env<Limits>, told: &Told, out: &mut
         {
             let Some(bounds) = temper_client_domain::forge::wire_limits(&env.limits.domain.forge) else { return false };
             let Some(request) = wire::decode_requesting(&record.bytes, &bounds) else { return false };
-            let forge = match request.into_parts().request {
-                w::Request::Install(value) => value.forge(),
-                w::Request::Return(_)
-                | w::Request::Adopt(_)
-                | w::Request::SetUp(_)
-                | w::Request::StartDemo
-                | w::Request::Connect(_) => {
+            let (forge, install, manifest) = match request.into_parts().request {
+                w::Request::Install(value) => (value.forge(), true, false),
+                w::Request::Connect(value) => match value.how() {
+                    w::How::GithubManifest(_) => (value.forge(), false, true),
+                    w::How::GithubApp(_) => return false,
+                },
+                w::Request::Return(_) | w::Request::Adopt(_) | w::Request::SetUp(_) | w::Request::StartDemo => {
                     return false;
                 }
             };
-            state.connections.insert(*key, Pending { forge, install: true, called: None });
+            state.connections.insert(*key, Pending { forge, install, manifest, called: None });
             true
         }
         Told::Answered { key, outcome } => {
@@ -184,14 +201,14 @@ fn answer(value: &Answered, limits: &Limits) -> Option<Answer> {
         | w::Outcome::StartFailed(_) => None,
     }
 }
-fn text(forge: u16, install: bool, answer: &Answer, kept: bool, limits: &Limits, out: &mut Text) {
+fn text(forge: u16, install: bool, manifest: bool, answer: &Answer, kept: bool, limits: &Limits, out: &mut Text) {
     if kept {
-        out.put(b"kept: forge-install ");
+        out.put(if install { b"kept: forge-install " } else { b"kept: forge-connect " });
     }
     match answer {
         Answer::Connecting => {
             out.put(b"connecting\n");
-            if !install {
+            if !install && !manifest {
                 out.put(b"temper ctl DIRECTORY wait forges --until connected:");
                 out.number(u64::from(forge));
                 out.put(b"\n");
@@ -213,11 +230,11 @@ fn text(forge: u16, install: bool, answer: &Answer, kept: bool, limits: &Limits,
         Answer::Unknown => out.put(b"unknown\n"),
     }
 }
-fn json(answer: &Answer, kept: bool, out: &mut Encoder) {
+fn json(answer: &Answer, kept: bool, install: bool, out: &mut Encoder) {
     if kept {
         out.object_start();
         out.key(b"operation");
-        out.string(b"forge-install");
+        out.string(if install { b"forge-install" } else { b"forge-connect" });
         out.key(b"outcome");
     }
     out.object_start();
@@ -267,10 +284,14 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
         Outcome::Answered(value) => answer(value, limits),
         Outcome::Unknown => Some(Answer::Unknown),
         Outcome::Held | Outcome::Limit | Outcome::Unconfirmed | Outcome::NotKept | Outcome::Unsent | Outcome::Lost => {
-            let mut operation =
-                render::outcome::Operation::of(&request(forge, None, limits).expect("checked forge limits"));
+            let mut operation = render::outcome::Operation::of(
+                &request(forge, None, pending.manifest, limits).expect("checked forge limits"),
+            );
             operation.word = if install { b"forge-install" } else { b"forge-connect" };
-            if !install && let Some(called) = &pending.called {
+            if !install
+                && !pending.manifest
+                && let Some(called) = &pending.called
+            {
                 operation.value_name.clone_from(&called.call.key);
             }
             if kept {
@@ -285,8 +306,8 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
     };
     let Some(answer) = answer else { return render::failure(b"forge answer decoding failed", structured, 1) };
     let status = match &answer {
-        Answer::Connecting => u8::from(install),
-        Answer::Link(_) if !install => {
+        Answer::Connecting => u8::from(install || pending.manifest),
+        Answer::Link(_) if !install && !pending.manifest => {
             return render::failure(b"forge answer does not fit connect", structured, 1);
         }
         Answer::Link(_) => 0,
@@ -296,17 +317,17 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
     let bytes = if structured {
         let bounds = skein_json::writer::Limits { depth: 8, length: limits.tools.text };
         let mut measure = Encoder::measure(&bounds);
-        json(&answer, kept, &mut measure);
+        json(&answer, kept, install, &mut measure);
         let Ok(size) = measure.measured() else { return render::failure(b"result limit", true, 1) };
         let mut out = Encoder::write(size, &bounds);
-        json(&answer, kept, &mut out);
+        json(&answer, kept, install, &mut out);
         let bytes = out.finish();
         if kept { render::outcome::newline(&bytes) } else { bytes }
     } else {
         let mut measure = Text::measure();
-        text(forge, install, &answer, kept, limits, &mut measure);
+        text(forge, install, pending.manifest, &answer, kept, limits, &mut measure);
         let mut out = Text::writing_exact(measure);
-        text(forge, install, &answer, kept, limits, &mut out);
+        text(forge, install, pending.manifest, &answer, kept, limits, &mut out);
         out.finish()
     };
     if bytes.len() > usize::try_from(limits.tools.text).expect("text fits") {

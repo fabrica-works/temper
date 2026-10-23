@@ -17,6 +17,7 @@ pub(super) fn row(
     w::ForgeRow::new(
         &w::CEILINGS,
         w::ForgeRowParts {
+            app: None,
             installations: List::with_capacity(0),
             ended: None,
             first: None,
@@ -88,8 +89,8 @@ fn choose_draws_a_card_per_choice_in_order() {
             "Setting up",
             "Ready",
             "GitHub",
-            "Your repositories on GitHub. temper makes its App there, or takes an App of yours, and you install it on the repositories you choose.",
-            "In your browser, on GitHub · about two minutes",
+            "Your repositories on GitHub. temper makes its own App there; you choose the account and the repositories it may use.",
+            "In this tab, on GitHub · about two minutes",
             "Connect GitHub",
             "Use an App of your own ›",
             "Forgejo on this machine",
@@ -439,25 +440,25 @@ fn attempt(mut out: skein_lib::Queue<d::Request>) -> skein_lib::Token {
     panic!("request sent")
 }
 fn answer(root: &mut d::Domain, attempt: skein_lib::Token, outcome: w::Outcome) {
-    f::root_event(
-        root,
-        d::Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Answer {
-                    attempt,
-                    envelope: skein_lib::RequestEnvelope::Final,
-                    why: None,
-                    answer: Some(jig_client::Answered::Family(jig_client::Family {
-                        family: temper_client_protocol_wire::FORGE,
-                        version: temper_client_protocol_wire::CLIENT_VERSION,
-                        bytes: temper_client_protocol_wire::answer(
-                            &w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).unwrap(),
-                        ),
-                    })),
-                },
+    f::root_event(root, answer_event(attempt, outcome));
+}
+fn answer_event(attempt: skein_lib::Token, outcome: w::Outcome) -> d::Event {
+    d::Event::Client {
+        event: jig_client::Event::Up {
+            up: jig_client::Up::Answer {
+                attempt,
+                envelope: skein_lib::RequestEnvelope::Final,
+                why: None,
+                answer: Some(jig_client::Answered::Family(jig_client::Family {
+                    family: temper_client_protocol_wire::FORGE,
+                    version: temper_client_protocol_wire::CLIENT_VERSION,
+                    bytes: temper_client_protocol_wire::answer(
+                        &w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).unwrap(),
+                    ),
+                })),
             },
         },
-    );
+    }
 }
 pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> List<w::ForgeRow> {
     let first = w::FirstRepository::new(
@@ -477,6 +478,7 @@ pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> Lis
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                app: None,
                 installations: List::with_capacity(0),
                 ended: None,
                 number: HERE,
@@ -885,4 +887,121 @@ fn a_connect_refusal_is_said_below_its_button() {
     );
     let view = f::browser_page_view(&root);
     words_in_order(view.tree(), &["Connect the App", "The key did not reach temper: paste it again."]);
+}
+
+fn manifest_started(address: Address) -> (d::Domain, skein_lib::Queue<d::Request>) {
+    let mut root = f::forge_root(address, rows(w::Connection::NotSetUp, w::Offer::Offered));
+    let mut view = f::browser_page_view(&root);
+    let button = node(view.tree(), Role::Button, b"Connect GitHub");
+    let action = crate::act(&mut view, button, Act::Press).expect("live manifest button");
+    let out = drive(&mut root, d::Event::Act { action });
+    (root, out)
+}
+#[test]
+fn connect_github_sends_the_pages_own_address() {
+    for (address, back) in [
+        (Address::ConnectForge { forge: None }, b"/forges/connect".as_slice()),
+        (Address::Welcome { step: Step::Forge { forge: None } }, b"/welcome?at=forge".as_slice()),
+    ] {
+        let (_, mut out) = manifest_started(address);
+        let mut sent = None;
+        while let Some(request) = out.pop() {
+            if let d::Request::Client {
+                request: jig_client::Request::Down { down: jig_client::Down::Send { request, value, .. } },
+            } = request
+            {
+                assert!(value.is_none());
+                let jig_client::Ask::Family { record, .. } = request else { panic!("family") };
+                sent = Some(
+                    temper_client_protocol_wire::decode_requesting(&record.bytes, &w::CEILINGS)
+                        .unwrap()
+                        .into_parts()
+                        .request,
+                );
+            }
+        }
+        let w::Request::Connect(connect) = sent.expect("manifest Connect") else { panic!("Connect") };
+        assert_eq!(connect.forge(), GITHUB);
+        let w::How::GithubManifest(manifest) = connect.how() else { panic!("manifest") };
+        assert_eq!(manifest.back().as_deref(), Some(back));
+    }
+}
+#[test]
+fn connect_github_is_disabled_until_the_answer() {
+    let (root, _) = manifest_started(Address::ConnectForge { forge: None });
+    let view = f::browser_page_view(&root);
+    let button = node(view.tree(), Role::Button, b"Connect GitHub");
+    assert!(view.tree().nodes().iter().find(|n| n.id == button).unwrap().states.as_slice().contains(&State::Disabled));
+}
+#[test]
+fn connect_github_refusal_shows_under_its_button() {
+    let (mut root, out) = manifest_started(Address::ConnectForge { forge: None });
+    answer(
+        &mut root,
+        attempt(out),
+        w::Outcome::ConnectRefused(
+            w::ConnectRefused::new(&w::CEILINGS, w::ConnectRefusedParts { why: w::ForgeRefusal::Busy }).unwrap(),
+        ),
+    );
+    let view = f::browser_page_view(&root);
+    words_in_order(
+        view.tree(),
+        &["Connect GitHub", "temper is busy with forge 2: try again when it ends.", "Use an App of your own"],
+    );
+}
+#[test]
+fn connect_github_link_leaves_the_tab_once() {
+    let (mut root, out) = manifest_started(Address::ConnectForge { forge: None });
+    let attempt = attempt(out);
+    let outcome = w::Outcome::Link(
+        w::Link::new(
+            &w::CEILINGS,
+            w::LinkParts { address: b"http://fake.invalid/forges/2/github/manifest?state=fake".as_slice().into() },
+        )
+        .unwrap(),
+    );
+    let mut out = drive(&mut root, answer_event(attempt, outcome.clone()));
+    let mut leaves = Vec::new();
+    while let Some(request) = out.pop() {
+        if let d::Request::Leave { to } = request {
+            leaves.push(to);
+        }
+    }
+    assert_eq!(leaves, [Box::<[u8]>::from(b"http://fake.invalid/forges/2/github/manifest?state=fake".as_slice())]);
+    let mut out = drive(&mut root, answer_event(attempt, outcome));
+    while let Some(request) = out.pop() {
+        if let d::Request::Leave { .. } = request {
+            panic!("only the first answer may leave the page");
+        }
+    }
+    let view = f::browser_page_view(&root);
+    let link = node(view.tree(), Role::Link, b"Connect GitHub");
+    assert_eq!(
+        view.tree().nodes().iter().find(|n| n.id == link).unwrap().external.as_deref(),
+        Some(b"http://fake.invalid/forges/2/github/manifest?state=fake".as_slice())
+    );
+}
+#[test]
+fn connecting_uses_the_apps_way_for_its_words() {
+    for (app, words) in [
+        (
+            Some(w::AppWay::Manifest),
+            "my-app is made on GitHub, under your account, and installed nowhere yet. Install it, and choose the repositories temper may use.",
+        ),
+        (
+            Some(w::AppWay::Pasted),
+            "my-app is connected to temper, and installed nowhere yet. Install it, and choose the repositories temper may use.",
+        ),
+        (
+            None,
+            "my-app is connected to temper, and installed nowhere yet. Install it, and choose the repositories temper may use.",
+        ),
+    ] {
+        let mut parts = github_rows(false).get(0).unwrap().clone().into_parts();
+        parts.app = app;
+        let mut rows = List::with_capacity(1);
+        rows.push(w::ForgeRow::new(&w::CEILINGS, parts).unwrap()).unwrap();
+        let root = f::forge_root(Address::ConnectForge { forge: Some(Choice::Forge(GITHUB)) }, rows);
+        words_in_order(f::browser_page_view(&root).tree(), &["Install temper’s App", words, "Install on GitHub"]);
+    }
 }

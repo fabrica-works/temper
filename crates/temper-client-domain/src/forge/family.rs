@@ -271,6 +271,11 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 .ok()?;
         }
         rows.push(Row {
+            app: match row.app {
+                Some(w::AppWay::Manifest) => Some(super::forges::AppWay::Manifest),
+                Some(w::AppWay::Pasted) => Some(super::forges::AppWay::Pasted),
+                None => None,
+            },
             installations: installations.into_boxed(),
             ended: match row.ended {
                 Some(ended) => Some(ended.into_parts().why),

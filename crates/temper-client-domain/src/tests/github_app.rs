@@ -86,7 +86,7 @@ fn carried(pem: &[u8]) -> Secret {
                 panic!("Connect")
             };
             assert_eq!(connect.forge(), 2);
-            let w::How::GithubApp(app) = connect.how();
+            let w::How::GithubApp(app) = connect.how() else { panic!("pasted App") };
             assert_eq!(app.id(), 7);
             carried = Some(value);
         }
@@ -231,6 +231,7 @@ fn each_forge_refusal_is_said_in_forge_md_words() {
 
 fn github_row() -> forge::forges::Row {
     forge::forges::Row {
+        app: None,
         number: 2,
         kind: forge::forges::Kind::GitHub,
         mode: forge::forges::Mode::Connected,
@@ -361,4 +362,31 @@ fn install_sends_its_way_back_and_leaves_once_only_from_the_answer() {
             panic!("only the first answer may leave the page");
         }
     }
+}
+
+fn manifest(root: &mut crate::Domain) -> Queue<Request> {
+    act(root, forge::Act::ConnectManifest { forge: 2, back: b"/forges/connect".as_slice().into() })
+}
+#[test]
+fn manifest_connect_needs_a_party() {
+    let mut root = crate::unlinked(&f::limits(), f::SEED);
+    assert!(manifest(&mut root).is_empty());
+}
+#[test]
+fn manifest_connect_waits_for_a_current_service() {
+    let (mut root, _, _) = connect::opened(true);
+    event(&mut root, Event::Forge(forge::Event::Served { served: forge::Served::OutOfDate }));
+    assert!(manifest(&mut root).is_empty());
+}
+#[test]
+fn manifest_connect_waits_for_the_pending_app_answer() {
+    let (mut root, _, _) = connect::opened(true);
+    manifest(&mut root);
+    assert!(manifest(&mut root).is_empty());
+}
+#[test]
+fn manifest_connect_shares_the_pending_install_guard() {
+    let (mut root, _, _) = connect::opened(true);
+    act(&mut root, forge::Act::Install { forge: 2, back: b"/forges/connect".as_slice().into() });
+    assert!(manifest(&mut root).is_empty());
 }

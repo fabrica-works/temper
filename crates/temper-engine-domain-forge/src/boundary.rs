@@ -149,8 +149,20 @@ pub enum Ask {
     Adopt(Adoption),
     SetUp { forge: u16, org: Box<[u8]>, repository: Box<[u8]>, project: SetUpProject },
     StartDemo,
-    Connect { forge: u16, app: core::num::NonZeroU64 },
+    Connect { forge: u16, how: How },
     Install { forge: u16, back: Option<Box<[u8]>> },
+}
+/// The public GitHub connect's input; keys remain carried handles.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum How {
+    GitHubApp { app: core::num::NonZeroU64 },
+    GitHubManifest { back: Option<Box<[u8]>> },
+}
+/// The App records' provenance since this engine started (client/README.md, 4.6).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum AppWay {
+    Manifest,
+    Pasted,
 }
 /// A retained application answer; only adoption outcomes are durable.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -172,9 +184,10 @@ pub enum ForgeRefusal {
     Busy,
     NoKey,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ConnectAnswer {
     Connecting,
+    Link(Box<[u8]>),
     Refused(ForgeRefusal),
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -279,6 +292,7 @@ pub struct Row {
     pub first: Option<First>,
     pub installations: Box<[(u64, Installation)]>,
     pub ended: Option<Box<[u8]>>,
+    pub app: Option<AppWay>,
 }
 /// The deployment's forges, ordered by number (domain/forge.md, 4.1).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -714,6 +728,11 @@ pub struct Installation {
 /// A parent or child input to the connector top.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// A successful conversion kept its App records.
+    AppRecorded {
+        forge: u16,
+        app: AppWay,
+    },
     /// Bind the folded member address before minting a sign-in.
     Bind {
         request: Token,
@@ -1037,6 +1056,11 @@ pub enum Request {
         request: Token,
         app: core::num::NonZeroU64,
         carried: jig_domain_core::Carried,
+    },
+    Manifest {
+        forge: u16,
+        request: Token,
+        back: Option<Box<[u8]>>,
     },
     Install {
         forge: u16,

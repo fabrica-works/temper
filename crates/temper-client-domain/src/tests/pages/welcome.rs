@@ -105,6 +105,7 @@ fn rows(root: &mut Domain, watch: Token, number: u16) -> Queue<Request> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    app: None,
                     installations: List::with_capacity(0),
                     ended: None,
                     first: None,
@@ -336,6 +337,7 @@ fn strip_forges(root: &mut Domain, watch: Token, connection: Option<w::Connectio
                 w::ForgeRow::new(
                     &w::CEILINGS,
                     w::ForgeRowParts {
+                        app: None,
                         installations: List::with_capacity(0),
                         ended: None,
                         number: 3,

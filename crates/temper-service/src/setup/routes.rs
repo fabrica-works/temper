@@ -25,9 +25,24 @@ fn split(target: &[u8]) -> (&[u8], &[u8]) {
         None => (target, b""),
     }
 }
-fn forge(path: &[u8]) -> Option<u16> {
-    let digits = path.strip_prefix(b"/forges/")?.strip_suffix(b"/github/setup")?;
-    u16::try_from(number(digits)?).ok()
+#[derive(Clone, Copy)]
+enum Route {
+    Setup,
+    Manifest,
+    Redirect,
+}
+fn forge(path: &[u8]) -> Option<(u16, Route)> {
+    let path = path.strip_prefix(b"/forges/")?;
+    for (suffix, route) in [
+        (b"/github/setup".as_slice(), Route::Setup),
+        (b"/github/manifest", Route::Manifest),
+        (b"/github/redirect", Route::Redirect),
+    ] {
+        if let Some(digits) = path.strip_suffix(suffix) {
+            return Some((u16::try_from(number(digits)?).ok()?, route));
+        }
+    }
+    None
 }
 fn hex(byte: u8) -> Option<u8> {
     match byte {
@@ -128,6 +143,8 @@ fn escaped(byte: &u8) -> &[u8] {
         _ => core::slice::from_ref(byte),
     }
 }
+/// SHA-256 of the form page's sole script, for its CSP; checked against `form` by a unit test.
+pub(crate) const MANIFEST_SCRIPT_HASH: &[u8] = b"ePniVEkSivX/c7XWBGafqh8tSpiRrKiqYeqbG7N1TOE=";
 /// The form posting GitHub's manifest to `target`, submitted by its one script and
 /// with no external resources; both attributes escape. Refuses a page past `max`.
 pub(super) fn form(target: &[u8], manifest: &[u8], max: u32) -> Option<Box<[u8]>> {
@@ -193,7 +210,7 @@ pub(super) fn ended(engine: &mut Engine, call: Token, forge: u16) {
 }
 fn route(engine: &mut Engine, call: Token, head: Call) {
     let (path, bytes) = split(&head.target);
-    let Some(forge) = forge(path) else {
+    let Some((forge, route)) = forge(path) else {
         engine.clients.github_answer(call, 404, None, b"Forge not found");
         return;
     };
@@ -211,6 +228,17 @@ fn route(engine: &mut Engine, call: Token, head: Call) {
     if head.method != Method::Get {
         engine.clients.github_answer(call, 405, None, b"Use GET");
         return;
+    }
+    if bytes.len() > usize::try_from(engine.clients.query_bytes).expect("query bound") {
+        bad_request(engine, call, forge);
+        return;
+    }
+    match route {
+        Route::Manifest | Route::Redirect => {
+            manifest_visit(engine, call, forge, route, bytes);
+            return;
+        }
+        Route::Setup => {}
     }
     let parsed = if bytes.len() <= usize::try_from(engine.clients.query_bytes).expect("query bound") {
         query(bytes)
@@ -247,7 +275,24 @@ fn route(engine: &mut Engine, call: Token, head: Call) {
         Some(return_to) => return_to.back,
         None => None,
     };
-    if super::lifecycle::busy(engine, forge)
+    if engine.setup.busy(forge) && engine.setup.waiting.room() > 0 {
+        // The forge's one run, as the reconcile after a manifest's Connected, ends first.
+        let until = engine.env.now.saturating_add(engine.setup.life);
+        let waiting = super::Waiting { forge, call, installation, state, back, until };
+        engine.setup.waiting.push(waiting);
+        return;
+    }
+    accept(engine, call, forge, installation, state, back);
+}
+fn accept(
+    engine: &mut Engine,
+    call: Token,
+    forge: u16,
+    installation: NonZeroU64,
+    state: Box<[u8]>,
+    back: Option<Box<[u8]>>,
+) {
+    if engine.setup.busy(forge)
         || engine.setup.runs.len() == engine.setup.env.limits.runs
         || engine.setup.public.len() == engine.setup.public.capacity()
     {
@@ -259,14 +304,120 @@ fn route(engine: &mut Engine, call: Token, head: Call) {
     engine.setup.staged.insert(run, host::Plan::Accept { forge, installation, state }).expect("staged room");
     super::request(engine, run);
 }
+fn bad_request(engine: &mut Engine, call: Token, forge: u16) {
+    page(engine, call, 400, b"This visit could not be read", b"Start again from temper.", &fallback(forge));
+}
+struct ManifestQuery {
+    state: Box<[u8]>,
+    code: Option<Box<[u8]>>,
+}
+fn manifest_query(bytes: &[u8], redirect: bool) -> Option<ManifestQuery> {
+    let mut state = None;
+    let mut code = None;
+    let mut rest = Some(bytes);
+    for _ in 0_u32..2 {
+        let Some(bytes) = rest.take() else { break };
+        let field = match skein_lib::bytes::find(bytes, b"&") {
+            Some(at) => {
+                rest = Some(bytes.get(at.checked_add(1)?..)?);
+                bytes.get(..at)?
+            }
+            None => bytes,
+        };
+        let eq = skein_lib::bytes::find(field, b"=")?;
+        let name = value(field.get(..eq)?)?;
+        let bytes = value(field.get(eq.checked_add(1)?..)?)?;
+        if bytes.is_empty() {
+            return None;
+        }
+        match name.as_ref() {
+            b"state" if state.is_none() => state = Some(bytes),
+            b"code" if redirect && code.is_none() => code = Some(bytes),
+            _ => return None,
+        }
+    }
+    if rest.is_some() || redirect && code.is_none() {
+        return None;
+    }
+    Some(ManifestQuery { state: state?, code })
+}
+fn manifest_visit(engine: &mut Engine, call: Token, forge: u16, route: Route, bytes: &[u8]) {
+    let redirect = match route {
+        Route::Redirect => true,
+        Route::Manifest => false,
+        Route::Setup => unreachable!("manifest visits"),
+    };
+    let Some(ManifestQuery { state, code }) = manifest_query(bytes, redirect) else {
+        bad_request(engine, call, forge);
+        return;
+    };
+    if !redirect {
+        let Some(page) = engine.setup.page(forge, &state, engine.env.now) else {
+            ended(engine, call, forge);
+            return;
+        };
+        let mut web = b"https://github.com".as_slice();
+        for config in &engine.workers.forges {
+            if config.number == forge {
+                if let Some(address) = &config.web {
+                    web = address;
+                }
+                break;
+            }
+        }
+        engine.clients.github_manifest_answer(call, page, web);
+        return;
+    }
+    let live = engine.setup.take_page(forge, &state, engine.env.now);
+    let back = match super::public::take_back(engine, forge, &state) {
+        Some(back) => back.back,
+        None => None,
+    };
+    if !live
+        || super::lifecycle::busy(engine, forge)
+        || engine.setup.runs.len() == engine.setup.env.limits.runs
+        || engine.setup.public.len() == engine.setup.public.capacity()
+    {
+        ended(engine, call, forge);
+        return;
+    }
+    let run = super::lifecycle::next_run(&mut engine.setup.lifecycle);
+    engine
+        .setup
+        .public
+        .insert(run, super::public::Caller::Redirect { forge, call, back })
+        .expect("public room checked");
+    engine
+        .setup
+        .staged
+        .insert(run, host::Plan::Convert { forge, code: skein_lib::Secret::new(code.expect("redirect code")), state })
+        .expect("staged room");
+    super::request(engine, run);
+}
+fn room(engine: &Engine) -> bool {
+    engine.events.room() >= 4
+        && engine.setup.room()
+        && engine.store.room()
+        && engine.forge.room(2)
+        && engine.notes.room() > 0
+}
 pub(super) fn advance(engine: &mut Engine) {
+    for _ in 0..engine.setup.waiting.len() {
+        if !room(engine) {
+            break;
+        }
+        let waiting = engine.setup.waiting.pop().expect("waiting count");
+        if !engine.setup.busy(waiting.forge) {
+            let super::Waiting { forge, call, installation, state, back, .. } = waiting;
+            accept(engine, call, forge, installation, state, back);
+        } else if engine.env.now < waiting.until {
+            engine.setup.waiting.push(waiting);
+        } else {
+            ended(engine, waiting.call, waiting.forge);
+        }
+    }
     for _ in 0..engine.clients.github_calls.len() {
-        if engine.events.room() < 4
-            || !engine.setup.room()
-            || !engine.store.room()
-            || !engine.forge.room(2)
-            || engine.notes.room() == 0
-        {
+        if !room(engine) {
             break;
         }
         let (call, head) = engine.clients.github_calls.pop().expect("route count");

@@ -27,7 +27,7 @@ pub const SET_UP: Tool = Tool {
 };
 pub const CONNECT: Tool = Tool {
     name: b"forge-connect",
-    line: b"Connect an existing GitHub App; other ways are not offered yet",
+    line: b"Connect GitHub through a manifest or an existing App",
     result: b"forge-connect",
     forms: &[
         &[
@@ -37,14 +37,20 @@ pub const CONNECT: Tool = Tool {
                 b"github-app",
                 Kind::Word { set: &[b"github-app"] },
                 Required,
-                b"github, forgejo and forgejo-admin are not offered yet",
+                b"An existing GitHub App",
             ),
             positional(b"id", b"ID", Kind::NumberRange { min: 1, max: u64::MAX }, Required, b"GitHub App id"),
             positional(b"file", b"FILE", Kind::File, Required, b"Private PEM key file; at most 4090 bytes"),
         ],
         &[
             positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
-            positional(b"way", b"github", Kind::Word { set: &[b"github"] }, Required, b"Not offered yet"),
+            positional(
+                b"way",
+                b"github",
+                Kind::Word { set: &[b"github"] },
+                Required,
+                b"Create a GitHub App from temper's manifest",
+            ),
         ],
         &[
             positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),

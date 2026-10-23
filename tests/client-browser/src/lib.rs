@@ -15,6 +15,7 @@ use std::{
 };
 mod configuration;
 mod forgery;
+mod github;
 mod issuer;
 
 /// How long a story waits for what a page shows.
@@ -174,6 +175,46 @@ impl Tier {
         configuration::private(&path, &serde_json::to_vec(&value).expect("accounts deployment JSON"));
         let peer = issuer::peer(address, &sign_in);
         (tier, peer)
+    }
+    /// A GitHub forge on the browser harness's loop, with a fixed clients' listener.
+    #[must_use]
+    pub fn github(name: &str) -> (Self, skein_fake_peers::forge::Peer) {
+        let tier = Self::reserved(name);
+        let listener = TcpListener::bind("127.0.0.1:0").expect("reserve GitHub port");
+        let address = listener.local_addr().expect("GitHub address");
+        let path = tier.scratch.path().join("temper.json");
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
+        value["application"]["forges"] = serde_json::json!([{
+            "number":1, "kind":"github", "api":{"socket":address.to_string()}, "transport":"plaintext",
+            "git":format!("http://{address}"), "web":format!("http://{address}")
+        }]);
+        value["application"]["identities"] = serde_json::json!([{"number":1,"forge":1,"login":null,"author":null}]);
+        configuration::private(&path, &serde_json::to_vec(&value).expect("GitHub deployment JSON"));
+        (tier, github::peer(address))
+    }
+    /// Sign in ctl with the held server link, then open its printed manifest link in the tab.
+    #[must_use]
+    pub fn github_connect(&self) -> Vec<Step> {
+        use skein_fake_person_browser::{Command, Opens, Stdin};
+        let command = |words: &[&str], stdin, opens| {
+            let mut args = vec!["ctl".into(), self.scratch.path().join("client").into_os_string()];
+            args.extend(words.iter().map(std::ffi::OsString::from));
+            Step::Run(Command { program: temper(), args, env: vec![], stdin, opens, within: WITHIN })
+        };
+        vec![
+            command(&["sign-in", "-"], Stdin::Printed, None),
+            Step::Exited { code: 0, within: WITHIN },
+            command(
+                &["forge-connect", "1", "github", "--key", "github-connect"],
+                Stdin::Closed,
+                Some(Opens {
+                    prefix: b"http://127.0.0.1:".as_slice().into(),
+                    on: Output::Stdout,
+                    keep: b"manifest-link".as_slice().into(),
+                }),
+            ),
+            Step::Exited { code: 0, within: WITHIN },
+        ]
     }
     /// A tier whose server listens at a loopback port reserved beforehand, so that a restart opens the same
     /// address and a page reconnects to it. Jig's tier has the same hook.

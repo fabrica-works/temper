@@ -112,7 +112,7 @@ pub(crate) fn body(
     place: Place,
 ) {
     match connect::step(choice, root.forges(), root.forge().demo()) {
-        Shown::Choose => choose(b, root, w, bindings, place),
+        Shown::Choose => choose(b, root, w, bindings, forge, place),
         Shown::Details(choice) => {
             link(b, w, bindings, Word::ForgeAll, place.address(None));
             match choice {
@@ -157,7 +157,7 @@ pub(crate) fn welcome(
         body(b, root, w, bindings, forge, choice, Place::Welcome);
     }
 }
-fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, place: Place) {
+fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, forge: &mut ForgeBindings, place: Place) {
     for choice in &connect::choices(root.forges(), root.forge().demo()) {
         let (heading, words, note, action) = match *choice {
             Choice::Elsewhere => {
@@ -182,9 +182,10 @@ fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, pl
             flow::card(b, &w.say(heading, &[]));
             text(b, w, Role::Paragraph, words);
             text(b, w, Role::Paragraph, note);
-            flow::control(b, Control::Disabled { name: &w.say(Word::ForgeConnectGitHub, &[]) });
+            if let Choice::Forge(number) = *choice {
+                app_control(b, root, w, forge, number, Word::ForgeConnectGitHub, Some(root.pages().address().clone()));
+            }
             link(b, w, bindings, Word::ForgeUseApp, place.address(Some(*choice)));
-            text(b, w, Role::Paragraph, Word::ForgeGitHubUnavailable);
             b.close();
             continue;
         }
@@ -264,6 +265,7 @@ pub(crate) fn app_control(
         flow::control(b, Control::Disabled { name: &name });
     } else {
         let meaning = match back {
+            Some(back) if word == Word::ForgeConnectGitHub => Meaning::ConnectManifest { forge: number, back },
             Some(back) => Meaning::Install { forge: number, back },
             None => Meaning::ConnectApp(number),
         };
@@ -431,7 +433,16 @@ pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &m
     if row.kind == Kind::GitHub {
         if forge::forges::slug(row).is_some() {
             flow::card(b, &w.say(Word::ForgeInstallTitle, &[]));
-            crate::cards::text(b, Role::Paragraph, &forge::words::app_install(row));
+            if row.app == Some(forge::forges::AppWay::Manifest) {
+                let slug = forge::forges::slug(row).expect("connected App slug");
+                crate::cards::text(
+                    b,
+                    Role::Paragraph,
+                    &w.say(Word::ForgeManifestInstall, &[Hole::Name(copy_of(slug))]),
+                );
+            } else {
+                crate::cards::text(b, Role::Paragraph, &forge::words::app_install(row));
+            }
             app_control(b, root, w, bindings, row.number, Word::ForgeInstall, Some(root.pages().address().clone()));
         } else {
             flow::card(b, &w.say(Word::ForgeConnecting, &[]));

@@ -710,7 +710,10 @@ fn paste_row(limits: &domain::Limits, request: Token, connected: bool, why: Opti
             request,
             token: request,
             retention: Duration::from_secs(3600),
-            ask: domain::Ask::Connect { forge: 1, app: core::num::NonZeroU64::new(7).unwrap() },
+            ask: domain::Ask::Connect {
+                forge: 1,
+                how: domain::How::GitHubApp { app: core::num::NonZeroU64::new(7).unwrap() },
+            },
             role: Some(jig_domain_people::Role::Owner),
             carried: Some(jig_domain_core::Carried { number: records::CARRIED, digest: [0; 32] }),
         },
@@ -1065,46 +1068,64 @@ fn setup_without_state_refuses_a_stray_installation() {
 }
 #[test]
 fn setup_malformed_queries_are_bad_requests() {
-    for query in [
-        b"".as_slice(),
-        b"installation_id=0&setup_action=install",
-        b"installation_id=22&setup_action=other",
-        b"state=%GG&setup_action=request",
-        b"state=s&state=s&setup_action=request",
+    for (path, query) in [
+        (b"setup".as_slice(), b"".as_slice()),
+        (b"setup", b"installation_id=0&setup_action=install"),
+        (b"setup", b"installation_id=22&setup_action=other"),
+        (b"setup", b"state=%GG&setup_action=request"),
+        (b"setup", b"state=s&state=s&setup_action=request"),
+        (b"manifest", b""),
+        (b"manifest", b"state="),
+        (b"manifest", b"state=%GG"),
+        (b"manifest", b"state=s&state=s"),
+        (b"manifest", b"state=s&code=c"),
+        (b"redirect", b"state=s"),
+        (b"redirect", b"code=c"),
+        (b"redirect", b"code=&state=s"),
+        (b"redirect", b"code=c&state="),
+        (b"redirect", b"code=c&state=%00"),
+        (b"redirect", b"code=c&code=d&state=s"),
     ] {
         let mut service = service(8, Duration::from_secs(3600));
-        let mut target = skein_lib::Writer::new(b"/forges/1/github/setup?".len().checked_add(query.len()).unwrap());
-        target.put(b"/forges/1/github/setup?").unwrap();
-        target.put(query).unwrap();
-        let peer = visit(&mut service, b"GET", &target.finish());
+        let target = joined(&[b"/forges/1/github/", path, b"?", query]);
+        let peer = visit(&mut service, b"GET", &target);
         status(&peer, b"400");
     }
 }
 #[test]
 fn setup_queries_past_the_configured_bound_are_bad_requests() {
-    let mut service = service(8, Duration::from_secs(3600));
-    service.engine.as_mut().unwrap().clients.query_bytes = 1;
-    let peer = visit(&mut service, b"GET", b"/forges/1/github/setup?setup_action=request&state=s");
-    status(&peer, b"400");
+    for path in [b"setup".as_slice(), b"manifest", b"redirect"] {
+        let mut service = service(8, Duration::from_secs(3600));
+        service.engine.as_mut().unwrap().clients.query_bytes = 1;
+        let target = joined(&[b"/forges/1/github/", path, b"?setup_action=request&state=s"]);
+        let peer = visit(&mut service, b"GET", &target);
+        status(&peer, b"400");
+    }
 }
 #[test]
 fn setup_non_get_is_method_not_allowed() {
-    let mut service = service(8, Duration::from_secs(3600));
-    let peer = visit(&mut service, b"POST", b"/forges/1/github/setup");
-    status(&peer, b"405");
+    for path in [b"setup".as_slice(), b"manifest", b"redirect"] {
+        let mut service = service(8, Duration::from_secs(3600));
+        let peer = visit(&mut service, b"POST", &joined(&[b"/forges/1/github/", path]));
+        status(&peer, b"405");
+    }
 }
 #[test]
 fn setup_unconfigured_forge_is_not_found() {
-    let mut service = service(8, Duration::from_secs(3600));
-    let peer = visit(&mut service, b"GET", b"/forges/2/github/setup");
-    status(&peer, b"404");
+    for path in [b"setup".as_slice(), b"manifest", b"redirect"] {
+        let mut service = service(8, Duration::from_secs(3600));
+        let peer = visit(&mut service, b"GET", &joined(&[b"/forges/2/github/", path]));
+        status(&peer, b"404");
+    }
 }
 #[test]
 fn setup_forgejo_is_not_found() {
-    let mut service = service(8, Duration::from_secs(3600));
-    service.engine.as_mut().unwrap().workers.forges[0].kind = crate::settings::Kind::Forgejo;
-    let peer = visit(&mut service, b"GET", b"/forges/1/github/setup");
-    status(&peer, b"404");
+    for path in [b"setup".as_slice(), b"manifest", b"redirect"] {
+        let mut service = service(8, Duration::from_secs(3600));
+        service.engine.as_mut().unwrap().workers.forges[0].kind = crate::settings::Kind::Forgejo;
+        let peer = visit(&mut service, b"GET", &joined(&[b"/forges/1/github/", path]));
+        status(&peer, b"404");
+    }
 }
 
 #[test]
@@ -1156,4 +1177,197 @@ fn git_token_fills_a_restored_installations_account_without_exposing_its_value()
     let rows = service.engine.as_ref().unwrap().domain.forges().rows;
     assert_eq!(rows[0].installations[0].1.account, Some((111, Box::from(b"account-fixture".as_slice()))));
     assert!(rows[0].installations[0].1.suspended);
+}
+
+fn manifest_link(service: &mut crate::Service, back: Option<&[u8]>) -> Box<[u8]> {
+    public::manifest(service.engine.as_mut().unwrap(), 1, Token::new(92), back.map(Box::from));
+    for _ in 0_u32..8 {
+        advance(service.engine.as_mut().unwrap());
+    }
+    let mut link = None;
+    while let Some(event) = service.engine.as_mut().unwrap().events.pop() {
+        if let root::Event::Forge(event) = event {
+            let domain::Event::ConnectAnswered { request, answer: domain::ConnectAnswer::Link(address), .. } = *event
+            else {
+                panic!("manifest link")
+            };
+            assert_eq!(request, Token::new(92));
+            link = Some(address);
+        }
+    }
+    link.expect("Manifest Done answers its page link")
+}
+fn joined(parts: &[&[u8]]) -> Box<[u8]> {
+    let mut size = 0_usize;
+    for part in parts {
+        size = size.checked_add(part.len()).unwrap();
+    }
+    let mut writer = skein_lib::Writer::new(size);
+    for part in parts {
+        writer.put(part).unwrap();
+    }
+    writer.finish()
+}
+fn manifest_target(state: &[u8]) -> Box<[u8]> {
+    joined(&[b"/forges/1/github/manifest?state=", state])
+}
+fn manifest_state(link: &[u8]) -> &[u8] {
+    let start = skein_lib::bytes::find(link, b"state=").unwrap().checked_add(b"state=".len()).unwrap();
+    link.get(start..).unwrap()
+}
+fn redirect_target(state: &[u8]) -> Box<[u8]> {
+    let prefix = b"/forges/1/github/redirect?code=fixture-code&state=";
+    let mut writer = skein_lib::Writer::new(prefix.len().checked_add(state.len()).unwrap());
+    writer.put(prefix).unwrap();
+    writer.put(state).unwrap();
+    writer.finish()
+}
+#[test]
+fn manifest_connect_answers_its_listener_page_with_policy_and_personal_form() {
+    // fixtures::http::address is loopback:7100; the manifest's form is the forge's 3000.
+    const PREFIX: &[u8] = b"http://127.0.0.1:7100/forges/1/github/manifest?state=";
+    let mut service = service(8, Duration::from_secs(3600));
+    let link = manifest_link(&mut service, Some(b"/forges?from=manifest"));
+    assert!(link.starts_with(PREFIX));
+    let state = manifest_state(&link);
+    let peer = visit(&mut service, b"GET", &manifest_target(state));
+    status(&peer, b"200");
+    assert!(contains(peer.received(), b"Content-Type: text/html; charset=utf-8"));
+    assert!(contains(peer.received(), b"Content-Security-Policy: default-src 'none'; form-action http://127.0.0.1:3000; script-src 'sha256-ePniVEkSivX/c7XWBGafqh8tSpiRrKiqYeqbG7N1TOE='"));
+    let target = joined(&[b"action=\"http://127.0.0.1:3000/settings/apps/new?state=", state, b"\""]);
+    assert!(contains(peer.received(), &target));
+    assert!(contains(peer.received(), b"method=\"post\""));
+    assert!(service.engine.as_ref().unwrap().setup.runs.is_empty());
+}
+#[test]
+fn manifest_unknown_used_and_expired_pages_are_ended() {
+    let mut service = service(8, Duration::from_secs(3));
+    let link = manifest_link(&mut service, None);
+    let state = manifest_state(&link);
+    service.engine.as_mut().unwrap().env.now = Time::ZERO.saturating_add(Duration::from_secs(3));
+    for state in [state, b"unknown"] {
+        status(&visit(&mut service, b"GET", &manifest_target(state)), b"410");
+    }
+    assert!(service.engine.as_ref().unwrap().setup.io.is_empty());
+}
+fn redirect_writes() -> (crate::Service, Face, fixtures::http::Peer, Box<[u8]>) {
+    let mut service = service(8, Duration::from_secs(3600));
+    let link = manifest_link(&mut service, Some(b"/forges?from=manifest"));
+    let target = redirect_target(manifest_state(&link));
+    let peer = visit(&mut service, b"GET", &target);
+    let face = conversion_replies(&mut service);
+    (service, face, peer, target)
+}
+fn converted_redirect() -> (crate::Service, fixtures::http::Peer, Box<[u8]>) {
+    let (mut service, mut face, peer, target) = redirect_writes();
+    for item in [Item::AppId, Item::AppSlug, Item::AppKey, Item::User] {
+        assert!(peer.received().is_empty(), "HTTP waits for durable records");
+        keep_next(&mut service, item);
+        face.turn(&mut service);
+    }
+    (service, peer, target)
+}
+#[test]
+fn redirect_keeps_records_then_installs_and_hands_back_to_setup() {
+    let (mut service, mut peer, target) = converted_redirect();
+    assert!(peer.received().is_empty(), "HTTP waits for Origin");
+    keep_next(&mut service, Item::Origin);
+    pump_visit(&mut service, &mut peer);
+    status(&peer, b"302");
+    let prefix = b"Location: http://127.0.0.1:3000/apps/app-fixture/installations/new?state=";
+    let start = skein_lib::bytes::find(peer.received(), prefix).unwrap().checked_add(prefix.len()).unwrap();
+    let rest = &peer.received()[start..];
+    let end = skein_lib::bytes::find(rest, b"\r\n").unwrap();
+    let state = Box::<[u8]>::from(&rest[..end]);
+    assert_ne!(state.as_ref(), manifest_state(&target));
+    assert_eq!(service.engine.as_ref().unwrap().forge.starts.len(), 1);
+    assert!(service.engine.as_ref().unwrap().events.iter().any(|event| if let root::Event::Forge(event) = event {
+        event.as_ref() == &domain::Event::AppRecorded { forge: 1, app: domain::AppWay::Manifest }
+    } else {
+        false
+    }));
+    let again = visit(&mut service, b"GET", &target);
+    status(&again, b"410");
+    status(&visit(&mut service, b"GET", &manifest_target(manifest_state(&target))), b"410");
+    let mut setup = visit(&mut service, b"GET", &setup_target(&state));
+    complete_accept(&mut service, &mut setup);
+    status(&setup, b"303");
+    assert!(contains(setup.received(), b"Location: /forges?from=manifest"));
+}
+#[test]
+fn redirect_conversion_stop_and_repeat_answer_ended() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let link = manifest_link(&mut service, None);
+    let target = redirect_target(manifest_state(&link));
+    let mut peer = visit(&mut service, b"GET", &target);
+    let mut face = Face::new();
+    face.sent(&mut service);
+    face.reply_status(&mut service, b"404 Not Found", b"{}");
+    pump_visit(&mut service, &mut peer);
+    status(&peer, b"410");
+    // The shell takes diagnostic notes between calls; this routing fixture drives it by hand.
+    while service.engine.as_mut().unwrap().notes.pop().is_some() {}
+    status(&visit(&mut service, b"GET", &target), b"410");
+    assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
+}
+#[test]
+fn redirect_for_a_busy_forge_answers_ended() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let link = manifest_link(&mut service, None);
+    start(&mut service, 19, host::Plan::Install { forge: 1 });
+    let peer = visit(&mut service, b"GET", &redirect_target(manifest_state(&link)));
+    status(&peer, b"410");
+}
+
+#[test]
+fn redirect_install_stop_answers_ended_with_the_app_kept() {
+    let (mut service, mut peer, _) = converted_redirect();
+    let engine = service.engine.as_mut().unwrap();
+    let owner = *engine.setup.writes.first().unwrap().0;
+    answer(engine, StoreEvent::Kept { owner });
+    while engine.setup.above.pop().is_some() {}
+    let run = *engine.setup.runs.first().unwrap().0;
+    engine.setup.above.push(host::Event::Stop {
+        run,
+        failure: reconcile::Failure {
+            forge: 1,
+            step: reconcile::Stage::State,
+            subject: Box::from(b"install".as_slice()),
+            why: reconcile::Why::Crowded,
+        },
+    });
+    advance(engine);
+    pump_visit(&mut service, &mut peer);
+    status(&peer, b"410");
+    assert_eq!(service.engine.as_ref().unwrap().forge.starts.len(), 1);
+}
+#[test]
+fn a_setup_visit_for_a_busy_forge_waits_for_its_run_then_accepts() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let state = install_link(&mut service, Some(b"/forges?from=manifest"));
+    // The forge's one run, as the reconcile after a manifest's Connected.
+    service.engine.as_mut().unwrap().setup.lifecycle.deleting.insert(1, ()).unwrap();
+    let mut peer = visit(&mut service, b"GET", &setup_target(&state));
+    assert!(peer.received().is_empty(), "the visit waits for the forge's run");
+    assert!(!service.engine.as_ref().unwrap().setup.work_pending(Time::ZERO));
+    service.engine.as_mut().unwrap().setup.lifecycle.deleting.remove(&1).unwrap();
+    assert!(service.engine.as_ref().unwrap().setup.work_pending(Time::ZERO));
+    pump_visit(&mut service, &mut peer);
+    complete_accept(&mut service, &mut peer);
+    status(&peer, b"303");
+    assert!(contains(peer.received(), b"Location: /forges?from=manifest"));
+}
+#[test]
+fn a_setup_visit_held_past_the_states_life_is_ended() {
+    let mut service = service(8, Duration::from_secs(3));
+    app(&mut service);
+    let state = install_link(&mut service, None);
+    service.engine.as_mut().unwrap().setup.lifecycle.deleting.insert(1, ()).unwrap();
+    let mut peer = visit(&mut service, b"GET", &setup_target(&state));
+    assert!(peer.received().is_empty(), "the visit waits for the forge's run");
+    let until = service.engine.as_ref().unwrap().setup.next_deadline().unwrap();
+    service.engine.as_mut().unwrap().env.now = until;
+    pump_visit(&mut service, &mut peer);
+    status(&peer, b"410");
 }

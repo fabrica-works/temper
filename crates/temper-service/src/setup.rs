@@ -3,6 +3,7 @@ pub(crate) mod diagnostics;
 pub(crate) mod lifecycle;
 pub(crate) mod public;
 mod routes;
+pub(crate) use routes::MANIFEST_SCRIPT_HASH;
 mod settings;
 use alloc::boxed::Box;
 use jig_protocol_store::Event as StoreEvent;
@@ -35,6 +36,8 @@ pub(crate) struct Layer {
     writes: Map<Token, Write>,
     next_write: u64,
     pages: Queue<Page>,
+    waiting: Queue<Waiting>,
+    listener: Box<[u8]>,
     life: Duration,
     value_bytes: u32,
     #[cfg(test)]
@@ -49,6 +52,15 @@ struct Page {
     forge: u16,
     state: Box<[u8]>,
     bytes: Box<[u8]>,
+    until: Time,
+}
+/// GitHub's setup visit for a forge busy with its one run, held until that run ends (client/forge.md, 9.1).
+struct Waiting {
+    forge: u16,
+    call: Token,
+    installation: core::num::NonZeroU64,
+    state: Box<[u8]>,
+    back: Option<Box<[u8]>>,
     until: Time,
 }
 // skein host/states.rs:53 spells its 16 random bytes as 32 hex bytes.
@@ -71,7 +83,15 @@ pub(crate) fn worst_case(
             listener.set_port(u16::MAX);
         }
     }
-    let host = host::worst_case(&l, &settings)?; // Includes pending fixed Settings, moved into Host::new.
+    let mut listener_bytes = 0_u64;
+    let mut web_bytes = 0_u64;
+    for forge in &settings.forges {
+        if let host::Kind::GitHub(given) = &forge.kind {
+            listener_bytes = listener_bytes.max(u64::try_from(given.url.len()).ok()?);
+            web_bytes = web_bytes.max(u64::try_from(given.web.len()).ok()?);
+        }
+    }
+    let host = host::worst_case(&l, &settings)?.checked_add(listener_bytes)?; // Includes pending fixed Settings, moved into Host::new.
     let installations = config.limits.forge_component.installations;
     let count = l.forges.checked_mul(installations)?;
     let above = batch.checked_mul(host::MAX_OUT.above)?;
@@ -121,7 +141,16 @@ pub(crate) fn worst_case(
         }
     }
     // Retained strings, codec parts and their encoded copy can coexist.
-    host.checked_add(handovers)?
+    // Each HTTP call may retain its own served manifest page. The policy's
+    // measured buffer and header copy overlap; 256 covers its fixed words.
+    let responses = if listener_bytes == 0 {
+        0
+    } else {
+        u64::from(crate::limits::server(&config.jig.limits).connections)
+            .checked_mul(u64::from(l.body_bytes).checked_add(web_bytes.checked_add(256)?.checked_mul(2)?)?)?
+    };
+    host.checked_add(responses)?
+        .checked_add(handovers)?
         // Pending/active intent names and the Create plan clone coexist.
         .checked_add(u64::from(l.forges).checked_mul(name.checked_mul(4)?)?)?
         .checked_add(local_bytes.checked_mul(3)?)?
@@ -172,6 +201,9 @@ pub(crate) fn worst_case(
         // Encoded record, including VERSION; the store's own copy stays in store::worst_case.
         .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(u64::from(writes))?)?
         .checked_add(Queue::<Page>::worst_case(l.states)?)?
+        // Held setup visits: each its state and a back as long as the backs' own.
+        .checked_add(Queue::<Waiting>::worst_case(l.states)?)?
+        .checked_add(u64::from(l.states).checked_mul(STATE_TEXT_BYTES + 512)?)?
         .checked_add(page.checked_mul(u64::from(l.states))?)?
         .checked_add(Queue::<host::Event>::worst_case(above)?)?
         .checked_add(payload.checked_mul(u64::from(above))?)?
@@ -211,11 +243,16 @@ impl Layer {
         batch: u32,
         installations: u32,
     ) -> Self {
+        let mut listener: Box<[u8]> = Box::new([]);
         let mut served = Map::with_capacity(limits.forges);
         for forge in &settings.forges {
             served.insert(forge.number(), ()).expect("configured host forges");
+            if let host::Kind::GitHub(given) = &forge.kind {
+                listener.clone_from(&given.url);
+            }
         }
         Self {
+            listener,
             component: None,
             pending: Some((settings, crypto)),
             waiting_for_webhooks: false,
@@ -236,6 +273,7 @@ impl Layer {
             writes: Map::with_capacity(limits.runs.checked_add(limits.forges).expect("setup writes")),
             next_write: 1,
             pages: Queue::with_capacity(limits.states),
+            waiting: Queue::with_capacity(limits.states),
             life,
             value_bytes,
             #[cfg(test)]
@@ -277,6 +315,7 @@ impl Layer {
         self.lifecycle.adoptions = Map::with_capacity(self.env.limits.forges);
         self.lifecycle.reconcile = Map::with_capacity(self.env.limits.forges);
         self.pages = Queue::with_capacity(self.env.limits.states);
+        self.waiting = Queue::with_capacity(self.env.limits.states);
         self.backs = Queue::with_capacity(self.env.limits.states);
         self.public = Map::with_capacity(self.env.limits.runs);
         self.staged = Map::with_capacity(self.env.limits.runs);
@@ -293,16 +332,40 @@ impl Layer {
             Some(host) => host.next_deadline(),
             None => None,
         };
-        crate::accounts::earliest(
+        let mut next = crate::accounts::earliest(
             host,
             match self.pages.iter().next() {
                 Some(page) => Some(page.until),
                 None => None,
             },
-        )
+        );
+        for waiting in &self.waiting {
+            next = crate::accounts::earliest(next, Some(waiting.until));
+        }
+        next
     }
     pub(crate) fn work_pending(&self, now: Time) -> bool {
-        !self.above.is_empty() || !self.io.is_empty() || due(self.next_deadline(), now)
+        !self.above.is_empty() || !self.io.is_empty() || due(self.next_deadline(), now) || self.waiting_ready()
+    }
+    fn waiting_ready(&self) -> bool {
+        for waiting in &self.waiting {
+            if !self.busy(waiting.forge) {
+                return true;
+            }
+        }
+        false
+    }
+    /// The forge's one run: a live run of it, or its removal (protocol/setup.md, 6.5).
+    pub(crate) fn busy(&self, forge: u16) -> bool {
+        if self.lifecycle.deleting.contains_key(&forge) {
+            return true;
+        }
+        for (_, run) in &self.runs {
+            if run.forge == forge {
+                return true;
+            }
+        }
+        false
     }
     pub(crate) fn lifecycle_ready(&self, engine: &crate::engine::Engine) -> bool {
         !self.closing
@@ -317,6 +380,21 @@ impl Layer {
             }
         }
         None
+    }
+    fn take_page(&mut self, forge: u16, state: &[u8], now: Time) -> bool {
+        let mut found = false;
+        for _ in 0..self.pages.len() {
+            let page = self.pages.pop().expect("page count");
+            if page.until <= now {
+                continue;
+            }
+            if page.forge == forge && page.state.as_ref() == state {
+                found = true;
+            } else {
+                self.pages.push(page);
+            }
+        }
+        found
     }
     fn hold(&mut self, forge: u16, state: Box<[u8]>, bytes: Box<[u8]>) {
         if self.pages.room() == 0 {
@@ -480,7 +558,13 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                         if item == skein_forge_setup::item::Item::Pasted {
                             let value = match engine.setup.public.get(&run) {
                                 Some(public::Caller::Connect { pem, .. }) => pem.clone(),
-                                Some(public::Caller::Install { .. } | public::Caller::Accept { .. }) | None => None,
+                                Some(
+                                    public::Caller::Install { .. }
+                                    | public::Caller::Accept { .. }
+                                    | public::Caller::Manifest { .. }
+                                    | public::Caller::Redirect { .. },
+                                )
+                                | None => None,
                             };
                             engine.setup.down(host::Request::Answer { run, answer: host::Answer::Read(value) });
                             continue;

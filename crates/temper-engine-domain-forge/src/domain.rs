@@ -110,6 +110,7 @@ pub struct Domain {
     pub(crate) connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
     first: Map<u16, crate::First>,
     pub(crate) ended: Map<u16, Box<[u8]>>,
+    pub(crate) apps: Map<u16, crate::AppWay>,
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,
     setup_pending: Map<Token, Token>,
     pub(crate) connect: crate::connect::State,
@@ -168,6 +169,7 @@ impl Domain {
         self.connections = Map::with_capacity(forges);
         self.first = Map::with_capacity(forges);
         self.ended = Map::with_capacity(forges);
+        self.apps = Map::with_capacity(forges);
         self.installations = Map::with_capacity(forges.checked_mul(installations).expect("connection bounds"));
     }
     #[must_use]
@@ -220,6 +222,18 @@ impl Domain {
                 first: self.first.get(forge).cloned(),
                 installations: installations.into_boxed(),
                 ended: self.ended.get(forge).cloned(),
+                app: match self.connection(*forge) {
+                    crate::Connection::Connected { .. } if config.kind == crate::Kind::GitHub => {
+                        self.apps.get(forge).copied()
+                    }
+                    crate::Connection::Connected { .. }
+                    | crate::Connection::NotConnected
+                    | crate::Connection::NotSetUp
+                    | crate::Connection::SettingUp { .. }
+                    | crate::Connection::SetUpFailed { .. }
+                    | crate::Connection::Connecting
+                    | crate::Connection::Stopped { .. } => None,
+                },
             })
             .expect("configured forges");
         }
@@ -478,6 +492,7 @@ impl Domain {
             connections: Map::with_capacity(l.client.repositories),
             first: Map::with_capacity(l.client.repositories),
             ended: Map::with_capacity(l.client.repositories),
+            apps: Map::with_capacity(l.client.repositories),
             setup_unknown: None,
             setup_pending: Map::with_capacity(l.applications),
             connect: crate::connect::State::new(l.applications),
@@ -959,6 +974,12 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 }
             }
             out.push(Request::MarkedForges);
+        }
+        Event::AppRecorded { forge, app } => {
+            if d.configured.contains_key(&forge) && !d.forge_ended(forge) {
+                d.apps.insert(forge, app).expect("configured forge App way");
+                out.push(Request::MarkedForges);
+            }
         }
         Event::ConnectAnswered { forge, request, answer } => crate::connect::connected(d, forge, request, answer, out),
         Event::InstallAnswered { forge, request, answer, stopped } => {

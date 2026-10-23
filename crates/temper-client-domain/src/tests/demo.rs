@@ -612,6 +612,7 @@ fn forge_rows(root: &mut crate::Domain, watch: skein_lib::Token, connected: bool
             w::ForgeRow::new(
                 &w::CEILINGS,
                 w::ForgeRowParts {
+                    app: None,
                     first: None,
                     number: wire::FORGE + 1,
                     kind: w::Kind::Forgejo,

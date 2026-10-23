@@ -375,10 +375,10 @@ fn github_details_offer_only_the_app_of_ones_own_with_a_masked_key() {
     assert!(!node(&world, client, Role::Button, b"Connect the App").states.as_slice().contains(&State::Disabled));
     assert_eq!(node(&world, client, Role::TextField, b"Private key").entry, Some(skein_ui::EntryKind::Secret));
     follow(&mut world, client, vec![PersonStep::Go { address: flow(None) }, see(Role::Button, b"Connect GitHub")]);
-    assert!(node(&world, client, Role::Button, b"Connect GitHub").states.as_slice().contains(&State::Disabled));
+    assert!(!node(&world, client, Role::Button, b"Connect GitHub").states.as_slice().contains(&State::Disabled));
     let words = text(&world, client);
     assert!(
-        words.contains("Connecting GitHub through temper’s own App is not available yet: use an App of your own."),
+        words.contains("Your repositories on GitHub. temper makes its own App there; you choose the account and the repositories it may use."),
         "{words}"
     );
 }

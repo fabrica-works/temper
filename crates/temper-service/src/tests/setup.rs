@@ -260,10 +260,18 @@ impl Face {
         advance(service.engine.as_mut().expect("engine"));
     }
     fn reply(&mut self, service: &mut crate::Service, body: &[u8]) {
+        self.reply_status(service, b"200 OK", body);
+    }
+    fn reply_status(&mut self, service: &mut crate::Service, status: &[u8], body: &[u8]) {
         let length = skein_lib::Decimal::of(u64::try_from(body.len()).unwrap());
-        let head = b"HTTP/1.1 200 OK\r\nContent-Length: ";
+        let head = b"HTTP/1.1 ";
+        let content = b"\r\nContent-Length: ";
         let mut writer = skein_lib::Writer::new(
             head.len()
+                .checked_add(status.len())
+                .unwrap()
+                .checked_add(content.len())
+                .unwrap()
                 .checked_add(length.as_bytes().len())
                 .unwrap()
                 .checked_add(4)
@@ -272,6 +280,8 @@ impl Face {
                 .unwrap(),
         );
         writer.put(head).unwrap();
+        writer.put(status).unwrap();
+        writer.put(content).unwrap();
         writer.put(length.as_bytes()).unwrap();
         writer.put(b"\r\n\r\n").unwrap();
         writer.put(body).unwrap();
@@ -291,8 +301,12 @@ fn writing() -> (crate::Service, Face) {
     let mut service = service(8, Duration::from_secs(3600));
     let state = manifest(&mut service, 1);
     start(&mut service, 2, host::Plan::Convert { forge: 1, code: code(), state });
+    let face = conversion_replies(&mut service);
+    (service, face)
+}
+fn conversion_replies(service: &mut crate::Service) -> Face {
     let mut face = Face::new();
-    face.sent(&mut service);
+    face.sent(service);
     let der = skein_fake_forge_github::keys::KEYS[0];
     let encoded =
         skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, u32::try_from(der.len()).unwrap())
@@ -307,11 +321,11 @@ fn writing() -> (crate::Service, Face) {
     body.put(prefix).unwrap();
     body.put(&base64.finish()).unwrap();
     body.put(suffix).unwrap();
-    face.reply(&mut service, &body.finish());
-    face.sent(&mut service);
-    face.reply(&mut service, br#"{"id":7,"slug":"app-fixture"}"#);
-    face.sent(&mut service);
-    face.reply(&mut service, br#"{"id":9,"login":"app-fixture[bot]"}"#);
+    face.reply(service, &body.finish());
+    face.sent(service);
+    face.reply(service, br#"{"id":7,"slug":"app-fixture"}"#);
+    face.sent(service);
+    face.reply(service, br#"{"id":9,"login":"app-fixture[bot]"}"#);
     if service.engine.as_mut().expect("engine").setup.writes.is_empty() {
         if let Some(root::Event::Setup { end, .. }) = service.engine.as_mut().expect("engine").events.pop() {
             panic!("conversion terminal: {end:?}");
@@ -323,7 +337,7 @@ fn writing() -> (crate::Service, Face) {
             service.engine.as_mut().expect("engine").setup.io.len()
         );
     }
-    (service, face)
+    face
 }
 #[test]
 fn written_is_answered_only_after_kept_and_the_routing_rows_follow_each_keep() {
@@ -1807,4 +1821,16 @@ fn the_manifest_form_escapes_its_attributes_and_refuses_a_page_past_its_bound() 
     let fits = u32::try_from(page.len()).unwrap();
     assert!(routes::form(target, manifest, fits).is_some());
     assert!(routes::form(target, manifest, fits - 1).is_none());
+}
+#[test]
+fn the_manifest_script_hash_matches_the_form_page() {
+    let page = routes::form(b"http://forge.test/settings/apps/new?state=s", b"{}", 4096).unwrap();
+    let start = skein_lib::bytes::find(&page, b"<script>").unwrap().checked_add(b"<script>".len()).unwrap();
+    let end = skein_lib::bytes::find(&page, b"</script>").unwrap();
+    let digest = skein_lib::sha256::digest(page.get(start..end).unwrap());
+    let alphabet = skein_lib::base64::Alphabet::Standard;
+    let size = skein_lib::base64::encoded_len(alphabet, u32::try_from(digest.len()).unwrap()).unwrap();
+    let mut writer = skein_lib::Writer::new(usize::try_from(size).unwrap());
+    skein_lib::base64::encode(alphabet, &digest, &mut writer).unwrap();
+    assert_eq!(writer.finish().as_ref(), MANIFEST_SCRIPT_HASH);
 }

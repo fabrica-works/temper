@@ -600,6 +600,7 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             request @ (Request::Worker(_)
             | Request::Party(_)
             | Request::Connect { .. }
+            | Request::Manifest { .. }
             | Request::Install { .. }
             | Request::EraseCarried { .. }
             | Request::Setup { .. }

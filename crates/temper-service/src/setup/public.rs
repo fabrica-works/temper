@@ -11,6 +11,8 @@ use temper_engine_domain_forge as domain;
 
 #[derive(Debug)]
 pub(super) enum Caller {
+    Manifest { forge: u16, request: Token, back: Option<Box<[u8]>> },
+    Redirect { forge: u16, call: Token, back: Option<Box<[u8]>> },
     Connect { forge: u16, request: Token, number: u64, pem: Option<Secret> },
     Install { forge: u16, request: Token, back: Option<Box<[u8]>> },
     Accept { forge: u16, call: Token, back: Option<Box<[u8]>> },
@@ -73,6 +75,35 @@ pub(crate) fn connect(engine: &mut Engine, forge: u16, request: Token, app: NonZ
         stage(engine, run, host::Plan::Paste { forge, app });
     }
 }
+pub(crate) fn manifest(engine: &mut Engine, forge: u16, request: Token, back: Option<Box<[u8]>>) {
+    if full(engine, forge) {
+        event(
+            engine,
+            domain::Event::ConnectAnswered {
+                forge,
+                request,
+                answer: domain::ConnectAnswer::Refused(domain::ForgeRefusal::Busy),
+            },
+        );
+        return;
+    }
+    let run = super::lifecycle::next_run(&mut engine.setup.lifecycle);
+    engine.setup.public.insert(run, Caller::Manifest { forge, request, back }).expect("public room checked");
+    stage(engine, run, host::Plan::Manifest { forge, target: skein_forge_setup::github::manifest::Target::Personal });
+}
+fn manifest_link(engine: &Engine, forge: u16, state: &[u8]) -> Box<[u8]> {
+    let number = skein_lib::Decimal::of(u64::from(forge));
+    let parts = [engine.setup.listener.as_ref(), b"forges/", number.as_bytes(), b"/github/manifest?state=", state];
+    let mut size = 0_usize;
+    for part in parts {
+        size = size.checked_add(part.len()).expect("bounded manifest link");
+    }
+    let mut writer = skein_lib::Writer::new(size);
+    for part in parts {
+        writer.put(part).expect("measured manifest link");
+    }
+    writer.finish()
+}
 fn pasted(bytes: &[u8]) -> Option<Secret> {
     if bytes.len() > 4096 {
         return None;
@@ -121,6 +152,26 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
         root::SetupEnd::Done { .. } => None,
     };
     match caller {
+        Caller::Manifest { forge, request, back } => {
+            let answer = match end {
+                root::SetupEnd::Done { outcome: root::SetupOutcome::Manifest { state }, .. } => {
+                    hold(engine, forge, state.clone(), back);
+                    domain::ConnectAnswer::Link(manifest_link(engine, forge, state))
+                }
+                root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => {
+                    event(engine, domain::Event::ConnectEnded { forge, request, connected: false, why: stopped });
+                    domain::ConnectAnswer::Connecting
+                }
+            };
+            event(engine, domain::Event::ConnectAnswered { forge, request, answer });
+        }
+        Caller::Redirect { forge, call, back } => match end {
+            root::SetupEnd::Done { outcome: root::SetupOutcome::Install { state, url }, .. } => {
+                hold(engine, forge, state.clone(), back);
+                engine.clients.github_answer(call, 302, Some(url), b"");
+            }
+            root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => super::routes::ended(engine, call, forge),
+        },
         Caller::Connect { forge, request, number, .. } => {
             if done(end) {
                 engine.setup.pastes.insert(number, forge).expect("one pending connect per forge");

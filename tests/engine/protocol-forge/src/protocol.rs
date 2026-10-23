@@ -465,6 +465,7 @@ impl Protocol {
                 | top::Request::StopGroup { .. }
                 | top::Request::SetUpGroup { .. }
                 | top::Request::Connect { .. }
+                | top::Request::Manifest { .. }
                 | top::Request::Install { .. }
                 | top::Request::CarriedUnused { .. }
                 | top::Request::EraseCarried { .. }

@@ -60,6 +60,7 @@ fn limits_take_each_bound_from_its_source_field() {
         fixtures::limits(),
         v1::Limits {
             install_back_some: 512,
+            git_hub_manifest_back_some: 512,
             link_address: crate::ADDRESS_BYTES,
             forges_forges: crate::FORGES,
             return_path: 512,
@@ -308,6 +309,7 @@ fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
                 v1::ForgeRow::new(
                     &limits,
                     v1::ForgeRowParts {
+                        app: None,
                         installations: List::with_capacity(0),
                         ended: None,
                         first: None,
@@ -333,6 +335,7 @@ fn each_forge_offer_round_trips() {
         let row = v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                app: None,
                 installations: List::with_capacity(0),
                 ended: None,
                 first: None,
@@ -420,6 +423,7 @@ fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
+                app: None,
                 installations: List::with_capacity(0),
                 ended: None,
                 first: None,
@@ -453,6 +457,7 @@ fn forges_refuse_seventeen_rows_unsorted_rows_and_duplicate_numbers() {
         v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                app: None,
                 installations: List::with_capacity(0),
                 ended: None,
                 first: None,
@@ -511,6 +516,7 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
                     let row = v1::ForgeRow::new(
                         &limits,
                         v1::ForgeRowParts {
+                            app: None,
                             installations: List::with_capacity(0),
                             ended: None,
                             first: None,
@@ -707,6 +713,7 @@ fn installation_row(count: u32, why_bytes: usize) -> v1::ForgeRowParts {
             .unwrap();
     }
     v1::ForgeRowParts {
+        app: None,
         number: 1,
         kind: v1::Kind::Github,
         mode: v1::Mode::Connected,
@@ -721,8 +728,8 @@ fn installation_row(count: u32, why_bytes: usize) -> v1::ForgeRowParts {
 }
 // Encode the fields explicitly to feed invalid lengths to the receiving boundary.
 fn installation_row_bytes(parts: v1::ForgeRowParts, why: &[u8]) -> Box<[u8]> {
-    // Number (2), four enum tags, first tag, list length (4), end tag, why length (4).
-    let mut size = why.len().checked_add(16).unwrap();
+    // Number (2), four enum tags, first tag, list length (4), end tag, why length (4), app tag.
+    let mut size = why.len().checked_add(17).unwrap();
     for installation in &parts.installations {
         size = size.checked_add(usize::try_from(installation.measure()).unwrap()).unwrap();
     }
@@ -740,6 +747,7 @@ fn installation_row_bytes(parts: v1::ForgeRowParts, why: &[u8]) -> Box<[u8]> {
     writer.put(&[1]).unwrap(); // an end
     writer.put(&u32::try_from(why.len()).unwrap().to_be_bytes()).unwrap();
     writer.put(why).unwrap();
+    writer.put(&[0]).unwrap(); // no App way
     writer.finish()
 }
 #[test]
@@ -769,4 +777,25 @@ fn filled(bytes: usize) -> Box<[u8]> {
         writer.put(b"x").unwrap();
     }
     writer.finish()
+}
+
+#[test]
+fn manifest_connects_and_app_ways_round_trip() {
+    let limits = fixtures::limits();
+    for back in [None, Some(Box::from(b"/forges/connect?forge=1".as_slice()))] {
+        let how = v1::GitHubManifest::new(&limits, v1::GitHubManifestParts { back }).unwrap();
+        let connect =
+            v1::Connect::new(&limits, v1::ConnectParts { forge: 1, how: v1::How::GithubManifest(how) }).unwrap();
+        let record =
+            v1::Requesting::new(&limits, v1::RequestingParts { request: v1::Request::Connect(connect) }).unwrap();
+        assert_eq!(crate::decode_requesting(&crate::requesting(&record), &limits), Some(record));
+    }
+    for app in [None, Some(v1::AppWay::Manifest), Some(v1::AppWay::Pasted)] {
+        let mut parts = installation_row(0, 0);
+        parts.app = app;
+        let row = v1::ForgeRow::new(&limits, parts).unwrap();
+        let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).unwrap());
+        row.encode(&mut writer).unwrap();
+        assert_eq!(v1::ForgeRow::decode(&limits, &mut Reader::new(&writer.finish())), Ok(row));
+    }
 }

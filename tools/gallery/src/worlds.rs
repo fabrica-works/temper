@@ -239,6 +239,7 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    app: None,
                     first: None,
                     number: FORGE,
                     kind: w::Kind::Forgejo,
@@ -261,6 +262,7 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    app: None,
                     number: 2,
                     kind: w::Kind::Github,
                     mode: w::Mode::Managed,
@@ -288,6 +290,7 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    app: None,
                     number: 3,
                     kind: w::Kind::Forgejo,
                     mode: w::Mode::Owned,

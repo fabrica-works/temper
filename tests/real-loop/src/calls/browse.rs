@@ -1,15 +1,27 @@
 //! A bounded browser on the caller's loop submissions; only local fake HTTP.
 use skein_io::kernel::{Complete, Done, Family, Op};
-use std::net::SocketAddr;
+use std::{fmt::Write as _, net::SocketAddr};
 
 const RESPONSE: usize = 65_536;
-const REDIRECTS: usize = 4;
+const HOPS: usize = 5;
 
 #[derive(Debug)]
 pub struct Browsed {
     pub call: usize,
     pub hops: Vec<u16>,
     pub body: Vec<u8>,
+    /// The converted App's slug, taken from the redirect's installation URL.
+    pub app_slug: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+enum Page {
+    Installation,
+    Manifest,
+    Create,
+    Convert,
+    Install,
+    Setup,
 }
 
 pub(super) struct Browser {
@@ -18,24 +30,33 @@ pub(super) struct Browser {
     target: String,
     bytes: Vec<u8>,
     next: Option<String>,
+    form: Option<String>,
+    page: Page,
     pub(super) done: bool,
 }
 impl Browser {
-    pub(super) const MEMORY: u64 = (RESPONSE * 3) as u64;
+    pub(super) const MEMORY: u64 = (RESPONSE * 4) as u64;
     pub(super) fn new(call: usize, stdout: &[u8]) -> Self {
-        let output = std::str::from_utf8(stdout).expect("install stdout");
+        let output = std::str::from_utf8(stdout).expect("browser stdout");
         let mut lines = output.lines();
         lines
             .find(|line| line.ends_with("Open this address in a browser on the engine's machine:"))
             .expect("ctl's browser instruction");
-        let url = lines.next().expect("ctl's installation address");
+        let url = lines.next().expect("ctl's browser address");
         let (address, target) = local(url);
+        let page = if target.starts_with("/forges/") && target.contains("/github/manifest?") {
+            Page::Manifest
+        } else {
+            Page::Installation
+        };
         Self {
-            seen: Browsed { call, hops: Vec::with_capacity(REDIRECTS + 1), body: Vec::new() },
+            seen: Browsed { call, hops: Vec::with_capacity(HOPS), body: Vec::new(), app_slug: None },
             address,
             target,
             bytes: Vec::with_capacity(RESPONSE),
             next: None,
+            form: None,
+            page,
             done: false,
         }
     }
@@ -45,13 +66,19 @@ impl Browser {
     pub(super) fn complete(&mut self, complete: Complete) -> Option<Op> {
         match (complete.kind, complete.result.expect("browser operation")) {
             (Op::Socket { .. }, Done::Fd(fd)) => Some(Op::Connect { fd, addr: self.address }),
-            (Op::Connect { fd, .. }, Done::Nothing) => Some(Op::Send {
-                fd,
-                bytes: format!("GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", self.target, self.address)
-                    .into_bytes()
-                    .into_boxed_slice(),
-                from: 0,
-            }),
+            (Op::Connect { fd, .. }, Done::Nothing) => {
+                let request = if let Some(form) = self.form.take() {
+                    format!(
+                        "POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{form}",
+                        self.target,
+                        self.address,
+                        form.len()
+                    )
+                } else {
+                    format!("GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", self.target, self.address)
+                };
+                Some(Op::Send { fd, bytes: request.into_bytes().into_boxed_slice(), from: 0 })
+            }
             (Op::Send { fd, bytes, from }, Done::Count(count)) => {
                 assert!(count > 0, "browser send progresses");
                 let from = from + count;
@@ -111,17 +138,85 @@ impl Browser {
         if self.bytes.len() < end + 4 + length {
             return false;
         }
+        assert!(self.seen.hops.len() < HOPS, "bounded browser hops");
         self.seen.hops.push(status);
-        if matches!(status, 302 | 303) {
-            assert!(self.seen.hops.len() <= REDIRECTS, "at most four redirects");
-            let location = location.expect("redirect Location");
-            self.next =
-                Some(if location.starts_with('/') { format!("http://{}{location}", self.address) } else { location });
-        } else {
-            self.seen.body = self.bytes[end + 4..end + 4 + length].to_vec();
+        let body = &self.bytes[end + 4..end + 4 + length];
+        let html = std::str::from_utf8(body).expect("browser page UTF-8");
+        match self.page {
+            Page::Manifest => {
+                assert_eq!(status, 200, "manifest page");
+                let mut forms = html.split("<form ").skip(1);
+                let form = forms.next().expect("one manifest form");
+                assert!(forms.next().is_none(), "only one manifest form");
+                self.next = Some(attribute(form.split_once('>').expect("form tag").0, "action"));
+                let input = html
+                    .split("<input ")
+                    .skip(1)
+                    .map(|part| part.split_once('>').expect("input tag").0)
+                    .find(|tag| tag.contains("name=\"manifest\""))
+                    .expect("manifest input");
+                assert_eq!(attribute(input, "type"), "hidden");
+                let manifest = attribute(input, "value");
+                let mut form = String::from("manifest=");
+                for byte in manifest.bytes() {
+                    write!(form, "%{byte:02X}").expect("form byte");
+                }
+                assert!(form.len() <= RESPONSE, "bounded posted manifest");
+                self.form = Some(form);
+                self.page = Page::Create;
+            }
+            Page::Create => {
+                assert_eq!(status, 200, "fake manifest form page");
+                let link = html
+                    .split("<a ")
+                    .skip(1)
+                    .map(|part| part.split_once('>').expect("link tag").0)
+                    .find(|tag| tag.contains("id=\"create\""))
+                    .expect("fake's create link");
+                self.next = Some(attribute(link, "href"));
+                self.page = Page::Convert;
+            }
+            Page::Convert => {
+                assert_eq!(status, 302, "converted App's installation redirect");
+                let mut url = location.expect("installation Location");
+                let (_, target) = local(&url);
+                let slug = target
+                    .strip_prefix("/apps/")
+                    .expect("App installation")
+                    .split_once("/installations/new?")
+                    .expect("installation state")
+                    .0;
+                self.seen.app_slug = Some(slug.to_owned());
+                url.push_str("&account=acme&repositories=all");
+                self.next = Some(url);
+                self.page = Page::Install;
+            }
+            Page::Install => {
+                assert_eq!(status, 302, "fake installation redirects to setup");
+                self.next = location;
+                assert!(self.next.is_some(), "setup Location");
+                self.page = Page::Setup;
+            }
+            Page::Installation if matches!(status, 302 | 303) => {
+                let location = location.expect("redirect Location");
+                self.next = Some(if location.starts_with('/') {
+                    format!("http://{}{location}", self.address)
+                } else {
+                    location
+                });
+            }
+            Page::Installation | Page::Setup => {
+                self.seen.body = body.to_vec();
+            }
         }
         true
     }
+}
+fn attribute(tag: &str, name: &str) -> String {
+    let marker = format!("{name}=\"");
+    let value = tag.split_once(&marker).expect("HTML attribute").1.split_once('"').expect("attribute end").0;
+    // Ampersand comes last, so an escaped entity's text is not decoded twice.
+    value.replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 }
 fn local(url: &str) -> (SocketAddr, String) {
     let rest = url.strip_prefix("http://").expect("fake browser uses plaintext HTTP");

@@ -80,8 +80,14 @@ pub struct Installation {
     pub suspended: bool,
     pub stray: bool,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AppWay {
+    Manifest,
+    Pasted,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
+    pub app: Option<AppWay>,
     pub number: u16,
     pub kind: Kind,
     pub mode: Mode,

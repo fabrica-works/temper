@@ -595,6 +595,7 @@ impl World {
                 | top::Request::SetUp { .. }
                 | top::Request::Connect { .. }
                 | top::Request::Install { .. }
+                | top::Request::Manifest { .. }
                 | top::Request::CarriedUnused { .. }
                 | top::Request::EraseCarried { .. }
                 | top::Request::Resource { .. }

@@ -899,6 +899,7 @@ fn forges_encode_the_domains_rows_without_settings() {
     let value = forge::Forges {
         rows: Box::new([
             forge::Row {
+                app: None,
                 installations: Box::new([]),
                 ended: None,
                 first: None,
@@ -909,6 +910,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::Offered,
             },
             forge::Row {
+                app: None,
                 installations: Box::new([]),
                 ended: None,
                 first: None,
@@ -919,6 +921,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotOffered,
             },
             forge::Row {
+                app: None,
                 installations: Box::new([]),
                 ended: None,
                 first: None,
@@ -929,6 +932,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotUnderTheBox,
             },
             forge::Row {
+                app: None,
                 installations: Box::new([]),
                 ended: None,
                 first: None,
@@ -963,6 +967,7 @@ fn forges_encode_the_domains_rows_without_settings() {
             &w::ForgeRow::new(
                 &w::CEILINGS,
                 w::ForgeRowParts {
+                    app: None,
                     installations: List::with_capacity(0),
                     ended: None,
                     first: None,
@@ -1074,6 +1079,7 @@ fn setup_projects_and_first_repository_states_translate_without_losing_fields() 
             };
             let value = forge::Forges {
                 rows: Box::new([forge::Row {
+                    app: None,
                     installations: Box::new([]),
                     ended: None,
                     number: 3,
@@ -1226,7 +1232,7 @@ fn demo_start_outcomes_encode_every_failure_and_unknown() {
 }
 
 #[test]
-fn return_and_install_paths_are_bounded_visible_paths_on_this_listener() {
+fn return_install_and_manifest_paths_are_bounded_visible_paths_on_this_listener() {
     let mut at_bound = [b'a'; 512];
     at_bound[0] = b'/';
     let mut past_bound = [b'a'; 513];
@@ -1259,6 +1265,22 @@ fn return_and_install_paths_are_bounded_visible_paths_on_this_listener() {
                 w::Request::Install(
                     w::Install::new(&w::CEILINGS, w::InstallParts { forge: 1, back: Some(path.into()) }).unwrap(),
                 ),
+                w::Request::Connect(
+                    w::Connect::new(
+                        &w::CEILINGS,
+                        w::ConnectParts {
+                            forge: 1,
+                            how: w::How::GithubManifest(
+                                w::GitHubManifest::new(
+                                    &w::CEILINGS,
+                                    w::GitHubManifestParts { back: Some(path.into()) },
+                                )
+                                .unwrap(),
+                            ),
+                        },
+                    )
+                    .unwrap(),
+                ),
             ] {
                 let request = w::Requesting::new(&w::CEILINGS, w::RequestingParts { request }).unwrap();
                 let result = family::to_root(
@@ -1277,7 +1299,10 @@ fn return_and_install_paths_are_bounded_visible_paths_on_this_listener() {
                             path
                         }
                         root::Application::Forge(ask) => {
-                            let forge::Ask::Install { forge, back: Some(back) } = ask else {
+                            let (forge::Ask::Install { forge, back: Some(back) }
+                            | forge::Ask::Connect { forge, how: forge::How::GitHubManifest { back: Some(back) } }) =
+                                ask
+                            else {
                                 panic!("{name}: install")
                             };
                             assert_eq!(forge, 1, "{name}");
@@ -1328,6 +1353,7 @@ fn installations_and_the_last_connect_end_encode_unchanged() {
     let bytes = family::forges(
         forge::Forges {
             rows: Box::new([forge::Row {
+                app: None,
                 number: 1,
                 kind: forge::Kind::GitHub,
                 mode: forge::Mode::Connected,

@@ -180,6 +180,7 @@ fn every_connection_decodes_into_the_forges_words() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        app: None,
                         installations: List::with_capacity(0),
                         ended: None,
                         first: None,
@@ -194,6 +195,7 @@ fn every_connection_decodes_into_the_forges_words() {
             )
             .unwrap();
         let row = Row {
+            app: None,
             installations: Box::new([]),
             ended: None,
             first: None,
@@ -221,6 +223,7 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
+        app: None,
         installations: Box::new([]),
         ended: None,
         first: None,
@@ -270,6 +273,7 @@ fn an_out_of_order_document_is_refused() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        app: None,
                         installations: List::with_capacity(0),
                         ended: None,
                         first: None,
@@ -369,6 +373,7 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     w::ForgeRow::new(
                         &limits(),
                         w::ForgeRowParts {
+                            app: None,
                             installations: List::with_capacity(0),
                             ended: None,
                             number: 3,
@@ -444,6 +449,7 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    app: None,
                     number: 1,
                     kind: w::Kind::Github,
                     mode: w::Mode::Connected,
