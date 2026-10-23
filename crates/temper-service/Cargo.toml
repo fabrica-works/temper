@@ -42,6 +42,7 @@ jig-domain-notes.workspace = true
 jig-domain-people.workspace = true
 skein-kv.workspace = true
 jig-protocol-store.workspace = true
+jig-protocol-transcript.workspace = true
 temper-protocol-store.workspace = true
 jig-protocol-config.workspace = true
 skein-json.workspace = true

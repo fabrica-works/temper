@@ -256,6 +256,7 @@ pub(crate) fn transcript_loaded(
     domain: &mut Domain,
     waiter: Token,
     rows: Box<[Record]>,
+    texts: Option<crate::TranscriptTexts>,
     next: Option<Key>,
     cut: Option<loads::Cut>,
     out: &mut Queue<Request>,
@@ -273,6 +274,23 @@ pub(crate) fn transcript_loaded(
         retire_read(domain, waiter);
         return;
     }
+    if let Some(texts) = &texts {
+        if texts.len() != rows.len() {
+            transcript_failed(domain, waiter);
+            return;
+        }
+        for text in texts.iter().flatten() {
+            if text.len() > usize::try_from(crate::TRANSCRIPT_TAIL_BYTES).expect("tail bound fits usize") {
+                transcript_failed(domain, waiter);
+                return;
+            }
+        }
+    }
+    let mut texts = match texts {
+        Some(texts) => texts,
+        None => Box::new([]),
+    }
+    .into_iter();
     for row in rows {
         let turn = match row {
             Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn))) => turn,
@@ -296,10 +314,7 @@ pub(crate) fn transcript_loaded(
                 return;
             }
         };
-        // The turn's own bytes are its tail text until the service renders
-        // them; jig keeps their end within the tail's budget.
-        let text = Some(turn.transcript.clone());
-        if !domain.core.append_transcript(task, turn, text) {
+        if !domain.core.append_transcript(task, turn, texts.next().flatten()) {
             transcript_failed(domain, waiter);
             return;
         }

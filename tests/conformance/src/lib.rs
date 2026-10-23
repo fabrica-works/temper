@@ -63,7 +63,7 @@ impl std::fmt::Debug for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Root(event) => {
-                if let engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }) = event {
+                if let engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next, texts: None }) = event {
                     // The store retains the exact rows; traces need the page's
                     // identity and bounds rather than another formatted copy.
                     f.debug_struct("Loaded")
@@ -484,7 +484,7 @@ impl Application for Temper {
             engine::Request::ToChild(released) => events.push(engine::Event::Released(released)),
             engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                 let (rows, next) = store.page(&range, after.as_ref(), most);
-                events.push(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
+                events.push(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next, texts: None }));
             }
             engine::Request::Forge { call, repository, op } => {
                 events.extend(systems.call(store, clock, call, repository, op));

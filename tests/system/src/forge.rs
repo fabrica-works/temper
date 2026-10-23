@@ -343,7 +343,12 @@ impl World {
                 }
                 engine::Request::Store(engine::StoreRequest::Load { owner, range, after, most, .. }) => {
                     let (rows, next) = self.store.page(&range, after.as_ref(), most);
-                    self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded { owner, rows, next }));
+                    self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded {
+                        owner,
+                        rows,
+                        next,
+                        texts: None,
+                    }));
                 }
                 engine::Request::Forge { call, repository, op } => {
                     let located = translate::locate_name(&op);

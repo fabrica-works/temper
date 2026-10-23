@@ -135,6 +135,7 @@ pub(crate) fn load_outputs(
     domain: &mut Domain,
     env: &Env<Limits>,
     load_out: &mut Queue<loads::Request>,
+    mut texts: Option<crate::TranscriptTexts>,
     decision: &mut Option<Decision>,
     out: &mut Queue<Request>,
 ) {
@@ -154,7 +155,7 @@ pub(crate) fn load_outputs(
                     Some(Waiting::Notes) => note_loaded(domain, waiter, rows, next, cut),
                     Some(Waiting::Input) if cut.is_none() => input_loaded(domain, waiter, rows, next, out),
                     Some(Waiting::Input) => input_failed(domain, waiter),
-                    Some(Waiting::Transcript) => transcript_loaded(domain, waiter, rows, next, cut, out),
+                    Some(Waiting::Transcript) => transcript_loaded(domain, waiter, rows, texts.take(), next, cut, out),
                     Some(Waiting::Ended) if cut.is_none() && next.is_none() => {
                         domain.work.push(Work::EndedLoaded { waiter, rows });
                     }
