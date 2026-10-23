@@ -1,6 +1,6 @@
 # QA in the lab
 
-2026-10-20, with director decision 253, revised 2026-10-21. temper's
+2026-10-20, with director decision 253, revised 2026-10-23. temper's
 binding to skein's lab (skein's `lab.md`): the experiments temper keeps
 in `lab/`, the cluster, seed, charter, tool and checks each runs with,
 what the fakes' scripts must say, the cost classes they name, and the
@@ -20,7 +20,7 @@ its adopted decisions, are section 11.
   through `temper ctl` alone (section 2).
 - **Three experiments in `lab/`:** the story with its driver (H); the
   same cluster with the story scripted and no driver, the free smoke
-  (S); H with `temper serve` killed after the driver's first action
+  (S); H with the engine killed after the driver's first action
   (P). P with its fault and planted list cleared is H byte for byte,
   so H's verdict is P′'s
   (section 3).
@@ -49,8 +49,7 @@ its adopted decisions, are section 11.
 ## 2. What M1 is, and is not
 
 - **For:** temper end to end on real processes (`draft/qa-loop.md`,
-  section 2): `temper serve`'s start on a rendered document, the engine
-  and its worker in one process, `temper agent` processes, `temper fake
+  section 2): `temper serve`'s start on a rendered document, one engine and two workers in separate processes, `temper agent` processes, `temper fake
   git` as the worker's git across processes, `temper ctl` as an agent
   meets it, the forge's webhook deliveries across a network, and
   the loop from a chat's request to a landing.
@@ -66,8 +65,8 @@ its adopted decisions, are section 11.
 - **Deliveries are required.** M1's story runs on the fake forge's
   webhook deliveries to serve across processes (11.2). Polling stays
   only where temper already uses it as its own fallback. The lab adds
-  no polling substitute for deliveries; the missing delivery and bound
-  webhook-address interfaces are named waits (11.1).
+  no polling substitute for deliveries; the bound webhook-address handoff
+  is a named prerequisite (11.1).
 
 ## 3. The experiments
 
@@ -77,7 +76,7 @@ its adopted decisions, are section 11.
 |---|---|---|---|---|
 | `lab/chat-change/` | `chat-change` | the charter of 6.1 | none | H: the story, judged on three seeds |
 | `lab/chat-change-smoke/` | `chat-change-smoke` | null | none | S: H's cluster, seed and checks, with the story as one more seed action (5.2) |
-| `lab/chat-change-killed/` | `chat-change` | as H | serve killed (section 9) | P: the planted fault |
+| `lab/chat-change-killed/` | `chat-change` | as H | engine killed (section 9) | P: the planted fault |
 
 - **H's files:** `experiment.json` (skein's `lab.md`, 4.1), `charter.md`
   (6.1), the templates of 4.4, `tools/ctl` (6.2), `checks/end-state`
@@ -122,109 +121,98 @@ temper=<binary> --artifact git=<the same binary>` (skein's `lab.md`,
 ### 4.1 Its order
 
 ```
-forge    temper fake forge, from its document, port 0          ready "listening " → address
-└─ llm   temper fake llm; its scripts name the forge's address  ready "listening " → address
-   └─ serve  temper serve, its documents naming both            ready → link and bound webhook address
-             then the seed actions (section 5), then the driver
+forge    temper fake forge; ready "listening " → address
+└─ llm   temper fake llm; scripts name forge; ready → address
+   └─ engine   temper serve, engine alone; ready → clients, workers, webhooks
+      ├─ w1    temper serve, worker alone; ready "linked w1 "
+      └─ w2    temper serve, worker alone; ready "linked w2 "
 ```
 
-- **One chain.** The chat's `delegate` names the forge's resources by
-  the forge's address (7.1), so the model starts after the forge;
-  serve's documents name both. Each start has one candidate, so the
-  start-order draw changes nothing (skein's `lab.md`, 5.4).
-- **Addresses from ready lines alone** (skein's `lab.md`, 4.4): each fake
-  prints `--ready`'s prefix and its bound address (`protocol/setup.md`,
-  8.4). Serve prints each listener's bound address on its stderr,
-  `listening webhooks <address>` among them (`protocol/README.md`,
-  15.3), a ready line the lab captures. Its sign-in link,
-  `http://HOST:PORT/jig/v1/sign-in/link?secret=…` (`client/README.md`,
-  section 7), gives the clients' listener's bound address. Reconcile
-  registers the webhook after serve binds; the fake delivers to that
-  hook. The bootstrap channel's exact syntax remains its owner's, not
-  invented in these templates.
-- **The cluster's processes,** an engine alone and workers alone, each
-  a `temper serve` of its own after the same fakes, are `lab/cluster/`'s
-  (`protocol/README.md`, section 15), by the same lines; M1's
-  experiment keeps one serve, standalone. `lab/cluster/` names no
-  driver, seed action, fault or check: the runner starts it and stops it
-  in reverse with no survivor, and the process tier's stories read it
-  (`protocol/README.md`, 15.5 and 15.6). Its fake forge joins it once
-  serve reconciles at its start (11.1).
+- **The canonical cluster** is `lab/cluster/experiment.json`
+  (`protocol/README.md`, 15.5 and 15.6): one engine and two workers,
+  each a real process. It holds no driver, seed action, fault or check.
+  S, H and P use its process contracts; their own files add the story,
+  seed and checks. The two workers may start in either seeded order
+  after the engine is ready (skein's `lab.md`, 5.4).
+- **Addresses from ready lines alone** (skein's `lab.md`, 4.4): fakes
+  print their chosen addresses after the configured prefix. The engine
+  prints `listening clients`, `listening workers` and
+  `listening webhooks` on stderr. Reconcile registers the actual bound
+  webhook endpoint; no fixed endpoint, socket probe or experiment poll
+  substitutes for that handoff. Workers print their linked lines.
+- **A private bootstrap:** the engine's sign-in link on stdout goes
+  directly to the seed client's stdin. It is never a file, readiness
+  capture, command argument, event or transcript. Only the public client
+  origin is kept and passed to the ctl wrapper. A spent link remains a
+  credential for this rule.
+- **S has an attended host** beside `lab/chat-change-smoke/`, while
+  skein's runner lacks private bootstrap and stopped collection. It
+  keeps the lab's subject, key, run, evidence and verdict records and
+  native contained process trees. It owns the stream handling that
+  removes the private link before any persistence. It does not use
+  the runner's runtime for a linked run. The runner's driver and
+  campaign execution for H and P remain a separate prerequisite.
 
 ### 4.2 Its processes
 
-```
-forge  files  forge.json
-       argv   {artifact.temper} fake forge --document {proc.forge.dir}/forge.json
-              --ready "listening " --seed {seed.forge} --observations {proc.forge.dir}/observations.jsonl
-llm    after  forge
-       files  llm.json
-       argv   {artifact.temper} fake llm --document {proc.llm.dir}/llm.json
-              --ready "listening " --seed {seed.llm}
-serve  after  llm
-       files  config/temper.json, config/agent.json, config/charters/chat.txt,
-              config/charters/coding.txt, secrets/worker.secret, secrets/worker.digest
-       argv   {artifact.temper} serve --config {proc.serve.dir}/config --data {dir.data} --cache {dir.cache}
-```
+Each process's document and ready contract comes from `lab/cluster/`.
+The story configures those contracts with:
 
-- **`dirs`:** `client`, `data` and `cache` (skein's `lab.md`, 4.1).
-- **`env` is `{}`** for each: nothing of the runner's or the machine's,
-  every path given.
-- **`memory_bytes`:** null for the fakes, which declare none; for
-  serve, what its document states for the engine and its worker, which
-  share its process (`protocol/configuration.md`, section 7); in the
-  cluster, each process's own service's (`protocol/README.md`, 15.1).
-- **Files beneath a directory** (`config/`, `secrets/`, `setup/`) keep
-  the configuration directory free of secrets
-  (`protocol/configuration.md`, section 12) and the fake's setup
-  directory to its handover and, until temper-15, the credential files
-  its reconcile step writes (`protocol/setup.md`, section 3); the lab
-  refuses only an absolute or climbing path (skein's `lab.md`, 4.7).
+- **`forge`:** `{artifact.temper} fake forge --document
+  {proc.forge.dir}/forge.json --ready "listening " --seed {seed.forge}
+  --observations {proc.forge.dir}/observations.jsonl`.
+- **`llm`, after forge:** `{artifact.temper} fake llm --document
+  {proc.llm.dir}/llm.json --ready "listening " --seed {seed.llm}`.
+- **`engine`, after llm:** `{artifact.temper} serve --config
+  {proc.engine.dir}/config --data {proc.engine.dir}/data --cache
+  {proc.engine.dir}/cache`; no in-process worker.
+- **`w1` and `w2`, after engine:** the same directory form for their
+  own process directories, linked to the engine's worker listener.
+  Each has one worker slot, the subject's agent and fake git, its
+  own secret, and the fake LLM's TLS endpoint and trust root.
+
+The client directory is `{dir.client}`. Process environments contain no
+inherited machine values; scripts needing standard tools declare their
+PATH explicitly. Fake memory bounds are null; each serve process's bound
+is its own service document's (`protocol/README.md`, 15.1). Secret files
+stay outside configuration directories (`protocol/configuration.md`, 12).
 
 ### 4.3 Run credentials
 
-| Credential | Made from | Where | Read by |
+| Credential | Made by | Where | Read by |
 |---|---|---|---|
-| the fake model's key | the fake LLM from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.llm.dir}/llm.key`; exact output interface pending (11.1) | the fake LLM; the seed's `add-key` |
-| the fake forge's admin token | the fake forge from its decimal u64 `--seed` | fake-written 0600 output, expected at `{proc.forge.dir}/setup/admin_token`; exact output interface pending | the fake forge before binding; until temper-15, box reconcile and serve's start-time adoption; the file stays (`protocol/setup.md`, 8.4) |
-| the sign-in link | serve | its ready line | the seed's `sign-in`, which spends it (`client/README.md`, 6.7) |
-| the owner's client token | the sign-in | `{dir.client}` | the seed's acts; the driver's `ctl` |
-| the bot's tokens | until temper-15, `temper forge reconcile DIRS N`, once after the fake process and before serve | the fake forge's private `api_token` and `git_token` files | serve |
-| the worker's secret and digest | a fixed pair of the experiment's, as the process tier's | `{proc.serve.dir}/secrets/` | serve |
+| fake model key | fake LLM, from its decimal u64 seed | fake-written private `{proc.llm.dir}/llm.key` | fake LLM and seed `add-key` |
+| fake admin token | fake forge, from its decimal u64 seed | private `{proc.forge.dir}/setup/admin_token` handover | fake forge and engine setup |
+| sign-in link | engine | memory and sign-in stdin only | seed client |
+| owner client token | sign-in | `{dir.client}` | seed and ctl wrapper |
+| bot access | start-time takeover and reconcile | engine records | engine and its worker connection |
+| worker secrets and digests | experiment's fixed matching pairs | workers' and engine's private data directories | their corresponding services |
 
-- **The fake's file-backed start is transitional until temper-15:**
-  reconcile writes `user` and `webhook_secret` beside the tokens;
-  serve answers its start-time adoptions from the handover and secret
-  file, then connects with file-built access (`protocol/setup.md`, 8.4).
-- **No machine secret:** no file, argument or environment of the
-  experiment names the home directory, `CODEX_HOME`, a real forge or a
-  real provider. Each credential above opens only this run's loopback
-  processes, which end with it.
-- **The runner invents no fake credential bytes.** It passes each
-  fake's decimal u64 seed and names its private output files; deriving
-  and writing the key or token is the fake's. This is decision 253's
-  default, routed to first-run; its final encoding and output interface
-  remain a wait. The outputs exist before readiness and are not runner
-  file templates.
-- **Recorded seeds and captures:** draws are in `run.json`'s `schedule`
-  and captures in its processes (skein's `lab.md`, 5.4 and 5.6).
-  Credential derivation belongs to the recorded fake executable's
-  identity. The link is spent by the seed before the driver starts.
-- **Nothing reaches the driver** but through `ctl`: its own commands
-  read none of these files (6.2).
+- **Records-only fake setup:** the forge entry supplies its endpoint and
+  identity without old file-backed access members. The setup takes over
+  the fake's handover and reconciles at engine start, then connects from
+  its records (`protocol/setup.md`, section 5). The seed runs no external
+  `temper forge reconcile`. The old file-backed fake is a separate
+  transitional form and is not this experiment's bootstrap.
+- **No machine credential:** fake key/token bytes come from their fakes,
+  never from runner templates or the user's account. The experiment names
+  only its own loopback peers, files and decimal seeds.
+- **Public evidence only:** recorded draws and endpoint captures identify
+  the run; fake credential contents and the sign-in link do not. No link
+  reaches the driver, including through ctl's prefix (6.2).
 
 ### 4.4 The documents
 
 - **`forge.json`,** the fake forge's lab form (`protocol/setup.md`,
   8.4): `listen` `127.0.0.1:0`; the private admin-token output path above
-  through the pending fake-owned output interface;
+  through its fake-owned output interface;
   `owner` `fake`; `repositories`, `widget` landing on `main`; and the
   CI cue of 7.2, a capability the form lacks (11.1).
 - **`llm.json`,** the fake LLM's lab form: `listen` `127.0.0.1:0`; the
-  private key output path above through the pending fake-owned output
+  private key output path above through the fake-owned output
   interface; the provider's one model with its window and
   output; the scripts of 7.1.
-- **`temper.json`,** serve's document, from the real loop's landing
+- **`engine.json`,** the engine's document, from the real loop's landing
   fixture (`tests/real-loop/src/landing.rs`, `fixture` and `configure`)
   and the process tier's documents, with:
   - project 1's landing rule on `fake/widget`'s `main` asking for CI, up
@@ -243,10 +231,10 @@ serve  after  llm
     address; its `setup` entry fake, `directory`
     `{proc.forge.dir}/setup`, bot `temper`, `listen` that address, owner
     `fake`, the one repository;
-  - one worker in the process, `root` `workspaces`, `git`
-    `{artifact.git}`, its agent `{artifact.temper}` with `["agent",
-    "{proc.serve.dir}/config/agent.json"]`; the worker's secret and
-    digest by their absolute paths;
+  - no local worker; both remote workers use `root` `workspaces`,
+    `git` `{artifact.git}`, and agent `{artifact.temper}` with their
+    own `config/agent.json`; secret/digest pairs match the canonical
+    cluster registrations;
   - a webhook listener on `127.0.0.1:0`, its actual bound address made
     available to reconcile through the pending serve interface;
     the clients' listener `127.0.0.1:0`, no bundle; `demo` null.
@@ -263,14 +251,14 @@ serve  after  llm
 `temper ctl add-key` is available at temper `dfc7cc70a`, in the
 `add-key PROVIDER FILE --deployment --key KEY` form used below. Its
 file must be private, regular and owned by the caller; the host strips
-one final newline. The fake's key output remains first-run's pending
-interface, not a runner-generated value.
+one final newline. The fake owns and writes its private key output;
+the runner does not generate that value.
 
 Each is `{artifact.temper} ctl {dir.client}` and then:
 
 | Action | Arguments | For |
 |---|---|---|
-| `sign-in` | `sign-in -`, stdin `{proc.serve.ready.link}` and a newline | the deployment's owner signs in by the full printed link |
+| `sign-in` | `sign-in -`, private link on stdin, with a newline; never recorded | the deployment's owner signs in by the full printed link |
 | `add-key` | `add-key 1 {proc.llm.dir}/llm.key --deployment --key lab-llm` | the fake model's key, the deployment's account (`client/tools.md`, 5.5, area 5) |
 | `usable` | `wait accounts --until usable --timeout 200` | the account usable |
 | `forge` | `wait forges --until connected:1 --timeout 200` | the fake's start-time adoption done (`protocol/setup.md`, 8.4) |
@@ -293,7 +281,7 @@ S adds one action, `story`: `/bin/sh {experiment}/smoke/story` with
 `ctl`'s argument prefix (6.2) after it. It makes the person's calls
 through the wrapper: `chat --project 1 --key smoke-chat` with the words
 of 3.3; the chat's number from `done: task N, chat`; `wait task N
---until ended --timeout 110`; `task N --tree`. It exits 0 only when the
+--until ended --timeout 220`; `task N --tree`. It exits 0 only when the
 chat ended, which it does after its delegate's result (7.1).
 
 ## 6. The driver
@@ -329,7 +317,7 @@ End with the lab's report: done only if you saw the change landed.
 
 ```
 {"name": "ctl",
- "argv": ["/bin/sh", "{experiment}/tools/ctl", "{artifact.temper}", "{dir.client}", "{proc.serve.ready.link}"],
+ "argv": ["/bin/sh", "{experiment}/tools/ctl", "{artifact.temper}", "{dir.client}", "http://{proc.engine.ready.clients}/"],
  "env": {}, "writes": ["{dir.client}"], "reads": ["{experiment}/tools/ctl", "{artifact.temper}"]}
 ```
 
@@ -347,8 +335,9 @@ For each call it checks, in order:
    forges and pasted files are named.
 2. **No argument is `--call`** or begins `--call=`: a call read from JSON
    names its tool where the wrapper does not look.
-3. **The directory's `address` is `http://` and the link's authority:**
-   the engine the seed signed in to, pinned before every call.
+3. **The directory's `address` is `http://` and the seed's public origin:**
+   the engine the seed signed in to, pinned before every call. The trusted
+   prefix is this public origin, never the sign-in link.
 
 Then it runs `{artifact.temper} ctl DIRECTORY ARGS...`, `help [TOOL]`
 as `temper ctl help [TOOL]`, and the call's stdin, stdout, stderr and
@@ -421,8 +410,8 @@ the charter's instructions and the task's words (skein's `fake-llm.md`,
 - **CI follows content:** context `check`, the domain's `Cue { path:
   NOTICE, green: "Maintained by temper." }` (skein's `fake-forge.md`,
   2.3): a head whose `NOTICE` holds that line passes, any other fails.
-  The lab form's CI passes every head (`protocol/setup.md`, 8.4); the
-  cue per repository is needed of it (11.1).
+  Set the per-repository cue in the fake's document
+  (`protocol/setup.md`, 8.4).
 - **No fault, latency or rate limit** in H, S or P.
 - **Its observations** to the file `--observations` names, in
   first-run's encoding of the domain's observations (8.3, 8.4).
@@ -431,7 +420,8 @@ the charter's instructions and the task's words (skein's `fake-llm.md`,
   domain's faults: the end-state check's content (8.4).
 - **Deliveries required:** the fake delivers its forge events to the
   hook reconcile registers on serve's actual bound webhook address.
-  Delivery across processes is first-run's pending capability (11.1).
+  The registered address must be the engine's actual bound address
+  (11.1).
 
 ## 8. Checks
 
@@ -443,15 +433,19 @@ discounted (skein's `lab.md`, 9.4). The experiment adds no generic check.
 
 ### 8.2 Collection
 
-First obtain the fake's complete flush boundary and explicit loss count
-while it is running, through first-run's pending interface (11.1).
-Its command and encoding remain the fake's contract, not an invented
-lab command. Then copy that complete evidence:
+The attended host keeps the completed story command and a causally confirmed
+observation flush boundary while the fake is running. It retains the complete
+checkpoint prefix with explicit cumulative loss count, including zero, and
+reads the objects needed by the live end-state check. EOF alone establishes
+no boundary. A missing boundary is undecided, never declared confirmed.
 
-`observations`: `/bin/cp {proc.forge.dir}/observations.jsonl
-{collect.dir}/observations.jsonl`, with `scan` empty: the file is
-copied out of scratch so that the checks and findings read evidence
-(skein's `lab.md`, 3.3 and 4.5).
+After the live evidence and object responses are retained, the host stops
+processes in reverse start order and confirms each exit and empty process
+tree. Only then does it copy the engine's `data/state/store` to evidence and
+run the promises check. A copy failure leaves that check unjudged; the live
+store is never opened by the checker. Raw observations, object requests and
+responses, boundary evidence, check output and process outcomes are retained
+with the run (skein's `lab.md`, 4.5).
 
 ### 8.3 The forge's promises
 
@@ -462,13 +456,12 @@ copied out of scratch so that the checks and findings read evidence
 7.2; its signatures are `promise/<promise>/<subject>`. The experiment
 judges no promise of its own.
 
-Its inputs include `{collected.observations}/observations.jsonl`, a
-client `Profile` and independent `Decision` records naming repository,
-pull and exact head, with their completeness declared even when empty.
-The decisions come from temper's own record, never from the merge
-being judged (decision 259). First-run designs those inputs and the
-final command's argv, with github's review; these are named waits,
-not schemas or flags the lab invents.
+Its existing command takes the engine's configuration directories, forge
+number, collected observations and stopped store copy. It derives its
+`Profile` and independent `Decision` records from temper's own record,
+including the exact head and completeness; never from the merge being
+judged (`protocol/setup.md`, 8.4; decision 259). QA supplies no alternate
+Profile/Decision input schema.
 
 The judge keeps breaches even when other evidence is undecided. The
 wrapper preserves both through the existing check contract (259):
@@ -483,9 +476,11 @@ Loss or unknown completeness never gives a pass. Status 2 with a
 
 ### 8.4 The story's end
 
-`end-state`: `{experiment}/checks/end-state
-{collected.observations}/observations.jsonl {proc.forge.ready.address}
-{experiment}/NOTICE`, under skein's `lab.md`, 7.2:
+`end-state` reads the collected observations and forge address. The attended
+host supplies the existing helper's confirmed/unknown boundary, one absolute
+monotonic command deadline, fresh evidence directory and result path
+(`lab/chat-change-smoke/checks/README.md`). NOTICE is the file beside the
+helper. Its results follow skein's `lab.md`, 7.2:
 
 The helper is Python 3.11+ standard library only, under the same
 "for now" as the runner (decision 253). It is lab tooling beside the
@@ -515,16 +510,16 @@ interpreter and executable identity (skein's `lab.md`, 2.3).
 
 ## 9. The planted fault
 
-- **P's fault:** `{"kill": "serve", "signal": "SIGKILL",
-  "after_actions": [1, 1]}`: `temper serve` alone killed once the
+- **P's fault:** `{"kill": "engine", "signal": "SIGKILL",
+  "after_actions": [1, 1]}`: the engine process alone killed once the
   driver's first action has ended (skein's `lab.md`, 4.6).
-- **Its planted signature:** `stop/serve/signal:SIGKILL` (skein's
+- **Its planted signature:** `stop/engine/signal:SIGKILL` (skein's
   `lab.md`, 7.1, as the runner spells it). A judged run of P lacking
   it fails `planted-missing/…`. This alone proves M1's stop detection.
   The story may have progressed before the first action returned;
   `check/end-state/not-landed/fake/widget/main` is an observed failure
   when present, never a required planted signature.
-- **Nothing is discounted:** a survivor of serve's tree, should an
+- **Nothing is discounted:** a survivor of the engine's tree, should an
   agent's process run at the kill, is a failure and a finding of its
   own.
 - **Detection:** P judged under `temper-m1` at H's subject, three seeds,
@@ -620,10 +615,12 @@ runner, and what to change in them.
 
 ## 11. What M1 waits for, and adopted decisions
 
-### 11.1 Pending
+### 11.1 Prerequisites and owners
 
-The experiments are written to these as designed; each is its owner's,
-and arrives through the director.
+These are the experiment contracts and their owners, rather than a claim
+that every row remains unimplemented. Runnable status and evidence are
+recorded with the experiment. Changes in another owner's area arrive
+through the director.
 
 | What | Whose | For |
 |---|---|---|
@@ -658,11 +655,11 @@ and arrives through the director.
   infer zero from a missing loss record.
 - **TLS:** H and S wait for fake LLM TLS with skein's test root. No
   plaintext variant.
-- **Credentials:** the director's default, routed to first-run, is
+- **Credentials:** the director's default, supplied by first-run, is
   decimal u64 `--seed` alone; fakes derive their own key/token bytes
   and write needed outputs to 0600 files the experiment names. The
   runner invents no bytes. Derivation and output interfaces remain
-  pending first-run's contract.
+  owned by first-run's contract.
 - **Content:** read the fake's store through the designed private git
   `objects` route, without an admin-token API workaround.
 - **Cost:** 245's ready, command, stop and triage values stay. Only
