@@ -723,6 +723,9 @@ impl Bounded {
     }
     #[must_use]
     pub fn requirements(&self) -> temper_service::startup::Requirements {
+        self.try_requirements().unwrap_or_else(|why| panic!("{}", String::from_utf8_lossy(&temper_service::startup::lines(&why))))
+    }
+    pub fn try_requirements(&self) -> Result<temper_service::startup::Requirements, temper_service::startup::Problems> {
         temper_service::startup::memory_requirements(
             &self.document,
             &jig_protocol_config::Directories::working(),
@@ -733,7 +736,6 @@ impl Bounded {
             self.forges(),
             Some(&self.setup),
         )
-        .unwrap_or_else(|why| panic!("{}", String::from_utf8_lossy(&temper_service::startup::lines(&why))))
     }
     pub fn startup(&self, document: &[u8]) -> Result<temper_service::Service, temper_service::startup::Problems> {
         temper_service::startup::with_setup(
@@ -799,6 +801,11 @@ pub fn bounded_records(directory: &Path) -> Bounded {
 /// Init's own document and agent, with the same counted paths at their bounds.
 #[must_use]
 pub fn bounded_template(directory: &Path) -> Bounded {
+    bounded_template_reasoning(directory, None)
+}
+
+// Scratch measurement: only the public model changes.
+pub fn bounded_template_reasoning(directory: &Path, reasoning: Option<u32>) -> Bounded {
     use std::num::NonZeroU16;
     use temper_init::{Content, Directories, Facts, Ports};
     let answer = temper_init::files(
@@ -830,6 +837,12 @@ pub fn bounded_template(directory: &Path) -> Bounded {
             }
             Content::Link { .. } => {}
         }
+    }
+    if let Some(reasoning) = reasoning {
+        let path = directory.join("agent.json");
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        value["endpoints"][0]["models"][0]["reasoning_item"] = reasoning.into();
+        fs::write(path, serde_json::to_vec(&value).unwrap()).unwrap();
     }
     local_agent(directory, "agent.json", "127.0.0.1:8370".parse().expect("LLM stand-in"));
     let value =

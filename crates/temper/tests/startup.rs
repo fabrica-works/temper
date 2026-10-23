@@ -1719,3 +1719,240 @@ fn tls_is_refused_before_reading_the_handover() {
     assert!(scratch.path().join("forge-1/admin_token").is_dir());
     scratch.remove();
 }
+
+// Scratch investigation; no runtime exchanges and no real credentials.
+#[test]
+fn reasoning_figures_shipped_template() {
+    for parts in [1_u32, 4] {
+        let mut low = 1;
+        let mut high = 65536;
+        while low < high {
+            let mid = (low + high) / 2;
+            if reasoning_opaque_turn_bytes(parts * mid + 7) > 65536 {
+                high = mid;
+            } else {
+                low = mid + 1;
+            }
+        }
+        eprintln!(
+            "RUNTIME parts={parts} first_R={low} prior_body={} first_body={}",
+            reasoning_opaque_turn_bytes(parts * (low - 1) + 7),
+            reasoning_opaque_turn_bytes(parts * low + 7)
+        );
+    }
+    for r in [2048_u32, 2049, 16384, 65536, 131072, 262144, 786430] {
+        let scratch = support::Scratch::startup(&format!("reasoning-figures-{r}"));
+        let bounded = support::owned::bounded_template_reasoning(scratch.path(), Some(r));
+        let value: serde_json::Value =
+            serde_json::from_slice(&fs::read(scratch.path().join("agent.json")).unwrap()).unwrap();
+        let mut shipped = value.clone();
+        shipped["profile"]["declared"]["memory"] = 2147483648_u64.into();
+        let actual = match smith_agent_shell::config::from_value(shipped) {
+            Ok(_) => "PASS".to_owned(),
+            Err(why) => why.detail(),
+        };
+        assert_eq!(actual, "PASS");
+        if r == 786430 {
+            let mut past = value.clone();
+            past["endpoints"][0]["models"][0]["reasoning_item"] = 786431_u32.into();
+            let why = smith_agent_shell::config::from_value(past).err().unwrap().detail();
+            assert!(why.contains("session.opaque_bytes=3145731 bytes; transcript.opaque_bytes=3145728 bytes"));
+            eprintln!("BOUNDARY R=786431: {why}");
+        }
+        let config = smith_agent_shell::config::from_value(value).unwrap();
+        let limits = &config.service.limits;
+        let e = smith_agent_service::worst_case(limits, &config.service.llm_endpoints).unwrap();
+        let program = smith_agent_service::program_worst_case(&config.service).unwrap();
+        let client = &limits.llm.adapter.client;
+        let session = &limits.domain.session;
+        let req = bounded.requirements();
+        let document: serde_json::Value = serde_json::from_slice(&bounded.document).unwrap();
+        eprintln!(
+            "ROW R={r} actual={actual} E={e} program={program} receiving={} opaque={} completion={} history_bytes={} messages={} blocks={} engine={} worker={} total={} engine_limit={} worker_limit={}",
+            client.receiving,
+            limits.channel.transcript.opaque_bytes,
+            session.completion_bytes,
+            session.history_bytes,
+            session.history_messages,
+            session.history_blocks,
+            req.engine_bytes,
+            req.worker_bytes,
+            req.engine_bytes + req.worker_bytes,
+            document["engine"]["memory_bytes"],
+            document["workers"][0]["memory_bytes"]
+        );
+        let store =
+            temper_service::store_limits(&bounded.document, &jig_protocol_config::Directories::working()).unwrap();
+        let parsed = jig_protocol_config::document(
+            &bounded.document,
+            &jig_protocol_config::DocumentLimits { bytes: 1048576, tokens: 1048576, depth: 32 },
+        )
+        .unwrap();
+        let at = jig_protocol_config::read::Object::new(&parsed, 0).unwrap().member(&parsed, b"workers").unwrap();
+        let ats = jig_protocol_config::read::list(&parsed, at, parsed.len()).unwrap();
+        let worker =
+            jig_protocol_config::worker(&parsed, *ats.get(0).unwrap(), &jig_protocol_config::Directories::working()).unwrap();
+        let own = temper_service::limits::profile(temper_service::limits::Profile::Small);
+        let payload = temper_service::worker_settings::payload_limits(&own).unwrap();
+        let link = temper_service::worker_settings::link_limits(&worker, &payload).unwrap();
+        let mut frame = 0;
+        for kind in jig_protocol_worker_wire::KINDS {
+            frame = frame.max(jig_protocol_worker_wire::sizes::largest_body(&link.sizes, kind.body).unwrap() + 8);
+        }
+        eprintln!(
+            "FIXED R={r} kv_value={} kv_commit={} wire_transcript={} wire_turn={} largest_frame={} host_turn={} host_transcript={}",
+            store.store.store.value,
+            store.store.store.commit,
+            link.sizes.transcript,
+            link.sizes.turn,
+            frame,
+            bounded.agent.host_limits.turn_bytes,
+            bounded.agent.host_limits.transcript_bytes
+        );
+        let outcome = bounded.startup(&bounded.document);
+        assert_eq!(outcome.is_ok(), r == 2048);
+        if r == 786430 {
+            check_bounded_startup(&bounded, req);
+        }
+        eprintln!(
+            "DEPLOY R={r}: {}",
+            match outcome {
+                Ok(_) => "PASS".to_owned(),
+                Err(why) => String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned(),
+            }
+        );
+        scratch.remove();
+    }
+}
+
+// Length-only synthetic ordinary turn: one assistant opaque block, no other
+// content or usage. The same generated constructor/encoder as encode_turn.
+fn reasoning_opaque_turn_bytes(opaque: u32) -> u64 {
+    use smith_transcript as wire;
+    let limits = wire::CEILINGS;
+    let mut blocks = skein_lib::List::with_capacity(1);
+    blocks
+        .push(wire::Block::Opaque(
+            wire::Opaque::new(
+                &limits,
+                wire::OpaqueParts { dialect: 3, bytes: vec![b'x'; opaque as usize].into_boxed_slice() },
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+    let mut messages = skein_lib::List::with_capacity(1);
+    messages
+        .push(wire::Message::new(&limits, wire::MessageParts { role: wire::Role::Assistant, blocks }).unwrap())
+        .unwrap();
+    let turn = wire::Turn::new(
+        &limits,
+        wire::TurnParts {
+            kind: wire::TurnKind::Ordinary,
+            opening: None,
+            endpoint: b"openai".as_slice().into(),
+            model: b"gpt-6-luna".as_slice().into(),
+            effort: None,
+            dialect: 3,
+            place: 2,
+            usage: wire::Usage::new(
+                &limits,
+                wire::UsageParts { input: None, output: None, cache_read: None, cache_write: None, reasoning: None },
+            )
+            .unwrap(),
+            spent: 0,
+            jobs: 0,
+            messages,
+        },
+    )
+    .unwrap();
+    let mut writer = skein_lib::Writer::new(turn.measure() as usize);
+    turn.encode(&mut writer).unwrap();
+    writer.finish().len() as u64
+}
+
+// Scratch follow-up: compare independently derived Smith and Jig envelopes.
+#[test]
+fn reasoning_host_turn_bounds() {
+    for r in [1_u32, 2048, 16384, 65536, 131072] {
+        let scratch = support::Scratch::startup(&format!("reasoning-host-{r}"));
+        let mut bounded = support::owned::bounded_template_reasoning(scratch.path(), Some(r));
+        let value = serde_json::from_slice(&fs::read(scratch.path().join("agent.json")).unwrap()).unwrap();
+        let config = smith_agent_shell::config::from_value(value).unwrap();
+        let limits = &config.service.limits;
+        let session = &limits.domain.session;
+        let run = &limits.domain.run;
+        eprintln!("RECORD_SLOT {}", std::mem::size_of::<temper_engine_domain::Record>());
+        eprintln!("HOST R={r} turn={} transcript={} local_turn={} local_answered={} answer={} completion={} host_part={} offer={} run={} history={} calls={} delegated={} tools={:?}",
+            limits.channel.bodies.turn_body, limits.channel.bodies.start_transcript,
+            bounded.agent.host_limits.turn_bytes, bounded.agent.host_limits.answered_bytes,
+            session.answer_bytes, session.completion_bytes, run.host_part, run.offer_bytes, run.run_bytes,
+            session.history_bytes, run.calls, session.delegated_result_bytes, session.tools);
+        assert!(limits.channel.bodies.turn_body > 65536);
+        assert!(limits.channel.bodies.start_transcript > 262144);
+        if r == 1 {
+            scratch.remove();
+            continue;
+        }
+        assert_eq!(limits.channel.bodies.turn_body, 777400 + 4 * r);
+        for mode in ["turn", "window", "coherent", "both"] {
+            let mut doc: serde_json::Value = serde_json::from_slice(&bounded.document).unwrap();
+            for side in ["engine", "worker"] {
+                let obj = if side == "engine" { &mut doc["engine"] } else { &mut doc["workers"][0] };
+                obj["limits"]["overrides"]["hub.turn_bytes"] = limits.channel.bodies.turn_body.into();
+                obj["limits"]["overrides"]["hub.turn_queue_bytes"] = (u64::from(limits.channel.bodies.turn_body) * u64::from(bounded.agent.host_limits.turns)).into();
+                if mode == "window" || mode == "coherent" {
+                    obj["limits"]["overrides"]["hub.transcript_bytes"] = (u64::from(limits.channel.bodies.turn_body) * 4).into();
+                }
+                if mode == "both" {
+                    obj["limits"]["overrides"]["hub.transcript_bytes"] = limits.channel.bodies.start_transcript.into();
+                }
+            }
+            if mode == "coherent" {
+                doc["engine"]["limits"]["overrides"]["core.resume_bytes"] = (limits.channel.bodies.turn_body + 4).into();
+                doc["application"]["limits"]["overrides"]["root.journal.transcript_bytes"] = (limits.channel.bodies.turn_body + 4).into();
+                doc["application"]["limits"]["overrides"]["root.loads.transcript_bytes"] = limits.channel.bodies.turn_body.into();
+                doc["application"]["limits"]["overrides"]["root.loads.bytes"] = (limits.channel.bodies.turn_body + u32::try_from(std::mem::size_of::<temper_engine_domain::Record>()).unwrap()).into();
+                doc["application"]["limits"]["overrides"]["root.loads.reply_bytes"] = (limits.channel.bodies.turn_body + u32::try_from(std::mem::size_of::<temper_engine_domain::Record>()).unwrap()).into();
+            }
+            let saved = bounded.document.clone();
+            bounded.document = serde_json::to_vec(&doc).unwrap();
+            let unchanged = bounded.startup(&bounded.document);
+            eprintln!("UNADJUSTED R={r} mode={mode} {}", match unchanged { Ok(_) => "PASS".into(), Err(why) => String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned() });
+            let required = bounded.try_requirements();
+            match required {
+                Ok(req) => {
+                    assert_ne!(mode, "both");
+                    eprintln!("RAISED R={r} mode={mode} engine={} worker={}", req.engine_bytes, req.worker_bytes);
+                    doc["engine"]["memory_bytes"] = req.engine_bytes.into();
+                    doc["workers"][0]["memory_bytes"] = req.worker_bytes.into();
+                    let outcome = bounded.startup(&serde_json::to_vec(&doc).unwrap());
+                    assert!(outcome.is_ok());
+                    eprintln!("RAISED_START R={r} mode={mode} {}", match outcome { Ok(_) => "PASS".into(), Err(why) => String::from_utf8_lossy(&temper_service::startup::lines(&why)).into_owned() });
+                    let parsed = jig_protocol_config::document(&bounded.document, &jig_protocol_config::DocumentLimits { bytes: 1048576, tokens: 1048576, depth: 32 }).unwrap();
+                    let workers = jig_protocol_config::read::Object::new(&parsed, 0).unwrap().member(&parsed, b"workers").unwrap();
+                    let ats = jig_protocol_config::read::list(&parsed, workers, parsed.len()).unwrap();
+                    let worker = jig_protocol_config::worker(&parsed, *ats.get(0).unwrap(), &jig_protocol_config::Directories::working()).unwrap();
+                    let own = temper_service::limits::profile(temper_service::limits::Profile::Small);
+                    let payload = temper_service::worker_settings::payload_limits(&own).unwrap();
+                    let link = temper_service::worker_settings::link_limits(&worker, &payload).unwrap();
+                    let mut frame = 0;
+                    for kind in jig_protocol_worker_wire::KINDS {
+                        frame = frame.max(jig_protocol_worker_wire::sizes::largest_body(&link.sizes, kind.body).unwrap() + 8);
+                    }
+                    let wire = jig_protocol_worker_wire::sizes::limits(&link.sizes).unwrap();
+                    eprintln!("WIRE R={r} mode={mode} turn={} transcript={} turn_frame={} assignment_frame={} max_frame={frame}", link.sizes.turn, link.sizes.transcript,
+                        jig_protocol_worker_wire::Turn::worst_case_bytes(&wire).unwrap() + 8,
+                        jig_protocol_worker_wire::Assignment::worst_case_bytes(&wire).unwrap() + 8);
+                    let store = temper_service::store_limits(&bounded.document, &jig_protocol_config::Directories::working()).unwrap();
+                    eprintln!("RAISED_KV R={r} mode={mode} value={} commit={}", store.store.store.value, store.store.store.commit);
+                }
+                Err(why) => {
+                    assert_eq!(mode, "both");
+                    eprintln!("RAISED_REFUSED R={r} mode={mode} {}", String::from_utf8_lossy(&temper_service::startup::lines(&why)));
+                }
+            }
+            bounded.document = saved;
+        }
+        scratch.remove();
+    }
+}
