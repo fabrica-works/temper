@@ -1304,6 +1304,8 @@ section 8; testing-strategy.md, 2.9).
   and client roots stay in `TEMPER_LIVE_STORE` (by default
   `$HOME/src/rust/tmp/live-store/forge-land`) on pass or failure. A rerun uses the
   kept sign-in without a person and stops when that sign-in is expired or refused.
+  It admits the deployment alone and makes its own client roots, so a sitting
+  that failed before its restart leaves a store a rerun can use.
 - **Its referee:** the process tier's, without the restart; and the
   completions, counted from the engine's transcripts. Each completion is
   a turn of main's conversation on either backend: on the program

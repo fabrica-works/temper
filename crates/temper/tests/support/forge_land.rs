@@ -660,14 +660,12 @@ pub fn reserve_live_store(path: &std::path::Path) -> Result<bool, String> {
     {
         return Ok(false);
     }
+    // The deployment alone: a rerun makes its own client roots, and a sitting
+    // that failed before its restart never made `second`.
     for (name, directory) in [
         ("config", true),
         ("data", true),
         ("cache", true),
-        ("first", true),
-        ("second", true),
-        ("first/client", true),
-        ("second/client", true),
         ("data/deployment", true),
         ("data/forge-3/forgejo", true),
         ("config/temper.json", false),
