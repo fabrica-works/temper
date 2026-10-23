@@ -1,4 +1,6 @@
-//! Stable names for requests (jig's client/domain/contract.md, 3.1).
+//! Stable names for requests (jig's client/domain/contract.md, 3.1): the same
+//! derivation as `temper-client-tools`' `jig::key`, which stays jig's own; a
+//! ctl test pins the first repository's keys to the same bytes.
 use alloc::boxed::Box;
 use skein_lib::{RequestKey, sha256::Sha256};
 /// One to 64 lower-case letters, digits or hyphens.
