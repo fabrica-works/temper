@@ -700,3 +700,92 @@ pub fn step_5_5_rules() -> Box<[Box<[Rule]>]> {
     .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
     Box::new([Box::new([]), Box::new(planner), Box::new([])])
 }
+
+// Act 2, step 5.6 (domain/testing.md, 5.3)
+#[must_use]
+pub fn step_5_6(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        MISREAD_HELPER, MISREAD_HELPER_HOLD, MISREAD_HELPER_PENDING, MISREAD_HELPER_SPEC, MISREAD_NOTE, MISREAD_REASON,
+        MISREAD_RECALL_HOLD, MISREAD_REPORT, MISREAD_RULE, MISREAD_RULE_PENDING, MISREAD_TIMER_AT, PROJECT,
+    };
+    use skein_fake_llm_domain::api::Piece;
+    let held = |marker: &str, hold: &[u8], mut turn: Turn| {
+        let mut lines = vec![Line::Pieces {
+            pieces: Box::new([
+                Piece { text: marker.as_bytes().into(), hold: None },
+                Piece { text: b"Continue.".as_slice().into(), hold: Some(hold.into()) },
+            ]),
+        }];
+        lines.extend(turn.lines);
+        turn.lines = lines.into();
+        turn
+    };
+    Box::new([
+        Script {
+            cue: Agent::Misread.cue().into(),
+            turns: Box::new([
+                call(b"subscribe", &json!({"kind":"timer","at":MISREAD_TIMER_AT})),
+                call(
+                    b"delegate",
+                    &json!({"batch":[{
+                        "executor":{"kind":"agent","charter":1},"tracked":{"priority":1},
+                        "spec":{"words":MISREAD_HELPER_SPEC,"parameters":[]},"contract":{"kind":"report","words":128},
+                        "authority":{"tools":0,"grants":[],"notes":0,
+                            "delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":5}}
+                    }]}),
+                ),
+                wait("A helper is acting on the priorities; the timer remains armed."),
+                call(b"cancel", &json!({"target":MISREAD_HELPER,"reason":MISREAD_REASON})),
+                call(
+                    b"note",
+                    &json!({"scope":{"kind":"project","project":PROJECT},
+                "description":MISREAD_NOTE,"body":MISREAD_RULE}),
+                ),
+                held(
+                    MISREAD_RULE_PENDING,
+                    MISREAD_RECALL_HOLD,
+                    call(
+                        b"recall",
+                        &json!({"kind":"search","scopes":[{"kind":"project","project":PROJECT}],
+                    "query":MISREAD_NOTE}),
+                    ),
+                ),
+                call(
+                    b"read_branch",
+                    &json!({"repository":{"forge":1,"repository":crate::forge::ID},"read":{"branch":"main"}}),
+                ),
+                report(MISREAD_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::MisreadHelper.cue().into(),
+            turns: Box::new([held(
+                MISREAD_HELPER_PENDING,
+                MISREAD_HELPER_HOLD,
+                report("The helper has landed nothing."),
+            )]),
+        },
+    ])
+}
+
+#[must_use]
+pub fn step_5_6_rules() -> Box<[Box<[Rule]>]> {
+    use super::{MISREAD_CORRECTION, MISREAD_HELPER, MISREAD_NOTE, MISREAD_RULE, MISREAD_TIMER};
+    // The counted stress trial restarted the opening on the person's later
+    // message: fresh runs reset the assistant count. Only the director needs
+    // input rules; the helper has one held turn, then ends with cancellation.
+    let director = [
+        (CROSSED, 7),
+        (&format!(": {MISREAD_NOTE}\n{MISREAD_RULE}\n"), 6),
+        (&super::draft_commit(), 7),
+        (" revision 1 written", 5),
+        ("Done", 4),
+        (MISREAD_CORRECTION, 3),
+        (&format!("Subscription {MISREAD_TIMER} added"), 1),
+        (&format!("{DELEGATED}{MISREAD_HELPER}"), 2),
+        (BEGIN, 0),
+        ("", 2),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    Box::new([Box::new(director), Box::new([])])
+}
