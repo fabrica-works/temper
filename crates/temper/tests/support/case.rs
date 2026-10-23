@@ -299,6 +299,14 @@ impl Judge {
         let mut value = read(&engine_dir.join("config/temper.json"));
         let ws = read(&ws_dir.join("config/temper.json"));
         let mut agent = read(&ws_dir.join("config/agent.json"));
+        // With a control listener, the fake's ready line names provider then control.
+        let mut addresses = self.members.capture("llm", "address").expect("LLM addresses").split_whitespace();
+        let llm: SocketAddr = addresses.next().expect("LLM provider").parse().expect("provider socket");
+        let control = addresses.next().map(|address| address.parse::<SocketAddr>().expect("control socket"));
+        assert_eq!(control, self.control, "LLM control ready at its reserved address");
+        assert!(addresses.next().is_none(), "only provider and control addresses");
+        value["engine"]["llm"]["endpoints"][0]["address"] = json!({"socket":llm.to_string()});
+        agent["endpoints"][0]["address"] = llm.to_string().into();
         value["workers"] = ws["workers"].clone();
         value["application"]["workers"] = ws["application"]["workers"].clone();
         base(&mut value, &engine_dir.join("config/charters/chat.txt"));
