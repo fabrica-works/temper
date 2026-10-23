@@ -1,6 +1,6 @@
 # The forge's setup
 
-Provisional, 2026-10-16, revised 2026-10-22. How a forge comes to be
+Provisional, 2026-10-16, revised 2026-10-23. How a forge comes to be
 ready for temper, in three modes: connected, where a person runs and sets
 up the forge and gives temper only what it strictly needs; managed,
 where a person runs it and temper sets itself up on it, with a Forgejo
@@ -329,6 +329,7 @@ otherwise nothing but the setup host runs it or writes what it makes.
 |---|---|---|---|
 | `Reconcile { forge, adopted }` | Forgejo, managed, owned or fake | each managed, owned or fake start; a managed connect; the box's `started` (5.1) | section 4 |
 | `Adopt { forge, repository }` | Forgejo, managed, owned or fake | an adoption, before its reads; the fake's start (8.4) | 4.5 |
+| `Create { forge, org, repository, files }` | Forgejo, owned | the box's `started`, when the set up asked for a first repository (6.7) | 4.9 |
 | `Check { forge }` | Forgejo, connected | a connect; a replacement | 4.6 |
 | `TakeOver { forge, admin_token }` | Forgejo, owned or fake | a start or the box's `started` with a handover, even with a kept `AdminToken` (6.5) | 4.7 |
 | `Reachable { forge, installation?, page }` | every kind | the picker | 4.8 |
@@ -659,7 +660,7 @@ files: at a first preparation, and for a runner older than its pin
   fake forge's `api_token`, `git_token`, `user` or `webhook_secret` file
   is written or read.
 - **A step that stops blocks that forge's connect.** A `TakeOver`,
-  `Reconcile` or `Adopt` stop, a handover read that fails, or a removal
+  `Reconcile`, `Create` or `Adopt` stop, a handover read that fails, or a removal
   that fails leaves the forge not connected, named by the plan's step or file
   operation, never a secret; at `started`, it is set up failed. A
   `TakeOver` stop leaves the file; a failed removal blocks reconcile.
@@ -681,6 +682,8 @@ files: at a first preparation, and for a runner older than its pin
 - **Then reconcile runs as managed's** (section 5), and makes each of
   the person's orgs that is missing, owned by the person (`POST
   /api/v1/admin/users/{person}/orgs`).
+- **Then the first repository,** at the box's `started`, when the set
+  up asked for one (6.7): `Create`, before the forge's connect.
 - **A forge not prepared,** with neither a handover nor an `AdminToken`
   record, is not set up: no access and no connect, including an owned
   forge whose setup says `"start": "asked"`; every other forge starts as
@@ -689,8 +692,8 @@ files: at a first preparation, and for a runner older than its pin
     whose setup says `"start": "asked"`. Its card says CI jobs run here
     unisolated, Forgejo stops with `temper box`, and its files are kept
     in temper's data directory. The routing writes `start FORGE`; at
-    `started FORGE` the engine takes the handover, reconciles and
-    connects; at `failed FORGE WHY` the page names the step and offers
+    `started FORGE` the engine takes the handover, reconciles, makes the
+    first repository (6.7) and connects; at `failed FORGE WHY` the page names the step and offers
     it again. Until that line carries the reason, the page points to
     `temper box`'s output for it.
   - **Without the box** (7.4), names `temper forge fetch N`, `temper
@@ -775,6 +778,70 @@ its own for any other host.
   host in `temper-forge-setup-shell`, on skein-io, skein-http and
   skein-tls (section 11). It holds no credential and writes no record
   (section 9).
+
+### 6.7 The first repository
+
+- **Asked with the set up.** `SetUp` carries an organization (default
+  `work`), a repository (default `hello`) and a project: an existing
+  project's number (default 1, "Default", the template's), or a new
+  project's name, refused "a new project" until jig makes projects at
+  runtime (jig's MakeProject, `domain/core.md`). The forge domain keeps
+  them with the forge, the set up's intent: one per forge, in memory
+  alone, replaced by the next `SetUp` it admits, and kept until the
+  repository is made or the set up has failed.
+- **Made after reconcile.** At the box's `started FORGE`, once
+  `TakeOver` and `Reconcile` are done (6.5), the setup host runs
+  `Create { forge, org, repository, files }` (skein's `forge-setup.md`,
+  4.9) by the admin's token: the org, private and owned by the person;
+  the repository, private, with Forgejo's README on `main`; the bot a
+  collaborator with `write`, and its hook on the webhooks' listener;
+  then the starter workflow, below. Then the forge connects, as before
+  (6.5). Each step finds what is already there and leaves it, so a set
+  up asked again finishes what the last one left. The engine's limits
+  for it are 1 file of at most 4 KiB (skein's `forge-setup.md`, 4.1).
+- **The starter workflow,** `.forgejo/workflows/ci.yml`, its commit
+  the bot's, run on a push to `main` and on each pull, on the owned
+  runner's label:
+
+  ```
+  on:
+    push:
+      branches: [main]
+    pull_request:
+  jobs:
+    check:
+      runs-on: temper-host
+      steps:
+        - run: echo "temper's starter check passed; replace this step with your own checks"
+  ```
+
+  Its push is the repository's first CI run, on the owned runner: the
+  owned forge enables Actions (6.2), and Forgejo gives a repository
+  made through its API the Actions unit (skein's `forge-setup.md`,
+  section 8). The step needs no network and no action from elsewhere.
+- **The row says it,** the forge's first repository beside its
+  connection (`../client/forge.md`, 5.4; `../client/README.md`, 4.6):
+  none; making `ORG/NAME` from the `SetUp`'s admission; made
+  `ORG/NAME`, with its project, once `Create` is done; or failed
+  `ORG/NAME`, at the step that stopped (the admin, the org, the
+  repository with its access, or the file). A `Create` that stops
+  blocks the connect as any step does (6.5): the forge is set up
+  failed, its `why` naming the step, and "Set up again" asks with the
+  same fields. A restart drops the row's first repository to none.
+- **Adopted by the client, for now.** Once the row says made, the
+  client sends `Adopt` under the same party: the project, the forge,
+  `ORG`, `NAME`, landing on `main`, owned, the project's home, with CI.
+  `temper ctl forge-setup` does it (`../client/tools.md`, 5.5), and so
+  does the set up flow's Ready step (`../client/forge.md`, 5.4). It is
+  transitional, until jig carries a deployment owner's act after
+  `SetUp`'s admission (section 15).
+- **A restart before the repository is made** loses the intent: the
+  start's sequence makes no repository, and the forge, set up by its
+  record, no longer offers "Set up a Forgejo here". The person makes it
+  with "New repository" (section 15).
+- **Its code:** the intent in `temper-engine-domain-forge`; `Create`'s
+  start and its end in `temper-service`'s setup; the starter workflow's
+  bytes and the plan's limits in `temper-forge-setup`.
 
 ## 7. The box: wiring only
 
@@ -1008,7 +1075,9 @@ running its commands, and the client names them (6.5).
   The code reads an owned entry's orgs from `person.orgs`, and still
   takes the entry's own `orgs`, the older form, in their place, never
   both; a managed entry keeps its `orgs` and a fake entry has none,
-  until the entry's form is brought to this table (temper-15).
+  until the entry's form is brought to this table (temper-15). The set
+  up's org is made by its first repository's `Create` (6.7), whether or
+  not `person.orgs` names it; `person.orgs` goes (section 15).
 
 - **A Forgejo with no `setup` entry** is connected's alone; GitHub takes
   no entry (section 17).
@@ -2306,7 +2375,13 @@ it checks of this document:
   Forgejo here" through the client, `temper ctl DIRECTORY forge-setup
   3`, answered setting up; forge 3's row, followed by `wait forges
   --until settled`, goes through "Setting up" and "Connecting" to
-  "Connected as temper", with no restart. The handover file is gone, and
+  "Connected as temper", with no restart, and its first repository made,
+  `work/hello`; the call adopts it into project 1, "Default" (6.7). The
+  workflow's push has run on the owned runner. The owner's first task
+  in the project, on the fake LLM, changes `hello`: its worker clones
+  it, its pull's run of the starter workflow passes, and it lands; the
+  test reads it all through temper's own reads, with no credential. The
+  handover file is gone, and
   forge 3's directory has no `api_token`, `git_token`, `user` or
   `webhook_secret` file. The service's step world shows the git value
   and its generation (forge.md, section 10, the box's link). A second
@@ -2318,23 +2393,18 @@ it checks of this document:
 
 Each is intended; what it needs is named with it.
 
-- **The first repository at set up:** the person picks an organization
-  (default `work`), a repository (default `hello`) and a project in the
-  set up's form, carried by `SetUp`. Once connected, the engine makes
-  the org, owned by the person (`CreateOrg`), makes the repository with
-  a README (Forgejo's auto-init, skein-forge's `CreateRepository`), and
-  grants its bot. The starter CI workflow, `runs-on: temper-host` with
-  one step, arrives as the worker's first git change. The
-  configuration's `person.orgs` goes: the form picks the org, made once.
+- **After the first repository** (6.7): the configuration's
+  `person.orgs` goes, since the set up's form picks the org, made once.
   "New repository" on a connected owned or managed card is the general
-  form of this flow, with the same fields. Until jig carries acts by a
-  deployment owner (projects at runtime and a follow-up act on `SetUp`'s
-  admission), adoption is the client's: `temper ctl forge-setup` sends
-  `Adopt` under the same party once the forge is connected,
-  transitional. Projects are seeded at the first start only
-  (configuration.md, section 3; jig's `domain/core.md`, 6.1), so
-  adoption goes to an existing project, the template's project 1,
-  "Default".
+  form of the same flow, with the same fields and `Create`, a managed
+  forge's org needing an owner. A new project, named in the form,
+  waits on jig's projects at runtime (MakeProject); until jig carries
+  acts by a deployment owner (projects at runtime and a follow-up act
+  on `SetUp`'s admission), adoption is the client's. Projects are
+  seeded at the first start only (configuration.md, section 3; jig's
+  `domain/core.md`, 6.1), so adoption goes to an existing project, the
+  template's project 1, "Default". The set up's intent is kept in
+  memory alone; keeping it across a restart is open (section 16).
 - **A lock and an exec in skein's shell,** onto which 6.4's module
   moves once skein's shell offers an exec and a lock held across it,
   which skein's `Lock` is not (skein's `io.md`, section 5). A second
@@ -2368,6 +2438,10 @@ Each is intended; what it needs is named with it.
   the agent it runs (`../client/tools.md`, section 10); never the
   preparation's `admin_token`, which the engine's setup host alone takes
   (section 9).
+- **The set up's intent across a restart** (6.7). Default: in memory
+  alone, so a restart before the first repository is made loses it,
+  and "New repository" makes it; a kept intent would be a stored
+  format to version, which nothing on the first run needs.
 - **Backups beyond an upgrade's.** Default: the person's, of the forge's
   directory and the store, with the box stopped.
 - **Two deployments on one managed forge.** Default: each its own bot

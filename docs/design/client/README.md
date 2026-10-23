@@ -965,7 +965,8 @@ for its kind, its user's login and its installations. Its nodes:
   engine.
 - **`CLIENT_VERSION`:** the version of every record below, 1 at first,
   2 since the demo's read, 3 since a change's panel, 4 since a forge's
-  set up and the deployment's forges, moved as
+  set up and the deployment's forges, 5 since the first repository
+  (`SetUp`'s fields and the row's `first`), moved as
   `../protocol/README.md`, section 9 says: at most once in a plan, at
   its first landing that changes one of these records, and shared by
   plans that run at once. A request, an outcome, a read, a subject or a
@@ -1011,11 +1012,16 @@ for its kind, its user's login and its installations. Its nodes:
   it is jig's answer, which never reaches the connector (jig's
   `client/domain/contract.md`, 3.3), and the form shows it in jig's
   words.
-- **`SetUp`:** the forge's number (u16), of the deployment's scope
-  (section 8). Its outcome, `Answer`'s: *setting up*, the box asked
+- **`SetUp`:** of the deployment's scope (section 8): the forge's
+  number (u16); its first repository's org and name (byte strings,
+  bounded as `Adopt`'s owner and name); and its project, `SetUpProject`:
+  `existing`, a project's number (u32), or `new`, a new project's name
+  (a byte string bounded as `Adopt`'s name) (`../protocol/setup.md`,
+  6.7). Its outcome, `Answer`'s: *setting up*, the box asked
   for the forge's group; *set up refused*, with why: not offered (the
   forge's connection does not offer it, or no such forge), not under
-  the box, or busy (`../protocol/forge.md`, 2.8); or *unknown*, its
+  the box, busy (`../protocol/forge.md`, 2.8), or a new project, which
+  waits on jig's projects at runtime; or *unknown*, its
   outcome no longer held (section 8), the same unknown as an
   adoption's. A refusal at admission is jig's answer, as for `Adopt`.
 - **The small store's record of a pending request** is `jig-client`'s
@@ -1073,9 +1079,13 @@ for its kind, its user's login and its installations. Its nodes:
   named one (fetch, prepare or run); set up failed, with why (text of
   at most 256 bytes, the box's line bound); connecting; connected, with
   the user's id (u64) and login (a byte string bounded as `Adopt`'s);
-  or stopped, with the component's reason; and its offer, the forge
-  domain's (`../domain/forge.md`, 4.1): offered, not under the box, or
-  not offered, which is what "Set up a Forgejo here", "Set up again"
+  or stopped, with the component's reason; its first repository,
+  `first`: none, or the set up's org, name and `SetUpProject` with its
+  state, `FirstState`: making; made, with the repository's id (u64);
+  or failed, with its step, `CreateStep`: admin, org, repository (its
+  bot's access with it) or file (`../protocol/setup.md`, 6.7); and its
+  offer, the forge domain's (`../domain/forge.md`, 4.1): offered, not
+  under the box, or not offered, which is what "Set up a Forgejo here", "Set up again"
   and the commands to run by hand follow (`forge.md`, 5.4). The read of the forges, the
   tools' `forges` (`tools.md`, 5.5, area 6), is the watch's first
   document.

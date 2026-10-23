@@ -1,6 +1,6 @@
 # Tools: temper for agents
 
-Provisional, 2026-10-17, revised 2026-10-22. How agents drive temper:
+Provisional, 2026-10-17, revised 2026-10-23. How agents drive temper:
 they read what it holds, act through jig's operations and wait for what
 changes, with `temper ctl`, a command line. It serves the agents
 (smith's) that QA and develop temper's core: they drive a throwaway
@@ -334,7 +334,7 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   | `tree N` | `ended` |
   | `run N` | `ended` |
   | `accounts` | `usable` (an account the party's work may use has a source usable on a host); `settled` (no sign-in or check the party asked is in progress) |
-  | `forges` | `settled` (no forge setting up or connecting: no set up, connect or install the deployment asked is in progress); `connected:F` (forge F is connected) |
+  | `forges` | `settled` (no forge setting up or connecting: no set up, connect or install the deployment asked is in progress); `connected:F` (forge F is connected); `made:F` (forge F's first repository is made, `../protocol/setup.md`, 6.7) |
 
 - **`replied`** holds while a chat's status (jig's
   `client/domain/client.md`, section 19, its facts) is parked, waiting
@@ -567,13 +567,15 @@ area lands with its stories (section 11).
    | `forge-install F` | prints a fresh link to install temper's App on another account, GitHub alone; the installation shows on `forges` once the person's browser comes back | `Install { forge }` | |
    | `forge-replace F FILE` | replaces what a person pasted: on GitHub, FILE the App's new key; on a connected Forgejo, a tokens file naming `api`, `git` or both; it must answer as the forge's user, and the old is erased once the new is kept | `Replace { forge, value }` | |
    | `forge-forget F` | erases a managed forge's admin's token; the forge is connected, its bot and tokens kept | `Forget { forge }` | |
-   | `forge-setup F` | sets up an owned Forgejo here, under the box: the box fetches its binaries, prepares it and starts Forgejo and its runner, then temper takes its handover (`../protocol/setup.md`, 6.5); prints `setting up` and the call that follows it, `wait forges --until settled`, and exits 0 once answered. Refused, exit 2: "not offered" (the forge is not an owned one whose setup says `"start": "asked"`, or it is set up, setting up or connecting), "busy" (the box is setting up another forge), or, without the box, "not under the box", with the commands to run (`../client/forge.md`, 5.4) | `SetUp { forge }` | |
+   | `forge-setup F [--org O] [--repository R] [--project P]` | sets up an owned Forgejo here, under the box, with its first repository: the box fetches its binaries, prepares it and starts Forgejo and its runner, then temper takes its handover, makes `O/R` (default `work/hello`) with the starter workflow, and connects (`../protocol/setup.md`, 6.5 and 6.7); prints `setting up`, waits as `wait forges --until made:F` does, then adopts `O/R` into project P, a project's number or name (default 1), as `adopt --project P --forge F --owner O --name R --landing main` would, under the same sign-in and with the key `first-repository-F`, so that the call run again adopts nothing twice; prints the adoption and exits 0. Refused, exit 2: "not offered" (the forge is not an owned one whose setup says `"start": "asked"`, or it is set up, setting up or connecting), "busy" (the box is setting up another forge), "a new project" (P names no project: a new one waits on jig's projects at runtime), or, without the box, "not under the box", with the commands to run (`../client/forge.md`, 5.4). Set up failed, or its first repository failed, exit 1, naming the step | `SetUp { forge, org, repository, project }`; then `Adopt` | |
    | `repositories F [--installation I] [--page N]` | the picker's page N, from 1 (`README.md`, 4.4): a line per row, `OWNER/NAME`, `private` where it is, and `R/U`, its repository id and owner id for `adopt --ids`; then the call that reads page N plus one while more follow, or that none do. `--installation I` is an accepted installation's id, as `forges` prints it, GitHub alone | `Reachable { forge, installation?, page }` | |
 
    - **`forges`' text,** one line per forge, in number order: `forge N
      · KIND · MODE · STATE`, the state in the row's words
      (`../client/forge.md`, 5.4), such as `forge 3 · Forgejo · owned ·
-     Setting up: preparing`; then the digest (5.4). Its JSON is the
+     Setting up: preparing`, then, when it has one, its first
+     repository in the row's words, such as `· work/hello made, in
+     Default`; then the digest (5.4). Its JSON is the
      rows' fields, the state by its name with its step, its why, or its
      user.
    - **The names are the forge's and the page's.** A `forge-` prefix

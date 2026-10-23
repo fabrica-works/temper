@@ -1,6 +1,6 @@
 # The forge in temper's client
 
-Provisional, 2026-10-05, revised 2026-10-22. What the forge connector
+Provisional, 2026-10-05, revised 2026-10-23. What the forge connector
 adds to temper's client: a change's way to landing and its result, a
 project's landing queues, approvals at a head, the forge's holds in
 words, repositories with their health and landing rules, the picker of
@@ -464,6 +464,15 @@ says:
   later and set workers[].git, then restart"; its repositories' commands
   fail on that worker, naming the forge's host, until it has one
   (`../protocol/git.md`, section 3).
+- **Its first repository,** when its set up asked for one
+  (`../protocol/setup.md`, 6.7): "Making ORG/NAME" from the ask until
+  it is made, "ORG/NAME made, in PROJECT" once it is, or "Making
+  ORG/NAME failed: STEP", the step one of "checking the admin's
+  token", "making the organization", "making the repository" (its
+  bot's access with it) or "adding the starter workflow", beside "Set
+  up failed". It is the engine's memory alone: a restart drops the
+  line. The set up flow's Ready step and `temper ctl forge-setup`
+  adopt the made repository into its project (`tools.md`, 5.5).
 - **Its mode** (`../protocol/setup.md`, the modes): owned, where the
   configuration's setup owns the forge; managed, where temper keeps a
   site admin's token for it; connected otherwise.
@@ -516,7 +525,7 @@ admin", with its forge number and bot (`../protocol/setup.md`, section
 | Install the App; Install on another account | GitHub, connected: "Install the App" before any accepted installation, "Install on another account" after one | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
 | New repository | Forgejo owned or managed, connected | the set up's same fields: organization (default `work`), repository (default `hello`) and an existing project; the general form of the first repository (`../protocol/setup.md`, section 15) |
 | Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
-| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | its organization (default `work`), its repository (default `hello`) and its project: a new one, named as the repository, or an existing one (`../protocol/setup.md`, section 15; a new project waits on jig's projects at runtime); then the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled, and the repository made and adopted into the project; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
+| Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | its organization (default `work`), its repository (default `hello`) and its project: a new one, named as the repository, or an existing one (`../protocol/setup.md`, section 15; a new project waits on jig's projects at runtime); then the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled, the repository made with the starter workflow (`../protocol/setup.md`, 6.7), and, once the row says it made, the client's `Adopt` into the project; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
 | Set up again | the row's offer offered, set up failed | the same ask again: what the last one left is kept, a fetched binary hashed and not fetched again |
 
 Connect, but on a stopped forge or one whose records say why it is not
