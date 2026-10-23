@@ -972,7 +972,7 @@ fn an_engine_alone_prints_its_lines_and_drains_on_a_signal() {
 fn engine_lines(engine: &support::cluster::Stopped) {
     let stderr = std::str::from_utf8(&engine.stderr).expect("engine lines");
     let lines: Vec<_> = stderr.lines().collect();
-    let [_, _] = lines.as_slice() else { panic!("exactly the two listening lines: {stderr}") };
+    let [_, _, _] = lines.as_slice() else { panic!("exactly the three listening lines") };
     let clients: std::net::SocketAddr = lines
         .iter()
         .find_map(|line| line.strip_prefix("listening clients "))
@@ -985,11 +985,19 @@ fn engine_lines(engine: &support::cluster::Stopped) {
         .expect("workers line")
         .parse()
         .expect("workers address");
-    for address in [clients, workers] {
+    let webhooks: std::net::SocketAddr = lines
+        .iter()
+        .find_map(|line| line.strip_prefix("listening webhooks "))
+        .expect("webhooks line")
+        .parse()
+        .expect("webhooks address");
+    for address in [clients, workers, webhooks] {
         assert_eq!(address.ip(), std::net::Ipv4Addr::LOCALHOST);
         assert_ne!(address.port(), 0, "a bound port");
     }
     assert_ne!(clients.port(), workers.port(), "distinct listeners");
+    assert_ne!(clients.port(), webhooks.port(), "distinct listeners");
+    assert_ne!(workers.port(), webhooks.port(), "distinct listeners");
     let stdout = std::str::from_utf8(&engine.stdout).expect("link text");
     let link = stdout.strip_suffix('\n').expect("terminated sign-in link");
     assert!(!link.contains('\n'), "exactly one stdout line");
@@ -1140,7 +1148,10 @@ fn an_unexpected_member_exit_is_reported_after_its_client_settles() {
 
 fn cluster_chats(case: &str, story: ClusterStory) {
     let scratch = support::Scratch::new(case);
-    let cluster = support::cluster::Cluster::read(scratch.path());
+    let mut cluster = support::cluster::Cluster::read(scratch.path());
+    if matches!(story, ClusterStory::Kill | ClusterStory::Hung) {
+        cluster.record_llm();
+    }
     let engine = cluster.dir("engine").join("config/temper.json");
     let key = cluster.dir("llm").join("llm.key");
     let (mut members, hosts) = cluster.members();
@@ -1421,6 +1432,14 @@ impl ClusterChatJudge {
         }
     }
     fn verify(&mut self, client: &mut support::cluster::Root, read: &ClusterRead) {
+        if matches!(self.story, ClusterStory::Kill | ClusterStory::Hung) {
+            // Keep causal client evidence beside the fake's query records on failure.
+            // Neither includes the linked client's sign-in link or engine stdout.
+            let path = self.members.dir("llm").join(format!("task-{}-attempt-{}.json", self.current(), read.attempt()));
+            let evidence = serde_json::json!({"task": &read.task, "activity": &read.rows});
+            support::write_private(&path, &serde_json::to_vec(&evidence).expect("chat evidence"));
+            eprintln!("cluster close evidence: {}", path.display());
+        }
         // The chat is ended by its requester (domain/agent.md, 4.6): its person's Close
         // cancels it, and the grace turn's finish is no result.
         let cancelled = &read.owner()["details"]["ending"]["cancelled"];
