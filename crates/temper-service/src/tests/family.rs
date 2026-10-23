@@ -785,7 +785,21 @@ fn setup_requests_preserve_the_keyed_envelope_and_forge() {
     let request = w::Requesting::new(
         &w::CEILINGS,
         w::RequestingParts {
-            request: w::Request::SetUp(w::SetUp::new(&w::CEILINGS, w::SetUpParts { forge: 3 }).unwrap()),
+            request: w::Request::SetUp(
+                w::SetUp::new(
+                    &w::CEILINGS,
+                    w::SetUpParts {
+                        forge: 3,
+                        org: b"work".as_slice().into(),
+                        repository: b"hello".as_slice().into(),
+                        project: w::SetUpProject::Existing(
+                            w::ExistingProject::new(&w::CEILINGS, w::ExistingProjectParts { project: 1 })
+                                .expect("project"),
+                        ),
+                    },
+                )
+                .unwrap(),
+            ),
         },
     )
     .unwrap();
@@ -800,7 +814,21 @@ fn setup_requests_preserve_the_keyed_envelope_and_forge() {
     else {
         panic!("setup application")
     };
-    assert_eq!((reply_to, sign_in, key, digest, request), (REPLY, 3, [5; 16], [7; 32], forge::Ask::SetUp { forge: 3 }));
+    assert_eq!(
+        (reply_to, sign_in, key, digest, request),
+        (
+            REPLY,
+            3,
+            [5; 16],
+            [7; 32],
+            forge::Ask::SetUp {
+                forge: 3,
+                org: b"work".as_slice().into(),
+                repository: b"hello".as_slice().into(),
+                project: forge::SetUpProject::Existing(1)
+            }
+        )
+    );
 }
 
 #[test]
@@ -867,6 +895,7 @@ fn forges_encode_the_domains_rows_without_settings() {
     let value = forge::Forges {
         rows: Box::new([
             forge::Row {
+                first: None,
                 number: 1,
                 kind: forge::Kind::Forgejo,
                 mode: forge::Mode::Owned,
@@ -874,6 +903,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::Offered,
             },
             forge::Row {
+                first: None,
                 number: 2,
                 kind: forge::Kind::GitHub,
                 mode: forge::Mode::Connected,
@@ -881,6 +911,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotOffered,
             },
             forge::Row {
+                first: None,
                 number: 3,
                 kind: forge::Kind::Forgejo,
                 mode: forge::Mode::Managed,
@@ -888,6 +919,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotUnderTheBox,
             },
             forge::Row {
+                first: None,
                 number: 4,
                 kind: forge::Kind::Forgejo,
                 mode: forge::Mode::Fake,
@@ -916,7 +948,8 @@ fn forges_encode_the_domains_rows_without_settings() {
     for (row, (number, kind, mode, connection, offer)) in rows.into_iter().zip(expected) {
         assert_eq!(
             row,
-            &w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap()
+            &w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { first: None, number, kind, mode, connection, offer })
+                .unwrap()
         );
     }
 }
@@ -952,5 +985,118 @@ fn an_exceeded_hold_refusal_keeps_each_bound_and_its_configured_value() {
         assert_eq!(exceeded.value(), u64::MAX);
         assert_eq!(moved.now().value(), 7);
         assert!(reader.is_empty());
+    }
+}
+
+#[test]
+fn setup_projects_and_first_repository_states_translate_without_losing_fields() {
+    for project in [forge::SetUpProject::Existing(7), forge::SetUpProject::New(b"Next".as_slice().into())] {
+        let wire_project = match &project {
+            forge::SetUpProject::Existing(project) => w::SetUpProject::Existing(
+                w::ExistingProject::new(&w::CEILINGS, w::ExistingProjectParts { project: *project }).unwrap(),
+            ),
+            forge::SetUpProject::New(name) => w::SetUpProject::New(
+                w::NewProject::new(&w::CEILINGS, w::NewProjectParts { name: name.clone() }).unwrap(),
+            ),
+        };
+        let record = w::Requesting::new(
+            &w::CEILINGS,
+            w::RequestingParts {
+                request: w::Request::SetUp(
+                    w::SetUp::new(
+                        &w::CEILINGS,
+                        w::SetUpParts {
+                            forge: 3,
+                            org: b"team".as_slice().into(),
+                            repository: b"widget".as_slice().into(),
+                            project: wire_project.clone(),
+                        },
+                    )
+                    .unwrap(),
+                ),
+            },
+        )
+        .unwrap();
+        let event = family::to_root(
+            exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&record)),
+            &[],
+            None,
+            &w::CEILINGS,
+        )
+        .unwrap();
+        let root::Event::Party(root::PartyInput::Application { request, .. }) = event else { panic!("application") };
+        assert_eq!(
+            request,
+            forge::Ask::SetUp {
+                forge: 3,
+                org: b"team".as_slice().into(),
+                repository: b"widget".as_slice().into(),
+                project: project.clone()
+            }
+        );
+        for state in [
+            forge::FirstState::Making,
+            forge::FirstState::Made { id: 42 },
+            forge::FirstState::Failed { step: forge::CreateStep::Admin },
+            forge::FirstState::Failed { step: forge::CreateStep::Org },
+            forge::FirstState::Failed { step: forge::CreateStep::Repository },
+            forge::FirstState::Failed { step: forge::CreateStep::File },
+        ] {
+            let first = forge::First {
+                org: b"team".as_slice().into(),
+                repository: b"widget".as_slice().into(),
+                project: project.clone(),
+                state,
+            };
+            let value = forge::Forges {
+                rows: Box::new([forge::Row {
+                    number: 3,
+                    kind: forge::Kind::Forgejo,
+                    mode: forge::Mode::Owned,
+                    connection: forge::Connection::Connecting,
+                    offer: forge::Offer::NotOffered,
+                    first: Some(first),
+                }]),
+            };
+            let bytes = family::forges(value, &w::CEILINGS).unwrap();
+            let rows = wire::decode_forges(&bytes, &w::CEILINGS).unwrap().into_parts().forges;
+            let first = rows.get(0).unwrap().first().as_ref().unwrap();
+            assert_eq!(
+                (first.org(), first.repository(), first.project()),
+                (b"team".as_slice(), b"widget".as_slice(), &wire_project)
+            );
+            match (state, first.state()) {
+                (forge::FirstState::Making, w::FirstState::Making) => {}
+                (forge::FirstState::Made { id }, w::FirstState::Made(value)) => assert_eq!(id, value.id()),
+                (forge::FirstState::Failed { step }, w::FirstState::Failed(value)) => assert_eq!(
+                    value.step(),
+                    &match step {
+                        forge::CreateStep::Admin => w::CreateStep::Admin,
+                        forge::CreateStep::Org => w::CreateStep::Org,
+                        forge::CreateStep::Repository => w::CreateStep::Repository,
+                        forge::CreateStep::File => w::CreateStep::File,
+                    }
+                ),
+                _ => panic!("first state changed"),
+            }
+        }
+    }
+}
+#[test]
+fn new_project_and_invalid_setup_refusals_translate_to_the_wire() {
+    let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small).clients.wire;
+    for (domain, wire) in [
+        (forge::SetUpRefusal::NewProject, w::SetUpRefusal::NewProject),
+        (forge::SetUpRefusal::Invalid, w::SetUpRefusal::Invalid),
+    ] {
+        let bytes =
+            family::answer(Some(forge::Answered::SetUp(forge::SetUpAnswer::Refused(domain))), &w::CEILINGS, &jig)
+                .unwrap();
+        let w::Outcome::SetUpRefused(value) =
+            w::Answer::decode(&w::CEILINGS, &mut Reader::new(&bytes)).unwrap().into_parts().outcome
+        else {
+            panic!("refusal")
+        };
+        assert_eq!(value.why(), &wire);
     }
 }

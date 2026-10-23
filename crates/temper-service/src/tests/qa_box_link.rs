@@ -18,7 +18,12 @@ fn qa_unasked_and_invalid_lines_are_named_without_state_changes() {
         if asked {
             crate::route::request(
                 stand.service.engine.as_mut().unwrap(),
-                root::Request::SetUp { forge: 3, request: Token::new(91) },
+                root::Request::SetUp {
+                    forge: 3,
+                    request: Token::new(91),
+                    org: b"work".as_slice().into(),
+                    repository: b"hello".as_slice().into(),
+                },
             );
             for _ in 0_u8..64 {
                 stand.turn();
@@ -64,7 +69,12 @@ fn qa_split_lines_and_coalesced_steps_keep_the_last_step() {
     }
     crate::route::request(
         stand.service.engine.as_mut().unwrap(),
-        root::Request::SetUp { forge: 3, request: Token::new(91) },
+        root::Request::SetUp {
+            forge: 3,
+            request: Token::new(91),
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+        },
     );
     for _ in 0_u8..64 {
         stand.turn();
@@ -117,7 +127,12 @@ fn qa_line_byte_bound_includes_lf_and_recovers_after_overflow() {
         }
         crate::route::request(
             stand.service.engine.as_mut().unwrap(),
-            root::Request::SetUp { forge: 3, request: Token::new(91) },
+            root::Request::SetUp {
+                forge: 3,
+                request: Token::new(91),
+                org: b"work".as_slice().into(),
+                repository: b"hello".as_slice().into(),
+            },
         );
         for _ in 0_u8..64 {
             stand.turn();

@@ -188,6 +188,8 @@ fn note_line(note: temper_service::Note) -> String {
                 SetUpRefusal::NotUnderTheBox => "not under the box",
                 SetUpRefusal::NotOffered => "not offered",
                 SetUpRefusal::Busy => "busy",
+                SetUpRefusal::NewProject => "a new project waits on jig's projects at runtime",
+                SetUpRefusal::Invalid => "invalid: the organization, repository or project name is empty or too long",
             };
             format!("temper serve: forge {number}: set up refused: {why}\n")
         }
@@ -225,6 +227,7 @@ fn note_line(note: temper_service::Note) -> String {
                         SetupPlan::Reconcile => "reconciling",
                         SetupPlan::TakeOver => "taking the handover",
                         SetupPlan::Adopt => "adopting",
+                        SetupPlan::Create => "making",
                     };
                     format!("{action} stopped at {:?}: {reason}", step.stage)
                 }

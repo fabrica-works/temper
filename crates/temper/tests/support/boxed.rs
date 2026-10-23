@@ -345,6 +345,7 @@ pub struct CtlOutcome<T> {
     pub checked: Option<T>,
 }
 struct CtlJudge<'a, F, T> {
+    expected_exits: Vec<(usize, u8)>,
     check: Option<F>,
     checked: &'a Cell<Option<T>>,
     stopping: bool,
@@ -355,7 +356,10 @@ struct CtlJudge<'a, F, T> {
 impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
     fn act(&mut self, now: Time, procs: &mut [Process]) {
         let [Process::Binary(binary), Process::Calls(calls)] = procs else { panic!("box and ctl") };
-        let failed = calls.ends().iter().any(|call| call.exit != Some(Exit::Code(0)));
+        let failed = calls.ends().iter().enumerate().any(|(index, call)| {
+            let expected = self.expected_exits.iter().find(|(at, _)| *at == index).map_or(0, |(_, code)| *code);
+            call.exit != Some(Exit::Code(expected))
+        });
         let expired = now >= self.deadline;
         if !self.stopping && (calls.idle() || failed || expired || binary.exit_status().is_some()) {
             if calls.idle() && !failed && !expired && binary.exit_status().is_none() {
@@ -395,6 +399,19 @@ pub fn run_ctl<T>(
     deadline: Duration,
     check: impl FnOnce() -> T,
 ) -> CtlOutcome<T> {
+    run_ctl_with_exits(directory, flags, client_root, steps, deadline, check, &[])
+}
+/// Continues through the exact expected nonzero calls, keeping the normal early-stop rule otherwise.
+#[must_use]
+pub fn run_ctl_with_exits<T>(
+    directory: &Path,
+    flags: Vec<String>,
+    client_root: &Path,
+    steps: Vec<super::ctl::Step>,
+    deadline: Duration,
+    check: impl FnOnce() -> T,
+    expected_exits: &[(usize, u8)],
+) -> CtlOutcome<T> {
     let clock = Clock::new();
     let mut binary = Binary::start_with_tree(
         Command {
@@ -415,6 +432,7 @@ pub fn run_ctl<T>(
     fds.push(root);
     let checked = Cell::new(None);
     let mut world = real::World::new(CtlJudge {
+        expected_exits: expected_exits.to_vec(),
         check: Some(check),
         checked: &checked,
         stopping: false,

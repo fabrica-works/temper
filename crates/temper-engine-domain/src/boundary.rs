@@ -467,6 +467,8 @@ pub enum Request {
     SetUp {
         forge: u16,
         request: Token,
+        org: Box<[u8]>,
+        repository: Box<[u8]>,
     },
     /// Run the staged plan named by this token; credential values stay in routing.
     Setup {

@@ -96,6 +96,7 @@ fn rows(root: &mut Domain, watch: Token, number: u16) -> Queue<Request> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    first: None,
                     number,
                     kind: w::Kind::Forgejo,
                     mode: w::Mode::Connected,
@@ -326,6 +327,7 @@ fn strip_forges(root: &mut Domain, watch: Token, connection: Option<w::Connectio
                         mode: w::Mode::Owned,
                         connection,
                         offer: w::Offer::Offered,
+                        first: None,
                     },
                 )
                 .unwrap(),

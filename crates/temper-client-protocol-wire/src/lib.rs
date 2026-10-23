@@ -42,7 +42,7 @@ pub const fn owner(number: u16) -> Option<Owner> {
     }
 }
 /// Every record's version, served by both ends (client/README.md, 4.6).
-pub const CLIENT_VERSION: u32 = 5;
+pub const CLIENT_VERSION: u32 = 6;
 
 /// The deployment's maximum number of forges (client/README.md, 4.6).
 pub const FORGES: u32 = 16;
@@ -89,6 +89,11 @@ pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
         demo_answer_name: bounds.field_bytes,
         demo_answer_cues: CUES,
         demo_answer_cues_item: CUE_BYTES,
+        set_up_org: bounds.field_bytes,
+        set_up_repository: bounds.field_bytes,
+        new_project_name: bounds.field_bytes,
+        first_repository_org: bounds.field_bytes,
+        first_repository_repository: bounds.field_bytes,
         adopt_owner: bounds.field_bytes,
         adopt_name: bounds.field_bytes,
         adopt_prefix: bounds.field_bytes,

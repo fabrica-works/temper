@@ -272,8 +272,9 @@ mod memory_literal;
 // ConnectForge's and the welcome's forge words and nodes, and 128 more phrase segments (77,364 B).
 // The chat's saved run state adds 320 B inline and three 512 B call texts (1,856 B).
 // The Forges page, the setup strip and the dot's words (2,664 B).
+// Wire 6's SetUp fields and the row's first repository, written by SKEIN_CODEGEN_WRITE=1 (+27,648 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274389901251;
+const WEB_BYTES: u64 = 274389928899;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

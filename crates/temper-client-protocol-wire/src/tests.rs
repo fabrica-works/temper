@@ -74,6 +74,11 @@ fn limits_take_each_bound_from_its_source_field() {
             demo_answer_name: 16,
             demo_answer_cues: crate::CUES,
             demo_answer_cues_item: crate::CUE_BYTES,
+            set_up_org: 16,
+            set_up_repository: 16,
+            new_project_name: 16,
+            first_repository_org: 16,
+            first_repository_repository: 16,
             adopt_owner: 16,
             adopt_name: 16,
             adopt_prefix: 16,
@@ -246,7 +251,21 @@ fn requesting_round_trips_and_refuses_trailing_and_version_three_adopt_bytes() {
     let limits = fixtures::limits();
     for request in [
         v1::Request::Adopt(fixtures::adopt()),
-        v1::Request::SetUp(v1::SetUp::new(&limits, v1::SetUpParts { forge: u16::MAX }).expect("forge number")),
+        v1::Request::SetUp(
+            v1::SetUp::new(
+                &limits,
+                v1::SetUpParts {
+                    forge: u16::MAX,
+                    org: b"work".as_slice().into(),
+                    repository: b"hello".as_slice().into(),
+                    project: v1::SetUpProject::Existing(
+                        v1::ExistingProject::new(&v1::CEILINGS, v1::ExistingProjectParts { project: 1 })
+                            .expect("project"),
+                    ),
+                },
+            )
+            .expect("forge number"),
+        ),
     ] {
         let record = v1::Requesting::new(&limits, v1::RequestingParts { request }).expect("request");
         let bytes = crate::requesting(&record);
@@ -279,6 +298,7 @@ fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
                 v1::ForgeRow::new(
                     &limits,
                     v1::ForgeRowParts {
+                        first: None,
                         number: *number,
                         kind: v1::Kind::Forgejo,
                         mode: v1::Mode::Owned,
@@ -301,6 +321,7 @@ fn each_forge_offer_round_trips() {
         let row = v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                first: None,
                 number,
                 kind: v1::Kind::Forgejo,
                 mode: v1::Mode::Owned,
@@ -385,6 +406,7 @@ fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
+                first: None,
                 number: 1,
                 kind: v1::Kind::Github,
                 mode: v1::Mode::Connected,
@@ -415,6 +437,7 @@ fn forges_refuse_seventeen_rows_unsorted_rows_and_duplicate_numbers() {
         v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                first: None,
                 number: 17,
                 kind: v1::Kind::Github,
                 mode: v1::Mode::Fake,
@@ -470,6 +493,7 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
                     let row = v1::ForgeRow::new(
                         &limits,
                         v1::ForgeRowParts {
+                            first: None,
                             number: u16::MAX,
                             kind: kind.clone(),
                             mode: mode.clone(),
