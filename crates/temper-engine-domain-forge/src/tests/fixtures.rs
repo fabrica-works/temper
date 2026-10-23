@@ -198,8 +198,7 @@ pub fn missing_pull_reads(d: &mut Domain) {
 }
 
 pub fn finish_missing(d: &mut Domain) -> Box<[Request]> {
-    let green =
-        skein_forge::api::Answer::Statuses { ci: skein_forge::api::Ci::Passed, statuses: Box::new([]), more: false };
+    let green = checks(skein_forge::api::Check::Passed);
     answer_next(d, Ok(green.clone()));
     answer_next(d, Ok(green));
     answer_next(
@@ -220,4 +219,31 @@ pub fn opened_during_chain() -> Domain {
     missing_pull(&mut d);
     answer(&mut d, opening, Ok(skein_forge::api::Answer::Created(1)));
     d
+}
+
+/// A reported CI row, shared by the fresh-read fixtures.
+pub fn checks(check: skein_forge::api::Check) -> skein_forge::api::Answer {
+    skein_forge::api::Answer::Checks(Box::new([skein_forge::api::Status {
+        at: Time::ZERO,
+        context: Box::from(b"ci".as_slice()),
+        check,
+        description: Box::new([]),
+        url: Box::new([]),
+        job: None,
+    }]))
+}
+
+/// The matching pull already supplied head CI, leaving just the base and comparison.
+pub fn finish_open(d: &mut Domain) -> Box<[Request]> {
+    answer_next(d, Ok(checks(skein_forge::api::Check::Passed)));
+    answer_next(
+        d,
+        Ok(skein_forge::api::Answer::Compare {
+            before: BASE,
+            after: HEAD,
+            contains_before: true,
+            files: Box::new([]),
+            commits: Box::new([]),
+        }),
+    )
 }

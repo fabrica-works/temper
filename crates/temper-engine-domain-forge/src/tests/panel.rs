@@ -246,14 +246,7 @@ fn a_gate_whose_review_runs_at_the_head_is_pending() {
 fn a_fresh_ci_read_marks_a_changed_verdict_and_restart_forgets_it() {
     let (mut d, _) = fixtures::opening();
     fixtures::missing_pull(&mut d);
-    let got = fixtures::answer_next(
-        &mut d,
-        Ok(skein_forge::api::Answer::Statuses {
-            ci: skein_forge::api::Ci::Pending,
-            statuses: Box::new([]),
-            more: false,
-        }),
-    );
+    let got = fixtures::answer_next(&mut d, Ok(fixtures::checks(skein_forge::api::Check::Pending)));
     assert_eq!(got.as_ref(), &[Request::Marked { tasks: Box::new([fixtures::CHANGE]) }]);
     assert_eq!(panel(&d).ci, change::Status::Pending);
     let row = d.change(fixtures::CHANGE).expect("kept change").clone();

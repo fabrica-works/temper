@@ -52,13 +52,17 @@ impl Protocol {
     }
     #[must_use]
     pub fn github(seed: u64) -> Self {
+        Self::github_with_checks(seed, joint::checks(1000))
+    }
+    #[must_use]
+    pub fn github_with_checks(seed: u64, checks: raw::Checks) -> Self {
         let joint = Joint::github(
             seed,
             0,
             fixtures::limits(),
             fixtures::github_settings(),
             fixtures::protocol_shared(),
-            joint::checks(1000),
+            checks,
         );
         Self::with(seed, joint, fixtures::GITHUB)
     }

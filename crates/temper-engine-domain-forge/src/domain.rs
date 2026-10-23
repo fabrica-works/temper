@@ -2217,6 +2217,10 @@ fn step_read(
     let repository = row.repository;
     let branch = row.branch.clone();
     let base = row.base.clone();
+    let required = match d.repositories.get(&repository) {
+        Some(repository) => crate::ci::required(&repository.protection),
+        None => &[],
+    };
     let next = match pending.stage {
         StepStage::Branch => {
             match result {
@@ -2261,17 +2265,28 @@ fn step_read(
                     skein_forge_client::Event::Read {
                         owner,
                         repository,
-                        read: skein_forge::api::Read::Statuses { commit: base_tip, page: 1 },
+                        read: skein_forge::api::Read::Checks { commit: base_tip },
                     },
                     out,
                 );
                 return;
             };
-            skein_forge::api::Read::Statuses { commit, page: 1 }
+            if required.is_empty()
+                && let Some(pull) = &pending.pull
+                && pull.commit == commit
+            {
+                pending.ci = status(pull.ci);
+                keep_panel_ci(d, pending.task, change::Ci { head: commit, status: pending.ci }, out);
+                pending.stage = StepStage::BaseCi;
+                let Some(base_tip) = pending.base_tip else { unreachable!("base read") };
+                skein_forge::api::Read::Checks { commit: base_tip }
+            } else {
+                skein_forge::api::Read::Checks { commit }
+            }
         }
         StepStage::Ci => {
             match result {
-                Ok(skein_forge::api::Answer::Statuses { ci, .. }) => pending.ci = status(ci),
+                Ok(skein_forge::api::Answer::Checks(rows)) => pending.ci = status(crate::ci::fold(&rows, required)),
                 Ok(_) | Err(_) => pending.ci = change::Status::Unknown,
             }
             if let Some(head) = pending.branch {
@@ -2279,11 +2294,13 @@ fn step_read(
             }
             pending.stage = StepStage::BaseCi;
             let Some(base_tip) = pending.base_tip else { unreachable!("base read") };
-            skein_forge::api::Read::Statuses { commit: base_tip, page: 1 }
+            skein_forge::api::Read::Checks { commit: base_tip }
         }
         StepStage::BaseCi => {
             match result {
-                Ok(skein_forge::api::Answer::Statuses { ci, .. }) => pending.base_ci = status(ci),
+                Ok(skein_forge::api::Answer::Checks(rows)) => {
+                    pending.base_ci = status(crate::ci::fold(&rows, required));
+                }
                 Ok(_) | Err(_) => pending.base_ci = change::Status::Unknown,
             }
             let Some(head) = pending.branch else {
@@ -3519,11 +3536,7 @@ fn ci_refresh(
     child(
         d,
         env,
-        skein_forge_client::Event::Read {
-            owner,
-            repository,
-            read: skein_forge::api::Read::Statuses { commit: head, page: 1 },
-        },
+        skein_forge_client::Event::Read { owner, repository, read: skein_forge::api::Read::Checks { commit: head } },
         out,
     );
 }
@@ -3559,7 +3572,12 @@ fn ci_read(
     out: &mut Queue<Request>,
 ) {
     let Some(pending) = d.pending_ci.remove(&owner) else { return };
-    if let Ok(skein_forge::api::Answer::Statuses { ci, .. }) = result {
+    if let Ok(skein_forge::api::Answer::Checks(rows)) = result {
+        let required = match d.repositories.get(&pending.repository) {
+            Some(repository) => crate::ci::required(&repository.protection),
+            None => &[],
+        };
+        let ci = crate::ci::fold(&rows, required);
         ci_observed(d, pending.repository, pending.head, ci, out);
     }
 }
@@ -3820,7 +3838,15 @@ fn pull_changed(
         None => true,
     };
     if changed_ci {
-        ci_observed(d, resource.repository, pull.commit, pull.ci, out);
+        let required = match d.repositories.get(&resource.repository) {
+            Some(repository) => crate::ci::required(&repository.protection),
+            None => &[],
+        };
+        if required.is_empty() {
+            ci_observed(d, resource.repository, pull.commit, pull.ci, out);
+        } else {
+            ci_refresh(d, env, resource.repository, pull.commit, out);
+        }
     }
 }
 

@@ -34,7 +34,6 @@ fn start_opening_kept(d: &mut Domain, task: u64, entry: u64, kept: bool) {
 
 /// Leave the lower chain's last read in flight while the higher entry commits.
 fn reversed_openings(lower_requested: bool) -> (Domain, Token) {
-    use skein_forge::api::Answer;
     use temper_engine_domain_forge_change as change;
     let mut d = domain();
     outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
@@ -54,7 +53,7 @@ fn reversed_openings(lower_requested: bool) -> (Domain, Token) {
     outputs(&mut d, Event::Change { row });
     start_opening(&mut d, fixtures::CHANGE, FIRST_ENTRY);
     fixtures::missing_pull_reads(&mut d);
-    let green = Answer::Statuses { ci: skein_forge::api::Ci::Passed, statuses: Box::new([]), more: false };
+    let green = fixtures::checks(skein_forge::api::Check::Passed);
     fixtures::answer_next(&mut d, Ok(green.clone()));
     fixtures::answer_next(&mut d, Ok(green));
     let (lower, _) = fixtures::next_call(&mut d);
@@ -158,7 +157,7 @@ fn a_wake_that_unkeeps_an_inflight_chain_is_not_lost() {
     fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::HEAD)));
     fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::BASE)));
     fixtures::answer_next(&mut d, Ok(Answer::Pull(fixtures::open_pull())));
-    fixtures::finish_missing(&mut d);
+    fixtures::finish_open(&mut d);
     let finished = fixtures::answer_next(&mut d, Ok(Answer::Reviews { reviews: Box::new([]), more: false }));
     assert!(
         finished.contains(&Request::ChangeDecision {
@@ -219,7 +218,7 @@ fn an_overtaking_open_outcome_restarts_the_fresh_chain() {
     fixtures::answer(&mut d, base, Ok(Answer::Commit(fixtures::BASE)));
     let (pull, pull_read) = fixtures::next_call(&mut d);
     fixtures::answer(&mut d, pull, Ok(Answer::Pull(fixtures::open_pull())));
-    fixtures::finish_missing(&mut d);
+    fixtures::finish_open(&mut d);
     let finished = fixtures::answer_next(&mut d, Ok(Answer::Reviews { reviews: Box::new([]), more: false }));
     assert_eq!(overtaken.as_ref(), &[]);
     assert_eq!(
@@ -259,4 +258,92 @@ fn an_unwoken_chain_finishes_with_its_single_decision() {
         }
     );
     assert_eq!(ready(&mut d).as_ref(), &[]);
+}
+
+fn merging_change(protection: Protection, pull_ci: skein_forge::api::Ci) -> Domain {
+    use skein_forge::api::Answer;
+    use temper_engine_domain_forge_change as change;
+    let mut d = domain();
+    let mut repository = adopted();
+    repository.protection = protection;
+    outputs(&mut d, Event::Restore { record: Stored::Repository(repository) });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(&mut d, Event::ReadAfresh);
+    outputs(&mut d, Event::SettleOutbox);
+    let mut row = fixtures::opening_row();
+    row.pending = None;
+    row.effect = change::EffectResult::None;
+    row.pull = Some(1);
+    row.change.state = change::State::First { head: fixtures::HEAD, ready_since: env().wall };
+    row.change.owns_turn = true;
+    outputs(&mut d, Event::Change { row });
+    fixtures::step_change(&mut d);
+    fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::HEAD)));
+    fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::BASE)));
+    let mut pull = fixtures::open_pull();
+    pull.ci = pull_ci;
+    fixtures::answer_next(&mut d, Ok(Answer::Pull(pull)));
+    d
+}
+
+fn merge_after_base_reads(d: &mut Domain) {
+    use skein_forge::api::{Answer, Check, Op, Read};
+    use temper_engine_domain_forge_change as change;
+    let (call, op) = fixtures::next_call(d);
+    assert_eq!(op, Op::Read(Read::Checks { commit: fixtures::BASE }));
+    fixtures::answer(d, call, Ok(fixtures::checks(Check::Passed)));
+    fixtures::answer_next(
+        d,
+        Ok(Answer::Compare {
+            before: fixtures::BASE,
+            after: fixtures::HEAD,
+            contains_before: true,
+            files: Box::new([]),
+            commits: Box::new([]),
+        }),
+    );
+    let finished = fixtures::answer_next(d, Ok(Answer::Reviews { reviews: Box::new([]), more: false }));
+    let mut merging = false;
+    for request in &finished {
+        if let Request::ChangeDecision {
+            decision: change::Decision::Effect(change::Effect::Merge { head, .. }), ..
+        } = request
+        {
+            assert_eq!(*head, fixtures::HEAD);
+            merging = true;
+        }
+    }
+    assert!(merging, "merge at the checked head: {finished:?}");
+}
+
+#[test]
+fn passed_pull_ci_merges_without_reading_head_checks_again() {
+    let mut d = merging_change(Protection::Absent, skein_forge::api::Ci::Passed);
+    merge_after_base_reads(&mut d);
+}
+
+#[test]
+fn required_head_checks_ignore_a_failed_non_required_row() {
+    use skein_forge::api::{Answer, Check, Op, Read};
+    let protection = Protection::Rule(skein_forge::api::Protection {
+        queue: false,
+        signatures: false,
+        linear: false,
+        code_owners: false,
+        bypass: skein_forge::api::Bypass::Never,
+        branch: Box::from(b"main".as_slice()),
+        contexts: Box::new([Box::from(b"ci".as_slice())]),
+        approvals: 0,
+        dismiss_stale: false,
+    });
+    // The failed lint row makes the pull's aggregate fail, too.
+    let mut d = merging_change(protection, skein_forge::api::Ci::Failed);
+    let (call, op) = fixtures::next_call(&mut d);
+    assert_eq!(op, Op::Read(Read::Checks { commit: fixtures::HEAD }));
+    let Answer::Checks(rows) = fixtures::checks(Check::Passed) else { unreachable!() };
+    let mut lint = rows[0].clone();
+    lint.context = Box::from(b"lint".as_slice());
+    lint.check = Check::Failed;
+    fixtures::answer(&mut d, call, Ok(Answer::Checks(Box::new([lint, rows[0].clone()]))));
+    merge_after_base_reads(&mut d);
 }

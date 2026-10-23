@@ -17,6 +17,7 @@ mod adoption;
 pub mod boundary;
 mod brief;
 mod capabilities;
+mod ci;
 mod connect;
 mod demo;
 mod domain;

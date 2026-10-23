@@ -478,10 +478,10 @@ fn restored_ci_subscriptions_are_read_in_the_fresh_step_and_delay_its_completion
     let fresh = outputs(&mut d, Event::ReadAfresh);
     assert!(fresh.is_empty(), "the subscription read is scheduled before completion");
     let calls = ready(&mut d);
-    let Request::Call { call, op: skein_forge::api::Op::Read(skein_forge::api::Read::Statuses { commit, .. }), .. } =
+    let Request::Call { call, op: skein_forge::api::Op::Read(skein_forge::api::Read::Checks { commit }), .. } =
         &calls[0]
     else {
-        panic!("CI statuses requested in fresh step")
+        panic!("CI checks requested in fresh step")
     };
     assert_eq!(*commit, [4; 32]);
     let done = outputs(
@@ -491,11 +491,7 @@ fn restored_ci_subscriptions_are_read_in_the_fresh_step_and_delay_its_completion
             rate: None,
             call: *call,
             cost: 1,
-            result: Ok(skein_forge::api::Answer::Statuses {
-                ci: skein_forge::api::Ci::Passed,
-                statuses: Box::new([]),
-                more: false,
-            }),
+            result: Ok(fixtures::checks(skein_forge::api::Check::Passed)),
         }),
     );
     assert!(done.contains(&Request::RestartDone { stage: RestartStage::ReadAfresh }));

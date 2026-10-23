@@ -122,6 +122,105 @@ fn a_github_change_is_produced_and_opened() {
         && branches.commit == world.branch(b"temper/51")));
 }
 
+fn commit_read(world: &mut Protocol, read: skein_forge::api::Read) -> skein_forge::api::Answer {
+    let owner = skein_lib::Token::new(1_u64 << 61);
+    world.take_seen();
+    world.event(top::Event::Client(skein_forge_client::Event::Read { owner, repository: REPO, read }));
+    world.run_for(1);
+    for request in world.take_seen() {
+        if let top::Request::Read { owner: answered, result } = request {
+            assert_eq!(answered, owner);
+            return result.expect("commit read through bytes");
+        }
+    }
+    panic!("commit read answered");
+}
+
+fn github_head_checks(world: &mut Protocol, expected: skein_forge::api::Check) {
+    use skein_forge::api::{Answer, Ci, Read};
+    let commit = temper_engine_forge_world::translate::commit(world.branch(b"temper/51"));
+    assert!(
+        matches!(commit_read(world, Read::Statuses { commit, page: 1 }),
+            Answer::Statuses { ci: Ci::None, statuses, more: false } if statuses.is_empty()
+        ),
+        "GitHub CI has no classic statuses"
+    );
+    let Answer::Checks(rows) = commit_read(world, Read::Checks { commit }) else { panic!("check rows") };
+    assert!(matches!(rows.as_ref(), [row] if row.context.as_ref() == b"build" && row.check == expected));
+}
+
+#[test]
+fn a_github_change_is_checked_by_its_check_runs_and_lands() {
+    use skein_fake_forge_domain::api::Check;
+    use skein_forge_machine_world::joint;
+    use skein_lib::Duration;
+
+    let mut checks = joint::checks(1000);
+    checks.latency_min = Duration::from_secs(20);
+    checks.latency_max = Duration::from_secs(20);
+    let mut world = opened_change_in(Protocol::github_with_checks(71, checks));
+    let head = world.branch(b"temper/51");
+    github_head_checks(&mut world, skein_forge::api::Check::Pending);
+    assert!(world.observations().iter().any(|observation| matches!(observation,
+        Observation::Reported { commit, state: Check::Pending, .. } if *commit == head
+    )));
+    // The delegate result is unknown: CI must come from the forge through bytes.
+    let mut waiting = false;
+    for entry in 4..7 {
+        waiting |= matches!(
+            change_step(&mut world, entry, change::Status::Unknown, Box::new([])),
+            change::Decision::Wait { .. }
+        );
+    }
+    assert!(waiting, "the pending check run holds the change");
+    assert_eq!(world.tally().routes.get(&Route::Merge), None);
+    world.run_for(20);
+    github_head_checks(&mut world, skein_forge::api::Check::Passed);
+    assert!(world.observations().iter().any(|observation| matches!(observation,
+        Observation::Reported { commit, state: Check::Passed, .. } if *commit == head
+    )));
+    let mut finished = false;
+    for entry in 7..24 {
+        if matches!(
+            change_step(&mut world, entry, change::Status::Unknown, Box::new([])),
+            change::Decision::Finish { .. }
+        ) {
+            finished = true;
+            break;
+        }
+    }
+    assert!(finished, "passed check runs land the change");
+    assert_eq!(world.tally().routes.get(&Route::Merge), Some(&1));
+    let merges: Vec<_> =
+        world.observations().iter().filter(|observation| matches!(observation, Observation::Merged { .. })).collect();
+    assert!(matches!(merges.as_slice(), [Observation::Merged { head: checked, .. }] if *checked == head));
+    assert_eq!(world.tally().routes.get(&Route::PostStatus), None);
+}
+
+#[test]
+fn a_github_change_whose_check_run_fails_is_repaired() {
+    use skein_fake_forge_domain::api::Check;
+    use skein_forge_machine_world::joint;
+
+    let mut world = opened_change_in(Protocol::github_with_checks(73, joint::checks(0)));
+    let head = world.branch(b"temper/51");
+    github_head_checks(&mut world, skein_forge::api::Check::Failed);
+    assert!(world.observations().iter().any(|observation| matches!(observation,
+        Observation::Reported { commit, state: Check::Failed, .. } if *commit == head
+    )));
+    let mut repaired = false;
+    for entry in 4..8 {
+        let decision = change_step(&mut world, entry, change::Status::Unknown, Box::new([]));
+        if decision == change::Decision::Delegate(change::Delegate::Repair(change::Repair::Ci)) {
+            repaired = true;
+            break;
+        }
+    }
+    assert!(repaired, "the failed check run requests a CI repair");
+    assert_eq!(world.tally().routes.get(&Route::Merge), None);
+    assert_eq!(world.tally().routes.get(&Route::PostStatus), None);
+}
+
 #[test]
 fn a_created_issue_with_its_answer_lost_is_found_after_restart() {
     let mut world = Protocol::new(23);
