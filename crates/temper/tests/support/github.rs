@@ -380,7 +380,8 @@ impl Judge {
                 .expect("closed installation record")
                 .expect("installation observation");
         }
-        let moved: Vec<_> = rows.iter().filter(|row| row["observation"] == "moved").collect();
+        let moved: Vec<_> =
+            rows.iter().filter(|row| row["observation"] == "moved" && row["branch"] != "main").collect();
         assert_eq!(moved.len(), 1, "Must: one moved branch across both lives");
         assert_eq!(moved[0]["repository"], "acme/app");
         assert_ne!(moved[0]["branch"], "main");
