@@ -14,7 +14,6 @@ pub(super) struct State {
     pub answered: bool,
     pub start: Option<Starting>,
     pub failure: Option<StartFailure>,
-    pub sent: bool,
     pub settled: bool,
     pub deployment: Option<(Handle, u32)>,
     pub end_provider: Option<u32>,
@@ -24,7 +23,6 @@ pub(super) struct State {
 #[derive(Debug)]
 pub(super) struct Starting {
     pub request: Token,
-    pub silent: bool,
 }
 impl State {
     pub const fn new() -> Self {
@@ -35,7 +33,6 @@ impl State {
             answered: false,
             start: None,
             failure: None,
-            sent: false,
             settled: false,
             deployment: None,
             end_provider: None,
@@ -74,7 +71,6 @@ pub(crate) fn told(side: &mut Side, told: &Told, limits: Limits, out: &mut Queue
                     side.demo.answer = answer;
                     side.changed();
                 }
-                configure(side, limits, out);
             }
             true
         }
@@ -274,7 +270,7 @@ fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Cl
     let changed = (model_ended && !side.demo.model_ended) || reread;
     side.demo.model_ended |= model_ended;
     side.demo.forge_ended |= forge_ended;
-    if model_ended || forge_ended {
+    if model_ended {
         // Retain the provider if a role change closes the watch before removal settles.
         side.demo.end_provider = Some(demo.provider);
     }
@@ -287,8 +283,7 @@ fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Cl
 }
 
 fn watch_deployment(side: &mut Side, client: &Client, out: &mut Queue<Request>) {
-    let needed = owner(client)
-        && (side.demo_running() || ((side.demo.model_ended || side.demo.forge_ended) && !side.demo.settled));
+    let needed = owner(client) && (side.demo_running() || (side.demo.model_ended && !side.demo.settled));
     if !needed {
         if let Some((handle, _)) = side.demo.deployment.take() {
             out.push(Request::Client { asked: jig_client::Event::Unwatch { handle } });
@@ -322,9 +317,12 @@ fn owner(client: &Client) -> bool {
     me.deployment_role == Some(c::HeldRole::Owner)
 }
 
-/// The end holds this watch even when the forge's reread has already answered none.
+/// Only the model's end needs client cleanup; the engine owns cleanup at the forge's end.
 fn remove(side: &mut Side, client: &Client, out: &mut Queue<Request>) {
-    if side.demo.settled || (!side.demo.model_ended && !side.demo.forge_ended) || !owner(client) {
+    if side.demo.forge_ended {
+        side.demo.settled = true;
+    }
+    if side.demo.settled || !side.demo.model_ended || !owner(client) {
         return;
     }
     let Some((_, provider)) = side.demo.deployment else { return };
@@ -455,28 +453,19 @@ fn start_key(side: &Side, key: jig_client::Key) -> bool {
         None => false,
     }
 }
-pub(crate) fn configure(side: &mut Side, limits: Limits, out: &mut Queue<Request>) {
-    if !side.demo.sent
-        && let Some(demo) = side.demo.answer.as_ref()
-        && demo.state == DemoState::Running
-    {
-        start(side, limits, true, out);
-    }
-}
-pub(crate) fn start(side: &mut Side, limits: Limits, silent: bool, out: &mut Queue<Request>) {
+pub(crate) fn start(side: &mut Side, limits: Limits, out: &mut Queue<Request>) {
     if side.party.is_none() || side.served == super::Served::OutOfDate || side.demo.start.is_some() {
         return;
     }
     let Some(demo) = side.demo.answer.as_ref() else { return };
-    if !silent && demo.state == DemoState::Running && side.demo.failure.is_none() {
+    if demo.state == DemoState::Running && side.demo.failure.is_none() {
         return;
     }
     let Some(ask) = ask(&limits) else { return };
     side.serial = side.serial.checked_add(1).expect("forge request serial fits");
     let request = Token::new(side.serial);
-    side.demo.start = Some(Starting { request, silent });
+    side.demo.start = Some(Starting { request });
     side.demo.failure = None;
-    side.demo.sent = true;
     out.push(Request::Send { request, name: None, ask });
     side.changed();
 }
