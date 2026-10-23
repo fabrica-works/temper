@@ -10,7 +10,7 @@ directories, `temper init`, the box, the client) on purpose; an owner
 splits it. It builds on `draft/github.md` as it lands: forges connected
 from the client, credentials taken at runtime and the forges' records
 in jig's secrets' store. Amended with the user on 2026-10-23: the
-welcome, and the demo's end (2.3).
+welcome, and the demo's end (2.3); the box's terminal (2.1, 2.5).
 
 The first run is sugar. Every piece below has a place of its own in the
 layering and is useful without the first run; the first run only
@@ -54,10 +54,36 @@ arranges them. Nothing here shapes a piece for the first run's sake.
 
 ```
 $ temper box
-box: wrote the configuration, ~/.config/temper/temper.json
-box: demo forge, demo model, temper serve: started
-Open http://127.0.0.1:<port>/#sign-in=...
+First run: wrote the configuration, ~/.config/temper/temper.json
+Logs: ~/.local/share/temper/box/logs/
+Starting serve
+
+Open this link in a browser on this machine. It signs you in as this
+temper's owner, once and for a short while, so keep it private.
+Opened again once spent, it prints a fresh one here.
+
+http://127.0.0.1:8367/jig/v1/sign-in/link?secret=FefMHTruDiW3sTE149SuCHJtUvH8GIulzGpv6X3-CPs
+
+Ctrl-C stops temper.
+
 ```
+
+Then, as the person goes (2.3), one line each:
+
+```
+14:03:20Z Playground: starting
+14:03:21Z Playground: started
+14:09:41Z Forge 3 (Forgejo): starting
+14:10:02Z Forge 3 (Forgejo): failed, prepare 3 exited 1
+    prepare 3: app.ini: Permission denied
+    Log: ~/.local/share/temper/box/logs/prepare-3.log
+^C
+14:31:05Z Stopping
+14:31:07Z Stopped
+```
+
+A later run on the same directories prints the same without its first
+line. What the terminal shows, and why, is 2.5.
 
 1. `temper box` finds `$XDG_CONFIG_HOME/temper` empty, runs `temper
    init` on it (3.3), and starts the document's steps (3.9).
@@ -177,6 +203,41 @@ With the user, 2026-10-23. Amends 1, 2.2, 2.3 and 3.4. Mockups:
   1 as before, the playground's start and the first repository adopt
   into it, and the client shows it as "Project 1"; the mockups draw the
   target, marked "ahead · jig".
+
+### 2.5 The box's terminal
+
+With the user, 2026-10-23. Amends 3.9; the mechanics are
+`../protocol/setup.md`, 7.2.
+
+- **Why it changed.** A run on a terminal printed serve's notes and the
+  sign-in link mixed, and the link itself cut by them: serve writes it
+  in pieces, and the box passed each piece of serve's stdout on as it
+  came, while it wrote the steps' stderr a line at a time. Pasting it
+  meant cleaning it by hand. And most of what the steps say (smith's
+  trust roots, the forges not connected yet) is nothing the person acts
+  on.
+- **Foreground, the only way.** `temper box` runs where it is started,
+  and Ctrl-C stops it: no detached mode, no pid file, no `temper box
+  down`. A process that shows what it started and where its logs are is
+  one a person trusts, and it is what servers people already run do. A
+  detached box would be a supervisor beside the system's: its pid file
+  stale after a crash or a reboot, a status command to ask whether it
+  runs, a restart at boot expected of it. The background way is the
+  system's supervisor (`../protocol/setup.md`, 7.4; section 7), and a
+  container runs the box in the foreground anyway.
+- **Quiet.** The terminal shows the box's own lines: what it wrote and
+  started, each group's start, end and failure, a step's restart, the
+  stop. Each step's own lines go to its log file in the data directory,
+  the last two runs kept; `--echo steps` shows them on the terminal
+  too, as before. A failure shows its step's last lines and its log's
+  path, so the person rarely opens a log.
+- **The link is pasteable.** On a line of its own, whole, after what it
+  is and how it behaves: it signs in once, for a short while, and a
+  spent one opened again prints a fresh one, which the terminal
+  announces. stdout stays the links alone, for scripts and tests; no
+  log file holds one.
+- **Times in UTC** on the lines after the link, since the box reads no
+  time zone; local time is open (section 8).
 
 ## 3. The pieces
 
@@ -319,12 +380,13 @@ experience; good defaults for a person's real work are open (section 8).
 
 ### 3.9 The box, changed
 
-- **`temper box [--config] [--data] [--cache]`,** no positional
+- **`temper box [--config] [--data] [--cache] [--echo]`,** no positional
   argument; init when empty (3.3).
 - **Its steps,** from the document: the fakes' (3.5), fetch, prepare
   and run for each started owned forge, then `temper serve`; a dormant
   forge's when asked (3.8). Its policy is section 7.2's, unchanged.
-- **Its stdout** is still `temper serve`'s, the link among it.
+- **Its stdout** is `temper serve`'s links alone, each whole; its
+  terminal is quiet, and each step's lines are in its log (2.5).
 
 ## 4. What needs a restart
 
@@ -403,6 +465,10 @@ experience; good defaults for a person's real work are open (section 8).
     within the same capacity; the same deployment, listeners, workers
     and endpoints. jig owns the lifecycle and its tests; temper its
     configuration's diff and its wiring.
+- **The box in the background:** should people want their terminal
+  back, a command that writes a systemd user unit for the box
+  (`../protocol/setup.md`, 7.4), never a pid file of temper's own
+  (2.5).
 
 ## 8. Open questions
 
@@ -436,3 +502,5 @@ experience; good defaults for a person's real work are open (section 8).
 - **A Forgejo elsewhere without a restart:** the client writing the
   document and the box restarting `temper serve`, or the hot restart.
   Default: the person adds it and restarts.
+- **The terminal's times in local time** (2.5): the machine's time zone
+  read by the box. Default: UTC, marked `Z`.

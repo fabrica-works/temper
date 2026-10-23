@@ -615,6 +615,8 @@ have one, an engine alone none. Each:
   | `box.restarts`, `box.window_ms` | a long step's exits within the window past which the box gives up; `box.restarts` at most 64; the backoff counted from the exits within the window (setup.md, 7.2) |
   | `box.grace_ms` | a long step's grace, after each of its stop's two signals (setup.md, 7.2) |
   | `box.line_bytes` | a line of the box's pipe, either way, its line feed among them; the box and `temper serve` each read within it (setup.md, 7.1) |
+  | `box.log_bytes` | a step's log file, past which it moves to `<name>.log.1` and starts afresh (setup.md, 7.2) |
+  | `box.tail_lines` | the lines of a step's log the box holds, and writes under a failure's terminal line (setup.md, 7.2) |
   | `clients.bundle_files` | the bundle's files, its page among them |
   | `clients.bundle_bytes` | the bundle's files' bytes in all, held in memory while `temper serve` runs |
 - **Limits checked against each other at start,** each failure naming
@@ -644,7 +646,8 @@ have one, an engine alone none. Each:
   - the setup's and the box's: each backoff at most its maximum;
     `setup.backoff_max_ms` below `setup.deadline_ms`; `box.backoff_max_ms`
     below `box.window_ms`; `setup.states`, `setup.state_life_ms`,
-    `setup.runs` and `setup.fetch_bytes` above 0; `box.line_bytes` at
+    `setup.runs`, `setup.fetch_bytes`, `box.log_bytes` and
+    `box.tail_lines` above 0; `box.line_bytes` at
     least 64, which holds each line but a `failed` one's `WHY`, which
     the box cuts to fit (setup.md, 7.1);
   - the bundle's: `clients.bundle_files` and `clients.bundle_bytes`
@@ -1121,7 +1124,7 @@ variable, else its default.
 | Directory | Flag, variable | Default | Holds | Kept |
 |---|---|---|---|---|
 | configuration | `--config DIR`, `TEMPER_CONFIG` | `$XDG_CONFIG_HOME/temper` | the document, `temper.json`; smith's agent configuration, `agent.json`; the charters' instructions; trusted roots' files | as a person's own files are: copied, synced or published, so it holds no secret |
-| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key and its git's link, in `demo/` (setup.md, 8.4); the box's records of the forges it has started, in `box/started/` (setup.md, 7.1); the programs directory | the deployment: backed up whole |
+| data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key and its git's link, in `demo/` (setup.md, 8.4); the box's records of the forges it has started, in `box/started/` (setup.md, 7.1); the box's logs of its last two runs, in `box/logs/` and `box/logs.previous/` (setup.md, 7.2); the programs directory | the deployment: backed up whole |
 | cache | `--cache DIR`, `TEMPER_CACHE` | `$XDG_CACHE_HOME/temper` | binaries fetched again at will: an owned forge's Forgejo and runner, `temper forge fetch`'s in `forgejo/VERSION/` and `forgejo-runner/RUNNER_VERSION/` (setup.md, 6.6) | never backed up |
 
 - **The document is `temper.json` in the configuration directory,**

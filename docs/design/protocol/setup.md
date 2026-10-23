@@ -850,7 +850,7 @@ its own for any other host.
 
 ### 7.1 What it runs
 
-`temper box [DIRECTORIES]` runs the configuration's steps, which
+`temper box [DIRECTORIES] [--echo none|steps]` runs the configuration's steps, which
 `temper-fake`'s `steps` gives (8.4), each a command of the `temper`
 binary, as a child process given the box's three directories as flags,
 `--config C --data D --cache K`, each absolute (configuration.md,
@@ -874,8 +874,9 @@ temper box
 
 - **An empty configuration directory,** absent or with no entry, is
   written first by `temper init` (8.2), in the box's own process, before
-  the document is read; the box says so on stderr, `box: wrote the
-  configuration, <path>`, and goes on to its steps. Otherwise the box
+  the document is read; the box says so on its terminal, `First run:
+  wrote the configuration, <path>` (7.2), and goes on to its steps.
+  Otherwise the box
   never writes the document: a configuration directory with entries but
   no document is refused as every command refuses it.
 - **An owned forge's group,** its fetch, its preparation, its Forgejo
@@ -915,7 +916,7 @@ temper box
   | `start FORGE` | serve, at the client's ask (6.5); the demo's, at the playground's start and at serve's start while the demo runs (8.4) | start the forge's group |
   | `step FORGE STEP` | the box | the group's step `fetch`, `prepare` or `run` is starting, for the client's row (`../client/forge.md`, 5.4) |
   | `started FORGE` | the box | the group's long steps are started, Forgejo answers, and its record is written, the demo's group writing none; the engine then takes the handover and reconciles (6.5) |
-  | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step by its name, as the box's stderr prefixes it (7.2), such as `prepare 3 exited 1`: `<step> exited <code>`, `<step> killed by signal <n>`, `<step> did not start`, or `record not written`, cut to fit the line's bound, and holds no secret; a step's own lines are on the box's stderr (7.2) |
+  | `failed FORGE WHY` | the box | the group stopped: `WHY` names the step by its name, as its log file and the box's terminal name it (7.2), such as `prepare 3 exited 1`: `<step> exited <code>`, `<step> killed by signal <n>`, `<step> did not start`, or `record not written`, cut to fit the line's bound, and holds no secret; a step's own lines are in its log, the last of them under the terminal's `failed` line (7.2) |
   | `stop FORGE` | serve, the demo's, at the demo's end (8.4) | stop the forge's group |
   | `stopped FORGE` | the box | the group's steps are closed, as the box's own stop closes them (7.2), and the group is dormant again; a record it wrote stays |
 
@@ -988,16 +989,77 @@ temper box
   `box.grace_ms`, a second signal, `box.grace_ms` again, then a close;
   a step that exits during it is not restarted, and a once step still
   running is closed with them. Once they are all closed the box answers
-  `stopped FORGE`, the group dormant, says `box: forge FORGE's group
-  stopped` on its stderr, and runs on; a termination signal during it
+  `stopped FORGE`, the group dormant, says `<label>: stopped` on its
+  terminal (below), and runs on; a termination signal during it
   stops the box as above, which closes them too.
-- **Its streams:** `temper serve`'s stdout, the sign-in links, is the
-  box's stdout, as is, but for its first line when a link step follows
-  it, which is that step's (8.4). Every other line a step writes, to its stdout or
-  its stderr, goes to the box's stderr prefixed `<step>: `; the box's own
-  lines are prefixed `box: `, such as `box: <step> gave up after <n>
-  restarts` and `box: forge <n>'s group stopped`. Each step gets the box's environment; `temper forge run`
-  clears it for Forgejo (6.4). Forgejo logs to its own files.
+- **Its stdout** carries `temper serve`'s stdout alone, the sign-in
+  links, but for its first line when a link step follows it, which is
+  that step's (8.4). The box reads every step's output a line at a
+  time, and writes a line only once it holds it whole, to its line feed
+  or its step's end, so that nothing written to its stderr lands inside
+  a link when both streams are one terminal.
+- **Its terminal,** its stderr, is quiet: the box's own lines alone.
+  Before the first sign-in block (below), `First run: wrote the
+  configuration, <path>` when `temper init` ran (7.1), `Logs:
+  <data>/box/logs/`, and `Starting <step>` as each step of `always`
+  starts. After it, each line begins with the time of day in UTC,
+  `HH:MM:SSZ `, since the box reads no time zone:
+  - for an asked group, named by its label (7.3): `<label>: starting`
+    at its `start`, then `<label>: started`, `<label>: failed, <WHY>` and
+    `<label>: stopped` as the pipe says them; its `step` lines are the
+    client's row's alone;
+  - a long step's exit, `<WHY>; restarting in <n> s`, and the box's give
+    up, `<WHY>; giving up`, `<WHY>` in `failed`'s words (7.1);
+  - `Stopping` at a first termination signal, and `Stopped` once every
+    step is closed;
+  - and the box's own refusals and failures, as this section and 7.1
+    name them: a record, a pipe's line, a log.
+
+  `--echo steps` (`TEMPER_ECHO`; the default, `none`; skein's
+  `shell.md`, 6.5) also writes every line each step writes, but serve's
+  stdout, prefixed `<step>: `, as it reaches the step's log.
+- **The sign-in block:** at `temper serve`'s first link, the box
+  writes the lines below, each once the one before it is written, so
+  that a terminal shows them in order: the link alone on stdout, the
+  rest on stderr.
+
+  ```
+
+  Open this link in a browser on this machine. It signs you in as this
+  temper's owner, once and for a short while, so keep it private.
+  Opened again once spent, it prints a fresh one here.
+
+  http://127.0.0.1:8367/jig/v1/sign-in/link?secret=...
+
+  Ctrl-C stops temper.
+
+  ```
+
+  Each later link, a fresh one after a spent or expired one was opened
+  (jig's `protocol/client.md`, section 8) or a restarted serve's first,
+  comes after `<time> A fresh sign-in link:` on stderr. A line given to
+  a link step has no block.
+- **Its logs,** `<data>/box/logs/`, mode 0700, made as needed: one file
+  per step, its name with each space a `-` and `.log` after it
+  (`serve.log`, `prepare-3.log`), mode 0600, holding every line the
+  step writes to its stdout or its stderr, each after the time the box
+  read it, `2026-10-23T14:03:20Z `, but serve's stdout: no file holds a
+  sign-in link. At its start the box moves the logs a box before it
+  left to `<data>/box/logs.previous/`, replacing that one, so the last
+  two runs are kept. A file past `box.log_bytes` (configuration.md,
+  section 7) moves to `<name>.log.1`, replacing that one, and starts
+  afresh, so a step's logs stay within twice the bound. A log the box
+  cannot write is named once on its terminal, and that step's lines
+  then go to the terminal as `--echo steps` writes them. Forgejo also
+  logs to its own files.
+- **A failure's tail:** under each terminal line of a step's failure,
+  a long step's exit, a group's `failed` or a give up, the box writes
+  the last `box.tail_lines` lines it logged for that step, held in
+  memory, each indented four spaces and without its time, then `Log:
+  <path>`, indented the same. With `--echo steps` it writes no tail,
+  the lines already shown.
+- **Its environment:** each step gets the box's; `temper forge run`
+  clears it for Forgejo (6.4).
 - **Its children** are skein-io's (skein's `io.md`, section 6), each in a
   process group of its own; closing one kills its group, so nothing the
   box started outlives its stop.
@@ -1011,9 +1073,12 @@ temper box
   closes, the pipe's lines and the groups' records out), hosted on
   skein-io.
 - **The steps in groups:** `Steps { always, asked }`, `always` the steps
-  run in order, and `asked` a list of `Group { forge, before, steps, recorded }`,
+  run in order, and `asked` a list of `Group { forge, before, steps, recorded, label }`,
   each dormant until asked (7.1), `recorded` whether its `started`
-  writes the box's record: an owned forge's does, the demo's does not. `before` is its place in the order:
+  writes the box's record: an owned forge's does, the demo's does not.
+  `label` is the words the terminal names it by (7.2), bytes the box
+  does not read: `Playground` for the demo's, `Forge N (Forgejo)` for
+  an owned forge's. `before` is its place in the order:
   the index in `always` it runs just before (its length puts it last).
   Each step carries its `Stage`, whose word its `step` lines carry. The
   machine's step tests drive a group from dormant to `started`, and to
@@ -2390,6 +2455,17 @@ relies on.
   at the box's next start until asked; a line past `box.line_bytes`
   refused; `temper serve` restarted with a pipe afresh, an answer meant
   for the exited one dropped.
+- **The box's terminal and logs** (7.2), in temper-box, its clock the
+  test's: given one pipe for its stdout and its stderr, serve's link
+  written in pieces between other steps' lines reads whole there; the
+  sign-in block's parts in order around it, and a later link's shorter
+  block; a step's lines in its log and not on the terminal, and on both
+  with `--echo steps`; no file holding a link; the terminal's lines
+  for a group's start, `started`, `failed` and `stopped`, by its label,
+  a restart, a give up and a stop; a failure's tail, its lines and its
+  log's path; a log moved to `.1` at `box.log_bytes`, and the last run's
+  moved to `logs.previous/` at a start; a log not written named once,
+  its step's lines then on the terminal.
 - **The setup host's handover at runtime** (5.1), in temper-service's
   step tests: at `started`, `TakeOver` when the handover is present, its
   record kept before removal, then `Reconcile` and the connect, the row
@@ -2527,7 +2603,8 @@ it checks of this document:
   since its changes never conflict. With no webhooks, the same story
   misses its budget.
 - **`temper box`,** a test of its own on a scratch directory: the sign-in
-  link on its stdout; Forgejo killed and restarted, with the engine still
+  link on its stdout, and whole on one pipe given as both its stdout and
+  its stderr, as a terminal is (7.2); Forgejo killed and restarted, with the engine still
   serving; a stop leaving no process it started.
 - **A first run,** a test of its own: `temper box` on three empty
   scratch directories writes the configuration (8.2), says so (init's
@@ -2559,7 +2636,7 @@ it checks of this document:
   demo started and connected, then a second box on the same
   directories, its document given a second fake forge, which runs in
   its place, unasked, and connects at serve's start: the demo ends
-  (8.4), the box's stderr says `box: forge 1's group stopped` (7.2),
+  (8.4), the box's terminal says `Playground: stopped` (7.2),
   `wait forges` lists the second forge alone, and `temper ctl
   demo-start` is answered not offered. A third box starts nothing of
   the demo's group, and answers the same.

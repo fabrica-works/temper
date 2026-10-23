@@ -1164,8 +1164,10 @@ directory of the QA harness's:
   to paste. With area 6, the agent reads it with `forges` and the
   repositories to adopt with `repositories`, every one the site admin
   can see, and adopts one with `adopt --ids`.
-- **Logs:** the engine's and the worker's in the box's stderr, each line
-  prefixed by its step; Forgejo's in its directory. Outside the tools.
+- **Logs:** each step's, the engine's and the worker's among them, in
+  its file under `<data>/box/logs/`, and on the box's stderr prefixed
+  by its step with `--echo steps` (`../protocol/setup.md`, 7.2);
+  Forgejo's in its directory. Outside the tools.
 - **Thrown away** by stopping the box with a termination signal and
   removing its directory: the harness's, never a tool's.
 

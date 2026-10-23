@@ -227,8 +227,10 @@ default; the document is `temper.json` in the configuration directory
     6.4);
   - `temper box`: the configuration's steps as child processes, in
     order, restarted when they exit and stopped in reverse order; its
-    stdout is `temper serve`'s, its stderr each step's, line by line,
-    prefixed by the step's name (setup.md, section 7).
+    stdout is `temper serve`'s sign-in links, each line whole; its
+    stderr, a terminal's, the box's own lines alone, each step's lines
+    in its log under the data directory, and on stderr too, prefixed by
+    the step's name, with `--echo steps` (setup.md, 7.2).
 - **Exit status:** 0 after a drained shutdown, a worker alone's ending
   or a finished command; 1 on
   any failure (a refused start, a usage error, a failed commit, an
