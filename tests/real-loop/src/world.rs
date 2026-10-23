@@ -161,6 +161,17 @@ impl Llm {
         }
     }
 }
+impl Llm {
+    /// Plays the deferred scripts, by their turn rules where given, once the forge is bound.
+    fn bind(&mut self, address: std::net::SocketAddr) {
+        let Some(scripts) = self.scripts.take() else { return };
+        let recipe = match self.rules.take() {
+            Some(rules) => llm::played_by_input(scripts(address), rules()),
+            None => llm::scripted(scripts(address)),
+        };
+        self.peer = llm::peer(recipe).expect("bound forge scripts");
+    }
+}
 impl std::ops::Deref for Llm {
     type Target = skein_fake_peers::llm::Peer;
     fn deref(&self) -> &Self::Target {
@@ -401,14 +412,8 @@ impl Referee<Proc> for Judge {
                 let Proc::Service(worker) = proc else { panic!("worker root") };
                 worker.forge_address = forge.address();
             }
-            if let Some(address) = forge.address()
-                && let Some(scripts) = peer.scripts.take()
-            {
-                let recipe = match peer.rules.take() {
-                    Some(rules) => llm::played_by_input(scripts(address), rules()),
-                    None => llm::scripted(scripts(address)),
-                };
-                peer.peer = llm::peer(recipe).expect("bound forge scripts");
+            if let Some(address) = forge.address() {
+                peer.bind(address);
             }
             if let Some(hooks) = service.hooks
                 && !state.hooked
