@@ -399,18 +399,46 @@ in the lower world that owns it, never here.
   terminal client, in the loop as the service is: temper's client root
   and view under skein's text shell, over jig's native transport to the
   service's clients' listener, on a loopback port the kernel assigned.
-  It is a general part of the tier, not of one story: a story that
-  needs a person at a client in the real loop has one.
+  It is a general part of the tier (`tests/real-loop/src/terminal.rs`),
+  not of one story: a story that needs a person at a client in the real
+  loop has one.
+  - **As `temper open` makes it.** The harness hosts the terminal's own
+    composition, `temper-client-shell-terminal`'s client and terminal,
+    as a program the harness spawns with its pipes for the terminal's
+    input and output, as the tools' root is hosted for `temper ctl`.
+    Its settings are `temper open`'s (../client/README.md, 6.2) but its
+    print interval, which the tier sets short, at 20 ms, as it sets the
+    engine's paces short: the shell prints at once after a command, and
+    a story waits on what the pages say, never on the interval. The
+    shipped interval's pacing is skein's text shell's to test (skein's
+    `ui-text.md`, section 8).
+  - **Signed in by the printed link,** as `temper open DIRECTORY LINK`
+    is (../client/README.md, 6.1), on a DIRECTORY of its own in the
+    scratch directory, never one of `temper ctl`'s
+    (../client/tools.md, section 15). One link is live at a time: where
+    `ctl` spent it first, the terminal's sign-in is refused, the service
+    prints a fresh link (jig's `protocol/client.md`, section 8), and the
+    harness opens the terminal again with it, as `ctl` signs in a second
+    DIRECTORY. A story's key comes first through `ctl`, as for the
+    tier's other stories (below).
   - **The typist** stands where a person sits. It types whole commands
     to the shell's input, as the person would (../client/README.md,
-    section 6.5), and reads the pages the shell prints at its print
-    interval (../client/README.md, section 6.3): what it knows of the
-    system is what the pages say. It is ordinary Rust in the test
-    process, with the process tier's typist as its model
-    (`crates/temper/tests/support/terminal.rs`) and no terminal device;
-    the shell's input and output are the harness's pipes in the loop.
-    It waits by the loop's deadlines, never by sleeping, and reads the
-    page after the print that follows its command.
+    section 6.5): a control's number from the last printed page, found
+    by its label, with the words after it, and `q` to close. It reads
+    the pages the shell prints (../client/README.md, sections 6.3 and
+    6.4): what it knows of the system is what the pages say. It is
+    ordinary Rust in the test process, with the process tier's typist
+    as its model (`crates/temper/tests/support/terminal.rs`) and no
+    terminal device; the shell's input and output are the harness's
+    pipes in the loop. Its acts are a story's steps: open, type on a
+    label, see a page that holds a text and lacks another, and close.
+    It waits by the loop's deadlines, never by sleeping; a see reads
+    only the pages printed after its last command; and every page it
+    read is kept, in order, for the story's checks.
+  - **Its smoke:** the person opens the terminal by the printed link,
+    starts a chat from Chats with its words, and reads the committed
+    reply on the chat's page; closing exits 0, and the credential stays
+    in the terminal's DIRECTORY, private to its user.
   - **The peers are fakes:** skein's fake LLM, the fake forge and the
     fake git program (4.1 to 4.3), as for the tier's other stories.
   - **The terminal is the real loop's test surface.** People use the
@@ -419,15 +447,20 @@ in the lower world that owns it, never here.
     (../client/README.md, section 6.9). The process tier's `temper open`
     tests stay smokes (2.6), outside the gate.
   - **A run's live text is one of its stories.** A person's message
-    starts a chat turn, and the fake LLM plays a reply in pieces and
-    holds it after its first piece (skein's `fake-llm.md`, section 2.2).
-    The typist reads a printed page that shows that piece under
-    "Writing…", before the turn commits. The story releases the hold;
-    the reply completes, the turn commits, and the next printed page has
-    the committed turn and no provisional text. A page printed while the
-    reply is held shows the same piece or a longer one, never a shorter
-    one; the story asserts that a piece it read is a prefix of the
-    committed turn's text.
+    starts a chat turn, and the fake LLM plays a reply in two pieces,
+    the second under a named hold, which waits before it (skein's
+    `fake-llm.md`, section 2.2): the first piece is sent and the reply
+    held. The typist reads a printed page that shows that piece under
+    "Writing…", before the turn commits; only then does the story
+    release the hold, through the fake LLM's owner in the loop, as the
+    world releases its other holds. The reply completes, the turn
+    commits, and the first page that shows the committed turn shows no
+    provisional text. A page printed while the reply is held shows the
+    same piece or a longer one, never a shorter one; the story asserts
+    that each piece it read is a prefix of the committed turn's text.
+    smith sends a piece by its flush deadline with no later delta to
+    push it, and may join deltas: the story reads prefixes and never
+    counts pieces.
 - **GitHub's stories,** the real loop's; their code waits for the
   real-loop plan's end. One smoke story per feature, each on the fake's
   GitHub layer, which the forge peer hosts on loopback beside its
@@ -1715,6 +1748,12 @@ world of temper's on a scripted engine (../client/README.md, section 10).
   the first (jig's `protocol/channel.md`, 6.4), and the fake person
   reads the chat's provisional "Writing…" turn with that piece, then the
   rest of the held text, and then the committed turn, which replaces it.
+  The joint world's front plays the run's worker: at the chat run's
+  assignment it sends the reply's first piece up the worker link, as
+  the text kind at offset 0, and holds; at each of the story's releases
+  it sends the next of its parts, the rest of the text as a second piece
+  at its offset, then the committed turn with the whole text and the
+  run's answer.
   Retries, gaps and cuts are jig's views' to test (jig's
   `domain/engine.md`, section 11); this story checks temper's wiring
   from the engine's root to the chat's page. The same story over real
