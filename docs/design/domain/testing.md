@@ -1329,16 +1329,27 @@ section 8; testing-strategy.md, 2.9).
     `429` and the test fails naming the cap; the last 20 are the
     teardown's, 400 in all. It forwards only the App's routes
     (`GET /app`, its hook's config, its delivery log, its installations,
-    a mint for the run's installation alone), `POST /graphql`,
-    `DELETE /installation/token`, the probe repository's API paths but
-    a `PATCH` or `DELETE` of the repository itself, and git's three
-    smart-HTTP paths of that repository; any other request is answered
+    a mint for the run's installation alone), `DELETE
+    /installation/token`, `POST /graphql` carrying skein's viewer or
+    pull document alone (the pull's on the probe; never a mutation),
+    `GET /user/ID`, `GET /repositories/ID` for the probe's id, learned
+    from the story's first read, the probe repository's reads, its
+    writes on temper's own routes (pulls, issues, comments, reviews,
+    reviewers, statuses, merge and update), and git's three smart-HTTP
+    paths of that
+    repository; a ref written, by the API or a push's commands, is one
+    under the run's prefix, never `main`; any other request is answered
     `403` and fails the test, naming it. Its journal holds each
     request's method, path and status, never a header or a body.
   - **The story:** the person signs in and adds the fake LLM's key;
     `forge-connect 1 github-app ID FILE` with the fixtures' App and key
-    file, and `wait forges --until connected:1`; `forge-install 1`
-    issues a state, and the test brings it to the engine's setup route
+    file, `wait forges --until connected:1`, then `--until settled`;
+    `forge-install 1` issues a state, asked again while setup answers
+    "busy", at most 30 times, one a 2 s poll, each under a fresh key (a
+    key's first answer is replayed, ../client/tools.md, 7) and logged
+    with its time: a known finding, the reconcile after a connect is the
+    engine's, which `settled` does not cover (../client/tools.md, 5.4),
+    and goes when the product does; and the test brings it to the engine's setup route
     with the installation's id, as GitHub's redirect would
     (`/forges/1/github/setup?installation_id=I&setup_action=install&state=S`),
     which accepts it; `adopt` of `OWNER/temper-probe` with the prefix

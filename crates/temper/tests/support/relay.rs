@@ -82,7 +82,7 @@ impl Guard {
         ) {
             return true;
         }
-        for prefix in ["/app/hook/deliveries/", "/app/installations/"] {
+        for prefix in ["/app/hook/deliveries/", "/app/installations/", "/user/"] {
             if path.strip_prefix(prefix).is_some_and(number) {
                 return true;
             }
@@ -406,9 +406,14 @@ impl Shared {
                 read_message(&mut io::BufReader::new(socket), Some(method))?.ok_or_else(invalid)
             }
         };
-        let Ok(answer) = answer else {
-            self.record(listener, method, path, 502, true)?;
-            return Ok(Message::answer(502, b"relay upstream failed"));
+        let answer = match answer {
+            Ok(answer) => answer,
+            Err(error) => {
+                // An io error names no credential; the path has no query.
+                eprintln!("live relay: upstream failed for {method} {path}: {error}");
+                self.record(listener, method, path, 502, true)?;
+                return Ok(Message::answer(502, b"relay upstream failed"));
+            }
         };
         let status = answer.status()?;
         if status == 201
@@ -449,11 +454,19 @@ fn serve(shared: &Shared, listener: &str, socket: TcpStream) {
             }
             read_body(&mut socket, &mut request, false)?;
             let (method, _) = request.request()?;
+            let close = request
+                .header("connection")?
+                .is_some_and(|value| value.split(',').any(|token| token.trim().eq_ignore_ascii_case("close")));
             let answer = shared.exchange(listener, &request, false)?;
             socket.get_mut().write_all(&answer.framed(method)?)?;
+            if close {
+                break;
+            }
         }
         Ok(())
     })();
+    // The quiesce list holds a clone: only a shutdown sends the FIN a graceful close waits for.
+    let _ = socket.get_ref().shutdown(Shutdown::Both);
     if result.is_err() && !shared.stop.load(Ordering::Acquire) {
         let _ = shared.record(listener, "INVALID", "/", 400, true);
     }
@@ -551,7 +564,11 @@ fn line(reader: &mut impl Read, output: &mut Vec<u8>, bound: usize) -> Result<bo
     let start = output.len();
     loop {
         let mut byte = [0];
-        if reader.read(&mut byte)? == 0 {
+        let count = match reader.read(&mut byte) {
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            count => count?,
+        };
+        if count == 0 {
             return if output.len() == start { Ok(false) } else { Err(invalid()) };
         }
         output.push(byte[0]);
@@ -733,7 +750,11 @@ impl Read for TlsReader {
                         break Up::Bytes(bytes);
                     }
                     let mut bytes = [0; 16384];
-                    let count = self.socket.read(&mut bytes)?;
+                    // A child's signal interrupts a read; the read is asked again.
+                    let count = match self.socket.read(&mut bytes) {
+                        Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                        count => count?,
+                    };
                     if count == 0 {
                         break Up::End;
                     }

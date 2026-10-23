@@ -45,6 +45,9 @@ fn guard_bounds_every_route_to_the_probe() {
         ("api", "DELETE", "/installation/token", Some(none), true),
         ("api", "GET", "/installation/repositories", Some(none), true),
         ("api", "GET", "/users/bot", Some(none), true),
+        ("api", "GET", "/user/345", Some(none), true),
+        ("api", "GET", "/user/bot", Some(none), false),
+        ("api", "GET", "/user", Some(none), false),
         ("api", "GET", "/repos/owner/probe", Some(none), true),
         ("api", "PATCH", "/repos/owner/probe", Some(none), false),
         ("api", "DELETE", "/repos/owner/probe", Some(none), false),
@@ -296,6 +299,38 @@ fn bodyless_answers_and_minted_tokens_stay_in_their_lanes() {
         assert!(!journal.contains(secret));
     }
     drop(git);
+    drop(relay);
+    scratch.remove();
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "offline relay framing against an owned loopback socket thread")]
+fn a_closing_client_hears_the_relay_end_its_connection() {
+    let scratch = support::Scratch::new("relay-close");
+    let upstream = TcpListener::bind("127.0.0.1:0").expect("stub");
+    let relay = Relay::plaintext(guard(), scratch.path(), upstream.local_addr().expect("stub address"));
+    let stub = thread::spawn(move || {
+        for _ in 0..2 {
+            let (mut socket, _) = upstream.accept().expect("stub accepts");
+            socket.set_read_timeout(Some(Duration::from_secs(2))).expect("timeout");
+            head(&mut socket);
+            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok").expect("stub response");
+        }
+    });
+    // The engine's setup host asks with Connection: close, then half-closes and drains until the peer ends.
+    let mut asked = TcpStream::connect(relay.api).expect("client");
+    asked.set_read_timeout(Some(Duration::from_secs(2))).expect("timeout");
+    asked.write_all(b"GET /app HTTP/1.1\r\nHost: original\r\nConnection: close\r\n\r\n").expect("request");
+    assert_eq!(answer(&mut asked), b"ok");
+    assert_eq!(asked.read(&mut [0; 1]).expect("the relay ends an asked close"), 0);
+    let mut halved = TcpStream::connect(relay.api).expect("client");
+    halved.set_read_timeout(Some(Duration::from_secs(2))).expect("timeout");
+    halved.write_all(b"GET /app HTTP/1.1\r\nHost: original\r\n\r\n").expect("request");
+    assert_eq!(answer(&mut halved), b"ok");
+    halved.shutdown(std::net::Shutdown::Write).expect("half-close");
+    assert_eq!(halved.read(&mut [0; 1]).expect("the relay ends a half-closed connection"), 0);
+    stub.join().expect("stub joined");
+    assert!(relay.refused().is_empty());
     drop(relay);
     scratch.remove();
 }

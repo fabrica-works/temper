@@ -19,6 +19,9 @@ use std::{
 };
 const WITHIN: Duration = Duration::from_secs(1200);
 const POLL: Duration = Duration::from_secs(2);
+/// Install links asked while setup is busy, one a poll: the reconcile after a connect is the
+/// engine's own, which `wait forges --until settled` does not cover (client/tools.md, 5.4).
+const BUSY: u32 = 30;
 const REPOSITORY: &str = "temper-probe";
 
 struct Inputs {
@@ -177,6 +180,7 @@ enum Stage {
     Engine,
     Worker,
     Install,
+    Link,
     Accepted,
     Adopt,
     Chat,
@@ -206,6 +210,8 @@ struct Judge<'a> {
     seen: Rc<RefCell<Seen>>,
     replied: bool,
     digest: Option<String>,
+    busy: u32,
+    started: Time,
 }
 fn story(inputs: &Inputs, relay: &Relay) {
     let clock = Clock::new();
@@ -233,6 +239,8 @@ fn story(inputs: &Inputs, relay: &Relay) {
         seen: seen.clone(),
         replied: false,
         digest: None,
+        busy: 0,
+        started: clock.now().now,
     });
     for host in hosts {
         world.spawn(|| host);
@@ -253,6 +261,14 @@ impl Judge<'_> {
         }
         let cluster::Root::Client { calls, .. } = host else { panic!("client root") };
         *calls = Some(Box::new(batch));
+    }
+    fn install(&mut self, host: &mut cluster::Root) {
+        // A key's first answer is replayed (client/tools.md, 7): each ask again draws a fresh key.
+        let key = format!("live-install-{}", self.busy);
+        self.one(host, &["forge-install", "1", "--key", &key], Stage::Link);
+    }
+    fn elapsed(&self) -> u64 {
+        self.now.saturating_since(self.started).as_nanos() / 1_000_000_000
     }
     fn one(&mut self, host: &mut cluster::Root, args: &[&str], stage: Stage) {
         self.queue(host, vec![ctl::Call::new(args)]);
@@ -288,7 +304,7 @@ impl Judge<'_> {
                     "live-app",
                 ]),
                 ctl::Call::new(&["wait", "forges", "--until", "connected:1"]),
-                ctl::Call::new(&["forge-install", "1", "--key", "live-install"]),
+                ctl::Call::new(&["wait", "forges", "--until", "settled"]),
             ],
         );
         self.stage = Stage::Install;
@@ -310,16 +326,35 @@ impl Judge<'_> {
     fn called(&mut self, host: &mut cluster::Root, calls: &ctl::Calls) {
         for (index, ended) in calls.ends().iter().enumerate() {
             self.seen.borrow_mut().outputs.extend([ended.stdout.clone(), ended.stderr.clone()]);
+            if self.stage == Stage::Link
+                && ended.exit == Some(Exit::Code(2))
+                && ended.stderr.trim_ascii() == b"busy"
+                && self.busy < BUSY
+            {
+                self.busy += 1;
+                eprintln!(
+                    "live github: install refused busy, asked again ({}/{BUSY}) at {}s",
+                    self.busy,
+                    self.elapsed()
+                );
+                self.install(host);
+                return;
+            }
             let expected = if index == 6 && matches!(self.stage, Stage::Before | Stage::After) { 2 } else { 0 };
-            assert_eq!(
-                ended.exit,
-                Some(Exit::Code(expected)),
-                "live ctl failed in {:?} (output retained for secrecy scan)",
-                self.stage
-            );
+            if ended.exit != Some(Exit::Code(expected)) {
+                // The failed call's words are shown once the secrecy scan has passed over them.
+                scan(self.inputs, self.relay, &[ended.stdout.clone(), ended.stderr.clone()]);
+                panic!(
+                    "live ctl call {index} failed in {:?}: {:?}, stderr: {}",
+                    self.stage,
+                    ended.exit,
+                    String::from_utf8_lossy(&ended.stderr)
+                );
+            }
         }
         match self.stage {
-            Stage::Install => {
+            Stage::Install => self.install(host),
+            Stage::Link => {
                 let text = std::str::from_utf8(&calls.ends().last().expect("install").stdout).expect("link text");
                 let link = text.lines().find(|s| s.starts_with("https://")).expect("GitHub installation link");
                 let state = link
