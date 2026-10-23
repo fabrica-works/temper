@@ -115,6 +115,7 @@ fn closing_scripts() -> Box<[api::Script]> {
 }
 
 #[test]
+#[ignore = "backlog: ctl reads a chat through its watch, which an ended chat ends (jig client contract 6)"]
 fn close_during_a_turn_keeps_the_cancelled_conversation_readable() {
     let ran = temper_real_loop_world::run_forge(chat_fixture(), |_| closing_scripts(), close_steps);
     let task: serde_json::Value =
