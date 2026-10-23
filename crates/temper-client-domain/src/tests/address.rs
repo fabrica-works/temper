@@ -131,3 +131,31 @@ fn each_number_spans_its_types_range() {
     assert_eq!(parse(b"/chats/18446744073709551616"), Place::Missing);
     assert_eq!(parse(b"/projects/4294967296/adopt"), Place::Missing);
 }
+
+#[test]
+fn the_welcome_prints_and_parses_each_step() {
+    use crate::Step;
+    for (step, path) in [
+        (Step::Welcome, b"/welcome".as_slice()),
+        (Step::Forge, b"/welcome?at=forge"),
+        (Step::Model, b"/welcome?at=model"),
+        (Step::Ready, b"/welcome?at=ready"),
+    ] {
+        let address = Address::Welcome { step };
+        assert_eq!(&*print(&address), path);
+        assert_eq!(parse(path), Place::Address(address));
+    }
+}
+#[test]
+fn a_welcome_query_it_cannot_read_opens_its_first_step() {
+    for path in [
+        b"/welcome?at=done".as_slice(),
+        b"/welcome?x=1",
+        b"/welcome?at=",
+        b"/welcome?at=Forge",
+        b"/welcome?at=done&at=forge",
+    ] {
+        assert_eq!(parse(path), Place::Address(Address::Welcome { step: crate::Step::Welcome }));
+    }
+    assert_eq!(parse(b"/welcome?x=1&at=model&at=forge"), Place::Address(Address::Welcome { step: crate::Step::Model }));
+}

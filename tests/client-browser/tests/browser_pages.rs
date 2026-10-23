@@ -17,7 +17,10 @@ fn back_then_forward_returns_to_the_chat() {
     assert_eq!(Harness::new(tier.setup()).run(&mut [&mut started]), Outcome::Done, "the chat to return to");
     let chats = Shown { address: b"/chats", sees: Find::exactly_named(Role::Heading { level: 1 }, b"Chats") };
     let chat = Shown { address: FIRST_CHAT_ADDRESS, sees: first_chat(b"Hello") };
-    assert_eq!(stories::back_and_forward(&tier.setup(), chats, chat, tier.states().live), Outcome::Done);
+    assert_eq!(
+        stories::back_and_forward(&tier.setup(), chats, chat, Find::exactly_named(Role::Link, b"Set up temper")),
+        Outcome::Done
+    );
 }
 
 #[test]
@@ -25,6 +28,8 @@ fn a_non_page_address_opens_the_inbox_at_slash() {
     let tier = Tier::new("non-page-address");
     let see = |find| Step::Person(PersonStep::See { find, within: WITHIN });
     let mut script = Script::new(Box::new([
+        see(Find::exactly_named(Role::Link, b"Set up temper")),
+        Step::Person(PersonStep::Go { address: Box::from(b"/chats".as_slice()) }),
         see(tier.states().live),
         Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Link, b"Chats") }),
         see(Find::exactly_named(Role::Heading { level: 1 }, b"Chats")),
@@ -42,6 +47,8 @@ fn enter_starts_one_chat_keeping_a_shift_enter_break() {
     let composer = || Find::exactly_named(Role::TextArea, b"Start a chat");
     let chats = || Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Link, b"Chats") });
     let mut script = Script::new(Box::new([
+        see(Find::exactly_named(Role::Link, b"Set up temper")),
+        Step::Person(PersonStep::Go { address: Box::from(b"/chats".as_slice()) }),
         see(tier.states().live),
         chats(),
         see(composer()),
@@ -67,7 +74,7 @@ fn a_panic_shows_the_failure_page() {
 #[test]
 fn a_chat_has_a_day_and_turn_clocks_beside_separately_named_speakers() {
     let tier = Tier::demo("chat-turn-times");
-    let mut steps = temper_client_browser_world::start_chat(b"Add CSV export to widget");
+    let mut steps = temper_client_browser_world::start_playground_chat(b"Add CSV export to widget");
     for find in [
         Find::exactly_named(Role::Log, b"Conversation"),
         Find::exactly_named(Role::Paragraph, b"You"),

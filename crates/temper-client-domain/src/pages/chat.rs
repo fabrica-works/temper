@@ -584,6 +584,7 @@ impl Chat {
             | Act::SignOut
             | Act::ChatWords { .. }
             | Act::StartChat
+            | Act::Playground
             | Act::Suggest { .. }
             | Act::ChatFilter { .. }
             | Act::PlanFilter { .. }

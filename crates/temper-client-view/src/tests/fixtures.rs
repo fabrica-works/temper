@@ -109,7 +109,7 @@ pub fn node_text(tree: &skein_ui::Tree, index: usize) -> Box<[u8]> {
         .expect("fixture index fits");
     nodes_text(&tree.nodes()[index..end])
 }
-fn nodes_text(nodes: &[skein_ui::Node]) -> Box<[u8]> {
+pub(super) fn nodes_text(nodes: &[skein_ui::Node]) -> Box<[u8]> {
     let mut bytes = 0_usize;
     for node in nodes {
         for run in &node.text {
@@ -253,6 +253,15 @@ fn root_at_with_activity(
         Event::Client { event: jig_client::Event::StartUnlinked { kept: List::with_capacity(0) } },
         &mut out,
     );
+    let welcome = match address {
+        temper_client_domain::Address::Welcome { .. } => true,
+        temper_client_domain::Address::Chats
+        | temper_client_domain::Address::Accounts
+        | temper_client_domain::Address::Inbox { .. }
+        | temper_client_domain::Address::Adopt { .. }
+        | temper_client_domain::Address::Chat { .. }
+        | temper_client_domain::Address::Task { .. } => false,
+    };
     // Sign in before opening the page's one-shot activity read.
     temper_client_domain::step(
         &mut root,
@@ -308,7 +317,7 @@ fn root_at_with_activity(
         &mut out,
     );
     answer_activity(&mut root, &env, activity_read, activity, &mut out);
-    if let Some((project, model)) = demo {
+    if demo.is_some() || welcome {
         let mut read = None;
         while let Some(request) = out.pop() {
             if let Request::Client {
@@ -321,15 +330,53 @@ fn root_at_with_activity(
                 read = Some(token);
             }
         }
-        deliver_demo(
-            &mut root,
-            read.expect("live link reads demo"),
-            account_watch.expect("accounts watch"),
-            project,
-            model,
-        );
+        if let Some((project, model)) = demo {
+            deliver_demo(
+                &mut root,
+                read.expect("live link reads demo"),
+                account_watch.expect("accounts watch"),
+                project,
+                model,
+            );
+        } else {
+            deliver_no_demo(&mut root, read.expect("demo read"), account_watch.expect("accounts watch"));
+        }
     }
     (root, watch.expect("me opened"), inbox_watch, tree_watch, account_watch)
+}
+fn deliver_no_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Token) {
+    root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read,
+                    result: jig_client::Readout::Family { family: wire::FORGE, record: None },
+                },
+            },
+        },
+    );
+    root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(Box::new(c::OwnerAccounts {
+                        accounts: List::with_capacity(0),
+                        readiness: List::with_capacity(0),
+                        readiness_cut: false,
+                        program_hosts: List::with_capacity(0),
+                        signing: List::with_capacity(0),
+                        last_end: None,
+                        usable: false,
+                        settled: true,
+                        cut: false,
+                    }))),
+                },
+            },
+        },
+    );
 }
 fn activity_token(request: Option<&temper_client_domain::Request>) -> Option<Token> {
     if let Some(temper_client_domain::Request::Client {
@@ -1289,3 +1336,9 @@ fn deliver_demo(root: &mut temper_client_domain::Domain, read: Token, watch: Tok
 }
 
 pub mod panel;
+
+/// First-run facts answered, with or without the deployment's demo.
+pub fn welcome_root(step: temper_client_domain::Step, demo: bool) -> temper_client_domain::Domain {
+    let address = temper_client_domain::Address::Welcome { step };
+    root_at_with_demo(address, &domain_limits(), b"Shop", if demo { Some((PROJECT, true)) } else { None }).0
+}

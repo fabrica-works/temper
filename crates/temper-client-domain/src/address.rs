@@ -6,9 +6,18 @@ pub enum Address {
     Inbox { filter: Filter },
     Chats,
     Accounts,
+    Welcome { step: Step },
     Chat { task: u64 },
     Task { task: u64 },
     Adopt { project: u32 },
+}
+/// The welcome's query names its step (client/browser.md, 2.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Step {
+    Welcome,
+    Forge,
+    Model,
+    Ready,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Filter {
@@ -38,6 +47,14 @@ pub enum Place {
 pub fn print(address: &Address) -> Box<[u8]> {
     let (name, number, tail) = match address {
         Address::Inbox { filter } => return print_filter(*filter),
+        Address::Welcome { step } => {
+            return match step {
+                Step::Welcome => b"/welcome".as_slice().into(),
+                Step::Forge => b"/welcome?at=forge".as_slice().into(),
+                Step::Model => b"/welcome?at=model".as_slice().into(),
+                Step::Ready => b"/welcome?at=ready".as_slice().into(),
+            };
+        }
         Address::Accounts => (b"accounts".as_slice(), None, b"".as_slice()),
         Address::Chats => (b"chats".as_slice(), None, b"".as_slice()),
         Address::Chat { task } => (b"chats".as_slice(), Some(*task), b"".as_slice()),
@@ -85,6 +102,7 @@ pub fn parse(path: &[u8]) -> Place {
     let (number, tail) = segment(rest);
     let address = match (name, number, tail) {
         (b"accounts", b"", b"") => Address::Accounts,
+        (b"welcome", b"", b"") => Address::Welcome { step: welcome_step(fields) },
         (b"chats", b"", b"") => Address::Chats,
         (b"chats", _, b"") => {
             let Some(task) = decimal(number) else {
@@ -203,4 +221,31 @@ fn decimal(bytes: &[u8]) -> Option<u64> {
 fn project_decimal(bytes: &[u8]) -> Option<u32> {
     let number = decimal(bytes)?;
     u32::try_from(number).ok()
+}
+
+fn welcome_step(query: &[u8]) -> Step {
+    let mut step = Step::Welcome;
+    let mut seen = false;
+    let mut rest = query;
+    for _ in 0..query.len() {
+        if rest.is_empty() {
+            break;
+        }
+        let end = skein_lib::bytes::find(rest, b"&").unwrap_or(rest.len());
+        let field = rest.get(..end).expect("separator in query");
+        rest = rest.get(end..).expect("separator in query").strip_prefix(b"&").unwrap_or(b"");
+        if let Some(value) = field.strip_prefix(b"at=") {
+            if seen {
+                continue;
+            }
+            seen = true;
+            step = match value {
+                b"forge" => Step::Forge,
+                b"model" => Step::Model,
+                b"ready" => Step::Ready,
+                _ => Step::Welcome,
+            };
+        }
+    }
+    step
 }

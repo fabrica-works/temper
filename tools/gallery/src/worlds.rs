@@ -171,8 +171,14 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                         &record.bytes,
                         &temper_client_domain::forge::wire_limits(&limits.forge).expect("wire limits"),
                     )
-                    .expect("gallery change watch");
-                    let w::Watch::Change(subject) = watching.watch() else { panic!("gallery change watch") };
+                    .expect("gallery forge watch");
+                    let subject = match watching.watch() {
+                        w::Watch::Forges => {
+                            forges_watched(&mut root, w, watch, &mut out);
+                            continue;
+                        }
+                        w::Watch::Change(subject) => subject,
+                    };
                     if let Some(panel) = change_panel(w, subject.task()) {
                         for up in [
                             jig_client::Up::Watched { watch, event: c::WatchEvent::Opened },
@@ -203,6 +209,40 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
         assert!(root.demo().expect("answered demo").1.model);
     }
     root
+}
+fn forges_watched(root: &mut Domain, world: World, watch: Token, out: &mut Queue<Request>) {
+    use temper_client_protocol_wire as wire;
+    let record = jig_client::Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: forges(world) };
+    step(
+        root,
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::FamilyDelivered { watch, record } } },
+        out,
+    );
+}
+fn forges(world: World) -> Box<[u8]> {
+    use temper_client_protocol_wire::{self as wire, v1 as w};
+    let limits = temper_client_domain::forge::wire_limits(&limits().forge).expect("wire limits");
+    let mut rows = List::with_capacity(1);
+    if matches_demo(world) {
+        rows.push(
+            w::ForgeRow::new(
+                &limits,
+                w::ForgeRowParts {
+                    number: FORGE,
+                    kind: w::Kind::Forgejo,
+                    mode: w::Mode::Fake,
+                    connection: w::Connection::Connected(
+                        w::Connected::new(&limits, w::ConnectedParts { id: 1, login: b"temper".as_slice().into() })
+                            .expect("demo login"),
+                    ),
+                    offer: w::Offer::NotOffered,
+                },
+            )
+            .expect("demo forge"),
+        )
+        .expect("one forge");
+    }
+    wire::forges(&w::Forges::new(&limits, w::ForgesParts { forges: rows }).expect("gallery forges"))
 }
 fn change_panel(w: World, task: u64) -> Option<temper_client_protocol_wire::v1::ChangePanel> {
     use temper_client_protocol_wire::v1 as w;
@@ -2160,7 +2200,7 @@ fn deployment(w: World) -> c::OwnerDeployment {
 pub(super) fn now(w: World) -> Wall {
     let minutes = match w {
         FirstRun { step } => match step {
-            1 => 0,
+            0 | 1 => 0,
             2 => 2,
             3 => 4,
             4 => 6,

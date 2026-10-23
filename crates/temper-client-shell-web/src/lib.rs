@@ -46,7 +46,7 @@ pub fn start() {
         return;
     }
     // Replace the printed secret's address before starting anything that can send.
-    let secret = sign_in::web::take_from_page(&sign_in::Route { path: b"/jig/v1/sign-in/link", home: b"/chats" });
+    let secret = sign_in::web::take_from_page(&sign_in::Route { path: b"/jig/v1/sign-in/link", home: b"/welcome" });
     let window = web_sys::window().expect("window");
     let mount = window.document().expect("document").get_element_by_id("app").expect("bundle mount");
     let facts = platform::facts();

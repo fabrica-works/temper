@@ -7,6 +7,7 @@ pub(crate) mod chat;
 pub(crate) mod chats;
 pub(crate) mod inbox;
 pub(crate) mod task;
+pub(crate) mod welcome;
 
 pub(crate) fn project_name<'a>(
     pages: &temper_client_domain::pages::Pages,

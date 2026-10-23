@@ -97,6 +97,19 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
     builder.open(Role::Banner);
     builder.style(crate::look::BANNER);
     text(builder, Role::Paragraph, &words.say(crate::words::Word::Brand, &[]), Some(crate::look::BRAND));
+    if let Address::Welcome { .. } = pages.address()
+        && unavailable(root).is_none()
+    {
+        builder.open(Role::Slot);
+        builder.style(crate::look::CORNER);
+        if let Some(me) = me {
+            text(builder, Role::Status, me.party.name.bytes(), None);
+            action(builder, Role::Button, &words.say(crate::words::Word::SignOut, &[]), Act::SignOut, false, bindings);
+        }
+        builder.close();
+        builder.close();
+        return;
+    }
     builder.open(Role::Disclosure);
     builder.name(&words.say(crate::words::Word::Menu, &[]));
     builder.style(crate::look::MENU);
@@ -183,7 +196,9 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     let (inbox_current, adopt_current) = match root.pages().address() {
         Address::Inbox { .. } => (true, false),
         Address::Adopt { .. } => (false, true),
-        Address::Chats | Address::Chat { .. } | Address::Task { .. } | Address::Accounts => (false, false),
+        Address::Welcome { .. } | Address::Chats | Address::Chat { .. } | Address::Task { .. } | Address::Accounts => {
+            (false, false)
+        }
     };
     let count = match root.pages().me(root.client()) {
         Some(me) => me.needs_total,
@@ -224,7 +239,11 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         Act::Go { address: Address::Chats },
         match root.pages().address() {
             Address::Chats | Address::Chat { .. } => true,
-            Address::Inbox { .. } | Address::Task { .. } | Address::Adopt { .. } | Address::Accounts => false,
+            Address::Welcome { .. }
+            | Address::Inbox { .. }
+            | Address::Task { .. }
+            | Address::Adopt { .. }
+            | Address::Accounts => false,
         },
         bindings,
     );

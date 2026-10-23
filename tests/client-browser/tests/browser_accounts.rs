@@ -16,10 +16,11 @@ fn the_accounts_page_returns_after_a_key_send() {
     let chats = || Find::exactly_named(Role::Heading { level: 1 }, b"Chats");
     let address = || Find::text(b"Open the sign-in page");
     let mut script = Script::new(Box::new([
-        see(tier.states().live),
-        press(b"Accounts", Role::Link),
+        see(Find::exactly_named(Role::Link, b"Set up temper")),
+        Step::Person(PersonStep::Go { address: Box::from(b"/accounts".as_slice()) }),
         see(accounts()),
         Step::Address(Box::from(b"/accounts".as_slice())),
+        see(Find::exactly_named(Role::Button, b"Use an API key")),
         press(b"Use an API key", Role::Button),
         input(b"Key (pasted once)", b"private-browser-key"),
         press(b"Add key", Role::Button),

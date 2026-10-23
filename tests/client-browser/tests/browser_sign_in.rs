@@ -1,7 +1,6 @@
 //! Signing in by the printed link (client/browser.md, 4.1, story 1): the page takes the secret from its own
-//! address, puts `/chats` in its place, and the browser keeps jig's cookie; a reload signs in by that cookie, and a
+//! address, puts `/welcome` in its place, and the browser keeps jig's cookie; a reload signs in by that cookie, and a
 //! spent link shows the signed-out words.
-use jig_client_fake_person_browser::stories;
 use skein_fake_person::{Find, Step as PersonStep};
 use skein_fake_person_browser::{Harness, Outcome, Script, Step};
 use skein_ui::Role;
@@ -10,11 +9,11 @@ use temper_client_browser_world::{FIRST_CHAT_ADDRESS, Tier, WITHIN, first_chat};
 #[test]
 fn the_printed_link_signs_in() {
     let tier = Tier::new("printed-link");
-    let chats = Find::exactly_named(Role::Heading { level: 1 }, b"Chats");
+    let welcome = Find::exactly_named(Role::Heading { level: 1 }, b"Welcome to temper");
     let mut script = Script::new(Box::new([
-        Step::Person(PersonStep::See { find: chats, within: WITHIN }),
-        Step::Person(PersonStep::See { find: tier.states().live, within: WITHIN }),
-        Step::Address(Box::from(b"/chats".as_slice())),
+        Step::Person(PersonStep::See { find: welcome, within: WITHIN }),
+        Step::Person(PersonStep::See { find: Find::exactly_named(Role::Link, b"Set up temper"), within: WITHIN }),
+        Step::Address(Box::from(b"/welcome".as_slice())),
     ]));
     assert_eq!(Harness::new(tier.setup()).run(&mut [&mut script]), Outcome::Done);
 }
@@ -37,5 +36,11 @@ fn a_reload_on_a_chat_signs_in_by_its_cookie() {
 #[test]
 fn a_spent_link_shows_the_signed_out_words() {
     let tier = Tier::new("spent-link");
-    assert_eq!(stories::a_spent_link_signs_the_person_out(&tier.setup(), &tier.states()), Outcome::Done);
+    let mut script = Script::new(Box::new([
+        Step::Person(PersonStep::See { find: Find::exactly_named(Role::Link, b"Set up temper"), within: WITHIN }),
+        Step::Reopen,
+        Step::Person(PersonStep::See { find: tier.states().signed_out, within: WITHIN }),
+        Step::Address(Box::from(b"/welcome".as_slice())),
+    ]));
+    assert_eq!(Harness::new(tier.setup()).run(&mut [&mut script]), Outcome::Done);
 }

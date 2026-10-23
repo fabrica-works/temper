@@ -5,6 +5,7 @@ mod choice;
 mod delegation;
 mod inbox;
 mod task;
+mod welcome;
 use super::fixtures;
 use crate::{
     Action, Address,

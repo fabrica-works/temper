@@ -548,7 +548,7 @@ fn form_page(
         Some(p) => p.outcome.is_none(),
         None => false,
     };
-    add_account(b, root, w, bindings, form, busy);
+    add_account(b, root, w, bindings, form, text_per_node);
     b.open(Role::Form);
     b.name(&words::say(w, W::Accounts, &[]));
     for (field, word, value) in [
@@ -627,17 +627,20 @@ fn form_page(
     }
     control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false, false);
     b.close();
-    outcome(b, root, w, form, text_per_node);
     b.close();
 }
-fn add_account(
+pub(crate) fn add_account(
     b: &mut Builder,
     root: &Domain,
     w: &Words,
     bindings: &mut Bindings,
     form: &accounts::Accounts,
-    busy: bool,
+    text_per_node: u32,
 ) {
+    let busy = match &form.pending {
+        Some(p) => p.outcome.is_none(),
+        None => false,
+    };
     text(b, w, Role::Heading { level: 2 }, W::AddAccount);
     b.open(Role::Form);
     b.name(&words::say(w, W::AddAccount, &[]));
@@ -656,6 +659,7 @@ fn add_account(
         );
     }
     offered_ways(b, root, w, bindings, form, busy);
+    outcome(b, root, w, form, text_per_node);
     b.close();
 }
 fn key_field(b: &mut Builder, w: &Words, bindings: &mut Bindings, form: &accounts::Accounts, busy: bool) {

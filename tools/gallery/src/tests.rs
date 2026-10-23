@@ -54,6 +54,17 @@ enum Part {
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
+        name: "welcome-first-run-0",
+        heading: "Welcome to temper",
+        parts: &[
+            Part::Named { role: Role::List, name: "Steps" },
+            Part::Named { role: Role::Region, name: "Try the playground" },
+            Part::Named { role: Role::Button, name: "Try the playground" },
+            Part::Named { role: Role::Region, name: "Set up temper" },
+            Part::Named { role: Role::Link, name: "Set up temper" },
+        ],
+    },
+    Holds {
         name: "chats-solo",
         heading: "Chats",
         parts: &[
@@ -449,8 +460,12 @@ fn print_writes_every_page_and_the_bundle() {
         assert!(at >= position, "table order");
         position = at + link.len();
         let page = fs::read_to_string(out.join(format!("{}.html", sample.name))).expect("sample page");
-        assert!(page.contains("class=\"temper-menu\""), "{}: menu disclosure", sample.name);
-        assert!(page.contains("<summary>Menu</summary>"), "{}: menu name", sample.name);
+        if matches!(sample.address, temper_client_domain::Address::Welcome { .. }) {
+            assert!(!page.contains("<summary>Menu</summary>"), "welcome has a bare frame");
+        } else {
+            assert!(page.contains("class=\"temper-menu\""), "{}: menu disclosure", sample.name);
+            assert!(page.contains("<summary>Menu</summary>"), "{}: menu name", sample.name);
+        }
         let mut position = 0;
         for file in ["skein-ui.css", "temper.css", "task-pages.css"] {
             let link = format!("href=\"bundle/{digest}/{file}\"");

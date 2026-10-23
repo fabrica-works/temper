@@ -22,6 +22,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         }
         Event::Went { place } => went(root, env, place, out),
         Event::Act { action } => match action {
+            Action::Pages(crate::pages::Act::Playground) => playground(root, env, out),
             Action::Pages(crate::pages::Act::Suggest { cue }) => suggest(root, env, cue, out),
             Action::Pages(act) => pages(root, env, crate::pages::Event::Act { act }, out),
             Action::Forge(act) => forge(root, env, forge::Event::Act { act }, out),
@@ -198,4 +199,14 @@ fn suggest(root: &mut Domain, env: &Env<Limits>, cue: u8, out: &mut Queue<Reques
             crate::pages::Request::Show { address } => out.push(Request::Show { address, replace: false }),
         }
     }
+}
+
+fn playground(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let Some(demo) = root.forge.demo() else { return };
+    if !root.demo_answered() {
+        return;
+    }
+    let project = demo.project;
+    pages(root, env, crate::pages::Event::Act { act: crate::pages::Act::Project { project } }, out);
+    out.push(Request::Show { address: Address::Chats, replace: false });
 }

@@ -203,6 +203,24 @@ pub const KIND_MENU: Style = Style { owner: owner(), token: 98 };
 pub const WAIT: Style = Style { owner: owner(), token: 99 };
 /// Inbox presentation (client/README.md, 3.5).
 pub const UPDATE_TIME: Style = Style { owner: owner(), token: 100 };
+/// Centred first-run column.
+pub const WELCOME: Style = Style { owner: owner(), token: 101 };
+/// Four wizard steps.
+pub const WELCOME_STEPS: Style = Style { owner: owner(), token: 102 };
+/// One wizard step, marked when current.
+pub const WELCOME_STEP: Style = Style { owner: owner(), token: 103 };
+/// The playground and setup cards.
+pub const WELCOME_CHOICES: Style = Style { owner: owner(), token: 104 };
+/// One first-run choice.
+pub const WELCOME_CARD: Style = Style { owner: owner(), token: 105 };
+/// The step’s introduction.
+pub const WELCOME_LEAD: Style = Style { owner: owner(), token: 106 };
+/// A choice’s cost and time.
+pub const WELCOME_MUTED: Style = Style { owner: owner(), token: 107 };
+/// The closing invitation to connect real backends.
+pub const WELCOME_AFTER: Style = Style { owner: owner(), token: 108 };
+/// Back, Later and the playground alternative.
+pub const WELCOME_FOOT: Style = Style { owner: owner(), token: 109 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -309,6 +327,15 @@ pub const NAMES: Names<'static> = Names {
         b"temper-kind-menu",
         b"temper-wait",
         b"temper-update-time",
+        b"temper-welcome",
+        b"temper-welcome-steps",
+        b"temper-welcome-step",
+        b"temper-welcome-choices",
+        b"temper-welcome-card",
+        b"temper-welcome-lead",
+        b"temper-welcome-muted",
+        b"temper-welcome-after",
+        b"temper-welcome-foot",
     ],
     regions: &[b"temper-link"],
 };

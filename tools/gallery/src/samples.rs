@@ -32,7 +32,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 32;
+pub const N: usize = 33;
 #[must_use]
 pub fn samples() -> [Sample; N] {
     use Then::{
@@ -45,6 +45,12 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "inbox-solo", world: Solo, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
         Sample { name: "task-solo-T3", world: Solo, address: Address::Task { task: 3 }, then: Shown },
         Sample { name: "accounts-solo", world: Solo, address: Address::Accounts, then: Shown },
+        Sample {
+            name: "welcome-first-run-0",
+            world: FirstRun { step: 0 },
+            address: Address::Welcome { step: temper_client_domain::Step::Welcome },
+            then: Shown,
+        },
         Sample { name: "chats-first-run-1", world: FirstRun { step: 1 }, address: Address::Chats, then: Shown },
         Sample { name: "adoption", world: Reference, address: Address::Adopt { project: 1 }, then: Shown },
         Sample { name: "adoption-filled", world: Reference, address: Address::Adopt { project: 1 }, then: Filled },
@@ -110,6 +116,7 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         Address::Chat { task } => ("chat", Some(task)),
         Address::Inbox { .. } => ("inbox", None),
         Address::Accounts => ("accounts", None),
+        Address::Welcome { .. } => ("welcome", None),
         Address::Task { task } => ("task", Some(task)),
         Address::Adopt { .. } => return None,
     };

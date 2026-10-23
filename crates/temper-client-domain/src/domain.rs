@@ -34,6 +34,10 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
 }
 impl Domain {
     #[must_use]
+    pub const fn demo_answered(&self) -> bool {
+        self.forge.demo_answered()
+    }
+    #[must_use]
     pub fn demo(&self) -> Option<(&forge::Demo, forge::demo::Halves)> {
         let answer = self.forge.demo()?;
         let halves = forge::demo::halves(Some(answer), self.pages.accounts_document(&self.client));
@@ -59,11 +63,13 @@ impl Domain {
 }
 pub fn step(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     route::event(root, env, event, out);
+    welcome(root, out);
 }
 pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut client = Queue::with_capacity(jig_client::max_out(&env.limits.client));
     root.client.fire(env.now, env.wall, &mut client);
     route::route_client(root, env, &mut client, out);
+    welcome(root, out);
 }
 #[must_use]
 pub fn next_deadline(root: &Domain) -> Option<Time> {
@@ -78,4 +84,20 @@ pub fn take(root: &mut Domain, _env: &Env<Limits>, _out: &mut Queue<Request>) {
 pub fn shown(root: &Domain) -> u64 {
     let count = crate::pages::shown(&root.pages);
     count.checked_add(forge::shown(&root.forge)).expect("forge shown count fits")
+}
+
+fn welcome(root: &mut Domain, out: &mut Queue<Request>) {
+    if *root.pages.address() != (crate::Address::Welcome { step: crate::Step::Welcome }) {
+        return;
+    }
+    let Some(page) = root.pages.welcome() else { return };
+    if page.decided {
+        return;
+    }
+    if let Some(over) = crate::pages::welcome::decision(root) {
+        root.pages.decide_welcome();
+        if over {
+            out.push(Request::Show { address: crate::Address::Chats, replace: true });
+        }
+    }
 }

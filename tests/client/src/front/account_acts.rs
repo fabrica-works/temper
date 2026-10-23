@@ -15,21 +15,32 @@ pub const PROVIDER: u32 = 17;
 pub const SMALL_ROWS: u32 = 2;
 #[must_use]
 pub fn fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, false)
+    fixture_root(seed, false, 2, None, false, false)
 }
 #[must_use]
 pub fn plan_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, true)
+    fixture_root(seed, false, 2, None, true, false)
 }
 #[must_use]
 pub fn tools_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, true, 2, None, false)
+    fixture_root(seed, true, 2, None, false, false)
 }
 #[must_use]
 pub fn small_rows_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 3, Some(SMALL_ROWS), false)
+    fixture_root(seed, false, 3, Some(SMALL_ROWS), false, false)
 }
-fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>, plan: bool) -> (Joint, Root) {
+#[must_use]
+pub fn welcome_fixture(seed: u64) -> (Joint, Root) {
+    fixture_root(seed, false, 2, None, false, true)
+}
+fn fixture_root(
+    seed: u64,
+    tools: bool,
+    own_accounts: u32,
+    rows: Option<u32>,
+    plan: bool,
+    welcome: bool,
+) -> (Joint, Root) {
     let mut limits = if tools { temper_client_tools::limits::client() } else { fixtures::domain_limits() };
     if let Some(rows) = rows {
         limits.client.domain.rows = rows;
@@ -58,6 +69,15 @@ fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>, pl
             config.core.settings.llm_providers.providers.get_mut(0).expect("fixture provider").models =
                 Box::new([Box::from(b"scripted".as_slice()), Box::from(b"effort-model".as_slice())]);
         }
+        if welcome {
+            config.core.connectors = Box::new([fixtures::FORGE]);
+            config.forges = Box::new([temper_engine_domain_forge::Configured {
+                number: 1,
+                kind: temper_engine_domain_forge::Kind::Forgejo,
+                mode: temper_engine_domain_forge::Mode::Connected,
+                asked: false,
+            }]);
+        }
         let mut engine_limits = engine_limits();
         // Restore one deployment account and leave the requested room for party accounts.
         engine_limits.documents.lines = engine_limits.documents.lines.max(own_accounts);
@@ -84,7 +104,19 @@ fn fixture_root(seed: u64, tools: bool, own_accounts: u32, rows: Option<u32>, pl
     } else {
         Root::Person(Box::new(temper_client_domain::unlinked(&limits, seed)))
     };
-    event(&mut front, &mut root, Temper::start(temper_client_domain::Address::Accounts, Vec::new(), 0));
+    event(
+        &mut front,
+        &mut root,
+        Temper::start(
+            if welcome {
+                temper_client_domain::Address::Welcome { step: temper_client_domain::Step::Welcome }
+            } else {
+                temper_client_domain::Address::Accounts
+            },
+            Vec::new(),
+            0,
+        ),
+    );
     (front, root)
 }
 pub fn event(front: &mut Joint, root: &mut Root, event: Event) {

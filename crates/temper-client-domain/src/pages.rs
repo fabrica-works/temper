@@ -13,6 +13,7 @@ pub mod choice;
 pub mod delegation;
 pub mod inbox;
 pub mod task;
+pub mod welcome;
 #[derive(Debug)]
 pub struct Pages {
     address: Address,
@@ -26,6 +27,7 @@ pub struct Pages {
     accounts: accounts::Accounts,
     pub(crate) choice: choice::Draft,
     accounts_open: bool,
+    welcome: Option<welcome::Welcome>,
     party: Option<u64>,
     next: u64,
     pub(crate) serial: u64,
@@ -40,6 +42,7 @@ pub enum Act {
     },
     Choice(choice::Act),
     SignOut,
+    Playground,
     Accounts(accounts::Act),
     ChatWords {
         words: Box<[u8]>,
@@ -145,6 +148,7 @@ impl Pages {
             accounts: accounts::Accounts::default(),
             choice: choice::Draft::default(),
             accounts_open: false,
+            welcome: None,
             party: None,
             next: 1,
             serial: 0,
@@ -160,6 +164,16 @@ impl Pages {
     #[must_use]
     pub fn accounts(&self) -> Option<&accounts::Accounts> {
         if self.accounts_open && self.party.is_some() { Some(&self.accounts) } else { None }
+    }
+    #[must_use]
+    pub const fn welcome(&self) -> Option<&welcome::Welcome> {
+        self.welcome.as_ref()
+    }
+    pub(crate) fn decide_welcome(&mut self) {
+        if let Some(welcome) = &mut self.welcome {
+            welcome.decided = true;
+            self.shown = self.shown.checked_add(1).expect("pages shown fits");
+        }
     }
     #[must_use]
     pub fn account_name(&self) -> skein_lib::RequestKey {
@@ -260,6 +274,7 @@ impl Pages {
 pub fn me_handle() -> Handle {
     Handle { asker: Owner::Pages.asker(), number: 0 }
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive page event router followed by watch configuration")]
 pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Started => started(pages, out),
@@ -276,6 +291,9 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         }
         Event::Left => {
             pages.accounts.leave(out);
+            if let Some(mut welcome) = pages.welcome.take() {
+                welcome.leave(out);
+            }
             pages.accounts_open = false;
         }
         Event::Act { act: Act::Choice(act) } => choice::act(pages, client, act, out),
@@ -285,7 +303,9 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             }
         }
         Event::Act { act: Act::StartChat } => start_chat(pages, env, client, out),
-        Event::Act { act: Act::Suggest { .. } } => unreachable!("suggestions are resolved by the root"),
+        Event::Act { act: Act::Suggest { .. } | Act::Playground } => {
+            unreachable!("suggestions are resolved by the root")
+        }
         Event::Act { act: Act::ClosedChats } => closed_chats(pages, out),
         Event::Act { act: Act::ChatFilter { filter } } => chat_filter(pages, filter),
         Event::Act { act: Act::PlanFilter { filter } } => plan_filter(pages, filter),
@@ -344,6 +364,13 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
             None => false,
         };
     pages.accounts.configure(owner, &mut pages.next, out);
+    let owner = match accounts::current_me(client) {
+        Some(me) => me.deployment_role == Some(jig_client::contract::HeldRole::Owner),
+        None => false,
+    };
+    if let Some(welcome) = &mut pages.welcome {
+        welcome.configure(owner, &mut pages.next, out);
+    }
     let me = pages.me(client);
     if let Some(chats) = &mut pages.chats {
         chats.configure(me, pages.project, &env.limits, out);
@@ -373,6 +400,9 @@ fn told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>
 fn started(pages: &mut Pages, out: &mut Queue<Request>) {
     pages.accounts.leave(out);
     pages.accounts_open = false;
+    if let Some(mut welcome) = pages.welcome.take() {
+        welcome.leave(out);
+    }
     pages.address = Address::Inbox { filter: crate::address::Filter::ALL };
     pages.project = None;
     if !pages.watching {
@@ -428,11 +458,19 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
         && pages.inbox.is_none()
         && pages.chats.is_none()
         && pages.chat.is_none()
-        && pages.task.is_none())
+        && pages.task.is_none()
+        && pages.welcome.is_none())
         || pages.address != address
     {
         pages.accounts.leave(out);
-        pages.accounts_open = address == Address::Accounts;
+        pages.accounts_open =
+            address == Address::Accounts || address == (Address::Welcome { step: crate::Step::Model });
+        if let Some(mut welcome) = pages.welcome.take() {
+            welcome.leave(out);
+        }
+        if let Address::Welcome { .. } = address {
+            pages.welcome = Some(welcome::Welcome::new(env.limits.forge));
+        }
         if let Some(inbox) = pages.inbox.take() {
             pages.next = inbox.leave(out);
         }
@@ -496,6 +534,11 @@ fn open_result(pages: &mut Pages, task: u64, through: u64, out: &mut Queue<Reque
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
+    if let Some(welcome) = &mut pages.welcome
+        && welcome.told(client, &told, out)
+    {
+        return true;
+    }
     if pages.accounts.told(client, &told) {
         return true;
     }
@@ -607,6 +650,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::SignOut
         | Act::ChatWords { .. }
         | Act::StartChat
+        | Act::Playground
         | Act::Suggest { .. }
         | Act::MessageWords { .. }
         | Act::Send
@@ -656,7 +700,7 @@ fn redirect_chat(pages: &Pages, client: &Client, out: &mut Queue<Request>) {
 /// Navigation can also close/reopen the two account watches.
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
-    inbox::max_out(limits).checked_add(4).expect("pages output fits")
+    inbox::max_out(limits).checked_add(6).expect("pages output fits")
 }
 
 fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {

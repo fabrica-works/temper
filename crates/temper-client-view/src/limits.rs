@@ -125,7 +125,8 @@ impl Limits {
             .checked_add(dependencies)?
             .checked_add(receiving.projects.checked_mul(4)?)?
             .checked_add(128)?
-            .max(account_nodes)
+            // Welcome steps, cards and foot, plus the shared accounts form.
+            .max(account_nodes.checked_add(64)?)
             .checked_add(choices)?
             // The context line splits the repository from its forge suffix.
             .checked_add(1)?

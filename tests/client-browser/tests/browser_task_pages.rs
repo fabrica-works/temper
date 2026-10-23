@@ -25,8 +25,9 @@ fn a_procedures_plan_reaches_its_agent_and_back_by_address() {
             .within(Box::new([Target::ExactRole { role: Role::TreeItem, name: b"Task 3".as_slice().into() }]))
     };
     let mut story = Script::new(Box::new([
+        see(Find::exactly_named(Role::Button, b"Try the playground")),
+        press(Find::exactly_named(Role::Button, b"Try the playground")),
         see(tier.states().live),
-        press(Find::exactly_named(Role::Link, b"Chats")),
         see(heading(1, b"What shall we change?")),
         see(Find::exactly_named(Role::Button, b"Add CSV export to widget")),
         press(Find::exactly_named(Role::Button, b"Add CSV export to widget")),

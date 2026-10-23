@@ -393,6 +393,7 @@ impl Task {
             | Act::Accounts(_)
             | Act::ChatWords { .. }
             | Act::StartChat
+            | Act::Playground
             | Act::Suggest { .. }
             | Act::Stop
             | Act::Close
@@ -485,6 +486,7 @@ impl Task {
             | Act::Accounts(_)
             | Act::ChatWords { .. }
             | Act::StartChat
+            | Act::Playground
             | Act::Suggest { .. }
             | Act::MessageWords { .. }
             | Act::Send

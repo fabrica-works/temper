@@ -9,7 +9,7 @@ use temper_client_protocol_wire::{self as wire, v1 as w};
 const PROVIDER: u32 = 17;
 const CUE: &[u8] = b"Change the title";
 const DRAFT: &[u8] = b"My draft";
-fn answer(cue: &[u8]) -> Box<[u8]> {
+pub(super) fn answer(cue: &[u8]) -> Box<[u8]> {
     let mut cues = List::with_capacity(1);
     cues.push(cue.into()).unwrap();
     wire::demo_answer(
@@ -87,6 +87,7 @@ fn a_demo_page_replaces_the_last_answer_or_clears_it() {
     ] {
         let mut side = forge::Side::new(&f::limits().forge, f::SEED);
         let first = read(&mut side);
+        assert!(!side.demo_answered(), "{row}: no answer yet");
         demo::told(
             &mut side,
             &Told::Page { handle: first, page: self::page() },
@@ -96,6 +97,7 @@ fn a_demo_page_replaces_the_last_answer_or_clears_it() {
         let shown = forge::shown(&side);
         demo::told(&mut side, &Told::Link { link: Link::Offline }, f::limits().forge, &mut Queue::with_capacity(1));
         assert!(side.demo().is_some(), "{row}: keep the last answer across the gap");
+        assert!(side.demo_answered(), "{row}: keep that the read answered across the gap");
         let handle = read(&mut side);
         assert!(
             demo::told(&mut side, &Told::Page { handle, page }, f::limits().forge, &mut Queue::with_capacity(1)),
@@ -105,7 +107,7 @@ fn a_demo_page_replaces_the_last_answer_or_clears_it() {
         assert_eq!(forge::shown(&side) != shown, !present, "{row}: redraw only on change");
     }
 }
-fn accounts(provider: Option<u32>, usable: bool, cut: bool) -> c::OwnerAccounts {
+pub(super) fn accounts(provider: Option<u32>, usable: bool, cut: bool) -> c::OwnerAccounts {
     let mut sources = List::with_capacity(1);
     sources
         .push(c::OwnerAccountSource {
@@ -286,5 +288,25 @@ fn a_suggestion_starts_one_chat_with_its_cue_and_preserves_the_draft() {
             );
         }
         assert_eq!(root.pages().chats().unwrap().words.as_ref(), DRAFT, "{row}");
+    }
+}
+
+#[test]
+fn the_first_demo_read_answer_counts_even_when_it_has_no_record() {
+    for page in [
+        Readout::Family { family: wire::FORGE, record: None },
+        Readout::NotServed { family: Some(wire::FORGE), served: None },
+        Readout::Limit,
+        Readout::Jig(c::ReadResult::None(c::ReadNone::Unknown)),
+    ] {
+        let mut side = forge::Side::new(&f::limits().forge, f::SEED);
+        let handle = read(&mut side);
+        let before = forge::shown(&side);
+        demo::told(&mut side, &Told::Page { handle, page }, f::limits().forge, &mut Queue::with_capacity(1));
+        assert!(side.demo_answered());
+        assert!(side.demo().is_none());
+        assert!(forge::shown(&side) > before, "an answered absence redraws the welcome");
+        demo::told(&mut side, &Told::Link { link: Link::Offline }, f::limits().forge, &mut Queue::with_capacity(1));
+        assert!(side.demo_answered());
     }
 }

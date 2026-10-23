@@ -34,7 +34,9 @@ fn chat() -> Find {
     Find::named(Role::Heading { level: 1 }, b"T1 \xc2\xb7 ")
 }
 fn played(setup: Setup<'_>, steps: Vec<Step>) {
-    let mut script = Script::new(steps.into_boxed_slice());
+    let mut entered = vec![see(Find::exactly_named(Role::Link, b"Set up temper")), go(b"/chats")];
+    entered.extend(steps);
+    let mut script = Script::new(entered.into_boxed_slice());
     assert_eq!(Harness::new(setup).run(&mut [&mut script]), Outcome::Done);
 }
 fn play(name: &str, steps: Vec<Step>) {
@@ -145,7 +147,7 @@ fn the_printed_link_opened_again_signs_the_person_out() {
     let tier = Tier::new("qa-shell-spent");
     played(
         tier.setup(),
-        vec![see(live()), Step::Reopen, see(tier.states().signed_out), at(b"/chats"), gone(Find::text(b"Needs you"))],
+        vec![see(live()), Step::Reopen, see(tier.states().signed_out), at(b"/welcome"), gone(Find::text(b"Needs you"))],
     );
 }
 
@@ -287,5 +289,6 @@ fn a_restart_shows_offline_then_live_with_the_chat_in_place() {
         at(b"/chats/1"),
         Step::Person(PersonStep::Pause { span: Duration::from_millis(300) }),
     ]);
-    played(setup, steps);
+    let mut script = Script::new(steps.into_boxed_slice());
+    assert_eq!(Harness::new(setup).run(&mut [&mut script]), Outcome::Done);
 }

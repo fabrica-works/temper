@@ -10,6 +10,31 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    WelcomeStep,
+    WelcomeForgeStep,
+    WelcomeModelStep,
+    WelcomeReadyStep,
+    WelcomeSteps,
+    WelcomeTitle,
+    WelcomeLead,
+    WelcomePlayground,
+    WelcomePlaygroundDescription,
+    WelcomePlaygroundCost,
+    WelcomeSetup,
+    WelcomeSetupDescription,
+    WelcomeSetupTime,
+    WelcomeAfter,
+    WelcomeForgeTitle,
+    WelcomeForgeLead,
+    WelcomeForgeUnavailable,
+    WelcomeModelTitle,
+    WelcomeModelLead,
+    WelcomeReadyTitle,
+    WelcomeReadyUnavailable,
+    WelcomeBack,
+    WelcomeLater,
+    WelcomePlaygroundInstead,
+
     TimeYesterdayWord,
     TimeJustNow,
     TimeUnderMinute,
@@ -353,8 +378,32 @@ pub enum Word {
 // Three empty and partial ended-children phrases (5.10).
 // A chat's numbered composer placeholder (3.5).
 // Twelve inbox count, filter, empty and update-line phrases (3.5).
-const PHRASES: u32 = 790;
-const ALL: [Word; 320] = [
+const PHRASES: u32 = 814;
+const ALL: [Word; 344] = [
+    Word::WelcomeStep,
+    Word::WelcomeForgeStep,
+    Word::WelcomeModelStep,
+    Word::WelcomeReadyStep,
+    Word::WelcomeSteps,
+    Word::WelcomeTitle,
+    Word::WelcomeLead,
+    Word::WelcomePlayground,
+    Word::WelcomePlaygroundDescription,
+    Word::WelcomePlaygroundCost,
+    Word::WelcomeSetup,
+    Word::WelcomeSetupDescription,
+    Word::WelcomeSetupTime,
+    Word::WelcomeAfter,
+    Word::WelcomeForgeTitle,
+    Word::WelcomeForgeLead,
+    Word::WelcomeForgeUnavailable,
+    Word::WelcomeModelTitle,
+    Word::WelcomeModelLead,
+    Word::WelcomeReadyTitle,
+    Word::WelcomeReadyUnavailable,
+    Word::WelcomeBack,
+    Word::WelcomeLater,
+    Word::WelcomePlaygroundInstead,
     Word::TimeYesterdayWord,
     Word::TimeJustNow,
     Word::TimeUnderMinute,
@@ -680,6 +729,31 @@ impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::WelcomeStep => 1300,
+            Self::WelcomeForgeStep => 1301,
+            Self::WelcomeModelStep => 1302,
+            Self::WelcomeReadyStep => 1303,
+            Self::WelcomeSteps => 1304,
+            Self::WelcomeTitle => 1305,
+            Self::WelcomeLead => 1306,
+            Self::WelcomePlayground => 1307,
+            Self::WelcomePlaygroundDescription => 1308,
+            Self::WelcomePlaygroundCost => 1309,
+            Self::WelcomeSetup => 1310,
+            Self::WelcomeSetupDescription => 1311,
+            Self::WelcomeSetupTime => 1312,
+            Self::WelcomeAfter => 1313,
+            Self::WelcomeForgeTitle => 1314,
+            Self::WelcomeForgeLead => 1315,
+            Self::WelcomeForgeUnavailable => 1316,
+            Self::WelcomeModelTitle => 1317,
+            Self::WelcomeModelLead => 1318,
+            Self::WelcomeReadyTitle => 1319,
+            Self::WelcomeReadyUnavailable => 1320,
+            Self::WelcomeBack => 1321,
+            Self::WelcomeLater => 1322,
+            Self::WelcomePlaygroundInstead => 1323,
+
             Self::TimeYesterdayWord => 1250,
             Self::TimeJustNow => 1200,
             Self::TimeUnderMinute => 1201,
@@ -1187,9 +1261,35 @@ impl Words {
 }
 const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task from its branch to a landed change."];
 #[expect(clippy::too_many_lines, reason = "one exhaustive table of the client's English words")]
+#[expect(clippy::match_same_arms, reason = "welcome phrases stay independent of the other pages in translations")]
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::WelcomeStep => (&[b"Welcome"], &[]),
+        Word::WelcomeForgeStep => (&[b"Forge"], &[]),
+        Word::WelcomeModelStep => (&[b"Model"], &[]),
+        Word::WelcomeReadyStep => (&[b"Ready"], &[]),
+        Word::WelcomeSteps => (&[b"Steps"], &[]),
+        Word::WelcomeTitle => (&[b"Welcome to temper"], &[]),
+        Word::WelcomeLead => (&[b"Ask for a change in a chat. temper\xe2\x80\x99s agents make it on a branch, open a pull request, and land it once CI passes."], &[]),
+        Word::WelcomePlayground => (&[b"Try the playground"], &[]),
+        Word::WelcomePlaygroundDescription => (&[b"A built-in scripted model and forge. Ask one of three requests and follow its change from a branch to main."], &[]),
+        Word::WelcomePlaygroundCost => (&[b"Nothing leaves this machine, and nothing costs. \xc2\xb7 Ready at once"], &[]),
+        Word::WelcomeSetup => (&[b"Set up temper"], &[]),
+        Word::WelcomeSetupDescription => (&[b"Your forge: GitHub, or a Forgejo temper runs on this machine. Your model: an OpenAI API key."], &[]),
+        Word::WelcomeSetupTime => (&[b"About five minutes"], &[]),
+        Word::WelcomeAfter => (&[b"Started in the playground? Connect your own forge and model whenever you like; the playground then steps aside."], &[]),
+        Word::WelcomeForgeTitle => (&[b"Connect a forge"], &[]),
+        Word::WelcomeForgeLead => (&[b"Where your repositories live: temper\xe2\x80\x99s agents push branches and open pull requests there."], &[]),
+        Word::WelcomeForgeUnavailable => (&[b"Connecting a forge here is not available yet."], &[]),
+        Word::WelcomeModelTitle => (&[b"Connect a model"], &[]),
+        Word::WelcomeModelLead => (&[b"temper\xe2\x80\x99s agents run on it, and what they use is billed to its account."], &[]),
+        Word::WelcomeReadyTitle => (&[b"Almost ready"], &[]),
+        Word::WelcomeReadyUnavailable => (&[b"This step is not available yet."], &[]),
+        Word::WelcomeBack => (&[b"\xe2\x80\xb9 Back"], &[]),
+        Word::WelcomeLater => (&[b"Later"], &[]),
+        Word::WelcomePlaygroundInstead => (&[b"Try the playground instead"], &[]),
+
         Word::DelegationChange => (&[b"T", b" \xc2\xb7 CHANGE"], &[Number]),
         Word::DelegationReport => (&[b"T", b" \xc2\xb7 REPORT"], &[Number]),
         Word::DelegationVerdict => (&[b"T", b" \xc2\xb7 VERDICT"], &[Number]),

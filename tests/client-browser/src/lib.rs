@@ -74,13 +74,27 @@ pub fn start_chat(words: &[u8]) -> Vec<Step> {
     let see = |find| Step::Person(PersonStep::See { find, within: WITHIN });
     let composer = || Find::exactly_named(Role::TextArea, b"Start a chat");
     vec![
+        see(Find::exactly_named(Role::Link, b"Set up temper")),
+        Step::Person(PersonStep::Go { address: Box::from(b"/chats".as_slice()) }),
         see(live()),
-        Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Link, b"Chats") }),
         see(composer()),
         Step::Person(PersonStep::Type { find: composer(), words: Box::from(words) }),
         Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Start") }),
         see(first_chat(words)),
     ]
+}
+/// Choose the playground at the printed link's welcome before starting a chat.
+#[must_use]
+pub fn start_playground_chat(words: &[u8]) -> Vec<Step> {
+    let mut steps = vec![
+        Step::Person(PersonStep::See {
+            find: Find::exactly_named(Role::Button, b"Try the playground"),
+            within: WITHIN,
+        }),
+        Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Try the playground") }),
+    ];
+    steps.extend(start_chat(words).into_iter().skip(2));
+    steps
 }
 fn live() -> Find {
     Find::exactly_named(Role::Status, b"Live")

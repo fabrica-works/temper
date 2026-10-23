@@ -2,7 +2,7 @@
 use skein_fake_person::{Find, Step as PersonStep};
 use skein_fake_person_browser::{Harness, Outcome, Script, Step};
 use skein_ui::Role;
-use temper_client_browser_world::{Tier, WITHIN, start_chat};
+use temper_client_browser_world::{Tier, WITHIN, start_playground_chat};
 
 fn see(find: Find) -> Step {
     Step::Person(PersonStep::See { find, within: WITHIN })
@@ -20,7 +20,7 @@ fn agent() -> Find {
 #[test]
 fn typed_agent_address_survives_reload_and_a_lineage_round_trip() {
     let tier = Tier::demo("qa-task-page-load-history");
-    let mut steps = start_chat(b"Add CSV export to widget");
+    let mut steps = start_playground_chat(b"Add CSV export to widget");
     steps.extend([
         see(Find::exactly_named(Role::Region, b"Task 2")),
         go(b"/tasks/3"),

@@ -9,10 +9,11 @@ pub(super) struct State {
     pub answer: Option<Demo>,
     pub pending: Option<Handle>,
     pub live: bool,
+    pub answered: bool,
 }
 impl State {
     pub const fn new() -> Self {
-        Self { answer: None, pending: None, live: false }
+        Self { answer: None, pending: None, live: false, answered: false }
     }
 }
 /// A link tell remains available to the other children; every forge read page is consumed.
@@ -58,7 +59,9 @@ pub(crate) fn told(side: &mut Side, told: &Told, limits: Limits, out: &mut Queue
                     }
                     Readout::Family { .. } | Readout::NotServed { .. } | Readout::Limit | Readout::Jig(_) => None,
                 };
-                if side.demo.answer != answer {
+                let first = !side.demo.answered;
+                side.demo.answered = true;
+                if first || side.demo.answer != answer {
                     side.demo.answer = answer;
                     side.changed();
                 }
@@ -92,17 +95,24 @@ pub fn halves(answer: Option<&Demo>, accounts: Option<&c::OwnerAccounts>) -> Hal
     }
     halves.forge = true;
     for line in &accounts.accounts {
-        if line.provider != Some(answer.provider) {
-            if line.cut {
-                return halves;
-            }
-            for source in &line.sources {
-                if source.usable {
-                    return halves;
-                }
-            }
+        if (line.provider != Some(answer.provider) && line.cut) || usable_account(line, Some(answer.provider)) {
+            return halves;
         }
     }
     halves.model = true;
     halves
+}
+
+/// A usable source of a provider other than the demo's, or any provider without a demo.
+#[must_use]
+pub fn usable_account(line: &c::OwnerAccountLine, demo_provider: Option<u32>) -> bool {
+    if demo_provider.is_some() && line.provider == demo_provider {
+        return false;
+    }
+    for source in &line.sources {
+        if source.usable {
+            return true;
+        }
+    }
+    false
 }

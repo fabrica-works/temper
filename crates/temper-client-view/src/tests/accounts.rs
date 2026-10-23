@@ -56,7 +56,7 @@ fn ways_root(offers: List<c::ProviderOffer>, demo: bool) -> d::Domain {
     );
     root
 }
-fn offered_root() -> d::Domain {
+pub(super) fn offered_root() -> d::Domain {
     let mut providers = List::with_capacity(1);
     providers.push(offer(PROVIDER, b"openai", true, false)).unwrap();
     ways_root(providers, false)
@@ -767,7 +767,7 @@ mod memory_literal;
 // The page reserves its patch queue once, at four patches a node.
 // A chat's composer placeholder adds one phrase (148 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6978194281;
+const ACCOUNT_BYTES: u64 = 6978197833;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

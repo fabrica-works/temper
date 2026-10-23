@@ -76,6 +76,10 @@ impl Side {
         self.form.as_ref()
     }
     #[must_use]
+    pub const fn demo_answered(&self) -> bool {
+        self.demo.answered
+    }
+    #[must_use]
     pub const fn demo(&self) -> Option<&Demo> {
         self.demo.answer.as_ref()
     }
