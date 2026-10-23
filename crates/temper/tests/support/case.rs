@@ -315,9 +315,7 @@ impl Judge {
         if self.late {
             setup(&mut value, forge, &self.members.dir("forge").join("setup"), &self.git);
         } else {
-            // 4.6 uses no repository: no start-time adoption or forge connection is needed.
-            value["application"]["forges"] = json!([]);
-            value["application"]["identities"] = json!([]);
+            // Keep the required records-only forge and identity, without adopting a repository.
             value["application"]["setup"] = json!([]);
         }
         value["engine"]["hosts"]["listener"] = json!([{"socket":self.hosts.to_string()}]);
