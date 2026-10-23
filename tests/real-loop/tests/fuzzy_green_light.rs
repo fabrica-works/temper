@@ -1,6 +1,6 @@
 //! The person's inbox green light lets the work delegate a CSV change and land it.
 //! The harness names its one fake repository acme/app; it stands as the first
-//! run's demo/widget, with widget's src/main.rs in its tree.
+//! run's playground/widget, with widget's src/main.rs in its tree.
 use serde_json::{Value, json};
 use skein_fake_forge_domain::api;
 use skein_fake_llm_domain::api::{Finish, Line, Part, Query, Role, Script, Turn};

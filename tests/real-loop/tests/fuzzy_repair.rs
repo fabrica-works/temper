@@ -1,7 +1,7 @@
 //! The first run's change fails CI at its first head for what it holds; the engine's
 //! repair writes the CSV header on its branch, CI passes there, and it lands.
 //! The harness names its one fake repository acme/app; it stands as the first
-//! run's demo/widget, with widget's src/main.rs in its tree.
+//! run's playground/widget, with widget's src/main.rs in its tree.
 use serde_json::{Value, json};
 use skein_fake_forge_domain::{Observation, api, object_bytes};
 use skein_fake_llm_domain::api::{Finish, Line, Part, Query, Role, Script, Turn};

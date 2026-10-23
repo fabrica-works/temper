@@ -4,12 +4,12 @@ use jig_client::contract as c;
 use skein_lib::{List, Wall};
 pub const CSV: &[u8] = b"Add CSV export to widget";
 pub const DARK: &[u8] = b"Add a dark theme to widget";
-pub const DELEGATING: &[u8] = "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes();
+pub const DELEGATING: &[u8] = "I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.".as_bytes();
 pub const LANDED: &[u8] =
-    "CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change."
+    "CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change."
         .as_bytes();
-pub const DARK_ANSWER: &[u8] = b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.";
-pub const REPORT: &[u8] = b"The demo changes nothing.";
+pub const DARK_ANSWER: &[u8] = b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.";
+pub const REPORT: &[u8] = b"The playground changes nothing.";
 pub const MERGE: &[u8] = b"1a2b3c4abcdef0123456789abcdef0123456789abcd";
 const OPENING: &[u8] = b"Begin the work your brief describes.";
 const ACK: &[u8] = b"Delegated tasks: 2";
@@ -169,7 +169,7 @@ pub fn activity(dark: bool, landed: bool, turn_text: u32) -> c::ActivityPage {
                         call(
                             3,
                             b"finish",
-                            br#"{"form":"report","text":"The demo changes nothing.","fields":{}}"#,
+                            br#"{"form":"report","text":"The playground changes nothing.","fields":{}}"#,
                             Some(b"accepted"),
                         )
                     } else {

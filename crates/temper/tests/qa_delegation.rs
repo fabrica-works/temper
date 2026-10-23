@@ -80,7 +80,7 @@ fn result_anchor_preserves_the_landed_words_and_task_link() {
     person.type_on(b"demo", b"");
     person.type_on(b"Start a chat: (empty) (enter sends)", b"Add CSV export to widget");
     person.type_on(b"Start", b"");
-    person.wait_for("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes(), WITHIN);
+    person.wait_for("CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.".as_bytes(), WITHIN);
     // This contiguous block checks the title and the first seven characters
     // of the result's merge commit, and keeps the four stand-in steps in
     // their design order.
@@ -120,12 +120,12 @@ fn original_delegate_call_uses_the_ended_task_document() {
     person.type_on(b"demo", b"");
     person.type_on(b"Start a chat: (empty) (enter sends)", b"Add CSV export to widget");
     person.type_on(b"Start", b"");
-    person.wait_for("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes(), WITHIN);
+    person.wait_for("CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.".as_bytes(), WITHIN);
     // The small conversation is whole (client/README.md, 5.4), its first turn
     // within the committed turn's own text budget: the original delegate call
     // carries the card, from the ended task's own document (5.7).
     person.wait_for(
-        format!("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.\n  Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit {merge}\n", merge = demo_merge_short_id()).as_bytes(),
+        format!("I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.\n  Task 2:\n    T2 · CHANGE\n    * Landed\n    ### Export widget's table as CSV\n    CI passed. Landed · merge commit {merge}\n", merge = demo_merge_short_id()).as_bytes(),
         WITHIN,
     );
     person.type_on(b"Task 2", b"");

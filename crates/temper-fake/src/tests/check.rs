@@ -553,7 +553,7 @@ fn stderr_evidence(
         decisions: decisions
             .iter()
             .map(|(number, head)| Decision {
-                repository: b"demo/widget".as_slice().into(),
+                repository: b"playground/widget".as_slice().into(),
                 number: *number,
                 head: *head,
             })
@@ -580,8 +580,8 @@ fn stderr() {
             Input::Evidence(stderr_evidence(b"temper/", allowed(), &[(9, 2), (1, 3)], false)),
             concat!(
                 "{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":false}\n",
-                "{\"decision\":{\"repository\":\"demo/widget\",\"number\":9,\"head\":2}}\n",
-                "{\"decision\":{\"repository\":\"demo/widget\",\"number\":1,\"head\":3}}\n"
+                "{\"decision\":{\"repository\":\"playground/widget\",\"number\":9,\"head\":2}}\n",
+                "{\"decision\":{\"repository\":\"playground/widget\",\"number\":1,\"head\":3}}\n"
             ),
         ),
         (

@@ -16,10 +16,10 @@ Demo:
   This is a demo, running on a demo model and a demo forge.
   [7] Connect a model
   [-] Connect a forge (disabled)
-demo · demo/widget on Demo forge
+demo · playground/widget on Demo forge
 Signed in as the deployment’s owner
 What shall we change?
-  Try a request in demo/widget. Follow the task from its branch to a landed change.
+  Try a request in playground/widget. Follow the task from its branch to a landed change.
   Suggested requests:
     - [8] Add CSV export to widget
     - [9] Add a dark theme to widget

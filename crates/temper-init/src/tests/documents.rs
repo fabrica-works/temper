@@ -159,7 +159,7 @@ fn the_default_is_the_owned_example_so_edited() {
                 json!([{
                     "forge": 1_u16, "directory": "demo/forge", "bot": {"login": "temper", "email": "temper@localhost"},
                     "mode": {"fake": {"listen": {"socket": format!("127.0.0.1:{}", facts.ports.forge)},
-                        "git": "demo/bin/git", "owner": "demo", "repositories": [{"name": "widget", "landing": "main"}]}}
+                        "git": "demo/bin/git", "owner": "playground", "repositories": [{"name": "widget", "landing": "main"}]}}
                 }, {
                     "forge": 3_u16, "directory": "forge-3", "bot": {"login": "temper", "email": "temper@localhost"},
                     "start": "asked",
@@ -220,13 +220,13 @@ fn demo(port: u16) -> Value {
                 {
                     "cue": "Add a dark theme to widget",
                     "turns": [
-                        demo_turn("I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
+                        demo_turn("I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
                     ]
                 },
                 {
                     "cue": "Fix widget's empty search state",
                     "turns": [
-                        demo_turn("I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
+                        demo_turn("I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.")
                     ]
                 }
             ],
@@ -237,7 +237,7 @@ fn demo(port: u16) -> Value {
                 }
             ],
             "otherwise": [
-                demo_turn("I am the demo model: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key.")
+                demo_turn("I am the scripted model, the playground’s: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key.")
             ]
         },
         "forge": 1,
@@ -249,7 +249,7 @@ fn demo(port: u16) -> Value {
 fn csv_chat() -> Value {
     json!([
         scripted_turn(json!([
-            {"text": "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge."},
+            {"text": "I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge."},
             {"call": "delegate", "arguments": {"batch": [{
                 "executor": {"kind": "procedure", "connector": 1, "code": 2},
                 "spec": {"words": "Export widget's table as CSV", "parameters": [
@@ -264,7 +264,7 @@ fn csv_chat() -> Value {
         ])),
         scripted_turn(json!([{"call": "wait", "arguments": {}}])),
         scripted_turn(json!([
-            {"text": "CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change."},
+            {"text": "CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change."},
             {"call": "wait", "arguments": {}}
         ]))
     ])
@@ -298,7 +298,7 @@ fn csv_coding() -> Value {
         }}])),
         scripted_turn(json!([{"call": "finish", "arguments": {"form": "change", "fields": {
             "title": "Add CSV export to widget",
-            "body": "widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted demo change."
+            "body": "widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted change."
         }}}]))
     ])
 }
@@ -321,9 +321,9 @@ fn scripted_turn(lines: Value) -> Value {
 }
 
 fn demo_turn(text: &str) -> Value {
-    json!({"lines": [{"text": text}, {"call": "finish", "arguments": {
-        "form": "report", "text": "The demo changes nothing.", "fields": {}
-    }}], "finish": "tool_calls", "tokens": text.len().div_ceil(4)})
+    scripted_turn(json!([{"text": text}, {"call": "finish", "arguments": {
+        "form": "report", "text": "The playground changes nothing.", "fields": {}
+    }}]))
 }
 
 fn demo_model() -> Value {

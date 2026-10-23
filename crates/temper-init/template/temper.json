@@ -240,7 +240,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 85584104286230,
+    "memory_bytes": 85584104286254,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -948,7 +948,7 @@
               "socket": "$forge"
             },
             "git": "demo/bin/git",
-            "owner": "demo",
+            "owner": "playground",
             "repositories": [
               {
                 "name": "widget",
@@ -1005,7 +1005,7 @@
               {
                 "lines": [
                   {
-                    "text": "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge."
+                    "text": "I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge."
                   },
                   {
                     "call": "delegate",
@@ -1118,7 +1118,7 @@
                   }
                 ],
                 "finish": "tool_calls",
-                "tokens": 256
+                "tokens": 259
               },
               {
                 "lines": [
@@ -1133,7 +1133,7 @@
               {
                 "lines": [
                   {
-                    "text": "CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change."
+                    "text": "CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change."
                   },
                   {
                     "call": "wait",
@@ -1151,19 +1151,19 @@
               {
                 "lines": [
                   {
-                    "text": "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                    "text": "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
                   },
                   {
                     "call": "finish",
                     "arguments": {
                       "form": "report",
-                      "text": "The demo changes nothing.",
+                      "text": "The playground changes nothing.",
                       "fields": {}
                     }
                   }
                 ],
                 "finish": "tool_calls",
-                "tokens": 67
+                "tokens": 87
               }
             ]
           },
@@ -1173,19 +1173,19 @@
               {
                 "lines": [
                   {
-                    "text": "I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
+                    "text": "I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
                   },
                   {
                     "call": "finish",
                     "arguments": {
                       "form": "report",
-                      "text": "The demo changes nothing.",
+                      "text": "The playground changes nothing.",
                       "fields": {}
                     }
                   }
                 ],
                 "finish": "tool_calls",
-                "tokens": 69
+                "tokens": 89
               }
             ]
           }
@@ -1232,13 +1232,13 @@
                       "form": "change",
                       "fields": {
                         "title": "Add CSV export to widget",
-                        "body": "widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted demo change."
+                        "body": "widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted change."
                       }
                     }
                   }
                 ],
                 "finish": "tool_calls",
-                "tokens": 48
+                "tokens": 47
               }
             ]
           }
@@ -1247,19 +1247,19 @@
           {
             "lines": [
               {
-                "text": "I am the demo model: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key."
+                "text": "I am the scripted model, the playground’s: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key."
               },
               {
                 "call": "finish",
                 "arguments": {
                   "form": "report",
-                  "text": "The demo changes nothing.",
+                  "text": "The playground changes nothing.",
                   "fields": {}
                 }
               }
             ],
             "finish": "tool_calls",
-            "tokens": 45
+            "tokens": 70
           }
         ]
       },
