@@ -108,7 +108,7 @@ class AssemblyTests(unittest.TestCase):
         change, = batch['arguments']['batch']
         self.assertEqual(change['executor'], dict(kind='procedure', connector=1, code=2))
         self.assertEqual(change['spec'], dict(words='@coding NOTICE', parameters=[
-            dict(name=1, kind='resource', connector=1, resource=1),
+            dict(name=1, kind='resource', connector=1, resource=4294967297),
             dict(name=2, kind='bytes', value='main')]))
         self.assertEqual(change['contract'], dict(kind='change', connector=1, change_kind=1, words=128))
         self.assertEqual(change['authority']['delegation'], dict(
