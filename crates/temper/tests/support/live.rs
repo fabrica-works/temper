@@ -52,6 +52,7 @@ pub fn configure(directory: &Path, forge: &Throwaway) {
         std::str::from_utf8(arguments).expect("delegate JSON").replace("@coding", "\\u0040coding")
     );
     write_private(&directory.join("charters/chat.txt"), instructions.as_bytes());
+    super::configuration::turn_bounds::apply(&mut value, super::configuration::turn_bounds::turn_body(&agent));
     write_private(&path, &serde_json::to_vec(&value).expect("live configuration JSON"));
     write_private(&agent_path, &serde_json::to_vec(&agent).expect("live agent JSON"));
 }

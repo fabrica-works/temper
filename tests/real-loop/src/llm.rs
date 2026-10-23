@@ -30,10 +30,10 @@ pub fn scripted_sized(scripts: Box<[api::Script]>, strings: u32) -> Recipe {
     // The first-turn request with a workspace mounted measured 31,007 B
     // when the delegate and amend schemas landed.
     const REQUEST: u32 = 65_536;
-    // The fake also parses an opaque scripted item through its request document reader.
-    let request = REQUEST.max(strings);
     // Larger wire chunks keep the zero-latency real-loop peer cheap.
     const WIRE_CHUNK: u32 = 4096;
+    // The fake also parses an opaque scripted item through its request document reader.
+    let request = REQUEST.max(strings);
     let mut config = skein_llm_world::fake::config();
     config.latency_min = Duration::ZERO;
     config.latency_max = Duration::ZERO;

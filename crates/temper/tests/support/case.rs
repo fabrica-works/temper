@@ -263,6 +263,7 @@ impl Judge {
         let forge = self.members.capture("forge", "address").expect("forge address").parse().expect("socket");
         (self.fixture.configure)(&mut value, &mut agent, forge);
         setup(&mut value, forge, &self.members.dir("forge").join("setup"), &self.git, &engine_dir);
+        super::configuration::turn_bounds::apply(&mut value, super::configuration::turn_bounds::turn_body(&agent));
         value["engine"]["hosts"]["listener"] = json!([{"socket":self.hosts.to_string()}]);
         value["engine"]["hosts"]["workers"][0]["name"] = "ws".into();
         value["engine"]["hosts"]["workers"][1]["name"] = "s1".into();

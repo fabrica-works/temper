@@ -217,6 +217,7 @@ pub fn configuration(directory: &Path, forge: &Forge<'_>, value: &mut Value) {
     let path = directory.join("agent.json");
     let mut agent: Value = serde_json::from_slice(&fs::read(&path).expect("agent configuration")).expect("agent JSON");
     landing::configure(value, &mut agent, *api);
+    super::configuration::turn_bounds::apply(value, super::configuration::turn_bounds::turn_body(&agent));
     write_private(&path, &serde_json::to_vec(&agent).expect("agent JSON"));
 }
 

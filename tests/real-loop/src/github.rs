@@ -129,6 +129,7 @@ pub(crate) fn write(path: &Path, address: SocketAddr, clients: SocketAddr, fixtu
         broaden(&mut project["policy"]["projections"]);
     }
     (fixture.configure)(&mut value, &mut agent, address);
+    fixtures::turn_bounds::apply(&mut value, fixtures::turn_bounds::turn_body(&agent));
     fixtures::private(&path.join("temper.json"), &serde_json::to_vec(&value)?)?;
     fixtures::private(&path.join("agent.json"), &serde_json::to_vec(&agent)?)
 }
