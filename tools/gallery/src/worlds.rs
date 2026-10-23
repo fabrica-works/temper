@@ -253,6 +253,7 @@ fn forges(world: World) -> Box<[u8]> {
                     mode: w::Mode::Managed,
                     connection: w::Connection::NotConnected,
                     offer: w::Offer::NotOffered,
+                    first: None,
                 },
             )
             .expect("GitHub choice"),
@@ -277,6 +278,7 @@ fn forges(world: World) -> Box<[u8]> {
                     mode: w::Mode::Owned,
                     connection,
                     offer: w::Offer::Offered,
+                    first: None,
                 },
             )
             .expect("owned Forgejo"),
