@@ -61,6 +61,20 @@ impl Cluster {
         probe(scratch);
         Self::description_from(scratch, directory)
     }
+    /// Reuse the GitHub story's templates with a relay in place of its forge process.
+    #[must_use]
+    pub(crate) fn github_relay(scratch: &Path, git: std::net::SocketAddr) -> Self {
+        let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/support/github");
+        let mut cluster = Self::read_from(scratch, &directory);
+        cluster.specs.retain(|spec| spec["name"] != "forge");
+        for spec in &mut cluster.specs {
+            if let Some(after) = spec["after"].as_array_mut() {
+                after.retain(|name| name != "forge");
+            }
+        }
+        cluster.bind("proc.forge.ready.address", &git.to_string());
+        cluster
+    }
     fn description(scratch: &Path) -> Self {
         Self::description_from(scratch, &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lab/cluster"))
     }

@@ -219,7 +219,7 @@ impl Judge {
             return;
         }
         self.restored = Some(row);
-        self.queue(host, Self::landing_reads());
+        self.queue(host, landing_reads());
         self.stage = Stage::LandingRestored;
     }
     fn install(&mut self, host: &mut cluster::Root, calls: &ctl::Calls) {
@@ -296,7 +296,7 @@ impl Judge {
             Stage::ReplyPages => self.reply_page(host, calls),
             Stage::ChatEnded => {
                 assert_eq!(ctl::json(calls.ends().last().expect("chat ended"))["task"]["chip"]["phase"], "ended");
-                self.queue(host, Self::landing_reads());
+                self.queue(host, landing_reads());
                 self.stage = Stage::BeforeRestart;
             }
             Stage::BeforeRestart => self.before_restart(now, host, calls),
@@ -419,20 +419,6 @@ impl Judge {
             self.members.stop_one("w1");
             self.stage = Stage::StopWorker;
         }
-    }
-    fn landing_reads() -> Vec<ctl::Call> {
-        [
-            &["task", "2", "--json"][..],
-            &["task", "1", "--json"],
-            &["tasks", "--project", "1", "--parent", "1", "--ended", "--json"],
-            &["tasks", "--project", "1", "--parent", "2", "--ended", "--json"],
-            &["forges", "--json"],
-            &["tasks", "--project", "1", "--json"],
-            &["task", "5", "--json"],
-        ]
-        .into_iter()
-        .map(ctl::Call::new)
-        .collect()
     }
     fn check_landing(&mut self, calls: &ctl::Calls) -> Option<String> {
         let task = ctl::json(&calls.ends()[0]);
@@ -719,7 +705,7 @@ fn decode(value: &Value) -> Box<[u8]> {
     )
     .expect("file bytes")
 }
-fn configure_llm(path: &Path) {
+pub(crate) fn configure_llm(path: &Path) {
     use serde_json::json;
     let mut value: Value = serde_json::from_slice(&fs::read(path).expect("LLM fixture")).expect("LLM JSON");
     value["cued"][0]["turns"][0]["lines"] =
@@ -733,8 +719,7 @@ fn configure_llm(path: &Path) {
     super::write_private(path, &serde_json::to_vec(&value).expect("LLM JSON"));
 }
 fn configure_engine(value: &mut Value, forge: SocketAddr) {
-    use serde_json::json;
-    value["application"]["landing"]["projects"] = json!([{"project":1,"rules":[{"connector":1,"kind":4,"pattern":{"segments":["forge",forge.to_string(),"acme","app","branch"],"last":"exact","value":"main"},"enforce":true,"ci":true,"up_to_date":true,"gates":[{"number":1,"blocking":true,"freshness":"exact"}],"approvals":[]}]}]);
+    configure_landing(value, forge, "acme", "app");
     let limits = &mut value["application"]["limits"]["overrides"];
     for (name, millis) in [("poll_ms", 10), ("poll_max_ms", 50), ("slow_ms", 100), ("hinted_ms", 10)] {
         limits[format!("forge.client.{name}")] = millis.into();
@@ -744,4 +729,24 @@ fn configure_engine(value: &mut Value, forge: SocketAddr) {
     limits["forge.client.calls"] = 4.into();
     limits["forge_component.connections"] = 4.into();
     limits["forge_component.log_poll_ms"] = 10.into();
+}
+
+pub(crate) fn landing_reads() -> Vec<ctl::Call> {
+    [
+        &["task", "2", "--json"][..],
+        &["task", "1", "--json"],
+        &["tasks", "--project", "1", "--parent", "1", "--ended", "--json"],
+        &["tasks", "--project", "1", "--parent", "2", "--ended", "--json"],
+        &["forges", "--json"],
+        &["tasks", "--project", "1", "--json"],
+        &["task", "5", "--json"],
+    ]
+    .into_iter()
+    .map(ctl::Call::new)
+    .collect()
+}
+
+pub(crate) fn configure_landing(value: &mut Value, forge: SocketAddr, owner: &str, repository: &str) {
+    use serde_json::json;
+    value["application"]["landing"]["projects"] = json!([{"project":1,"rules":[{"connector":1,"kind":4,"pattern":{"segments":["forge",forge.to_string(),owner,repository,"branch"],"last":"exact","value":"main"},"enforce":true,"ci":true,"up_to_date":true,"gates":[{"number":1,"blocking":true,"freshness":"exact"}],"approvals":[]}]}]);
 }

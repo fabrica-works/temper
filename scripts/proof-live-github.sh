@@ -1,0 +1,130 @@
+#!/bin/sh
+# Owner-run only, domain/testing.md 2.7. Implementers compile this tier offline.
+set -eu
+umask 077
+cd "$(dirname "$0")/.."
+case ${1:-} in freeekanayaka|fabrig-ai) owner=$1 ;; *) printf '%s\n' 'usage: proof-live-github.sh {freeekanayaka|fabrig-ai} [FIXTURES]' >&2; exit 2 ;; esac
+[ "$#" -le 2 ] || exit 2
+fixtures=$(readlink -f "${2:-$HOME/src/rust/tmp/github-conformance}")
+[ -d "$fixtures" ] && [ "$(stat -c %a "$fixtures")" = 700 ] || {
+    printf '%s\n' 'fixtures must be a directory with mode 0700' >&2; exit 2;
+}
+export NEXTEST_DOUBLE_SPAWN=0
+heavy cargo nextest run -p temper --profile live --no-run
+scratch=$(readlink -f "$(mktemp -d "${TMPDIR:-/tmp}/temper-live-github.XXXXXX")")
+cleanup() {
+    # A fresh private cwd identifies only this run's processes. Never inspect environments.
+    owned=
+    for process in /proc/[0-9]*; do
+        case $(readlink "$process/cwd" 2>/dev/null || true) in
+            "$scratch"/*) owned="$owned ${process#/proc/}" ;;
+        esac
+    done
+    for process in $owned; do kill -KILL "$process" 2>/dev/null || true; done
+    attempt=0
+    while [ "$attempt" -lt 100 ]; do
+        left=
+        for process in $owned; do
+            if kill -0 "$process" 2>/dev/null; then left="$left $process"; fi
+        done
+        [ -n "$left" ] || break
+        owned=$left
+        attempt=$((attempt + 1))
+        sleep 0.1
+    done
+    # Python only orchestrates curl and parses public metadata. The person's token
+    # enters curl's configuration on stdin, never its argv, a log, or a copied file.
+    python3 - "$scratch" "$fixtures" "$owner" <<'PY'
+import json
+import pathlib
+import re
+import subprocess
+import sys
+import urllib.parse
+scratch, fixtures, owner = map(pathlib.Path, sys.argv[1:])
+owner = str(owner)
+manifest = scratch / 'run.json'
+if not manifest.exists():
+    sys.exit(0)
+run = json.loads(manifest.read_text())
+if run.get('cleaned') is True:
+    sys.exit(0)
+# Refuse tampered metadata before constructing any URL or reading a token.
+if (run.get('owner') != owner or run.get('repository') != 'temper-probe'
+        or not re.fullmatch(r'\d{8}T\d{6}[0-9a-f]{4}', run.get('run', ''))
+        or run.get('prefix') != 'temper/live-' + run['run'] + '/'):
+    raise SystemExit('backstop: invalid run metadata')
+count_file = scratch / 'count.txt'
+try:
+    count = int(count_file.read_text().strip())
+except (OSError, ValueError):
+    raise SystemExit('backstop: missing or invalid count; refusing uncounted cleanup')
+if not 0 <= count <= 400:
+    raise SystemExit('backstop: count outside cap')
+token = (fixtures / ('person-' + owner + '.token')).read_text().strip()
+if not token or any(c.isspace() or c in '\\"' for c in token):
+    raise SystemExit('backstop: invalid token shape')
+start = count
+base = '/repos/' + owner + '/temper-probe'
+prefix = run['prefix']
+
+def ask(method, path, body=None):
+    global count
+    if count >= 400:
+        raise RuntimeError('backstop: request cap reached')
+    count += 1
+    count_file.write_text(str(count) + '\n')
+    config = 'header = "Authorization: Bearer ' + token + '"\n'
+    args = ['curl', '--silent', '--show-error', '--connect-timeout', '15', '--max-time', '30',
+            '--max-filesize', '16777216', '-K', '-', '-X', method, '-H', 'User-Agent: temper-live-backstop',
+            '-H', 'Accept: application/vnd.github+json', '-w', '\n%{http_code}',
+            'https://api.github.com' + path]
+    if body is not None:
+        args.extend(['-H', 'Content-Type: application/json', '--data', json.dumps(body)])
+    result = subprocess.run(args, input=config.encode(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if result.returncode:
+        raise RuntimeError('backstop: curl failed')
+    data, status = result.stdout.rsplit(b'\n', 1)
+    return int(status), data
+
+try:
+    path = base + '/git/matching-refs/heads/' + urllib.parse.quote(prefix, safe='/')
+    status, data = ask('GET', path)
+    if status != 200:
+        raise RuntimeError('backstop: cannot list run branches')
+    for row in json.loads(data):
+        name = row['ref'].removeprefix('refs/heads/')
+        if not name.startswith(prefix):
+            raise RuntimeError('backstop: branch outside run')
+        status, _ = ask('DELETE', base + '/git/refs/heads/' + urllib.parse.quote(name, safe='/'))
+        if status not in (204, 404):
+            print('backstop: branch left=' + name, file=sys.stderr)
+    query = urllib.parse.urlencode({'state': 'open', 'head': owner + ':' + prefix + '1/c2', 'per_page': 100})
+    status, data = ask('GET', base + '/pulls?' + query)
+    if status != 200:
+        raise RuntimeError('backstop: cannot list run pulls')
+    for pull in json.loads(data):
+        if (not pull['head']['ref'].startswith(prefix)
+                or pull['head']['repo']['full_name'] != owner + '/temper-probe'):
+            raise RuntimeError('backstop: pull outside run')
+        number = pull['number']
+        if not isinstance(number, int) or number <= 0:
+            raise RuntimeError('backstop: invalid pull number')
+        status, _ = ask('PATCH', base + '/pulls/' + str(number), {'state': 'closed'})
+        if status != 200:
+            print('backstop: pull left=' + str(number), file=sys.stderr)
+except (RuntimeError, ValueError, KeyError, TypeError):
+    print('backstop: cleanup incomplete; inspect private state=' + str(scratch), file=sys.stderr)
+finally:
+    print('live github backstop requests=' + str(count-start) + ' total=' + str(count) + ' state=' + str(scratch))
+PY
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+status=0
+TEMPER_LIVE_GITHUB_OWNER=$owner TEMPER_LIVE_GITHUB_FIXTURES=$fixtures TMPDIR=$scratch \
+    heavy cargo nextest run -p temper --profile live --run-ignored only --no-capture \
+    -E 'binary(=live_github) & test(=a_chat_lands_a_change_on_github_com_through_a_restart)' || status=$?
+exit "$status"

@@ -1,0 +1,745 @@
+//! The owner-run GitHub story (domain/testing.md, 2.7). Never invoked by the gate.
+use super::{
+    cluster, ctl, github, github_land,
+    relay::{Guard, Relay},
+    write_private,
+};
+use serde_json::{Value, json};
+use skein_io::kernel::Exit;
+use skein_lib::{Duration, Time};
+use skein_shell::{Clock, Host};
+use skein_world::{Referee, real};
+use std::{
+    cell::RefCell,
+    fs,
+    io::Read,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
+const WITHIN: Duration = Duration::from_secs(1200);
+const POLL: Duration = Duration::from_secs(2);
+const REPOSITORY: &str = "temper-probe";
+
+struct Inputs {
+    owner: String,
+    installation: u64,
+    app: u64,
+    slug: String,
+    pem: PathBuf,
+    person: Vec<u8>,
+    git: PathBuf,
+    run: String,
+    prefix: String,
+    scratch: PathBuf,
+}
+impl Inputs {
+    fn read(scratch: &Path) -> Self {
+        let owner = std::env::var("TEMPER_LIVE_GITHUB_OWNER").expect("owner from proof-live-github.sh");
+        assert!(matches!(owner.as_str(), "freeekanayaka" | "fabrig-ai"), "probe owner only");
+        let fixtures = PathBuf::from(std::env::var_os("TEMPER_LIVE_GITHUB_FIXTURES").expect("fixtures path"));
+        let app: Value = serde_json::from_slice(&fs::read(fixtures.join("app.json")).expect("public App fixture"))
+            .expect("App JSON");
+        let installation = app["installations"]
+            .as_array()
+            .expect("fixture installations")
+            .iter()
+            .find(|row| row["account"] == owner)
+            .expect("owner installation")["id"]
+            .as_u64()
+            .expect("installation id");
+        let person =
+            fs::read(fixtures.join(format!("person-{owner}.token"))).expect("person token file").trim_ascii().to_vec();
+        assert!(!person.is_empty() && !person.iter().any(u8::is_ascii_whitespace), "one person token");
+        let git = std::env::split_paths(&std::env::var_os("PATH").expect("PATH"))
+            .map(|p| p.join("git"))
+            .find(|p| p.is_file())
+            .expect("real git on PATH")
+            .canonicalize()
+            .expect("git path");
+        let version = std::process::Command::new(&git).arg("--version").env_clear().output().expect("git version");
+        let version =
+            std::str::from_utf8(&version.stdout).expect("version text").split_whitespace().nth(2).expect("git version");
+        let mut parts = version.split('.').map(|part| part.parse::<u32>().expect("git version number"));
+        let major = parts.next().expect("major");
+        let minor = parts.next().expect("minor");
+        assert!(major > 2 || (major == 2 && minor >= 41), "git >= 2.41 required");
+        // UTC formatting through date; randomness comes from the OS, neither carries a credential.
+        let date = std::process::Command::new("date").args(["-u", "+%Y%m%dT%H%M%S"]).output().expect("UTC date");
+        assert!(date.status.success());
+        let mut random = [0; 2];
+        fs::File::open("/dev/urandom").expect("random source").read_exact(&mut random).expect("run randomness");
+        let run =
+            format!("{}{:02x}{:02x}", String::from_utf8(date.stdout).expect("UTC text").trim(), random[0], random[1]);
+        let prefix = format!("temper/live-{run}/");
+        Self {
+            owner,
+            installation,
+            app: app["id"].as_u64().expect("App id"),
+            slug: app["slug"].as_str().expect("App slug").into(),
+            pem: fixtures.join("app.pem"),
+            person,
+            git,
+            run,
+            prefix,
+            scratch: scratch.into(),
+        }
+    }
+    fn manifest(&self, cleaned: bool) {
+        write_private(&self.scratch.join("run.json"), &serde_json::to_vec(&json!({"run":self.run,"owner":self.owner,"repository":REPOSITORY,"prefix":self.prefix,"cleaned":cleaned})).expect("run metadata"));
+    }
+    fn authorization(&self) -> Vec<u8> {
+        [b"Bearer ".as_slice(), &self.person].concat()
+    }
+    fn base(&self) -> String {
+        format!("/repos/{}/{}", self.owner, REPOSITORY)
+    }
+}
+
+pub fn run() {
+    let clock = Clock::new();
+    let started = clock.now().now;
+    let scratch = PathBuf::from(std::env::var_os("TMPDIR").expect("run through proof-live-github.sh"));
+    let inputs = Inputs::read(&scratch);
+    inputs.manifest(false);
+    eprintln!("live github run={}", inputs.run);
+    let mut relay = Relay::start(Guard {
+        owner: inputs.owner.clone(),
+        repository: REPOSITORY.into(),
+        installation: inputs.installation,
+        prefix: inputs.prefix.clone(),
+    });
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| story(&inputs, &relay)));
+    // World owns cgroup-contained Binary hosts; dropping an unwound world abandons and reaps
+    // those trees before this cleanup (skein-world end_to_end.rs, Binary::drop).
+    relay.quiesce();
+    let cleanup = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| teardown(&inputs, &relay)));
+    eprintln!(
+        "live github run={} requests={} wall={}s state={}",
+        inputs.run,
+        relay.count(),
+        clock.now().now.saturating_since(started).as_nanos() / 1_000_000_000,
+        scratch.display()
+    );
+    if let Err(failed) = result {
+        std::panic::resume_unwind(failed);
+    }
+    if let Err(failed) = cleanup {
+        std::panic::resume_unwind(failed);
+    }
+    assert!(relay.refused().is_empty(), "relay refusals: {:?}", relay.refused());
+}
+
+fn document(path: &Path) -> Value {
+    serde_json::from_slice(&fs::read(path).expect("fixture document")).expect("fixture JSON")
+}
+fn save(path: &Path, value: &Value) {
+    write_private(path, &serde_json::to_vec(value).expect("document JSON"));
+}
+fn render_owner(value: &mut Value, owner: &str) {
+    match value {
+        Value::String(s) if s == "acme" => *s = owner.into(),
+        Value::Array(rows) => {
+            for row in rows {
+                render_owner(row, owner);
+            }
+        }
+        Value::Object(fields) => {
+            for (_, field) in fields {
+                render_owner(field, owner);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+fn configure_llm(path: &Path, inputs: &Inputs) {
+    github_land::configure_llm(path);
+    let mut value = document(path);
+    value["cued"][0]["turns"][0]["lines"][0]["arguments"]["repository"] =
+        format!("{}/{}", inputs.owner, REPOSITORY).into();
+    value["cued"][1]["turns"] = json!([
+        {"lines":[{"call":"write","arguments":{"path":format!("probe/{}.md",inputs.run),"content":format!("temper live run {}\n",inputs.run)}}],"finish":"tool_calls","tokens":20},
+        {"lines":[{"call":"finish","arguments":{"form":"change","fields":{"title":format!("Live run {}",inputs.run),"body":format!("Adds probe/{}.md.",inputs.run)}}}],"finish":"tool_calls","tokens":20}
+    ]);
+    save(path, &value);
+}
+#[derive(Default)]
+struct Seen {
+    landed: Option<Value>,
+    identity: Option<Value>,
+    tasks: Vec<u64>,
+    outputs: Vec<Vec<u8>>,
+    coder: Option<Value>,
+}
+#[derive(Debug, PartialEq)]
+enum Stage {
+    Llm,
+    Engine,
+    Worker,
+    Install,
+    Accepted,
+    Adopt,
+    Chat,
+    Landed,
+    Reply,
+    Pages,
+    Close,
+    Before,
+    StopWorker,
+    StopEngine,
+    RestartEngine,
+    RestartWorker,
+    Reconnected,
+    After,
+    Stopping,
+}
+struct Judge<'a> {
+    members: cluster::Members,
+    inputs: &'a Inputs,
+    relay: &'a Relay,
+    clients: SocketAddr,
+    workers: SocketAddr,
+    stage: Stage,
+    deadline: Time,
+    poll: Time,
+    now: Time,
+    seen: Rc<RefCell<Seen>>,
+    replied: bool,
+    digest: Option<String>,
+}
+fn story(inputs: &Inputs, relay: &Relay) {
+    let clock = Clock::new();
+    // The first read: it shows the guard the probe's id, the one `/repositories/<id>` it allows.
+    let probe = ask(inputs, relay, &inputs.base());
+    assert_eq!(probe["full_name"], format!("{}/{}", inputs.owner, REPOSITORY), "the probe repository");
+    let [clients, workers] = super::free_addresses(&[relay.api, relay.git]);
+    let mut description = cluster::Cluster::github_relay(&inputs.scratch, relay.git);
+    description.bind("story.clients", &clients.to_string());
+    description.prepare("llm");
+    configure_llm(&description.dir("llm").join("llm.json"), inputs);
+    let (mut members, hosts) = description.members();
+    members.up(&["llm"]);
+    let seen = Rc::new(RefCell::new(Seen::default()));
+    let mut world = real::World::new(Judge {
+        members,
+        inputs,
+        relay,
+        clients,
+        workers,
+        stage: Stage::Llm,
+        deadline: clock.now().now.saturating_add(WITHIN),
+        poll: clock.now().now,
+        now: clock.now().now,
+        seen: seen.clone(),
+        replied: false,
+        digest: None,
+    });
+    for host in hosts {
+        world.spawn(|| host);
+    }
+    world.spawn(cluster::Root::client);
+    let outcome = world.run(&clock, WITHIN);
+    assert!(outcome.procs.iter().all(Host::is_empty), "no process outlives the story");
+    let seen = seen.borrow();
+    github_musts(inputs, relay, &seen);
+    scan(inputs, relay, &seen.outputs);
+}
+impl Judge<'_> {
+    fn queue(&mut self, host: &mut cluster::Root, args: Vec<ctl::Call>) {
+        let link = format!("http://{}", self.members.capture("engine", "link").expect("engine link"));
+        let mut batch = ctl::Calls::linked(&link, &self.inputs.scratch.join("client"));
+        for call in args {
+            batch.push(ctl::Step::Run(call));
+        }
+        let cluster::Root::Client { calls, .. } = host else { panic!("client root") };
+        *calls = Some(Box::new(batch));
+    }
+    fn one(&mut self, host: &mut cluster::Root, args: &[&str], stage: Stage) {
+        self.queue(host, vec![ctl::Call::new(args)]);
+        self.stage = stage;
+    }
+    fn read_landing(&mut self, host: &mut cluster::Root, stage: Stage) {
+        let mut reads = github_land::landing_reads();
+        reads.push(ctl::Call::new(&["task", "3", "--json"]));
+        self.queue(host, reads);
+        self.stage = stage;
+    }
+    fn begin(&mut self, host: &mut cluster::Root) {
+        self.queue(
+            host,
+            vec![
+                ctl::Call::sign_in(),
+                ctl::Call::new(&[
+                    "add-key",
+                    "1",
+                    self.members.dir("llm").join("llm.key").to_str().expect("LLM key path"),
+                    "--deployment",
+                    "--key",
+                    "live-llm",
+                ]),
+                ctl::Call::new(&["wait", "accounts", "--until", "usable"]),
+                ctl::Call::new(&[
+                    "forge-connect",
+                    "1",
+                    "github-app",
+                    &self.inputs.app.to_string(),
+                    self.inputs.pem.to_str().expect("App key path"),
+                    "--key",
+                    "live-app",
+                ]),
+                ctl::Call::new(&["wait", "forges", "--until", "connected:1"]),
+                ctl::Call::new(&["forge-install", "1", "--key", "live-install"]),
+            ],
+        );
+        self.stage = Stage::Install;
+    }
+    fn row(packet: &Value) -> Value {
+        packet["forges"].as_array().expect("forge rows").iter().find(|row| row["number"] == 1).expect("forge 1").clone()
+    }
+    fn accepted(&self, row: &Value) -> bool {
+        row["installations"].as_array().is_some_and(|rows| {
+            rows.iter().any(|row| {
+                row["id"] == self.inputs.installation
+                    && row["account"]["login"] == self.inputs.owner
+                    && row["stray"] == false
+                    && row["suspended"] == false
+            })
+        })
+    }
+    #[expect(clippy::too_many_lines, reason = "the ordered client script shares M1's cluster and landing reads")]
+    fn called(&mut self, host: &mut cluster::Root, calls: &ctl::Calls) {
+        for (index, ended) in calls.ends().iter().enumerate() {
+            self.seen.borrow_mut().outputs.extend([ended.stdout.clone(), ended.stderr.clone()]);
+            let expected = if index == 6 && matches!(self.stage, Stage::Before | Stage::After) { 2 } else { 0 };
+            assert_eq!(
+                ended.exit,
+                Some(Exit::Code(expected)),
+                "live ctl failed in {:?} (output retained for secrecy scan)",
+                self.stage
+            );
+        }
+        match self.stage {
+            Stage::Install => {
+                let text = std::str::from_utf8(&calls.ends().last().expect("install").stdout).expect("link text");
+                let link = text.lines().find(|s| s.starts_with("https://")).expect("GitHub installation link");
+                let state = link
+                    .split('?')
+                    .nth(1)
+                    .expect("link query")
+                    .split('&')
+                    .find_map(|part| part.strip_prefix("state="))
+                    .expect("install state");
+                assert!(state.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_%.".contains(&b)), "URL state");
+                let url = format!(
+                    "http://{}/forges/1/github/setup?installation_id={}&setup_action=install&state={state}",
+                    self.clients, self.inputs.installation
+                );
+                let response = github::request_url(self.clients, "GET", &url, "", b"");
+                assert_eq!(response.status, 200, "setup accepted");
+                self.seen.borrow_mut().outputs.push(response.body);
+                self.one(host, &["forges", "--json"], Stage::Accepted);
+            }
+            Stage::Accepted => {
+                let row = Self::row(&ctl::json(&calls.ends()[0]));
+                if self.accepted(&row) {
+                    self.one(
+                        host,
+                        &[
+                            "adopt",
+                            "--project",
+                            "1",
+                            "--forge",
+                            "1",
+                            "--owner",
+                            &self.inputs.owner,
+                            "--name",
+                            REPOSITORY,
+                            "--landing",
+                            "main",
+                            "--prefix",
+                            &self.inputs.prefix,
+                            "--key",
+                            "live-adopt",
+                            "--json",
+                        ],
+                        Stage::Adopt,
+                    );
+                } else {
+                    self.one(host, &["forges", "--json"], Stage::Accepted);
+                }
+            }
+            Stage::Adopt => {
+                assert!(ctl::json(&calls.ends()[0])["adopted"].is_object(), "repository adopted");
+                self.one(
+                    host,
+                    &["chat", "--project", "1", "--key", "live-chat", "@forge_chat Make the live probe", "--json"],
+                    Stage::Chat,
+                );
+            }
+            Stage::Chat => {
+                self.queue(
+                    host,
+                    vec![
+                        ctl::Call::new(&["wait", "task", "1", "--until", "replied"]),
+                        ctl::Call::new(&["wait", "task", "2", "--until", "ended", "--json"]),
+                    ],
+                );
+                self.stage = Stage::Landed;
+            }
+            Stage::Landed => {
+                let packet = ctl::json(calls.ends().last().expect("landed task"));
+                assert_eq!(packet["task"]["chip"]["phase"], "ended");
+                assert_eq!(packet["task"]["result"]["value"]["change"]["kind"], 1);
+                self.seen.borrow_mut().landed = Some(packet["task"]["result"].clone());
+                self.one(host, &["task", "1", "--json"], Stage::Reply);
+            }
+            Stage::Reply => {
+                self.digest = Some(
+                    ctl::json(calls.ends().last().expect("reply snapshot"))["digest"]
+                        .as_str()
+                        .expect("task digest")
+                        .into(),
+                );
+                self.one(host, &["chat", "1", "--json"], Stage::Pages);
+            }
+            Stage::Pages => {
+                let page = ctl::json(&calls.ends()[0]);
+                self.replied |= page["activity"]["rows"].to_string().contains("The change landed.");
+                if let Some(before) = page["activity"]["before"]["value"].as_str() {
+                    self.one(host, &["chat", "1", "--before", before, "--json"], Stage::Pages);
+                } else if !self.replied {
+                    self.one(
+                        host,
+                        &[
+                            "wait",
+                            "task",
+                            "1",
+                            "--until",
+                            "replied",
+                            "--since",
+                            &self.digest.clone().expect("snapshot"),
+                            "--json",
+                        ],
+                        Stage::Reply,
+                    );
+                } else {
+                    self.queue(
+                        host,
+                        vec![
+                            ctl::Call::new(&["close", "1", "--key", "live-close", "--json"]),
+                            ctl::Call::new(&["wait", "task", "1", "--until", "ended", "--json"]),
+                        ],
+                    );
+                    self.stage = Stage::Close;
+                }
+            }
+            Stage::Close => self.read_landing(host, Stage::Before),
+            Stage::Reconnected => {
+                let row = Self::row(&ctl::json(calls.ends().last().expect("reconnected forges")));
+                if self.accepted(&row) {
+                    self.read_landing(host, Stage::After);
+                } else {
+                    self.one(host, &["forges", "--json"], Stage::Reconnected);
+                }
+            }
+            Stage::Before | Stage::After => self.check_landing(host, calls),
+            Stage::Llm
+            | Stage::Engine
+            | Stage::Worker
+            | Stage::StopWorker
+            | Stage::StopEngine
+            | Stage::RestartEngine
+            | Stage::RestartWorker
+            | Stage::Stopping => unreachable!("calls only in script stages"),
+        }
+    }
+    fn check_landing(&mut self, _host: &mut cluster::Root, calls: &ctl::Calls) {
+        let mut seen = self.seen.borrow_mut();
+        let task = ctl::json(&calls.ends()[0]);
+        assert_eq!(task["chip"]["phase"], "ended");
+        assert_eq!(task["result"], *seen.landed.as_ref().expect("first landing"), "same pull and merge");
+        assert_eq!(ctl::json(&calls.ends()[1])["chip"]["phase"], "ended", "chat closed");
+        let mut tasks = vec![1];
+        for index in [2, 3] {
+            let packet = ctl::json(&calls.ends()[index]);
+            super::forge_land::assert_no_live_tasks(&packet);
+            assert_eq!(packet["ended"]["rows"]["cut"], false);
+            assert!(packet["ended"]["rows"]["after"].is_null(), "complete four-task fixture");
+            tasks.extend(
+                packet["ended"]["rows"]["rows"]
+                    .as_array()
+                    .expect("task rows")
+                    .iter()
+                    .map(|row| row["chip"]["task"].as_u64().expect("task id")),
+            );
+        }
+        tasks.sort_unstable();
+        assert_eq!(tasks, [1, 2, 3, 4], "complete task set");
+        super::forge_land::assert_no_live_roots(&ctl::json(&calls.ends()[5]));
+        assert_eq!(calls.ends()[6].stderr.trim_ascii_end(), br#"{"error":"unknown"}"#);
+        let row = Self::row(&ctl::json(&calls.ends()[4]));
+        assert_eq!(row["state"], "connected");
+        assert_eq!(row["login"], format!("{}[bot]", self.inputs.slug));
+        assert!(row["id"].as_u64().is_some());
+        assert!(self.accepted(&row), "same accepted installation");
+        let coder = ctl::json(&calls.ends()[7]);
+        assert_eq!(coder["chip"]["phase"], "ended");
+        if self.stage == Stage::Before {
+            seen.identity = Some(row);
+            seen.tasks = tasks;
+            seen.coder = Some(coder["result"].clone());
+            self.members.stop_one("w1");
+            self.stage = Stage::StopWorker;
+        } else {
+            assert_eq!(row["id"], seen.identity.as_ref().expect("prior bot")["id"]);
+            assert_eq!(tasks, seen.tasks);
+            assert_eq!(Some(&coder["result"]), seen.coder.as_ref());
+            self.members.stop();
+            self.stage = Stage::Stopping;
+        }
+    }
+}
+impl Referee<cluster::Root> for Judge<'_> {
+    fn act(&mut self, now: Time, hosts: &mut [cluster::Root]) {
+        self.now = now;
+        self.members.act(now, hosts);
+        if self.members.failed() {
+            self.stage = Stage::Stopping;
+            return;
+        }
+        let host = hosts.last_mut().expect("client");
+        if self.stage == Stage::Llm && self.members.is_up() {
+            self.members.prepare("engine");
+            let path = self.members.dir("engine").join("config/temper.json");
+            let mut value = document(&path);
+            render_owner(&mut value, &self.inputs.owner);
+            value["engine"]["hosts"]["listener"][0]["socket"] = self.workers.to_string().into();
+            value["application"]["forges"][0] = json!({"number":1,"kind":"github","api":{"socket":self.relay.api.to_string()},"transport":"plaintext","git":format!("http://{}",self.relay.git),"web":null,"app_read_only":true});
+            github_land::configure_landing(&mut value, self.relay.git, &self.inputs.owner, REPOSITORY);
+            value["application"]["limits"]["overrides"]["forge_component.log_poll_ms"] = 15000.into();
+            save(&path, &value);
+            self.members.up(&["engine"]);
+            self.stage = Stage::Engine;
+        } else if self.stage == Stage::Engine && self.members.is_up() {
+            self.members.prepare("w1");
+            let path = self.members.dir("w1").join("config/temper.json");
+            let mut value = document(&path);
+            value["application"]["workers"][0]["git"] = json!(self.inputs.git);
+            save(&path, &value);
+            self.members.up(&["w1"]);
+            self.stage = Stage::Worker;
+        } else if self.stage == Stage::Worker && self.members.is_up() {
+            assert_eq!(self.members.linked("w1"), 1);
+            self.begin(host);
+        } else if self.stage == Stage::StopWorker && self.members.ended("w1") {
+            self.members.stop_one("engine");
+            self.stage = Stage::StopEngine;
+        } else if self.stage == Stage::StopEngine && self.members.ended("engine") {
+            self.members.restart("engine");
+            self.stage = Stage::RestartEngine;
+        } else if self.stage == Stage::RestartEngine && self.members.capture("engine", "link").is_some() {
+            self.members.restart("w1");
+            self.stage = Stage::RestartWorker;
+        } else if self.stage == Stage::RestartWorker && self.members.is_up() {
+            assert_eq!(self.members.linked("w1"), 2);
+            self.queue(
+                host,
+                vec![
+                    ctl::Call::new(&["wait", "forges", "--until", "connected:1"]),
+                    ctl::Call::new(&["forges", "--json"]),
+                ],
+            );
+            self.stage = Stage::Reconnected;
+        } else if host.is_empty()
+            && now >= self.poll
+            && !matches!(
+                self.stage,
+                Stage::Llm
+                    | Stage::Engine
+                    | Stage::Worker
+                    | Stage::StopWorker
+                    | Stage::StopEngine
+                    | Stage::RestartEngine
+                    | Stage::RestartWorker
+                    | Stage::Stopping
+            )
+        {
+            let cluster::Root::Client { calls, .. } = host else { panic!("client") };
+            let calls = calls.take().expect("finished batch");
+            self.called(host, &calls);
+            self.poll = now.saturating_add(POLL);
+        }
+    }
+    fn observe(&mut self, now: Time, hosts: &[cluster::Root]) {
+        self.members.observe(now, &hosts[..hosts.len() - 1]);
+        assert!(self.relay.refused().is_empty(), "relay refusals: {:?}", self.relay.refused());
+        if let Some(stopped) = self.members.stopped() {
+            assert!(hosts.iter().all(Host::is_empty));
+            assert_eq!(
+                stopped.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+                ["w1", "engine", "w1", "engine", "llm"]
+            );
+            for process in stopped {
+                self.seen.borrow_mut().outputs.extend([process.stdout.clone(), process.stderr.clone()]);
+                assert_eq!(process.exit, Some(Exit::Code(0)));
+                assert!(!process.killed && process.survivors.is_empty());
+            }
+        }
+    }
+    fn next_deadline(&self) -> Option<Time> {
+        Some(self.members.next_deadline().unwrap_or(self.deadline).min(self.deadline).min(if self.poll > self.now {
+            self.poll
+        } else {
+            self.deadline
+        }))
+    }
+    fn overdue(&self, now: Time) -> Option<String> {
+        (now >= self.deadline).then(|| format!("live GitHub deadline in {:?}", self.stage))
+    }
+    fn passed(&self) -> bool {
+        self.members.passed()
+    }
+}
+
+fn ask(inputs: &Inputs, relay: &Relay, path: &str) -> Value {
+    let (status, body) = relay.ask("GET", path, &inputs.authorization(), b"").expect("person read through relay");
+    assert_eq!(status, 200, "person read {path}");
+    serde_json::from_slice(&body).expect("GitHub JSON")
+}
+fn github_musts(inputs: &Inputs, relay: &Relay, seen: &Seen) {
+    let base = inputs.base();
+    let result = &seen.landed.as_ref().expect("landed result")["value"]["change"];
+    let number = result["part"]["key"]["number"].as_u64().expect("pull number");
+    let pull = ask(inputs, relay, &format!("{base}/pulls/{number}"));
+    assert_eq!(pull["merged"], true);
+    assert_eq!(pull["merge_commit_sha"], result["words"]["bytes"]);
+    let head = pull["head"]["sha"].as_str().expect("pull head");
+    // GitHub must agree with the exact head temper submitted for its change's merge.
+    assert_eq!(relay.merge_heads(), [head], "pull head is the change head submitted by temper");
+    let file = ask(inputs, relay, &format!("{base}/contents/probe/{}.md?ref=main", inputs.run));
+    let compact: Vec<u8> =
+        file["content"].as_str().expect("file base64").bytes().filter(|b| !b.is_ascii_whitespace()).collect();
+    let bytes = skein_lib::base64::decode(skein_lib::base64::Alphabet::Standard, &compact, 8192).expect("file bytes");
+    assert_eq!(bytes.as_ref(), format!("temper live run {}\n", inputs.run).as_bytes());
+    let checks = ask(inputs, relay, &format!("{base}/commits/{head}/check-runs?per_page=100"));
+    let ci = checks["check_runs"]
+        .as_array()
+        .expect("check runs")
+        .iter()
+        .find(|run| run["name"] == "ci" && run["app"]["slug"] == "github-actions")
+        .expect("real Actions ci");
+    assert_eq!(ci["head_sha"], head);
+    assert_eq!(ci["status"], "completed");
+    assert_eq!(ci["conclusion"], "success");
+    assert!(
+        ci["completed_at"].as_str().expect("completion UTC") <= pull["merged_at"].as_str().expect("merge UTC"),
+        "CI completed before merge"
+    );
+    let journal = relay.journal();
+    for (method, path) in [("POST", format!("{base}/pulls")), ("PUT", format!("{base}/pulls/{number}/merge"))] {
+        assert_eq!(
+            journal.iter().filter(|row| row.0 == "api" && row.1 == method && row.2 == path).count(),
+            1,
+            "one {method} {path}"
+        );
+    }
+    assert!(relay.refused().is_empty());
+}
+fn scan(inputs: &Inputs, relay: &Relay, outputs: &[Vec<u8>]) {
+    let scan = github::Scan::new(&fs::read(&inputs.pem).expect("PEM read only for scan"));
+    let mut secrets = relay.tokens();
+    secrets.push(inputs.person.clone());
+    let clean = |bytes: &[u8]| {
+        scan.clean(bytes);
+        for secret in &secrets {
+            assert!(skein_lib::bytes::find(bytes, secret).is_none(), "no minted or person token outside jig secrets");
+        }
+    };
+    for bytes in outputs {
+        clean(bytes);
+    }
+    let mut pending = ["engine", "w1", "llm"].map(|name| inputs.scratch.join(name)).to_vec();
+    let excluded = inputs.scratch.join("engine/data/state/secrets");
+    while let Some(path) = pending.pop() {
+        if path == excluded {
+            continue;
+        }
+        let metadata = fs::symlink_metadata(&path).expect("scan metadata");
+        if metadata.is_dir() {
+            pending.extend(fs::read_dir(path).expect("scan directory").map(|e| e.expect("entry").path()));
+        } else if metadata.is_file() {
+            clean(&fs::read(&path).expect("scan file"));
+        }
+    }
+}
+fn cleanup_refs(inputs: &Inputs, relay: &Relay) -> bool {
+    let base = inputs.base();
+    let auth = inputs.authorization();
+    let mut ok = true;
+    let list = relay.teardown("GET", &format!("{base}/git/matching-refs/heads/{}", inputs.prefix), &auth, b"");
+    match list {
+        Ok((200, body)) => {
+            if let Ok(Value::Array(refs)) = serde_json::from_slice::<Value>(&body) {
+                for row in refs {
+                    let name = row["ref"].as_str().and_then(|r| r.strip_prefix("refs/heads/")).expect("branch ref");
+                    assert!(name.starts_with(&inputs.prefix), "teardown confined to run");
+                    let deleted = relay
+                        .teardown("DELETE", &format!("{base}/git/refs/heads/{name}"), &auth, b"")
+                        .is_ok_and(|(s, _)| s == 204 || s == 404);
+                    if !deleted {
+                        eprintln!("live github branch left={name}");
+                        ok = false;
+                    }
+                }
+            } else {
+                ok = false;
+            }
+        }
+        _ => ok = false,
+    }
+    // Query by the run's exact head prefix, then verify it before closing any pull.
+    match relay.teardown(
+        "GET",
+        &format!("{base}/pulls?state=open&head={}:{}1/c2&per_page=100", inputs.owner, inputs.prefix),
+        &auth,
+        b"",
+    ) {
+        Ok((200, body)) => {
+            if let Ok(Value::Array(pulls)) = serde_json::from_slice::<Value>(&body) {
+                for pull in pulls {
+                    let head = pull["head"]["ref"].as_str().expect("pull branch");
+                    assert!(
+                        head.starts_with(&inputs.prefix)
+                            && pull["head"]["repo"]["full_name"] == format!("{}/{}", inputs.owner, REPOSITORY),
+                        "run's pull only"
+                    );
+                    let n = pull["number"].as_u64().expect("pull number");
+                    if !relay
+                        .teardown("PATCH", &format!("{base}/pulls/{n}"), &auth, br#"{"state":"closed"}"#)
+                        .is_ok_and(|(s, _)| s == 200)
+                    {
+                        ok = false;
+                    }
+                }
+            } else {
+                ok = false;
+            }
+        }
+        _ => ok = false,
+    }
+    ok
+}
+fn teardown(inputs: &Inputs, relay: &Relay) {
+    let mut ok =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| cleanup_refs(inputs, relay))).unwrap_or(false);
+    for token in relay.tokens() {
+        let auth = [b"Bearer ".as_slice(), &token].concat();
+        if !relay.teardown("DELETE", "/installation/token", &auth, b"").is_ok_and(|(s, _)| s == 204 || s == 401) {
+            ok = false;
+        }
+    }
+    if ok {
+        inputs.manifest(true);
+    }
+    assert!(ok, "GitHub teardown incomplete; script backstop will retry");
+}

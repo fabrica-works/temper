@@ -9,7 +9,7 @@
 # live, QA and browser tiers have profiles of their own, at the end.
 
 [profile.default]
-default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
+default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
 global-timeout = "30s"
 slow-timeout = { period = "6s" }
 
@@ -20,7 +20,7 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^qa_/)"
+default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/)"
 global-timeout = "120s"
 slow-timeout = { period = "40s" }
 
@@ -47,7 +47,7 @@ test-threads = 1
 [profile.live]
 # The live tier (docs/design/domain/testing.md, 2.7): crates/temper's live binary
 # alone, one test at a time, which scripts/proof-live.sh runs.
-default-filter = "binary(=live)"
+default-filter = "binary(=live) | binary(=live_github)"
 global-timeout = "50m"
 test-threads = 1
 retries = 0
