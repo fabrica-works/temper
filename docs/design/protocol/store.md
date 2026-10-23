@@ -146,7 +146,14 @@ section 7).
   The routing gives it to jig's component, whose format row records it;
   a store written with another refuses to open, saying so (jig's
   `protocol/store.md`, 5.2 and 5.3).
-- **`STORE_VERSION` is 6,** with the `Demo` family, tag 17,
+- **`STORE_VERSION` is 7,** with a repository's tag made its forge's
+  number and its id, packed (`../domain/forge.md`, section 4): the
+  tasks' resource parameters and saved resources jig keeps name the
+  pair, where 6's named the forge's id alone. The schema is 6's; the
+  move from 6 to 7 breaks the stored format as each move does: a store
+  written at 6 refuses to open, saying so, rather than resolving its
+  tags to no repository later.
+- **`STORE_VERSION` 6** came with the `Demo` family, tag 17,
   `Key::Demo(forge)` (section 2), its row `{ forge, state }`, the
   state running or ended: the demo's state, the engine's alone
   (setup.md, 8.4), shaped so that its end adds nothing to it. 4 and 5
