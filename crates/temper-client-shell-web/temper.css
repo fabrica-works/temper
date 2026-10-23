@@ -854,3 +854,8 @@ body > noscript, #app:not(:empty):not(:has(*)) { margin-top: 213px; }
 .temper-flow-progress { padding-left: 20px; }
 .temper-flow-progress li { margin: 10px 0; }
 .temper-flow-progress [role="status"] { display: inline; margin-left: 8px; }
+
+/* Navigation dots retain their state words for assistive technology. */
+.temper-navigation .temper-nav-needs, .temper-navigation .temper-nav-limited { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 5px; vertical-align: 1px; overflow: hidden; text-indent: 100%; white-space: nowrap; }
+.temper-navigation .temper-nav-needs { background: #a65d53; }
+.temper-navigation .temper-nav-limited { background: #9b7343; }

@@ -257,14 +257,26 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
             bindings,
         );
     }
-    action(
-        builder,
-        Role::Link,
-        &crate::accounts::words::say(words, crate::accounts::words::Word::Accounts, &[]),
-        Act::Go { address: Address::Accounts },
-        *root.pages().address() == Address::Accounts,
-        bindings,
-    );
+    let name = crate::accounts::words::say(words, crate::accounts::words::Word::Accounts, &[]);
+    crate::link(builder, &name, bindings.insert(Act::Go { address: Address::Accounts }));
+    builder.text(Run::Plain, &name);
+    if *root.pages().address() == Address::Accounts {
+        builder.state(skein_ui::State::Current);
+    }
+    if let Some(mark) = crate::accounts::words::mark(root) {
+        use crate::accounts::words::{Mark, Word};
+        let (word, style) = match mark {
+            Mark::Needs => (Word::NavNeeds, crate::look::NAV_NEEDS),
+            Mark::Limited => (Word::NavLimited, crate::look::NAV_LIMITED),
+        };
+        let words = crate::accounts::words::say(words, word, &[]);
+        builder.open(Role::Text);
+        builder.style(style);
+        builder.name(&words);
+        builder.run(Run::Plain, &words);
+        builder.close();
+    }
+    builder.close();
     builder.close();
 }
 

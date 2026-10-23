@@ -150,6 +150,8 @@ pub(crate) enum Word {
     MadeNamed,
     RenewedNamed,
     MadePlan,
+    NavNeeds,
+    NavLimited,
 }
 const ROWS: &[(Word, &[u8])] = &[
     (Word::AccountsOmitted, b"Accounts left out: "),
@@ -285,6 +287,8 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::HeldDeployment, b"held by the deployment"),
     (Word::Separator, " · ".as_bytes()),
     (Word::KeyWayOnly, b"Use an API key"),
+    (Word::NavNeeds, b"an account needs you"),
+    (Word::NavLimited, b"an account is limited"),
 ];
 // Both names are borrowed; no configured name is replaced by a guessed brand.
 pub(crate) fn provider_words(name: &[u8]) -> (&[u8], &[u8]) {
@@ -479,4 +483,44 @@ fn literal_number(word: Word) -> u16 {
         }
     }
     unreachable!("closed account words")
+}
+
+/// The navigation reads only supplied own-account facts (client/README.md, 5.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Mark {
+    Needs,
+    Limited,
+}
+pub(crate) fn mark(root: &temper_client_domain::Domain) -> Option<Mark> {
+    use jig_client::contract::{OwnerAccountHolder, OwnerAccountState};
+    let document = root.pages().accounts_document(root.client())?;
+    let party = root.pages().me(root.client())?.party.number;
+    let mut demo = None;
+    if let Some(answer) = root.forge().demo() {
+        demo = Some(answer.provider);
+    }
+    let mut limited = false;
+    for account in &document.accounts {
+        if account.holder != OwnerAccountHolder::Party(party) || (demo.is_some() && account.provider == demo) {
+            continue;
+        }
+        // The deciding source is the first supplied in order (client/README.md, 5.3).
+        // The accounts page also reads source.state directly; cuts add no inferred state.
+        let Some(source) = account.sources.get(0) else { continue };
+        if source.attention {
+            return Some(Mark::Needs);
+        }
+        limited |= source.spent_until.is_some();
+        match source.state {
+            OwnerAccountState::SignInAgain | OwnerAccountState::Misconfigured | OwnerAccountState::Unloaded { .. } => {
+                return Some(Mark::Needs);
+            }
+            OwnerAccountState::Later { .. } => limited = true,
+            OwnerAccountState::Asking
+            | OwnerAccountState::Granted
+            | OwnerAccountState::Cancelled
+            | OwnerAccountState::Closing => {}
+        }
+    }
+    if limited { Some(Mark::Limited) } else { None }
 }

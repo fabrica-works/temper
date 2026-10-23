@@ -233,6 +233,10 @@ pub const FLOW_CARD: Style = Style { owner: owner(), token: 113 };
 pub const FLOW_MUTED: Style = Style { owner: owner(), token: 114 };
 /// Shared flow presentation (client/README.md, 5.2).
 pub const FLOW_PROGRESS: Style = Style { owner: owner(), token: 115 };
+/// A navigation entry needs the person.
+pub const NAV_NEEDS: Style = Style { owner: owner(), token: 116 };
+/// A navigation entry is limited.
+pub const NAV_LIMITED: Style = Style { owner: owner(), token: 117 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -354,6 +358,8 @@ pub const NAMES: Names<'static> = Names {
         b"temper-flow-card",
         b"temper-flow-muted",
         b"temper-flow-progress",
+        b"temper-nav-needs",
+        b"temper-nav-limited",
     ],
     regions: &[b"temper-link"],
 };

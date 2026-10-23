@@ -507,3 +507,218 @@ fn assert_menu(view: &crate::View, children: &[(Role, Option<&[u8]>)]) {
     }
     assert_eq!(index, end, "all banner contents follow the brand inside Menu");
 }
+
+// A second source lets the deciding-source test keep a later needing source.
+const NAVIGATION_SOURCES: u32 = 2;
+const NAVIGATION_PROVIDER: u32 = 18;
+const NAVIGATION_PARTY: u64 = 73; // Pat in fixture_me.
+
+fn navigation_accounts(states: &[jig_client::contract::OwnerAccountState]) -> jig_client::contract::OwnerAccounts {
+    use jig_client::contract as c;
+    let mut accounts = skein_lib::List::with_capacity(u32::try_from(states.len()).unwrap());
+    for (index, state) in states.iter().enumerate() {
+        let number = u32::try_from(index.checked_add(1).unwrap()).unwrap();
+        let mut sources = skein_lib::List::with_capacity(NAVIGATION_SOURCES);
+        sources
+            .push(c::OwnerAccountSource {
+                name: None,
+                place: 1,
+                number,
+                kind: c::OwnerAccountKind::Key,
+                state: *state,
+                usable: *state == c::OwnerAccountState::Granted,
+                expiring: false,
+                attention: false,
+                spent_until: None,
+            })
+            .unwrap();
+        accounts
+            .push(c::OwnerAccountLine {
+                number,
+                place: number,
+                uses: None,
+                plan: false,
+                provider: Some(NAVIGATION_PROVIDER),
+                provider_name: None,
+                manage_usage: None,
+                display: c::DocumentText::complete(c::Text::new(Box::from(b"Pat".as_slice()), 32).unwrap()),
+                holder: c::OwnerAccountHolder::Party(NAVIGATION_PARTY),
+                sources,
+                cut: false,
+            })
+            .unwrap();
+    }
+    c::OwnerAccounts {
+        program_hosts: skein_lib::List::with_capacity(0),
+        readiness: skein_lib::List::with_capacity(0),
+        readiness_cut: false,
+        accounts,
+        signing: skein_lib::List::with_capacity(0),
+        last_end: None,
+        usable: false,
+        settled: true,
+        cut: false,
+    }
+}
+
+fn deliver_navigation_accounts(
+    root: &mut temper_client_domain::Domain,
+    watch: skein_lib::Token,
+    doc: jig_client::contract::OwnerAccounts,
+) {
+    fixtures::root_event(
+        root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::OwnerAccounts(
+                        Box::new(doc),
+                    )),
+                },
+            },
+        },
+    );
+}
+
+fn assert_account_mark(root: &temper_client_domain::Domain, expected: Option<(crate::accounts::words::Mark, &[u8])>) {
+    let view = fixtures::page_view(root);
+    let tree = view.tree();
+    let link = fixtures::person_find(tree, Role::Link, b"Accounts").expect("person finds Accounts");
+    let nodes = tree.nodes();
+    let mut at = 0;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.id == link {
+            at = index;
+        }
+    }
+    let end = at.checked_add(usize::try_from(nodes[at].size).unwrap()).unwrap();
+    let children = &nodes[at.checked_add(1).unwrap()..end];
+    assert_eq!(children[0].text.get(0).unwrap().text.as_ref(), b"Accounts");
+    let mut marks = 0_u32;
+    let mut found = None;
+    for node in children {
+        for style in node.styles.as_slice() {
+            if *style == crate::look::NAV_NEEDS || *style == crate::look::NAV_LIMITED {
+                marks = marks.checked_add(1).unwrap();
+                found = Some(node);
+            }
+        }
+    }
+    match expected {
+        None => assert_eq!(marks, 0),
+        Some((mark, words)) => {
+            assert_eq!(marks, 1, "one navigation dot");
+            let node = found.unwrap();
+            assert_eq!(fixtures::person_find(tree, Role::Text, words), Some(node.id));
+            assert_eq!(node.text.get(0).unwrap().text.as_ref(), words);
+            assert_eq!(
+                node.styles.as_slice(),
+                [match mark {
+                    crate::accounts::words::Mark::Needs => crate::look::NAV_NEEDS,
+                    crate::accounts::words::Mark::Limited => crate::look::NAV_LIMITED,
+                }]
+            );
+            assert_eq!(children.len(), 2, "the state has its own text node after the name");
+        }
+    }
+}
+
+#[test]
+fn accounts_navigation_has_no_dot_without_accounts_or_with_usable_accounts() {
+    use jig_client::contract::OwnerAccountState as S;
+    let (mut root, watch) = fixtures::account_root();
+    assert_account_mark(&root, None);
+    for states in [&[][..], &[S::Granted, S::Granted][..]] {
+        deliver_navigation_accounts(&mut root, watch, navigation_accounts(states));
+        assert_account_mark(&root, None);
+    }
+}
+
+#[test]
+fn accounts_navigation_is_red_for_each_state_needing_the_person() {
+    use c::OwnerAccountState as S;
+    use jig_client::contract as c;
+    let (mut root, watch) = fixtures::account_root();
+    for state in [
+        S::Unloaded { at: c::OwnerAccountPlace::File, why: c::OwnerAccountUnread::Refused },
+        S::SignInAgain,
+        S::Misconfigured,
+        S::Unloaded { at: c::OwnerAccountPlace::Directory, why: c::OwnerAccountUnread::Unreadable },
+    ] {
+        deliver_navigation_accounts(&mut root, watch, navigation_accounts(&[state]));
+        assert_account_mark(&root, Some((crate::accounts::words::Mark::Needs, b"an account needs you")));
+    }
+}
+
+#[test]
+fn accounts_navigation_is_amber_for_limited_and_red_takes_precedence() {
+    use crate::accounts::words::Mark;
+    use jig_client::contract::OwnerAccountState as S;
+    let (mut root, watch) = fixtures::account_root();
+    for (states, mark, words) in [
+        (&[S::Later { until: None }][..], Mark::Limited, b"an account is limited".as_slice()),
+        (&[S::Later { until: None }, S::SignInAgain][..], Mark::Needs, b"an account needs you".as_slice()),
+        (&[S::SignInAgain, S::Later { until: None }][..], Mark::Needs, b"an account needs you".as_slice()),
+    ] {
+        deliver_navigation_accounts(&mut root, watch, navigation_accounts(states));
+        assert_account_mark(&root, Some((mark, words)));
+    }
+}
+
+#[test]
+fn accounts_navigation_uses_only_the_first_supplied_source_even_when_cut() {
+    use jig_client::contract::OwnerAccountState as S;
+    let (mut root, watch) = fixtures::account_root();
+    let mut doc = navigation_accounts(&[S::Granted, S::SignInAgain]);
+    let later = doc.accounts.get(1).unwrap().sources.get(0).unwrap().clone();
+    doc.accounts.truncate(1);
+    let row = doc.accounts.get_mut(0).unwrap();
+    row.sources.push(later).unwrap();
+    row.cut = true;
+    doc.cut = true;
+    deliver_navigation_accounts(&mut root, watch, doc);
+    assert_account_mark(&root, None);
+    let mut doc = navigation_accounts(&[S::SignInAgain]);
+    doc.cut = true;
+    doc.accounts.get_mut(0).unwrap().cut = true;
+    deliver_navigation_accounts(&mut root, watch, doc);
+    assert_account_mark(&root, Some((crate::accounts::words::Mark::Needs, b"an account needs you")));
+}
+
+#[test]
+fn accounts_navigation_ignores_the_demo_provider_and_other_holders() {
+    use jig_client::contract as c;
+    let (mut root, _, _, _, watch) = fixtures::root_at_with_demo(
+        temper_client_domain::Address::Accounts,
+        &fixtures::domain_limits(),
+        b"Shop",
+        Some((fixtures::PROJECT, true)),
+    );
+    let provider = root.demo().unwrap().0.provider;
+    let mut doc = navigation_accounts(&[c::OwnerAccountState::SignInAgain; 3]);
+    doc.accounts.get_mut(0).unwrap().provider = Some(provider);
+    doc.accounts.get_mut(1).unwrap().holder = c::OwnerAccountHolder::Deployment;
+    doc.accounts.get_mut(2).unwrap().holder = c::OwnerAccountHolder::Party(fixtures::OTHER_PARTY);
+    for cut in [false, true] {
+        doc.cut = cut;
+        deliver_navigation_accounts(&mut root, watch.unwrap(), doc.clone());
+        assert_account_mark(&root, None);
+    }
+}
+
+#[test]
+fn accounts_navigation_reads_attention_as_needing_and_spent_usage_as_limited() {
+    use crate::accounts::words::Mark;
+    use jig_client::contract::OwnerAccountState as S;
+    let (mut root, watch) = fixtures::account_root();
+    let mut attention = navigation_accounts(&[S::Granted]);
+    attention.accounts.get_mut(0).unwrap().sources.get_mut(0).unwrap().attention = true;
+    deliver_navigation_accounts(&mut root, watch, attention);
+    assert_account_mark(&root, Some((Mark::Needs, b"an account needs you")));
+    let mut spent = navigation_accounts(&[S::Granted]);
+    spent.accounts.get_mut(0).unwrap().sources.get_mut(0).unwrap().spent_until =
+        Some(skein_lib::Wall::from_nanos(60_000_000_000));
+    deliver_navigation_accounts(&mut root, watch, spent);
+    assert_account_mark(&root, Some((Mark::Limited, b"an account is limited")));
+}

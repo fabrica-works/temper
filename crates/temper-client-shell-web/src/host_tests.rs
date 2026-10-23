@@ -264,7 +264,7 @@ mod memory_literal;
 // Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
 // The flow's three state words (444 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388743787;
+const WEB_BYTES: u64 = 274388744083;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

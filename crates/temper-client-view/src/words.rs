@@ -414,7 +414,8 @@ pub enum Word {
 // Twenty-nine closed-chat, confirmation and refusal phrases (3.5 and 3.6).
 // Nine of jig's phrases for a hold on a configured bound.
 // The flow's three state words (5.2).
-const PHRASES: u32 = 855;
+// The Accounts navigation's two state words (5.3).
+const PHRASES: u32 = 857;
 const ALL: [Word; 376] = [
     Word::FlowDone,
     Word::FlowUnderWay,
