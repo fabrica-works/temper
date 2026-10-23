@@ -18,7 +18,7 @@ pub mod forge;
 #[must_use]
 pub fn party(event: core::Event) -> engine::Event {
     engine::Event::Party(match event {
-        core::Event::SignIn { reply_to, identity } => PartyInput::SignedIn { reply_to, identity },
+        core::Event::SignIn { reply_to, identity, held } => PartyInput::SignedIn { reply_to, identity, held },
         core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask, models }) => {
             PartyInput::Ask { reply_to, sign_in, key, ask, models }
         }

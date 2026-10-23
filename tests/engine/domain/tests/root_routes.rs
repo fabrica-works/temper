@@ -269,6 +269,7 @@ fn people_roles_config(seed: u64) -> (engine::Config, engine::Limits) {
 
 fn sign_in_person(driver: &mut Driver, user: u64, reply: u64) -> (u64, u64) {
     driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
+        held: None,
         reply_to: ReplyTo::new(Token::new(reply)),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: (user).to_be_bytes().into() },
@@ -4546,6 +4547,52 @@ fn restart_refuses_live_tasks_or_claims_past_lowered_limits_without_dropping_the
         assert_eq!(restarted.store.rows, before);
         assert!(restarted.delivered.is_empty());
     }
+}
+
+#[test]
+#[expect(clippy::wildcard_enum_match_arm, reason = "the snapshot selects only durable sign-in rows")]
+fn signing_in_with_a_live_held_sign_in_keeps_its_number_expiry_and_pool() {
+    let mut driver = Driver::new(Store::new());
+    driver.settle();
+    let (person, session) = sign_in_person(&mut driver, 7, 1100);
+    let before: Vec<_> = driver
+        .store
+        .rows
+        .values()
+        .filter_map(|row| match row {
+            Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { number, person, expires })) => {
+                Some((*number, *person, *expires))
+            }
+            _ => None,
+        })
+        .collect();
+    let expires = before.iter().find(|(number, _, _)| *number == session).expect("live sign-in").2;
+    let reply = Token::new(1101);
+    driver.send(engine::Event::Party(engine::PartyInput::SignedIn {
+        reply_to: ReplyTo::new(reply),
+        identity: people::Identity {
+            key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
+            login: b"person".as_slice().into(),
+            name: b"Person".as_slice().into(),
+        },
+        held: Some(session),
+    }));
+    driver.settle();
+    assert!(driver.delivered.iter().any(|delivery| matches!(delivery,
+        Delivery::WebReply { to, reply: people::Reply::SignedIn { person: who, sign_in, expires: until } }
+            if *to == ReplyTo::new(reply) && *who == person && *sign_in == session && *until == expires)));
+    let after: Vec<_> = driver
+        .store
+        .rows
+        .values()
+        .filter_map(|row| match row {
+            Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { number, person, expires })) => {
+                Some((*number, *person, *expires))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(after, before, "the people's live sign-ins and their expiries are unchanged");
 }
 
 #[test]

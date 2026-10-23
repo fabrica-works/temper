@@ -23,15 +23,17 @@ pub(super) fn link_chat(stored: Option<skein_lib::Secret>) -> (NativeClient, ske
     let mut activity = None;
     while let Some(request) = host.out.pop() {
         if let domain::Request::Client { request: Request::Exchange { exchange, credential, message } } = request {
-            assert!(credential.is_none(), "the explicit link never uses the stored identity");
             match message {
                 jig_client::Message::SignInLink(record) => {
+                    host.authentication.insert(exchange, false).expect("bounded sign-in exchanges");
+                    assert_eq!(credential, host.credential, "the link offers the directory bearer");
                     let link = w::LinkSignIn::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&record))
                         .expect("actual link exchange");
                     assert_eq!(link.secret(), &[0; 32], "the printed fixture link owns the exchange");
                     assert!(signing.replace(exchange).is_none(), "one sign-in exchange");
                 }
                 jig_client::Message::Read(_) => {
+                    assert!(credential.is_none(), "no identity installed before the link succeeds");
                     assert!(activity.replace(exchange).is_none(), "one initial activity read");
                 }
                 jig_client::Message::SignInService
@@ -52,12 +54,13 @@ pub(super) fn signed_credential() -> skein_lib::Secret {
 }
 
 pub(super) fn signed_in() -> Box<[u8]> {
+    sign_in_answer(Some(signed_credential()))
+}
+
+pub(super) fn sign_in_answer(token: Option<skein_lib::Secret>) -> Box<[u8]> {
     let answer = w::SignInAnswer::SignedIn(
-        w::SignedIn::new(
-            &w::CEILINGS,
-            w::SignedInParts { token: Some(signed_credential()), party: CURRENT_PARTY, expires: 0 },
-        )
-        .expect("signed-in answer"),
+        w::SignedIn::new(&w::CEILINGS, w::SignedInParts { token, party: CURRENT_PARTY, expires: 0 })
+            .expect("signed-in answer"),
     );
     let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer fits"));
     answer.encode(&mut bytes).expect("answer room");

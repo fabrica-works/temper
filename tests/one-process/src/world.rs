@@ -44,6 +44,7 @@ pub struct Outcome {
 #[derive(Clone, Copy)]
 pub(crate) enum Phase {
     Story,
+    SignIn,
     Drain,
     Restart,
     Fault { cut: skein_world::Cut, before: u32 },
@@ -750,6 +751,47 @@ fn deliveries(procs: &[Proc]) -> Vec<Delivery> {
         .collect()
 }
 
+/// Two native starts on one disk, checking the held sign-in's stored identity and credential.
+#[must_use]
+pub fn sign_in_again(settings: Settings) -> [Outcome; 2] {
+    let scenario = Story::Chat { words: b"Hello" };
+    let run = Rc::new(RefCell::new(referee::Run::default()));
+    let (first, mut disk, store) =
+        run_phase(settings, scenario, Phase::SignIn, machine::fresh(), Store::new(), run.clone());
+    let before = sign_ins(&store);
+    assert_eq!(before.len(), 1, "one live sign-in before the fresh link");
+    let token = token_bytes(&mut disk);
+    assert_eq!(token.len(), 40, "the native bearer is saved on disk");
+    let (again, mut disk, store) = run_phase(settings, scenario, Phase::SignIn, disk, store, run);
+    assert_eq!(token_bytes(&mut disk), token, "same directory keeps every token byte");
+    assert_eq!(sign_ins(&store), before, "same sign-in number and expiry, pool unchanged");
+    [first, again]
+}
+
+#[expect(clippy::wildcard_enum_match_arm, reason = "the snapshot selects only durable sign-in rows")]
+fn sign_ins(store: &Store) -> Vec<(u64, u64, Wall)> {
+    store
+        .rows
+        .values()
+        .filter_map(|row| match row {
+            temper_engine_domain::Record::Core(jig_domain_core::Record::People(
+                jig_domain_people::Stored::SignIn { number, person, expires },
+            )) => Some((*number, *person, *expires)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn token_bytes(disk: &mut skein_fake_machine::Machine) -> Vec<u8> {
+    let root = disk.reopen_root(2);
+    let file = disk.open(root, b"private/token", skein_fake_machine::How::ReadNoFollow).expect("native token file");
+    let size = u32::try_from(disk.stat(file).size).expect("bounded token");
+    let bytes = disk.read(file, 0, size).expect("read native token");
+    disk.close(file);
+    disk.close(root);
+    bytes
+}
+
 fn run_phase(
     settings: Settings,
     scenario: Story,
@@ -760,7 +802,7 @@ fn run_phase(
 ) -> (Outcome, skein_fake_machine::Machine, Store) {
     stories::set(scenario);
     PROGRESS.with(|progress| *progress.borrow_mut() = Progress::default());
-    let client = matches!(phase, Phase::Story | Phase::Drain).then(|| disk.reopen_root(2));
+    let client = matches!(phase, Phase::Story | Phase::SignIn | Phase::Drain).then(|| disk.reopen_root(2));
     let store = Rc::new(RefCell::new(previous));
     STORE.with(|cell| {
         *cell.borrow_mut() = Some(store.clone());
@@ -797,7 +839,7 @@ fn run_phase(
             world.spawn(|| Proc::Peer(Box::new(SignalHost::new(stories::provider(scenario), None))));
             world.spawn(|| Proc::Forge(Box::new(SignalHost::new(peer(), None))));
         }
-        Phase::Story | Phase::Drain => {
+        Phase::Story | Phase::SignIn | Phase::Drain => {
             world.spawn_root(skein_sim::Handle::new(client.expect("story client root").raw()), |root| {
                 Proc::Client(Box::new(SignalHost::new(Person::new(root, scenario), None)))
             });

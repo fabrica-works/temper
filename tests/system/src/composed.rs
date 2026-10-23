@@ -612,6 +612,7 @@ impl World {
     fn party_request(&mut self, request: parties::Up) {
         let event = match request {
             parties::Up::SignIn { to, provider, subject } => engine::Event::Party(engine::PartyInput::SignedIn {
+                held: None,
                 reply_to: ReplyTo::new(Token::new(to)),
                 identity: people::Identity {
                     key: people::IdentityKey { provider, subject },

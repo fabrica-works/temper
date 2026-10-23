@@ -793,6 +793,7 @@ pub fn signed_worker() -> crate::Service {
     }));
     settle_root(&mut service, &mut skein_lib::Queue::with_capacity(32));
     service.engine.as_mut().expect("engine").step(root::Event::Party(root::PartyInput::SignedIn {
+        held: None,
         reply_to: skein_lib::ReplyTo::new(Token::new(100)),
         identity: jig_domain_people::Identity {
             key: jig_domain_people::IdentityKey { provider: 1, subject: b"owner-a".as_slice().into() },

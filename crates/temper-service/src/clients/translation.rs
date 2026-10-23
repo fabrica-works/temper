@@ -9,7 +9,7 @@ use temper_engine_domain as root;
 /// event on this boundary aborts the component instead of deciding root work.
 pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> {
     let value = match event {
-        core::Event::SignIn { reply_to, identity } => root::PartyInput::SignedIn { reply_to, identity },
+        core::Event::SignIn { reply_to, identity, held } => root::PartyInput::SignedIn { reply_to, identity, held },
         core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask, models }) => {
             root::PartyInput::Ask { reply_to, sign_in, key, ask, models }
         }

@@ -57,6 +57,35 @@ fn an_explicit_startup_link_takes_precedence_over_the_stored_credential() {
 }
 
 #[test]
+fn a_kept_link_sign_in_holds_the_stored_credential_without_writing_it() {
+    let (mut host, signing, _) = fixtures::link_chat(Some(fixtures::credential()));
+    host.transport(jig_client::Event::Reply { exchange: signing, message: fixtures::sign_in_answer(None) });
+    assert_eq!(host.root.client().link().credential, Some(&fixtures::credential()));
+    assert_eq!(host.credential, Some(fixtures::credential()));
+    assert!(host.saving_signing.is_none(), "no token write delays the answer");
+    assert_eq!(host.signing(), Some(Signing::SignedIn { party: CURRENT_PARTY }));
+}
+
+#[test]
+fn a_refused_or_lost_startup_link_keeps_the_stored_credential() {
+    for refused in [true, false] {
+        let (mut host, signing, _) = fixtures::link_chat(Some(fixtures::credential()));
+        let event = if refused {
+            let answer = jig_client_protocol_wire::SignInAnswer::Refused;
+            let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+            answer.encode(&mut writer).expect("answer room");
+            jig_client::Event::Reply { exchange: signing, message: writer.finish() }
+        } else {
+            jig_client::Event::Lost { exchange: signing }
+        };
+        host.transport(event);
+        assert_eq!(host.credential, Some(fixtures::credential()));
+        assert!(host.saving_signing.is_none(), "no token write on a failed link");
+        assert_eq!(host.signing(), Some(if refused { Signing::Refused } else { Signing::Lost }));
+    }
+}
+
+#[test]
 fn first_link_sign_in_recovers_the_cancelled_nonempty_activity_read() {
     first_link_activity(true);
 }

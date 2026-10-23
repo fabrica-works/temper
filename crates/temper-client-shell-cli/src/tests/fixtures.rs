@@ -40,6 +40,8 @@ pub struct Frame {
     pub linked_leaf: Option<Error>,
     pub carried_keys: Vec<skein_lib::Secret>,
     pub refuse_link: Option<()>,
+    pub keep_link: Option<()>,
+    pub link_bearers: Vec<Option<Box<[u8]>>>,
     pub again_links: u32,
     pub link_posts: Vec<Box<[u8]>>,
     hold_stores: Option<()>,
@@ -116,6 +118,8 @@ impl Frame {
             linked_leaf: None,
             carried_keys: Vec::new(),
             refuse_link: None,
+            keep_link: None,
+            link_bearers: Vec::new(),
             again_links: 0,
             link_posts: Vec::new(),
             hold_stores: None,
@@ -163,6 +167,7 @@ impl Frame {
     pub fn sign_in(link: &'static [u8]) -> Self {
         let mut frame = Self::act(&[b"sign-in", b"link-file"]);
         frame.link = link;
+        frame.token = b"";
         frame.hold_stores = Some(());
         frame
     }
@@ -491,6 +496,12 @@ impl Frame {
         match path.as_slice() {
             b"/jig/v1/sign-in/link" => {
                 self.link_posts.push(socket.request[end + 4..].into());
+                self.link_bearers.push(head.lines().find_map(|line| {
+                    line.strip_prefix("Authorization: Bearer ").map(|value| {
+                        skein_lib::base64::decode(skein_lib::base64::Alphabet::Url, value.as_bytes(), 40)
+                            .expect("native bearer encoding")
+                    })
+                }));
                 let answer = if self.again_links > 0 {
                     self.again_links -= 1;
                     w::SignInAnswer::NotReady
@@ -501,7 +512,7 @@ impl Frame {
                         w::SignedIn::new(
                             &w::CEILINGS,
                             w::SignedInParts {
-                                token: Some(skein_lib::Secret::new(TOKEN_BYTES.into())),
+                                token: self.keep_link.is_none().then(|| skein_lib::Secret::new(TOKEN_BYTES.into())),
                                 party: 1,
                                 expires: u64::MAX,
                             },
