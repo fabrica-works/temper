@@ -96,7 +96,7 @@ pub(crate) fn main(
         }
         Shown::Ready(number) => {
             if let Some(row) = connect::row(number, root.forges(), root.forge().demo()) {
-                ready_card(b, root, w, bindings, row);
+                ready_card(b, root, w, bindings, forge, row);
             }
         }
     }
@@ -144,7 +144,7 @@ pub(crate) fn welcome(
             && let Connection::Connected { .. } = row.connection
         {
             if forge::forges::accepted(row) {
-                ready_card(b, root, w, bindings, row);
+                ready_card(b, root, w, bindings, forge, row);
             } else {
                 setting_up(b, root, w, forge, row);
             }
@@ -465,7 +465,14 @@ pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &m
     }
     b.close();
 }
-pub(crate) fn ready_card(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, row: &Row) {
+pub(crate) fn ready_card(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut Bindings,
+    forge: &mut ForgeBindings,
+    row: &Row,
+) {
     if let Some(first) = &row.first {
         let repository = forge::words::full_name(&first.org, &first.repository);
         let project = project_name(root, w, &first.project);
@@ -486,8 +493,43 @@ pub(crate) fn ready_card(b: &mut Builder, root: &Domain, w: &Words, bindings: &m
         let open = w.say(Word::SetupOpen, &[Hole::Name(project)]);
         if pending {
             flow::control(b, Control::Disabled { name: &open });
-        } else if let SetUpProject::Existing(project) = first.project {
-            flow::control(b, Control::Link { name: &open, to: bindings.insert(Act::OpenProject { project }) });
+        } else {
+            let project = match root.forge().set_up() {
+                Some(last) if last.forge == row.number => match &last.adoption {
+                    Some(adoption) => match &adoption.outcome {
+                        Some(forge::Answer::Adopted(_)) => Some(adoption.value.project),
+                        Some(
+                            forge::Answer::CoreRefused(_)
+                            | forge::Answer::ForgeRefused(_)
+                            | forge::Answer::EntranceRefused(_)
+                            | forge::Answer::Unknown,
+                        )
+                        | None => None,
+                    },
+                    None => None,
+                },
+                Some(_) | None => match first.project {
+                    SetUpProject::Existing(project) => Some(project),
+                    SetUpProject::New(_) => None,
+                },
+            };
+            if let Some(project) = project {
+                flow::control(b, Control::Link { name: &open, to: bindings.insert(Act::OpenProject { project }) });
+            }
+        }
+        if let Some(last) = root.forge().set_up()
+            && last.forge == row.number
+            && let Some(starting) = &last.starting
+            && let Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(
+                jig_client::contract::Answer::Refused { refusal, .. },
+            ))) = &starting.value.outcome
+        {
+            b.open(Role::Alert);
+            w.refusal(b, refusal, w.name_bytes);
+            b.close();
+            setup_field(b, root, w, forge, SetupField::Project, Word::SetupNew, row.number);
+            let label = w.say(Word::SetupAdopt, &[Hole::Name(forge::words::full_name(&first.org, &first.repository))]);
+            flow::control(b, Control::Button { name: &label, to: forge.insert(Meaning::StartIn(row.number)) });
         }
         if let Some(last) = root.forge().set_up()
             && last.forge == row.number
@@ -601,29 +643,12 @@ pub(crate) fn each_step(b: &mut Builder, w: &Words, row: &Row) {
 }
 
 fn setup_fields(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, number: u16) {
-    let draft = root.forge().setup_form();
-    for (field, word) in
-        [(SetupField::Organization, Word::SetupOrganization), (SetupField::Repository, Word::SetupRepository)]
-    {
+    for (field, word) in [
+        (SetupField::Organization, Word::SetupOrganization),
+        (SetupField::Repository, Word::SetupRepository),
+        (SetupField::Project, Word::SetupNew),
+    ] {
         setup_field(b, root, w, bindings, field, word, number);
-    }
-    b.open(Role::ChoiceGroup);
-    b.name(&w.say(Word::SetupProject, &[]));
-    let project = project_name(root, w, &SetUpProject::Existing(root.pages().project().unwrap_or(1)));
-    for (new, label) in
-        [(false, w.say(Word::SetupExisting, &[Hole::Name(project)])), (true, w.say(Word::SetupNew, &[]))]
-    {
-        b.open(Role::Choice);
-        b.name(&label);
-        b.bind(bindings.insert(Meaning::SetupNew(new)));
-        if draft.new == new {
-            b.state(State::Selected);
-        }
-        b.close();
-    }
-    b.close();
-    if draft.new {
-        setup_field(b, root, w, bindings, SetupField::Project, Word::SetupNew, number);
     }
 }
 fn setup_field(
@@ -662,7 +687,21 @@ pub(crate) fn project_name(root: &Domain, w: &Words, project: &SetUpProject) -> 
             Some(name) => copy_of(name),
             None => w.say(Word::Project, &[Hole::Number(u64::from(*project))]),
         },
-        SetUpProject::New(name) => copy_of(name),
+        SetUpProject::New(name) => {
+            if let Some(last) = root.forge().set_up()
+                && let Some(starting) = &last.starting
+                && last.project == *project
+            {
+                if starting.value.adoption.project != 0
+                    && let Some(name) =
+                        crate::pages::project_name(root.pages(), root.client(), starting.value.adoption.project)
+                {
+                    return copy_of(name);
+                }
+                return starting.value.name.clone();
+            }
+            copy_of(name)
+        }
     }
 }
 pub(crate) fn first_line(b: &mut Builder, root: &Domain, w: &Words, row: &Row) {

@@ -51,6 +51,10 @@ pub struct Limits {
 /// resumed by the root and never passed to the protocol as child events.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Delivery {
+    /// The root hears a project made only after its decision commits.
+    ProjectMade {
+        project: u32,
+    },
     /// Sign-in binding answer held behind the row's commit (protocol/sign-in.md, 5).
     Bound {
         request: Token,
@@ -464,6 +468,7 @@ impl Decision {
             Delivery::Host(host) => host_within(host, limits),
             Delivery::SourceSignedOut { .. }
             | Delivery::Link { .. }
+            | Delivery::ProjectMade { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Bound { .. }

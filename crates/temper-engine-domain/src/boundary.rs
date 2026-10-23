@@ -724,7 +724,8 @@ pub struct Released(pub(crate) Delivery);
 /// Put an owner-produced held output in its destination envelope, by variant only.
 pub(crate) fn delivery_output(delivery: Delivery) -> Request {
     match delivery {
-        delivery @ (Delivery::ForgeCommitted { .. }
+        delivery @ (Delivery::ProjectMade { .. }
+        | Delivery::ForgeCommitted { .. }
         | Delivery::Fleet(_)
         | Delivery::Relay { .. }
         | Delivery::Load { .. }

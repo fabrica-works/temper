@@ -35,6 +35,7 @@ pub enum Word {
     SetupProject,
     SetupExisting,
     SetupNew,
+    SetupAdopt,
     SetupRequired,
     SetupInto,
     SetupMaking,
@@ -544,8 +545,9 @@ pub enum Word {
 // Seven demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
 // The browser sign-in heading and Google link add two phrases.
-const PHRASES: u32 = 1027;
-const ALL: [Word; 494] = [
+const PHRASES: u32 = 1029;
+const SEGMENTS: u32 = 1800;
+const ALL: [Word; 495] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -570,6 +572,7 @@ const ALL: [Word; 494] = [
     Word::SetupProject,
     Word::SetupExisting,
     Word::SetupNew,
+    Word::SetupAdopt,
     Word::SetupRequired,
     Word::SetupInto,
     Word::SetupMaking,
@@ -1069,6 +1072,7 @@ impl Word {
             Self::SetupProject => 1822,
             Self::SetupExisting => 1823,
             Self::SetupNew => 1824,
+            Self::SetupAdopt => 1870,
             Self::SetupRequired => 1825,
             Self::SetupInto => 1826,
             Self::SetupMaking => 1827,
@@ -1600,56 +1604,42 @@ fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32
     }
     Ok(if kind == HoleKind::Name { joined } else { 0 })
 }
-impl Words {
-    /// The configured playground model's identifier has its own display name (client/README.md, 5.6).
-    pub(crate) fn model_name(&self, name: &[u8]) -> Box<[u8]> {
-        if name == b"demo" { self.say(Word::DemoModelName, &[]) } else { copy_of(name) }
-    }
-
-    pub fn english(connector: u16, text: u32, shell: Shell) -> Result<Words, Invalid> {
-        let joined = match text.checked_mul(2) {
-            Some(bytes) => match bytes.checked_add(1) {
-                Some(bytes) => bytes,
-                None => return Err(Invalid::Overflow),
-            },
-            None => return Err(Invalid::Overflow),
-        };
-        let mut shapes = List::with_capacity(PHRASES);
-        let mut phrases = List::with_capacity(PHRASES);
-        for word in ALL {
-            let (literals, kinds) = english(word, shell);
-            let mut holes = List::with_capacity(4);
-            let mut segments = List::with_capacity(9);
-            for (index, literal) in literals.iter().enumerate() {
-                segments.push(Segment::Text(copy_of(literal))).expect("closed English segments fit");
-                if let Some(kind) = kinds.get(index) {
-                    holes
-                        .push(HoleShape {
-                            kind: *kind,
-                            bytes: hole_bytes(word, *kind, index.checked_add(1) == Some(kinds.len()), joined)?,
-                        })
-                        .expect("four holes fit");
-                    segments
-                        .push(Segment::Hole {
-                            index: u16::try_from(index).expect("four hole indices fit"),
-                            kind: *kind,
-                        })
-                        .expect("closed segments fit");
-                }
+fn english_language(
+    connector: u16,
+    text: u32,
+    shell: Shell,
+    joined: u32,
+) -> Result<(List<PhraseShape>, Language), Invalid> {
+    let mut shapes = List::with_capacity(PHRASES);
+    let mut phrases = List::with_capacity(PHRASES);
+    for word in ALL {
+        let (literals, kinds) = english(word, shell);
+        let mut holes = List::with_capacity(4);
+        let mut segments = List::with_capacity(9);
+        for (index, literal) in literals.iter().enumerate() {
+            segments.push(Segment::Text(copy_of(literal))).expect("closed English segments fit");
+            if let Some(kind) = kinds.get(index) {
+                holes
+                    .push(HoleShape {
+                        kind: *kind,
+                        bytes: hole_bytes(word, *kind, index.checked_add(1) == Some(kinds.len()), joined)?,
+                    })
+                    .expect("four holes fit");
+                segments
+                    .push(Segment::Hole { index: u16::try_from(index).expect("four hole indices fit"), kind: *kind })
+                    .expect("closed segments fit");
             }
-            let id = word.id(connector);
-            let plural = if word == Word::WaitingForDelegates || word == Word::ToolCalls || word == Word::ChatDelegates
-            {
-                Some(0)
-            } else {
-                None
-            };
-            shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural }).expect("closed shapes fit");
-            let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
-            let forms: Box<[Form]> = if word == Word::WaitingForDelegates
-                || word == Word::ToolCalls
-                || word == Word::ChatDelegates
-            {
+        }
+        let id = word.id(connector);
+        let plural = if word == Word::WaitingForDelegates || word == Word::ToolCalls || word == Word::ChatDelegates {
+            Some(0)
+        } else {
+            None
+        };
+        shapes.push(PhraseShape { id, holes: holes.into_boxed(), plural }).expect("closed shapes fit");
+        let other = Form { class: PluralClass::Other, segments: segments.into_boxed() };
+        let forms: Box<[Form]> =
+            if word == Word::WaitingForDelegates || word == Word::ToolCalls || word == Word::ChatDelegates {
                 Box::new([
                     Form {
                         class: PluralClass::One,
@@ -1668,31 +1658,66 @@ impl Words {
             } else {
                 Box::new([other])
             };
-            phrases.push(Phrase { id, forms }).expect("closed phrases fit");
+        phrases.push(Phrase { id, forms }).expect("closed phrases fit");
+    }
+    for word in jig_client::words::ALL {
+        shapes.push(word.shape(text)).expect("jig word shapes fit");
+    }
+    for phrase in jig_language().phrases {
+        phrases.push(phrase).expect("jig words fit");
+    }
+    crate::accounts::words::extend(&mut shapes, &mut phrases, joined, text);
+    crate::cards::words::extend(text, &mut shapes, &mut phrases);
+    temper_client_domain::forge::words::extend(connector, text, &mut shapes, &mut phrases);
+    temper_client_domain::forge::words::extend_change(connector, &mut shapes, &mut phrases);
+    resource_phrases(connector, joined, &mut shapes, &mut phrases);
+    let language = Language {
+        plural: PluralRule::English,
+        span_unit: SpanUnit::Seconds,
+        wall: WallFormat::Seconds,
+        phrases: phrases.into_boxed(),
+    };
+    Ok((shapes, language))
+}
+
+#[cfg(test)]
+pub(crate) fn english_declarations() -> [(&'static str, u64, u64); 2] {
+    let (shapes, language) = english_language(1, 256, Shell::Browser, 513).expect("bounded English");
+    let mut segments = 0_u64;
+    for phrase in &language.phrases {
+        for form in &phrase.forms {
+            segments = segments
+                .checked_add(u64::try_from(form.segments.len()).expect("bounded segments"))
+                .expect("bounded English");
         }
-        for word in jig_client::words::ALL {
-            shapes.push(word.shape(text)).expect("jig word shapes fit");
-        }
-        for phrase in jig_language().phrases {
-            phrases.push(phrase).expect("jig words fit");
-        }
-        crate::accounts::words::extend(&mut shapes, &mut phrases, joined, text);
-        crate::cards::words::extend(text, &mut shapes, &mut phrases);
-        temper_client_domain::forge::words::extend(connector, text, &mut shapes, &mut phrases);
-        temper_client_domain::forge::words::extend_change(connector, &mut shapes, &mut phrases);
-        resource_phrases(connector, joined, &mut shapes, &mut phrases);
-        let language = Language {
-            plural: PluralRule::English,
-            span_unit: SpanUnit::Seconds,
-            wall: WallFormat::Seconds,
-            phrases: phrases.into_boxed(),
+    }
+    [
+        ("const PHRASES: u32 = ", u64::from(PHRASES), u64::from(shapes.len())),
+        ("const SEGMENTS: u32 = ", u64::from(SEGMENTS), segments),
+    ]
+}
+
+impl Words {
+    /// The configured playground model's identifier has its own display name (client/README.md, 5.6).
+    pub(crate) fn model_name(&self, name: &[u8]) -> Box<[u8]> {
+        if name == b"demo" { self.say(Word::DemoModelName, &[]) } else { copy_of(name) }
+    }
+
+    pub fn english(connector: u16, text: u32, shell: Shell) -> Result<Words, Invalid> {
+        let joined = match text.checked_mul(2) {
+            Some(bytes) => match bytes.checked_add(1) {
+                Some(bytes) => bytes,
+                None => return Err(Invalid::Overflow),
+            },
+            None => return Err(Invalid::Overflow),
         };
+        let (shapes, language) = english_language(connector, text, shell, joined)?;
         let limits = PhraseLimits {
             languages: 1,
             phrases: PHRASES,
             holes: 4,
             // Setup fields and first repository need 28 more segments; the demo's start 15.
-            segments: 1804,
+            segments: SEGMENTS,
             text_bytes: 32768,
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined
@@ -1779,7 +1804,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::SetupRepository => (&[b"Repository"], &[]),
         Word::SetupProject => (&[b"Project"], &[]),
         Word::SetupExisting => (&[b"", b", the project you are in"], &[Name]),
-        Word::SetupNew => (&[b"A new project"], &[]),
+        Word::SetupNew => (&[b"Into a new project, named"], &[]),
+        Word::SetupAdopt => (&[b"Adopt ", b""], &[Name]),
         Word::SetupRequired => (&[b"Required."], &[]),
         Word::SetupInto => (&[b"", b", into ", b""], &[Name, Name]),
         Word::SetupMaking => (&[b"Connecting, and making ", b""], &[Name]),

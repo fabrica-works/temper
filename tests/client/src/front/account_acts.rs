@@ -184,6 +184,9 @@ fn fixture_root(
             engine_limits.journal.writes.checked_add((engine_limits.fleet.grants - 2) * 4).expect("grant cohorts fit");
         let rules = config.core.authority.rules().clone();
         config.core.authority = auth::Domain::new(rules, engine_limits.authority).expect("account authority bounds");
+        if forge == WelcomeForge::Owned {
+            super::first_run_projects(&mut config, &mut engine_limits);
+        }
         (config, engine_limits)
     });
     let mut front = Joint::with_engine(seed, &limits, Store::new(), [bootstrap, config], &engine_limits, 1);

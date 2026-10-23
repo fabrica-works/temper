@@ -48,6 +48,7 @@ pub(super) fn encode_admission_limit(
         jig_client::contract::AdmissionLimit::Priority => out.string(b"priority"),
         jig_client::contract::AdmissionLimit::Policy => out.string(b"policy"),
         jig_client::contract::AdmissionLimit::Resource => out.string(b"resource"),
+        jig_client::contract::AdmissionLimit::Projects => out.string(b"projects"),
         jig_client::contract::AdmissionLimit::Service => out.string(b"service"),
     }
 }

@@ -129,6 +129,7 @@ fn the_default_is_the_owned_example_so_edited() {
             }
         }
         assert_eq!(replace_org_patterns(&mut expected), 40, "{row}");
+        expected["engine"]["policies"] = expected["engine"]["projects"].clone();
         expected["application"]["limits"]["overrides"]["forge.client.repositories"] = json!(3_u32);
         expected["application"]["limits"]["overrides"]["forge.repositories"] = json!(3_u32);
         expected["application"]["limits"]["overrides"]["forge.output"] = json!(82_u32);
@@ -216,6 +217,9 @@ fn the_default_is_the_owned_example_so_edited() {
         ] {
             set(&mut expected, path, value);
         }
+        expected["application"]["landing"]["deployment"] =
+            expected["application"]["landing"]["projects"][0]["rules"].clone();
+        expected["application"]["landing"]["projects"] = parse(b"[]");
         assert_eq!(actual, expected, "{row}");
     }
 }
@@ -482,4 +486,22 @@ fn the_person_keeps_a_forgejo_login_or_falls_back() {
             "{row}"
         );
     }
+}
+
+#[test]
+fn the_template_keeps_project_one_and_offers_its_whole_policy_for_runtime_projects() {
+    let document = parse(template::TEMPER);
+    assert_eq!(document["engine"]["projects"].as_array().unwrap().len(), 1);
+    assert_eq!(document["engine"]["projects"][0]["number"], 1_u32);
+    assert_eq!(document["engine"]["policies"], document["engine"]["projects"]);
+    let landing = &document["application"]["landing"];
+    assert_eq!(landing["projects"], parse(b"[]"));
+    assert_eq!(
+        landing["deployment"],
+        json!([{
+            "connector": 1_u16, "kind": 4_u16, "pattern": every_forge(),
+            "enforce": true, "ci": true, "up_to_date": true,
+            "gates": parse(b"[]"), "approvals": parse(b"[]")
+        }])
+    );
 }

@@ -18,7 +18,9 @@ fn signed_in_on(role: Option<people::Role>, kind: forge::Kind) -> (Domain, Env<L
     let mut config = config(1);
     config.forges = Box::new([forge::Configured { number: 1, kind, mode: forge::Mode::Owned, asked: true }]);
     config.under_box = true;
-    let (mut domain, env) = root_with_config(config);
+    signed_in_root(root_with_config(config), role)
+}
+fn signed_in_root((mut domain, env): (Domain, Env<Limits>), role: Option<people::Role>) -> (Domain, Env<Limits>) {
     domain.core.people = people::Domain::new(&env.limits.people, Box::new([]), 1, Box::new([]));
     let mut out = Queue::with_capacity(people::max_out(&env.limits.people));
     for record in [
@@ -408,4 +410,101 @@ fn a_new_binding_answers_only_after_its_commit_is_durable() {
         settle(&mut domain, &env).as_ref(),
         [Request::Bound { request: token, answer: forge::BindAnswer::Bound }]
     );
+}
+
+fn runtime_project_root() -> (Domain, Env<Limits>) {
+    let mut configured = super::resume_fixture::config_with_project_room(1, 2);
+    let seed = &configured.core.seed_projects.first().unwrap().policy;
+    let policy = jig_domain_core::ConfiguredPolicy {
+        policy: seed.policy.clone(),
+        permissions: seed.permissions.clone(),
+        templates: seed.templates.clone(),
+    };
+    configured.core.policies.insert(1, policy).unwrap();
+    let mut limits = super::resume_fixture::limits();
+    limits.authority.projects = 2;
+    limits.people.projects = 3;
+    limits.journal.writes = crate::limits::route_bound(&limits).unwrap().checked_add(limits.call_records).unwrap();
+    signed_in_root(super::resume_fixture::root_with_config_and_limits(configured, &limits), Some(people::Role::Owner))
+}
+
+fn make_project(name: &str) -> Event {
+    Event::Party(PartyInput::Ask {
+        reply_to: ReplyTo::new(Token::new(90)),
+        sign_in: SIGN_IN,
+        key: [81; 16],
+        ask: people::Ask::MakeProject { name: name.into(), policy: 1 },
+        models: Box::new([]),
+    })
+}
+
+#[test]
+fn make_project_copies_policy_one_and_the_root_hears_it_only_after_commit() {
+    let (mut domain, env) = runtime_project_root();
+    let policy = domain.core.authority.policy(1).unwrap().clone();
+    crate::try_step(&mut domain, &env, make_project("Tally")).unwrap();
+    let mut out = Queue::with_capacity(crate::max_out(&env.limits).checked_mul(2).unwrap());
+    let mut commit = None;
+    let mut saved = false;
+    for _ in 0_u32..32_u32 {
+        crate::release(&mut domain, &env, &mut out);
+        while let Some(request) = out.pop() {
+            if let Request::Store(StoreRequest::Commit { number, writes }) = request {
+                assert!(commit.replace(number).is_none(), "one project decision");
+                for write in writes {
+                    if let crate::Write::Save(crate::Record::Core(jig_domain_core::Record::People(
+                        people::Stored::Policy { project, name, .. },
+                    ))) = write
+                    {
+                        assert_eq!(project, 2);
+                        assert_eq!(name.as_ref(), "Tally");
+                        saved = true;
+                    }
+                }
+            } else {
+                panic!("nothing leaves the uncommitted project decision: {request:?}");
+            }
+        }
+    }
+    assert!(saved, "the new project's policy and name are durable");
+    assert_eq!(domain.core.authority.policy(2), Some(&policy));
+    crate::try_step(&mut domain, &env, Event::Store(StoreInput::Committed { number: commit.unwrap(), fill: 0 }))
+        .unwrap();
+    let mut heard = false;
+    let mut answered = false;
+    for _ in 0_u32..32_u32 {
+        crate::release(&mut domain, &env, &mut out);
+        while let Some(request) = out.pop() {
+            if let Request::ToChild(released) = request {
+                assert_eq!(released.0, Delivery::ProjectMade { project: 2 });
+                assert!(!heard, "one notification");
+                heard = true;
+                crate::try_step(&mut domain, &env, Event::Released(released)).unwrap();
+            } else if let Request::Party(PartyRequest::Deliver(Delivery::WebReply { reply, .. })) = request {
+                assert_eq!(reply, people::Reply::Outcome(people::Outcome::ProjectMade { project: 2 }));
+                answered = true;
+            } else {
+                panic!("only the root and maker hear the committed project: {request:?}");
+            }
+        }
+    }
+    assert!(heard && answered);
+    assert_eq!(domain.core.projects.as_slice(), &[1, 2]);
+    assert_eq!(domain.core.people.role(1, 2), Some(people::Role::Owner));
+}
+
+#[test]
+fn a_taken_project_name_is_refused_without_making_a_project() {
+    let (mut domain, env) = runtime_project_root();
+    crate::try_step(&mut domain, &env, make_project("project 1")).unwrap();
+    let requests = settle(&mut domain, &env);
+    assert_eq!(
+        requests.as_ref(),
+        &[Request::Party(PartyRequest::Deliver(Delivery::WebReply {
+            to: ReplyTo::new(Token::new(90)),
+            reply: people::Reply::Outcome(people::Outcome::Refused(people::Refusal::NameTaken)),
+        }))]
+    );
+    assert_eq!(domain.core.projects.as_slice(), &[1]);
+    assert!(domain.core.authority.policy(2).is_none());
 }

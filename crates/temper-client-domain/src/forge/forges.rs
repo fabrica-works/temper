@@ -186,8 +186,8 @@ impl SetupField {
 pub struct Draft {
     pub fields: [Box<[u8]>; 3],
     pub written: [u64; 3],
-    pub project: u32,
-    pub new: bool,
+    /// The person wrote the project's name; until then it follows the repository's.
+    pub named: bool,
     pub checked: bool,
 }
 impl Draft {
@@ -195,8 +195,7 @@ impl Draft {
         Self {
             fields: [Box::from(b"work".as_slice()), Box::from(b"hello".as_slice()), Box::from(b"hello".as_slice())],
             written: [0; 3],
-            project: 1,
-            new: false,
+            named: false,
             checked: false,
         }
     }
@@ -213,17 +212,18 @@ impl Draft {
         *self.written.get(field.index()).expect("three setup fields")
     }
 }
-pub(crate) fn project(side: &mut super::Side, project: u32) {
-    side.setup_form.project = project;
-}
 pub(crate) fn write(side: &mut super::Side, limits: super::Limits, field: SetupField, text: Box<[u8]>) {
     if text.len() > usize::try_from(limits.field_bytes).expect("field bytes fit") {
         return;
     }
     let draft = &mut side.setup_form;
     let index = field.index();
-    if field == SetupField::Repository && draft.written[2] == 0 {
+    if field == SetupField::Project {
+        draft.named = true;
+    } else if field == SetupField::Repository && !draft.named {
+        // A count of its own, so that the platform's field takes the followed text.
         draft.fields[2].clone_from(&text);
+        draft.written[2] = draft.written[2].checked_add(1).expect("written count fits");
     }
     *draft.fields.get_mut(index).expect("three setup fields") = text;
     let written = draft.written.get_mut(index).expect("three setup fields");
@@ -242,6 +242,12 @@ pub struct FirstAdoption {
     pub value: super::Adoption,
     pub outcome: Option<super::Answer>,
 }
+/// `MakeProject` is kept independently of `SetUp` and Adopt.
+#[derive(Debug)]
+pub struct FirstProject {
+    pub request: skein_lib::Token,
+    pub value: super::start::StartIn,
+}
 /// The last set up sent by this client, retained across page changes.
 #[derive(Debug)]
 pub struct SetUp {
@@ -251,6 +257,7 @@ pub struct SetUp {
     pub repository: Box<[u8]>,
     pub project: SetUpProject,
     pub adoption: Option<FirstAdoption>,
+    pub starting: Option<FirstProject>,
     pub request: skein_lib::Token,
     pub progress: Option<skein_lib::RequestProgress>,
     pub answer: Option<SetUpAnswer>,
@@ -308,19 +315,11 @@ pub(crate) fn set_up(
     let (org, repository, project) = match previous {
         Some(fields) => (fields.org, fields.repository, fields.project),
         None => {
-            if draft.fields[0].is_empty() || draft.fields[1].is_empty() || (draft.new && draft.fields[2].is_empty()) {
+            if draft.fields[0].is_empty() || draft.fields[1].is_empty() || draft.fields[2].is_empty() {
                 side.changed();
                 return;
             }
-            (
-                draft.fields[0].clone(),
-                draft.fields[1].clone(),
-                if draft.new {
-                    SetUpProject::New(draft.fields[2].clone())
-                } else {
-                    SetUpProject::Existing(draft.project)
-                },
-            )
+            (draft.fields[0].clone(), draft.fields[1].clone(), SetUpProject::New(draft.fields[2].clone()))
         }
     };
     let Some(ask) = ask(forge, org.clone(), repository.clone(), project.clone(), &limits) else {
@@ -335,6 +334,7 @@ pub(crate) fn set_up(
         repository,
         project,
         adoption: None,
+        starting: None,
         request,
         progress: Some(skein_lib::RequestProgress::Parked),
         answer: None,
@@ -380,6 +380,9 @@ pub(crate) fn told(
     out: &mut skein_lib::Queue<super::Request>,
 ) -> bool {
     use jig_client::{Latest, Outcome, Progress, Told};
+    if project_told(side, client, value, limits, out) {
+        return true;
+    }
     match value {
         Told::Changed { handle: changed } if *changed == handle() => {
             side.forges = match client.document(*changed) {
@@ -452,6 +455,49 @@ pub(crate) fn told(
     side.changed();
     true
 }
+fn project_told(
+    side: &mut super::Side,
+    client: &jig_client::Client,
+    value: &jig_client::Told,
+    limits: super::Limits,
+    out: &mut skein_lib::Queue<super::Request>,
+) -> bool {
+    use jig_client::{Outcome, Progress, Told};
+    if let Some(last) = &mut side.set_up
+        && let Some(starting) = &mut last.starting
+        && starting.value.outcome.is_none()
+    {
+        let key = jig_client::Key { asker: crate::owner::Owner::Forge.asker(), number: starting.request.raw() };
+        let outcome = match value {
+            Told::Answered { key: answered, outcome } if *answered == key => Some(outcome.clone()),
+            Told::Pending { key: pending } if *pending == key => match client.pending(key) {
+                Some(pending) if pending.progress == Progress::Unknown => Some(Outcome::Unknown),
+                Some(_) | None => return true,
+            },
+            Told::Link { .. }
+            | Told::Pending { .. }
+            | Told::Answered { .. }
+            | Told::Kept { .. }
+            | Told::Dropped { .. }
+            | Told::Changed { .. }
+            | Told::Text { .. }
+            | Told::Ended { .. }
+            | Told::Page { .. } => None,
+        };
+        if let Some(outcome) = outcome {
+            let adoption = starting.value.answered(&outcome);
+            if side.party == Some(last.party)
+                && let Some(adoption) = adoption
+            {
+                send_adoption(side, limits, &adoption, false, out);
+            }
+            side.changed();
+            return true;
+        }
+    }
+    false
+}
+
 fn setup_key(side: &super::Side, key: jig_client::Key) -> bool {
     let Some(last) = &side.set_up else { return false };
     key.asker == crate::owner::Owner::Forge.asker() && key.number == last.request.raw()
@@ -472,12 +518,16 @@ pub fn worst_case(limits: &super::Limits) -> Option<u64> {
         // Three draft fields, three sent fields, two adoption names, main and temper/.
         .checked_add(u64::from(limits.field_bytes).checked_mul(8)?)?
         .checked_add(11)?
+        // MakeProject retains a name, an adoption, and jig's bounded refusal.
+        .checked_add(u64::from(limits.field_bytes).checked_mul(5)?)?
+        .checked_add(65_536)?
+        .checked_add(skein_lib::List::<(u16, u64)>::worst_case(ROWS)?)?
         .checked_add(u64::try_from(size_of::<SetUp>()).ok()?)?
         .checked_add(w::Answer::worst_case_heap(&wire)?)
 }
 
 // The first repository is adopted on the forge side, even away from the flow
-// (protocol/setup.md, 6.7). New projects are refused before a run starts.
+// (protocol/setup.md, 6.7), after jig has made its project.
 pub(crate) fn maybe_adopt(side: &mut super::Side, limits: super::Limits, out: &mut skein_lib::Queue<super::Request>) {
     if side.party.is_none() || side.served == super::Served::OutOfDate {
         return;
@@ -485,7 +535,7 @@ pub(crate) fn maybe_adopt(side: &mut super::Side, limits: super::Limits, out: &m
     let Some(last) = &side.set_up else {
         return;
     };
-    if last.adoption.is_some() || side.party != Some(last.party) {
+    if last.starting.is_some() || last.adoption.is_some() || side.party != Some(last.party) {
         return;
     }
     let State::Rows(rows) = &side.forges else {
@@ -510,11 +560,10 @@ pub(crate) fn maybe_adopt(side: &mut super::Side, limits: super::Limits, out: &m
                 FirstState::Made { .. } => {}
                 FirstState::Making | FirstState::Failed { .. } => return,
             }
-            let SetUpProject::Existing(project) = last.project else {
-                return;
-            };
+            let SetUpProject::New(name) = &last.project else { return };
+            let name = name.clone();
             let adoption = super::Adoption {
-                project,
+                project: 0,
                 forge: last.forge,
                 owner: first.org.clone(),
                 name: first.repository.clone(),
@@ -525,11 +574,75 @@ pub(crate) fn maybe_adopt(side: &mut super::Side, limits: super::Limits, out: &m
                 checks: Box::default(),
                 home: true,
             };
-            send_adoption(side, limits, &adoption, false, out);
+            let forge = last.forge;
+            start_in(side, limits, forge, adoption, name, out);
             return;
         }
     }
 }
+/// The project's number is deliberately absent until jig answers `MakeProject`.
+pub(crate) fn start_in(
+    side: &mut super::Side,
+    limits: super::Limits,
+    forge: u16,
+    adoption: super::Adoption,
+    name: Box<[u8]>,
+    out: &mut skein_lib::Queue<super::Request>,
+) {
+    let value = super::start::StartIn::new(adoption, name);
+    let Some(ask) = value.ask(&limits) else { return };
+    let mut attempt = None;
+    for index in 0..side.start_attempts.len() {
+        let (number, next) = side.start_attempts.get_mut(index).expect("counted attempts");
+        if *number == forge {
+            attempt = Some(*next);
+            *next = next.checked_add(1).expect("start attempts fit");
+            break;
+        }
+    }
+    let attempt = match attempt {
+        Some(attempt) => attempt,
+        None => {
+            if side.start_attempts.push((forge, 1)).is_err() {
+                return;
+            }
+            0
+        }
+    };
+    // The name is the engine's dedup key: after refusal, changing the text
+    // needs start-project-F-N, counting attempts within this client.
+    side.serial = side.serial.checked_add(1).expect("forge request serial fits");
+    let request = skein_lib::Token::new(side.serial);
+    side.set_up.as_mut().expect("setup retained").starting = Some(FirstProject { request, value });
+    out.push(super::Request::Send { request, name: Some(super::start_project_key(forge, attempt)), ask });
+    side.changed();
+}
+pub(crate) fn retry_start(
+    side: &mut super::Side,
+    limits: super::Limits,
+    forge: u16,
+    out: &mut skein_lib::Queue<super::Request>,
+) {
+    let Some(last) = &side.set_up else { return };
+    if last.forge != forge || side.party != Some(last.party) || side.served == super::Served::OutOfDate {
+        return;
+    }
+    let Some(starting) = &last.starting else { return };
+    // Retry only a known refusal: an unknown answer may already have made a project.
+    let Some(jig_client::Outcome::Answered(Answered::Jig(c::Answer::Refused { .. }))) = &starting.value.outcome else {
+        return;
+    };
+    side.setup_form.checked = true;
+    let name = side.setup_form.text(SetupField::Project);
+    if name.is_empty() {
+        side.changed();
+        return;
+    }
+    let adoption = starting.value.adoption.clone();
+    let name = Box::from(name);
+    start_in(side, limits, forge, adoption, name, out);
+}
+
 fn send_adoption(
     side: &mut super::Side,
     limits: super::Limits,

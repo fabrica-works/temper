@@ -1961,6 +1961,7 @@ fn offers(kinds: &[c::ActKind]) -> List<c::Offered> {
             | c::ActKind::SetRoles
             | c::ActKind::MakeService
             | c::ActKind::SetPool
+            | c::ActKind::Rename
             | c::ActKind::Withdraw => None,
         };
         result.push(c::Offered { act: *act, admission: c::Admission::Allowed, effect }).expect("act capacity");

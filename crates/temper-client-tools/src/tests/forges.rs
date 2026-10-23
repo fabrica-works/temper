@@ -401,9 +401,9 @@ fn made() -> w::FirstState {
 fn setup_defaults_flags_and_project_names_are_carried_in_the_request() {
     const WORDS_WITH_ONE_FLAG: u32 = 4;
     for (flags, org, repository, project) in [
-        (&[][..], b"work".as_slice(), b"hello".as_slice(), 1),
-        (&["--org", "team"][..], b"team", b"hello", 1),
-        (&["--repository", "widget"][..], b"work", b"widget", 1),
+        (&[][..], b"work".as_slice(), b"hello".as_slice(), 0),
+        (&["--org", "team"][..], b"team", b"hello", 0),
+        (&["--repository", "widget"][..], b"work", b"widget", 0),
         (&["--project", "7"][..], b"work", b"hello", 7),
         (&["--project", "shop"][..], b"work", b"hello", f::PROJECT),
     ] {
@@ -422,8 +422,16 @@ fn setup_defaults_flags_and_project_names_are_carried_in_the_request() {
             panic!("setup")
         };
         assert_eq!((value.org(), value.repository()), (org, repository));
-        let w::SetUpProject::Existing(value) = value.project() else { panic!("existing project") };
-        assert_eq!(value.project(), project);
+        match value.project() {
+            w::SetUpProject::Existing(value) => {
+                assert_ne!(project, 0);
+                assert_eq!(value.project(), project);
+            }
+            w::SetUpProject::New(value) => {
+                assert_eq!(project, 0);
+                assert_eq!(value.name(), repository);
+            }
+        }
     }
 }
 #[test]
@@ -948,4 +956,85 @@ fn human_forges_bounds_the_wire_maximum_installations_with_longest_logins() {
             assert_eq!(plain.stderr.as_ref(), b"result limit\n");
         }
     }
+}
+
+#[test]
+fn setup_makes_the_default_or_named_project_then_adopts_the_answered_number() {
+    for flags in [&[][..], &["--project", "Next"][..], &["--project", "7"][..]] {
+        let mut root = f::signed_in(f::PARTY);
+        let mut argv = List::with_capacity(4);
+        argv.push("forge-setup").unwrap();
+        argv.push("3").unwrap();
+        for flag in flags {
+            argv.push(*flag).unwrap();
+        }
+        let call = root.submit(argv.as_slice());
+        root.adoption_answer(call, w::Outcome::SettingUp);
+        deliver(
+            &mut root,
+            record_first(
+                w::Connection::Connected(
+                    w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 1, login: b"temper".as_slice().into() })
+                        .unwrap(),
+                ),
+                Some(first_record(made())),
+            ),
+        );
+        let expected = if flags == ["--project", "7"] {
+            7
+        } else {
+            let client::Ask::Jig(ask) = root.adoption_bytes(call) else { panic!("MakeProject before Adopt") };
+            let c::Ask::MakeProject { name, policy } = ask.as_ref() else { panic!("MakeProject") };
+            assert_eq!(name.bytes(), if flags.is_empty() { b"hello".as_slice() } else { b"Next" });
+            assert_eq!(*policy, 1);
+            assert_eq!(root.sent_name(call), Some(crate::key::engine(&f::name(b"start-project-3"))));
+            let (attempt, _, _) = root.sends.get(&call).unwrap();
+            root.client(client::Event::Up {
+                up: client::Up::Answer {
+                    attempt: *attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                        c::OwnerOutcome::ProjectMade { project: 8 },
+                    )))),
+                    why: None,
+                },
+            });
+            8
+        };
+        assert_eq!(root.sent_adoption(call).project, expected);
+        assert!(root.sent_adoption(call).home);
+        assert_eq!(root.sent_name(call), Some(forge::first_repository_key(3, false)));
+        root.adoption_answer(call, f::adopted_with_unknown_protection());
+        assert_eq!(root.answer(call).unwrap().status, 0);
+    }
+}
+
+#[test]
+fn refused_make_project_prints_jigs_words_and_sends_no_adoption() {
+    let mut root = f::signed_in(f::PARTY);
+    let call = root.submit(&["forge-setup", "3"]);
+    root.adoption_answer(call, w::Outcome::SettingUp);
+    deliver(
+        &mut root,
+        record_first(
+            w::Connection::Connected(
+                w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 1, login: b"temper".as_slice().into() })
+                    .unwrap(),
+            ),
+            Some(first_record(made())),
+        ),
+    );
+    let (attempt, _, _) = root.sends.get(&call).unwrap();
+    root.client(client::Event::Up {
+        up: client::Up::Answer {
+            attempt: *attempt,
+            envelope: skein_lib::RequestEnvelope::Final,
+            answer: Some(client::Answered::Jig(c::Answer::Refused { refusal: c::Refusal::NameTaken, at: None })),
+            why: None,
+        },
+    });
+    let printed = root.answer(call).unwrap();
+    assert_eq!(printed.status, 2);
+    assert!(skein_lib::bytes::find(&printed.stderr, b"Another project has that name").is_some());
+    let client::Ask::Jig(_) = root.adoption_bytes(call) else { panic!("no adoption after refusal") };
 }

@@ -138,7 +138,7 @@ fn each_pages_main_carries_the_main_token() {
 }
 #[test]
 fn the_composers_carry_the_composer_token() {
-    for root in [fixtures::chats_root(), fixtures::chat::messaging_root()] {
+    for root in fixtures::pair(fixtures::chats_root(), fixtures::chat::messaging_root()) {
         let view = fixtures::page_view(&root);
         assert_eq!(fixtures::styles(view.tree(), Role::TextArea).as_ref(), [Box::from([COMPOSER])]);
     }

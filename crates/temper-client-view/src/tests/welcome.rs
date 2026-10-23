@@ -46,9 +46,7 @@ fn model_names_the_new_project_while_forgejo_sets_up() {
         Address::Welcome { step: Step::Forge { forge: None } },
         forge::rows(w::Connection::NotSetUp, w::Offer::Offered),
     );
-    for action in [d::forge::Act::SetupNew { new: true }, d::forge::Act::SetUp { forge: HERE }] {
-        f::root_event(&mut root, d::Event::Act { action: d::Action::Forge(action) });
-    }
+    f::root_event(&mut root, d::Event::Act { action: d::Action::Forge(d::forge::Act::SetUp { forge: HERE }) });
     // The setup request supplies the names until the watch's row carries them.
     forge::deliver(
         &mut root,

@@ -281,7 +281,11 @@ otherwise nothing but the setup host runs it or writes what it makes.
 - **Per forge, one writing plan at once, and one `Reachable` beside
   it,** since the picker's read writes nothing. A second of either kind
   is refused "busy", never queued, and so is one past `setup.runs`,
-  which counts both kinds.
+  which counts both kinds. One exception: an `Install` waits for the
+  engine's own run on its forge (the reconcile after a connect, at a
+  start or on a hint), at most one per forge and for at most
+  `setup.state_life_ms`, and is refused busy only by a run a person
+  asked, since its link writes nothing.
 - **Its needs:** a write is a `Keep` of the forge's record, answered
   `Written` only once `Kept`, so a browser is answered and a connect
   sent only on what a restart would find; a read is served from the

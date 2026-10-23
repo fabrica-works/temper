@@ -176,7 +176,7 @@ fn ready(
             root.forge().demo(),
         );
         if row.first.is_some() && ready == temper_client_domain::forge::connect::Shown::Ready(row.number) {
-            connect::ready_card(b, root, w, bindings, row);
+            connect::ready_card(b, root, w, bindings, forge, row);
         } else if row.first.is_some() && ready == temper_client_domain::forge::connect::Shown::SettingUp(row.number) {
             connect::setting_up(b, root, w, forge, row);
         } else if row.first.is_none()

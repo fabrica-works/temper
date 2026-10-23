@@ -1584,3 +1584,13 @@ pub fn sign_in_view(
     build(&mut view, root);
     view
 }
+
+pub fn pair(
+    first: temper_client_domain::Domain,
+    second: temper_client_domain::Domain,
+) -> Box<[temper_client_domain::Domain]> {
+    let mut roots = List::with_capacity(2);
+    roots.push(first).expect("first root");
+    roots.push(second).expect("second root");
+    roots.into_boxed()
+}

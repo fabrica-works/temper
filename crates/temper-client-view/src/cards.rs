@@ -25,6 +25,7 @@ pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
         c::Refusal::Taken { by } => Some(Hole::Number(*by)),
         c::Refusal::Llm { model, .. } => Some(Hole::Name(words.model_name(model.bytes()))),
         c::Refusal::NoEscalationHolder
+        | c::Refusal::NameTaken
         | c::Refusal::Malformed { .. }
         | c::Refusal::Role { .. }
         | c::Refusal::NotWaiting
@@ -117,6 +118,8 @@ fn owner_outcome(b: &mut Builder, words: &Words, value: &c::OwnerOutcome) {
         | O::Compound { .. }
         | O::MarkedSeen { .. }
         | O::NoteEdited { .. }
+        | O::ProjectMade { .. }
+        | O::Renamed { .. }
         | O::ServiceMade { .. }
         | O::Adopted { .. }
         | O::Stopped { .. }

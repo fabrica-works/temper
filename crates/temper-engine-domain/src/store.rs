@@ -646,6 +646,9 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                         };
                         scope_bytes.checked_add(change_bytes)
                     }
+                    jig_domain_people::Ask::MakeProject { name, .. } | jig_domain_people::Ask::Rename { name, .. } => {
+                        u64::try_from(name.len()).ok()
+                    }
                     jig_domain_people::Ask::MakeService { name, .. } => u64::try_from(name.len()).ok(),
                     jig_domain_people::Ask::Adopt { adoption, .. } => {
                         let mut bytes =
@@ -874,6 +877,8 @@ fn program_answer_bytes(outcome: &jig_domain_people::Outcome) -> Option<u64> {
         }
         Outcome::Compound { .. }
         | Outcome::CompoundRefused { .. }
+        | Outcome::ProjectMade { .. }
+        | Outcome::Renamed { .. }
         | Outcome::Created { .. }
         | Outcome::MarkedSeen { .. }
         | Outcome::Applied { .. }

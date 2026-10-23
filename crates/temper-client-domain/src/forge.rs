@@ -11,6 +11,7 @@ pub mod github;
 pub mod listed;
 pub(crate) mod me;
 pub mod panel;
+pub mod start;
 mod vocabulary;
 pub mod words;
 pub use form::{Act, Broken, Check, Field, Form, Marks, Text, Typed, adoption, broken, form, write};
@@ -54,6 +55,7 @@ pub struct Side {
     served: Served,
     form: Option<Form>,
     serial: u64,
+    start_attempts: skein_lib::List<(u16, u64)>,
     party: Option<u64>,
     me: bool,
     link: jig_client::Link,
@@ -75,6 +77,7 @@ impl Side {
             served: Served::Unknown,
             form: None,
             serial: skein_lib::Rng::new(seed).next_u64(),
+            start_attempts: skein_lib::List::with_capacity(forges::ROWS),
             party: None,
             me: false,
             link: jig_client::Link::Starting,
@@ -230,14 +233,7 @@ fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
         Act::StartDemo => demo::start(side, limits, false, out),
         Act::SetUp { forge } => forges::set_up(side, limits, forge, out),
         Act::SetupWrite { field, text } => forges::write(side, limits, field, text),
-        Act::SetupNew { new } => {
-            side.setup_form.new = new;
-            side.setup_form.checked = false;
-            if let Some(last) = &mut side.set_up {
-                last.answer = None;
-            }
-            side.changed();
-        }
+        Act::StartIn { forge } => forges::retry_start(side, limits, forge, out),
         Act::Adopt => {
             let Some(_party) = side.party else {
                 return;
@@ -425,4 +421,23 @@ pub fn first_repository_key(forge: u16, additional: bool) -> skein_lib::RequestK
     text.put(prefix).expect("key prefix fits");
     text.put(number.as_bytes()).expect("key number fits");
     crate::key::named(crate::key::TOOLS, &crate::key::Name::new(&text.finish()).expect("first repository key fits"))
+}
+
+/// Project creation has its own dedup name; a refused attempt needs a new one.
+#[must_use]
+pub fn start_project_key(forge: u16, attempt: u64) -> skein_lib::RequestKey {
+    let prefix = b"start-project-";
+    let forge = skein_lib::Decimal::of(u64::from(forge));
+    let number = skein_lib::Decimal::of(attempt);
+    let suffix = if attempt == 0 { 0 } else { number.as_bytes().len().checked_add(1).expect("suffix fits") };
+    let length =
+        prefix.len().checked_add(forge.as_bytes().len()).expect("forge fits").checked_add(suffix).expect("key fits");
+    let mut text = skein_lib::Writer::new(length);
+    text.put(prefix).expect("key prefix fits");
+    text.put(forge.as_bytes()).expect("forge fits");
+    if attempt != 0 {
+        text.put(b"-").expect("separator fits");
+        text.put(number.as_bytes()).expect("attempt fits");
+    }
+    crate::key::named(crate::key::TOOLS, &crate::key::Name::new(&text.finish()).expect("start project key fits"))
 }

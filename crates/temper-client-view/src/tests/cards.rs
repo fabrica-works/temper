@@ -212,7 +212,7 @@ fn occurrences(tree: &skein_ui::Tree, text: &[u8]) -> usize {
 fn proposal_titles_head_the_cards_and_funding_is_said_once_in_both_pages() {
     use skein_ui::Role;
     for (page, owner) in [(batch_proposal(), true), (document_proposal(), false)] {
-        for root in [
+        for root in fixtures::pair(
             fixtures::chat::proposal_root_with_document(None, Some(page.clone())),
             fixtures::inbox_with_document(
                 temper_client_domain::address::Filter::ALL,
@@ -226,7 +226,7 @@ fn proposal_titles_head_the_cards_and_funding_is_said_once_in_both_pages() {
                     page,
                 )),
             ),
-        ] {
+        ) {
             let view = fixtures::page_view(&root);
             let tree = view.tree();
             let budget = super::chat::named_position(tree.nodes(), Role::Term, Some(b"Budget")).expect("Budget row");

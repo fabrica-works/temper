@@ -210,7 +210,8 @@ impl Store {
         }
         let immediate = match &request {
             protocol::Secrets::Get { .. } | protocol::Secrets::Load { .. } => true,
-            protocol::Secrets::Adopt { .. }
+            protocol::Secrets::AdoptValue { .. }
+            | protocol::Secrets::Adopt { .. }
             | protocol::Secrets::Keep { .. }
             | protocol::Secrets::Replace { .. }
             | protocol::Secrets::Erase { .. }

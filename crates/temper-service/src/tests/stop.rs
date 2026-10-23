@@ -120,11 +120,12 @@ fn non_format_open_refusals_keep_the_deployment_problem() {
 }
 
 #[test]
-fn stores_before_the_binding_family_refuse_at_startup() {
-    // Store 6 named a repository by its id alone; 7 has no Binding family.
+fn stores_before_embedded_people_v12_refuse_at_startup() {
+    // Store 6 named a repository by its id alone; 7 has no Binding family;
+    // 8 embeds people v11 refusal tags.
     let wanted = temper_protocol_store::STORE_VERSION;
-    assert_eq!(wanted, 8);
-    for found in [6, 7] {
+    assert_eq!(wanted, 9);
+    for found in [6, 7, 8] {
         refused(OpenRefusal::Format { family: Family::Application, found, wanted }, Stop::StoreVersion);
     }
 }

@@ -300,6 +300,14 @@ impl Accounts {
                     }
                 }
                 translate::Down::Restored => self.inventory.restored(),
+                // The account's move (jig accounts.md 6): no request reaches the child to start one before
+                // temper routes it (o/accounts-move's M3), and the Moving hold behind Return and Refresh comes
+                // only from a move.
+                translate::Down::Withdraw { .. }
+                | translate::Down::Return { .. }
+                | translate::Down::Refresh { .. }
+                | translate::Down::Open { .. }
+                | translate::Down::Adopt { .. } => unreachable!("an account's move before temper routes it"),
                 translate::Down::Keep { source, carried, replaces } => {
                     self.inventory.name(source);
                     let next = self.keys.keep(source, carried, replaces);

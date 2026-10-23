@@ -805,6 +805,7 @@ impl World {
             | Delivery::Refuse { .. }
             | Delivery::TurnBusy { .. } => panic!("unexpected escalation delivery {delivery:?}"),
             Delivery::Fleet(_)
+            | Delivery::ProjectMade { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ReadLoad { .. }
             | Delivery::ReadEscalationDecision { .. }

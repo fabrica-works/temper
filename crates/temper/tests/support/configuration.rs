@@ -36,9 +36,12 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
     value["engine"]["limits"]["overrides"]["views.watchers"] = 16.into();
     value["engine"]["limits"]["overrides"]["views.watchers_per_party"] = 16.into();
-    value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
-    value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
+    // Projects 0 and 1, and the one forge-setup makes for the first repository.
+    value["engine"]["limits"]["overrides"]["people.projects"] = 3.into();
+    value["engine"]["limits"]["overrides"]["authority.projects"] = 3.into();
     value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
+    // That project is made from policy 1 (tools.md 5.5).
+    value["engine"]["policies"] = value["engine"]["projects"].clone();
     value["application"] = serde_json::json!({
         "webhooks":null,
 "clients":{"listener":{"socket":"127.0.0.1:0"},"public":null,"bundle":null},
@@ -48,7 +51,7 @@ pub fn documents(directory: &Path, program: &str) -> (Vec<u8>, Vec<u8>) {
             "author":{"name":"Temper","email":"temper@example.test"}}],
         "setup":[],"demo":null,"sign_in":null,"landing":{"deployment":[],"projects":[]},"charter":1,
         "limits":{"profile":"small","overrides":{"checkout.name_bytes":256,"checkout.repositories":2,
-            "checkout.message_bytes":4096,"forge.name_bytes":64,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
+            "checkout.message_bytes":4096,"forge.name_bytes":64,"forge.judge_projects":3,"forge.resources_per_task":2,"git_component.stdout_bytes":2048}},
         "workers":[{"root":"worker-root","git":"/usr/bin/git"}]});
     turn_bounds::apply(&mut value, turn_bounds::turn_body(&agent));
     (serde_json::to_vec(&agent).expect("agent JSON"), serde_json::to_vec(&value).expect("deployment JSON"))

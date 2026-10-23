@@ -19,6 +19,18 @@ pub(super) fn encode_malformed(value: jig_client::contract::Malformed, out: &mut
         jig_client::contract::Malformed::ProjectMismatch => out.string(b"project_mismatch"),
         jig_client::contract::Malformed::TwoAsAllowed => out.string(b"two_as_allowed"),
         jig_client::contract::Malformed::ConversationNotAgent => out.string(b"conversation_not_agent"),
+        jig_client::contract::Malformed::Name(rule) => {
+            out.object_start();
+            out.key(b"name");
+            out.string(match rule {
+                jig_client::contract::NameRule::Empty => b"empty",
+                jig_client::contract::NameRule::Long => b"long",
+                jig_client::contract::NameRule::Control => b"control",
+                jig_client::contract::NameRule::Space => b"space",
+                jig_client::contract::NameRule::Digits => b"digits",
+            });
+            out.object_end();
+        }
         jig_client::contract::Malformed::Cycle => out.string(b"cycle"),
         jig_client::contract::Malformed::EndedBy => out.string(b"ended_by"),
         jig_client::contract::Malformed::ProposedAsAllowed => out.string(b"proposed_as_allowed"),

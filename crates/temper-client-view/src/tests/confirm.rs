@@ -221,7 +221,7 @@ fn proposal_rows_and_task_release_keep_their_own_shapes() {
 
 #[test]
 fn proposal_rejection_starts_in_a_closed_disclosure_in_both_pages() {
-    for root in [fixtures::chat::proposal_root(), root(ActKind::Reject, Admission::Allowed)] {
+    for root in fixtures::pair(fixtures::chat::proposal_root(), root(ActKind::Reject, Admission::Allowed)) {
         let view = fixtures::page_view(&root);
         let nodes = view.tree().nodes();
         let at = super::chat::named_position(nodes, Role::Disclosure, Some(b"Reject with reason"))

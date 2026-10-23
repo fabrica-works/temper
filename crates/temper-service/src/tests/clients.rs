@@ -174,7 +174,7 @@ fn the_next_clients_stream_opens_once_a_peer_ends_its_own() {
     let mut sign_in =
         peer::Peer::new(service.engine.as_mut().expect("engine"), b"POST", b"/jig/v1/sign-in/link", &body, None);
     sign_in.pump(service.engine.as_mut().expect("engine"), true);
-    let jig_client_protocol_wire::v15::SignInAnswer::SignedIn(answer) =
+    let jig_client_protocol_wire::v16::SignInAnswer::SignedIn(answer) =
         sign_in.sign_in_answer(service.engine.as_ref().expect("engine"))
     else {
         panic!("signed in")
@@ -206,7 +206,7 @@ fn a_link_sign_in_reaches_the_root_and_answers_a_token() {
     let mut peer =
         peer::Peer::new(service.engine.as_mut().expect("engine"), b"POST", b"/jig/v1/sign-in/link", &body, None);
     peer.pump(service.engine.as_mut().expect("engine"), true);
-    let jig_client_protocol_wire::v15::SignInAnswer::SignedIn(answer) =
+    let jig_client_protocol_wire::v16::SignInAnswer::SignedIn(answer) =
         peer.sign_in_answer(service.engine.as_ref().expect("engine"))
     else {
         panic!("signed in")
@@ -254,7 +254,7 @@ fn a_request_before_decisions_open_is_answered_not_ready() {
     assert_eq!(engine.clients.early.len(), 1, "request staged during restoration");
     crate::engine::iterate(engine, skein_lib::Time::ZERO, skein_lib::Wall::EPOCH);
     peer.pump(engine, false);
-    assert_eq!(peer.sign_in_answer(engine), jig_client_protocol_wire::v15::SignInAnswer::NotReady);
+    assert_eq!(peer.sign_in_answer(engine), jig_client_protocol_wire::v16::SignInAnswer::NotReady);
     assert!(!engine.domain.ready());
 }
 #[test]

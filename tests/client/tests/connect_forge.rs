@@ -131,7 +131,7 @@ fn setting_up_forgejo_here_from_the_welcome() {
     node(
         &model,
         Role::Paragraph,
-        "Forgejo on this machine · Setting up: preparing · work/hello, into Project 1".as_bytes(),
+        "Forgejo on this machine · Setting up: preparing · work/hello, into the new project hello".as_bytes(),
     );
     node(&model, Role::Disclosure, b"Each step");
     pump(
@@ -154,7 +154,7 @@ fn setting_up_forgejo_here_from_the_welcome() {
     );
     let making = view(&root);
     node(&making, Role::Heading { level: 2 }, b"Setting up Forgejo on this machine");
-    node(&making, Role::Paragraph, b"work/hello, into Project 1");
+    node(&making, Role::Paragraph, b"work/hello, into hello");
     let before = front.applications_admitted();
     front.engine.send(temper_engine_domain::Event::Forge(Box::new(forge::Event::FirstMade { forge: OWNED, id: 42 })));
     front.engine.settle();
@@ -167,6 +167,11 @@ fn setting_up_forgejo_here_from_the_welcome() {
     );
     assert_eq!(front.applications_admitted(), before + 1, "one adoption admitted");
     assert!(front.engine_adopted(OWNED, 42));
+    let setup = root.person().forge().set_up().expect("asking client's setup");
+    let project = setup.starting.as_ref().expect("MakeProject answered");
+    assert_eq!(project.value.adoption.project, 2);
+    assert_eq!(project.value.name.as_ref(), b"hello");
+    assert_eq!(setup.adoption.as_ref().expect("Adopt sent").value.project, 2);
     for _ in 0_u32..2 {
         pump(
             &mut front,
@@ -176,7 +181,7 @@ fn setting_up_forgejo_here_from_the_welcome() {
         );
         let ready = view(&root);
         node(&ready, Role::Heading { level: 2 }, b"work/hello is ready");
-        node(&ready, Role::Link, b"Open Project 1");
+        node(&ready, Role::Link, b"Open hello");
         assert_eq!(front.applications_admitted(), before + 1, "revisiting Ready does not adopt again");
     }
 }
@@ -193,7 +198,7 @@ fn model_follows_forgejo_from_setup_to_its_first_repository() {
     node(
         &setting_up,
         Role::Paragraph,
-        "Forgejo on this machine · Setting up: preparing · work/hello, into Project 1".as_bytes(),
+        "Forgejo on this machine · Setting up: preparing · work/hello, into the new project hello".as_bytes(),
     );
     node(&setting_up, Role::Disclosure, b"Each step");
     connection(&mut front, Connection::Connected { id: 1, login: b"temper".as_slice().into() });
@@ -203,7 +208,8 @@ fn model_follows_forgejo_from_setup_to_its_first_repository() {
     assert_eq!(root.person().pages().address(), &model_address);
     assert!(front.engine_adopted(OWNED, 42));
     let made = view(&root);
-    let line = node(&made, Role::Paragraph, "Forgejo on this machine · work/hello, in Project 1".as_bytes());
+    let line =
+        node(&made, Role::Paragraph, "Forgejo on this machine · work/hello, in the new project hello".as_bytes());
     let line = made.tree().nodes().iter().find(|n| n.id == line).expect("forge line");
     assert!(line.styles.as_slice().contains(&temper_client_view::look::FLOW_DONE));
     assert!(!made.tree().nodes().iter().any(|n| n.role == Role::Disclosure && n.name.as_deref() == Some(b"Each step")));

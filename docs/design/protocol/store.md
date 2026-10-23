@@ -148,7 +148,8 @@ section 7).
   The routing gives it to jig's component, whose format row records it;
   a store written with another refuses to open, saying so (jig's
   `protocol/store.md`, 5.2 and 5.3).
-- **`STORE_VERSION` is 8,** with the `Binding` family, tag 18,
+- **`STORE_VERSION` is 9,** with people v12 refusal bytes embedded in application outcomes.
+  Version 8 came with the `Binding` family, tag 18,
   `Key::Binding(address)` (section 2), its row `{ address, subject }`: the
   folded member address and its first Google subject (`sign-in.md`,
   section 5). The move from 7 to 8 breaks the stored format as each move

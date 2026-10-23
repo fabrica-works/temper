@@ -76,6 +76,7 @@ pub fn limits() -> engine::Limits {
         room_refusals: 2,
     };
     let people = people::Limits {
+        act_grants: 0,
         batch: 4,
         operations: 2,
         people: 2,
@@ -175,6 +176,7 @@ pub fn limits() -> engine::Limits {
             gather: Duration::from_secs(1),
         },
         accounts: accounts::Limits {
+            move_deadline: Duration::from_secs(60),
             accounts: 1,
             holder_accounts: 1,
             sources: 3,
@@ -775,6 +777,10 @@ impl World {
         assert_eq!(assignment.run.sources.as_ref(), &[Some(assignment.grants[0].account)]);
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive outside delivery adapter drives the finite authenticated script"
+    )]
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
             Delivery::SourceSignedOut { .. } => panic!("this story issues no source sign-out"),
@@ -869,6 +875,7 @@ impl World {
                 panic!("unexpected walking delivery {delivery:?}")
             }
             Delivery::Fleet(_)
+            | Delivery::ProjectMade { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ReadEscalationDecision { .. }
             | Delivery::Relay { .. }

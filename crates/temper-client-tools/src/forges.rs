@@ -20,7 +20,13 @@ pub const SET_UP: Tool = Tool {
         positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
         flag(b"org", b"O", Kind::Literal, Optional, b"Organization; default work"),
         flag(b"repository", b"R", Kind::Literal, Optional, b"Repository; default hello"),
-        flag(b"project", b"P", Kind::Project { empty: true }, Optional, b"Project name or number; default 1"),
+        flag(
+            b"project",
+            b"P",
+            Kind::Project { empty: true },
+            Optional,
+            b"Project name or number; default a new project named R",
+        ),
     ]],
     keyed: Keyed::Optional,
     area: 6,
@@ -138,6 +144,7 @@ pub(crate) struct Forges {
     pending: BTreeMap<Key, SettingUp>,
     watches: BTreeMap<Handle, Watching>,
     adopting: BTreeMap<Key, Adopting>,
+    starting: BTreeMap<Key, Starting>,
     json: bool,
     connections: BTreeMap<Key, connection::Pending>,
 }
@@ -159,6 +166,11 @@ struct Adopting {
     adoption: temper_client_domain::forge::Adoption,
 }
 #[derive(Debug)]
+struct Starting {
+    called: Called,
+    value: temper_client_domain::forge::start::StartIn,
+}
+#[derive(Debug)]
 struct Watching {
     called: Called,
     setup: Option<Intent>,
@@ -173,6 +185,7 @@ impl Forges {
             pending: BTreeMap::new(),
             watches: BTreeMap::new(),
             adopting: BTreeMap::new(),
+            starting: BTreeMap::new(),
             json: false,
             connections: BTreeMap::new(),
         }
@@ -183,6 +196,8 @@ impl Forges {
             .checked_add(self.waiting.len())
             .expect("bounded calls")
             .checked_add(self.pending.len())
+            .expect("bounded calls")
+            .checked_add(self.starting.len())
             .expect("bounded calls")
             .checked_add(self.adopting.len())
             .expect("bounded calls")
@@ -315,6 +330,20 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
     match told {
         Told::Kept { key, request } => restore(state, env, *key, request),
         Told::Answered { key, outcome } => {
+            if let Some(mut starting) = state.starting.remove(key) {
+                if let Some(adoption) = starting.value.answered(outcome) {
+                    send_adoption(state, env, starting.called, adoption, out);
+                } else {
+                    let mut operation = render::outcome::Operation::of(
+                        &starting.value.ask(&env.limits.domain.forge).expect("admitted project name"),
+                    );
+                    operation.word = b"forge-setup";
+                    let printed =
+                        render::outcome::print(&operation, outcome, starting.called.json, None, &env.limits.tools);
+                    finish(starting.called, printed, out);
+                }
+                return;
+            }
             if let Some(adopting) = state.adopting.remove(key) {
                 adopted(state, env, adopting, outcome, out);
                 return;
@@ -848,7 +877,7 @@ pub(crate) fn setup_print(forge: u16, outcome: &Outcome, json: bool, kept: bool,
                     forge,
                     b"work".as_slice().into(),
                     b"hello".as_slice().into(),
-                    SetUpProject::Existing(1),
+                    SetUpProject::New(b"hello".as_slice().into()),
                     &limits.domain.forge,
                 )
                 .expect("checked limits"),
@@ -930,7 +959,7 @@ fn intent(forge: u16, call: &jig::call::Call, client: &Client) -> Intent {
                 None => SetUpProject::New(name.clone()),
             }
         }
-        _ => SetUpProject::Existing(1),
+        _ => SetUpProject::New(repository.clone()),
     };
     Intent { forge, org, repository, project }
 }
@@ -971,8 +1000,9 @@ fn setup_changed(state: &mut Forges, env: &Env<Limits>, handle: Handle, rows: &[
             let watch = state.watches.remove(&handle).expect("active setup watch");
             out.push(Out::Client { event: Event::Unwatch { handle } });
             let intent = watch.setup.expect("setup intent");
-            let SetUpProject::Existing(project) = intent.project else {
-                unreachable!("new project refused before setup")
+            let project = match intent.project {
+                SetUpProject::Existing(project) => project,
+                SetUpProject::New(_) => 0,
             };
             let adoption = temper_client_domain::forge::Adoption {
                 project,
@@ -986,18 +1016,42 @@ fn setup_changed(state: &mut Forges, env: &Env<Limits>, handle: Handle, rows: &[
                 prefix: b"temper/".as_slice().into(),
                 checks: Box::default(),
             };
-            let Some(request) = temper_client_domain::forge::ask(&adoption, &env.limits.domain.forge) else {
-                let printed = render::failure(b"adoption encoding failed", watch.called.json, 1);
-                finish(watch.called, printed, out);
-                return;
-            };
-            let name = temper_client_domain::forge::first_repository_key(intent.forge, false);
-            let key = Key { asker: Owner::Forge.asker(), number: (u64::from(watch.called.call_number) << 32u32) | 3 };
-            state.adopting.insert(key, Adopting { called: watch.called, adoption });
-            out.push(Out::Client { event: Event::Send { key, name: Some(name), request } });
+            match intent.project {
+                SetUpProject::Existing(_) => send_adoption(state, env, watch.called, adoption, out),
+                SetUpProject::New(name) => {
+                    let value = temper_client_domain::forge::start::StartIn::new(adoption, name);
+                    let Some(request) = value.ask(&env.limits.domain.forge) else {
+                        let printed = render::failure(b"project encoding failed", watch.called.json, 1);
+                        finish(watch.called, printed, out);
+                        return;
+                    };
+                    let name = temper_client_domain::forge::start_project_key(intent.forge, 0);
+                    let key =
+                        Key { asker: Owner::Forge.asker(), number: (u64::from(watch.called.call_number) << 32u32) | 5 };
+                    state.starting.insert(key, Starting { called: watch.called, value });
+                    out.push(Out::Client { event: Event::Send { key, name: Some(name), request } });
+                }
+            }
             return;
         }
     }
+}
+fn send_adoption(
+    state: &mut Forges,
+    env: &Env<Limits>,
+    called: Called,
+    adoption: temper_client_domain::forge::Adoption,
+    out: &mut Queue<Out>,
+) {
+    let Some(request) = temper_client_domain::forge::ask(&adoption, &env.limits.domain.forge) else {
+        let printed = render::failure(b"adoption encoding failed", called.json, 1);
+        finish(called, printed, out);
+        return;
+    };
+    let name = temper_client_domain::forge::first_repository_key(adoption.forge, false);
+    let key = Key { asker: Owner::Forge.asker(), number: (u64::from(called.call_number) << 32u32) | 3 };
+    state.adopting.insert(key, Adopting { called, adoption });
+    out.push(Out::Client { event: Event::Send { key, name: Some(name), request } });
 }
 fn first_json(first: &First, out: &mut Encoder) {
     out.object_start();

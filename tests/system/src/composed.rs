@@ -856,6 +856,7 @@ impl World {
             | Delivery::Refuse { .. }
             | Delivery::Read { .. }
             | Delivery::WatchEnded { .. }
+            | Delivery::ProjectMade { .. }
             | Delivery::ForgeCommitted { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Bound { .. }

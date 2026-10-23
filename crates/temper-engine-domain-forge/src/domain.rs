@@ -1071,12 +1071,18 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 if d.setup_pending.insert(request, token).is_err() {
                     out.push(Request::ApplicationAgain { request, why: jig_domain_people::Again::Busy });
                 } else {
-                    let refusal = if let crate::SetUpProject::New(_) = project {
-                        Some(crate::SetUpRefusal::NewProject)
-                    } else if !setup_login(&org)
+                    let invalid_project = match &project {
+                        crate::SetUpProject::New(name) => {
+                            name.is_empty()
+                                || name.len() > usize::try_from(env.limits.name_bytes).expect("name bound fits")
+                        }
+                        crate::SetUpProject::Existing(_) => false,
+                    };
+                    let refusal = if !setup_login(&org)
                         || !setup_repository(&repository)
                         || org.len() > usize::try_from(env.limits.name_bytes).expect("name bound fits")
                         || repository.len() > usize::try_from(env.limits.name_bytes).expect("name bound fits")
+                        || invalid_project
                     {
                         Some(crate::SetUpRefusal::Invalid)
                     } else {

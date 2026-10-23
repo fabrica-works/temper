@@ -17,7 +17,7 @@ pub enum Meaning {
     Install { forge: u16, back: temper_client_domain::Address },
     SetUp(u16),
     SetupField(forge::forges::SetupField),
-    SetupNew(bool),
+    StartIn(u16),
 }
 #[derive(Debug)]
 struct Entry {
@@ -82,7 +82,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                     Action::Forge(forge::Act::Install { forge, back: temper_client_domain::address::print(&back) })
                 }
                 Meaning::Adopt => Action::Forge(forge::Act::Adopt),
-                Meaning::SetupNew(new) => Action::Forge(forge::Act::SetupNew { new }),
+                Meaning::StartIn(forge) => Action::Forge(forge::Act::StartIn { forge }),
                 Meaning::AppId | Meaning::AppKey | Meaning::Field(_) | Meaning::SetupField(_) => return None,
             }),
             (_, Act::Input { .. } | Act::Submit | Act::Drawing { .. }) => None,

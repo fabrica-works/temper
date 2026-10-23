@@ -217,6 +217,24 @@ pub(super) fn encode_owner_outcome(
             out.object_end();
             out.object_end();
         }
+        jig_client::contract::OwnerOutcome::ProjectMade { project } => {
+            out.object_start();
+            out.key(b"project_made");
+            out.object_start();
+            out.key(b"project");
+            out.unsigned(u64::from(*project));
+            out.object_end();
+            out.object_end();
+        }
+        jig_client::contract::OwnerOutcome::Renamed { project } => {
+            out.object_start();
+            out.key(b"renamed");
+            out.object_start();
+            out.key(b"project");
+            out.unsigned(u64::from(*project));
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::OwnerOutcome::AccountChanged => out.string(b"account_changed"),
         jig_client::contract::OwnerOutcome::AccountRemoved { confirmed, failed_hosts } => {
             out.object_start();

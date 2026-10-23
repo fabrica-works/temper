@@ -76,6 +76,22 @@ fn engine_limits() -> engine::Limits {
     limits.documents.lines = limits.documents.lines.min(tools.projects);
     limits
 }
+/// The first-run stories need the seeded project and one made at runtime.
+/// Use the real `MakeProject` path, with a configured policy and room for its owner.
+pub fn first_run_projects(config: &mut engine::Config, limits: &mut engine::Limits) {
+    limits.authority.projects = 2;
+    limits.people.projects = 3; // The deployment roster and two projects.
+    limits.people.holdings = 3;
+    let rules = config.core.authority.rules().clone();
+    config.core.authority = jig_domain_authority::Domain::new(rules, limits.authority).expect("first-run authority");
+    let seed = &config.core.seed_projects[0].policy;
+    let policy = jig_domain_core::ConfiguredPolicy {
+        policy: seed.policy.clone(),
+        permissions: seed.permissions.clone(),
+        templates: seed.templates.clone(),
+    };
+    config.core.policies.insert(1, policy).expect("first-run policy");
+}
 impl Joint {
     /// The next chat run's reply, written in these pieces: the first is sent at the
     /// run's assignment and each later part at one `release_reply` (testing.md 6.3).
@@ -164,7 +180,7 @@ impl Joint {
         use temper_engine_domain_forge::{Key, Role, Stored};
         let key = engine::Key::Forge(Key::Repository(skein_forge::api::Repository { forge, repository }));
         let Some(engine::Record::Forge { row }) = self.engine.store.rows.get(&key) else { return false };
-        matches!(row.as_ref(), Stored::Repository(value) if value.project == 1 && value.role == Role::Owned)
+        matches!(row.as_ref(), Stored::Repository(value) if value.role == Role::Owned)
     }
     #[must_use]
     pub fn applications_admitted(&self) -> usize {

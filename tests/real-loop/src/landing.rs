@@ -71,6 +71,12 @@ pub fn configure(value: &mut Value, agent: &mut Value, forge: SocketAddr) {
     for project in value["engine"]["projects"].as_array_mut().expect("projects").iter_mut().skip(1) {
         project["policy"] = policy.clone();
     }
+    // forge-setup's new project is made from policy 1, which must sit under the ceiling too.
+    if let Some(policies) = value["engine"].get_mut("policies").and_then(Value::as_array_mut) {
+        for configured in policies {
+            configured["policy"] = policy.clone();
+        }
+    }
     let limits = value["engine"]["limits"]["overrides"].as_object_mut().expect("engine overrides");
     for (name, size) in [
         ("people.operations", 5),

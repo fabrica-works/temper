@@ -1492,12 +1492,15 @@ fn a_configured_forge_without_routing_input_reads_not_connected() {
 }
 
 #[test]
-fn a_new_project_is_refused_before_any_box_effect_or_first_repository() {
-    for name in [b"Next".as_slice(), b"", &[b'x'; 129]] {
-        let mut d = setup_domain(&CONFIGURED, true);
-        let request = Token::new(91);
-        let token = Token::new(92);
-        let event = Event::Application {
+fn a_new_project_is_admitted_and_retained_until_the_repository_is_made() {
+    let mut d = setup_domain(&CONFIGURED, true);
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
+    let request = Token::new(91);
+    let token = Token::new(92);
+    let project = SetUpProject::New(b"Next".as_slice().into());
+    let emitted = outputs(
+        &mut d,
+        Event::Application {
             role: None,
             carried: None,
             request,
@@ -1505,17 +1508,26 @@ fn a_new_project_is_refused_before_any_box_effect_or_first_repository() {
             retention: Duration::from_secs(60),
             ask: Ask::SetUp {
                 forge: 1,
-                org: Box::default(),
-                repository: Box::default(),
-                project: SetUpProject::New(name.into()),
+                org: b"work".as_slice().into(),
+                repository: b"hello".as_slice().into(),
+                project: project.clone(),
             },
-        };
-        assert_eq!(outputs(&mut d, event).as_ref(), [Request::ApplicationDone { request, token }]);
-        assert_eq!(d.application_answer(token), Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::NewProject))));
-        for row in &d.forges().rows {
-            assert!(row.first.is_none());
-        }
-    }
+        },
+    );
+    assert_eq!(
+        emitted.as_ref(),
+        [
+            Request::MarkedForges,
+            Request::SetUp {
+                forge: 1,
+                request,
+                org: b"work".as_slice().into(),
+                repository: b"hello".as_slice().into()
+            }
+        ]
+    );
+    assert_eq!(d.forges().rows[0].first.as_ref().unwrap().project, project);
+    assert!(d.application_answer(token).is_none());
 }
 #[test]
 fn setup_names_are_validated_at_admission_on_both_sides_of_the_name_bound() {

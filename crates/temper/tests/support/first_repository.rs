@@ -86,10 +86,12 @@ pub fn task_steps(root: &Path) -> Vec<Step> {
     vec![
         Step::Run(Call::new(&["add-key", "1", key.to_str().expect("key path"), "--key", "first-repository-llm"])),
         Step::Run(Call::new(&["wait", "accounts", "--until", "usable", "--timeout", "10s"])),
+        // forge-setup's first repository goes into a project of its own, made after project 1
+        // (tools.md 5.5): work/hello is project 2's.
         Step::Run(Call::new(&[
             "chat",
             "--project",
-            "1",
+            "2",
             "--key",
             "first-hello",
             "@first-repository Land a README change in work/hello",

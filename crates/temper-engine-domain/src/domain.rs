@@ -279,7 +279,8 @@ impl Domain {
                         jig_domain_core::Request::Write(_)
                         | jig_domain_core::Request::Ask { .. }
                         | jig_domain_core::Request::Held(_)
-                        | jig_domain_core::Request::Now(_),
+                        | jig_domain_core::Request::Now(_)
+                        | jig_domain_core::Request::ProjectMade { .. },
                     )
                     | None => unreachable!("configuration decides nothing"),
                 }
@@ -549,7 +550,8 @@ fn only_decided(requests: &jig_domain_core::Requests) -> bool {
             jig_domain_core::Request::Write(_)
             | jig_domain_core::Request::Ask { .. }
             | jig_domain_core::Request::Held(_)
-            | jig_domain_core::Request::Now(_) => return false,
+            | jig_domain_core::Request::Now(_)
+            | jig_domain_core::Request::ProjectMade { .. } => return false,
         }
     }
     true
@@ -822,6 +824,13 @@ pub(crate) fn step_released(domain: &mut Domain, env: &Env<Limits>, released: Re
 
 fn released_into(domain: &mut Domain, _env: &Env<Limits>, released: Released, out: &mut Queue<Request>) {
     match released.0 {
+        Delivery::ProjectMade { project: _ } => {
+            // jig's domain/engine.md, "a project made": the root hears it after commit.
+            // LandingPolicy.projects, forge Judges.projects and GatePolicy.projects
+            // hold optional seeded overrides; deployment rules already cover this project.
+            // Repositories/homes arise on adoption, panels on watching, and the demo
+            // still names its configured project. None needs an empty-project row.
+        }
         Delivery::ForgeCommitted { entry } => {
             domain.work.push(Work::Forge(forge::Event::Committed { entry }));
         }

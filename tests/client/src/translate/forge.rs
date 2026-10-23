@@ -400,6 +400,7 @@ pub fn incoming(
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
+        | Delivery::ProjectMade { .. }
         | Delivery::ForgeCommitted { .. }
         | Delivery::ForgeCall { .. }
         | Delivery::Bound { .. }

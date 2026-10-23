@@ -486,7 +486,7 @@ fn write_setup(root: &mut crate::Domain, field: forges::SetupField, text: &[u8])
     assert!(f::form_act(root, forge::Act::SetupWrite { field, text: text.into() }).is_empty());
 }
 #[test]
-fn a_set_up_asks_for_work_hello_in_the_persons_project_else_one() {
+fn a_set_up_asks_for_a_new_project_regardless_of_the_current_project() {
     for project in [None, Some(7_u32)] {
         let (mut root, me, _) = opened(true);
         if let Some(project) = project {
@@ -510,8 +510,8 @@ fn a_set_up_asks_for_work_hello_in_the_persons_project_else_one() {
         }
         let (_, _, w::Request::SetUp(value)) = sent(setup(&mut root)) else { panic!("setup") };
         assert_eq!((value.org(), value.repository()), (b"work".as_slice(), b"hello".as_slice()));
-        let w::SetUpProject::Existing(value) = value.project() else { panic!("existing project") };
-        assert_eq!(value.project(), project.unwrap_or(1));
+        let w::SetUpProject::New(value) = value.project() else { panic!("new project") };
+        assert_eq!(value.name(), b"hello");
     }
 }
 #[test]
@@ -522,7 +522,6 @@ fn a_set_up_sends_the_fields_the_person_gave() {
     assert_eq!(root.forge().setup_form().text(forges::SetupField::Project), b"widget");
     write_setup(&mut root, forges::SetupField::Project, b"Next");
     write_setup(&mut root, forges::SetupField::Repository, b"app");
-    f::form_act(&mut root, forge::Act::SetupNew { new: true });
     let (_, _, w::Request::SetUp(value)) = sent(setup(&mut root)) else { panic!("setup") };
     assert_eq!((value.org(), value.repository()), (b"team".as_slice(), b"app".as_slice()));
     let w::SetUpProject::New(value) = value.project() else { panic!("new project") };
@@ -537,7 +536,6 @@ fn a_set_up_sends_the_fields_the_person_gave() {
 fn an_empty_field_is_required_and_sends_nothing() {
     for field in [forges::SetupField::Organization, forges::SetupField::Repository, forges::SetupField::Project] {
         let (mut root, _, _) = opened(true);
-        f::form_act(&mut root, forge::Act::SetupNew { new: true });
         write_setup(&mut root, field, b"");
         assert!(setup(&mut root).is_empty());
         assert!(root.forge().setup_form().required(field));
@@ -602,11 +600,18 @@ fn the_client_that_set_up_adopts_the_made_repository_once_on_another_page() {
     event(&mut root, Event::Went { place: Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) });
     assert!(deliver_first(&mut root, watch, connected(), w::FirstState::Making).is_empty());
     assert!(deliver_first(&mut root, watch, w::Connection::Connecting, made()).is_empty());
-    let (_, key, w::Request::Adopt(adoption)) = sent(deliver_first(&mut root, watch, connected(), made())) else {
-        panic!("adoption")
-    };
+    let out = deliver_first(&mut root, watch, connected(), made());
+    let (attempt, project_key, name) = sent_project(out);
+    assert_eq!(project_key, forge::start_project_key(HERE, 0));
+    assert_eq!(name.as_ref(), b"hello");
+    let out = project_reply(
+        &mut root,
+        attempt,
+        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::ProjectMade { project: 7 })),
+    );
+    let (_, key, w::Request::Adopt(adoption)) = sent(out) else { panic!("adoption") };
     assert_eq!(key, forge::first_repository_key(HERE, false));
-    assert_eq!((adoption.project(), adoption.forge(), adoption.home(), adoption.ci()), (1, HERE, true, true));
+    assert_eq!((adoption.project(), adoption.forge(), adoption.home(), adoption.ci()), (7, HERE, true, true));
     assert_eq!(
         (adoption.owner(), adoption.name(), adoption.prefix(), adoption.landing()),
         (b"work".as_slice(), b"hello".as_slice(), b"temper/".as_slice(), b"main".as_slice())
@@ -625,7 +630,14 @@ fn the_adoption_is_keyed_as_ctls_and_retried_once_without_home() {
     let (mut root, _, watch) = opened(true);
     let (attempt, _, _) = sent(setup(&mut root));
     reply(&mut root, attempt, w::Outcome::SettingUp);
-    let (attempt, _, _) = sent(deliver_first(&mut root, watch, connected(), made()));
+    let out = deliver_first(&mut root, watch, connected(), made());
+    let (attempt, _, _) = sent_project(out);
+    let out = project_reply(
+        &mut root,
+        attempt,
+        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::ProjectMade { project: 7 })),
+    );
+    let (attempt, _, _) = sent(out);
     let refused = w::Outcome::ForgeRefused(
         w::ForgeRefused::new(&w::CEILINGS, w::ForgeRefusedParts { reason: w::ForgeReason::Refused }).unwrap(),
     );
@@ -697,4 +709,65 @@ fn signing_out_forgets_the_automatic_adoption_intent() {
     setup(&mut root);
     event(&mut root, Event::SignedOut);
     assert!(root.forge().set_up().is_none());
+}
+
+fn sent_project(mut out: Queue<Request>) -> (Token, skein_lib::RequestKey, Box<[u8]>) {
+    let mut found = None;
+    while let Some(request) = out.pop() {
+        if let Request::Client {
+            request: client::Request::Down { down: Down::Send { attempt, key, request: client::Ask::Jig(ask), .. } },
+        } = request
+        {
+            let c::Ask::MakeProject { name, policy } = *ask else { panic!("MakeProject") };
+            assert_eq!(policy, 1);
+            assert!(found.is_none());
+            found = Some((attempt, key, Box::from(name.bytes())));
+        }
+    }
+    found.expect("sent MakeProject")
+}
+fn project_reply(root: &mut crate::Domain, attempt: Token, answer: c::Answer) -> Queue<Request> {
+    up(
+        root,
+        Up::Answer {
+            attempt,
+            envelope: skein_lib::RequestEnvelope::Final,
+            answer: Some(client::Answered::Jig(answer)),
+            why: None,
+        },
+    )
+}
+#[test]
+fn name_taken_keeps_jigs_refusal_and_a_new_name_uses_a_new_key_before_adopting() {
+    let (mut root, _, watch) = opened(true);
+    let (attempt, _, _) = sent(setup(&mut root));
+    reply(&mut root, attempt, w::Outcome::SettingUp);
+    let out = deliver_first(&mut root, watch, connected(), made());
+    let (attempt, key, _) = sent_project(out);
+    let refusal = c::Answer::Refused { refusal: c::Refusal::NameTaken, at: None };
+    let mut out = project_reply(&mut root, attempt, refusal.clone());
+    while let Some(request) = out.pop() {
+        if let Request::Client { request: client::Request::Down { down: Down::Send { .. } } } = request {
+            panic!("a refused MakeProject must not send adoption");
+        }
+    }
+    assert!(root.forge().set_up().unwrap().adoption.is_none());
+    assert_eq!(
+        root.forge().set_up().unwrap().starting.as_ref().unwrap().value.outcome,
+        Some(client::Outcome::Answered(client::Answered::Jig(refusal)))
+    );
+    assert!(deliver_first(&mut root, watch, connected(), made()).is_empty());
+    write_setup(&mut root, forges::SetupField::Project, b"Other");
+    let (attempt, retry_key, name) = sent_project(f::form_act(&mut root, forge::Act::StartIn { forge: HERE }));
+    assert_eq!(name.as_ref(), b"Other");
+    assert_ne!(key, retry_key);
+    assert_eq!(retry_key, crate::key::named(crate::key::TOOLS, &crate::key::Name::new(b"start-project-3-1").unwrap()));
+    let out = project_reply(
+        &mut root,
+        attempt,
+        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::ProjectMade { project: 8 })),
+    );
+    let (_, key, w::Request::Adopt(adoption)) = sent(out) else { panic!("Adopt after ProjectMade") };
+    assert_eq!(key, forge::first_repository_key(HERE, false));
+    assert_eq!(adoption.project(), 8);
 }

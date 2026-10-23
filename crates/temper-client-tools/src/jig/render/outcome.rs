@@ -69,6 +69,8 @@ impl Operation {
                 c::Ask::DeleteNote { .. } => (b"delete-note", None),
                 c::Ask::ChangePolicy { .. } => (b"change-policy", None),
                 c::Ask::SetRoles { .. } => (b"set-roles", None),
+                c::Ask::MakeProject { .. } => (b"make-project", None),
+                c::Ask::Rename { .. } => (b"rename", None),
                 c::Ask::MakeService { .. } => (b"make-service", None),
                 c::Ask::SetPool { .. } => (b"set-pool", None),
                 c::Ask::Withdraw { .. } => (b"withdraw", None),

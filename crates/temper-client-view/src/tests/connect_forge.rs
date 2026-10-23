@@ -528,24 +528,25 @@ fn has_state(tree: &skein_ui::Tree, role: Role, name: &[u8], state: State) -> bo
 fn details_show_the_set_ups_fields_with_their_defaults() {
     let mut root = here(w::Connection::NotSetUp);
     let view = f::page_view(&root);
-    for (name, value) in [(b"Organization".as_slice(), b"work".as_slice()), (b"Repository", b"hello")] {
+    for (name, value) in [
+        (b"Organization".as_slice(), b"work".as_slice()),
+        (b"Repository", b"hello"),
+        (b"Into a new project, named", b"hello"),
+    ] {
         let id = node(view.tree(), Role::TextField, name);
         assert_eq!(
             view.tree().nodes().iter().find(|n| n.id == id).unwrap().value.as_ref().unwrap().text.as_ref(),
             value
         );
     }
-    node(view.tree(), Role::ChoiceGroup, b"Project");
-    assert!(has_state(view.tree(), Role::Choice, b"Shop, the project you are in", State::Selected));
-    let action = press(&root, Role::Choice, b"A new project");
-    f::root_event(&mut root, d::Event::Act { action });
+    assert!(!view.tree().nodes().iter().any(|node| node.role == Role::ChoiceGroup));
     let mut view = f::page_view(&root);
-    let id = node(view.tree(), Role::TextField, b"A new project");
+    let id = node(view.tree(), Role::TextField, b"Into a new project, named");
     let action = crate::act(&mut view, id, Act::Input { value: Box::default() }).unwrap();
     f::root_event(&mut root, d::Event::Act { action });
     act(&mut root, d::forge::Act::SetUp { forge: HERE });
     let view = f::page_view(&root);
-    assert!(has_state(view.tree(), Role::TextField, b"A new project", State::Invalid));
+    assert!(has_state(view.tree(), Role::TextField, b"Into a new project, named", State::Invalid));
     node(view.tree(), Role::Alert, b"Required.");
 }
 #[test]
@@ -596,7 +597,7 @@ fn setting_up_uses_the_sent_fields_until_the_row_carries_them() {
     act(&mut root, d::forge::Act::SetUp { forge: HERE });
     deliver(&mut root, watch, rows(w::Connection::Connecting, w::Offer::Offered));
     let view = f::page_view(&root);
-    node(view.tree(), Role::Paragraph, b"work/hello, into Shop");
+    node(view.tree(), Role::Paragraph, b"work/hello, into hello");
     words_in_order(view.tree(), &["Starting Forgejo and its runner", "Connecting"]);
     assert!(!f::text(view.tree()).windows(b"Connecting, and making".len()).any(|w| w == b"Connecting, and making"));
 }
@@ -637,7 +638,14 @@ fn pending_adoption() -> (d::Domain, skein_lib::Token) {
     );
     let token = attempt(act(&mut root, d::forge::Act::SetUp { forge: HERE }));
     answer(&mut root, token, w::Outcome::SettingUp);
-    let token = attempt(deliver(&mut root, watch, first_rows(connected(), made())));
+    let token = attempt(deliver(&mut root, watch, new_first_rows()));
+    let token = attempt(jig_answer(
+        &mut root,
+        token,
+        jig_client::contract::Answer::Done(jig_client::contract::Outcome::Owner(
+            jig_client::contract::OwnerOutcome::ProjectMade { project: f::PROJECT },
+        )),
+    ));
     (root, token)
 }
 #[test]
@@ -659,7 +667,7 @@ fn a_refused_adoption_says_its_outcome() {
     );
     let view = f::page_view(&root);
     words_in_order(view.tree(), &["Forge 3 did not answer; nothing was adopted. Try again."]);
-    node(view.tree(), Role::Link, b"Open Shop");
+    assert!(f::find(view.tree(), Role::Link, b"Open Shop").is_none());
 }
 #[test]
 fn a_failed_first_repository_says_its_step_with_set_up_again() {
@@ -1004,4 +1012,92 @@ fn connecting_uses_the_apps_way_for_its_words() {
         let root = f::forge_root(Address::ConnectForge { forge: Some(Choice::Forge(GITHUB)) }, rows);
         words_in_order(f::browser_page_view(&root).tree(), &["Install temper’s App", words, "Install on GitHub"]);
     }
+}
+
+fn jig_answer(
+    root: &mut d::Domain,
+    token: skein_lib::Token,
+    answer: jig_client::contract::Answer,
+) -> skein_lib::Queue<d::Request> {
+    drive(
+        root,
+        d::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt: token,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Jig(answer)),
+                    why: None,
+                },
+            },
+        },
+    )
+}
+#[test]
+fn ready_keeps_make_project_refusal_and_the_name_with_a_bound_retry_button() {
+    let (mut root, watch) = f::forge_root_watch(
+        Address::ConnectForge { forge: Some(Choice::Forge(HERE)) },
+        rows(w::Connection::NotSetUp, w::Offer::Offered),
+    );
+    let token = attempt(act(&mut root, d::forge::Act::SetUp { forge: HERE }));
+    answer(&mut root, token, w::Outcome::SettingUp);
+    let token = attempt(deliver(&mut root, watch, new_first_rows()));
+    jig_answer(
+        &mut root,
+        token,
+        jig_client::contract::Answer::Refused { refusal: jig_client::contract::Refusal::NameTaken, at: None },
+    );
+    let mut view = f::page_view(&root);
+    let id = node(view.tree(), Role::TextField, b"Into a new project, named");
+    assert_eq!(
+        view.tree().nodes().iter().find(|n| n.id == id).unwrap().value.as_ref().map(|value| value.text.as_ref()),
+        Some(b"hello".as_slice())
+    );
+    words_in_order(view.tree(), &["Another project has that name"]);
+    let id = node(view.tree(), Role::Button, b"Adopt work/hello");
+    assert_eq!(crate::act(&mut view, id, Act::Press), Some(d::Action::Forge(d::forge::Act::StartIn { forge: HERE })));
+    assert!(root.forge().set_up().unwrap().adoption.is_none());
+}
+#[test]
+fn ready_opens_the_made_project_and_uses_its_banner_name() {
+    let (mut root, token) = pending_adoption();
+    answer(
+        &mut root,
+        token,
+        w::Outcome::Adopted(
+            w::Adopted::new(
+                &w::CEILINGS,
+                w::AdoptedParts {
+                    forge: HERE,
+                    repository: 7,
+                    owner: b"work".as_slice().into(),
+                    name: b"hello".as_slice().into(),
+                    role: w::Role::Owned,
+                    home: true,
+                    kinds: w::Kinds::new(&w::CEILINGS, w::KindsParts { skein_bools: [true; 9] }).unwrap(),
+                    protection: w::Protection::Unknown,
+                },
+            )
+            .unwrap(),
+        ),
+    );
+    let view = f::page_view(&root);
+    node(view.tree(), Role::Paragraph, b"In Shop, on Forgejo on this machine.");
+    assert_eq!(
+        press(&root, Role::Link, b"Open Shop"),
+        d::Action::Pages(pages::Act::OpenProject { project: f::PROJECT })
+    );
+}
+
+fn new_first_rows() -> List<w::ForgeRow> {
+    let mut rows = first_rows(connected(), made());
+    let row = rows.get_mut(0).unwrap();
+    let mut parts = row.clone().into_parts();
+    let mut first = parts.first.take().unwrap().into_parts();
+    first.project = w::SetUpProject::New(
+        w::NewProject::new(&w::CEILINGS, w::NewProjectParts { name: b"hello".as_slice().into() }).unwrap(),
+    );
+    parts.first = Some(w::FirstRepository::new(&w::CEILINGS, first).unwrap());
+    *row = w::ForgeRow::new(&w::CEILINGS, parts).unwrap();
+    rows
 }

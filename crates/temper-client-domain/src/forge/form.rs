@@ -43,7 +43,7 @@ pub enum Act {
     Adopt,
     SetUp { forge: u16 },
     SetupWrite { field: super::forges::SetupField, text: Box<[u8]> },
-    SetupNew { new: bool },
+    StartIn { forge: u16 },
     StartDemo,
     AppWrite { text: Box<[u8]> },
     ConnectApp { forge: u16 },

@@ -37,6 +37,8 @@ fn config(under_box: bool) -> engine::Config {
         },
         forge::Configured { number: AUTOMATIC, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: false },
     ]);
+    let mut limits = temper_engine_domain_world::fixtures::forge_limits();
+    temper_client_world::front::first_run_projects(&mut config, &mut limits);
     config
 }
 struct World {
@@ -56,6 +58,9 @@ struct World {
 impl World {
     fn new(under_box: bool) -> Self {
         let mut limits = temper_engine_domain_world::fixtures::forge_limits();
+        limits.authority = *config(under_box).core.authority.limits();
+        limits.people.projects = 3;
+        limits.people.holdings = 3;
         // Four configured forges distinguish both ineligible modes from the two asked ones.
         let extra = 4 - limits.forge.client.repositories;
         limits.forge.client.repositories = 4;
@@ -386,7 +391,7 @@ fn a_failed_setup_settles_with_its_why_and_can_be_asked_again() {
 }
 
 #[test]
-fn setup_fields_reach_the_engine_and_the_row_while_unknown_projects_are_refused() {
+fn setup_fields_reach_the_engine_and_unknown_project_names_are_admitted() {
     use temper_client_domain::forge::forges as d;
     let mut world = World::new(true);
     let call = world.call(&[b"forge-setup", b"3", b"--org", b"team", b"--repository", b"widget", b"--project", b"1"]);
@@ -409,10 +414,15 @@ fn setup_fields_reach_the_engine_and_the_row_while_unknown_projects_are_refused(
     let failed = world.answer(call);
     assert_eq!(failed.status, 1);
     assert!(contains(&failed.stderr, b"Set up failed: the box closed the pipe"));
-    let printed = world.invoke(&[b"forge-setup", b"3", b"--project", b"Next"]);
-    assert_eq!(printed.status, 2);
-    assert!(contains(&printed.stderr, b"a new project"));
-    assert_eq!(world.box_calls, 1, "new project reaches no box effect");
+    let mut world = World::new(true);
+    let next = world.call(&[b"forge-setup", b"3", b"--project", b"Next"]);
+    assert!(!world.printed.contains_key(&next));
+    assert_eq!(world.box_calls, 1, "new project is admitted to the box");
+    world.read();
+    assert_eq!(
+        row(&world, FORGE).first.as_ref().expect("first repository").project,
+        d::SetUpProject::New(b"Next".as_slice().into())
+    );
 }
 #[test]
 fn invalid_setup_names_are_refused_without_a_box_effect() {

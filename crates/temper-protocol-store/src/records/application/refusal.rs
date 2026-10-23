@@ -1,6 +1,6 @@
 //! Jig's complete refusal facts at its pinned people-store version.
 use jig_domain_people as p;
-use jig_protocol_store::people_v11 as w;
+use jig_protocol_store::people_v12 as w;
 use skein_lib::Wall;
 pub(super) fn encode_failure_class(value: p::FailureClass, _l: &w::Limits) -> w::FailureClass {
     match value {
@@ -219,6 +219,7 @@ pub(super) fn decode_lack(value: w::Lack) -> p::Lack {
 }
 pub(super) fn encode_limit_kind(value: p::LimitKind, _l: &w::Limits) -> w::LimitKind {
     match value {
+        p::LimitKind::Projects => w::LimitKind::Projects,
         p::LimitKind::Words => w::LimitKind::Words,
         p::LimitKind::Identity => w::LimitKind::Identity,
         p::LimitKind::Roles => w::LimitKind::Roles,
@@ -265,6 +266,7 @@ pub(super) fn encode_limit_kind(value: p::LimitKind, _l: &w::Limits) -> w::Limit
 }
 pub(super) fn decode_limit_kind(value: w::LimitKind) -> p::LimitKind {
     match value {
+        w::LimitKind::Projects => p::LimitKind::Projects,
         w::LimitKind::Words => p::LimitKind::Words,
         w::LimitKind::Identity => p::LimitKind::Identity,
         w::LimitKind::Roles => p::LimitKind::Roles,
@@ -309,8 +311,13 @@ pub(super) fn decode_limit_kind(value: w::LimitKind) -> p::LimitKind {
         w::LimitKind::Goals => p::LimitKind::Goals,
     }
 }
+#[expect(
+    clippy::too_many_lines,
+    reason = "one exhaustive translation preserves the complete embedded refusal vocabulary"
+)]
 pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
+        p::Refusal::NameTaken => w::Refusal::NameTaken,
         p::Refusal::Account { account, why } => w::Refusal::Account(w::RefusalAccount::new(
             l,
             w::RefusalAccountParts {
@@ -329,6 +336,18 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
                 at: *at,
                 why: match why {
                     p::Malformed::ProposedAsAllowed => w::Malformed::ProposedAsAllowed,
+                    p::Malformed::Name(rule) => w::Malformed::Name(w::MalformedName::new(
+                        l,
+                        w::MalformedNameParts {
+                            rule: match rule {
+                                p::NameRule::Empty => w::NameRule::Empty,
+                                p::NameRule::Long => w::NameRule::Long,
+                                p::NameRule::Control => w::NameRule::Control,
+                                p::NameRule::Space => w::NameRule::Space,
+                                p::NameRule::Digits => w::NameRule::Digits,
+                            },
+                        },
+                    )?),
                     p::Malformed::Cycle => w::Malformed::Cycle,
                     p::Malformed::AsAllowedTwice => w::Malformed::AsAllowedTwice,
                     p::Malformed::Conversation => w::Malformed::Conversation,
@@ -404,6 +423,7 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
 }
 pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
     match value {
+        w::Refusal::NameTaken => p::Refusal::NameTaken,
         w::Refusal::Account(value) => p::Refusal::Account {
             account: value.account(),
             why: match value.why() {
@@ -417,6 +437,13 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
             at: value.at(),
             why: match value.why() {
                 w::Malformed::ProposedAsAllowed => p::Malformed::ProposedAsAllowed,
+                w::Malformed::Name(value) => p::Malformed::Name(match value.rule() {
+                    w::NameRule::Empty => p::NameRule::Empty,
+                    w::NameRule::Long => p::NameRule::Long,
+                    w::NameRule::Control => p::NameRule::Control,
+                    w::NameRule::Space => p::NameRule::Space,
+                    w::NameRule::Digits => p::NameRule::Digits,
+                }),
                 w::Malformed::Cycle => p::Malformed::Cycle,
                 w::Malformed::AsAllowedTwice => p::Malformed::AsAllowedTwice,
                 w::Malformed::Conversation => p::Malformed::Conversation,

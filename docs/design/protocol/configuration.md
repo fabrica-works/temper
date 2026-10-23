@@ -871,7 +871,9 @@ have one, an engine alone none. Each:
     every start applies (`../domain/root.md`, section 6), and none of
     `landing.projects`, which names seeded projects alone; its first
     period is made with it (jig's `domain/people.md`, 5.2). The default
-    document seeds no project (setup.md, 8.3).
+    document still seeds project 1 and offers policy 1, equal to its seeded
+    policy; the green-CI landing rule is in `landing.deployment` for every
+    project (setup.md, 8.3).
 - **Every start:**
   - jig's parts apply as jig says (jig's `protocol/configuration.md`,
     section 8);

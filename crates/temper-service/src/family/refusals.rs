@@ -1,8 +1,12 @@
 //! Sparse entrance facts without invented names, words or bounds (jig's
 //! client/domain/contract.md, 4).
-use jig_client_protocol_wire::v15 as w;
+use jig_client_protocol_wire::v16 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
+#[expect(
+    clippy::too_many_lines,
+    reason = "one exhaustive translation preserves the complete embedded refusal vocabulary"
+)]
 pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     Ok(match value {
         p::Refusal::Account { account, why } => w::Refusal::Account(w::RefusalAccount::new(
@@ -24,6 +28,18 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
                 why: match why {
                     p::Malformed::AsAllowedTwice => w::Malformed::TwoAsAllowed,
                     p::Malformed::Conversation => w::Malformed::ConversationNotAgent,
+                    p::Malformed::Name(rule) => w::Malformed::Name(w::MalformedName::new(
+                        limits,
+                        w::MalformedNameParts {
+                            rule: match rule {
+                                p::NameRule::Empty => w::NameRule::Empty,
+                                p::NameRule::Long => w::NameRule::Long,
+                                p::NameRule::Control => w::NameRule::Control,
+                                p::NameRule::Space => w::NameRule::Space,
+                                p::NameRule::Digits => w::NameRule::Digits,
+                            },
+                        },
+                    )?),
                     p::Malformed::Cycle => w::Malformed::Cycle,
                     p::Malformed::EndedBy => w::Malformed::EndedBy,
                     p::Malformed::ProposedAsAllowed => w::Malformed::ProposedAsAllowed,
@@ -84,6 +100,7 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::Taken { by } => w::Refusal::Taken(w::RefusalTaken::new(limits, w::RefusalTakenParts { by })?),
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
+        p::Refusal::NameTaken => w::Refusal::NameTaken,
         p::Refusal::Unknown => w::Refusal::Unknown,
         p::Refusal::NotOffered => w::Refusal::NotOffered,
         p::Refusal::Provider => w::Refusal::Provider,
@@ -163,6 +180,7 @@ pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
         p::LimitKind::Empty => w::AdmissionLimit::Empty,
         p::LimitKind::Batch => w::AdmissionLimit::Batch,
         p::LimitKind::ProjectLiveTasks => w::AdmissionLimit::ProjectLiveTasks,
+        p::LimitKind::Projects => w::AdmissionLimit::Projects,
         p::LimitKind::Goals => w::AdmissionLimit::Goals,
         p::LimitKind::LiveTasks => w::AdmissionLimit::LiveTasks,
         p::LimitKind::Tree => w::AdmissionLimit::Tree,

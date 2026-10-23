@@ -657,7 +657,7 @@ fn welcome_accepted_setup_moves_to_model_and_follows_its_forge() {
             see(Role::Heading { level: 2 }, b"Setting up Forgejo on this machine"),
         ],
     );
-    assert!(text(&world, client).contains("work/hello, into Project 1"));
+    assert!(text(&world, client).contains("work/hello, into hello"), "{}", text(&world, client));
     assert_eq!(world.front().set_ups().len(), ONE_SETUP);
 }
 

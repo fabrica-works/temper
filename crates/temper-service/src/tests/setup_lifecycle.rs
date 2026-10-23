@@ -1371,3 +1371,71 @@ fn a_setup_visit_held_past_the_states_life_is_ended() {
     pump_visit(&mut service, &mut peer);
     status(&peer, b"410");
 }
+// The forge's one run, as the engine's own reconcile (internal) or a run a person asked.
+fn running(service: &mut crate::Service, internal: bool) -> Token {
+    let token = Token::new(99);
+    let run =
+        Run { first: None, forge: 1, kind: Kind::Reconcile, internal, previous: domain::Connection::NotConnected };
+    service.engine.as_mut().unwrap().setup.runs.insert(token, run).unwrap();
+    token
+}
+fn install_answer(service: &mut crate::Service) -> Option<(domain::InstallAnswer, Option<Box<[u8]>>)> {
+    let engine = service.engine.as_mut().unwrap();
+    let mut found = None;
+    while let Some(event) = engine.events.pop() {
+        if let root::Event::Forge(event) = event
+            && let domain::Event::InstallAnswered { request, answer, stopped, .. } = *event
+        {
+            assert_eq!(request, Token::new(91));
+            found = Some((answer, stopped));
+        }
+    }
+    found
+}
+#[test]
+fn an_install_during_the_engines_own_run_answers_its_link_once_the_run_ends() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let reconcile = running(&mut service, true);
+    public::install(service.engine.as_mut().unwrap(), 1, Token::new(91), None);
+    for _ in 0_u32..8 {
+        advance(service.engine.as_mut().unwrap());
+    }
+    assert_eq!(install_answer(&mut service), None, "the Install waits for the engine's run");
+    assert_eq!(service.engine.as_ref().unwrap().setup.held.len(), 1);
+    assert!(!service.engine.as_ref().unwrap().setup.work_pending(Time::ZERO));
+    service.engine.as_mut().unwrap().setup.runs.remove(&reconcile).unwrap();
+    assert!(service.engine.as_ref().unwrap().setup.work_pending(Time::ZERO));
+    for _ in 0_u32..8 {
+        advance(service.engine.as_mut().unwrap());
+    }
+    let Some((domain::InstallAnswer::Link(_), None)) = install_answer(&mut service) else { panic!("install link") };
+    assert!(service.engine.as_ref().unwrap().setup.held.is_empty());
+}
+#[test]
+fn an_install_during_a_persons_run_answers_busy() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    running(&mut service, false);
+    public::install(service.engine.as_mut().unwrap(), 1, Token::new(91), None);
+    assert_eq!(
+        install_answer(&mut service),
+        Some((domain::InstallAnswer::Refused(domain::ForgeRefusal::Busy), None)),
+        "a person's run refuses an Install at once"
+    );
+    assert!(service.engine.as_ref().unwrap().setup.held.is_empty());
+}
+#[test]
+fn an_install_held_past_the_states_life_answers_busy() {
+    let mut service = service(8, Duration::from_secs(3));
+    app(&mut service);
+    running(&mut service, true);
+    public::install(service.engine.as_mut().unwrap(), 1, Token::new(91), None);
+    advance(service.engine.as_mut().unwrap());
+    assert_eq!(install_answer(&mut service), None, "the Install waits for the engine's run");
+    service.engine.as_mut().unwrap().env.now = Time::ZERO.saturating_add(Duration::from_secs(3));
+    advance(service.engine.as_mut().unwrap());
+    let Some((domain::InstallAnswer::Connecting, Some(why))) = install_answer(&mut service) else { panic!("busy") };
+    assert_eq!(why.as_ref(), b"setup host: busy");
+    assert!(service.engine.as_ref().unwrap().setup.held.is_empty());
+}

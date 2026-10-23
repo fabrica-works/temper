@@ -37,6 +37,7 @@ pub(crate) struct Layer {
     next_write: u64,
     pages: Queue<Page>,
     waiting: Queue<Waiting>,
+    held: Queue<Held>,
     listener: Box<[u8]>,
     life: Duration,
     value_bytes: u32,
@@ -61,6 +62,13 @@ struct Waiting {
     installation: core::num::NonZeroU64,
     state: Box<[u8]>,
     back: Option<Box<[u8]>>,
+    until: Time,
+}
+/// A person's Install that met only the engine's own run on its forge, held until that run ends
+/// (protocol/setup.md, 5.1): the forge's one person's request, so at most one per forge.
+struct Held {
+    run: Token,
+    forge: u16,
     until: Time,
 }
 // skein host/states.rs:53 spells its 16 random bytes as 32 hex bytes.
@@ -203,6 +211,7 @@ pub(crate) fn worst_case(
         .checked_add(Queue::<Page>::worst_case(l.states)?)?
         // Held setup visits: each its state and a back as long as the backs' own.
         .checked_add(Queue::<Waiting>::worst_case(l.states)?)?
+        .checked_add(Queue::<Held>::worst_case(l.forges)?)?
         .checked_add(u64::from(l.states).checked_mul(STATE_TEXT_BYTES + 512)?)?
         .checked_add(page.checked_mul(u64::from(l.states))?)?
         .checked_add(Queue::<host::Event>::worst_case(above)?)?
@@ -274,6 +283,7 @@ impl Layer {
             next_write: 1,
             pages: Queue::with_capacity(limits.states),
             waiting: Queue::with_capacity(limits.states),
+            held: Queue::with_capacity(limits.forges),
             life,
             value_bytes,
             #[cfg(test)]
@@ -316,6 +326,7 @@ impl Layer {
         self.lifecycle.reconcile = Map::with_capacity(self.env.limits.forges);
         self.pages = Queue::with_capacity(self.env.limits.states);
         self.waiting = Queue::with_capacity(self.env.limits.states);
+        self.held = Queue::with_capacity(self.env.limits.forges);
         self.backs = Queue::with_capacity(self.env.limits.states);
         self.public = Map::with_capacity(self.env.limits.runs);
         self.staged = Map::with_capacity(self.env.limits.runs);
@@ -342,6 +353,9 @@ impl Layer {
         for waiting in &self.waiting {
             next = crate::accounts::earliest(next, Some(waiting.until));
         }
+        for held in &self.held {
+            next = crate::accounts::earliest(next, Some(held.until));
+        }
         next
     }
     pub(crate) fn work_pending(&self, now: Time) -> bool {
@@ -350,6 +364,11 @@ impl Layer {
     fn waiting_ready(&self) -> bool {
         for waiting in &self.waiting {
             if !self.busy(waiting.forge) {
+                return true;
+            }
+        }
+        for held in &self.held {
+            if !self.busy(held.forge) {
                 return true;
             }
         }
@@ -366,6 +385,22 @@ impl Layer {
             }
         }
         false
+    }
+    /// Busy with the engine's own runs alone: the reconcile after a connect, at a start or on a hint.
+    pub(super) fn busy_internally(&self, forge: u16) -> bool {
+        if self.lifecycle.deleting.contains_key(&forge) {
+            return false;
+        }
+        let mut any = false;
+        for (_, run) in &self.runs {
+            if run.forge == forge {
+                if !run.internal {
+                    return false;
+                }
+                any = true;
+            }
+        }
+        any
     }
     pub(crate) fn lifecycle_ready(&self, engine: &crate::engine::Engine) -> bool {
         !self.closing
@@ -447,6 +482,10 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
                 reason: Box::from(b"forge holds App records; Forget before making a new App".as_slice()),
             },
         );
+    } else if is_install(&plan) && engine.setup.busy_internally(number) && engine.setup.held.room() > 0 {
+        // An Install's link writes nothing: it waits for the engine's own run, never a person's.
+        let until = engine.env.now.saturating_add(engine.setup.life);
+        engine.setup.held.push(Held { run, forge: number, until });
     } else if lifecycle::busy(engine, number) || engine.setup.runs.len() == engine.setup.env.limits.runs {
         ended(
             engine,
@@ -473,6 +512,43 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
             lifecycle::state(engine, number, temper_engine_domain_forge::Connection::Connecting);
         }
         run_plan(engine, run, plan);
+    }
+}
+/// Run each held Install whose forge is free, or end it busy past the state's life.
+fn release(engine: &mut crate::engine::Engine) {
+    for _ in 0..engine.setup.held.len() {
+        if engine.events.room() < 4 || !engine.setup.room() {
+            break;
+        }
+        let held = engine.setup.held.pop().expect("held count");
+        if !engine.setup.busy(held.forge) {
+            engine
+                .setup
+                .staged
+                .insert(held.run, host::Plan::Install { forge: held.forge })
+                .expect("held run was staged");
+            request(engine, held.run);
+        } else if engine.env.now < held.until && engine.setup.busy_internally(held.forge) {
+            engine.setup.held.push(held);
+        } else {
+            let reason = Box::from(b"setup host: busy".as_slice());
+            ended(engine, held.run, root::SetupEnd::Stopped { forge: held.forge, reason });
+        }
+    }
+}
+fn is_install(plan: &host::Plan) -> bool {
+    match plan {
+        host::Plan::Install { .. } => true,
+        host::Plan::Manifest { .. }
+        | host::Plan::Convert { .. }
+        | host::Plan::Accept { .. }
+        | host::Plan::Reconcile { .. }
+        | host::Plan::Paste { .. }
+        | host::Plan::Check { .. }
+        | host::Plan::TakeOver { .. }
+        | host::Plan::Adopt { .. }
+        | host::Plan::Create { .. }
+        | host::Plan::Reachable { .. } => false,
     }
 }
 fn matches_app_plan(plan: &host::Plan) -> bool {
@@ -517,6 +593,7 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
     engine.setup.env.now = engine.env.now;
     engine.setup.env.wall = engine.env.wall;
     begin(engine);
+    release(engine);
     routes::advance(engine);
     for _ in 0..engine.setup.pages.len() {
         if !due(

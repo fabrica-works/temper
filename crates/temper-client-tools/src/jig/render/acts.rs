@@ -33,6 +33,7 @@ pub fn name(act: ActKind) -> &'static [u8] {
         ActKind::ChangePolicy => b"change-policy",
         ActKind::SetRoles => b"set-roles",
         ActKind::MakeService => b"make-service",
+        ActKind::Rename => b"rename",
         ActKind::SetPool => b"set-pool",
         ActKind::Withdraw => b"withdraw",
     }
@@ -95,6 +96,7 @@ fn has_tool(_task: &Task, act: ActKind) -> bool {
         | ActKind::DeleteNote
         | ActKind::ChangePolicy
         | ActKind::SetRoles
+        | ActKind::Rename
         | ActKind::MakeService
         | ActKind::SetPool
         | ActKind::Withdraw => false,
@@ -127,6 +129,7 @@ fn call(task: &Task, act: ActKind, out: &mut Text) {
                 | ActKind::Adopt
                 | ActKind::ChangePolicy
                 | ActKind::SetRoles
+                | ActKind::Rename
                 | ActKind::MakeService
                 | ActKind::SetPool
                 | ActKind::Withdraw => {}
@@ -168,6 +171,7 @@ fn call(task: &Task, act: ActKind, out: &mut Text) {
         | ActKind::DeleteNote
         | ActKind::ChangePolicy
         | ActKind::SetRoles
+        | ActKind::Rename
         | ActKind::MakeService
         | ActKind::SetPool
         | ActKind::Withdraw => return,
@@ -267,6 +271,7 @@ pub fn refusal(why: &Refusal, book: &Phrasebook, out: &mut Text) {
         | Refusal::Circle { .. }
         | Refusal::Dependency { .. }
         | Refusal::Kept { .. }
+        | Refusal::NameTaken
         | Refusal::Provider => book.say(0, word.id(), &[]),
     }
     .expect("checked refusal phrase")

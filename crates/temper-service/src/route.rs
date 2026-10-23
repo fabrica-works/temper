@@ -252,6 +252,7 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
             | root::Delivery::WatchEnded { .. }
             | root::Delivery::SourceSignedOut { .. }
             | root::Delivery::Result { .. }
+            | root::Delivery::ProjectMade { .. }
             | root::Delivery::ForgeCommitted { .. }
             | root::Delivery::ForgeCall { .. }
             | root::Delivery::Bound { .. }

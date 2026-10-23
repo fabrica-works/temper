@@ -310,6 +310,7 @@ fn delivery_packet(
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
+        | Delivery::ProjectMade { .. }
         | Delivery::ForgeCommitted { .. }
         | Delivery::ForgeCall { .. }
         | Delivery::Bound { .. }

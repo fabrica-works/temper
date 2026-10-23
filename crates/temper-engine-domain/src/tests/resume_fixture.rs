@@ -66,6 +66,7 @@ pub fn limits() -> engine::Limits {
     };
     let people = people::Limits {
         batch: 4,
+        act_grants: 0,
         operations: 2,
         people: 2,
         program_hosts: 2,
@@ -165,6 +166,7 @@ pub fn limits() -> engine::Limits {
         },
         accounts: accounts::Limits {
             accounts: 1,
+            move_deadline: Duration::from_secs(60),
             holder_accounts: 1,
             sources: 3,
             sign_ins: 1,
@@ -226,6 +228,10 @@ fn authority_value(spend: u64, kinds: Box<[authority::Executor]>) -> authority::
 /// Real authority policy and an authenticated owner, rather than allow flags.
 #[must_use]
 pub fn config(seed: u64) -> engine::Config {
+    config_with_project_room(seed, 1)
+}
+
+pub fn config_with_project_room(seed: u64, projects: u32) -> engine::Config {
     let ceiling = authority_value(1000, Box::new([authority::Executor::Charter(1)]));
     let rules = authority::Rules {
         ceiling: ceiling.clone(),
@@ -235,7 +241,9 @@ pub fn config(seed: u64) -> engine::Config {
         implies: authority::Implies::new(Box::new([]), 0).expect("empty implication configuration"),
         requirements: Box::new([]),
     };
-    let domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
+    let mut policy_limits = authority_limits();
+    policy_limits.projects = projects;
+    let domain = authority::Domain::new(rules, policy_limits).expect("valid authority configuration");
     let policy = authority::Policy {
         projections: ceiling.grants.clone(),
         escalation_role: Some(0),
@@ -454,7 +462,13 @@ pub fn root() -> (engine::Domain, Env<engine::Limits>) {
     root_with_config(config(7))
 }
 pub fn root_with_config(config: engine::Config) -> (engine::Domain, Env<engine::Limits>) {
-    let limits = limits();
+    root_with_config_and_limits(config, &limits())
+}
+
+pub fn root_with_config_and_limits(
+    config: engine::Config,
+    limits: &engine::Limits,
+) -> (engine::Domain, Env<engine::Limits>) {
     // Model a later start: the store supplies the complete project rows and
     // their deployment high-water mark, rather than configuration reseeding.
     let mut projects = skein_lib::List::with_capacity(limits.authority.projects);
@@ -471,8 +485,8 @@ pub fn root_with_config(config: engine::Config) -> (engine::Domain, Env<engine::
             .push(people::Stored::Policy { project: project.number, name: project.name.clone(), value })
             .expect("bounded fixture projects");
     }
-    let mut root = engine::Domain::new(config, &limits).unwrap();
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut root = engine::Domain::new(config, limits).unwrap();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut request = root.core.restart_begin();
     let mut deployment = root.core.counters.deployment();
     deployment.projects = project_mark;

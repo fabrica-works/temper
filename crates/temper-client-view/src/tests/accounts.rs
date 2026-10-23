@@ -714,7 +714,7 @@ mod memory_literal;
 // The demo start's words, full failure text and retry nodes (1,724,026 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 #[cfg(target_pointer_width = "64")]
-const ACCOUNT_BYTES: u64 = 11526788614;
+const ACCOUNT_BYTES: u64 = 11526788862;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -1289,4 +1289,12 @@ fn only_deployment_rows_show_usage_facts_and_their_use_summary() {
         rows += 1;
     }
     assert_eq!(rows, 2);
+}
+
+#[test]
+fn english_phrase_declarations_match_the_vocabulary() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/words.rs");
+    for (marker, expected, actual) in crate::words::english_declarations() {
+        memory_literal::check(&path, marker, expected, actual);
+    }
 }

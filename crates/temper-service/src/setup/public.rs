@@ -120,7 +120,9 @@ fn pasted(bytes: &[u8]) -> Option<Secret> {
     Some(Secret::new(Box::from(pem)))
 }
 pub(crate) fn install(engine: &mut Engine, forge: u16, request: Token, back: Option<Box<[u8]>>) {
-    if full(engine, forge) {
+    // The engine's own run on the forge holds an Install rather than refusing it (setup.md, 5.1).
+    let held = engine.setup.busy_internally(forge) && engine.setup.public.len() < engine.setup.public.capacity();
+    if !held && full(engine, forge) {
         event(
             engine,
             domain::Event::InstallAnswered {

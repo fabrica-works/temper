@@ -361,7 +361,7 @@ fn the_signed_in_corner_groups_link_person_and_sign_out_in_order() {
 }
 #[test]
 fn the_unavailable_corner_holds_only_the_link_region() {
-    for root in [fixtures::signed_out(), fixtures::out_of_date()] {
+    for root in fixtures::pair(fixtures::signed_out(), fixtures::out_of_date()) {
         let view = fixtures::page_view(&root);
         assert_corner(&view, &[(Role::Region, None)]);
     }
@@ -511,7 +511,7 @@ fn the_banner_menu_keeps_navigation_and_corner_while_connecting() {
 
 #[test]
 fn the_unavailable_banner_menu_holds_its_corner_alone() {
-    for root in [fixtures::signed_out(), fixtures::out_of_date()] {
+    for root in fixtures::pair(fixtures::signed_out(), fixtures::out_of_date()) {
         assert_menu(&fixtures::page_view(&root), &[(Role::Slot, None)]);
     }
 }
