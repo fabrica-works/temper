@@ -691,7 +691,7 @@ mod memory_literal;
 // The flow's three state words (444 B).
 // First-repository setup fields and Ready words add 2,076 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 10348343792;
+const ACCOUNT_BYTES: u64 = 10348345868;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
