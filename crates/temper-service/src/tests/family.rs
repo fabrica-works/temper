@@ -317,7 +317,7 @@ fn an_outcome_past_its_retention_is_encoded_unknown() {
 }
 #[test]
 fn a_core_refusal_uses_jigs_refusal_record() {
-    use jig_client_protocol_wire::v12 as j;
+    use jig_client_protocol_wire::v13 as j;
     let limits = fixtures::engine().jig.limits.clients.wire;
     for (row, input, expected) in [
         ("unknown", people::Refusal::Unknown, j::Refusal::Unknown),
@@ -918,5 +918,39 @@ fn forges_encode_the_domains_rows_without_settings() {
             row,
             &w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap()
         );
+    }
+}
+
+#[test]
+fn an_exceeded_hold_refusal_keeps_each_bound_and_its_configured_value() {
+    use jig_client_protocol_wire::v13 as j;
+    for (bound, expected) in [
+        (people::Bound::Reasoning, j::Bound::Reasoning),
+        (people::Bound::Metadata, j::Bound::Metadata),
+        (people::Bound::Items, j::Bound::Items),
+        (people::Bound::Answer, j::Bound::Answer),
+        (people::Bound::Tools, j::Bound::Tools),
+        (people::Bound::HistoryItems, j::Bound::HistoryItems),
+        (people::Bound::History, j::Bound::History),
+        (people::Bound::Window, j::Bound::Window),
+        (people::Bound::Output, j::Bound::Output),
+    ] {
+        let bytes = refusal_bytes(people::Refusal::Moved {
+            now: people::Moved::Hold {
+                revision: 7,
+                reason: people::HoldReason::Exceeded(people::Exceeded { bound, value: u64::MAX }),
+            },
+        });
+        let mut reader = Reader::new(&bytes);
+        let j::Refusal::Moved(moved) = j::Refusal::decode(&j::CEILINGS, &mut reader).expect("jig refusal") else {
+            panic!("moved")
+        };
+        let j::Moved::Hold(hold) = moved.what() else { panic!("hold") };
+        let Some(j::CurrentHold::Reason(reason)) = hold.reason() else { panic!("hold reason") };
+        let j::HoldCategory::Exceeded(exceeded) = reason.value() else { panic!("exceeded") };
+        assert_eq!(exceeded.bound(), &expected);
+        assert_eq!(exceeded.value(), u64::MAX);
+        assert_eq!(moved.now().value(), 7);
+        assert!(reader.is_empty());
     }
 }

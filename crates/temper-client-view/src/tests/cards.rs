@@ -33,7 +33,15 @@ fn a_result_shows_its_committed_words_in_temper_nodes() {
 const OTHER_TASK: u64 = 12;
 const ENTRY: u64 = 11;
 const POOL: u64 = 7;
-const HOLDS: [(c::HoldCategory, &[u8]); 4] = [
+const HOLDS: [(c::HoldCategory, &[u8]); 6] = [
+    (
+        c::HoldCategory::Exceeded(c::Exceeded { bound: c::Bound::Reasoning, value: 2048 }),
+        b"Held: the model's reasoning went past its configured allowance of 2048 bytes",
+    ),
+    (
+        c::HoldCategory::Exceeded(c::Exceeded { bound: c::Bound::History, value: 2048 }),
+        b"Held: the run's history no longer fits its configured allowance, even compacted",
+    ),
     (c::HoldCategory::Circle, b"Held for a circle of waits"),
     (c::HoldCategory::Dependency { task: OTHER_TASK }, b"Dependency task 12"),
     (c::HoldCategory::Uncertain { entry: ENTRY }, b"Uncertain outbox entry 11"),

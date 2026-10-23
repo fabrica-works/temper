@@ -378,7 +378,7 @@ pub enum Word {
 // Three empty and partial ended-children phrases (5.10).
 // A chat's numbered composer placeholder (3.5).
 // Twelve inbox count, filter, empty and update-line phrases (3.5).
-const PHRASES: u32 = 814;
+const PHRASES: u32 = 823;
 const ALL: [Word; 344] = [
     Word::WelcomeStep,
     Word::WelcomeForgeStep,
