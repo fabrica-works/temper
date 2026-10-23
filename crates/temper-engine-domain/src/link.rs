@@ -229,6 +229,7 @@ const fn turned(failure: host::Failure) -> Option<fleet::Turned> {
         host::Failure::Run(host::RunFailure::Refused { account }) => Some(fleet::Turned::Refused { account }),
         host::Failure::Run(
             host::RunFailure::Model
+            | host::RunFailure::Exceeded(_)
             | host::RunFailure::Budget
             | host::RunFailure::Policy
             | host::RunFailure::Cancelled
@@ -364,6 +365,20 @@ fn end(ending: &host::Ending) -> tasks::End {
         host::Ending::Refused(host::Refusal::Busy) => tasks::End::Refused,
         host::Ending::Refused(host::Refusal::Invalid(_)) => tasks::End::Failed(tasks::Class::Invalid),
         host::Ending::Parked { .. } => tasks::End::Parked,
+        host::Ending::Failed { failure: host::Failure::Run(host::RunFailure::Exceeded(exceeded)), .. } => {
+            let bound = match exceeded.bound {
+                host::Bound::Reasoning => tasks::Bound::Reasoning,
+                host::Bound::Metadata => tasks::Bound::Metadata,
+                host::Bound::Items => tasks::Bound::Items,
+                host::Bound::Answer => tasks::Bound::Answer,
+                host::Bound::Tools => tasks::Bound::Tools,
+                host::Bound::HistoryItems => tasks::Bound::HistoryItems,
+                host::Bound::History => tasks::Bound::History,
+                host::Bound::Window => tasks::Bound::Window,
+                host::Bound::Output => tasks::Bound::Output,
+            };
+            tasks::End::Exceeded(tasks::Exceeded { bound, value: exceeded.value })
+        }
         host::Ending::Failed { failure, .. } => tasks::End::Failed(match failure {
             host::Failure::Unprepared(host::Preparation::Transient) => tasks::Class::Transient,
             host::Failure::Unprepared(host::Preparation::Permanent { .. }) => tasks::Class::Permanent,
