@@ -91,8 +91,9 @@ worker's root      Event::Assign { assignment, items, save }            Request:
   `protocol/channel.md`, 4.1).
 - **It moves** when one of those encodings changes, by the rule temper's
   versions share (`README.md`, section 9); a repin of smith that changes
-  the delivery's record is such a change, and so was a repository's
-  `git` (section 4). An engine and its workers are
+  the delivery's record is such a change, and so were a repository's
+  `git` (section 4) and, at 4, its tag's widening to the pair, 64
+  bits. An engine and its workers are
   one release, so nothing is translated between versions (jig's
   `protocol/README.md`, section 7).
 
@@ -108,7 +109,7 @@ In the schema's terms (each byte field and list has its limit, section
 
 ```
 record Items       { repositories: list Repository  save: option bytes }
-record Repository  { tag: u32  name: bytes  remote: bytes  git: option bytes  start: Start  access: Access  identity: u32  account: option u64 }
+record Repository  { tag: u64  name: bytes  remote: bytes  git: option bytes  start: Start  access: Access  identity: u32  account: option u64 }
 enum   Start       { merge: Merge, base: Branch, branch: Branch, commit: Commit, saved: Branch }
 record Merge       { branch: bytes  base: fixed 32 }
 record Branch      { branch: bytes }
@@ -119,7 +120,7 @@ record Writable    { push: bytes  expected: option fixed 32 }
 
 | Field | From the engine (`ForgeRepository`) | To the worker (`wire::Repository`) |
 |---|---|---|
-| `tag` | `tag`, the deployment's tag | `tag`, echoed in what landed |
+| `tag` | `tag`, the deployment's tag: the forge's number and the repository's id, packed (`../domain/forge.md`, section 4) | `tag`, echoed in what landed |
 | `name` | `name` | `name`: the directory, one path component, unique in the workspace |
 | `remote` | made: the `git` of the configured forge whose number is `provider.forge`, `/`, `owner`, `/`, `name`, `.git` (configuration.md, section 3) | `remote`, never interpreted by the domain; the git component's URL (git.md, section 3) |
 | `git` | made by the routing: the `git` of the setup entry faking the forge whose number is `provider.forge`, resolved to an absolute path (setup.md, 8.2); none for every other forge | `git`, never interpreted by the domain; the program the git component runs for every operation on the repository, and `workers[].git` for none (git.md, section 3) |
@@ -160,9 +161,9 @@ refusal carries none. Each names a repository by its tag.
 
 ```
 record Left             { landed: list Landed }
-record Landed           { tag: u32  commit: fixed 32 }
+record Landed           { tag: u64  commit: fixed 32 }
 record Saved            { repositories: list SavedRepository }
-record SavedRepository  { tag: u32  from_saved: bool  landing: Landing }
+record SavedRepository  { tag: u64  from_saved: bool  landing: Landing }
 enum   Landing          { conflicted: Files, explained: PushFailure, landed: Commit,
                           moved, failed, refused, unchanged }
 record Files            { files: list bytes }
@@ -172,8 +173,8 @@ enum   PushReason       { missing_repository, missing_branch, missing_commit, re
                           too_large, nothing, unknown }
 record Diagnostic       { output: bytes  cut: u64 }
 enum   Preparation      { transient, missing: Missed, refused: Tag }
-record Missed           { tag: u32  missing: Missing }
-record Tag              { tag: u32 }
+record Missed           { tag: u64  missing: Missing }
+record Tag              { tag: u64 }
 enum   Missing          { repository, branch, commit }
 ```
 

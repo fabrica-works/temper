@@ -173,6 +173,15 @@ temper-engine-domain-forge              the connector's top: resources and holds
   from then on (`Repository { forge, repository }`), so a rename or a
   transfer on the forge keeps it the same repository. A repository the
   forge does not have refuses the adoption as not found.
+- **A task names a repository by its tag, the pair packed.** jig's
+  resource number, opaque to jig, is temper's tag: `(forge << 32) |
+  repository`, the forge's number in the high half and the forge's id
+  for the repository in the low, both 32 bits, packed and read back by
+  one pair of functions in the forge's domain. A delegation's resource,
+  a workspace's repository, what a run left and a pushed head carry it,
+  and a saved resource's path is the pair itself (`root.md`, section
+  6), so two forges' repositories with the same id in one project stay
+  two. A tag whose pair the task's project has not adopted names none.
 - **The adoption request is the forge's own,** keyed as any party's
   request (`../client/README.md`, 4.4): the root takes it from the protocol
   layer typed, and the connector refuses a forge the deployment does not

@@ -369,7 +369,9 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   `pull` or `issue` and a number; forge.md, section 2); and, for a hold,
   three segments, the forge's number, the repository's id and the
   branch, which it reads back for the forge's branches only. A saved
-  repository's tag becomes the task's saved resource, and back.
+  repository's tag becomes the task's saved resource, its path the
+  forge's number and the repository's id (forge.md, section 4), and
+  back.
 - **The change procedure's decisions** become the core's procedure
   steps:
 
