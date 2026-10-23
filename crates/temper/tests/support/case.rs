@@ -614,10 +614,11 @@ impl Judge {
             live_channels(&ctl::json(call), &mut self.channels);
         }
         self.processed = batch.ends().len();
-        self.map_channels(&ctl::json(batch.ends().last().expect("placement hosts")));
+        let accounts = ctl::json(batch.ends().last().expect("placement hosts"));
+        self.map_channels(&accounts);
         assert!(
             ["ws", "s1", "s2"].iter().all(|name| self.assigned.contains(*name)),
-            "every started worker held a run: assigned {:?}; channels {:?}; placed {:?}",
+            "every started worker held a run: assigned {:?}; channels {:?}; placed {:?}; accounts {accounts}",
             self.assigned,
             self.channels,
             self.workers
@@ -990,13 +991,17 @@ impl Judge {
         );
     }
     fn map_channels(&mut self, accounts: &Value) {
-        assert_eq!(accounts["cut"], false, "complete placement hosts: {}", accounts["accounts"]["deployment_facts"]);
-        let hosts = accounts
+        let deployment = accounts
             .pointer("/accounts/deployment_facts/program_hosts")
             .and_then(Value::as_array)
             .expect("worker channels");
+        let party =
+            accounts.pointer("/accounts/program_hosts").and_then(Value::as_array).expect("party worker channels");
+        // Both lists are supplied host facts in this one read; rendering may cut the later list.
         self.channels.retain(|task, channel| {
-            let Some(host) = hosts.iter().find(|host| host["channel"] == *channel) else { return true };
+            let Some(host) = deployment.iter().chain(party).find(|host| host["channel"] == *channel) else {
+                return true;
+            };
             let name = host["name"].as_str().expect("worker name");
             self.assigned.insert(name.into());
             if self.placed.contains(task) {
