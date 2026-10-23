@@ -114,14 +114,14 @@ fn failed_start_survives_navigation_and_try_again_uses_a_new_key() {
     assert!(!has(&root, Role::Button, b"Try again"));
 }
 #[test]
-fn running_read_starts_once_silently_and_welcome_moves_once() {
+fn running_read_sends_no_start_and_welcome_moves_once() {
     let (mut front, mut root) = accounts::demo_fixture(f::SEED, &w::DemoState::Running);
-    assert_eq!(front.demo_starts.len(), 1);
+    assert_eq!(front.demo_starts.len(), 0);
     assert_eq!(root.person().pages().address(), &Address::Chats { filter: ChatsFilter::All, start: false });
     assert!(!has(&root, Role::Status, b"Starting"));
     let replaces = go(&mut front, &mut root, Address::Welcome { step: Step::Welcome });
     assert_eq!(replaces, 1);
-    assert_eq!(front.demo_starts.len(), 1);
+    assert_eq!(front.demo_starts.len(), 0);
     go(&mut front, &mut root, Address::Welcome { step: Step::Ready });
     assert!(!has(&root, Role::Region, b"Playground"));
     assert!(!has(&root, Role::Region, b"Setup"));
@@ -244,8 +244,7 @@ fn a_forge_connected_clears_the_demo_everywhere_and_welcome_moves_when_a_model_i
     let reads = front.demo_reads;
     connected(&mut front, &mut root);
     assert_eq!(front.demo_reads, reads + 1);
-    assert_eq!(front.demo_removals.len(), 1);
-    assert!(!demo_account(&mut front, &mut root));
+    assert_eq!(front.demo_removals.len(), 0);
     assert!(root.person().forge().demo().is_none());
     assert!(d::forge::listed::playground(root.person()).is_none());
     assert!(!has(&root, Role::Region, b"Playground"));
@@ -259,6 +258,6 @@ fn a_forge_connected_clears_the_demo_everywhere_and_welcome_moves_when_a_model_i
     add_model(&mut front, &mut root);
     assert_eq!(go(&mut front, &mut root, Address::Welcome { step: Step::Welcome }), 1);
     assert_eq!(root.person().pages().address(), &Address::Chats { filter: ChatsFilter::All, start: false });
-    assert_eq!(front.demo_starts.len(), 1);
-    assert_eq!(front.demo_removals.len(), 1);
+    assert_eq!(front.demo_starts.len(), 0);
+    assert_eq!(front.demo_removals.len(), 0);
 }
