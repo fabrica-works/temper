@@ -56,6 +56,14 @@ impl Host for Proc {
             {
                 llm.peer.release(crate::cluster::PLACED).expect("placement hold");
             }
+            if let Self::Llm(llm) = self
+                && let Some(name) = llm.release.take()
+            {
+                llm.peer
+                    .release(name)
+                    .unwrap_or_else(|error| panic!("release LLM hold {}: {error:?}", String::from_utf8_lossy(name)));
+                llm.released = Some(name);
+            }
             let host = self.host_mut();
             if host.work_pending(now)
                 || !host.completions().is_empty()
@@ -76,7 +84,8 @@ impl Host for Proc {
         self.host_mut().submissions()
     }
     fn work_pending(&self, now: Time) -> bool {
-        !matches!(self, Self::Llm(llm) if llm.scripts.is_some()) && self.host().work_pending(now)
+        !matches!(self, Self::Llm(llm) if llm.scripts.is_some())
+            && (matches!(self, Self::Llm(llm) if llm.release.is_some()) || self.host().work_pending(now))
     }
     fn next_deadline(&self) -> Option<Time> {
         self.host().next_deadline()
@@ -116,7 +125,13 @@ pub(crate) fn run(
         llm_history: LlmHistory::default(),
     });
     world.spawn(|| {
-        Proc::Llm(Box::new(Llm { peer: llm::peer(recipe()).expect("independent LLM peer"), scripts: None, cue: false }))
+        Proc::Llm(Box::new(Llm {
+            peer: llm::peer(recipe()).expect("independent LLM peer"),
+            scripts: None,
+            cue: false,
+            release: None,
+            released: None,
+        }))
     });
     world
         .spawn_signals(|signals| Proc::Service(Box::new(ServiceHost::new(scratch.path().into(), signals, direct_key))));
@@ -128,6 +143,8 @@ pub(crate) struct Llm {
     pub(crate) peer: skein_fake_peers::llm::Peer,
     scripts: Option<Scripts>,
     cue: bool,
+    release: Option<&'static [u8]>,
+    released: Option<&'static [u8]>,
 }
 impl std::ops::Deref for Llm {
     type Target = skein_fake_peers::llm::Peer;
@@ -164,6 +181,8 @@ pub(crate) fn run_forge(
             peer: llm::peer(llm::scripted(Box::new([]))).expect("deferred peer"),
             scripts: Some(scripts),
             cue: false,
+            release: None,
+            released: None,
         }))
     });
     world.spawn_signals(|signals| {
@@ -197,6 +216,8 @@ pub(crate) fn run_github(
             peer: llm::peer(llm::scripted(Box::new([]))).expect("deferred peer"),
             scripts: Some(scripts),
             cue: false,
+            release: None,
+            released: None,
         }))
     });
     world
@@ -332,6 +353,14 @@ impl Referee<Proc> for Judge {
             }
         }
         self.worker_actions(caller_end, caller, workers);
+        if let Some(name) = caller.releasing_hold() {
+            if peer.released == Some(name) {
+                peer.released = None;
+                caller.hold_released.set(true);
+            } else if !caller.hold_released.get() {
+                peer.release = Some(name);
+            }
+        }
         if placed(workers) && !self.finished {
             peer.cue = true;
         }
@@ -486,6 +515,7 @@ impl Referee<Proc> for Judge {
         if worker_action || caller.adding_worker().and_then(named_worker).is_some_and(|worker| {
             !worker_started(worker) || worker.linked() > 0 && !caller.added.get()
         })
+            || (caller.releasing_hold().is_some() && !caller.hold_released.get() && peer.release.is_none())
             || placing
             || workers_changed
             || (self.stopping && workers.iter().all(Host::is_empty) && !self.engine_stopping)
@@ -604,6 +634,8 @@ fn cluster_roots<R: Referee<Proc>>(
             peer: llm::peer(recipe()).expect("cluster LLM"),
             scripts: forge.map(|(_, scripts)| scripts),
             cue: false,
+            release: None,
+            released: None,
         }))
     });
     world.spawn_signals(|signals| {

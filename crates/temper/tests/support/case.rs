@@ -414,6 +414,7 @@ impl Judge {
             Step::StartWorker { .. } => panic!("StartWorker unsupported"),
             Step::FixtureReady => panic!("FixtureReady unsupported"),
             Step::Advance => panic!("Advance unsupported"),
+            Step::ReleaseHold { .. } => panic!("ReleaseHold unsupported"),
             Step::Probe { .. } => panic!("Probe unsupported"),
             Step::Release { .. } => panic!("Release unsupported"),
             Step::Contended { .. } => panic!("Contended unsupported"),

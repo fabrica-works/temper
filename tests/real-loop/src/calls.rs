@@ -31,6 +31,10 @@ pub enum Step {
     /// A person at the hosted terminal.
     Terminal(crate::terminal::Act),
     Advance,
+    /// Release a fake LLM hold through its owner in the loop.
+    ReleaseHold {
+        name: &'static [u8],
+    },
     /// Drain a named worker while retaining its root for a restart.
     StopWorker {
         name: &'static str,
@@ -98,6 +102,11 @@ pub fn stop_worker(name: &'static str) -> Step {
 #[must_use]
 pub fn start_worker(name: &'static str) -> Step {
     Step::StartWorker { name }
+}
+/// Release the named fake LLM hold before proceeding.
+#[must_use]
+pub fn release_hold(name: &'static [u8]) -> Step {
+    Step::ReleaseHold { name }
 }
 #[must_use]
 pub fn advance() -> Step {
@@ -243,6 +252,7 @@ pub(crate) struct Caller {
     recording: Recording,
     pub(crate) released: bool,
     pub(crate) advanced: Cell<bool>,
+    pub(crate) hold_released: Cell<bool>,
     pub(crate) added: Cell<bool>,
     pub(crate) worker_ready: Cell<bool>,
     pub(crate) held: Cell<bool>,
@@ -273,6 +283,7 @@ impl Caller {
         self.steps.iter().filter_map(|step| match step {
             Step::Held { name } => Some(*name),
             Step::FixtureReady
+            | Step::ReleaseHold { .. }
             | Step::Terminal(_)
             | Step::StopWorker { .. }
             | Step::StartWorker { .. }
@@ -302,6 +313,9 @@ impl Caller {
     }
     pub(crate) fn starting_worker(&self) -> Option<&'static str> {
         if let Some(Step::StartWorker { name }) = self.steps.get(self.next) { Some(*name) } else { None }
+    }
+    pub(crate) fn releasing_hold(&self) -> Option<&'static [u8]> {
+        if let Some(Step::ReleaseHold { name }) = self.steps.get(self.next) { Some(*name) } else { None }
     }
     pub(crate) fn advancing(&self) -> bool {
         matches!(self.steps.get(self.next), Some(Step::Advance))
@@ -339,6 +353,7 @@ impl Caller {
             recording: Recording::Story,
             released: false,
             advanced: Cell::new(false),
+            hold_released: Cell::new(false),
             added: Cell::new(false),
             worker_ready: Cell::new(false),
             held: Cell::new(false),
@@ -396,6 +411,7 @@ impl Caller {
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
             Step::FixtureReady
+            | Step::ReleaseHold { .. }
             | Step::Terminal(_)
             | Step::StopWorker { .. }
             | Step::StartWorker { .. }
@@ -678,6 +694,11 @@ impl Caller {
             Step::StopWorker { .. } | Step::StartWorker { .. } if !self.worker_ready.replace(false) => return,
             Step::Advance if !self.advanced.get() => return,
             Step::StopWorker { .. } | Step::StartWorker { .. } | Step::AddWorker { .. } | Step::Advance => {}
+            Step::ReleaseHold { .. } => {
+                if !self.hold_released.replace(false) {
+                    return;
+                }
+            }
             Step::Held { .. } => return,
             Step::Kill { call } => {
                 if !self.kill_call(*call) {
@@ -761,6 +782,7 @@ impl Caller {
             Some(Step::FixtureReady) => self.running.iter().all(Option::is_none),
             Some(Step::StopWorker { .. } | Step::StartWorker { .. }) => self.worker_ready.get(),
             Some(Step::Advance) => self.advanced.get(),
+            Some(Step::ReleaseHold { .. }) => self.hold_released.get(),
             Some(Step::AddWorker { .. }) => self.added.get(),
             Some(Step::Held { .. }) => self.held.get(),
             Some(Step::SameParty { .. }) if self.retry_link.is_some() => {
