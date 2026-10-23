@@ -1810,6 +1810,7 @@ them as it does any Forgejo.
   |---|---|---|
   | `listen` | an address, jig's format | a socket address on loopback, port 0 for the kernel's |
   | `key` | an absolute path | the key's file, which the fake writes (below) |
+| `added_keys` | a list of absolute paths, optional, none when absent | at most 15, each distinct and other than `key`'s: further keys' files, which the fake writes (below), the provider's accepted credentials 1 onward in the list's order, `key`'s being 0 |
   | `tls` | `{"root"}`, or null for plaintext | `root` an absolute path: the test root's file, which the fake writes (below) |
   | `models` | a list of `{"name", "window", "output"}` | 1 to 8, each as a provider's model's members are (configuration.md, section 2) |
   | `cued` | a list of `{"cue", "turns"}`, each with `inputs` optional | at most 8, as `llm.asked` is; each cue looked for in the system text (skein's `fake-llm.md`, 2.4) |
@@ -1832,6 +1833,23 @@ them as it does any Forgejo.
   it, since nothing could release the hold (skein's `fake-llm.md`,
   2.2).
 
+  A turn's lines may also hold a failing line, `{"fail"}`, here alone
+  and never in a deployment's document: `{"error", "credentials"}`,
+  skein's `Line::Fail` (skein's `fake-llm.md`, 2.3), with its report
+  the domain's default. `error` is one of `"overloaded"`,
+  `"unavailable"`, `"context_too_long"`, `"unauthorized"`,
+  `"refused"`, `"unsupported"` and `"invalid_request"`, or
+  `{"rate_limited": {"retry_after_ms"}}` or `{"exhausted":
+  {"retry_after_ms"}}`, `retry_after_ms` a u64 of milliseconds, at
+  least 1, null in an `exhausted` for a limit without a reset; skein's
+  error classes are translated one for one, so that a class skein adds
+  is a build error in `temper-fake` the day it is added.
+  `credentials` is a list of 0 to 16 distinct indices of the
+  document's accepted credentials (`key`'s 0, then `added_keys`'),
+  each below their count, an empty list failing every call. Where a failing
+  line falls in its turn and whose calls it fails are skein's (its
+  2.3): a refused document is refused at the start, naming the turn.
+
   The forge's:
 
   | Member | Type | Bounds |
@@ -1849,9 +1867,9 @@ them as it does any Forgejo.
   start, naming it. Each file's directory must exist, but the admin
   token's, the forge's directory (section 3), which the fake makes
   private when absent and refuses, naming it, when it is not private, as
-  `temper forge prepare` does. The key and the admin token are each 20
+  `temper forge prepare` does. Each key, `key`'s and `added_keys`', and the admin token are each 20
   bytes as 40 lowercase hexadecimal digits, from skein-lib's `Rng`
-  seeded by `--seed` and a constant of each credential's, a stream apart
+  seeded by `--seed` and a constant of each credential's (an added key's its index's), a stream apart
   from the domain's draws, so the runner draws none
   (`../draft/qa-loop.md`, section 4). A seeded credential is no secret
   from whoever holds the run's record: it opens only that run's loopback
