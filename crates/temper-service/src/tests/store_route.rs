@@ -503,7 +503,7 @@ fn loaded_tail(transcript: Box<[u8]>) -> Box<[u8]> {
     let mut routes = fixtures::routes();
     let request = route::down(
         &mut routes,
-        load(engine::Range::Core(engine::CoreRange::TaskTranscript { task: 7, from: (1, 1) }), None, 4, 4096),
+        load(engine::Range::Core(engine::CoreRange::TaskTranscript { task: 7, from: (1, 1) }), None, 4, 8192),
     )
     .unwrap();
     let store::Request::Transcript { owner, .. } = request else { panic!("window load") };
@@ -564,12 +564,12 @@ fn a_broken_loaded_turn_reaches_the_fresh_tail_as_an_unreadable_line() {
 }
 
 #[test]
-fn a_loaded_turn_larger_than_the_tail_budget_is_refused_as_text() {
-    let words = [b'a'; 2048];
-    let turn = assistant_turn(&words);
-    assert!(
-        turn.len() > usize::try_from(engine::TRANSCRIPT_TAIL_BYTES).unwrap(),
-        "the encoded turn exceeds the tail budget"
-    );
-    assert_eq!(loaded_tail(turn).as_ref(), b"[a turn not readable as text]\n");
+fn a_loaded_turn_larger_than_the_tail_budget_keeps_its_texts_end() {
+    let mut words = [b'a'; 4096];
+    words[4000..].fill(b'z');
+    let tail = loaded_tail(assistant_turn(&words));
+    assert_eq!(tail.len(), usize::try_from(engine::TRANSCRIPT_TAIL_BYTES).unwrap(), "one whole tail");
+    assert!(tail.starts_with(b"[earlier text cut]\n"), "the cut is marked");
+    assert!(tail.ends_with(b"\n"), "the rendering's own line end");
+    assert!(tail[..tail.len() - 1].ends_with(&words[4000..]), "the newest words are kept");
 }
