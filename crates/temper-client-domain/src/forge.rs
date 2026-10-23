@@ -1,4 +1,5 @@
 //! The forge's adoption form, demo read, panel watch and receiving state.
+use alloc::boxed::Box;
 use skein_lib::{Env, Queue, Time};
 pub mod change;
 pub mod connect;
@@ -34,14 +35,15 @@ pub enum Event {
 pub enum Request {
     Show { address: Address },
     Client { asked: jig_client::Event },
-    Send { request: skein_lib::Token, ask: jig_client::Ask },
+    Send { request: skein_lib::Token, name: Option<skein_lib::RequestKey>, ask: jig_client::Ask },
 }
 #[derive(Debug)]
 pub struct Side {
     demo: demo::State,
     forges: forges::State,
     forges_open: bool,
-    set_up: Option<forges::SetUp>,
+    set_up: Option<Box<forges::SetUp>>,
+    setup_form: forges::Draft,
     panel: Option<panel::Panel>,
     address: Option<Address>,
     served: Served,
@@ -60,6 +62,7 @@ impl Side {
             forges: forges::State::Unknown,
             forges_open: false,
             set_up: None,
+            setup_form: forges::Draft::new(),
             panel: None,
             address: None,
             served: Served::Unknown,
@@ -100,8 +103,12 @@ impl Side {
         &self.forges
     }
     #[must_use]
-    pub const fn set_up(&self) -> Option<&forges::SetUp> {
-        self.set_up.as_ref()
+    pub fn set_up(&self) -> Option<&forges::SetUp> {
+        self.set_up.as_deref()
+    }
+    #[must_use]
+    pub const fn setup_form(&self) -> &forges::Draft {
+        &self.setup_form
     }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("forge shown count fits");
@@ -129,6 +136,11 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         Event::Served { served: value } => served(side, value),
         Event::Act { act } => act_on(side, env.limits, act, out),
         Event::Progress { request, progress } => {
+            if progress == skein_lib::RequestProgress::Unknown
+                && forges::adopted(side, env.limits, request, &Answer::Unknown, out)
+            {
+                return;
+            }
             if let Some(draft) = &mut side.form
                 && let Some((pending, _)) = draft.pending
                 && pending == request
@@ -152,6 +164,9 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             }
         }
         Event::Answered { request, answer } => {
+            if forges::adopted(side, env.limits, request, &answer, out) {
+                return;
+            }
             if let Some(draft) = &mut side.form
                 && let Some((pending, _)) = draft.pending
                 && pending == request
@@ -167,11 +182,21 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             }
         }
     }
+    forges::maybe_adopt(side, env.limits, out);
 }
 fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::Go { address } => out.push(Request::Show { address }),
         Act::SetUp { forge } => forges::set_up(side, limits, forge, out),
+        Act::SetupWrite { field, text } => forges::write(side, limits, field, text),
+        Act::SetupNew { new } => {
+            side.setup_form.new = new;
+            side.setup_form.checked = false;
+            if let Some(last) = &mut side.set_up {
+                last.answer = None;
+            }
+            side.changed();
+        }
         Act::Adopt => {
             let Some(_party) = side.party else {
                 return;
@@ -193,6 +218,7 @@ fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
                 draft.pending = Some((request, skein_lib::RequestProgress::Parked));
                 out.push(Request::Send {
                     request,
+                    name: None,
                     ask: ask(&adoption, &limits).expect("validated adoption fits wire"),
                 });
             }
@@ -344,4 +370,15 @@ pub fn answer(limits: &crate::Limits, answered: &jig_client::Answered) -> Option
         }
         jig_client::Answered::Jig(jig_client::contract::Answer::Done(_)) => Some(Answer::Unknown),
     }
+}
+
+/// The page and ctl name the same adoption (client/forge.md, 5.4).
+#[must_use]
+pub fn first_repository_key(forge: u16, additional: bool) -> skein_lib::RequestKey {
+    let prefix: &[u8] = if additional { b"first-repository-additional-" } else { b"first-repository-" };
+    let number = skein_lib::Decimal::of(u64::from(forge));
+    let mut text = skein_lib::Writer::new(prefix.len().checked_add(number.as_bytes().len()).expect("key fits"));
+    text.put(prefix).expect("key prefix fits");
+    text.put(number.as_bytes()).expect("key number fits");
+    crate::key::named(crate::key::TOOLS, &crate::key::Name::new(&text.finish()).expect("first repository key fits"))
 }

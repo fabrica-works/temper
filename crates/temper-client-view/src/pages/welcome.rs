@@ -44,14 +44,15 @@ fn steps(b: &mut Builder, root: &Domain, w: &Words, current: Step) {
         Step::Model { .. } => 2,
         Step::Ready => {
             let connected = match crate::forge::connect::personal(root) {
-                Some(row) => match row.connection {
-                    Connection::Connected { .. } => true,
-                    Connection::NotConnected
-                    | Connection::NotSetUp
-                    | Connection::SettingUp { .. }
-                    | Connection::SetUpFailed { .. }
-                    | Connection::Connecting
-                    | Connection::Stopped { .. } => false,
+                Some(row) => match temper_client_domain::forge::connect::step(
+                    Some(temper_client_domain::Choice::Forge(row.number)),
+                    root.forges(),
+                    root.forge().demo(),
+                ) {
+                    temper_client_domain::forge::connect::Shown::Ready(_) => true,
+                    temper_client_domain::forge::connect::Shown::Choose
+                    | temper_client_domain::forge::connect::Shown::Details(_)
+                    | temper_client_domain::forge::connect::Shown::SettingUp(_) => false,
                 },
                 None => false,
             };
@@ -118,6 +119,7 @@ pub(crate) fn main(
             paragraph(b, w, Word::WelcomeForgeLead, look::WELCOME_LEAD);
             if let Some(row) = crate::forge::connect::personal(root) {
                 crate::forge::connect::status(b, root, w, row, false);
+                crate::forge::connect::first_line(b, root, w, row);
                 crate::forge::connect::link(
                     b,
                     w,
@@ -141,6 +143,7 @@ pub(crate) fn main(
             if let Some(row) = temper_client_domain::forge::connect::underway_forge(root.forges(), root.forge().demo())
             {
                 crate::forge::connect::status(b, root, w, row, false);
+                crate::forge::connect::first_line(b, root, w, row);
                 crate::forge::connect::each_step(b, w, row);
             }
             text(b, w, Role::Heading { level: 1 }, Word::WelcomeModelTitle);
@@ -149,7 +152,7 @@ pub(crate) fn main(
         }
         Step::Ready => {
             text(b, w, Role::Heading { level: 1 }, Word::WelcomeReadyTitle);
-            ready(b, root, w, bindings);
+            ready(b, root, w, bindings, forge);
         }
     }
     if step != Step::Welcome {
@@ -170,14 +173,31 @@ pub(crate) fn main(
     b.close();
 }
 
-fn ready(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings) {
+fn ready(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut Bindings,
+    forge: &mut crate::forge::bindings::Bindings,
+) {
     use crate::forge::connect;
     use skein_ui::phrases::Hole;
     b.open(Role::List);
     b.open(Role::Item);
     let row = connect::personal(root);
     if let Some(row) = row {
-        if let Connection::Connected { login, .. } = &row.connection {
+        let ready = temper_client_domain::forge::connect::step(
+            Some(temper_client_domain::Choice::Forge(row.number)),
+            root.forges(),
+            root.forge().demo(),
+        );
+        if row.first.is_some() && ready == temper_client_domain::forge::connect::Shown::Ready(row.number) {
+            connect::ready_card(b, root, w, bindings, row);
+        } else if row.first.is_some() && ready == temper_client_domain::forge::connect::Shown::SettingUp(row.number) {
+            connect::setting_up(b, root, w, forge, row);
+        } else if row.first.is_none()
+            && let Connection::Connected { login, .. } = &row.connection
+        {
             crate::cards::text(
                 b,
                 Role::Paragraph,
@@ -207,6 +227,7 @@ fn ready(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings) {
     b.close();
     b.close();
     if let Some(row) = row
+        && row.first.is_none()
         && let Connection::Connected { .. } = row.connection
     {
         connect::adopt(b, root, w, bindings);

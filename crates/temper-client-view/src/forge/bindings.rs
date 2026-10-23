@@ -11,6 +11,8 @@ pub enum Meaning {
     Ci,
     Adopt,
     SetUp(u16),
+    SetupField(forge::forges::SetupField),
+    SetupNew(bool),
 }
 #[derive(Debug)]
 struct Entry {
@@ -47,6 +49,9 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
             continue;
         }
         return match (entry.meaning, act) {
+            (Meaning::SetupField(field), Act::Input { value }) => {
+                Some(Action::Forge(forge::Act::SetupWrite { field, text: value }))
+            }
             (Meaning::Field(field), Act::Input { value }) => {
                 let typed = match field {
                     forge::Text::Forge => forge::Typed::Forge(forge_number(&value)),
@@ -63,7 +68,8 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Ci => Action::Forge(forge::Act::Ci),
                 Meaning::SetUp(forge) => Action::Forge(forge::Act::SetUp { forge }),
                 Meaning::Adopt => Action::Forge(forge::Act::Adopt),
-                Meaning::Field(_) => return None,
+                Meaning::SetupNew(new) => Action::Forge(forge::Act::SetupNew { new }),
+                Meaning::Field(_) | Meaning::SetupField(_) => return None,
             }),
             (_, Act::Input { .. } | Act::Submit | Act::Drawing { .. }) => None,
         };

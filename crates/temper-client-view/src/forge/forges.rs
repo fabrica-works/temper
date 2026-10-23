@@ -57,6 +57,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     b.close();
 }
 fn connection(row: &Row) -> Box<[u8]> {
+    if forge::connect::failed(row) {
+        return forge::words::forge_connection(row);
+    }
     match &row.connection {
         Connection::Connected { login, .. } => forge::words::forge_connected_as(login),
         Connection::NotConnected
@@ -75,32 +78,76 @@ fn personal(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, 
         Kind::Forgejo => Word::ForgeOther,
         Kind::GitHub => Word::ForgeGitHub,
     };
-    b.description(&forge::words::forge_summary(
+    let summary = forge::words::forge_summary(
         &w.say(Word::ForgeSummary, &[Hole::Number(u64::from(row.number)), Hole::Name(w.say(kind, &[]))]),
         &connection(row),
-    ));
+    );
+    let line = repository_line(root, w, row);
+    if let Some(line) = line {
+        let bytes = summary.len().checked_add(1).expect("summary fits").checked_add(line.len()).expect("summary fits");
+        let mut text = skein_lib::Writer::new(bytes);
+        text.put(&summary).expect("summary counted");
+        text.put(b"\n").expect("separator counted");
+        text.put(&line).expect("repository line counted");
+        b.description(&text.finish());
+    } else {
+        b.description(&summary);
+    }
+    if let Some(first) = &row.first {
+        crate::cards::text(b, Role::Paragraph, &forge::words::first_repository(first));
+    }
     account(b, w, row);
-    match row.connection {
-        Connection::SetUpFailed { .. } if row.offer == Offer::Offered => {
-            connect::setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
+    if forge::connect::failed(row) && row.offer == Offer::Offered {
+        connect::setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
+    } else {
+        match row.connection {
+            Connection::SetUpFailed { .. } if row.offer == Offer::Offered => {
+                connect::setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
+            }
+            Connection::SettingUp { .. } | Connection::Connecting => connect::link(
+                b,
+                w,
+                bindings,
+                Word::ForgeOpenSetup,
+                Address::ConnectForge { forge: Some(Choice::Forge(row.number)) },
+            ),
+            Connection::Stopped { .. } if row.mode == Mode::Owned => {
+                connect::text(b, w, Role::Paragraph, Word::ForgeRestartBox);
+            }
+            Connection::Connected { .. } => connect::adopt(b, root, w, bindings),
+            Connection::NotConnected
+            | Connection::NotSetUp
+            | Connection::SetUpFailed { .. }
+            | Connection::Stopped { .. } => {}
         }
-        Connection::SettingUp { .. } | Connection::Connecting => connect::link(
-            b,
-            w,
-            bindings,
-            Word::ForgeOpenSetup,
-            Address::ConnectForge { forge: Some(Choice::Forge(row.number)) },
-        ),
-        Connection::Stopped { .. } if row.mode == Mode::Owned => {
-            connect::text(b, w, Role::Paragraph, Word::ForgeRestartBox);
-        }
-        Connection::Connected { .. } => connect::adopt(b, root, w, bindings),
-        Connection::NotConnected
-        | Connection::NotSetUp
-        | Connection::SetUpFailed { .. }
-        | Connection::Stopped { .. } => {}
     }
     b.close();
+}
+fn repository_line(root: &Domain, w: &Words, row: &Row) -> Option<Box<[u8]>> {
+    if forge::connect::failed(row) {
+        return None;
+    }
+    let first = row.first.as_ref()?;
+    let word = match first.state {
+        forge::forges::FirstState::Failed { .. } => return None,
+        forge::forges::FirstState::Making => Word::SetupInto,
+        forge::forges::FirstState::Made { .. } => match row.connection {
+            Connection::Connected { .. } => Word::SetupMade,
+            Connection::NotConnected
+            | Connection::NotSetUp
+            | Connection::SettingUp { .. }
+            | Connection::SetUpFailed { .. }
+            | Connection::Connecting
+            | Connection::Stopped { .. } => Word::SetupInto,
+        },
+    };
+    Some(w.say(
+        word,
+        &[
+            Hole::Name(forge::words::full_name(&first.org, &first.repository)),
+            Hole::Name(connect::project_name(root, w, &first.project)),
+        ],
+    ))
 }
 fn account(b: &mut Builder, w: &Words, row: &Row) {
     if let Connection::Connected { id, login } = &row.connection {

@@ -60,6 +60,7 @@ const HOLDS: [Holds; samples::N] = [
         parts: &[
             Part::Named { role: Role::Heading { level: 2 }, name: "Setting up Forgejo on this machine" },
             Part::Named { role: Role::Status, name: "under way" },
+            Part::Named { role: Role::Paragraph, name: "work/hello, into Default" },
         ],
     },
     Holds {
@@ -70,7 +71,7 @@ const HOLDS: [Holds; samples::N] = [
             Part::Described {
                 role: Role::Disclosure,
                 name: "Forgejo on this machine",
-                description: "forge 3 · Forgejo · Connected as temper",
+                description: "forge 3 · Forgejo · Connected as temper\nwork/hello · project Default",
             },
             Part::Absent { role: Role::Heading { level: 2 }, name: "The playground" },
         ],

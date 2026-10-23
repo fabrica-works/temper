@@ -470,6 +470,7 @@ fn made_sends_the_home_adoption_with_its_stable_key_and_prints_its_answer() {
         assert_eq!(adopted.prefix.as_ref(), b"temper/");
         assert!(adopted.checks.is_empty());
         assert_eq!(root.sent_name(call), Some(crate::key::engine(&f::name(b"first-repository-3"))));
+        assert_eq!(root.sent_name(call), Some(forge::first_repository_key(3, false)));
         assert_eq!(root.closed.len(), 1);
         root.adoption_answer(
             call,
@@ -479,6 +480,7 @@ fn made_sends_the_home_adoption_with_its_stable_key_and_prints_its_answer() {
             assert!(root.answer(call).is_none());
             assert!(!root.sent_adoption(call).home);
             assert_eq!(root.sent_name(call), Some(crate::key::engine(&f::name(b"first-repository-additional-3"))));
+            assert_eq!(root.sent_name(call), Some(forge::first_repository_key(3, true)));
             root.adoption_answer(call, f::adopted_with_unknown_protection());
         }
         assert_eq!(root.answer(call).unwrap().status, 0);

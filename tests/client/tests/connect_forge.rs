@@ -132,10 +132,28 @@ fn setting_up_forgejo_here_from_the_welcome() {
         &mut now,
         d::Event::Went { place: d::Place::Address(Address::ConnectForge { forge: Some(Choice::Forge(OWNED)) }) },
     );
-    let ready = view(&root);
-    node(&ready, Role::Heading { level: 2 }, b"Forgejo on this machine is connected");
-    node(&ready, Role::Paragraph, b"Connected as temper.");
-    node(&ready, Role::Link, b"Adopt a repository");
+    let making = view(&root);
+    node(&making, Role::Heading { level: 2 }, b"Setting up Forgejo on this machine");
+    node(&making, Role::Paragraph, b"work/hello, into Project 1");
+    let before = front.applications_admitted();
+    front.engine.send(temper_engine_domain::Event::Forge(Box::new(forge::Event::FirstMade { forge: OWNED, id: 42 })));
+    front.engine.settle();
+    // Creation is observed and adopted while the person is on another page.
+    pump(&mut front, &mut root, &mut now, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    assert_eq!(front.applications_admitted(), before + 1, "one adoption admitted");
+    assert!(front.engine_adopted(OWNED, 42));
+    for _ in 0_u32..2 {
+        pump(
+            &mut front,
+            &mut root,
+            &mut now,
+            d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Ready }) },
+        );
+        let ready = view(&root);
+        node(&ready, Role::Heading { level: 2 }, b"work/hello is ready");
+        node(&ready, Role::Link, b"Open Project 1");
+        assert_eq!(front.applications_admitted(), before + 1, "revisiting Ready does not adopt again");
+    }
 }
 
 #[test]
