@@ -82,6 +82,10 @@ pub enum Read {
     DirectionBFirst,
     StoryOwnerEnded,
     DirectionEnded,
+    StoryOwnerEarlier,
+    StoryOwnerFirst,
+    DirectionNoteWritten,
+    DirectionFirst,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -609,26 +613,34 @@ pub fn step_5_6() -> Vec<calls::Step> {
 }
 
 // Act 2, step 5.4 (domain/testing.md, 5.3)
+const DIRECTION_B_ENDED: usize = 30;
+const STORY_OWNER_ENDED: usize = 35;
+const DIRECTION_ENDED: usize = 37;
+const STORY_OWNER_EARLIER: usize = 38;
 pub const READS_5_4: &[(Read, usize)] = &[
     (Read::X3Open, 7),
     (Read::X3Produced, 8),
     (Read::PlannedRunning, 12),
     (Read::DirectionBHeld, 15),
-    (Read::X3Ended, 18),
-    (Read::StoryLanded, 22),
-    (Read::DirectionBPending, 23),
-    (Read::PlannedEnded, 26),
-    (Read::DirectionBEnded, 27),
-    (Read::DirectionBFirst, 28),
-    (Read::StoryOwnerEnded, 30),
-    (Read::DirectionEnded, 31),
+    (Read::DirectionNoteWritten, 18),
+    (Read::X3Ended, 20),
+    (Read::StoryLanded, 23),
+    (Read::DirectionBPending, 24),
+    (Read::PlannedEnded, 28),
+    (Read::DirectionBEnded, DIRECTION_B_ENDED),
+    (Read::DirectionBFirst, 31),
+    (Read::StoryOwnerEnded, STORY_OWNER_ENDED),
+    (Read::DirectionEnded, DIRECTION_ENDED),
+    (Read::StoryOwnerEarlier, STORY_OWNER_EARLIER),
+    (Read::DirectionFirst, 39),
+    (Read::StoryOwnerFirst, 40),
 ];
 #[must_use]
 pub fn step_5_4() -> Vec<calls::Step> {
     use super::{
         Agent, B_DELEGATE_HOLD, DIRECTION, DIRECTION_MESSAGE, DIRECTION_PERSON, OVERLAP_HOLD_REVISION, OVERLAP_OWNER,
-        PLANNED, PLANNED_CANCEL_REASON, PLANNED_CODER, PLANNED_CODING_HOLD, STORY_CHANGE, STORY_OWNER,
-        STORY_RECALL_HOLD, STORY_REVIEWER, X3, X3_CANCEL_REASON, X3_CODER, X3_REVIEW_HOLD, X3_REVIEWER,
+        PLANNED, PLANNED_CODER, PLANNED_CODING_HOLD, STORY_CHANGE, STORY_OWNER, STORY_RECALL_HOLD, X3, X3_CODER,
+        X3_REVIEW_HOLD, X3_REVIEWER,
     };
     vec![
         sign_in(D1),
@@ -652,19 +664,17 @@ pub fn step_5_4() -> Vec<calls::Step> {
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", "direction", DIRECTION_PERSON]),
         call(D1, argv!["wait", "task", number(DIRECTION), "--until", "replied"]),
         call(D1, argv!["wait", "task", number(STORY_OWNER), "--until", "replied"]),
-        // Fake Pieces keep the named runs writing until ReleaseHold.
-        // Step::Held instead gates engine requests (the task's addendum 2).
+        // The delegate cue selects x3's review before its writing observation.
+        // Fake Pieces keep it writing until ReleaseHold (i2's addendum 2).
         calls::until(D1, argv!["task", number(X3), "--json"], Agent::Review.cue(), b"\"task\""),
         calls::until(D1, argv!["task", number(X3_REVIEWER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
         call(D1, argv!["task", number(X3), "--activity", "32", "--json"]),
-        call(D1, argv!["task", number(X3_CODER), "--json"]),
+        call(D1, argv!["task", number(X3_CODER), "--activity", "32", "--json"]),
         calls::release_hold(B_DELEGATE_HOLD),
         calls::until(D1, argv!["task", number(OVERLAP_OWNER), "--json"], Agent::PlannedWriter.cue(), b"\"task\""),
         calls::until(D1, argv!["task", number(PLANNED), "--json"], b"\"live_delegates\":1", b"\"task\""),
         calls::until(D1, argv!["task", number(PLANNED_CODER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
         call(D1, argv!["task", number(PLANNED), "--activity", "32", "--json"]),
-        // B parks after its wait, as in 5.2; its 1 ms waiting observation
-        // need not still be live when the held coder has been read.
         call(D1, argv!["wait", "task", number(OVERLAP_OWNER), "--until", "phase:idle"]),
         call(D1, argv!["stop", number(OVERLAP_OWNER), "--key", "stop-b"]),
         calls::until(
@@ -674,54 +684,60 @@ pub fn step_5_4() -> Vec<calls::Step> {
             b"\"task\"",
         ),
         call(D1, argv!["message", number(DIRECTION), "--key", "new-direction", DIRECTION_MESSAGE]),
-        calls::until(D1, argv!["task", number(X3), "--json"], X3_CANCEL_REASON.as_bytes(), b"\"task\""),
-        calls::release_hold(X3_REVIEW_HOLD),
-        calls::until(D1, argv!["task", number(X3), "--activity", "32", "--json"], b"\"phase\":\"ended\"", b"\"task\""),
-        // The cancellation's result reaches A asynchronously. Read its new
-        // delegate card before polling the fresh change's task number.
-        calls::until(D1, argv!["task", number(STORY_OWNER), "--json"], Agent::StoryWriter.cue(), b"\"task\""),
-        calls::until(D1, argv!["task", number(STORY_CHANGE), "--json"], Agent::Review.cue(), b"\"task\""),
-        calls::until(D1, argv!["task", number(STORY_REVIEWER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
-        calls::release_hold(X3_REVIEW_HOLD),
+        call(D1, argv!["wait", "task", number(X3), "--until", "phase:closing"]),
+        // Commit the note before releasing the review: otherwise the cancel's
+        // result can take the note's fresh number between A's two tool calls.
         calls::until(
             D1,
-            argv!["task", number(STORY_CHANGE), "--activity", "32", "--json"],
-            b"\"phase\":\"ended\"",
+            argv!["task", number(STORY_OWNER), "--activity", "32", "--json"],
+            b"\"tool\":\"note\"",
             b"\"task\"",
         ),
+        calls::release_hold(X3_REVIEW_HOLD),
+        call(D1, argv!["wait", "task", number(X3), "--until", "ended"]),
+        call(D1, argv!["task", number(X3), "--activity", "32", "--json"]),
+        calls::until(D1, argv!["task", number(STORY_OWNER), "--json"], Agent::StoryWriter.cue(), b"\"task\""),
+        // a1's review has no hold. Watch endings once, then read their journals,
+        // avoiding repeated reads of the same large activity documents.
+        call(D1, argv!["wait", "task", number(STORY_CHANGE), "--until", "ended"]),
+        call(D1, argv!["task", number(STORY_CHANGE), "--activity", "32", "--json"]),
         call(D1, argv!["task", number(OVERLAP_OWNER), "--activity", "32", "--json"]),
         call(
             D1,
             argv!["release", number(OVERLAP_OWNER), "--hold", number(OVERLAP_HOLD_REVISION), "--key", "release-b"],
         ),
-        calls::until(D1, argv!["task", number(PLANNED), "--json"], PLANNED_CANCEL_REASON.as_bytes(), b"\"task\""),
+        call(D1, argv!["wait", "task", number(PLANNED), "--until", "phase:closing"]),
         calls::release_hold(PLANNED_CODING_HOLD),
-        calls::until(
+        call(D1, argv!["wait", "task", number(PLANNED), "--until", "ended"]),
+        call(D1, argv!["task", number(PLANNED), "--activity", "32", "--json"]),
+        call(D1, argv!["wait", "task", number(OVERLAP_OWNER), "--until", "ended"]),
+        call(D1, argv!["task", number(OVERLAP_OWNER), "--activity", "32", "--json"]),
+        call(
             D1,
-            argv!["task", number(PLANNED), "--activity", "32", "--json"],
-            b"\"phase\":\"ended\"",
-            b"\"task\"",
+            argv!["activity", number(OVERLAP_OWNER), "--before", calls::activity_before(DIRECTION_B_ENDED), "--json"],
         ),
-        calls::until(
-            D1,
-            argv!["task", number(OVERLAP_OWNER), "--activity", "32", "--json"],
-            b"\"phase\":\"ended\"",
-            b"\"task\"",
-        ),
-        call(D1, argv!["activity", number(OVERLAP_OWNER), "--before", calls::activity_before(27), "--json"]),
-        calls::until(D1, argv!["task", number(STORY_OWNER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
-        calls::release_hold(STORY_RECALL_HOLD),
+        // Select the run woken by a1's change result, then await its held
+        // writing turn (i2's addendum 2). x3's result was a cancellation.
         calls::until(
             D1,
             argv!["task", number(STORY_OWNER), "--activity", "32", "--json"],
-            b"\"phase\":\"ended\"",
+            b"\"kind\":{\"result\":{\"change\":",
             b"\"task\"",
         ),
-        calls::until(
+        calls::until(D1, argv!["task", number(STORY_OWNER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        calls::release_hold(STORY_RECALL_HOLD),
+        call(D1, argv!["wait", "task", number(STORY_OWNER), "--until", "ended"]),
+        call(D1, argv!["task", number(STORY_OWNER), "--activity", "32", "--json"]),
+        call(D1, argv!["wait", "task", number(DIRECTION), "--until", "ended"]),
+        call(D1, argv!["task", number(DIRECTION), "--activity", "32", "--json"]),
+        call(
             D1,
-            argv!["task", number(DIRECTION), "--activity", "32", "--json"],
-            b"\"phase\":\"ended\"",
-            b"\"task\"",
+            argv!["activity", number(STORY_OWNER), "--before", calls::activity_before(STORY_OWNER_ENDED), "--json"],
+        ),
+        call(D1, argv!["activity", number(DIRECTION), "--before", calls::activity_before(DIRECTION_ENDED), "--json"]),
+        call(
+            D1,
+            argv!["activity", number(STORY_OWNER), "--before", calls::activity_before(STORY_OWNER_EARLIER), "--json"],
         ),
     ]
 }

@@ -111,6 +111,12 @@ pub enum Agent {
     Subowner,
     Misread,
     MisreadHelper,
+    Direction,
+    StoryOwner,
+    OverlapOwner,
+    X3Writer,
+    PlannedWriter,
+    StoryWriter,
 }
 impl Agent {
     #[must_use]
@@ -118,12 +124,6 @@ impl Agent {
         match self {
             Self::Misread => b"@case_misread_director",
             Self::MisreadHelper => b"@case_misread_helper",
-    Direction,
-    StoryOwner,
-    OverlapOwner,
-    X3Writer,
-    PlannedWriter,
-    StoryWriter,
             Self::Direction => b"@case_direction",
             Self::StoryOwner => b"@case_story_owner",
             Self::OverlapOwner => b"@case_overlap_owner",
@@ -617,7 +617,12 @@ pub const STORY_CODER: u64 = 10;
 pub const STORY_REVIEWER: u64 = 11;
 pub const DIRECTION_REVISION: u64 = 1;
 pub const OVERLAP_HOLD_REVISION: u64 = 1;
-pub const DEFERRED_NOTE_NUMBER: u64 = 1;
+pub const DEFERRED_NOTE_NUMBER: u64 = 7;
+pub const DIRECTION_PERSON_MESSAGE: u64 = 5;
+pub const DIRECTION_AMENDMENT_MESSAGE: u64 = 6;
+pub const OVERLAP_LANDING_MESSAGE: u64 = 13;
+pub const OVERLAP_SUBSCRIPTION: u64 = 3;
+pub const OVERLAP_RECHECK_ATTEMPT: u64 = 3;
 pub const DIRECTION_PERSON: &str = "@case_direction Delegate A and B as owners on kit and wait for my direction.";
 pub const DIRECTION_MESSAGE: &str = "The end-to-end story first; cut it to one path; placeholders are fine. Stop x3. B's files are A's where the story needs them.";
 pub const DIRECTION_BRIEF: &str = "The end-to-end story first, one path with placeholders. Stop x3 and defer its plan in a project note. B's files are A's where the story needs them.";
@@ -644,6 +649,7 @@ pub const DEFERRED_WORDS: &str =
 pub const STORY_OWNER_REPORT: &str = "The story landed; x3's deferred plan was recalled.";
 pub const OVERLAP_OWNER_REPORT: &str = "B heard A's overlapping landing after release and cancelled h1.";
 pub const DIRECTION_REPORT: &str = "A's story landed and B reported after release.";
+pub const DIRECTION_HELD_WORDS: &str = "Waiting at the story's event.";
 pub const B_DELEGATE_HOLD: &[u8] = b"case-5-4-b-delegate";
 pub const X3_REVIEW_HOLD: &[u8] = b"case-5-4-x3-review";
 pub const PLANNED_CODING_HOLD: &[u8] = b"case-5-4-h1-code";
@@ -662,6 +668,8 @@ pub fn fixture_5_4() -> forge::Fixture {
         },
         configure: |value, agent, forge| {
             (fixture().configure)(value, agent, forge);
+            // Read all three spec parameters, including the planned path (name 6).
+            value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
             // The director's two-owner batch was refused: "batch limit".
             value["engine"]["limits"]["overrides"]["tasks.batch"] = 2.into();
             // Then "task 2 goal limit": both owners must be tracked.
