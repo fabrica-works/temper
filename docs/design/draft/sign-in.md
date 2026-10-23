@@ -249,7 +249,15 @@ On temper's clients' listener, its issuer the public origin:
   an access token lives five minutes. A restart drops them: a sign-in
   to Forgejo under way fails, and the person signs in again.
 - **The signing key** is drawn at the first start and kept in jig's
-  secrets' store. Its algorithm is open (section 9).
+  secrets' store. Its algorithm is RS256 (section 9).
+- **What Forgejo 17's client does,** and the endpoints meet (its goth
+  v1.82.0): it always sends a PKCE challenge, S256, and its verifier at
+  the exchange; it authenticates at the token endpoint by Basic first,
+  and by its secret in the body when that fails, so the token endpoint
+  takes both; it calls the userinfo endpoint only when the discovery
+  document advertises one, by `GET` with the access token as Bearer,
+  and requires its `sub` to be the ID token's. The ID token is required
+  in the token's answer either way.
 
 ### 5.3 The authorization
 
@@ -290,7 +298,11 @@ owners.
   Forgejo the same `sub` for the same member, never a party's number,
   which a fresh store would give to someone else.
 - **`preferred_username`:** the member's login. **`email`,**
-  verified: the member's address. **`name`:** as Google gave it.
+  verified: the member's address. **`name`:** as Google gave it. No
+  `nickname`: Forgejo's client takes a user's nickname from `nickname`,
+  then `preferred_username`, so without one `USERNAME = nickname` and
+  `USERNAME = preferred_username` (below) both name the account by the
+  login.
 - **Forgejo's settings** (its configuration cheat sheet):
   - `[oauth2_client] ENABLE_AUTO_REGISTRATION = true` and `USERNAME =
     preferred_username`: a member's first sign-in makes their account,
@@ -401,14 +413,27 @@ owners.
   perhaps a name and a line in the configuration, or a template of the
   owner's, as Forgejo takes its `APP_NAME` and `APP_SLOGAN` and
   templates under its custom directory.
-- **The signing algorithm.** `ring`, which skein's TLS links, signs
-  RS256 with a key it is given but cannot make one. Default: RS256 with
-  a key made at the first start by the setup (`openssl genrsa`), kept
-  in jig's secrets' store; ES256, which `ring` can make, if Forgejo 17's
-  client accepts it (to check). Rotation waits.
-- **Single sign-out.** Default: none, said on the signed-out page. A
-  logout Forgejo would take from its provider waits for Forgejo to take
-  one (to check).
+- **The signing algorithm: RS256.** Forgejo 17's OpenID Connect client
+  (goth v1.82.0) reads the ID token's payload and checks its `aud`,
+  `iss` and `exp`, with no fetch of the key set: it verifies no
+  signature, so it accepts ES256, and any algorithm, alike. That is
+  acceptable here, since Forgejo takes the token directly from temper's
+  token endpoint, over TLS, authenticated by its secret by Basic
+  (OpenID Connect Core, 3.1.3.7). So ES256 buys Forgejo nothing, and
+  RS256 stays, for its own reasons: `skein_tls::sign_rs256` signs it;
+  its signatures (PKCS#1 v1.5) are deterministic, so the worlds replay
+  byte for byte, where `ring`'s ECDSA draws from a system randomness of
+  its own and signs differently on every run; and skein-oauth's client,
+  the issuer's peer in its world, verifies RS256 alone. `ring` signs
+  RS256 with a key it is given but cannot make one: the key, 2048 bits,
+  is made at the first start by the setup (`openssl genrsa`) and kept
+  in jig's secrets' store. Rotation waits.
+- **Single sign-out: none,** said on the signed-out page. Forgejo 17
+  takes no signal from its provider: no back-channel, front-channel or
+  session-management logout, and no RP-initiated one (it parses the
+  discovery document's `end_session_endpoint` and never uses it); its
+  own sign-out is local. A logout Forgejo would take from its provider
+  waits for Forgejo to take one.
 - **Members at runtime.** jig seeds roles on a first start only. A
   member added later signs in with no project; an owner's invitation,
   and roles granted from the client, wait for a design of their own.
