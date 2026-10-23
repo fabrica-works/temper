@@ -118,6 +118,18 @@ impl Agent {
         match self {
             Self::Misread => b"@case_misread_director",
             Self::MisreadHelper => b"@case_misread_helper",
+    Direction,
+    StoryOwner,
+    OverlapOwner,
+    X3Writer,
+    PlannedWriter,
+    StoryWriter,
+            Self::Direction => b"@case_direction",
+            Self::StoryOwner => b"@case_story_owner",
+            Self::OverlapOwner => b"@case_overlap_owner",
+            Self::X3Writer => b"@case_x3_writer",
+            Self::PlannedWriter => b"@case_planned_writer",
+            Self::StoryWriter => b"@case_story_writer",
             Self::Plan => b"@case_plan_director",
             Self::Planner => b"@case_planner",
             Self::Subowner => b"@case_subowner",
@@ -586,5 +598,96 @@ pub fn fixture_5_6() -> forge::Fixture {
             landing::admit(value);
         },
         ..fixture()
+    }
+}
+
+// Act 2, step 5.4 (domain/testing.md, 5.3)
+pub const DIRECTION: u64 = 1;
+pub const STORY_OWNER: u64 = 2;
+pub const OVERLAP_OWNER: u64 = 3;
+pub const X3: u64 = 4;
+pub const X3_PULL_NUMBER: u64 = 1;
+pub const STORY_PULL_NUMBER: u64 = 2;
+pub const X3_CODER: u64 = 5;
+pub const X3_REVIEWER: u64 = 6;
+pub const PLANNED: u64 = 7;
+pub const PLANNED_CODER: u64 = 8;
+pub const STORY_CHANGE: u64 = 9;
+pub const STORY_CODER: u64 = 10;
+pub const STORY_REVIEWER: u64 = 11;
+pub const DIRECTION_REVISION: u64 = 1;
+pub const OVERLAP_HOLD_REVISION: u64 = 1;
+pub const DEFERRED_NOTE_NUMBER: u64 = 1;
+pub const DIRECTION_PERSON: &str = "@case_direction Delegate A and B as owners on kit and wait for my direction.";
+pub const DIRECTION_MESSAGE: &str = "The end-to-end story first; cut it to one path; placeholders are fine. Stop x3. B's files are A's where the story needs them.";
+pub const DIRECTION_BRIEF: &str = "The end-to-end story first, one path with placeholders. Stop x3 and defer its plan in a project note. B's files are A's where the story needs them.";
+pub const DIRECTION_REASON: &str =
+    "The person wants the end-to-end story first; stop x3 and use B's files where needed.";
+pub const STORY_OWNER_SPEC: &str =
+    "@case_story_owner Own A's work: delegate x3, then await the director's new instructions.";
+pub const OVERLAP_OWNER_SPEC: &str =
+    "@case_overlap_owner Own B's work: delegate planned h1 on B's file, then wait for news.";
+pub const X3_SPEC: &str = "@case_x3_writer Write docs/design/x3.md, Markdown alone.";
+pub const PLANNED_SPEC: &str = "@case_planned_writer Plan a change to B's file; wait before coding it.";
+pub const STORY_SPEC: &str = "@case_story_writer Write the end-to-end story in docs/design/b.md, Markdown alone.";
+pub const X3_FILE: &str = "docs/design/x3.md";
+pub const X3_WORDS: &str = "# x3\n\nThe old plan, deferred.\n";
+pub const B_FILE: &str = "docs/design/b.md";
+pub const B_WORDS: &str = "# B\n\nA placeholder before the story.\n";
+pub const STORY_WORDS: &str = "# B\n\nThe end-to-end story takes one path through B's file.\n";
+pub const STORY_GREEN: &str = "The end-to-end story takes one path through B's file.";
+pub const X3_CANCEL_REASON: &str = "Defer x3: the person's end-to-end story comes first.";
+pub const PLANNED_CANCEL_REASON: &str = "A's landing overlaps h1; cancel the plan to go again from the new main.";
+pub const DEFERRED_NOTE: &str = "x3's deferred plan";
+pub const DEFERRED_WORDS: &str =
+    "Task 4 (x3) is deferred under its closed pull; return to its old plan after the end-to-end story.";
+pub const STORY_OWNER_REPORT: &str = "The story landed; x3's deferred plan was recalled.";
+pub const OVERLAP_OWNER_REPORT: &str = "B heard A's overlapping landing after release and cancelled h1.";
+pub const DIRECTION_REPORT: &str = "A's story landed and B reported after release.";
+pub const B_DELEGATE_HOLD: &[u8] = b"case-5-4-b-delegate";
+pub const X3_REVIEW_HOLD: &[u8] = b"case-5-4-x3-review";
+pub const PLANNED_CODING_HOLD: &[u8] = b"case-5-4-h1-code";
+pub const STORY_RECALL_HOLD: &[u8] = b"case-5-4-recall";
+
+#[must_use]
+pub fn fixture_5_4() -> forge::Fixture {
+    forge::Fixture {
+        setup: || {
+            let mut setup = (fixture().setup)();
+            let mut tree = setup.tree.into_vec();
+            tree.push(api::File { path: B_FILE.as_bytes().into(), content: B_WORDS.as_bytes().into() });
+            setup.tree = tree.into();
+            setup.checks.cue = Some(api::Cue::File { path: B_FILE.as_bytes().into(), green: b"# B".as_slice().into() });
+            setup
+        },
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            // The director's two-owner batch was refused: "batch limit".
+            value["engine"]["limits"]["overrides"]["tasks.batch"] = 2.into();
+            // Then "task 2 goal limit": both owners must be tracked.
+            value["engine"]["limits"]["overrides"]["tasks.project_goals"] = 2.into();
+            value["engine"]["limits"]["overrides"]["fleet.calls"] = PAUSE_WORKERS.len().into();
+            // "Authority refused: task allowance": the tree has eleven tasks,
+            // two owners plus A's six descendants and B's two, under the chat.
+            value["engine"]["limits"]["overrides"]["tasks.tree_tasks"] = 11.into();
+            value["engine"]["rules"]["ceiling"]["delegation"]["tasks"] = 11.into();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["delegation"]["tasks"] = 11.into();
+                project["policy"]["roles"][0]["authority"]["delegation"]["tasks"] = 11.into();
+            }
+            // The director was told "spend allowance": its run reserves ten,
+            // and A and B reserve thirty and twenty for their subtrees.
+            value["engine"]["templates"][0]["budget"] = json!({"as_allowed":60});
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["roles"][0]["authority"]["budget"]["spend"] = 60.into();
+            }
+            // Adoption and the fake forge's hooks supply listing changes (5.2).
+            let story_ms = crate::PATIENCE.as_nanos().div_euclid(1_000_000);
+            for name in ["poll_ms", "poll_max_ms"] {
+                value["application"]["limits"]["overrides"][format!("forge.client.{name}")] = (story_ms + 1).into();
+            }
+            value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
+            landing::admit(value);
+        },
     }
 }
