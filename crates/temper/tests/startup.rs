@@ -1202,6 +1202,13 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // 256-B reasons in retained connections and handoffs, and its path in Notes.
             - 388
             + 387_647
+            // Live text (jig b29665e8 and temper's repair), measured at that pin,
+            // releases 101,901,872 B at these same bounded strings.
+            - 101_901_872
+            // Exceeded grows the largest stored row by one byte. The two KV
+            // stores and decoded page carriers add 21,379,829 B; three file
+            // drivers add 15 B; six room-256 read queues add 1,536 B.
+            + 21_379_829 + 15 + 1_536
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1227,6 +1234,9 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             - 8_711
             // Jig e5140872's host/link layouts at these unchanged bounds.
             + 260
+            // Live text: 64 told slots * (4096 piece + 256 call id + 64 tool)
+            // plus 16 B of host/root carrier growth. Exceeded adds no worker bytes.
+            + 64 * (4_096 + 256 + 64) + 16
     );
 
     support::owned::check_memory("../../docs/examples/owned.json", required);
@@ -1280,7 +1290,7 @@ fn records_only_owned_memory_admits_checked_input_at_the_exact_bound() {
     assert_eq!(handovers, 1);
     // iii's path, Secret, staged/read/removal/diagnostic overlap is admitted
     // at both bounds; the embedded worker's certified envelope is unchanged.
-    assert_eq!(required.worker_bytes, 3_283_176_433_542);
+    assert_eq!(required.worker_bytes, 3_283_176_716_182);
     eprintln!(
         "records-only handover requirements: engine {}, worker {} bytes",
         required.engine_bytes, required.worker_bytes
