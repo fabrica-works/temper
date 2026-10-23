@@ -181,15 +181,18 @@ fn the_public_live_reply_script_commits_without_losing_its_prefix() {
 }
 
 #[test]
-fn navigation_away_works_while_the_reply_is_held() {
+fn reply_notification_arrives_after_leaving_the_held_chat() {
     // client/README.md, 6.5 and 6.9: commands work while text streams.
-    let ran = run(pieces, || {
-        let mut steps = start_chat();
+    // client/README.md, 3.5: turns are seen through the newest the window holds.
+    // One hold lets the inbox's reply notification acknowledge its release.
+    let ran = run(scripts::live_scripts, || {
+        let mut steps = open_chat(scripts::WORDS.as_bytes());
         steps.extend([
+            terminal::see(WRITING),
+            terminal::see_without(scripts::FIRST, scripts::SECOND),
             terminal::type_on(b"Inbox", b""),
-            terminal::see_without(b"Needs you", PREFIX.as_bytes()),
-            calls::release_hold(FIRST_HOLD),
-            calls::release_hold(LAST_HOLD),
+            terminal::see_without(b"Needs you", scripts::FIRST),
+            calls::release_hold(scripts::LIVE),
             terminal::see(b"replied"),
             terminal::close(),
         ]);
@@ -199,12 +202,42 @@ fn navigation_away_works_while_the_reply_is_held() {
         .terminal()
         .pages
         .iter()
-        .find(|page| calls::occurrences(&page.bytes, PREFIX.as_bytes()) > 0)
+        .find(|page| calls::occurrences(&page.bytes, scripts::FIRST) > 0)
         .expect("prefix before navigation");
     assert!(
         ran.terminal().pages.iter().any(|page| page.commands > first.commands
             && calls::occurrences(&page.bytes, b"Needs you") > 0
-            && calls::occurrences(&page.bytes, PREFIX.as_bytes()) == 0),
+            && calls::occurrences(&page.bytes, scripts::FIRST) == 0),
         "the command must leave the chat while the reply is held"
+    );
+}
+
+#[test]
+fn a_composer_command_is_processed_while_the_reply_is_held() {
+    // client/README.md, 6.5 and 6.9: a command works during streaming.
+    let ran = run(scripts::live_scripts, || {
+        let mut steps = open_chat(scripts::WORDS.as_bytes());
+        steps.extend([
+            terminal::see(WRITING),
+            terminal::see_without(scripts::FIRST, scripts::SECOND),
+            terminal::type_on(b"Reset choice", b""),
+            terminal::see_without(scripts::FIRST, scripts::SECOND),
+            calls::release_hold(scripts::LIVE),
+            terminal::see_without(scripts::SECOND, WRITING),
+            terminal::close(),
+        ]);
+        steps
+    });
+    let first = ran
+        .terminal()
+        .pages
+        .iter()
+        .find(|page| calls::occurrences(&page.bytes, scripts::FIRST) > 0)
+        .expect("the held prefix before the command");
+    assert!(
+        ran.terminal().pages.iter().any(|page| page.commands > first.commands
+            && calls::occurrences(&page.bytes, scripts::FIRST) > 0
+            && calls::occurrences(&page.bytes, scripts::SECOND) == 0),
+        "a fresh page must follow the command before the hold is released"
     );
 }
