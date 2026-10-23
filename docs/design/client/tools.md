@@ -505,12 +505,15 @@ area lands with its stories (section 11).
    | `verify ACCOUNT [--source S]` | has each host check a program source's login now; answered once asked, then `wait accounts --until settled` | check | |
    | `rank ACCOUNT POSITION [--source S]` | the account's place among its holder's accounts of its LLM provider, from 1; with `--source`, the source's place in the account's order | order | |
    | `retry ACCOUNT [--source S]` | resumes a limited source, so that the runs it holds start again | resume | |
+   | `export ACCOUNT FILE` | moves a signed-in account out, by its holder: its signed-in source withdrawn, so that no run takes it and no refresh follows; its record written to FILE, made new and private; then the engine erases it. Refused, exit 2: "not signed in" (no signed-in source: a key is added again, a program's login is per host), "exists" (FILE). A record not written is not erased: the move is cancelled | move out | |
+   | `import FILE` | moves a record in from FILE: taken into the secrets' store, checked as this application's and its subject held by no other holder, the account made or the one of its subject renewed; prints the account, then removes FILE. Refused, exit 2: "not ours" (another application's or LLM provider's record), "held" (its subject held by another holder) | move in | yes |
 
    - **The names are plain verbs, and reads nouns,** as the other
-     tools' are. Six are not jig's words: `sign-in` and `sign-out` are
+     tools' are. Eight are not jig's words: `sign-in` and `sign-out` are
      the host's (5.6), so a sign-in with a provider is `connect` and its
      end `disconnect`; `forget`, `rank`, `verify` and `retry` are
-     jig's remove, order, check and resume.
+     jig's remove, order, check and resume; `export` and `import`, its
+     move out and in.
    - **Offers and readiness are supplied facts.** `me` prints `providers`,
      `providers_cut` and `key_bytes`. `accounts` prints the party's
      `readiness` and `readiness_cut`; for an owner its `deployment_facts`
@@ -551,6 +554,15 @@ area lands with its stories (section 11).
    - **An account's uses** have no tool: each takes jig's default (jig's
      `domain/accounts.md`, 4.2) until the QA loop asks for one (section
      15).
+   - **An account moved,** `export` and `import`, is jig's move (jig's
+     `domain/accounts.md`, section 6), built with it: its two requests
+     are not yet among jig's. The QA loop on real backends needs it
+     first: each run's fresh deployment takes the one signed-in account
+     in and gives it back (`../draft/qa-live.md`, 4.3), as a host with no
+     browser takes a record signed in on a computer with one. FILE is
+     read and written as a key's file is, the record never printed, and
+     `import`'s request never kept (section 7). `move` and `take` are
+     area 3's names.
 6. **Forges** (`forge.md`, 5.1, 5.4 and 5.5): each configured forge as
    temper's `Forges` page shows it, its connects, and the adoption
    form's picker. Each act is one of the FORGE requests (`README.md`,
@@ -1428,7 +1440,8 @@ contract's reads, watches and requests, they take:
 - **A deadline as a span** in a request a template gives one (jig's
   `client/domain/contract.md`, 3.2), so that a named request is built
   without the clock (section 7).
-- **For area 5,** jig's accounts (jig's `domain/accounts.md`, section 5):
+- **For area 5,** jig's accounts (jig's `domain/accounts.md`, section 5)
+  and their move (its section 6, for `export` and `import`):
   their requests (jig's `client/domain/contract.md`, 3.2), each under a
   key as the others, a key's bytes held to the tools' own bound
   (section 12) and the engine's refusal past its own exit 2; the
@@ -1471,11 +1484,6 @@ Each is named here and designed when it comes.
   engine serves each of the forge's other parts (`forge.md`, section 9).
 - **A service's credential reissued, or a service removed** (jig's
   `domain/people.md`, section 3): tools of area 3.
-- **An account moved,** `export ACCOUNT FILE` and `import FILE` (keyed),
-  of area 5, with jig's move (jig's `domain/accounts.md`, section 6): the
-  record written to a private file, refused if the file exists, and read
-  back from one, `import`'s request never kept (section 7). `move` and
-  `take` are area 3's names.
 - **An account's uses** set, as a tool of area 5, when the QA loop asks
   for one (section 15).
 

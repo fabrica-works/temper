@@ -1,6 +1,6 @@
 # The QA loop, first milestone
 
-Draft, 2026-10-20, revised 2026-10-21. Agents use temper end to end, as
+Draft, 2026-10-20, revised 2026-10-23. Agents use temper end to end, as
 processes, through its agents' tools, and report what they find in
 records of a fixed shape. It records a session with the user on
 2026-10-20. The loop runs by hand for now, but its records, its runner
@@ -9,8 +9,9 @@ into the lab application later and inform its design; `qa.md` is the
 inspiration. This draft covers the loop's mechanics and its first
 milestone, M1: the loop's process and tooling, proven on the simplest
 story, on fake backends. M2 (a real forge, the fake LLM) and M3 (real
-forges, real LLMs) are drafts of their own; the mapping of the owners'
-process onto temper is `temper-on-temper.md`.
+forges, real LLMs) are drafts of their own: M3 begins on ChatGPT and an
+owned Forgejo in `qa-live.md`, which takes M2's real forge with it; the
+mapping of the owners' process onto temper is `temper-on-temper.md`.
 
 ## 1. In one page
 
@@ -293,9 +294,13 @@ class, and a fix checked again.
 ## 12. Later
 
 - **M2:** a real forge with the fake LLM: skein's throwaway Forgejo,
-  then GitHub, and with it real git in the loop (draft of its own).
-- **M3:** real forges and real LLMs, Codex then Claude; verdicts become
-  rates over many runs (draft of its own).
+  then GitHub, and with it real git in the loop. Its first part is in
+  `qa-live.md`: the owned Forgejo set up by `ctl` with no LLM, and a
+  real failure's transcript replayed by the fake LLM on it (its 3.1 and
+  section 8).
+- **M3:** real forges and real LLMs, ChatGPT then Claude; verdicts
+  become rates over many runs. Its first part is `qa-live.md`: a ladder
+  of the fakes' roadmap's stories on ChatGPT and an owned Forgejo.
 - **More stories,** growing with the tools' areas 2 to 4, until
   temper-on-temper (`temper-on-temper.md`).
 - **Driver agents on documents alone:** no code, only the user-facing
