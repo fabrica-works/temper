@@ -1213,6 +1213,15 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // stores and decoded page carriers add 21,379,829 B; three file
             // drivers add 15 B; six room-256 read queues add 1,536 B.
             + 21_379_829 + 15 + 1_536
+            // Wire v8's three ask bytes in each assignment: two run slots
+            // in each of six engine channels (two workers + four opening).
+            + 6 * 2 * 3
+            // Sizes.piece grows the worker link's Limits/Component by 8 B,
+            // also retained inline in Service's worker option.
+            + 8
+            // Three new codec u32 bounds grow the engine workers component
+            // by 8 B after padding, retained in Service's engine option.
+            + 8
     );
     // Worker host payload stays 107,206,624 B. Program-source hub outputs grow
     // room 7,286 -> 10,198: 2,912 additional slots, three host payload queues.
@@ -1241,6 +1250,17 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // Live text: 64 told slots * (4096 piece + 256 call id + 64 tool)
             // plus 16 B of host/root carrier growth. Exceeded adds no worker bytes.
             + 64 * (4_096 + 256 + 64) + 16
+            // Wire v8 reserves 4,470 rather than 64 fact bytes in the link.
+            + (4_470 - 64)
+            // At 25 B per shortest fact, 176 extra channel queue slots,
+            // each holding a 32-B Queued frame.
+            + (4_470 / 25 - 64 / 25) * 32
+            // The received assignment adds three live-ask bool bytes.
+            + 3
+            // Both transient translation copies hold that larger assignment.
+            + 2 * 3
+            // Sizes.piece grows the padded link Limits and Component by 8 B.
+            + 8
     );
 
     support::owned::check_memory("../../docs/examples/owned.json", required);
@@ -1294,7 +1314,20 @@ fn records_only_owned_memory_admits_checked_input_at_the_exact_bound() {
     assert_eq!(handovers, 1);
     // iii's path, Secret, staged/read/removal/diagnostic overlap is admitted
     // at both bounds; the embedded worker's certified envelope is unchanged.
-    assert_eq!(required.worker_bytes, 3_283_176_716_182);
+    assert_eq!(
+        required.worker_bytes,
+        3_283_176_716_182
+            // Wire v8's additional reserved link fact bytes.
+            + (4_470 - 64)
+            // Additional 32-B channel frame slots at 25 B per shortest fact.
+            + (4_470 / 25 - 64 / 25) * 32
+            // Three live-ask bytes in the received assignment.
+            + 3
+            // Two transient copies of the larger assignment.
+            + 2 * 3
+            // Sizes.piece grows the padded link Component by 8 B.
+            + 8
+    );
     eprintln!(
         "records-only handover requirements: engine {}, worker {} bytes",
         required.engine_bytes, required.worker_bytes
@@ -1324,6 +1357,10 @@ fn owned_memory_figures_for_init_match_its_own_document() {
     // Records-only forge 3 adds 4 B of checked admission; its asked legacy
     // files were already absent, so there is no credential release here.
     // Records-only fake startup and its adoption state add 20,272 B; worker unchanged.
+    // Wire v8 adds the same 6 * 2 * 3 assignment bytes and 8 + 8 B of
+    // inline worker-link/engine-codec layout to this engine, and the same
+    // (4470 - 64) fact bytes, (4470 / 25 - 64 / 25) * 32 frame slots,
+    // 3 received + 2 * 3 transient ask bytes and 8 B link layout to its worker.
     support::owned::check_memory("../temper-init/template/temper.json", required);
     eprintln!("init requirements: engine {}, worker {} bytes", required.engine_bytes, required.worker_bytes);
     check_bounded_startup(&bounded, required);
@@ -1573,6 +1610,9 @@ fn owned_memory_figures_for_a_worker_alone_include_its_process_and_no_engine() {
     // Configured forges and volatile setup answers add 80 B through Service's
     // engine option here; an embedded worker's payload is unchanged.
     // iii's one-time restored guard adds 8 B to that engine option's layout.
+    // Wire v8 adds the embedded worker's five terms above, plus Service's
+    // inline worker-link layout (+8 B) and engine codec layout (+8 B),
+    // retained even when its engine option is empty.
     let figure = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/figures/worker-alone-memory.txt");
     if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
         fs::write(&figure, format!("{}\n", required.worker_bytes)).expect("worker-alone fixture");
