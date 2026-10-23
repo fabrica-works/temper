@@ -1398,7 +1398,7 @@ runs it (section 7).
   SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'
   ```
 
-  At these pins the engine requires 645,701,969,936,168 bytes and the worker
+  At these pins the engine requires 645,707,287,580,064 bytes and the worker
   3,380,142,268,295 bytes. Ordinary runs fail on drift and never write the
   example. Program declarations survive startup; runnable program grants
   still wait for smith's program backend and jig's program sources.
@@ -2852,7 +2852,7 @@ Each is intended; what it needs is named with it.
 - **The owned example's agent, sized for a person's work.** Default: the
   process tier's profile (8.1), sized for the live tier's stories.
 - **The owned example's `memory_bytes`** are `small`'s worst cases with
-  its strings at their bounds (8.1): 645,701,969,936,168 bytes for the
+  its strings at their bounds (8.1): 645,707,287,580,064 bytes for the
   engine and 3,380,142,268,295 for the worker, more than any machine
   has, so the start's check bounds nothing a person's machine holds.
   Default: as the example states them; which terms of the worst cases

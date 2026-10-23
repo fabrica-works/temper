@@ -100,6 +100,10 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 engine.admission = None;
             }
             let event = match request {
+                root::PartyRequest::Deliver(root::Delivery::DemoNote { line }) => {
+                    engine.notes.push(crate::Note::Demo { line });
+                    None
+                }
                 root::PartyRequest::Deliver(root::Delivery::Forges { watcher, forges }) => {
                     match crate::family::forges(forges, &temper_client_protocol_wire::v1::CEILINGS) {
                         Some(record) => Some(jig_protocol_engine_clients::Event::Application(
@@ -236,7 +240,9 @@ fn worker(engine: &mut Engine, request: root::WorkerRequest) {
                     &mut engine.events,
                 ),
             },
-            root::Delivery::Procedure { .. }
+            root::Delivery::DemoActed { .. }
+            | root::Delivery::DemoNote { .. }
+            | root::Delivery::Procedure { .. }
             | root::Delivery::Application { .. }
             | root::Delivery::Forges { .. }
             | root::Delivery::Panel { .. }

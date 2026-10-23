@@ -110,6 +110,10 @@ pub struct SetupStep {
 /// Operator diagnostics taken by the shell (protocol/forge.md, 2.3).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Note {
+    /// A bounded diagnostic from the demo end (protocol/setup.md, 8.4).
+    Demo {
+        line: Box<[u8]>,
+    },
     /// A listener bound its address (protocol/README.md, 15.3).
     Listening {
         listener: Listening,

@@ -301,7 +301,9 @@ fn delivery_packet(
             None
         }
         // Jig has no separate live requester Result; the task document carries it.
-        Delivery::Application { .. }
+        Delivery::DemoActed { .. }
+        | Delivery::DemoNote { .. }
+        | Delivery::Application { .. }
         | Delivery::Forges { .. }
         | Delivery::Panel { .. }
         | Delivery::SourceSignedOut { .. }

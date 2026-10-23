@@ -1,5 +1,5 @@
 use super::fixtures;
-use crate::{records, v7};
+use crate::{records, v8};
 use temper_engine_domain_forge as forge;
 
 #[test]
@@ -54,7 +54,7 @@ fn bounds_take_each_limit_from_its_source() {
 #[test]
 fn bounds_refuse_sources_past_schema_ceilings() {
     let mut larger = fixtures::LIMITS;
-    larger.name_bytes = v7::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
+    larger.name_bytes = v8::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
     assert_eq!(crate::bounds(&larger), None);
 }
 
@@ -659,21 +659,21 @@ fn every_application_outcome_preserves_its_complete_record() {
     assert!(
         jig_protocol_store::people_v11::Refusal::worst_case_bytes(&jig_protocol_store::people_v11::CEILINGS)
             .expect("bounded facts")
-            <= u64::from(v7::CEILINGS.core_refused_refusal)
+            <= u64::from(v8::CEILINGS.core_refused_refusal)
     );
 }
 #[test]
 fn application_decoding_refuses_malformed_refusal_facts() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for refusal in [Box::from([255]), Box::from([2]), Box::from([9, 0])] {
-        let value = v7::CoreRefused::new(&v7::CEILINGS, v7::CoreRefusedParts { refusal }).expect("small piece");
-        let application = v7::Application::new(
-            &v7::CEILINGS,
-            v7::ApplicationParts { token: 9, until: 10, outcome: v7::ApplicationOutcome::CoreRefused(value) },
+        let value = v8::CoreRefused::new(&v8::CEILINGS, v8::CoreRefusedParts { refusal }).expect("small piece");
+        let application = v8::Application::new(
+            &v8::CEILINGS,
+            v8::ApplicationParts { token: 9, until: 10, outcome: v8::ApplicationOutcome::CoreRefused(value) },
         )
         .expect("application");
         let row =
-            v7::Row::new(&v7::CEILINGS, v7::RowParts { value: v7::Value::Application(application) }).expect("row");
+            v8::Row::new(&v8::CEILINGS, v8::RowParts { value: v8::Value::Application(application) }).expect("row");
         assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable));
     }
 }
@@ -747,5 +747,20 @@ fn demo_states_round_trip_and_refuse_a_mismatched_key() {
             let other = crate::keys::encode(&forge::Key::Writer(forge), u32::MAX).expect("other family");
             assert_eq!(records::row(&other, &bytes, &bounds), Err(crate::Undecodable));
         }
+    }
+}
+
+#[test]
+fn demo_end_acts_round_trip_with_their_keys() {
+    let bounds = crate::bounds(&fixtures::LIMITS).unwrap();
+    for act in [
+        forge::DemoActKind::Close { project: u32::MAX, task: u64::MAX },
+        forge::DemoActKind::RemoveAccount { account: u32::MAX },
+    ] {
+        let row = forge::Stored::DemoAct(forge::DemoAct { key: [255; 16], act });
+        let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).unwrap();
+        assert_eq!(key[0], 18);
+        assert_eq!(crate::keys::decode(&key, &fixtures::LIMITS), Some(forge::stored_key(&row)));
+        assert_eq!(records::row(&key, &records::encode(&row), &bounds), Ok(row));
     }
 }

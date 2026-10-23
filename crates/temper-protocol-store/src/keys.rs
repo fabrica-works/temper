@@ -134,6 +134,9 @@ pub fn encode(key: &forge::Key, limit: u32) -> Option<Box<[u8]>> {
         forge::Key::Application(token) => {
             writer.tag(15).u64(*token);
         }
+        forge::Key::DemoAct(key) => {
+            writer.tag(18).bytes(key);
+        }
         forge::Key::Demo(forge) => {
             writer.tag(17).u64(u64::from(*forge));
         }
@@ -171,6 +174,7 @@ pub fn decode(bytes: &[u8], limits: &forge::Limits) -> Option<forge::Key> {
         14 => forge::Key::Release(reader.u64()?),
         15 => forge::Key::Application(reader.u64()?),
         16 => forge::Key::Writer(u16::try_from(reader.u64()?).ok()?),
+        18 => forge::Key::DemoAct(reader.bytes()?.as_ref().try_into().ok()?),
         17 => forge::Key::Demo(u16::try_from(reader.u64()?).ok()?),
         _ => return None,
     };

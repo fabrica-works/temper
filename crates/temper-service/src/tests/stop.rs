@@ -123,6 +123,13 @@ fn non_format_open_refusals_keep_the_deployment_problem() {
 fn a_store_with_bare_repository_tags_refuses_at_startup() {
     // Store 6 (the demo's state) still named a task's repository by its id alone.
     let wanted = temper_protocol_store::STORE_VERSION;
-    assert_eq!(wanted, 7);
+    assert_eq!(wanted, 8);
     refused(OpenRefusal::Format { family: Family::Application, found: 6, wanted }, Stop::StoreVersion);
+}
+
+#[test]
+fn a_store_without_demo_acts_refuses_at_startup() {
+    let wanted = temper_protocol_store::STORE_VERSION;
+    assert_eq!(wanted, 8);
+    refused(OpenRefusal::Format { family: Family::Application, found: 7, wanted }, Stop::StoreVersion);
 }

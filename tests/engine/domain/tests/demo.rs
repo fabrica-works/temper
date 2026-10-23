@@ -9,6 +9,22 @@ use temper_engine_domain_world::{direct::Driver, fixtures, forge_stand::ForgeSta
 fn config(under_box: bool) -> engine::Config {
     let mut config = walking::config(71);
     config.under_box = under_box;
+    config.core.settings.templates[0].budget = people::TemplateBudget::AsAllowed { cap: Some(200) };
+    let mut rules = config.core.authority.rules().clone();
+    rules.ceiling.delegation.depth = 2;
+    config.core.seed_projects[0].policy.policy.ceiling.delegation.depth = 2;
+    config.core.seed_projects[0].policy.policy.roles[0].authority.delegation.depth = 2;
+    config.core.authority =
+        jig_domain_authority::Domain::new(rules, fixtures::forge_limits().authority).expect("demo authority");
+    config.core.grants = Box::new([people::ActGrant {
+        connector: config.core.connectors[0],
+        may: Box::new([
+            people::ActKind::Close,
+            people::ActKind::AddKey,
+            people::ActKind::RemoveAccount,
+            people::ActKind::Adopt,
+        ]),
+    }]);
     config.forges = Box::new([
         forge::Configured { number: 1, kind: forge::Kind::Forgejo, mode: forge::Mode::Fake, asked: true },
         forge::Configured { number: 2, kind: forge::Kind::Forgejo, mode: forge::Mode::Fake, asked: false },
@@ -18,14 +34,29 @@ fn config(under_box: bool) -> engine::Config {
     config
 }
 fn driver(connected: bool, under_box: bool) -> (Driver, u64) {
+    driver_grant(connected, under_box, true)
+}
+fn driver_grant(connected: bool, under_box: bool, granted: bool) -> (Driver, u64) {
     let mut limits = fixtures::forge_limits();
+    limits.tasks.depth = 2;
+    limits.accounts.accounts = 2;
+    limits.fleet.grants = limits.accounts.credentials + limits.accounts.accounts;
     // Two starts, one account reply awaiting reclaim, and the adoption's admission.
     limits.people.pending = 4;
-    limits.journal.writes += 4;
+    limits.people.requests = 8;
+    limits.journal.writes = walking::writes(&limits) + 4;
     limits.journal.deliveries += 4;
     limits.journal.held += 12;
-    let store = fixtures::first_start_over(Store::new(), config(under_box), &limits);
-    let mut d = Driver::cold(store, config(under_box), &limits);
+    let configuration = std::array::from_fn(|_| {
+        let mut configuration = config(under_box);
+        if !granted {
+            configuration.core.grants = Box::new([]);
+        }
+        configuration
+    });
+    let [bootstrap, configuration] = configuration;
+    let store = fixtures::first_start_over(Store::new(), bootstrap, &limits);
+    let mut d = Driver::cold(store, configuration, &limits);
     d.forge = Some(ForgeStand::new());
     d.settle();
     d.sign_in();
@@ -304,7 +335,13 @@ fn another_connected_forge_ends_the_demo_persists_and_stops_once_and_restart_ask
         1
     );
     start(&mut d, sign_in, 82, true);
-    assert_eq!(answers(&d), [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))]);
+    assert_eq!(
+        answers(&d),
+        [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))],
+        "deliveries: {:?}; stopped: {}",
+        d.delivered,
+        d.stopped
+    );
     d.root = engine::Domain::new(config(true), &d.env.limits).expect("valid demo config");
     d.immediate.clear();
     d.send(engine::Event::Restart);
@@ -328,9 +365,404 @@ fn another_forge_connecting_answers_a_held_demo_start_not_offered() {
         state: forge::Connection::Connected { id: 2, login: b"other".as_slice().into() },
     })));
     d.settle();
-    assert_eq!(answers(&d), [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))]);
+    assert_eq!(
+        answers(&d),
+        [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))],
+        "deliveries: {:?}; stopped: {}",
+        d.delivered,
+        d.stopped
+    );
     connection(&mut d, forge::Connection::Connected { id: 1, login: b"temper".as_slice().into() });
     d.fire_at(Duration::from_secs(10));
     d.settle();
-    assert_eq!(answers(&d), [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))]);
+    assert_eq!(
+        answers(&d),
+        [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))],
+        "deliveries: {:?}; stopped: {}",
+        d.delivered,
+        d.stopped
+    );
+}
+
+fn end(d: &mut Driver) {
+    d.send(engine::Event::Forge(Box::new(forge::Event::Connection {
+        forge: 2,
+        state: forge::Connection::Connected { id: 2, login: b"other".as_slice().into() },
+    })));
+}
+fn open_chat(d: &mut Driver, sign_in: u64, number: u8) -> u64 {
+    let mut ask = d.chat_ask(1, b"hello");
+    let people::Ask::Create { batch, .. } = &mut ask else { panic!("chat fixture") };
+    batch[0].budget = people::Budget::AsAllowed { cap: Some(200) };
+    d.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(u64::from(number))),
+        sign_in,
+        key: [number; 16],
+        ask,
+    }));
+    d.pump();
+    d.delivered
+        .iter()
+        .rev()
+        .find_map(|delivery| {
+            if let Delivery::WebReply { to, reply: people::Reply::Outcome(people::Outcome::Created { first, .. }) } =
+                delivery
+                && to == &ReplyTo::new(Token::new(u64::from(number)))
+            {
+                Some(*first)
+            } else {
+                None
+            }
+        })
+        .expect("chat admitted")
+}
+fn keep_key(d: &mut Driver, sign_in: u64, holder: people::AccountHolder, number: u8) {
+    d.send(engine::Event::Party(engine::PartyInput::Key {
+        reply_to: ReplyTo::new(Token::new(u64::from(number))),
+        sign_in,
+        key: [number; 16],
+        ask: Box::new(people::Ask::AccountChange {
+            holder,
+            change: people::AccountChange::AddKey { provider: 1, join: None, digest: [8; 32] },
+        }),
+        carried: core::Carried { number: u64::from(number), digest: [8; 32] },
+    }));
+    d.settle();
+    assert!(d.delivered.iter().any(|delivery| matches!(delivery,
+        Delivery::WebReply { to, reply: people::Reply::Outcome(people::Outcome::AccountKeyKept { .. }) }
+            if to == &ReplyTo::new(Token::new(u64::from(number))))));
+}
+fn live_demo(account: bool) -> (Driver, u64, u64) {
+    demo_with_chat(account, true)
+}
+fn demo_with_chat(account: bool, granted: bool) -> (Driver, u64, u64) {
+    let (mut d, sign_in) = driver_grant(true, false, granted);
+    keep_key(&mut d, sign_in, people::AccountHolder::Own, 90);
+    // Running is committed before the account/adoption complete. The end also
+    // owns chats of a running demo whose start was interrupted.
+    start(&mut d, sign_in, 81, false);
+    d.hello(Token::new(7));
+    d.settle();
+    let task = open_chat(&mut d, sign_in, 91);
+    if account {
+        keep_key(&mut d, sign_in, people::AccountHolder::Deployment, 95);
+    }
+    assert_eq!(d.root.demo_state(), Some(forge::DemoState::Running));
+    (d, task, sign_in)
+}
+fn saved_acts(d: &Driver) -> Vec<forge::DemoAct> {
+    d.transactions
+        .iter()
+        .flatten()
+        .filter_map(|write| {
+            if let engine::Write::Save(engine::Record::Forge { row }) = write
+                && let forge::Stored::DemoAct(row) = row.as_ref()
+            {
+                Some(*row)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+fn kept_acts(d: &Driver) -> Vec<forge::DemoAct> {
+    d.store
+        .rows
+        .values()
+        .filter_map(|record| {
+            if let engine::Record::Forge { row } = record
+                && let forge::Stored::DemoAct(row) = row.as_ref()
+            {
+                Some(*row)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+fn acted(d: &Driver) -> Vec<(people::Act, people::Outcome)> {
+    d.store
+        .rows
+        .values()
+        .filter_map(|record| {
+            if let engine::Record::Core(core::Record::People(people::Stored::Acted { act, outcome, .. })) = record {
+                Some((act.clone(), outcome.clone()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+fn restart(d: &mut Driver, granted: bool) {
+    let mut configuration = config(false);
+    if !granted {
+        configuration.core.grants = Box::new([]);
+    }
+    restart_with(d, configuration);
+}
+fn restart_with(d: &mut Driver, configuration: engine::Config) {
+    d.root = engine::Domain::new(configuration, &d.env.limits).expect("restart config");
+    d.events.clear();
+    d.delivered.clear();
+    d.send(engine::Event::Restart);
+    d.pump();
+    assert!(d.root.ready() && !d.stopped);
+}
+fn assert_erased(d: &Driver, rows: &[forge::DemoAct]) {
+    assert!(kept_acts(d).is_empty());
+    for row in rows {
+        assert!(d.transactions.iter().flatten().any(|write| matches!(write, engine::Write::Erase(engine::Key::Forge(forge::Key::DemoAct(key))) if *key == row.key)));
+    }
+}
+
+#[test]
+fn demo_end_closes_chats_with_delegates_and_removes_its_account_erasing_answered_rows() {
+    use jig_domain_tasks as tasks;
+    let (mut d, task, _sign_in) = live_demo(true);
+    let parent = d.last_assignment();
+    assert_eq!(parent.task, task);
+    let mut delegate = fixtures::report_delegate(b"work", Box::new([]));
+    // A conversation requested by a task is a delegate, not another demo chat.
+    delegate.flags.conversation = true;
+    fixtures::tool_call(&mut d, &parent, 61, engine::Tool::Delegate { batch: Box::new([delegate]) });
+    let Some(engine::CallAnswer::Delegated(children)) = d.answered(61) else { panic!("delegate admitted") };
+    let child = children[0].task;
+    end(&mut d);
+    d.pump();
+    let rows = saved_acts(&d);
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().any(|row| row.act == forge::DemoActKind::Close { project: 1, task }));
+    assert_erased(&d, &rows);
+    let answers = acted(&d);
+    assert!(answers.iter().any(|(act, outcome)| matches!((act, outcome), (people::Act::Close { project: 1, task: closed, grace: Some(grace), reason }, people::Outcome::Compound { operations: 2, .. }) if *closed == task && *grace == Duration::from_secs(5) && reason.as_ref() == b"Ended with the playground")));
+    assert!(answers.iter().any(|(act, outcome)| matches!(
+        (act, outcome),
+        (people::Act::RemoveAccount { .. }, people::Outcome::AccountRemoved { .. })
+    )));
+    assert!(!d.store.rows.values().any(|record| matches!(
+        record,
+        engine::Record::Core(core::Record::Accounts(accounts::Stored::Account {
+            holder: accounts::Holder::Deployment,
+            provider: 1,
+            ..
+        }))
+    )));
+    let grace = d.task(task).expect("live chat").grace.as_ref().expect("template grace");
+    assert_eq!(grace.reason.as_ref(), b"Ended with the playground");
+    assert_eq!(grace.by, tasks::Party::Deployment { project: 1 });
+    assert_eq!(grace.until, skein_lib::Wall::from_nanos(Duration::from_secs(5).as_nanos()));
+    assert!(d.store.rows.values().any(|record| matches!(record,
+        engine::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) if row.number == child
+            && matches!(&row.phase, tasks::Phase::Ended(tasks::Ending::Cancelled { by: tasks::Party::Deployment { project: 1 }, reason, .. }) if reason.as_ref() == b"Ended with the playground"))));
+    assert!(d.transactions.iter().any(|writes| {
+        let ended = writes.iter().any(|write| matches!(write, engine::Write::Save(engine::Record::Forge { row }) if matches!(row.as_ref(), forge::Stored::Demo(forge::Demo { state: forge::DemoState::Ended, .. }))));
+        let acts = writes.iter().filter(|write| matches!(write, engine::Write::Save(engine::Record::Forge { row }) if matches!(row.as_ref(), forge::Stored::DemoAct(_)))).count();
+        ended && acts == 2
+    }));
+    d.fire_at(Duration::from_secs(5));
+    d.settle();
+    assert!(
+        matches!(&d.task(task).expect("live chat").phase, tasks::Phase::Closing(closing) if matches!(&closing.ending, tasks::Ending::Cancelled { by: tasks::Party::Deployment { project: 1 }, reason, .. } if reason.as_ref() == b"Ended with the playground"))
+    );
+}
+
+#[test]
+fn demo_end_selects_only_persons_live_conversations_and_never_chats_opened_afterward() {
+    let (mut d, task, sign_in) = live_demo(false);
+    let parent = d.last_assignment();
+    // The same project's ordinary task has no conversation flag.
+    let mut ask = d.chat_ask(1, b"ordinary task");
+    let people::Ask::Create { batch, .. } = &mut ask else { panic!("create fixture") };
+    batch[0].flags = people::Flags::PLAIN;
+    batch[0].budget = people::Budget::Named;
+    batch[0].authority.spend = 10;
+    batch[0].label = 2;
+    batch[0].tracked = Some(1);
+    d.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(92)),
+        sign_in,
+        key: [92; 16],
+        ask,
+    }));
+    d.pump();
+    let reply = d
+        .delivered
+        .iter()
+        .find_map(|delivery| {
+            if let Delivery::WebReply { to, reply } = delivery
+                && to == &ReplyTo::new(Token::new(92))
+            {
+                Some(reply)
+            } else {
+                None
+            }
+        })
+        .expect("ordinary task reply");
+    assert!(matches!(reply, people::Reply::Outcome(people::Outcome::Created { .. })), "ordinary task: {reply:?}");
+    end(&mut d);
+    d.pump();
+    assert_eq!(
+        saved_acts(&d).iter().map(|row| row.act).collect::<Vec<_>>(),
+        [forge::DemoActKind::Close { project: 1, task }]
+    );
+    let ordinary = d.store.header().tasks;
+    assert_ne!(ordinary, task);
+    assert!(!d.task(ordinary).expect("live ordinary task").flags.conversation);
+    assert!(d.task(ordinary).expect("live ordinary task").grace.is_none());
+    // A second connection cannot reselect the ordinary task or a later chat.
+    d.fire_at(Duration::from_secs(5));
+    d.pump();
+    d.answer(Token::new(7), parent.task, parent.attempt, 0, jig_domain_tasks::End::Parked, engine::Parts::none());
+    d.pump();
+    let later = open_chat(&mut d, sign_in, 93);
+    end(&mut d);
+    d.pump();
+    assert!(d.task(later).expect("live later chat").grace.is_none());
+    assert_eq!(saved_acts(&d).len(), 1);
+}
+
+#[test]
+fn demo_end_without_a_deployment_account_asks_only_for_the_chat() {
+    let (mut d, task, _sign_in) = live_demo(false);
+    end(&mut d);
+    d.pump();
+    assert!(d.store.rows.values().any(|record| matches!(
+        record,
+        engine::Record::Core(core::Record::Accounts(accounts::Stored::Account {
+            holder: accounts::Holder::Party(_),
+            provider: 1,
+            ..
+        }))
+    )));
+    let rows = saved_acts(&d);
+    assert_eq!(rows.iter().map(|row| row.act).collect::<Vec<_>>(), [forge::DemoActKind::Close { project: 1, task }]);
+    assert_erased(&d, &rows);
+}
+
+#[test]
+fn demo_end_committed_before_its_answer_is_resent_with_the_same_key_and_closed_once() {
+    let (mut d, task, _sign_in) = live_demo(false);
+    end(&mut d);
+    // The first decision keeps both the row and the core's compound, before its held answer.
+    assert!(!d.store.pending.is_empty());
+    d.store.apply();
+    let rows = kept_acts(&d);
+    assert_eq!(rows.len(), 1);
+    assert!(d.store.rows.values().any(|record| matches!(record,
+        engine::Record::Core(core::Record::People(people::Stored::Acted { key, .. })) if key.key == rows[0].key)));
+    let before = d.task(task).expect("live chat").clone();
+    let answers = acted(&d);
+    assert_eq!(answers.len(), 1);
+    restart(&mut d, true);
+    assert_erased(&d, &rows);
+    assert_eq!(acted(&d), answers);
+    assert_eq!(d.task(task).expect("live chat").grace, before.grace);
+    assert_eq!(d.task(task).expect("live chat").last_message, before.last_message);
+}
+
+#[test]
+fn demo_end_unknown_and_ended_answers_erase_the_kept_act() {
+    let (mut d, task, _sign_in) = live_demo(false);
+    end(&mut d);
+    d.pump();
+    let row = saved_acts(&d)[0];
+    // While a cancellation is closing, a fresh key receives Ended. A missing task/account gets Unknown.
+    d.fire_at(Duration::from_secs(5));
+    d.settle();
+    let rows = [
+        forge::DemoAct { key: [201; 16], act: row.act },
+        forge::DemoAct { key: [202; 16], act: forge::DemoActKind::Close { project: 1, task: u64::MAX } },
+        forge::DemoAct { key: [203; 16], act: forge::DemoActKind::RemoveAccount { account: u32::MAX } },
+    ];
+    assert_eq!(row.act, forge::DemoActKind::Close { project: 1, task });
+    d.store.seed(
+        rows.iter()
+            .map(|row| engine::Record::Forge { row: Box::new(forge::Stored::DemoAct(*row)) })
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+        Box::new([]),
+    );
+    restart(&mut d, true);
+    assert_erased(&d, &rows);
+    assert!(
+        acted(&d).iter().any(|(_, answer)| matches!(answer, people::Outcome::Refused(people::Refusal::Ended { .. })))
+    );
+    assert_eq!(
+        acted(&d)
+            .iter()
+            .filter(|(_, answer)| matches!(answer, people::Outcome::Refused(people::Refusal::Unknown)))
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn demo_end_without_the_grant_serves_keeps_names_and_resends_until_a_granted_restart() {
+    let (mut d, task, _sign_in) = demo_with_chat(true, false);
+    assert!(d.root.ready());
+    end(&mut d);
+    d.settle();
+    let rows = kept_acts(&d);
+    assert_eq!(rows.len(), 2);
+    assert!(acted(&d).is_empty());
+    assert_eq!(d.delivered.iter().filter(|delivery| matches!(delivery, Delivery::DemoNote { line } if line.starts_with(b"demo end:") && line.windows(b"engine.acts".len()).any(|part| part == b"engine.acts"))).count(), 2);
+    restart(&mut d, false);
+    assert_eq!(kept_acts(&d), rows);
+    assert_eq!(d.delivered.iter().filter(|delivery| matches!(delivery, Delivery::DemoNote { .. })).count(), 2);
+    assert!(d.task(task).expect("live chat").grace.is_none());
+    restart(&mut d, true);
+    assert_erased(&d, &rows);
+    assert_eq!(acted(&d).len(), 2);
+    assert!(d.task(task).expect("live chat").grace.is_some());
+}
+
+#[test]
+fn demo_end_does_not_act_on_a_chat_already_closing() {
+    let (mut d, task, sign_in) = live_demo(false);
+    d.send(engine::Event::Party(engine::PartyInput::Ask {
+        models: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(94)),
+        sign_in,
+        key: [94; 16],
+        ask: people::Ask::Cancel { project: 1, task, reason: b"done".as_slice().into(), grace: None },
+    }));
+    d.settle();
+    assert!(matches!(d.task(task).expect("live chat").phase, jig_domain_tasks::Phase::Closing(_)));
+    end(&mut d);
+    d.settle();
+    assert!(saved_acts(&d).is_empty());
+    assert!(acted(&d).is_empty());
+}
+
+#[test]
+fn demo_end_saved_refusal_is_named_and_erased_but_no_owner_is_named_and_kept() {
+    for no_owner in [false, true] {
+        let (mut d, task, _sign_in) = live_demo(false);
+        let row = forge::DemoAct { key: [210; 16], act: forge::DemoActKind::Close { project: 1, task } };
+        d.store.seed(Box::new([engine::Record::Forge { row: Box::new(forge::Stored::DemoAct(row)) }]), Box::new([]));
+        let mut configuration = config(false);
+        if no_owner {
+            configuration.core.owners = Box::new([]);
+        } else {
+            configuration.core.settings.templates[0].grace = Some(Duration::from_secs(6));
+        }
+        restart_with(&mut d, configuration);
+        assert_eq!(kept_acts(&d), if no_owner { vec![row] } else { vec![] });
+        let expected = if no_owner { b"no first owner configured".as_slice() } else { b"Limit".as_slice() };
+        assert!(d.delivered.iter().any(
+            |delivery| matches!(delivery, Delivery::DemoNote { line } if line.ends_with(expected) && line.len() <= 256)
+        ));
+        if !no_owner {
+            assert_erased(&d, &[row]);
+            assert!(acted(&d).iter().any(|(_, answer)| matches!(
+                answer,
+                people::Outcome::CompoundRefused {
+                    why: people::Refusal::Limit { which: people::LimitKind::Grace },
+                    ..
+                }
+            )));
+        }
+    }
 }

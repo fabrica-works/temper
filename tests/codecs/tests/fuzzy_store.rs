@@ -30,11 +30,28 @@ fn golden(bytes: &[u8], bounds: &Bounds) {
     versioned.extend_from_slice(bytes);
     record(&versioned, bounds);
 }
+fn end_act(rng: &mut Rng, bounds: &Bounds) {
+    let act = if rng.below(2) == 0 {
+        forge::DemoActKind::Close {
+            project: u32::try_from(rng.below(u64::from(u32::MAX))).expect("u32"),
+            task: rng.next_u64(),
+        }
+    } else {
+        forge::DemoActKind::RemoveAccount { account: u32::try_from(rng.below(u64::from(u32::MAX))).expect("u32") }
+    };
+    let row = forge::Stored::DemoAct(forge::DemoAct { key: [u8::try_from(rng.below(256)).expect("byte"); 16], act });
+    let bytes = records::encode(&row);
+    record(&bytes, bounds);
+    record(&temper_codecs_world::mutated(rng, &bytes), bounds);
+    let bytes = keys::encode(&forge::stored_key(&row), u32::MAX).expect("act key");
+    key(&bytes);
+    key(&temper_codecs_world::mutated(rng, &bytes));
+}
 #[test]
 fn store_decoders_never_panic_and_reencode_the_same() {
     let bounds = temper_protocol_store::bounds(&LIMITS).expect("fixture limits fit");
     let mut rng = Rng::new(0x7e3d_0405);
-    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v7");
+    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v8");
     for _ in 0..2_000 {
         record(&temper_codecs_world::drawn(&mut rng, 512), &bounds);
         key(&temper_codecs_world::drawn(&mut rng, 512));
@@ -48,6 +65,7 @@ fn store_decoders_never_panic_and_reencode_the_same() {
         let bytes = keys::encode(&forge::stored_key(&demo), u32::MAX).expect("demo key");
         key(&bytes);
         key(&temper_codecs_world::mutated(&mut rng, &bytes));
+        end_act(&mut rng, &bounds);
         let writer = forge::Stored::Writer(skein_forge_client::Writer {
             forge: u16::try_from(rng.below(65_536)).expect("u16"),
             author: rng.next_u64().max(1),

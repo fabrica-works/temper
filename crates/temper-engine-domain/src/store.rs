@@ -647,19 +647,7 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                         scope_bytes.checked_add(change_bytes)
                     }
                     jig_domain_people::Ask::MakeService { name, .. } => u64::try_from(name.len()).ok(),
-                    jig_domain_people::Ask::Adopt { adoption, .. } => {
-                        let mut bytes =
-                            u64::try_from(adoption.resource.path.len().checked_add(adoption.options.len())?)
-                                .ok()?
-                                .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
-                        for segment in &adoption.resource.path {
-                            bytes = bytes.checked_add(u64::try_from(segment.len()).ok()?)?;
-                        }
-                        for option in &adoption.options {
-                            bytes = bytes.checked_add(u64::try_from(option.len()).ok()?)?;
-                        }
-                        Some(bytes)
-                    }
+                    jig_domain_people::Ask::Adopt { adoption, .. } => adoption_bytes(adoption),
                     jig_domain_people::Ask::SetRoles { holdings, .. } => u64::try_from(holdings.len())
                         .ok()?
                         .checked_mul(u64::try_from(size_of::<jig_domain_people::Holding>()).ok()?),
@@ -710,8 +698,13 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
             jig_domain_people::Stored::Policy { name, value, .. } => {
                 jig_domain_people::policy_bytes(value)?.checked_add(u64::try_from(name.len()).ok()?)
             }
-            jig_domain_people::Stored::Acted { .. } => {
-                unreachable!("the current application grants no deployment acts")
+            jig_domain_people::Stored::Acted { act, outcome, .. } => {
+                let payload = match act {
+                    jig_domain_people::Act::Close { reason, .. } => u64::try_from(reason.len()).ok()?,
+                    jig_domain_people::Act::AddKey { .. } | jig_domain_people::Act::RemoveAccount { .. } => 0,
+                    jig_domain_people::Act::Adopt { adoption, .. } => adoption_bytes(adoption)?,
+                };
+                payload.checked_add(program_answer_bytes(outcome)?)
             }
         },
     }
@@ -859,7 +852,7 @@ fn model_context_bytes(models: &[Box<[u8]>]) -> Option<u64> {
 }
 
 /// Newly owned program answer fields, beside the retained ask and model context.
-fn program_answer_bytes(outcome: &jig_domain_people::Outcome) -> Option<u64> {
+pub(crate) fn program_answer_bytes(outcome: &jig_domain_people::Outcome) -> Option<u64> {
     use jig_domain_people::Outcome;
     match outcome {
         Outcome::AccountProgramDeclared { name, .. } => u64::try_from(name.len()).ok(),
@@ -904,4 +897,17 @@ fn program_answer_bytes(outcome: &jig_domain_people::Outcome) -> Option<u64> {
         | Outcome::AccountChanged
         | Outcome::Refused(_) => Some(0),
     }
+}
+
+fn adoption_bytes(adoption: &jig_domain_people::Adoption) -> Option<u64> {
+    let mut bytes = u64::try_from(adoption.resource.path.len().checked_add(adoption.options.len())?)
+        .ok()?
+        .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
+    for segment in &adoption.resource.path {
+        bytes = bytes.checked_add(u64::try_from(segment.len()).ok()?)?;
+    }
+    for option in &adoption.options {
+        bytes = bytes.checked_add(u64::try_from(option.len()).ok()?)?;
+    }
+    Some(bytes)
 }

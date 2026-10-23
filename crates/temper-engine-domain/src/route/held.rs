@@ -192,8 +192,6 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
         core::Held::NotesWritten { .. } | core::Held::NotesDeleted { .. } => {
             unreachable!("the current application has no note caller")
         }
-        core::Held::Acted { .. } => {
-            unreachable!("the current application grants no deployment acts")
-        }
+        core::Held::Acted { to, outcome } => emit(decision, &env.limits, Delivery::DemoActed { to, outcome }),
     }
 }

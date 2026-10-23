@@ -1,5 +1,6 @@
 {
   "engine": {
+    "acts": [{"connector": 1, "may": ["close", "add_key", "remove_account", "adopt"]}],
     "limits": {
       "profile": "small",
       "overrides": {
@@ -244,7 +245,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 443462900573524,
+    "memory_bytes": 443468218217420,
     "rules": {
       "ceiling": {
         "tools": 1,
