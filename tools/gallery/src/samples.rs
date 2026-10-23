@@ -112,92 +112,31 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "chat-rejecting", world: Solo, address: Address::Chat { task: 10 }, then: Rejecting },
         Sample { name: "task-held", world: Solo, address: Address::Task { task: 3 }, then: Held },
         Sample { name: "task-releasing", world: Solo, address: Address::Task { task: 3 }, then: Releasing },
-        Sample {
-            name: "connect-model-choose",
-            world: Reference,
-            address: Address::ConnectModel { way: None },
-            then: Shown,
-        },
-        Sample {
-            name: "connect-model-key-details",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::Key }),
-            },
-            then: Shown,
-        },
-        Sample {
-            name: "connect-model-program-details",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay {
-                    provider: 17,
-                    kind: temper_client_domain::WayKind::Program,
-                }),
-            },
-            then: Shown,
-        },
-        Sample {
-            name: "connect-model-signing-in",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
-            },
-            then: SigningIn,
-        },
-        Sample {
-            name: "connect-model-key-ready",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::Key }),
-            },
-            then: KeyReady,
-        },
-        Sample {
-            name: "connect-model-signin-ready",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
-            },
-            then: SignInReady,
-        },
-        Sample {
-            name: "connect-model-declined",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
-            },
-            then: Declined,
-        },
-        Sample {
-            name: "connect-model-renewed",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
-            },
-            then: Renewed,
-        },
-        Sample {
-            name: "connect-model-refused",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
-            },
-            then: SignInRefused,
-        },
-        Sample {
-            name: "connect-model-key-lost",
-            world: Reference,
-            address: Address::ConnectModel {
-                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::Key }),
-            },
-            then: AccountRefused,
-        },
+        model_sample("connect-model-choose", None, Shown),
+        model_sample("connect-model-key-details", Some(temper_client_domain::WayKind::Key), Shown),
+        model_sample("connect-model-program-details", Some(temper_client_domain::WayKind::Program), Shown),
+        model_sample("connect-model-signing-in", Some(temper_client_domain::WayKind::SignIn), SigningIn),
+        model_sample("connect-model-key-ready", Some(temper_client_domain::WayKind::Key), KeyReady),
+        model_sample("connect-model-signin-ready", Some(temper_client_domain::WayKind::SignIn), SignInReady),
+        model_sample("connect-model-declined", Some(temper_client_domain::WayKind::SignIn), Declined),
+        model_sample("connect-model-renewed", Some(temper_client_domain::WayKind::SignIn), Renewed),
+        model_sample("connect-model-refused", Some(temper_client_domain::WayKind::SignIn), SignInRefused),
+        model_sample("connect-model-key-lost", Some(temper_client_domain::WayKind::Key), AccountRefused),
         Sample { name: "task-reference-T28", world: Reference, address: Address::Task { task: 28 }, then: Shown },
         Sample { name: "task-reference-T24", world: Reference, address: Address::Task { task: 24 }, then: Shown },
         Sample { name: "task-reference-T12", world: Reference, address: Address::Task { task: 12 }, then: Shown },
         Sample { name: "task-solo-T9", world: Solo, address: Address::Task { task: 9 }, then: Shown },
     ]
+}
+fn model_sample(name: &'static str, kind: Option<temper_client_domain::WayKind>, then: Then) -> Sample {
+    let way = match kind {
+        Some(kind) => Some(temper_client_domain::ModelWay {
+            provider: if kind == temper_client_domain::WayKind::Program { 17 } else { 18 },
+            kind,
+        }),
+        None => None,
+    };
+    Sample { name, world: World::Reference, address: Address::ConnectModel { way }, then }
 }
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
@@ -335,7 +274,7 @@ fn adoption(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
         );
     }
     step(root, Event::Act { action: Action::Forge(A::Choose { role: forge::Role::Owned }) }, out);
-    if key {
+    if refused {
         step(root, Event::Act { action: Action::Forge(A::Adopt) }, out);
         step(root, Event::Client { event: jig_client::Event::Stored }, out);
         let attempt = sent_attempt(out);

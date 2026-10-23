@@ -54,7 +54,7 @@ fn model(w: World) -> c::LlmChoice {
         subagents: List::with_capacity(0),
     }
 }
-fn frame(w: World) -> c::Me {
+fn frame(w: World, connecting: bool) -> c::Me {
     let mut me = base_frame(person(w), project(w));
     let member = me.projects.get_mut(0).expect("one project");
     let template = member.templates.get_mut(0).expect("chat template");
@@ -81,6 +81,16 @@ fn frame(w: World) -> c::Me {
         })
         .expect("model");
     me.providers = providers(w);
+    if connecting {
+        for index in 0..me.providers.len() {
+            let provider = me.providers.get_mut(index).expect("provider index");
+            if provider.name.bytes() == b"OpenAI" {
+                provider.name = doc("openai");
+            } else if provider.name.bytes() == b"Anthropic" {
+                provider.name = doc("anthropic");
+            }
+        }
+    }
     me.needs = needs(w);
     me.needs_total = if w == Solo { 2 } else { 0 };
     me.updates = c::Count { value: if w == Solo { 2 } else { u32::from(w == Reference) }, limited: false };
@@ -120,6 +130,7 @@ fn needs(w: World) -> c::Needs {
     c::Needs { proposals: u32::from(w == Solo), questions: u32::from(w == Solo), escalations: 0, person_tasks: 0 }
 }
 pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
+    let connecting = matches!(address, Address::ConnectModel { .. });
     let limits = limits();
     let mut root = temper_client_domain::unlinked(&limits, SEED);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));
@@ -138,7 +149,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
             match down {
                 jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(subject) } => {
                     let document = match subject {
-                        c::Subject::Me => Some(c::Delivery::Me(Box::new(frame(w)))),
+                        c::Subject::Me => Some(c::Delivery::Me(Box::new(frame(w, connecting)))),
                         c::Subject::Accounts => Some(c::Delivery::OwnerAccounts(Box::new(accounts(w, then)))),
                         c::Subject::Tasks { window, .. } => Some(c::Delivery::Tasks(Box::new(task_window(w, window)))),
                         c::Subject::Inbox { window } => {
@@ -1681,11 +1692,15 @@ fn accounts(w: World, then: Then) -> c::OwnerAccounts {
                 number: 2,
                 place: 2,
                 uses: None,
-                plan: true,
+                plan: then != Then::KeyReady,
                 provider: Some(18),
                 provider_name: Some(doc("OpenAI")),
                 manage_usage: None,
-                display: doc("ChatGPT"),
+                display: doc(if matches!(then, Then::SignInReady | Then::Declined | Then::Renewed) {
+                    "pat@example.com"
+                } else {
+                    "ChatGPT"
+                }),
                 holder: c::OwnerAccountHolder::Party(73),
                 sources,
                 cut: false,
