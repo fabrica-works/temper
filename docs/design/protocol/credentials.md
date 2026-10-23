@@ -1,6 +1,6 @@
 # Credentials
 
-Provisional, 2026-10-03, revised 2026-10-21. temper's credentials: which
+Provisional, 2026-10-03, revised 2026-10-23. temper's credentials: which
 secrets temper's processes hold, where each comes from, who may use it,
 and how it reaches the process that does. LLM accounts, workers' secrets
 and people's sign-ins are jig's (jig's `protocol/README.md`, section 8;
@@ -276,10 +276,19 @@ sources in its holder's order. temper configures the LLM providers
   never in a root, temper's records, a fact, a request or an answer. A
   key reaches the engine in a request the client sends once and never
   keeps (jig's `domain/accounts.md`, section 5).
-- **Nothing handed in.** No record is read from a file or from another
-  program's login: a ChatGPT account comes only from a sign-in (jig's
+- **Nothing handed in but a moved record.** No record is read from
+  another program's login: a ChatGPT account comes from a sign-in (jig's
   `protocol/llm.md`, 5.4), and its grant is a bearer with no account's
-  id (jig's `protocol/llm.md`, 5.3).
+  id (jig's `protocol/llm.md`, 5.3). The one record read from a file is
+  a moved one: a signed-in account moved out of another temper
+  deployment by `temper ctl export` and in by `temper ctl import`
+  (`../client/tools.md`, 5.5, area 5), jig's move (jig's
+  `domain/accounts.md`, section 6), in jig's form (jig's
+  `protocol/llm.md`, 5.6) under the application's name `temper`,
+  temper's root's constant. The file is the person's, written new and
+  private by `ctl` and removed once moved in; the account has one
+  holder at a time, the file or one deployment, and each side refreshes
+  the record once it takes it, so a copy left behind is dead.
 - **The sources** (jig's `domain/accounts.md`, 3.4):
   - **signed in:** the person's sign-in with the LLM provider, asked
     from the client. The engine binds a loopback listener for each
@@ -374,7 +383,8 @@ sources in its holder's order. temper configures the LLM providers
   removes it from the client.
 - **What temper does not do:** configure an account, sign one in at a
   terminal of its own, keep a record or a key in its own store or a
-  file, refresh an account, or read a program's login.
+  file of its own (a moved record's file is the person's, above),
+  refresh an account, or read a program's login.
 
 ## 4. Git identities
 

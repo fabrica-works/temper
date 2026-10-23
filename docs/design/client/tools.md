@@ -505,8 +505,8 @@ area lands with its stories (section 11).
    | `verify ACCOUNT [--source S]` | has each host check a program source's login now; answered once asked, then `wait accounts --until settled` | check | |
    | `rank ACCOUNT POSITION [--source S]` | the account's place among its holder's accounts of its LLM provider, from 1; with `--source`, the source's place in the account's order | order | |
    | `retry ACCOUNT [--source S]` | resumes a limited source, so that the runs it holds start again | resume | |
-   | `export ACCOUNT FILE` | moves a signed-in account out, by its holder: its signed-in source withdrawn, so that no run takes it and no refresh follows; its record written to FILE, made new and private; then the engine erases it. Refused, exit 2: "not signed in" (no signed-in source: a key is added again, a program's login is per host), "exists" (FILE). A record not written is not erased: the move is cancelled | move out | |
-   | `import FILE` | moves a record in from FILE: taken into the secrets' store, checked as this application's and its subject held by no other holder, the account made or the one of its subject renewed; prints the account, then removes FILE. Refused, exit 2: "not ours" (another application's or LLM provider's record), "held" (its subject held by another holder) | move in | yes |
+   | `export ACCOUNT FILE` | moves a signed-in account out, by its holder: FILE made new and private before anything is sent; the signed-in source withdrawn, so that no run takes it and no refresh follows; its record written to FILE and synced; then *written*, and the engine erases it. Prints `moved out: account N to FILE`. FILE already there, exit 1, nothing sent. Refused, exit 2, FILE removed: "not signed in" (no signed-in source: a key is added again, a program's login is per host), "moving", "cancelled" (*written* past the move's deadline). A record not written, or lost on its way, is not erased: exit 1, FILE removed, and the engine cancels the move at its deadline | move out, then *written* | |
+   | `import FILE` | moves a record in from FILE, read as a key's file is: taken into the secrets' store, checked as this application's and its subject held by no other holder, the account made or the one of its subject renewed; prints `moved in: account N`, `, renewed` after it for a renewal, then removes FILE. FILE refused (not private, a link, empty, past the bound), exit 1, nothing sent. Refused, exit 2, FILE kept: "not ours" (another application's or LLM provider's record), "held" (its subject held by another holder), "moving" (its subject's account moving out here) | move in | yes |
 
    - **The names are plain verbs, and reads nouns,** as the other
      tools' are. Eight are not jig's words: `sign-in` and `sign-out` are
@@ -555,14 +555,68 @@ area lands with its stories (section 11).
      `domain/accounts.md`, 4.2) until the QA loop asks for one (section
      15).
    - **An account moved,** `export` and `import`, is jig's move (jig's
-     `domain/accounts.md`, section 6), built with it: its two requests
-     are not yet among jig's. The QA loop on real backends needs it
-     first: each run's fresh deployment takes the one signed-in account
-     in and gives it back (`../draft/qa-live.md`, 4.3), as a host with no
-     browser takes a record signed in on a computer with one. FILE is
-     read and written as a key's file is, the record never printed, and
-     `import`'s request never kept (section 7). `move` and `take` are
-     area 3's names.
+     `domain/accounts.md`, section 6) through `jig-client`'s `move_out`,
+     `written` and `move_in` (jig's `client/domain/client.md`, section
+     6). The QA loop on real backends needs it first: each run's fresh
+     deployment takes the one signed-in account in and gives it back
+     (`../draft/qa-live.md`, 4.3), as a host with no browser takes a
+     record signed in on a computer with one. The record is never
+     printed, never an argument, and in no request or answer kept
+     (section 7). `move` and `take` are area 3's names.
+   - **The file's form is jig's,** opaque to temper: a moved record,
+     `JIGM` and its version, then the application's name, the issuer,
+     the client id, the subject, the display name and skein's record
+     (jig's `protocol/llm.md`, 5.6). The application's name is
+     `temper`, temper's root's constant, the same in every deployment
+     and never configured, so a file moves between any two temper
+     deployments whose LLM provider has the same registration (issuer
+     and client id, as ChatGPT's is: `../protocol/setup.md`, 8.1), and
+     is refused "not ours" by another application built on jig.
+   - **`export`, step by step,** in the shell
+     (`temper-client-shell-cli`), the tools' root deciding each step:
+     1. FILE is made new before anything is sent: an exclusive create,
+        so that no name already there, a link among them, is opened,
+        with no group or other bits (0600). FILE there: `temper ctl:
+        FILE exists`, exit 1.
+     2. `move_out` is sent once, under a name the table draws and never
+        keeps (section 7).
+     3. Answered *moving out*, the record is written to FILE whole,
+        FILE synced and then its directory, and only then is `written`
+        sent with the move's number, an ordinary request, kept in
+        DIRECTORY until answered (8.2). Answered done, the tool prints
+        `moved out: account N to FILE`, FILE as given, and exits 0:
+        FILE is the account's only holder.
+     4. Until `written` is sent, every failure removes FILE, which
+        then holds no record the engine has let go: a refusal ("not
+        signed in", "moving"), exit 2; the record not written (a write
+        or a sync failed), `temper ctl: FILE not written: WHY; the
+        engine keeps the account and cancels the move at its
+        deadline`, exit 1; the answer lost (jig-client's *lost*: the
+        exchange ended with no whole answer, or the answer came with no
+        record), `temper ctl: the record of the move was lost on its
+        way; the engine keeps the account and cancels the move at its
+        deadline; export again after it`, exit 1; *unsent*, as every
+        call's, exit 1; a signal, 128 plus its number.
+     5. `written` refused "cancelled" (the move's deadline passed, or
+        the engine restarted, and its record was refreshed once at the
+        engine, so FILE's is dead): FILE is removed, exit 2.
+     6. Once `written` is sent and its answer has not come (the link
+        down past its deadline, a signal), FILE is kept: it is the only
+        holder if the engine took `written`, and a dead record if the
+        move was cancelled. The call exits as 6.3 says, and the next
+        call sends the kept `written` (section 15).
+   - **`import`, step by step:** FILE is read as a key's file is
+     (above), its bytes whole, nothing trimmed, within the bound of
+     section 12; refused, exit 1, nothing sent, the line naming FILE's
+     fault and never its bytes. `move_in` carries the bytes once under
+     `--key NAME`, never kept (section 7). Answered *moved in*, the tool
+     prints the account, then removes FILE, whose record is dead once
+     the engine refreshes it; a removal that fails exits 1, `temper
+     ctl: FILE not removed: WHY; its record is spent`, after the
+     account's line. Every other end keeps FILE, the only holder of the
+     record: a refusal, exit 2; *unsent*, *lost* or the link down,
+     exit 1, and the agent asks again with the same `--key` and FILE,
+     answered with the first answer within the engine's retention.
 6. **Forges** (`forge.md`, 5.1, 5.4 and 5.5): each configured forge as
    temper's `Forges` page shows it, its connects, and the adoption
    form's picker. Each act is one of the FORGE requests (`README.md`,
@@ -866,6 +920,13 @@ may change with them.
   signal's number, never 0 (8.2).
 - **A call whose link stays down** past its deadline exits 1, and what
   it sent stays in the small store, for the next call that sends (8.2).
+- **An account's move** (5.5, area 5) keeps the rule: 2 is the
+  engine's refusal alone, "not signed in", "not ours", "held",
+  "moving" and "cancelled"; FILE's faults are the tool's own, exit 1,
+  nothing sent: `export`'s FILE already there, `import`'s FILE not
+  private, a link, empty or past its bound; so are a record not
+  written and an answer lost or unsent, exit 1, each line saying what
+  the engine does with the account.
 - **Only `sign-in` creates DIRECTORY.** Three of 1's lines, word for
   word: `temper ctl: DIRECTORY does not exist`, for any other call on a
   DIRECTORY that is not there; `temper ctl: DIRECTORY is not signed
@@ -962,6 +1023,17 @@ may change with them.
   `--key` optionally, as the other acts do, but the name drawn is not
   kept, so only a name the agent gives can be asked again; a rerun
   without one replaces the key or the tokens again.
+- **An account's move** (5.5, area 5): `import`'s `move_in` is a
+  request carrying a value, as `add-key`'s is, under its `--key`.
+  `export`'s `move_out` is a request whose answer carries one, the
+  record: sent once under a name the table draws, never kept and never
+  sent again, since the record comes with the first answer alone and
+  the name asked again is answered with none, *lost* (jig's
+  `client/domain/contract.md`, 3.1). So `export` takes no `--key`: an
+  export asked again is a new request, refused "moving" until the
+  first move is cancelled at its deadline. Its `written` is an
+  ordinary request under a drawn name, kept in DIRECTORY until
+  answered (8.2).
 
 ## 8. The command line: `temper ctl`
 
@@ -1202,6 +1274,18 @@ ready.
 - **DIRECTORY's records,** in `temper-client-shell-cli`'s tests: a
   record of a store version the tools do not read counted by `pending`,
   and the next call that sends saying it dropped it.
+- **An account's move,** in `temper-client-shell-cli`'s tests, the
+  engine's answers scripted (5.5, area 5; 6.3): `export`'s FILE already
+  there, a link among them, exit 1 with nothing sent; FILE made with
+  mode 0600, the record written whole and synced, then its directory,
+  before `written` is sent; each of the engine's refusals, exit 2, FILE
+  removed; `written` refused "cancelled", exit 2, FILE removed; a write
+  that fails, and an answer lost, exit 1, FILE removed and no `written`
+  sent; `written`'s answer not come, FILE kept. `import`'s FILE not
+  private, a link, empty and past its bound, exit 1 with nothing sent;
+  *moved in*, the account printed and FILE removed; each refusal, exit
+  2, and *lost*, exit 1, FILE kept. No record's byte on stdout, stderr
+  or in DIRECTORY's store.
 
 ### 11.2 `tests/client`
 
@@ -1359,11 +1443,23 @@ section 10, and a key's file refused when it is not private, as a
 forge's pasted value's file is), an act
 cut by a termination signal, its status 128 plus the signal's number
 (8.2), then asked again under its key, made once, and agent process
-launch. Under `temper box`, `forge-setup` of the default document's
+launch; an account moved between two deployments (below). Under `temper box`, `forge-setup` of the default document's
 forge 3 and `wait forges --until settled` against the real Forgejo and
 runner (`../domain/testing.md`, 2.6). One landing on the owned Forgejo proves a change against real
 git and CI (`../domain/testing.md`, 2.6). The lock, DIRECTORY's files
 and a call's exit are the real loop's (11.3).
+
+**An account moved,** one story (5.5, area 5): two `temper serve`
+processes, deployments A and B on directories of their own, and one
+fake issuer. A person signs in to A with the LLM provider through
+`connect`, the fake browser approving; `export ACCOUNT FILE` exits 0
+and A's `accounts` no longer has the account; the owner of B, signed in
+to B by its printed link, runs `import FILE --key NAME`, which prints
+the account and exits 0, FILE gone; B, stopped and started again on its
+directories, holds the account, and a grant is lent on it after its one
+refresh at the issuer; the issuer refuses the refresh token FILE held.
+What jig's worlds show of the move (a late *written*, a restart while
+moving, the refusals' decisions) is not repeated here.
 
 ### 11.5 The agents' guide
 
@@ -1418,6 +1514,7 @@ terminal's, whose window shows two rows:
 | the link's deadline: the engine unreachable, or a call's request or answer unheard | 30 s |
 | the lock's wait | 60 s, tried every 100 ms |
 | a key's file, less a final newline (5.5, area 5) | 4 KiB; past it, or empty, exit 1 with nothing sent; a key the engine refuses is its refusal, exit 2 |
+| a moved record's file, whole (5.5, area 5) | 128 KiB, jig's bound on a keyed request's value (jig's `protocol/client.md`, section 5); past it, or empty, exit 1 with nothing sent; a file past its form's bound at the engine is its refusal, a limit, exit 2 |
 | a forge's pasted value: its file, and the bundle the tool makes of it (5.5, area 6) | 4 KiB, jig's bound on a carried value; past it, or empty, exit 1 with nothing sent; a value the engine refuses, one past the deployment's `records.value_bytes` among them, is its refusal, exit 2 |
 | a picker's page, `repositories` (5.5, area 6) | 100 rows, the most `picker.page` takes, printed whole: temper's own family carries them, not jig's rows; a step test fails when 100 rows at the client's bound on a field's bytes pass a result's text (11.1) |
 | a wait's timeout | 300 s by default, at most 3600 (5.4) |
@@ -1450,7 +1547,8 @@ contract's reads, watches and requests, they take:
   `accounts` watch (jig's `client/domain/contract.md`, 7.1); the models
   a party may use, in `me` (jig's `client/domain/contract.md`, 5.1),
   and the LLM choice in a task's request (jig's `domain/tasks.md`,
-  section 3); and a request carrying a value,
+  section 3); and a request carrying a value, and one whose answer
+  carries one (the moved record, `jig-client`'s `move_out`),
   sent once and never kept nor resent (jig's `client/domain/client.md`,
   section 6; jig's `protocol/client.md`, section 10).
 - **For area 6,** temper's FORGE requests (`README.md`, section 8), each
@@ -1504,6 +1602,13 @@ Each is named here and designed when it comes.
 - **An account's uses:** no tool, each account taking jig's defaults
   (jig's `domain/accounts.md`, 4.2). Default: a tool of area 5 once the
   QA loop plays a service paid by a person's account (section 14).
+- **An export's `written` answered to a later call** (5.5, area 5): when
+  `export` ends before `written` is answered, the next call that sends
+  it reports its answer as any kept request's, and nothing removes
+  FILE when it is refused "cancelled", though FILE's record is then
+  dead (an import of it makes an account needing sign-in at its first
+  refresh). Default: so, until the QA loop meets it; the alternative
+  keeps FILE's path with the kept request, a stored format.
 - **A tokens file's layout** (5.5, area 6): temper's bundle is items by
   number (`../protocol/credentials.md`, pasted values), which no person
   writes. Default: `NAME VALUE` lines, as 5.5 has them; JSON, or a file
