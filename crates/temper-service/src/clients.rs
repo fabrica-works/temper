@@ -889,8 +889,13 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
     Some(kit::Kept { digest: skein_lib::Secret::new(Box::from(bytes.get(8..)?)), expires: Wall::from_nanos(expires) })
 }
 
-fn http_settings(_public: Option<&crate::startup::application::Origin>) -> http::Settings {
-    http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
+#[expect(clippy::manual_map, reason = "the strict subset does not use closures")]
+fn http_settings(public: Option<&crate::startup::application::Origin>) -> http::Settings {
+    let public = match public {
+        Some(origin) => Some(origin.name.clone()),
+        None => None,
+    };
+    http::Settings { prefix: Box::from(b"/jig".as_slice()), public }
 }
 
 fn event_owner(event: &io::Event) -> Option<Token> {

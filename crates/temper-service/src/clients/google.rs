@@ -5,6 +5,7 @@ use super::{Clients, fetch};
 use alloc::boxed::Box;
 use jig_domain_people as people;
 use jig_protocol_engine_clients as kit;
+use jig_protocol_engine_clients_http as mapping;
 use skein_http::{Header, Method, server as http};
 use skein_lib::{
     CryptoRng, Decimal, Duration, Env, List, Map, Queue, Secret, Time, Token, Wall, Writer,
@@ -58,6 +59,8 @@ pub(super) struct Reply {
     body: Option<Box<[u8]>>,
     offset: usize,
     returned: bool,
+    /// How the call came, as jig decides its cookies' `Secure` (jig protocol/client.md, 17.3).
+    via: mapping::Via,
 }
 #[must_use]
 pub fn claims(target: &[u8]) -> bool {
@@ -215,11 +218,6 @@ fn cookie(public: bool, name: &[u8], path: &[u8], value: &[u8], life: Duration, 
     }
     Header { name: bytes::copy_of(b"Set-Cookie"), value: out.finish() }
 }
-/// Current-pin stand-in. At the jig repin replace this with
-/// `http::cookie(&settings, http::via(&settings, &call), credential, life)`.
-pub(super) fn credential_cookie(public: bool, credential: &Secret, life: Duration) -> Header {
-    cookie(public, b"jig-sign-in", b"/jig", credential.expose(), life, false)
-}
 impl Google {
     pub(super) fn new(
         settings: &crate::settings::SignIn,
@@ -360,17 +358,18 @@ fn claims_from(token: &[u8], limits: &oauth::Limits) -> Option<Claims> {
     Some(claims)
 }
 impl Clients {
-    fn google_secure(&self) -> bool {
-        match &self.public {
-            Some(origin) => origin.scheme == crate::startup::application::Scheme::Https,
-            None => false,
+    fn google_via(&self, call: Token) -> mapping::Via {
+        match self.google_replies.get(&call) {
+            Some(reply) => reply.via,
+            None => mapping::Via::Listener,
         }
     }
     #[expect(clippy::too_many_lines, reason = "the start and return share one bounded route admission")]
     pub(super) fn google_call(&mut self, call: Token, head: http::Call) {
         let (path, parameters) = split(&head.target);
         let returned = path == b"/sign-in/google/return";
-        self.google_replies.insert(call, Reply { body: None, offset: 0, returned }).expect("bounded HTTP calls");
+        let via = mapping::via(&super::http_settings(self.public.as_ref()), &head);
+        self.google_replies.insert(call, Reply { body: None, offset: 0, returned, via }).expect("bounded HTTP calls");
         let Some(mut google) = self.google.take() else {
             self.google_answer(call, 404, None, &[], None);
             return;
@@ -499,7 +498,7 @@ impl Clients {
         self.google = Some(google);
     }
     fn google_answer(&mut self, call: Token, status: u16, location: Option<&[u8]>, body: &[u8], set: Option<Header>) {
-        let secure = self.google_secure();
+        let secure = self.google_via(call) == mapping::Via::Public;
         self.server.release(call);
         let Some(reply) = self.google_replies.get_mut(&call) else { return };
         if reply.body.is_some() {
@@ -651,7 +650,8 @@ impl Clients {
             self.google_answer(call, 400, None, &pages::expired(&pending.then), None);
         } else if let Some((credential, expires)) = answer {
             let life = Duration::from_nanos(expires.as_nanos().saturating_sub(self.env.wall.as_nanos()));
-            let cookie = credential_cookie(self.google_secure(), &credential, life);
+            let cookie =
+                mapping::cookie(&super::http_settings(self.public.as_ref()), self.google_via(call), &credential, life);
             self.google_answer(call, 303, Some(&pending.then), &[], Some(cookie));
         } else {
             self.google_answer(call, 503, None, &pages::busy(&pending.then), None);
@@ -673,7 +673,7 @@ impl Clients {
             oauth::Request::Visit { url } => {
                 if let Some(call) = pending.call.take() {
                     let set = cookie(
-                        self.google_secure(),
+                        self.google_via(call) == mapping::Via::Public,
                         b"temper-sign-in",
                         b"/sign-in/google",
                         &pending.tag,

@@ -8,7 +8,9 @@ use super::{Problems, What};
 use crate::{limits, settings};
 use alloc::boxed::Box;
 use jig_protocol_config::{self as config, Path};
-pub use public::{Origin, Scheme};
+pub use public::Origin;
+#[cfg(test)]
+pub use public::Scheme;
 use skein_json::{Document, document::Kind};
 use skein_lib::{List, bytes};
 

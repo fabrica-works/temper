@@ -81,20 +81,6 @@ fn then_is_a_single_origin_path_after_one_decode() {
     assert_eq!(then(past.as_bytes()).as_ref(), b"/");
 }
 #[test]
-fn the_cookie_standin_matches_jigs_attributes_and_public_secure_decision() {
-    for public in [false, true] {
-        let cookie = credential_cookie(public, &Secret::new(Box::new([0; 40])), Duration::from_secs(60));
-        assert!(cookie.value.starts_with(b"jig-sign-in="));
-        assert!(
-            cookie
-                .value
-                .windows(b"; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=60".len())
-                .any(|part| part == b"; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=60")
-        );
-        assert_eq!(cookie.value.ends_with(b"; Secure"), public);
-    }
-}
-#[test]
 fn endings_escape_addresses_errors_and_return_attributes() {
     let address = b"a<&\"@example.com";
     let then = b"/a?x=\"&y=<";
