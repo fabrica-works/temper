@@ -123,6 +123,7 @@ pub(crate) fn run(
         forge: None,
         github: None,
         llm_history: LlmHistory::default(),
+        children: Children::default(),
     });
     world.spawn(|| {
         Proc::Llm(Box::new(Llm {
@@ -202,6 +203,7 @@ pub(crate) fn run_forge(
         forge: Some(state.clone()),
         github: None,
         llm_history: LlmHistory::default(),
+        children: Children::default(),
     });
     world.spawn(|| {
         Proc::Llm(Box::new(Llm {
@@ -317,6 +319,71 @@ struct Judge {
     forge: Option<std::rc::Rc<std::cell::RefCell<Option<forge::State>>>>,
     github: Option<crate::github::State>,
     llm_history: LlmHistory,
+    children: Children,
+}
+
+/// Hosted children append during a pass; killed children are removed between passes.
+#[derive(Default)]
+struct Children {
+    seen: usize,
+    finished: bool,
+    terminals: Vec<usize>,
+    calls: Vec<[Option<(usize, bool)>; 2]>,
+    repeated: Vec<usize>,
+    locks: std::rc::Rc<std::cell::RefCell<crate::calls::recorded::LockChanges>>,
+}
+impl Children {
+    fn observe(&mut self, children: &[Proc]) -> bool {
+        let removed = children.len() < self.seen;
+        if removed {
+            self.seen = 0;
+            self.terminals.clear();
+            self.calls.clear();
+            self.repeated.clear();
+            self.locks.borrow_mut().clear();
+        }
+        for (offset, proc) in children[self.seen..].iter().enumerate() {
+            if let Proc::Ctl(recorded) = proc {
+                let index = self.seen + offset;
+                if self.calls.len() <= recorded.call {
+                    self.calls.resize(recorded.call + 1, [None; 2]);
+                }
+                let first = &mut self.calls[recorded.call][usize::from(recorded.setup)];
+                if let Some((first, repeated)) = first {
+                    if !*repeated {
+                        self.repeated.push(*first);
+                        *repeated = true;
+                    }
+                    self.repeated.push(index);
+                } else {
+                    *first = Some((index, false));
+                }
+                if !self.finished {
+                    recorded.observe_with(&self.locks);
+                }
+            } else if matches!(proc, Proc::Terminal(_)) {
+                self.terminals.push(self.seen + offset);
+            }
+        }
+        self.seen = children.len();
+        removed
+    }
+    fn finish(&mut self, children: &[Proc]) {
+        // The referee owns the queue's heap. Hosts must release their subscriptions
+        // before the referee drops, so no host frees another owner's allocation.
+        for proc in children {
+            if let Proc::Ctl(recorded) = proc {
+                recorded.stop_observing();
+            }
+        }
+        self.finished = true;
+    }
+    fn settled(&self, children: &[Proc]) -> bool {
+        self.terminals.iter().all(|index| {
+            let Proc::Terminal(terminal) = &children[*index] else { panic!("terminal position") };
+            terminal.is_empty()
+        })
+    }
 }
 
 #[derive(Default)]
@@ -371,7 +438,7 @@ impl Referee<Proc> for Judge {
     fn act(&mut self, now: Time, procs: &mut [Proc]) {
         self.wake = None;
         let engine_index = procs.iter().position(|proc| matches!(proc, Proc::Service(_))).expect("engine root");
-        let caller_end = procs.iter().position(|proc| matches!(proc, Proc::Caller(_))).expect("caller root") + 1;
+        let caller_end = 3;
         let (roots, children) = procs.split_at_mut(caller_end);
         let [Proc::Llm(peer), Proc::Service(service), Proc::Caller(caller)] = roots else {
             panic!("root admission order")
@@ -396,17 +463,17 @@ impl Referee<Proc> for Judge {
             }
             self.armed = true;
         }
-        for proc in children.iter_mut() {
-            if let Proc::Ctl(recorded) = proc {
-                if recorded.setup && !caller.setup() {
-                    continue;
+        // Observe removals before this pass can append children with reused positions.
+        if self.children.observe(children) {
+            // Removal can reveal an older attempt at a reused call number. Restore
+            // the retained hosts' admission order, just as the whole scan did.
+            for proc in children.iter() {
+                if let Proc::Ctl(recorded) = proc {
+                    recorded.apply(caller);
                 }
-                let result = &mut caller.calls[recorded.call];
-                result.locked = recorded.locked;
-                result.released = recorded.released;
-                result.busy = recorded.busy;
             }
         }
+        self.children.locks.borrow_mut().apply(caller);
         if let Some(state) = &self.forge {
             let mut borrowed = state.borrow_mut();
             let state = borrowed.as_mut().expect("spawned forge");
@@ -450,7 +517,7 @@ impl Referee<Proc> for Judge {
             service.arm_watch(call);
             caller.watched = service.delivered();
         }
-        if caller.is_empty() && terminals_settled(children) && !self.stopping {
+        if caller.is_empty() && self.children.settled(children) && !self.stopping {
             for (position, _) in self.workers.iter().enumerate() {
                 self.controls.signal(caller_end + position, ServiceSignal::Terminate);
             }
@@ -462,6 +529,7 @@ impl Referee<Proc> for Judge {
         }
         if service.is_empty() && !self.finished {
             peer.shutdown();
+            self.children.finish(children);
             self.finished = true;
         }
     }
@@ -469,7 +537,7 @@ impl Referee<Proc> for Judge {
         let [Proc::Llm(peer), Proc::Service(service), Proc::Caller(caller), ..] = procs else {
             panic!("root admission order")
         };
-        let caller_end = procs.iter().position(|proc| matches!(proc, Proc::Caller(_))).expect("caller root") + 1;
+        let caller_end = 3;
         let (workers, children) = procs[caller_end..].split_at(self.workers.len());
         let workers_changed = workers.iter().any(|proc| {
             let Proc::Service(worker) = proc else { panic!("worker root") };
@@ -478,35 +546,24 @@ impl Referee<Proc> for Judge {
                     && service.workers_address.is_some()
                     && worker.cluster.as_ref().is_some_and(|shape| !shape.ready()))
         });
-        if let Some(terminal) = children
-            .iter()
-            .rev()
-            .find_map(|proc| if let Proc::Terminal(terminal) = proc { Some(terminal) } else { None })
-        {
+        let _ = self.children.observe(children);
+        if let Some(index) = self.children.terminals.last() {
+            let Proc::Terminal(terminal) = &children[*index] else { panic!("terminal position") };
+            // Exit lines mutate in place, rather than appending to a history.
             caller.terminal.refused.set(terminal.exit_line().is_some_and(|line| {
                 line.as_ref() == b"temper open: the link was refused: use the fresh link temper serve printed\n"
             }));
         }
         caller.held.set(service.held_at(caller.held_index()));
         caller.links.set(service.links());
-        let lock_changed = children.iter().any(|proc| match proc {
-            Proc::Ctl(recorded) => {
-                if recorded.setup && !caller.setup() {
-                    return false;
-                }
-                caller.calls[recorded.call].busy != recorded.busy
-                    || caller.calls[recorded.call].locked != recorded.locked
-                    || caller.calls[recorded.call].released != recorded.released
-            }
-            Proc::Llm(_)
-            | Proc::Forge(_)
-            | Proc::Service(_)
-            | Proc::Caller(_)
-            | Proc::Terminal(_)
-            | Proc::Agent(_)
-            | Proc::Git(_)
-            | Proc::GitRoute(_) => false,
-        });
+        // Retried calls reuse a caller slot: older immutable records may disagree
+        // with the newest attempt even without another host event. Keep these
+        // comparisons whole; ordinary calls only compare their queued changes.
+        let lock_changed = self.children.locks.borrow().changed(caller)
+            || self.children.repeated.iter().any(|index| {
+                let Proc::Ctl(recorded) = &children[*index] else { panic!("repeated ctl position") };
+                recorded.differs(caller)
+            });
         let forge_changed = self.forge.as_ref().is_some_and(|state| {
             let borrowed = state.borrow();
             let state = borrowed.as_ref().expect("spawned forge");
@@ -552,7 +609,7 @@ impl Referee<Proc> for Judge {
                 && !caller.released
                 && workers.iter().all(|proc| matches!(proc, Proc::Service(worker) if !worker_started(worker) || worker.linked() > 0)))
             || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))
-            || (caller.is_empty() && terminals_settled(children) && !self.stopping)
+            || (caller.is_empty() && self.children.settled(children) && !self.stopping)
             || (service.is_empty() && !self.finished)
         {
             self.wake = Some(now);
@@ -579,10 +636,6 @@ fn person_push(now: Time, caller: &Caller, state: &mut forge::State, seen: &mut 
         state.push(now, skein_shell::Clock::new().now().wall, path, words);
         seen.pushed(&state.handle);
     }
-}
-
-fn terminals_settled(children: &[Proc]) -> bool {
-    children.iter().all(|proc| !matches!(proc, Proc::Terminal(terminal) if !terminal.is_empty()))
 }
 
 fn github_cues(
@@ -662,6 +715,7 @@ fn cluster_judge(
         forge,
         github: None,
         llm_history: LlmHistory::default(),
+        children: Children::default(),
     }
 }
 

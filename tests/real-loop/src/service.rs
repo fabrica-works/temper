@@ -39,6 +39,7 @@ pub struct ServiceHost {
     local_completion: bool,
     life_tasks: usize,
     life_links: usize,
+    linked: usize,
 
     pub(crate) cluster: Option<crate::cluster::Shape>,
     pub(crate) workers_address: Option<SocketAddr>,
@@ -134,6 +135,7 @@ impl ServiceHost {
             local_completion: false,
             life_tasks: 0,
             life_links: 0,
+            linked: 0,
             cluster,
             workers_address: None,
             notes: Vec::new(),
@@ -268,7 +270,7 @@ impl ServiceHost {
     /// Worker openings retained from the shipped service's diagnostics.
     #[must_use]
     pub fn linked(&self) -> usize {
-        self.notes.iter().filter(|note| matches!(note, temper_service::Note::Linked { .. })).count()
+        self.linked
     }
     /// Links printed by this service start, independent of the scratch's old file.
     #[must_use]
@@ -374,9 +376,11 @@ impl Host for ServiceHost {
                 if let temper_service::Note::Listening { listener: temper_service::Listening::Workers, addr } = note {
                     self.workers_address = Some(addr);
                 }
+                self.linked += usize::from(matches!(note, temper_service::Note::Linked { .. }));
                 self.notes.push(note);
             }
             while let Some(note) = service.notes().pop() {
+                self.linked += usize::from(matches!(note, temper_service::Note::Linked { .. }));
                 self.notes.push(note);
             }
             while let Some(link) = service.links().pop() {
