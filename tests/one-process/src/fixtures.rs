@@ -1,6 +1,8 @@
 //! Configuration bytes, private files and scripts shared by the stories.
 #[cfg(test)]
 pub(crate) mod durable;
+#[path = "../../real-loop/src/turn_bounds.rs"]
+pub mod turn_bounds;
 use crate::world::Settings;
 use jig_channel_world::fixtures as channel;
 use skein_lib::{Duration, List, Secret};
@@ -147,6 +149,7 @@ pub(crate) fn document() -> Vec<u8> {
     value["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
     value["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
     value["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
+    turn_bounds::apply(&mut value, agent().limits.bodies.turn_body);
     serde_json::to_vec(&value).expect("deployment JSON")
 }
 pub(crate) fn files() -> temper_service::settings::Files {
