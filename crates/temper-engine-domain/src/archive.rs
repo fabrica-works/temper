@@ -296,7 +296,7 @@ pub(crate) fn transcript_loaded(
                 return;
             }
         };
-        if !domain.core.append_transcript(task, turn) {
+        if !domain.core.append_transcript(task, turn, None) {
             transcript_failed(domain, waiter);
             return;
         }

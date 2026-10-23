@@ -134,6 +134,7 @@ pub(crate) fn core_limits(limits: &Limits) -> jig_domain_core::Limits {
         brief: brief_limits(&limits.brief),
         brief_parts: limits.brief.parts,
         brief_core_budgets: jig_domain_core::CoreBriefBudgets {
+            tail: 2048,
             task: limits.brief.budgets.task,
             dependencies: limits.brief.budgets.dependencies,
             attempts: limits.brief.budgets.attempts,
