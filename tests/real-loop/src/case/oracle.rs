@@ -2795,7 +2795,7 @@ pub fn step_5_5(observed: &Observed) -> Vec<Miss> {
 }
 
 fn plan_authority(observed: &Observed, misses: &mut Vec<Miss>) {
-    use super::{A_DEADLINE, A1_DEADLINE, PLANNER, SUBOWNER, SUBOWNER_REFUSAL};
+    use super::{A_DEADLINE, A1_DEADLINE, PLANNER, SPEND_DEFICIT, SUBOWNER, SUBOWNER_REFUSAL};
     let a = task_document(observed, Read::PlannerEnded);
     let a1 = task_document(observed, Read::SubownerEnded);
     step_check(
@@ -2817,12 +2817,14 @@ fn plan_authority(observed: &Observed, misses: &mut Vec<Miss>) {
         "5.5",
         number(a1, "/authority/authority/delegation/depth") == Some(0)
             && refused.len() == 1
-            && refused.iter().all(|(_, _, output)| contains(output, SUBOWNER_REFUSAL))
+            && refused
+                .iter()
+                .all(|(_, _, output)| contains(output, SUBOWNER_REFUSAL) && !contains(output, SPEND_DEFICIT))
             && number(a1, "/chip/details/owner/details/live_delegates") == Some(0)
             && a1["delegates"].as_array().is_some_and(Vec::is_empty)
             && observed.documents.values().all(|doc| number(&doc["task"], "/requester/task") != Some(SUBOWNER)),
         PLAN_DEPTH,
-        "A1 must hear its delegation refusal, with depth 0 and no child in any read document",
+        "A1 must hear its delegation refusal for depth alone, with depth 0 and no child in any read document",
     );
 }
 
@@ -3217,7 +3219,11 @@ mod plan_tests {
         if let Part::ToolOutput { id, .. } = &mut forged_output.told[5].history[1].parts[0] {
             *id = b"unmatched".as_slice().into();
         }
-        for observed in [prose, child, wrong_parent, forged_output] {
+        let mut spend = met();
+        if let Part::ToolOutput { output, .. } = &mut spend.told[5].history[1].parts[0] {
+            *output = format!("{SUBOWNER_REFUSAL}spend allowance; ").into_bytes().into();
+        }
+        for observed in [prose, child, wrong_parent, forged_output, spend] {
             assert!(!step_5_5(&observed).is_empty());
         }
     }
