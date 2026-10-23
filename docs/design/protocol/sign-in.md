@@ -496,6 +496,14 @@ by the client, not by a route:
   The web shell gives them to the view with the ways; the signed-out
   note and "to continue to" read them, as "Open Forgejo ↗" reads the
   forge's row.
+- **The address's bound:** signed out, an authorization address
+  (`/oauth/authorize?` and its query) past the Google start's `then`
+  bound, 1,024 bytes (4.2), cannot ride the sign-in, and is refused
+  *malformed* before anything is sent. Signed in, the query goes to jig
+  as it came, within jig's own bound on it.
+- **No ADDRESS yet:** jig's party gives the client its name and login,
+  not its identity's subject, so the signed-in line drops " · ADDRESS"
+  until it does (section 10).
 - **No consent page:** the clients are the deployment's, configured by
   its owners.
 
@@ -620,6 +628,8 @@ section 3), and temper's `application.sign_in.forges`:
   addresses alone.
 - **A terminal sign-in for a member who is not the owner:** a device
   code's flow. Default: the browser alone.
+- **The signed-in line's address.** Default: dropped, since jig's
+  party carries no subject (9.3); otherwise jig's party carries it.
 - **The authorization's refusals without words:** *malformed*, *no
   provider* and *not a person* (9.3). Default, until words are chosen:
   the heading "This sign-in can’t continue" with no paragraph.
