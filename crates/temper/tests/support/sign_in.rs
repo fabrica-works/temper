@@ -46,7 +46,7 @@ pub fn configuration(directory: &Path) -> oauth::Peer {
 
 /// Point an initialized config directory at the issuer and the existing TLS fake.
 #[must_use]
-pub(super) fn patch_configuration(directory: &Path) -> oauth::Peer {
+pub fn patch_configuration(directory: &Path) -> oauth::Peer {
     let [address] = super::free_addresses(&["127.0.0.1:34443".parse().expect("LLM address")]);
     let origin = format!("http://{address}");
     let path = directory.join("temper.json");
@@ -79,6 +79,24 @@ pub(super) fn patch_configuration(directory: &Path) -> oauth::Peer {
     super::write_private(&agent_path, &serde_json::to_vec(&agent).expect("agent JSON"));
     super::write_private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
     issuer(address, &registration, redirect.as_bytes())
+}
+
+/// Recreate the fake issuer on its recorded address without changing the deployment.
+#[must_use]
+pub fn restart_issuer(directory: &Path) -> oauth::Peer {
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.join("temper.json")).expect("patched document")).expect("JSON");
+    let registration = &value["engine"]["llm"]["providers"][0]["sources"]["sign_in"];
+    let address = registration["issuer"]
+        .as_str()
+        .expect("patched issuer")
+        .strip_prefix("http://")
+        .expect("local plaintext issuer")
+        .parse()
+        .expect("issuer socket");
+    // The fixture permits a varying callback port; no second sign-in is asked.
+    let redirect = format!("http://127.0.0.1:0/{}", registration["redirect_path"].as_str().expect("callback path"));
+    issuer(address, registration, redirect.as_bytes())
 }
 
 fn issuer(address: std::net::SocketAddr, registration: &serde_json::Value, redirect: &[u8]) -> oauth::Peer {
@@ -347,12 +365,7 @@ impl Referee<Process> for AnswerJudge {
         if self.observation == Observation::Signing && person.steps_seen() >= SIGNING_SEEN {
             let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
             let connected = &calls.ends()[2];
-            let address = connected
-                .stdout
-                .split(|byte| *byte == b'\n')
-                .find(|line| line.starts_with(b"http://127.0.0.1:"))
-                .expect("connect prints the address")
-                .to_vec();
+            let address = authorization_address(connected).expect("connect prints the address").to_vec();
             let Process::Visitor(visitor) = &mut procs[3] else { panic!("browser") };
             visitor.hand(&address);
             self.observation = Observation::Visited;
@@ -710,7 +723,7 @@ fn assert_lasting_chat(ends: &[super::Ended], allowance: u64) {
     assert!(*size >= allowance && *size > 65_536, "native item and its turn pass 64 KiB: {size}");
 }
 
-pub(super) fn assert_plan_account(me: &super::Ended, ready: &super::Ended) {
+pub fn assert_plan_account(me: &super::Ended, ready: &super::Ended) {
     let person = ctl::json(me)["party"]["number"].as_u64().expect("person number");
     let ready = ctl::json(ready);
     let account = ready["accounts"]["party"]
@@ -727,4 +740,9 @@ pub(super) fn assert_plan_account(me: &super::Ended, ready: &super::Ended) {
         }),
         "usable signed-in source"
     );
+}
+
+/// The authorization address printed by connect, handed to the fake browser by either referee.
+pub(super) fn authorization_address(connected: &super::Ended) -> Option<&[u8]> {
+    connected.stdout.split(|byte| *byte == b'\n').find(|line| line.starts_with(b"http://127.0.0.1:"))
 }

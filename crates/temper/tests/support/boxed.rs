@@ -360,6 +360,9 @@ pub struct CtlOutcome<T> {
 }
 struct CtlJudge<'a, F, T> {
     expected_exits: Vec<(usize, u8)>,
+    face: Option<super::forge_land::FaceProcs>,
+    visit: Visit,
+    reply: Option<super::forge_land::Reply>,
     on_link: Option<Box<dyn FnOnce()>>,
     check: Option<F>,
     checked: &'a Cell<Option<T>>,
@@ -368,8 +371,32 @@ struct CtlJudge<'a, F, T> {
     settled: bool,
     deadline: Time,
 }
+enum Visit {
+    AwaitingAddress,
+    Handed,
+}
 impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
     fn act(&mut self, now: Time, procs: &mut [Process]) {
+        let Process::Calls(calls) = &procs[1] else { panic!("ctl") };
+        let failed = calls.ends().iter().enumerate().any(|(index, call)| {
+            let expected = self.expected_exits.iter().find(|(at, _)| *at == index).map_or(0, |(_, code)| *code);
+            call.exit != Some(Exit::Code(expected))
+        });
+        if let Some(face) = &self.face {
+            let Process::Calls(calls) = &mut procs[1] else { panic!("ctl") };
+            if matches!(self.visit, Visit::AwaitingAddress)
+                && let Some(address) = calls.ends().iter().find_map(super::sign_in::authorization_address)
+            {
+                let address = address.to_vec();
+                let Process::Visitor(visitor) = &mut procs[face.visitor] else { panic!("visitor") };
+                visitor.hand(&address);
+                self.visit = Visit::Handed;
+            }
+            let Process::Calls(calls) = &mut procs[1] else { panic!("ctl") };
+            if !failed {
+                self.reply.as_mut().expect("face reply reads").advance(calls, &mut self.expected_exits);
+            }
+        }
         let (drivers, peers) = procs.split_at_mut(2);
         let [Process::Binary(binary), Process::Calls(calls)] = drivers else { panic!("box and ctl") };
         if printed_link(calls.stdout()).is_some()
@@ -378,19 +405,45 @@ impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
             on_link();
         }
         calls.observe_box_stderr(binary.stderr(), now);
+        // The box's stderr may end a call: judge the calls again after it.
         let failed = calls.ends().iter().enumerate().any(|(index, call)| {
             let expected = self.expected_exits.iter().find(|(at, _)| *at == index).map_or(0, |(_, code)| *code);
             call.exit != Some(Exit::Code(expected))
         });
         let expired = now >= self.deadline;
         if !self.stopping && (calls.idle() || failed || expired || binary.exit_status().is_some()) {
+            if self.face.is_some() {
+                eprintln!(
+                    "face box stop: idle {}, failed {failed}, expired {expired}, calls {}",
+                    calls.idle(),
+                    calls.ends().len()
+                );
+                for (index, call) in calls.ends().iter().enumerate().rev().take(3) {
+                    eprintln!(
+                        "face call {index}: {:?}; stdout {}; stderr {}",
+                        call.exit,
+                        String::from_utf8_lossy(&call.stdout),
+                        String::from_utf8_lossy(&call.stderr)
+                    );
+                }
+                eprintln!("face box stderr: {}", String::from_utf8_lossy(binary.stderr()));
+            }
             if calls.idle() && !failed && !expired && binary.exit_status().is_none() {
                 self.checked.set(Some(self.check.take().expect("one live check")()));
             }
+            // A held batch keeps its root open for the reply referee. Release
+            // it on failure too, so cancellation drains that descriptor.
+            calls.release();
             calls.cancel();
             for proc in peers {
-                if let Process::Peer(peer) = proc {
-                    peer.shutdown();
+                match proc {
+                    Process::Peer(peer) => peer.shutdown(),
+                    Process::Issuer(issuer) => issuer.shutdown(),
+                    Process::Binary(_)
+                    | Process::Calls(_)
+                    | Process::Person(_)
+                    | Process::Stdout(_)
+                    | Process::Visitor(_) => {}
                 }
             }
             if binary.exit_status().is_none() {
@@ -406,6 +459,9 @@ impl<F: FnOnce() -> T, T> Referee<Process> for CtlJudge<'_, F, T> {
     }
     fn observe(&mut self, _now: Time, procs: &[Process]) {
         self.settled = self.stopping && procs.iter().all(Host::is_empty);
+        if self.face.is_some() && self.cleanup && !self.settled {
+            eprintln!("face drain: {:?}", procs.iter().map(Host::is_empty).collect::<Vec<_>>());
+        }
     }
     fn next_deadline(&self) -> Option<Time> {
         (!self.stopping).then_some(self.deadline)
@@ -448,8 +504,9 @@ pub fn run_ctl_with_exits<T>(
         steps,
         deadline,
         check,
-        CtlPeers { expected_exits: expected_exits.to_vec(), llm: None },
+        CtlPeers { expected_exits: expected_exits.to_vec(), model: CtlModel::None },
     )
+    .0
 }
 /// An independent fake and a fixture hook after the box has written its files.
 pub struct CtlLlm {
@@ -458,7 +515,12 @@ pub struct CtlLlm {
 }
 struct CtlPeers {
     expected_exits: Vec<(usize, u8)>,
-    llm: Option<CtlLlm>,
+    model: CtlModel,
+}
+enum CtlModel {
+    None,
+    Llm(Box<CtlLlm>),
+    Face(Box<super::forge_land::CtlFace>),
 }
 /// Drive the first task without changing the box's template or demo.
 #[must_use]
@@ -478,8 +540,31 @@ pub fn run_ctl_with_llm<T>(
         steps,
         deadline,
         check,
-        CtlPeers { expected_exits: Vec::new(), llm: Some(llm) },
+        CtlPeers { expected_exits: Vec::new(), model: CtlModel::Llm(Box::new(llm)) },
     )
+    .0
+}
+/// Drive the owned forge with a plan issuer, redirect visitor and bearer peer.
+#[must_use]
+pub fn run_ctl_with_face<T>(
+    directory: &Path,
+    flags: Vec<String>,
+    client_root: &Path,
+    steps: Vec<super::ctl::Step>,
+    deadline: Duration,
+    check: impl FnOnce() -> T,
+    face: super::forge_land::CtlFace,
+) -> (CtlOutcome<T>, super::forge_land::Seen) {
+    let (outcome, seen) = run_ctl_peers(
+        directory,
+        flags,
+        client_root,
+        steps,
+        deadline,
+        check,
+        CtlPeers { expected_exits: Vec::new(), model: CtlModel::Face(Box::new(face)) },
+    );
+    (outcome, seen.expect("face observations"))
 }
 fn run_ctl_peers<T>(
     directory: &Path,
@@ -489,10 +574,11 @@ fn run_ctl_peers<T>(
     deadline: Duration,
     check: impl FnOnce() -> T,
     peers: CtlPeers,
-) -> CtlOutcome<T> {
-    let (peer, on_link) = match peers.llm {
-        Some(llm) => (Some(llm.peer), Some(llm.on_link)),
-        None => (None, None),
+) -> (CtlOutcome<T>, Option<super::forge_land::Seen>) {
+    let (peer, on_link, face, reply) = match peers.model {
+        CtlModel::Llm(llm) => (Some(llm.peer), Some(llm.on_link), None, None),
+        CtlModel::Face(story) => (None, None, Some(story.face), Some(super::forge_land::Reply::new(story.first))),
+        CtlModel::None => (None, None, None, None),
     };
     let clock = Clock::new();
     let mut binary = Binary::start_with_tree(
@@ -501,7 +587,11 @@ fn run_ctl_peers<T>(
             arguments: std::iter::once("box".into()).chain(flags.into_iter().map(Into::into)).collect(),
             directory: directory.into(),
             // The real repository story needs init to discover system git.
-            environment: if on_link.is_some() { vec![("PATH".into(), "/usr/bin:/bin".into())] } else { Vec::new() },
+            environment: if on_link.is_some() || face.is_some() {
+                vec![("PATH".into(), "/usr/bin:/bin".into())]
+            } else {
+                Vec::new()
+            },
         },
         Mode::Pipes,
         262_144,
@@ -516,6 +606,9 @@ fn run_ctl_peers<T>(
     let checked = Cell::new(None);
     let mut world = real::World::new(CtlJudge {
         expected_exits: peers.expected_exits,
+        face: face.as_ref().map(|_| super::forge_land::FaceProcs { issuer: 2, visitor: 3, peer: 4 }),
+        visit: Visit::AwaitingAddress,
+        reply,
         on_link,
         check: Some(check),
         checked: &checked,
@@ -529,24 +622,33 @@ fn run_ctl_peers<T>(
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || {
-        Process::Calls(Box::new(super::ctl::Calls::new(root, steps, Some(&streams), None).with_box_stderr()))
+        let mut calls = super::ctl::Calls::new(root, steps, Some(&streams), None).with_box_stderr();
+        if face.is_some() {
+            calls.hold();
+        }
+        Process::Calls(Box::new(calls))
     });
+    let face_procs = face.map(|face| face.spawn(&mut world));
+
     if let Some(peer) = peer {
         world.spawn(|| Process::Peer(Box::new(peer)));
     }
     let ended = world.run(&clock, deadline);
     assert!(ended.procs.iter().all(Host::is_empty), "box, ctl and peer io settles");
     let [Process::Binary(binary), Process::Calls(calls), ..] = ended.procs.as_slice() else { panic!("box and ctl") };
-    CtlOutcome {
-        exit: binary.exit_status(),
-        stdout: calls.stdout().to_vec(),
-        stderr: binary.stderr().to_vec(),
-        left: binary.tree_status().live_at_leader_exit.clone(),
-        calls: calls
-            .ends()
-            .iter()
-            .map(|call| super::Ended { exit: call.exit, stdout: call.stdout.clone(), stderr: call.stderr.clone() })
-            .collect(),
-        checked: checked.take(),
-    }
+    (
+        CtlOutcome {
+            exit: binary.exit_status(),
+            stdout: calls.stdout().to_vec(),
+            stderr: binary.stderr().to_vec(),
+            left: binary.tree_status().live_at_leader_exit.clone(),
+            calls: calls
+                .ends()
+                .iter()
+                .map(|call| super::Ended { exit: call.exit, stdout: call.stdout.clone(), stderr: call.stderr.clone() })
+                .collect(),
+            checked: checked.take(),
+        },
+        face_procs.as_ref().map(|at| super::forge_land::seen(&ended.procs, at)),
+    )
 }

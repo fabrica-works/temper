@@ -627,50 +627,24 @@ fn a_first_run_answers_on_the_demo() {
 /// domain/testing.md, 2.6; protocol/setup.md, 13.4, "A first run set up for real".
 #[test]
 fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
-    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
+    use skein_forge::forgejo::pin::VERSION;
     use std::{fs, os::unix::fs::PermissionsExt};
-    use support::ctl::{Call, Step};
+    use support::ctl::Step;
 
-    let (forgejo, runner) = support::owned::binaries();
     let scratch = support::Scratch::new("forgejo-from-client");
     let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
     for path in &paths {
         fs::create_dir(path).expect("empty first-run directory");
         fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("private first-run directory");
     }
-    let flags: Vec<String> = ["--config", "--data", "--cache"]
-        .into_iter()
-        .zip(&paths)
-        .flat_map(|(flag, path)| [flag.into(), path.display().to_string()])
-        .collect();
-    let cached = [
-        paths[2].join(format!("forgejo/{VERSION}/forgejo")),
-        paths[2].join(format!("forgejo-runner/{RUNNER_VERSION}/forgejo-runner")),
-    ];
-    for (source, target) in [forgejo, runner].iter().zip(&cached) {
-        cache_binary(source, target);
-    }
-    let before = cached.each_ref().map(|path| cached_binary_fingerprint(path));
+    let flags = deployment_flags(&paths);
+    let (cached, before) = cache_forgejo_binaries(&paths[2]);
     let mut bot = None;
     for run in ["first", "second"] {
         let client_root = scratch.path().join(run);
         fs::create_dir(&client_root).expect("fresh client root");
         fs::set_permissions(&client_root, fs::Permissions::from_mode(0o700)).expect("private client root");
-        let mut steps = vec![Step::Mark("start"), Step::Run(Call::sign_in())];
-        if run == "first" {
-            steps.extend([
-                Step::Run(Call::new(&["forges"])),
-                Step::Run(Call::new(&["forges", "--json"])),
-                Step::Run(Call::new(&["forge-setup", "3"])),
-            ]);
-        }
-        // Real preparation, hashing two releases, runner registration and reconcile
-        // take seconds; allow three minutes, plus ten seconds to stop and reap.
-        steps.extend([
-            Step::Run(Call::new(&["wait", "forges", "--until", "settled", "--timeout", "180s"])),
-            Step::Run(Call::new(&["forges", "--json"])),
-            Step::Run(Call::new(&["forges"])),
-        ]);
+        let mut steps = forgejo_setup_steps(run);
         let clock = skein_shell::Clock::new();
         let began = clock.now().now;
         steps.push(Step::Mark("first repository ready"));
@@ -727,6 +701,219 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         assert_eq!(stderr.contains(&wrote), run == "first", "only the first box writes configuration");
     }
     scratch.remove();
+}
+
+/// domain/testing.md, 2.6: a plan-backed change on the first owned repository.
+#[test]
+fn a_persons_plan_change_lands_on_the_owned_forge_and_is_found_after_a_restart() {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    use support::forge_land::{self, CtlFace, Plan};
+
+    let scratch = support::Scratch::new("forgejo-plan-change");
+    let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
+    let mut issuer = Some(forge_land::fake_deployment(&paths));
+    let flags = deployment_flags(&paths);
+    let (cached, before) = cache_forgejo_binaries(&paths[2]);
+    let clock = skein_shell::Clock::new();
+    let addition = format!("Plan change at {}-{}", std::process::id(), clock.now().now.as_nanos());
+    let words = format!("Please append this line to work/hello README.md: {addition}");
+    let mut bot = None;
+    let mut landed = None;
+    let mut ended_tasks = None;
+    for run in ["first", "second"] {
+        let first = run == "first";
+        let client = scratch.path().join(run);
+        fs::create_dir(&client).expect("fresh client root");
+        fs::set_permissions(&client, fs::Permissions::from_mode(0o700)).expect("private client root");
+        let mut steps = forgejo_setup_steps(run);
+        let setup_calls = if first { 7 } else { 4 };
+        let (account_at, found_at) = plan_change_steps(&mut steps, first, setup_calls, &words);
+        let scripts = if first {
+            forge_land::plan_scripts(&Plan {
+                words: words.as_bytes(),
+                line: addition.as_bytes(),
+                repository: temper_engine_domain_forge::tag(3, 1),
+                readme: b"# hello\n\n",
+            })
+        } else {
+            // A fresh fake has no request cursor from the old process. Its
+            // first turn answers Close's finish request with text, which parks
+            // the Open run. Its system cue remains the original task's words.
+            forge_land::restart_script(words.as_bytes())
+        };
+        let issuer = issuer.take().unwrap_or_else(|| support::sign_in::restart_issuer(&paths[0]));
+        let clock = skein_shell::Clock::new();
+        let began = clock.now().now;
+        let (outcome, seen) = support::boxed::run_ctl_with_face(
+            scratch.path(),
+            flags.clone(),
+            &client,
+            steps,
+            Duration::from_secs(240),
+            || support::first_repository::live(&paths[0], &paths[1], &client),
+            CtlFace { face: forge_land::fake_face(issuer, scripts), first },
+        );
+        eprintln!("{run} plan Forgejo box: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
+        let stderr = String::from_utf8_lossy(&outcome.stderr);
+        eprintln!(
+            "{run} peer: {} requests; answers {:?}; schemes {:?}",
+            seen.requests.len(),
+            seen.answers,
+            seen.schemes
+        );
+        assert_plan_box(run, first, &outcome, &stderr);
+        assert!(outcome.calls.len() > found_at + 3, "all story reads ran: {stderr}");
+        bot = Some(assert_forgejo_setup(run, &outcome.calls[..setup_calls], &stderr, bot, &paths[1]));
+        support::sign_in::assert_plan_account(&outcome.calls[setup_calls], &outcome.calls[account_at]);
+        let evidence = outcome.checked.expect("live check ran");
+        support::first_repository::assert_task(run, &outcome.calls[found_at..found_at + 3], &stderr, &evidence);
+        let task = String::from_utf8(outcome.calls[found_at + 1].stdout.clone()).expect("landed task UTF-8");
+        let identity = forge_land::landed_identity(&task, &evidence.page);
+        let tasks_at = outcome.calls.len() - if first { 2 } else { 6 };
+        let tasks = [0, 1].map(|offset| {
+            forge_land::ended_tasks(&support::ctl::json(&outcome.calls[tasks_at + offset]), 2 + offset as u64)
+        });
+        if first {
+            landed = Some(identity);
+            ended_tasks = Some(tasks);
+        } else {
+            assert_eq!(Some(identity), landed, "same pull and merge commit");
+            assert_eq!(Some(tasks), ended_tasks, "no second change or producer");
+            let ended = support::ctl::json(&outcome.calls[tasks_at + 3]);
+            assert_eq!(ended["met"], true);
+            assert_eq!(ended["task"]["chip"]["phase"], "ended");
+            forge_land::assert_no_live_roots(&support::ctl::json(&outcome.calls[tasks_at + 4]));
+            let unknown = &outcome.calls[tasks_at + 5];
+            assert_eq!(unknown.exit, Some(Exit::Code(2)), "no task 4: {stderr}");
+            assert_eq!(unknown.stderr.trim_ascii_end(), b"{\"error\":\"unknown\"}", "no task 4: {stderr}");
+        }
+        forge_land::assert_reply(&outcome.calls[found_at + 4..tasks_at], first);
+        // Init has no review gate. Four coder turns include the workflow read;
+        // three chat turns delegate, wait, then reply after the procedure ends.
+        // After the restart, the chat's lost attempt answers again, then Close's
+        // finish request takes its last text.
+        forge_land::assert_requests(&seen, if first { 7 } else { 2 }, words.as_bytes(), first);
+        let link = support::printed_link(&outcome.stdout).expect("printed link");
+        assert_eq!(outcome.stdout, [link, b"\n"].concat(), "one printed link");
+        assert_eq!(support::boxed::status(evidence.address, "/api/v1/version"), None);
+        assert_eq!(
+            evidence.version.expect("live Forgejo")["version"].as_str().expect("version").split('+').next(),
+            Some(skein_forge::forgejo::pin::VERSION)
+        );
+        assert!(
+            !stderr.contains(&format!("box: wrote the configuration, {}\n", paths[0].join("temper.json").display())),
+            "init wrote configuration before either box"
+        );
+        for (path, fingerprint) in cached.iter().zip(&before) {
+            assert_eq!(&cached_binary_fingerprint(path), fingerprint);
+            assert!(
+                !path
+                    .with_file_name(format!("{}.part", path.file_name().expect("binary name").to_str().expect("UTF-8")))
+                    .exists()
+            );
+        }
+    }
+    scratch.remove();
+}
+
+fn plan_change_steps(
+    steps: &mut Vec<support::ctl::Step>,
+    first: bool,
+    setup_calls: usize,
+    words: &str,
+) -> (usize, usize) {
+    use support::ctl::{Call, Step};
+    steps.push(Step::Run(Call::new(&["me", "--json"])));
+    if first {
+        steps.extend([
+            Step::Run(Call::new(&["connect", "1", "--key", "connect-plan"])),
+            Step::Run(Call::new(&["wait", "accounts", "--until", "settled", "--json"])),
+        ]);
+    }
+    let account_at = setup_calls + if first { 3 } else { 1 };
+    steps.push(Step::Run(Call::new(&["accounts", "--json"])));
+    if first {
+        steps.push(Step::Run(Call::new(&[
+            "chat",
+            "--project",
+            "1",
+            "--model",
+            "gpt-6-luna",
+            "--key",
+            "change-on-plan",
+            words,
+            "--json",
+        ])));
+    }
+    if first {
+        // Chat creation answers before its delegate exists. As in the
+        // first-repository story, wait for the chat's initial reply first.
+        steps.push(Step::Run(Call::new(&["wait", "task", "1", "--until", "replied", "--timeout", "120s", "--json"])));
+    }
+    let found_at = account_at + 1 + 2 * usize::from(first);
+    steps.extend(support::first_repository::found_steps());
+    // The referee holds ctl open, reads and pages the conversation, and
+    // follows --since if the procedure's end has not yet reached the chat.
+    steps.push(Step::Run(Call::new(&["task", "1", "--json"])));
+    (account_at, found_at)
+}
+
+fn assert_plan_box<T>(run: &str, first: bool, outcome: &support::boxed::CtlOutcome<T>, stderr: &str) {
+    assert_eq!(outcome.exit, Some(Exit::Code(0)), "{run}: {stderr}");
+    assert_eq!(outcome.left, Some(vec![]), "{run}: {stderr}");
+    for (index, call) in outcome.calls.iter().enumerate() {
+        assert_eq!(
+            call.exit,
+            Some(Exit::Code(if !first && index == outcome.calls.len() - 1 { 2 } else { 0 })),
+            "{run} call {index}: stdout {}; stderr {}; box {stderr}",
+            String::from_utf8_lossy(&call.stdout),
+            String::from_utf8_lossy(&call.stderr)
+        );
+    }
+}
+
+fn deployment_flags(paths: &[std::path::PathBuf; 3]) -> Vec<String> {
+    ["--config", "--data", "--cache"]
+        .into_iter()
+        .zip(paths)
+        .flat_map(|(flag, path)| [flag.into(), path.display().to_string()])
+        .collect()
+}
+
+type BinaryFingerprint = (u64, [u8; 32]);
+
+fn cache_forgejo_binaries(cache: &std::path::Path) -> ([std::path::PathBuf; 2], [BinaryFingerprint; 2]) {
+    use skein_forge::forgejo::pin::{RUNNER_VERSION, VERSION};
+    let (forgejo, runner) = support::owned::binaries();
+    let cached = [
+        cache.join(format!("forgejo/{VERSION}/forgejo")),
+        cache.join(format!("forgejo-runner/{RUNNER_VERSION}/forgejo-runner")),
+    ];
+    for (source, target) in [forgejo, runner].iter().zip(&cached) {
+        cache_binary(source, target);
+    }
+    let before = cached.each_ref().map(|path| cached_binary_fingerprint(path));
+    (cached, before)
+}
+
+fn forgejo_setup_steps(run: &str) -> Vec<support::ctl::Step> {
+    use support::ctl::{Call, Step};
+    let mut steps = vec![Step::Mark("start"), Step::Run(Call::sign_in())];
+    if run == "first" {
+        steps.extend([
+            Step::Run(Call::new(&["forges"])),
+            Step::Run(Call::new(&["forges", "--json"])),
+            Step::Run(Call::new(&["forge-setup", "3"])),
+        ]);
+    }
+    // Real preparation, hashing two releases, runner registration and reconcile
+    // take seconds; allow three minutes, plus ten seconds to stop and reap.
+    steps.extend([
+        Step::Run(Call::new(&["wait", "forges", "--until", "settled", "--timeout", "180s"])),
+        Step::Run(Call::new(&["forges", "--json"])),
+        Step::Run(Call::new(&["forges"])),
+    ]);
+    steps
 }
 
 fn cache_binary(source: &std::path::Path, target: &std::path::Path) {
@@ -818,7 +1005,7 @@ fn assert_forgejo_setup(
     user
 }
 
-fn cached_binary_fingerprint(path: &std::path::Path) -> (u64, [u8; 32]) {
+fn cached_binary_fingerprint(path: &std::path::Path) -> BinaryFingerprint {
     use std::io::Read;
     let mut file = std::fs::File::open(path).expect("cached binary");
     let length = file.metadata().expect("cached metadata").len();
