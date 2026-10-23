@@ -99,12 +99,14 @@ its tests and its lab, is section 15.
    webhooks' address, and what it relies on of Forgejo and GitHub.
 10. **setup.md:** the forge's setup: connected, managed and owned, the
     setup host in the engine, and `temper box`.
-11. **`../client/README.md`:** temper's client: its client root on `jig-client`,
+11. **sign-in.md:** people's sign-in with Google on a deployment's
+    public address: its members, routes, endings and binding.
+12. **`../client/README.md`:** temper's client: its client root on `jig-client`,
     its pages, the forge's client family, its view, the terminal, and the
     clients' listener of temper's server; then **`../client/tools.md`**, `temper
     ctl`, the agents' tools.
-12. **`../domain/testing.md`:** the tiers below the domain.
-13. **`../client/browser.md`:** the browser, the second shell of
+13. **`../domain/testing.md`:** the tiers below the domain.
+14. **`../client/browser.md`:** the browser, the second shell of
     temper's client.
 
 ## 3. Names

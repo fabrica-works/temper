@@ -81,135 +81,24 @@ world Google sign-in (`../client/mockups/README.md`).
 
 ### 2.2 The public address
 
-The configuration's new `application.clients.public`: the origin the
-people's browsers use, `https://temper.example.com`. It is where the
-listener's being on loopback stops telling temper what the browser
-sees:
-
-- **The Host allow-list** (jig's `protocol/browser.md`, 12.2) holds the
-  public name beside the listener's loopback address.
-- **The cookie is `Secure`** on an exchange that came by the public
-  name. jig's mapping leaves `Secure` off on a loopback listener (jig's
-  `protocol/client.md`, 17.3); behind the proxy the listener is loopback
-  but the browser's origin is not. The mapping decides by the
-  exchange's `Host`: the public name sets `Secure`, the loopback address
-  does not.
-- **Every address temper gives out** is the public origin's: Google's
-  return (4.2), the provider's issuer and endpoints (5.2), and a GitHub
-  App's redirect and setup URLs, were a GitHub forge configured.
-- **The bundle is the same,** served at every other `GET` as today
-  (`../client/browser.md`, 2.2).
+Adopted: `../protocol/sign-in.md`, 2.2, and
+`../protocol/configuration.md`, section 3, `clients.public`.
 
 ### 2.3 The printed link
 
-- **It stays, for recovery:** the owner's way in when Google or the
-  configuration is wrong, and the terminal's only way (`temper open`
-  signs in by a link, `../client/README.md`, section 7).
-- **On the host alone.** jig enables it only where its clients reach it
-  on loopback (jig's `protocol/configuration.md`, section 3, `clients`);
-  the listener is, and the proxy denies its route from outside. The
-  owner reaches it through an SSH tunnel to the listener.
-- **It signs in the first owner** as jig's `owners` names them: the
-  owner's Google identity (section 3), so the link and Google sign in
-  the same person.
+Adopted: `../protocol/sign-in.md`, 2.3.
 
 ## 3. Who may sign in
 
-- **An identity is Google's provider and the member's address.** jig's
-  `providers` numbers Google's sign-in, of kind application. The
-  subject temper gives jig is the member's Google address as the
-  configuration writes it, not Google's own subject, so that a member
-  can be named before their first sign-in: jig's `owners` and a project
-  seed's parties' roles name them on a first start (jig's
-  `protocol/configuration.md`, section 3).
-- **Members are configured:** `application.sign_in.members`, each with
-  their Google address and a login: the name Forgejo gives their
-  account (5.4), unique among members, in a Forgejo username's shape,
-  checked at start. jig's `owners` are members, checked at start.
-- **Bound to Google's account at the first sign-in.** temper keeps the
-  Google subject (`sub`) that first signed in with a member's address,
-  in a record of its own in the store. A later sign-in with the same
-  address and another subject is refused (4.3): an address Google
-  gave to a new account is not the member.
-- **Google's word on the address:** `email_verified` true, or the
-  sign-in is refused.
-- **The check is temper's,** before `Mint`: a member, bound or not yet
-  bound, is minted; anyone else is answered with the refusal page and
-  nothing is minted.
-- **Adding a member is a change to the configuration and a restart**
-  (section 9).
+Adopted: `../protocol/sign-in.md`, section 3, and the binding, its
+section 5.
 
 ## 4. Signing in with Google
 
-### 4.1 The sign-in page
-
-- **Signed out, every page of temper's is the sign-in page.** In the
-  browser, the view's signed-out main (`../client/README.md`, 5.1)
-  becomes temper's mark, "Sign in", and a button for each way of
-  signing in the configuration gives: here one, "Continue with Google".
-  It replaces "Signed out. To sign in, open a sign-in link `temper
-  serve` printed." where a way is configured; a deployment with none
-  keeps that line.
-- **Stock:** nothing on it is the deployment's own: no name, no words
-  about it, no note on who may sign in. The same page serves every
-  deployment, and says only what temper itself knows: arriving from
-  Forgejo, "to continue to" the forge (5.3); signed out, that the forge
-  keeps its sign-in (section 6).
-- **The terminal is unchanged:** "Signed out." and its own line
-  (`../client/README.md`, 6.6).
-- **Where the person was going is kept:** the page's address, carried
-  through the sign-in as `then`, a path on the public origin, so a link
-  into a chat opens the chat once signed in.
-
-### 4.2 The flow
-
-1. "Continue with Google" goes to `GET /sign-in/google?then=PATH`,
-   temper's route on the clients' listener. temper starts a sign-in
-   with skein's OAuth client as a confidential client with Google's
-   registration (skein's `oauth.md`, sections 1 and 2): its state, its
-   nonce and its PKCE verifier. It sets a short cookie that binds the
-   state to this browser, `temper-sign-in`, `HttpOnly; Secure;
-   SameSite=Lax; Path=/sign-in/google`, which lives as long as the
-   sign-in's deadline, and answers `303` to Google's authorization URL,
-   scopes `openid email profile`.
-2. Google signs the person in, and sends the browser to
-   `GET /sign-in/google/return?code=…&state=…`. Lax lets the binding
-   cookie come back with this cross-site navigation; jig's cookie,
-   strict, does not, and is not needed here.
-3. temper checks the state against the cookie, exchanges the code with
-   Google's token endpoint, checks the ID token (its issuer, audience,
-   expiry, nonce and signature, by Google's published keys; skein's
-   `oauth.md`, 2.2) and then the member (section 3).
-4. temper sends `Mint` with the identity, the member's login and
-   Google's `name`. On `Minted`, temper's answer sets jig's cookie by
-   the mapping's function, clears the binding cookie, and is `303` to
-   `then`. Google's tokens are dropped: temper keeps nothing of them.
-5. The page at `then` loads, and its own exchanges, same-origin, carry
-   jig's cookie: the client signs in by `Transport` (jig's
-   `client/domain/client.md`, section 12).
-
-Google's registration is a web application's OAuth client in Google's
-console, its redirect URI the public origin's `/sign-in/google/return`,
-with the non-sensitive scopes alone. Its client id is in the
-configuration; its secret is a secrets' file
-(`../protocol/configuration.md`, section 6).
-
-### 4.3 Its endings
-
-The return route answers each ending with a page of its own, as the
-GitHub routes do (`../client/forge.md`, 9.1), never a page of the
-client's: the person is not signed in. Each is stock, as the sign-in
-page is.
-
-| Ending | Its page |
-|---|---|
-| a member | no page: `303` to `then` |
-| not a member | "ADDRESS can't sign in here: Google signed you in, but no one here signs in with this address", with "Use another Google account", a fresh sign-in with Google's account chooser |
-| the address bound to another Google account | "ADDRESS signs in here with another Google account", with "Use another Google account" |
-| the address not verified by Google | "Google hasn't verified ADDRESS", with "Use another Google account" |
-| cancelled at Google, or Google's `error` | "The sign-in didn't finish", saying Google's word, with "Try again" |
-| the state unknown, used or past its deadline, or a restart since | "The sign-in didn't finish: it took too long, or temper restarted", with "Try again" |
-| `MintRefused`: not ready or busy | "temper couldn't sign you in just now", with "Try again" |
+Adopted: `../protocol/sign-in.md`, sections 4 and 7: the routes, the
+flow, its endings' pages and the browser's sign-in page. Stage 2 adds
+to the page's facts the forge's name, for 5.1's "to continue to", as a
+further `temper-` meta (its section 7).
 
 ## 5. temper as Forgejo's sign-in provider
 
@@ -369,11 +258,10 @@ owners.
 
 ### 7.3 temper
 
-- **The configuration's members:** `application.clients.public` (2.2),
-  `application.sign_in` with Google's registration and its members
-  (section 3), and the provider's client for Forgejo (5.2).
-- **Google's routes** (4.2), their endings' pages (4.3) and the
-  member's binding record (section 3).
+- **Stage 1's,** adopted into `../protocol/sign-in.md`: the public
+  address, the members, Google's routes, their endings' pages, the
+  binding and the browser's stock sign-in page.
+- **The provider's client for Forgejo** in the configuration (5.2).
 - **The provider's routes** (5.2), handing each to jig.
 - **The client:** the browser's stock sign-in page with the configured
   ways (4.1), the `Authorize` place (5.3), and "Open Forgejo ↗" to
@@ -385,7 +273,8 @@ owners.
 ### 7.4 The stages
 
 1. **Google into temper:** 2.2, 2.3, section 3, section 4, and jig's
-   public address. The deployment is usable by its members; Forgejo
+   public address; adopted into `../protocol/sign-in.md` (jig's part
+   built, jig 936c9f1a2). The deployment is usable by its members; Forgejo
    signs them in by its own passwords meanwhile.
 2. **temper as Forgejo's provider:** section 5, skein's issuer and
    jig's provider. Forgejo's passwords are then retired by
@@ -393,9 +282,7 @@ owners.
 
 ## 8. Testing
 
-- **The Google flow in temper's worlds** with `skein-fake-oauth` as
-  Google: a member minted, each ending of 4.3, the binding refused for
-  a second subject, and `then` kept. No browser.
+- **The Google flow:** adopted, `../protocol/sign-in.md`, section 8.
 - **The provider against a real Forgejo** in the process tier, on
   skein's throwaway Forgejo with the temper source added by its command
   line: a scripted client with a cookie jar follows Forgejo's sign-in
@@ -404,8 +291,9 @@ owners.
   can.
 - **The browser tier, for what only a browser proves:** jig's strict
   cookie absent from a navigation that started on another site and
-  present on the page's own exchanges (5.3), and the binding cookie's
-  return from Google's cross-site redirect (4.2).
+  present on the page's own exchanges (5.3); the binding cookie's
+  return from Google's cross-site redirect is stage 1's
+  (`../protocol/sign-in.md`, section 8).
 
 ## 9. Open questions
 

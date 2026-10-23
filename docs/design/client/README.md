@@ -1578,6 +1578,12 @@ of each (`../draft/first-run.md`, 3.6).
     construction: the terminal's "Signed out." (6.6); the browser's
     "Signed out. To sign in, open a sign-in link `temper serve`
     printed." (`browser.md`, 2.4);
+  - *signed out, with a way of signing in:* in the browser alone, in
+    place of the paragraph, the sign-in page: temper's mark, the
+    heading "Sign in", and a link for each way the view was given at
+    construction, "Continue with Google" to `/sign-in/google?then=PATH`,
+    `PATH` the page's printed address (`../protocol/sign-in.md`,
+    section 7);
   - *signed out, the link's sign-in not taken:* while the link's view
     says why its last sign-in installed nothing and the link stays
     usable (jig's `client/domain/client.md`, section 12,
