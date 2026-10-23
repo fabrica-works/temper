@@ -304,7 +304,7 @@ fn another_connected_forge_ends_the_demo_persists_and_stops_once_and_restart_ask
         1
     );
     start(&mut d, sign_in, 82, true);
-    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::NotOffered))]);
+    assert_eq!(answers(&d), [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))]);
     d.root = engine::Domain::new(config(true), &d.env.limits).expect("valid demo config");
     d.immediate.clear();
     d.send(engine::Event::Restart);
@@ -328,9 +328,9 @@ fn another_forge_connecting_answers_a_held_demo_start_not_offered() {
         state: forge::Connection::Connected { id: 2, login: b"other".as_slice().into() },
     })));
     d.settle();
-    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::NotOffered))]);
+    assert_eq!(answers(&d), [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))]);
     connection(&mut d, forge::Connection::Connected { id: 1, login: b"temper".as_slice().into() });
     d.fire_at(Duration::from_secs(10));
     d.settle();
-    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::NotOffered))]);
+    assert_eq!(answers(&d), [Some(engine::ApplicationAnswer::StartDemo(forge::StartAnswer::NotOffered))]);
 }
