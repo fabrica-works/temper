@@ -1,119 +1,60 @@
 # M1 lab pieces
 
-**The experiment is not yet runnable.** These are S's independent pieces from
-`docs/design/qa.md` (amended design `998a5f054`), reusable by H/P. No
-`experiment.json` or configuration templates with guessed members are supplied.
-Python 3.11+ standard library is the authorized temporary lab implementation;
-none of this is product code or a temper world test.
+`chat-change-smoke/` holds S's `lab-experiment/1` manifest, templates and
+checks from `docs/design/qa.md`. It has no driver, fault or generic runner.
+**S awaits integration review and has not run.** The exact remaining joins
+and the case-2 review boundary are in
+[chat-change-smoke/README.md](chat-change-smoke/README.md).
 
-From the repository root, after the trusted seed has signed in:
+The canonical process description is [cluster/](cluster/). QA supplies its
+TLS fake model, NOTICE scripts, two charters, authority, landing rules and
+capacities. Case-2 supplies the canonical forge process, records-only setup,
+worker fake git and shared process reader. Until those contracts join,
+canonical QA templates refer to a future forge readiness capture. S retains
+an anticipated forge configuration for that review; it is not a second
+canonical cluster.
 
-```sh
-/bin/sh lab/chat-change-smoke/tools/ctl TEMPER CLIENT_DIRECTORY SERVE_LINK me
-/bin/sh lab/chat-change-smoke/tools/ctl TEMPER CLIENT_DIRECTORY SERVE_LINK help task
-/bin/sh lab/chat-change-smoke/smoke/story TEMPER CLIENT_DIRECTORY SERVE_LINK
-```
-
-`TEMPER` is the run's actual subject executable, `SERVE_LINK` its full printed
-`http://HOST:PORT/jig/v1/sign-in/link?secret=…` URL. The three prefix arguments
-are trusted runner inputs. The wrapper takes area 1's tool names, refuses
-`sign-in`, `sign-out`, `--call` and `--call=…` in any argument, validates numeric
-HTTP loopback and pins the directory's address to the link's exact authority
-on every call (including help). The actual host's file is **one final-newline
-line**, not JSON. The wrapper uses shell builtins, then execs the subject;
-help omits DIRECTORY, and stdin/stdout/stderr/status belong to ctl. It reads no
-token or other credential and records nothing. Directory ownership, private
-modes and no-follow checks remain the actual host's too; the lab tool boundary
-keeps the driver from writing this directory. Source: `crates/temper/src/ctl.rs`,
-`temper-client-shell-cli/src/{arguments,directory,signing,host}.rs` under
-`crates/`, and `client/tools.md`, 8.1.
-
-The story makes exactly one `chat --project 1 --key smoke-chat` with the
-exact request in qa.md, 3.3; extracts `done: task N, chat`; watches `wait
-task N --until ended --timeout 220`; then reads `task N --tree`. The runner
-must enforce the approved **240s (120s before the user's doubling of 10-22,
-provisional) total command budget**. There is no sleep, application polling
-or new deadline. The private Python text reader checks the actual task
-header, historical result JSON, digest, wait's `met` and the ended tree
-root; failures/malformed output exit nonzero. Ended includes
-Failed/Cancelled as ctl's `ended` condition does; it does not establish
-landing. `checks/_end_state.py` judges landing independently. No full story
-success has been exercised against a product cluster yet.
-
-`NOTICE` is exactly `b'Maintained by temper.\n'`, 22 bytes. The private pure
-`_judge` takes explicit completeness/loss knowledge, the last target
-Merged/Moved counts and complete byte trees from the fake's objects. It returns
-pass/fail/undecided (0/1/2), stable qa.md signatures, and deterministic evidence
-(C, P, sorted paths and NOTICE bytes). No missing loss record means zero; unknown
-flush, truncated lines or unreadable objects stay undecided. Its private
-`_Object` follows the actual fake domain's parent/merge-parent/byte-tree model;
-it is **not an observation encoding or a public normalized schema**. No
-`checks/end-state` executable is supplied until its real adapters can work.
-
-Exact checks, run from this directory's repository root, through heavy only:
+After the attended seed signs in and adopts `fake/widget`, its story uses:
 
 ```sh
-heavy python3 -I -B -m unittest discover -s lab/tests/unit -v
-heavy python3 -I -B -m unittest discover -s lab/tests/process -v
+/bin/sh lab/chat-change-smoke/tools/ctl TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN me
+/bin/sh lab/chat-change-smoke/tools/ctl TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN help task
+/bin/sh lab/chat-change-smoke/smoke/story TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN
 ```
 
-The unit tests use known binary content/trees, loss/incomplete/refused stories
-and ctl output. Process tests use the real POSIX shell and `/bin/echo`,
-`/bin/cat`, `/bin/true`, `/bin/false` canaries for guard/stream/status behavior,
-and refusal of malformed story output. They introduce no fake product/harness.
-No gate integration, cluster, model or paid calibration is run here.
+`PUBLIC_ORIGIN` is exactly `http://HOST:PORT/`, from the engine's public
+clients listener, with numeric loopback and an explicit port. The wrapper
+pins every call, including help, to the directory's exact authority. It
+permits area 1 only and refuses sign-in/out and JSON call indirection in
+any argument. It uses shell builtins before exec, preserving streams and
+exit status. The address file is one newline-terminated line. The host owns
+directory permissions and protection from writes by the driver.
 
-Native validation through heavy: 18 unit tests passed in 0.003s and 14 process
-tests passed in 0.258s. The process tests exercise real shells and canary
-executables; they do not prove the product story, its containment or a full
-cluster. No paid driver or calibration run has started.
+The sign-in link is a credential. The attended host must remove it from
+engine stdout before persistence and supply it only through an in-memory
+pipe to `ctl sign-in -`. No manifest capture, stdin template or credential
+file is provided. The wrapper rejects sign-in URLs as its trusted prefix.
 
-Still required to finish S's canonical document/templates and runnable checks:
+The story asks for NOTICE, reads its created task number, waits for ended
+with timeout 220 and reads the task tree. Seed waits are 200; the approved
+cost class is ready120/command240/stop20. No new budget or polling schedule
+is introduced. Ended can include failure and never establishes landing.
+The independent live check reads observations and C/P objects; the promises
+check reads an engine store copy only after engine exit and empty trees.
+See [checks/README.md](chat-change-smoke/checks/README.md) for its existing
+arguments and evidence requirements.
 
-- First-run's fake CLI/documents, required TLS/root, cued tool-call scripts,
-  CI content cue, widget ID and seed without NOTICE; fake git by argv[0].
-- Cross-process deliveries, serve's bound webhook address available to
-  reconcile, listener readiness and bootstrap link interface. No null webhook
-  configuration, polling variant or shortened fallback is substituted.
-- Fake-owned decimal u64 seed derivation and named 0600 key/token output
-  interfaces. The runner will supply seeds and paths, never credential bytes.
-- First-run's observation writer and complete flush reachable before stop,
-  using skein `527480f3`'s encoding and explicit cumulative loss count 0.
-  The promises judge landed at skein `4f13123c`; its command wrapper and
-  Profile/Decision inputs remain first-run's, reviewed by github. Decision
-  records must come from temper's own record, never the merge being judged.
-  Decision 259 maps any retained breaches to exit 1, with fail lines and an
-  undecided reason if present; exit 2 has reasons only, exit 0 no stdout.
-- The designed private git `objects` route, including real request/response
-  encoding and complete C/P trees. Then add the private decoder/route adapter
-  and `checks/end-state`, stderr evidence and runner check result encoding.
-- Director-routed `wait forges --until connected:1`, plus the
-  runner's ready captures, collection and command/check contracts. Then render
-  `forge.json`, `llm.json`, `config/temper.json`, agent/charter/worker files
-  and `experiment.json`
-  against those exact landed contracts, and run S's three attended seeds.
+Python 3.11+ standard library remains the authorized temporary lab tooling
+exception to programming-model.md, section 1. Contract tests check the
+fixture's scripts, TLS, authority, capacities and assembly; shell process
+tests use real shell/canary executables. They make no product or containment
+proof. Run targeted checks through `heavy` only, for example:
 
-`add-key` is available at temper `dfc7cc70a` as
-`add-key PROVIDER FILE --deployment --key KEY`. It reads a private regular
-owned file and strips one final newline; it does not supply the fake's
-pending key-output interface. Serve's directory form is available at temper
-`65d2b3bea`: `temper serve --config CONFIG --data DATA --cache CACHE`, with
-`temper.json` inside CONFIG. The lab supplies absolute paths to these three
-directories. The fake forms and the forge wait remain dependencies in
-qa.md, 11.1.
-The wrapper/story expect the full printed sign-in URL without a second scheme
-prefix, as qa.md, 5.1 specifies.
-The fake Observation (`observe.rs`: Merged.commit, Moved.to, Refused) and Object
-(`git.rs`: u64 counts, byte-path/content Tree) were source-read in skein's
-`testing/skein-fake-forge-domain/src/`; the designed route is skein's
-`fake-forge.md`, section 4. This is domain evidence, not a landed wire API.
-
-Memory verification used `home-free-src-rust-temper`, generation
-`2026-10-20T15:48:45Z`; relevant ctl paths matched metadata except the noted
-changed docs/rendering/startup paths, which were source-read. Skein's graph
-generation `2026-10-19T04:48:30Z` does not track those fake domain paths, so
-their source is the evidence. No index was written or deleted.
-The process cluster description and its templates live in [cluster/](cluster/).
+```sh
+heavy python3 -I -B -m unittest discover -s lab/tests/unit -p test_smoke_assembly.py -v
+heavy python3 -I -B -m unittest discover -s lab/tests/unit -p test_end_state.py -v
+heavy python3 -I -B -m unittest discover -s lab/tests/process -p test_ctl.py -v
+```
 
 # The look experiment
 

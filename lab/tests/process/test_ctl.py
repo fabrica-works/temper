@@ -8,7 +8,7 @@ from pathlib import Path
 EXPERIMENT = Path(__file__).resolve().parents[2] / "chat-change-smoke"
 WRAPPER = EXPERIMENT / "tools" / "ctl"
 STORY = EXPERIMENT / "smoke" / "story"
-LINK = "http://127.0.0.1:4000/jig/v1/sign-in/link?secret=run-only"
+ORIGIN = "http://127.0.0.1:4000/"
 ALLOW = "me inbox tasks task chat activity turn run wait message close adopt answer decide release stop cancel pending help".split()
 
 
@@ -21,8 +21,8 @@ class CtlTests(unittest.TestCase):
         self.address = self.client / "address"
         self.address.write_bytes(b"http://127.0.0.1:4000\n")
 
-    def call(self, *args, binary="/bin/echo", link=LINK, stdin=b""):
-        return subprocess.run(["/bin/sh", str(WRAPPER), binary, str(self.client), link, *args],
+    def call(self, *args, binary="/bin/echo", origin=ORIGIN, stdin=b""):
+        return subprocess.run(["/bin/sh", str(WRAPPER), binary, str(self.client), origin, *args],
                               input=stdin, capture_output=True, check=False)
 
     def refused(self, result):
@@ -71,7 +71,7 @@ class CtlTests(unittest.TestCase):
                          (expected.returncode, expected.stdout, expected.stderr))
         self.assertFalse(marker.exists())
 
-    def test_invalid_address_files_are_refused_independently_of_link_match(self):
+    def test_invalid_address_files_are_refused_independently_of_origin_match(self):
         for address in (
             b"", b"http://127.0.0.1:4000", b"http://127.0.0.1:4000\n\n",
             b"http://127.0.0.1:4000\nextra", b"http://127.0.0.1:4000\r\n",
@@ -88,8 +88,8 @@ class CtlTests(unittest.TestCase):
         ):
             with self.subTest(address=address):
                 self.address.write_bytes(address)
-                link = address.decode().rstrip("\n") + "/jig/v1/sign-in/link?secret=run-only"
-                self.refused(self.call("me", link=link))
+                origin = address.decode().rstrip("\n") + "/"
+                self.refused(self.call("me", origin=origin))
 
     def test_numeric_loopback_spellings_are_accepted(self):
         for host in ("127.0.0.1", "127.3.4.5", "[::1]", "[0:0:0:0:0:0:0:1]",
@@ -97,7 +97,7 @@ class CtlTests(unittest.TestCase):
             with self.subTest(host=host):
                 authority = host + ":4000"
                 self.address.write_text("http://" + authority + "\n")
-                self.assertEqual(self.call("me", link="http://" + authority + "/jig/v1/sign-in/link?secret=run-only").returncode, 0)
+                self.assertEqual(self.call("me", origin="http://" + authority + "/").returncode, 0)
 
     def test_address_is_pinned_for_every_call_including_help(self):
         for address in (b"http://127.0.0.1:4001\n", b"http://127.0.0.2:4000\n"):
@@ -108,11 +108,14 @@ class CtlTests(unittest.TestCase):
         self.address.unlink()
         self.refused(self.call("me"))
 
-    def test_malformed_or_other_run_links_are_refused(self):
-        for link in ("127.0.0.1:4000", "https://127.0.0.1:4000/path", "http://127.0.0.1:4000",
-                     "http://user@127.0.0.1:4000/path", "http://127.0.0.1:4000.evil/path"):
-            with self.subTest(link=link):
-                self.refused(self.call("me", link=link))
+    def test_malformed_or_other_run_origins_are_refused(self):
+        for origin in ("127.0.0.1:4000", "https://127.0.0.1:4000/path", "http://127.0.0.1:4000",
+                     "http://user@127.0.0.1:4000/path", "http://127.0.0.1:4000.evil/path",
+                     "http://127.0.0.1:4000/path", "http://127.0.0.1:4000/?query=value",
+                     "http://127.0.0.1:4000/#fragment",
+                     "http://127.0.0.1:4000/jig/v1/sign-in/link?secret=invented"):
+            with self.subTest(origin=origin):
+                self.refused(self.call("me", origin=origin))
 
     def test_real_canary_stderr_and_status_survive_exec(self):
         for binary in ("/bin/true", "/bin/false", "/bin/cat"):
@@ -136,7 +139,7 @@ class CtlTests(unittest.TestCase):
         self.refused(self.call())
 
     def test_story_refuses_echo_output_instead_of_fabricating_completion(self):
-        result = subprocess.run(["/bin/sh", str(STORY), "/bin/echo", str(self.client), LINK],
+        result = subprocess.run(["/bin/sh", str(STORY), "/bin/echo", str(self.client), ORIGIN],
                                 capture_output=True, check=False)
         self.assertEqual(result.returncode, 1)
         self.assertIn(b"--key smoke-chat", result.stdout)
@@ -144,7 +147,7 @@ class CtlTests(unittest.TestCase):
         self.assertIn(b"story: expected done: task N, chat", result.stderr)
 
     def test_story_stops_on_real_command_failure(self):
-        result = subprocess.run(["/bin/sh", str(STORY), "/bin/false", str(self.client), LINK],
+        result = subprocess.run(["/bin/sh", str(STORY), "/bin/false", str(self.client), ORIGIN],
                                 capture_output=True, check=False)
         self.assertEqual((result.returncode, result.stdout, result.stderr), (1, b"", b""))
 
