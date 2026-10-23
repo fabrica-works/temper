@@ -1021,7 +1021,11 @@ fn a_persons_plan_change_lands_on_the_owned_forge_and_is_found_after_a_restart()
             steps,
             Duration::from_secs(240),
             || support::first_repository::live(&paths[0], &paths[1], &client),
-            CtlFace { face: forge_land::fake_face(issuer, scripts), first },
+            CtlFace {
+                face: forge_land::fake_face(issuer, scripts),
+                first,
+                reply: if first { forge_land::LANDED } else { forge_land::RESTARTED },
+            },
         );
         eprintln!("{run} plan Forgejo box: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
         let stderr = String::from_utf8_lossy(&outcome.stderr);
@@ -1083,6 +1087,64 @@ fn a_persons_plan_change_lands_on_the_owned_forge_and_is_found_after_a_restart()
             );
         }
     }
+    scratch.remove();
+}
+
+/// domain/testing.md, 2.6: a change whose coder fails holds, and its chat answers the escalation.
+#[test]
+fn a_change_whose_coder_fails_holds_and_its_chat_answers() {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    use support::forge_land::{self, CtlFace, Plan};
+
+    let scratch = support::Scratch::new("forgejo-held-change");
+    let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
+    let issuer = forge_land::fake_deployment(&paths);
+    let flags = deployment_flags(&paths);
+    let _cached = cache_forgejo_binaries(&paths[2]);
+    let clock = skein_shell::Clock::new();
+    let addition = format!("Held change at {}-{}", std::process::id(), clock.now().now.as_nanos());
+    let words = format!("Please append this line to work/hello README.md: {addition}");
+    let client = scratch.path().join("first");
+    fs::create_dir(&client).expect("fresh client root");
+    fs::set_permissions(&client, fs::Permissions::from_mode(0o700)).expect("private client root");
+    let mut steps = forgejo_setup_steps("first");
+    let setup_calls = 7;
+    let (_, found_at) = forge_land::held_change_steps(&mut steps, setup_calls, &words);
+    let scripts = forge_land::held_scripts(&Plan {
+        words: words.as_bytes(),
+        line: addition.as_bytes(),
+        repository: temper_engine_domain_forge::tag(3, 1),
+        readme: b"# hello\n\n",
+    });
+    let (outcome, seen) = support::boxed::run_ctl_with_face(
+        scratch.path(),
+        flags,
+        &client,
+        steps,
+        Duration::from_secs(240),
+        || support::first_repository::live(&paths[0], &paths[1], &client),
+        CtlFace { face: forge_land::fake_face(issuer, scripts), first: true, reply: forge_land::HELD },
+    );
+    let stderr = String::from_utf8_lossy(&outcome.stderr);
+    assert_plan_box("first", true, &outcome, &stderr);
+    let _bot = assert_forgejo_setup("first", &outcome.calls[..setup_calls], &stderr, None, &paths[1]);
+    let held = support::ctl::json(&outcome.calls[found_at]);
+    assert_eq!(held["met"], true, "the change holds: {stderr}");
+    let change = support::ctl::json(&outcome.calls[found_at + 1]);
+    assert_eq!(change["chip"]["phase"], "held", "{change}");
+    // The box stopped once the chat replied HELD; its last read of the chat
+    // shows it answering, not refused before each run.
+    let chat = outcome
+        .calls
+        .iter()
+        .rev()
+        .filter_map(|call| serde_json::from_slice::<serde_json::Value>(&call.stdout).ok())
+        .find(|read| read["chip"]["task"] == 1)
+        .expect("a read of the chat");
+    assert_ne!(chat["chip"]["phase"], "backing_off", "{chat}");
+    assert_eq!(chat["chip"]["details"]["owner"]["details"]["retry"], serde_json::Value::Null, "{chat}");
+    // The chat delegates, replies, then answers the escalation once; the coder fails in one turn.
+    assert_eq!(seen.requests.len(), 4, "model requests: {stderr}");
     scratch.remove();
 }
 
