@@ -942,10 +942,15 @@ and 10).
     waited linked; a worker stopped is ended (`Members::stop_one`) and
     waited ended, its directories kept; a worker started again is
     restarted (`Members::restart`) on its own three directories and
-    waited linked once more; a wait the acts watch goes on once the
-    background `temper ctl` wait has its task's document from the
-    engine, as the real loop's world waits for that delivery, never on
-    time. Where a script holds a reply until every worker holds a run
+    waited linked once more; a wait the acts watch (`Watching`) goes on
+    once its background `temper ctl` call is running: no process
+    shows when that call has its task's document, and none needs to,
+    since `wait --until ended` without `--since` holds on whichever
+    document it receives first, an ended task's being retained, so
+    what it prints doesn't hang on when it subscribed, as the opener's
+    two watches already run without the act; the real loop's world
+    holds the act until its host has the delivery, to keep its hosts
+    in one order. Where a script holds a reply until every worker holds a run
     (4.3's check, armed on `cluster::PLACED`), the harness releases the
     hold through the fake LLM's control (4.1) at each of its passes
     once every started worker has held a run, read from the tasks'
