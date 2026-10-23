@@ -319,15 +319,15 @@ its sockets tagged as the server's are.
 
 ## 7. The browser's sign-in page
 
-- **The page tells the ways.** temper's page source carries `<meta
-  name="temper-sign-in" content="{sign-in}">`; temper-service fills the
-  marker when it makes the bundle at start, with the ways the
-  configuration gives, space-separated (`google`, or nothing), and the
-  `ETag` is of the filled page. A page without the marker is served as
-  it is, with no way. The web shell reads the meta at start and gives
-  the view the ways at construction. Further facts of a signed-out page
-  come as further `temper-` metas filled the same way (stage 2: the
-  forge's name, for "to continue to").
+- **The page tells the ways.** When temper-service makes the bundle's
+  page at start (`../client/browser.md`, 2.2), it inserts `<meta
+  name="temper-sign-in" content="WAYS">` before the page's `</head>`,
+  `WAYS` the configured ways, space-separated (`google`, or nothing),
+  and the `ETag` is the page's so made; a page without `</head>` is
+  refused at start, naming the bundle. The web shell reads the meta at
+  start and gives the view the ways at construction. Further facts of a
+  signed-out page come as further `temper-` metas made the same way
+  (stage 2: the forge's name, for "to continue to").
 - **The signed-out main** (`../client/README.md`, 5.1), in the browser
   with a way: temper's mark, the level-1 heading "Sign in", and a link
   for each way, "Continue with Google" to `/sign-in/google?then=PATH`,
