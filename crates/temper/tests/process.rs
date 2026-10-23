@@ -920,7 +920,13 @@ fn first_run(restart: bool) {
             &client,
             person,
             BOX_DEADLINE,
-            || demo_bot(&paths[0], &client),
+            || {
+                let bot = demo_bot(&paths[0], &client);
+                if run == "first" {
+                    demo_landed(&paths[0], &client);
+                }
+                bot
+            },
         );
         eprintln!("{run} run: {} ms", clock.now().now.saturating_since(began).as_nanos() / 1_000_000);
         let stderr = String::from_utf8_lossy(&ended.stderr);
@@ -961,9 +967,7 @@ fn assert_demo_streams(stdout: &[u8], stderr: &[u8]) {
         );
     }
 }
-// The worker's clone, push and delivery-driven landing are proved by demo_change.
-// The fake's private git route requires authentication, so this observer uses
-// the client's public forge row instead of reading temper's bot credentials.
+// Read the connected bot through temper without opening a forge credential.
 fn demo_bot(config: &std::path::Path, root: &std::path::Path) -> u64 {
     // NativeClient keeps the token; ctl also needs the public endpoint address.
     let document: serde_json::Value =
@@ -987,6 +991,77 @@ fn demo_bot(config: &std::path::Path, root: &std::path::Path) -> u64 {
         .expect("forge 1 is Connected as temper");
     assert_ne!(id, 0);
     id
+}
+
+// setup.md, 13.4: temper's landed id names the seeded tree plus the scripted edit.
+fn demo_landed(config: &std::path::Path, root: &std::path::Path) {
+    use std::collections::BTreeMap;
+    let private = root.join("private");
+    let call = support::ctl::Call::bare(&[private.to_str().expect("client path"), "task", "2"]);
+    let ended = support::ctl::alone(root, call);
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&ended.stderr));
+    let task = String::from_utf8(ended.stdout).expect("change read");
+    let hex = task
+        .lines()
+        .find_map(|line| line.strip_prefix("result: Landed · merge commit "))
+        .expect("the delegated change's full landed merge id");
+    let commit = temper_worker_protocol_git::invocation::object(hex.as_bytes()).expect("merge hex");
+    let merge = skein_fake_forge_protocol::routes::commit(&skein_forge::forgejo::id::ObjectId {
+        format: skein_forge::forgejo::id::ObjectFormat::Sha1,
+        bytes: commit.raw(),
+    })
+    .expect("the public fake commit spelling");
+    let document: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(config.join("temper.json")).expect("written configuration"))
+            .expect("JSON");
+    let address = document["application"]["forges"][0]["api"]["socket"]
+        .as_str()
+        .expect("demo fake address")
+        .parse()
+        .expect("loopback socket");
+    let landed = support::fake_objects(address, merge);
+    let landed = &landed["objects"][0];
+    assert_eq!(landed["commit"], merge);
+    // The fake seeds its one repository with root commit 1 on every start.
+    assert_eq!(landed["parent"], 1, "the merge's first parent is the seeded head");
+    let seed = support::fake_objects(address, landed["parent"].as_u64().expect("first parent"));
+    let seed = &seed["objects"][0];
+    assert_eq!(seed["commit"], 1);
+    assert!(seed["parent"].is_null() && seed["merge_parent"].is_null(), "the seed is a root");
+    let tree = |object: &serde_json::Value| -> BTreeMap<Vec<u8>, Vec<u8>> {
+        let decode = |value: &serde_json::Value| {
+            skein_lib::base64::decode(
+                skein_lib::base64::Alphabet::Standard,
+                value.as_str().expect("base64 file").as_bytes(),
+                8192,
+            )
+            .expect("file bytes")
+            .into_vec()
+        };
+        object["tree"]
+            .as_array()
+            .expect("commit tree")
+            .iter()
+            .map(|file| (decode(&file["path"]), decode(&file["content"])))
+            .collect()
+    };
+    let mut expected: BTreeMap<Vec<u8>, Vec<u8>> =
+        temper_fake::forge::FILES.into_iter().map(|(path, bytes)| (path.to_vec(), bytes.to_vec())).collect();
+    assert_eq!(tree(seed), expected, "the seed holds temper-fake's files");
+    let script = document["application"]["demo"]["llm"]["cued"]
+        .as_array()
+        .expect("demo scripts")
+        .iter()
+        .find(|script| script["cue"] == "Export widget's table as CSV")
+        .expect("coding script");
+    let edit = &script["turns"][1]["lines"][0]["arguments"]["edits"][0];
+    let old = edit["old"].as_str().expect("old main");
+    let new = edit["new"].as_str().expect("new main");
+    let main = expected.get_mut(b"src/main.rs".as_slice()).expect("seeded main");
+    let source = std::str::from_utf8(main).expect("seeded source");
+    assert_eq!(source.matches(old).count(), 1, "one coding edit in the seed");
+    *main = source.replacen(old, new, 1).into_bytes();
+    assert_eq!(tree(landed), expected, "the merge holds exactly the coding agent's edit");
 }
 
 // protocol/README.md, 15.6: the description's first process stories.
