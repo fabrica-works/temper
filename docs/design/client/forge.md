@@ -929,8 +929,12 @@ manifest from it (`../protocol/forge.md`, the setup's host).
     and `Accept`'s `Stop`.
   - *A request:* GitHub's visit with `setup_action=request` and no
     installation, after a member of an organization who is not its
-    owner asked for the App there. The state is used, nothing is
-    accepted, and the route answers `200`: "GitHub sent a request, not
+    owner asked for the App there. Nothing is accepted: the routing
+    takes the state's `back` from what it holds (removing it), and the
+    setup's host's state is left to the end of its life, since `Accept`
+    needs an installation to use it; a later visit with that state and
+    an installation is accepted as any other, and answered as one with
+    no `back`. The route answers `200`: "GitHub sent a request, not
     an installation", "Only an owner of an organization can install
     temper’s App there, and temper can’t wait for an owner to approve
     it yet: an installation approved later isn’t used. Install it on
