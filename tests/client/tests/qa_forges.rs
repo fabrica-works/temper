@@ -57,15 +57,22 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
 fn configured_with(owner: bool, under_box: bool, rows: [forge::Configured; 2]) -> Pages {
     configured_accounts(owner, under_box, rows, true)
 }
-fn configured_accounts(owner: bool, under_box: bool, rows: [forge::Configured; 2], model: bool) -> Pages {
+fn configured_accounts(owner: bool, under_box: bool, rows: [forge::Configured; 2], account: bool) -> Pages {
     let mut world = if owner { f::accounts_world(f::SEED) } else { f::world(f::SEED) };
     let front = world.front();
-    let store = std::mem::replace(&mut front.engine.store, Store::new());
+    let mut store = std::mem::replace(&mut front.engine.store, Store::new());
+    if !account {
+        // The charter keeps its model; the restored deployment account goes.
+        let accounts = store
+            .rows
+            .iter()
+            .filter(|(_, row)| matches!(row, engine::Record::Core(jig_domain_core::Record::Accounts(_))))
+            .map(|(key, _)| key.clone())
+            .collect();
+        store.seed(Box::new([]), accounts);
+    }
     let configs = std::array::from_fn(|_| {
         let mut config = walking::config(f::SEED);
-        if !model {
-            config.core.settings.models = Box::new([]);
-        }
         config.core.connectors = Box::new([temper_client_protocol_wire::FORGE]);
         config.forge.writers = rows
             .iter()
@@ -762,7 +769,7 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
         (Address::Forges, false),
         (flow(None), false),
     ] {
-        // No configured model or usable account line: the accounts document is not usable.
+        // No usable account: the accounts document is not usable.
         let mut world = configured_accounts(
             true,
             true,
