@@ -295,7 +295,12 @@ deployment that starts:
   document. The document always names a fixed port, as a configured
   GitHub forge requires (configuration.md, section 8); a later start on
   a port taken refuses, naming it and the document, as any start does.
-  An owned forge's port is chosen the same way.
+  An owned forge's port is chosen the same way, and so are the fakes'
+  and the webhooks'. Under `temper box` the sockets init chose are
+  kept: the box holds every step's listener from its start and gives
+  each step its own, so that no port is free between init and the
+  step, and a second first run beside the first chooses other ports
+  (setup.md, 7.1 and 8.2).
 - **Nothing else:** no account, no forge credential, no repository,
   which are runtime's.
 
@@ -415,7 +420,10 @@ experience; good defaults for a person's real work are open (section 8).
    the defaults and the content are its follow-up.
 4. **Going real from the client:** fetch, the dormant owned forge, the
    box's pipe, the handover at runtime, and the client's banner and
-   wording.
+   wording; and the first run's ports, each step's listener held by the
+   box from its start and given to the step (3.3; setup.md, 7.1), which
+   rests on skein holding, giving and adopting a listener (skein's
+   `io.md`, 3.2 and 6.3; `shell.md`, 6.6).
 5. **The welcome and the demo's end** (2.3): adopted, closed here.
    The demo's state, the fakes asked, the seed's acts and the end in
    the engine, `stop` on the pipe (setup.md, 7.1, 7.2 and 8.4;

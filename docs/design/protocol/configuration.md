@@ -921,10 +921,12 @@ have one, an engine alone none. Each:
     forge whose setup says `"start": "asked"`, with neither a handover
     nor a record of one, is not set up until the client asks the box
     for it (setup.md, 6.5);
-  - under the box, `temper serve --box` adopts the box's pipe, its fds 3
-    and 4, and refuses its start, naming the fd, when either is not an
-    open pipe (setup.md, 7.1); a start without the flag has none, and
-    leaves fds 3 and 4 alone;
+  - under the box, `temper serve` takes the listeners the box gives it,
+    from fd 3, `LISTEN_FDS` of them, its clients' and webhooks' listeners
+    claiming them by their addresses, and `--box` adopts the box's pipe,
+    the two fds after them, refusing its start, naming the fd, when
+    either is not an open pipe (setup.md, 7.1); a start without the flag
+    has no pipe, and leaves those fds alone;
   - every identity whose forge has a value is announced at generation 1
     before the root's restart; a GitHub forge's, once its first tokens
     are minted (credentials.md, section 4). Every connected forge's user
