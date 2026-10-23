@@ -981,11 +981,12 @@ temper ctl help [TOOL]
   alike.
 - **`sign-in FILE|-`** signs in by the link `temper serve` printed, read
   from FILE or stdin and never an argument (section 9), on loopback, and
-  writes the token and the address the link names, as `temper open`
-  does (`README.md`, section 7). `sign-out` ends the sign-in, and jig's
-  native shell, keeping none, leaves `token` a zero-byte file, which a
-  call reads as no token. Every other tool signs in with the token
-  DIRECTORY holds (`SignIn { with: Held }`).
+  writes the token and the address the link names, as `temper open` does
+  (`README.md`, section 7). It offers the token DIRECTORY holds, if any,
+  beside the link: a sign-in kept leaves `token` as it was. `sign-out`
+  ends the sign-in, and jig's native shell, keeping none, leaves `token`
+  a zero-byte file, which a call reads as no token. Every other tool
+  signs in with the token DIRECTORY holds (`SignIn { with: Held }`).
 - **Loopback only,** as `temper open`, until the clients' listener
   serves TLS: a call checks that `address` is on loopback, `127.0.0.0/8`
   or `[::1]`, before it sends the token, and otherwise exits 1, "the

@@ -2631,7 +2631,9 @@ Its rules:
 - **LINK_OR_ADDRESS** is one of:
   - the link `temper serve` printed,
     `http://HOST:PORT/jig/v1/sign-in/link?secret=SECRET`: the client
-    signs in by it first (section 7);
+    signs in by it first, offering the credential DIRECTORY holds, if
+    any, beside it, so that a person still signed in keeps their sign-in
+    (section 7);
   - the engine's address, its clients' listener's `http://HOST:PORT`,
     with or without a final `/`: the client signs in with the credential
     DIRECTORY holds. Before its loop, `jig-client-shell-native` reads
@@ -2882,17 +2884,28 @@ temper's:
   mapping's link route under temper's prefix,
   `http://HOST:PORT/jig/v1/sign-in/link?secret=SECRET`. `temper open
   DIRECTORY LINK` checks that the link names the engine's address on
-  loopback and that route, and gives the secret to `jig-client`
-  (`SignIn { with: Link(secret) }`). The secret is in the command line
-  only until the sign-in spends it; the client root passes it on and
-  keeps nothing of it.
+  loopback and that route, and gives the secret to `jig-client` with the
+  credential DIRECTORY holds, if any (`SignIn { with: Link { secret,
+  held } }`). The secret is in the command line only until the sign-in
+  spends it; the client root passes it on and keeps nothing of it.
+- **A sign-in held is kept** (jig's `domain/people.md`, section 3): a
+  person still signed in who opens a fresh link with the same DIRECTORY
+  keeps their sign-in, its number and its expiry, and the deployment's
+  sign-ins don't grow. The engine checks the credential offered as any
+  exchange's and answers with none; `jig-client` goes on holding the
+  one offered, and `DIRECTORY/token` is not written. A credential the
+  engine does not know, or one ended or expired, is no refusal: the
+  link signs the person in afresh, and its credential is written. A
+  link refused, or an engine not reached, leaves `DIRECTORY/token` as
+  it was.
 - **The bearer credential,** the sign-in's number beside 32 random
   bytes, is `DIRECTORY/token`, a private file (`0o600`), which
   `jig-client-shell-native` writes where the host says, when it says.
   Once signed in by a link, the host reads the credential from
   `jig-client`'s `link()`, through the client root, and has the native
   shell keep it, before anything is told of the sign-in; a new sign-in
-  by a link has it written anew; signed out, the host has the native
+  by a link has it written anew, and a sign-in kept writes nothing,
+  its credential unchanged; signed out, the host has the native
   shell keep none, which erases it. A later `temper open DIRECTORY
   ADDRESS` has the native shell read it before its loop (6.1), and the
   host gives it back as held (`SignIn { with: Held(credential) }`). It

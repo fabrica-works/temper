@@ -1,6 +1,6 @@
 # Testing temper
 
-Provisional, 2026-10-03, revised 2026-10-22. How temper is tested. The
+Provisional, 2026-10-03, revised 2026-10-23. How temper is tested. The
 strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
 faults, what every fake shares, what every world checks, scenarios and
 the referee, the two suites, and where a failure is fixed. This document
@@ -623,6 +623,10 @@ and 10).
 - **Stories:**
   - a person signs in by the link `temper serve` prints, and a chat is
     answered;
+  - a person still signed in signs in again by a fresh link, with the
+    same directory, and keeps their sign-in: its number, token and
+    expiry, and the deployment's sign-ins unchanged
+    (../client/README.md, section 7);
   - a repository is adopted through temper's client, and a goal's change
     is prepared, committed and pushed on the fake forge through the fake
     git program;
@@ -745,6 +749,17 @@ and 10).
   by `SIGINT` or `SIGTERM` sends nothing more, prints nothing more,
   leaves DIRECTORY's kept requests as they are, and exits 130 or 143
   (../client/tools.md, 8.2).
+- **A sign-in kept,** on a scratch directory of its own, over five
+  starts of `temper serve`, each printing a fresh link: `temper ctl
+  DIRECTORY sign-in -` with each of three starts' links keeps the
+  first's token, byte for byte, and each passes, though the
+  configuration's pool holds two sign-ins (`people.sign_ins`); then the
+  link's route, posted as a browser posts it, sets a cookie, and the
+  next start's link posted with that cookie is answered signed in with
+  no credential and no `Set-Cookie`, DIRECTORY's sign-in still live
+  (../client/README.md, section 7; jig's `domain/people.md`, section 3).
+  The cookie is proved here, below the browser, whose harness can't yet
+  open a later printed link in the same context.
 - **The server's guards,** a third test, against `temper serve`'s
   clients' listener: jig's one attack story that needs no browser, a
   rebound Host (jig's `protocol/browser.md`, section 15): a request
