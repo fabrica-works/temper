@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install temper and the bundle where init finds it (protocol/setup.md, 8.2).
+# Install the binary with its own browser bundle (client/browser.md, 2.6).
 set -eu
 if [ "$#" -ne 1 ]; then
     echo "usage: scripts/install.sh PREFIX" >&2
@@ -9,7 +9,7 @@ prefix=$1
 cd "$(dirname "$0")/.."
 mkdir -p "$prefix/bin"
 prefix=$(cd "$prefix" && pwd)
-cargo build --release --locked -p temper
+# A person's binary, whatever the environment says (client/browser.md, 2.6).
+TEMPER_BUNDLE=embed cargo build --release --locked -p temper
 install -m 0755 target/release/temper "$prefix/bin/temper"
-bundle=$(scripts/bundle.sh "$prefix/share/temper/bundle")
-printf '%s\n' "$prefix/bin/temper" "$bundle"
+printf '%s\n' "$prefix/bin/temper"

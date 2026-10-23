@@ -155,7 +155,6 @@ fn io_error(why: Error) -> String {
 #[derive(Debug)]
 pub(crate) struct Written {
     pub paths: Vec<PathBuf>,
-    pub missing_bundle: Option<PathBuf>,
     pub missing_git: bool,
     pub person: temper_init::Person,
     pub login: Option<Box<[u8]>>,
@@ -184,8 +183,6 @@ pub(crate) fn write(
     }
     let git = find(environment, b"git");
     let claude = find(environment, b"claude");
-    let bundle_path = binary.parent().ok_or("binary: no parent directory")?.join("../share/temper/bundle");
-    let bundle = bundle_path.join("index.html").is_file().then_some(&bundle_path);
     let mut io = Io::open()?;
     let ports = io.ports(preferred)?;
     let secret = skein_shell::crypto_seed().map_err(|errno| format!("random secret: errno {errno}"))?;
@@ -196,7 +193,6 @@ pub(crate) fn write(
             binary: binary.as_os_str().as_bytes(),
             git: git.as_ref().map(|path| path.as_os_str().as_bytes()),
             claude: claude.as_ref().map(|path| path.as_os_str().as_bytes()),
-            bundle: bundle.map(|path| path.as_os_str().as_bytes()),
             ports,
             login: login.as_deref(),
         },
@@ -234,13 +230,7 @@ pub(crate) fn write(
         result.map_err(|why| format!("{}: {why}", destination.display()))?;
         paths.push(destination);
     }
-    Ok(Written {
-        paths,
-        missing_bundle: bundle.is_none().then_some(bundle_path.clone()),
-        missing_git: git.is_none(),
-        person: answer.person,
-        login,
-    })
+    Ok(Written { paths, missing_git: git.is_none(), person: answer.person, login })
 }
 pub(crate) fn core(directories: &Directories) -> Result<Written, String> {
     let binary = std::env::current_exe().map_err(|why| why.to_string())?;
@@ -251,8 +241,8 @@ pub(crate) fn run(directories: &Directories) -> Result<u8, String> {
     for path in written.paths {
         eprintln!("init: wrote {}", path.display());
     }
-    if let Some(path) = written.missing_bundle {
-        eprintln!("init: no bundle at {}: the browser is not served", path.display());
+    if crate::bundle::OWN.is_none() {
+        eprintln!("init: this temper has no browser (built with TEMPER_BUNDLE=none): the browser is not served");
     }
     if written.missing_git {
         eprintln!("init: no git on PATH: a real forge's repositories need git 2.41 or later, set as workers[].git");

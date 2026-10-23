@@ -2298,6 +2298,7 @@ dependencies = [
  "smith-local-process-world",
  "smith-local-service",
  "temper-box",
+ "temper-client-bundle",
  "temper-client-domain",
  "temper-client-shell-cli",
  "temper-client-shell-terminal",
@@ -2357,6 +2358,10 @@ dependencies = [
  "smith-agent-shell",
  "temper-engine-domain",
 ]
+
+[[package]]
+name = "temper-client-bundle"
+version = "0.0.0"
 
 [[package]]
 name = "temper-client-domain"

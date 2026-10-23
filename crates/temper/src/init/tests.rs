@@ -71,18 +71,16 @@ fn taken_default_owned_and_webhooks_ports_get_distinct_kernel_ports() {
 
 #[test]
 #[expect(clippy::too_many_lines, reason = "one facts table checks reservations, file modes and optional programs")]
-fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
+fn init_finds_ports_and_programs_and_writes_exact_modes_in_order() {
     let mut rows = Vec::new();
     for held in [false, true] {
         for claude in [false, true] {
-            for bundle in [false, true] {
-                rows.push((held, claude, bundle, true, false));
-            }
+            rows.push((held, claude, true, false));
         }
     }
-    rows.extend([(false, false, false, false, false), (false, false, false, true, true)]);
-    for (held, claude, bundle, git, same) in rows {
-        let row = format!("facts-{held}-{claude}-{bundle}-{git}-{same}");
+    rows.extend([(false, false, false, false), (false, false, true, true)]);
+    for (held, claude, git, same) in rows {
+        let row = format!("facts-{held}-{claude}-{git}-{same}");
         let root = scratch(&row);
         let dirs = directories(&root);
         let env = environment(&root, claude);
@@ -90,10 +88,6 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             fs::remove_file(root.join("bin/git")).expect("no git on PATH");
         }
         let binary = root.join("bin/temper");
-        if bundle {
-            fs::create_dir_all(root.join("share/temper/bundle")).expect("bundle");
-            fs::write(root.join("share/temper/bundle/index.html"), b"page").expect("page");
-        }
         let listeners = [
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred clients listener"),
             TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).expect("preferred owned listener"),
@@ -122,7 +116,7 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
             .expect("socket");
         assert_eq!(address.port() == preferred[0], !held, "{row}");
         assert!(TcpListener::bind(address).is_ok(), "{row}: reservation released");
-        assert_eq!(document["application"]["clients"]["bundle"].is_string(), bundle);
+        assert!(document["application"]["clients"]["bundle"].is_null());
         let agent: serde_json::Value =
             serde_json::from_slice(&fs::read(path(&dirs.config).join("agent.json")).expect("agent")).expect("JSON");
         let llm: std::net::SocketAddr =
@@ -183,7 +177,6 @@ fn init_finds_ports_programs_and_bundle_and_writes_exact_modes_in_order() {
         assert_eq!(llm.port() == preferred[3], !held, "{row}");
         assert!(TcpListener::bind(llm).is_ok(), "{row}: LLM reservation released");
         assert_eq!(agent["programs"].as_object().expect("programs").contains_key("claude_code"), claude);
-        assert_eq!(written.missing_bundle.is_none(), bundle);
         assert_eq!(written.missing_git, !git);
         assert_eq!(document["application"]["workers"][0]["git"].is_null(), !git);
         check_agent(&dirs, agent);

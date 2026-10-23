@@ -50,7 +50,6 @@ pub(crate) fn documents(facts: &Facts<'_>, directories: &Directories<'_>, login:
         (b"email".as_slice(), json(Value::Text(Some(&email)))),
         (b"llm".as_slice(), json(Value::Text(Some(&llm)))),
         (b"webhooks".as_slice(), json(Value::Text(Some(&webhooks)))),
-        (b"bundle".as_slice(), json(Value::Text(facts.bundle))),
         (b"programs".as_slice(), json(Value::Programs { claude: facts.claude, directory: &programs })),
     ];
     (fill(TEMPER, &values), fill(AGENT, &values))

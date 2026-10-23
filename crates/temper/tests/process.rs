@@ -1194,15 +1194,13 @@ fn assert_demo_streams(stdout: &[u8], stderr: &[u8]) {
     let stderr = std::str::from_utf8(stderr).expect("demo diagnostics");
     assert!(!stderr.contains("temper fake seed"), "the engine owns the demo's start: {stderr}");
     let steps = ["fake llm: ", "prepare 1: ", "fake forge 1: ", "serve: ", "box: "];
-    let bundle = std::path::Path::new(env!("CARGO_BIN_EXE_temper"))
-        .parent()
-        .expect("binary parent")
-        .join("../share/temper/bundle");
-    let no_bundle = format!("init: no bundle at {}: the browser is not served", bundle.display());
+    let no_bundle = "init: this temper has no browser (built with TEMPER_BUNDLE=none): the browser is not served";
     let no_git = "init: no git on PATH: a real forge's repositories need git 2.41 or later, set as workers[].git";
     for line in stderr.lines() {
         assert!(
-            steps.iter().any(|prefix| line.starts_with(prefix)) || line == no_git || line == no_bundle,
+            steps.iter().any(|prefix| line.starts_with(prefix))
+                || line == no_git
+                || (temper::bundle::OWN.is_none() && line == no_bundle),
             "unprefixed demo diagnostic: {line}"
         );
     }

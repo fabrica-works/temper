@@ -783,7 +783,6 @@ pub fn bounded_template(directory: &Path) -> Bounded {
             binary: b"/usr/local/bin/temper",
             git: Some(b"/usr/bin/git"),
             claude: Some(b"/usr/bin/claude"),
-            bundle: None,
             login: Some(b"ada"),
             ports: Ports {
                 clients: NonZeroU16::new(8367).expect("clients port"),

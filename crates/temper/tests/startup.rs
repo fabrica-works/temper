@@ -658,12 +658,24 @@ type Spoiled<'a> = (&'a str, fn(&std::path::Path), &'a str);
 /// A limit's row: its name, the configuration's change, and the start's refusal.
 type Limited<'a> = (&'a str, fn(&mut serde_json::Value), &'a str);
 
+const BUNDLE_FILES: &[(&str, &[u8])] = &[
+    ("index.html", PAGE),
+    ("0123456789abcdef/boot.js", b"boot();"),
+    ("0123456789abcdef/files/robots.txt", b"User-agent: *\nDisallow:\n"),
+];
+// The page, boot.js and robots.txt: three files, 31 + 7 + 24 bytes.
+const BUNDLE_COUNT: u32 = 3;
+const BUNDLE_BYTES: u32 = 62;
+// A .js path at the service's 1024-byte bound.
+const PATH_STEM_BOUND: usize = temper_service::clients::bundle::NAME_BYTES as usize - b".js".len();
+const BUNDLE_LIMITS: temper_service::limits::Clients =
+    temper_service::limits::Clients { bundle_files: 128, bundle_bytes: 16 << 20 };
 fn fixture_bundle(directory: &std::path::Path) {
-    fs::create_dir_all(directory.join(DIGEST).join("files")).expect("bundle directory");
-    fs::write(directory.join("bundle/index.html"), PAGE).expect("bundle page");
-    fs::write(directory.join(DIGEST).join("boot.js"), b"boot();").expect("bundle script");
-    fs::write(directory.join(DIGEST).join("files/robots.txt"), b"User-agent: *\nDisallow:\n")
-        .expect("bundle root file");
+    for (name, bytes) in BUNDLE_FILES {
+        let file = directory.join("bundle").join(name);
+        fs::create_dir_all(file.parent().expect("bundle parent")).expect("bundle directory");
+        fs::write(file, bytes).expect("bundle file");
+    }
 }
 fn bundle_configuration(directory: &std::path::Path) {
     support::configuration(directory, &support::Forge::Unreached);
@@ -694,6 +706,123 @@ fn a_bundle_directory_is_read_with_its_one_digest_directory() {
     );
     scratch.remove();
 }
+#[test]
+fn embedded_and_directory_files_make_the_same_bundle() {
+    let scratch = support::Scratch::startup("bundle-embedded");
+    fixture_bundle(scratch.path());
+    // Root files beside index.html are ignored in both reads.
+    fs::write(scratch.path().join("bundle/ignored.bin"), b"ignored").expect("root file");
+    let mut files = BUNDLE_FILES.to_vec();
+    files.push(("ignored.bin", b"ignored"));
+    let directory = temper::bundle::read(scratch.path().join("bundle").as_os_str().as_encoded_bytes(), BUNDLE_LIMITS)
+        .expect("directory");
+    let embedded = temper::bundle::embedded(&files, BUNDLE_LIMITS).expect("embedded");
+    assert_eq!(embedded.page, directory.page);
+    assert_eq!(embedded.etag, directory.etag);
+    assert_eq!(embedded.digest, directory.digest);
+    assert_eq!(embedded.files.len(), directory.files.len());
+    for (name, _) in BUNDLE_FILES.iter().skip(1) {
+        let (_, relative) = name.split_once('/').expect("digest path");
+        let from_directory = directory.files.get(relative.as_bytes()).expect("directory file");
+        let from_embedded = embedded.files.get(relative.as_bytes()).expect("embedded file");
+        assert_eq!(from_embedded.kind, from_directory.kind);
+        assert_eq!(from_embedded.bytes, from_directory.bytes);
+    }
+    scratch.remove();
+}
+
+#[test]
+fn embedded_files_refuse_each_spoiled_bundle_and_limit() {
+    use temper_service::limits::Clients;
+    let long = format!("0123456789abcdef/{}.js", "a".repeat(PATH_STEM_BOUND + 1)); // 1025 bytes below the digest.
+    let rows = [
+        ("no page", BUNDLE_FILES[1..].to_vec(), BUNDLE_LIMITS, "index.html: absent".to_owned()),
+        ("no digest", BUNDLE_FILES[..1].to_vec(), BUNDLE_LIMITS, "no digest directory".to_owned()),
+        (
+            "two digests",
+            vec![("index.html", PAGE), ("0123456789abcdef/a.js", b""), ("fedcba9876543210/a.js", b"")],
+            BUNDLE_LIMITS,
+            "fedcba9876543210: more than one digest directory".to_owned(),
+        ),
+        (
+            "bad digest",
+            vec![("index.html", PAGE), ("0123456789abcdeF/a.js", b"")],
+            BUNDLE_LIMITS,
+            "0123456789abcdeF: digest must be 16 lowercase hex digits".to_owned(),
+        ),
+        (
+            "short digest",
+            vec![("index.html", PAGE), ("abc/a.js", b"")],
+            BUNDLE_LIMITS,
+            "abc: digest must be 16 lowercase hex digits".to_owned(),
+        ),
+        (
+            "parent path",
+            vec![("index.html", PAGE), ("0123456789abcdef/../a.js", b"")],
+            BUNDLE_LIMITS,
+            "0123456789abcdef/../a.js: path must be plain and at most 1024 bytes".to_owned(),
+        ),
+        (
+            "dot path",
+            vec![("index.html", PAGE), ("0123456789abcdef/./a.js", b"")],
+            BUNDLE_LIMITS,
+            "0123456789abcdef/./a.js: path must be plain and at most 1024 bytes".to_owned(),
+        ),
+        (
+            "empty component",
+            vec![("index.html", PAGE), ("0123456789abcdef//a.js", b"")],
+            BUNDLE_LIMITS,
+            "0123456789abcdef//a.js: path must be plain and at most 1024 bytes".to_owned(),
+        ),
+        (
+            "long path",
+            vec![("index.html", PAGE), (long.as_str(), b"")],
+            BUNDLE_LIMITS,
+            format!("{long}: path must be plain and at most 1024 bytes"),
+        ),
+        (
+            "closed list",
+            vec![("index.html", PAGE), ("0123456789abcdef/data.bin", b"")],
+            BUNDLE_LIMITS,
+            "0123456789abcdef/data.bin: file type is not on the closed list".to_owned(),
+        ),
+        (
+            "files",
+            BUNDLE_FILES.to_vec(),
+            Clients { bundle_files: BUNDLE_COUNT - 1, ..BUNDLE_LIMITS },
+            "0123456789abcdef/files/robots.txt: past clients.bundle_files".to_owned(),
+        ),
+        (
+            "bytes",
+            BUNDLE_FILES.to_vec(),
+            Clients { bundle_bytes: BUNDLE_BYTES - 1, ..BUNDLE_LIMITS },
+            "0123456789abcdef/files/robots.txt: past clients.bundle_bytes".to_owned(),
+        ),
+    ];
+    for (name, files, limits, why) in rows {
+        assert_eq!(
+            temper::bundle::embedded(&files, limits).expect_err("refused"),
+            format!("application.clients.bundle: the binary's bundle: {why}"),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn embedded_files_at_each_bound_are_admitted() {
+    let bound = format!("0123456789abcdef/{}.js", "a".repeat(PATH_STEM_BOUND));
+    for (name, files, limits) in [
+        (
+            "files and bytes",
+            BUNDLE_FILES.to_vec(),
+            temper_service::limits::Clients { bundle_files: BUNDLE_COUNT, bundle_bytes: BUNDLE_BYTES },
+        ),
+        ("path", vec![("index.html", PAGE), (bound.as_str(), b"")], BUNDLE_LIMITS),
+    ] {
+        temper::bundle::embedded(&files, limits).unwrap_or_else(|why| panic!("{name}: {why}"));
+    }
+}
+
 #[test]
 fn a_directory_that_is_no_bundle_refuses_the_start() {
     let rows: [Spoiled<'_>; 4] = [

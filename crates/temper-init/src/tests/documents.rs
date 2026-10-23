@@ -190,13 +190,7 @@ fn the_default_is_the_owned_example_so_edited() {
             ("/application/demo", demo(facts.ports.llm.get())),
             ("/application/webhooks", json!({"listener": {"socket": format!("127.0.0.1:{}", facts.ports.webhooks)}})),
             ("/application/clients/listener/socket", json!(format!("127.0.0.1:{}", facts.ports.clients))),
-            (
-                "/application/clients/bundle",
-                match facts.bundle {
-                    Some(bundle) => json!(text(bundle)),
-                    None => Value::Null,
-                },
-            ),
+            ("/application/clients/bundle", Value::Null),
             (
                 "/application/workers/0/git",
                 match facts.git {
@@ -423,7 +417,6 @@ fn no_placeholder_is_left() {
                 (b"\"$agent\"".as_slice(), 2),
                 (b"\"$git\"".as_slice(), 1),
                 (b"\"$listener\"".as_slice(), 1),
-                (b"\"$bundle\"".as_slice(), 1),
                 (b"\"$forge\"".as_slice(), 2),
                 (b"\"$forge_git\"".as_slice(), 1),
                 (b"\"$owned\"".as_slice(), 2),

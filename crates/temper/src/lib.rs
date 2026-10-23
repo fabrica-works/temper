@@ -363,7 +363,10 @@ fn prepare_with_limits(
         }
     }
     files.entries = entries;
-    let bundle = named.bundle.as_deref().map(|configured| bundle::read(configured, named.bundle_limits)).transpose()?;
+    let bundle = match named.bundle.as_deref() {
+        Some(configured) => Some(bundle::read(configured, named.bundle_limits)?),
+        None => bundle::own(named.bundle_limits)?,
+    };
     let runtime = if let Some(worker) = &named.worker {
         let root_path = path(&worker.root);
         if std::fs::symlink_metadata(root_path).is_ok() {

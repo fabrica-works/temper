@@ -135,9 +135,9 @@ fn without_a_bundle_the_root_and_printed_link_serve_temper_with_the_page_policy(
         assert!(body.contains("<title>temper</title>"));
         assert!(body.contains("<h1>temper</h1>"));
         for paragraph in [
-            "This temper serves no browser client: its configuration names no bundle (application.clients.bundle).",
+            "This temper was built without its browser client.",
             "Open the link in a terminal with temper open DIRECTORY LINK.",
-            "To serve the browser, install temper with scripts/install.sh, or build a bundle with scripts/bundle.sh, name its directory in application.clients.bundle, and restart temper.",
+            "To serve the browser, build temper with the wasm32-unknown-unknown target, or name a bundle's directory in application.clients.bundle, and restart temper.",
         ] {
             assert!(body.contains(&format!("<p>{paragraph}</p>")));
         }

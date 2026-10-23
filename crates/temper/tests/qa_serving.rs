@@ -409,32 +409,47 @@ fn robots_txt_is_the_bundles_root_file_revalidated_disallowing_every_path() {
 }
 
 #[test]
-fn with_no_bundle_gets_serve_temper_and_other_requests_stay_not_found() {
+fn with_bundle_null_gets_serve_the_binarys_own_page_and_files() {
+    // The binary's own bundle, or none built with TEMPER_BUNDLE=none (client/browser.md, 2.2 and 2.6).
+    let own = temper::bundle::OWN;
     let served = Served::start("no_bundle", false);
-    let file = format!("/bundle/{DIGEST}/boot.js");
+    let fixture_file = format!("/bundle/{DIGEST}/boot.js");
+    // Each row: the request, and its status from a binary without its bundle and from one with it.
     let rows = [
-        ("GET", "/"),
-        ("GET", "/projects/7"),
-        ("GET", served.route.as_str()),
-        ("GET", "/robots.txt"),
-        ("GET", file.as_str()),
-        ("GET", "/jigsaw"),
-        ("HEAD", "/"),
-        ("POST", "/"),
-        ("DELETE", "/bundle/x"),
-        ("PUT", "/robots.txt"),
+        ("GET", "/", 200, 200),
+        ("GET", "/projects/7", 200, 200),
+        ("GET", served.route.as_str(), 200, 200),
+        ("GET", "/robots.txt", 404, 200),
+        ("GET", fixture_file.as_str(), 404, 404),
+        ("GET", "/jigsaw", 200, 200),
+        ("HEAD", "/", 404, 405),
+        ("POST", "/", 404, 405),
+        ("DELETE", "/bundle/x", 404, 405),
+        ("PUT", "/robots.txt", 404, 405),
     ];
-    for (method, path) in rows {
+    let page: &[u8] = match own {
+        None => temper_service::clients::bundle::NO_BUNDLE_PAGE,
+        Some(_) => temper_client_bundle::FILES.iter().find(|(name, _)| *name == "index.html").expect("embedded page").1,
+    };
+    for (method, path, without, with) in rows {
         let reply = served.send(method, path, &[]);
-        let page = method == "GET" && path != "/robots.txt" && !path.starts_with("/bundle/");
-        assert_eq!(reply.status, if page { 200 } else { 404 }, "{method} {path}");
-        if page {
+        let status = if own.is_some() { with } else { without };
+        assert_eq!(reply.status, status, "{method} {path}");
+        if method == "GET" && path != "/robots.txt" && !path.starts_with("/bundle/") {
             assert_eq!(reply.header("content-type"), Some("text/html; charset=utf-8"));
-            assert!(reply.body.windows(b"<h1>temper</h1>".len()).any(|part| part == b"<h1>temper</h1>"));
-        } else {
+            assert_eq!(reply.body, page, "{method} {path}");
+        } else if status == 404 {
             assert!(reply.body.is_empty());
         }
         reply.policy(&format!("{method} {path}"));
+    }
+    if let Some(digest) = own {
+        let prefix = format!("{digest}/");
+        let (name, bytes) =
+            temper_client_bundle::FILES.iter().find(|(name, _)| name.starts_with(&prefix)).expect("embedded file");
+        let reply = served.get(&format!("/bundle/{name}"));
+        assert_eq!((reply.status, reply.body.as_slice()), (200, *bytes), "{name}");
+        reply.policy(name);
     }
     served.stop();
 }

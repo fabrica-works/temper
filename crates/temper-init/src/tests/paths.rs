@@ -16,7 +16,6 @@ fn assign<'a>(facts: &mut Facts<'a>, directories: &mut Directories<'a>, fact: Fa
         Fact::Binary => facts.binary = path,
         Fact::Git => facts.git = Some(path),
         Fact::Claude => facts.claude = Some(path),
-        Fact::Bundle => facts.bundle = Some(path),
         Fact::Config => directories.config = path,
         Fact::Data => directories.data = path,
     }
@@ -27,7 +26,7 @@ fn a_fact_is_refused_naming_it() {
     let long = absolute(4097);
     let mut nontext_long = long.clone();
     *nontext_long.last_mut().expect("the path has 4097 bytes") = 0xff;
-    let facts_in_order = [Fact::Binary, Fact::Git, Fact::Claude, Fact::Bundle, Fact::Config, Fact::Data];
+    let facts_in_order = [Fact::Binary, Fact::Git, Fact::Claude, Fact::Config, Fact::Data];
     for fact in facts_in_order {
         for (row, reason, path) in [
             ("relative", Reason::Relative, b"relative".as_slice()),
@@ -117,7 +116,7 @@ fn paths_join_once_and_accept_the_bound() {
         );
     }
     let long = absolute(4096);
-    for fact in [Fact::Binary, Fact::Git, Fact::Claude, Fact::Bundle] {
+    for fact in [Fact::Binary, Fact::Git, Fact::Claude] {
         let mut facts = fixtures::facts();
         let mut directories = DIRECTORIES;
         assign(&mut facts, &mut directories, fact, &long);
@@ -137,13 +136,7 @@ fn paths_join_once_and_accept_the_bound() {
     // The encoder's worst expansion also fits: six JSON bytes per byte.
     let mut controls = long;
     controls.get_mut(1..).expect("the path has 4096 bytes").fill(1);
-    let facts = Facts {
-        binary: &controls,
-        git: Some(&controls),
-        claude: Some(&controls),
-        bundle: Some(&controls),
-        ..fixtures::facts()
-    };
+    let facts = Facts { binary: &controls, git: Some(&controls), claude: Some(&controls), ..fixtures::facts() };
     let mut config = absolute(4085);
     config.get_mut(1..).expect("the configuration directory has 4085 bytes").fill(1);
     let mut data = absolute(4087);

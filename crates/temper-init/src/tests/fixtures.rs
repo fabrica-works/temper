@@ -11,7 +11,6 @@ pub fn facts() -> Facts<'static> {
         binary: b"/opt/temper/bin/temper",
         git: Some(b"/usr/bin/git"),
         claude: None,
-        bundle: None,
         login: Some(b"ada"),
         ports: Ports {
             clients: NonZeroU16::new(8367).expect("the default port is nonzero"),
@@ -23,7 +22,7 @@ pub fn facts() -> Facts<'static> {
     }
 }
 
-pub fn cases() -> [(&'static str, Facts<'static>); 5] {
+pub fn cases() -> [(&'static str, Facts<'static>); 4] {
     [
         ("neither, default port", facts()),
         ("no git on PATH", Facts { git: None, ..facts() }),
@@ -41,28 +40,7 @@ pub fn cases() -> [(&'static str, Facts<'static>); 5] {
                 ..facts()
             },
         ),
-        (
-            "bundle, kernel port",
-            Facts {
-                bundle: Some(b"/opt/temper/share/temper/bundle"),
-                ports: Ports {
-                    clients: NonZeroU16::new(41023).expect("the kernel-port fixture is nonzero"),
-                    owned: NonZeroU16::new(41026).expect("the kernel owned forge port is nonzero"),
-                    forge: NonZeroU16::new(41024).expect("the kernel forge port is nonzero"),
-                    llm: NonZeroU16::new(65535).expect("the kernel LLM port is nonzero"),
-                    webhooks: NonZeroU16::new(41025).expect("the kernel webhooks port is nonzero"),
-                },
-                ..facts()
-            },
-        ),
-        (
-            "both, default port",
-            Facts {
-                claude: Some(b"/opt/claude/bin/claude"),
-                bundle: Some(b"/opt/temper/share/temper/bundle"),
-                ..facts()
-            },
-        ),
+        ("claude, default port", Facts { claude: Some(b"/opt/claude/bin/claude"), ..facts() }),
     ]
 }
 

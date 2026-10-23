@@ -23,8 +23,6 @@ pub struct Facts<'a> {
     pub git: Option<&'a [u8]>,
     /// The claude found on PATH, if any: Claude Code's program.
     pub claude: Option<&'a [u8]>,
-    /// The browser's bundle, if one holds index.html: clients.bundle.
-    pub bundle: Option<&'a [u8]>,
     /// The listeners' ports on 127.0.0.1.
     pub ports: Ports,
     /// The effective uid's name in /etc/passwd, or none.
@@ -99,7 +97,6 @@ pub enum Fact {
     Binary,
     Git,
     Claude,
-    Bundle,
     Config,
     Data,
 }
@@ -132,9 +129,6 @@ pub fn files(
     }
     if let Some(claude) = facts.claude {
         path::check(Fact::Claude, claude, b"")?;
-    }
-    if let Some(bundle) = facts.bundle {
-        path::check(Fact::Bundle, bundle, b"")?;
     }
     path::check(Fact::Config, directories.config, b"agent.json")?;
     path::check(Fact::Data, directories.data, b"programs")?;

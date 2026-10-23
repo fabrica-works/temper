@@ -14,6 +14,7 @@ members = [
     "testing/temper-fake-git-hosted",
     "testing/temper-github-app",
     "crates/temper",
+    "crates/temper-client-bundle",
     "tests/engine/protocol-forge",
     "crates/temper-client-shell-terminal",
     "crates/temper-client-shell-cli",
@@ -66,6 +67,7 @@ temper-box = { path = "crates/temper-box" }
 temper-forge-setup-shell = { path = "crates/temper-forge-setup-shell" }
 temper-forge-setup = { path = "crates/temper-forge-setup" }
 temper-init = { path = "crates/temper-init" }
+temper-client-bundle = { path = "crates/temper-client-bundle" }
 jig-boundary = { git = "https://github.com/fabrig-dev/jig.git" }
 temper-fake-git = { path = "crates/temper-fake-git" }
 temper-fake-git-hosted = { path = "testing/temper-fake-git-hosted" }
@@ -208,6 +210,16 @@ overflow-checks = true
 [profile.release]
 panic = "abort"
 overflow-checks = true
+
+# The browser's release module, embedded by a release build (skein's ui-web.md, 4.1; client/browser.md, 2.6).
+[profile.web]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
+strip = true
 
 [profile.dev.package.skein-codegen]
 opt-level = 3

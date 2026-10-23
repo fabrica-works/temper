@@ -6,13 +6,17 @@ to edit in `owned/charters/` before asking for work.
 
 ## Step 1. Install the three programs
 
-Install temper, Forgejo **17.0.0**, and Forgejo runner **13.2.0** at the
-paths below. temper does not download them. You also need `/usr/bin/git`,
-`sha256sum`, and free loopback ports 3000, 7100 and 7101. Run this from
-the temper checkout; keep this terminal for steps 2 to 5.
+Install temper from this checkout, and Forgejo **17.0.0** and Forgejo
+runner **13.2.0** at the paths below; temper does not download them. The
+temper binary is the whole install: it holds its browser, so its build
+needs Rust's wasm32 target (`rustup target add wasm32-unknown-unknown`).
+You also need `/usr/bin/git`, `sha256sum`, and free loopback ports 3000,
+7100 and 7101. Run this from the temper checkout; keep this terminal for
+steps 2 to 5.
 
 ```sh
-TEMPER=/usr/local/bin/temper
+scripts/install.sh "$HOME/.local"
+TEMPER="$HOME/.local/bin/temper"
 FORGEJO=/opt/forgejo/forgejo
 RUNNER=/opt/forgejo/forgejo-runner
 EXAMPLES="$PWD/docs/examples"
@@ -110,7 +114,7 @@ The link signs in once, within five minutes of its printing; past them
 the client is refused, and the box prints a fresh link in its terminal.
 
 ```sh
-TEMPER=/usr/local/bin/temper
+TEMPER="$HOME/.local/bin/temper"
 printf 'Paste the sign-in link, then press Enter: '
 read -r LINK
 "$TEMPER" open client "$LINK"
