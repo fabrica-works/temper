@@ -397,17 +397,32 @@ impl Referee<Process> for AnswerJudge {
 }
 const ANSWER_CALLS: usize = 9;
 
-fn answer_peer(exceeded: bool) -> skein_fake_peers::llm::Peer {
+fn answer_peer(directory: &Path, exceeded: bool) -> skein_fake_peers::llm::Peer {
     use skein_fake_llm_domain::api::{Finish, Line, Turn};
     // The chat is ended by its requester (domain/agent.md, 4.6): its answer is the
     // turn's text, and the finish only ends the turn.
     // Pass the shipped per-item reasoning allowance, retaining valid native replay JSON.
+    let mut strings = 16_384_u32;
     let lines = if exceeded {
+        let agent: serde_json::Value =
+            serde_json::from_slice(&fs::read(directory.join("agent.json")).expect("initialized agent")).expect("JSON");
+        let allowance = agent["endpoints"]
+            .as_array()
+            .expect("endpoints")
+            .iter()
+            .flat_map(|endpoint| endpoint["models"].as_array().expect("models"))
+            .find(|model| model["name"] == "gpt-6-luna")
+            .expect("plan model")["reasoning_item"]
+            .as_u64()
+            .expect("reasoning allowance");
+        let item = usize::try_from(allowance).expect("item length").checked_add(1).expect("allowance plus one");
         let bytes = serde_json::to_vec(&serde_json::json!({
             "type": "reasoning", "id": "reasoning-1", "summary": [],
-            "encrypted_content": "a".repeat(2049)
+            "encrypted_content": "a".repeat(item)
         }))
         .expect("native reasoning item");
+        // Retain the ordinary peer's room for script slots and wire framing.
+        strings = strings.checked_add(u32::try_from(bytes.len()).expect("scripted item length")).expect("peer strings");
         vec![Line::Opaque { bytes: bytes.into() }].into_boxed_slice()
     } else {
         vec![
@@ -419,10 +434,17 @@ fn answer_peer(exceeded: bool) -> skein_fake_peers::llm::Peer {
         ]
         .into_boxed_slice()
     };
-    let mut recipe = temper_real_loop_world::llm::scripted(Box::new([skein_fake_llm_domain::api::Script {
-        cue: Box::default(),
-        turns: Box::new([Turn { lines, finish: if exceeded { Finish::Stop } else { Finish::ToolCalls }, tokens: 1 }]),
-    }]));
+    let mut recipe = temper_real_loop_world::llm::scripted_sized(
+        Box::new([skein_fake_llm_domain::api::Script {
+            cue: Box::default(),
+            turns: Box::new([Turn {
+                lines,
+                finish: if exceeded { Finish::Stop } else { Finish::ToolCalls },
+                tokens: 1,
+            }]),
+        }]),
+        strings,
+    );
     recipe.credential = skein_llm::Credential::bearer(ACCESS.into());
     skein_fake_peers::llm::Peer::new(
         "127.0.0.1:34443".parse().expect("fake LLM address"),
@@ -453,12 +475,12 @@ fn model_requests(procs: &[Process]) -> usize {
 fn exceeded_hold(ended: &super::Ended) -> u64 {
     let task = ctl::json(ended);
     let held = &task["chip"]["details"]["owner"]["phase"]["held"];
-    assert_eq!(held["reason"], serde_json::json!({"exceeded":{"bound":"reasoning","value":2048}}), "{task}");
+    assert_eq!(held["reason"], serde_json::json!({"exceeded":{"bound":"reasoning","value":65536}}), "{task}");
     held["revision"].as_u64().expect("hold revision")
 }
 
 fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
-    let peer = answer_peer(exceeded);
+    let peer = answer_peer(directory, exceeded);
     let clock = Clock::new();
     let mut binary = start(directory);
     let streams = binary.take_streams().expect("serve pipes");

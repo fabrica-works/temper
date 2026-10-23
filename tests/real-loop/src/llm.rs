@@ -18,30 +18,37 @@ pub struct Recipe {
 
 #[must_use]
 pub fn scripted(scripts: Box<[api::Script]>) -> Recipe {
+    scripted_sized(scripts, 16_384)
+}
+
+/// The same peer with room for a story's larger scripted item and its framing.
+#[must_use]
+pub fn scripted_sized(scripts: Box<[api::Script]>, strings: u32) -> Recipe {
     // Smith's configured peer bounds, for an agent's prompt and finish call.
     // REQUEST is this fake's admission, not production's bound (50,331,648 B
     // from the template's window, crates/temper-init/template/agent.json).
     // The first-turn request with a workspace mounted measured 31,007 B
     // when the delegate and amend schemas landed.
-    const STRINGS: u32 = 16_384;
     const REQUEST: u32 = 65_536;
+    // The fake also parses an opaque scripted item through its request document reader.
+    let request = REQUEST.max(strings);
     // Larger wire chunks keep the zero-latency real-loop peer cheap.
     const WIRE_CHUNK: u32 = 4096;
     let mut config = skein_llm_world::fake::config();
     config.latency_min = Duration::ZERO;
     config.latency_max = Duration::ZERO;
-    config.script_bytes = config.script_bytes.max(STRINGS);
-    config.answer_bytes = config.answer_bytes.max(STRINGS);
-    config.query_bytes = config.query_bytes.max(STRINGS);
+    config.script_bytes = config.script_bytes.max(strings);
+    config.answer_bytes = config.answer_bytes.max(strings);
+    config.query_bytes = config.query_bytes.max(strings);
     let mut protocol = skein_llm_world::fake::limits(&skein_llm_world::limits());
     protocol.http.read = WIRE_CHUNK;
     protocol.http.send = WIRE_CHUNK;
     protocol.sse.chunk = WIRE_CHUNK;
-    protocol.documents.openai.request = REQUEST;
-    protocol.documents.openai.strings = STRINGS;
-    protocol.documents.openai.answer = protocol.documents.openai.answer.max(STRINGS);
-    protocol.http.body = protocol.http.body.max(u64::from(REQUEST));
-    protocol.sse.event = protocol.sse.event.max(STRINGS);
+    protocol.documents.openai.request = request;
+    protocol.documents.openai.strings = strings;
+    protocol.documents.openai.answer = protocol.documents.openai.answer.max(strings);
+    protocol.http.body = protocol.http.body.max(u64::from(request));
+    protocol.sse.event = protocol.sse.event.max(strings);
     protocol.documents.openai.tokens = 4096;
     protocol.documents.openai.output_items = 256;
     protocol.documents.anthropic.output_items = 256;

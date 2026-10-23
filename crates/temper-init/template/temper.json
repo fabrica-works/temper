@@ -5,13 +5,13 @@
       "overrides": {
         "authority.grants": 12,
         "authority.segments": 8,
-        "core.resume_bytes": 785596,
+        "core.resume_bytes": 1039548,
         "documents.lines": 2,
         "documents.rows": 2,
         "documents.text_bytes": 128,
-        "hub.transcript_bytes": 3142384,
-        "hub.turn_bytes": 785592,
-        "hub.turn_queue_bytes": 6284736,
+        "hub.transcript_bytes": 4158192,
+        "hub.turn_bytes": 1039544,
+        "hub.turn_queue_bytes": 8316352,
         "notes.scopes": 15,
         "tasks.authority_bytes": 512,
         "tasks.authority_grants": 12,
@@ -244,7 +244,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 350116147281550,
+    "memory_bytes": 443411293470350,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -838,12 +838,12 @@
         "overrides": {
           "hub.accounts": 4,
           "hub.event_bytes": 4096,
-          "hub.transcript_bytes": 3142384,
-          "hub.turn_bytes": 785592,
-          "hub.turn_queue_bytes": 6284736
+          "hub.transcript_bytes": 4158192,
+          "hub.turn_bytes": 1039544,
+          "hub.turn_queue_bytes": 8316352
         }
       },
-      "memory_bytes": 3266374440811
+      "memory_bytes": 3363266628203
     }
   ],
   "application": {
@@ -1281,11 +1281,11 @@
         "forge.client.repositories": 3,
         "forge.output": 82,
         "forge.repositories": 3,
-        "root.journal.transcript_bytes": 785596,
-        "root.loads.bytes": 785832,
-        "root.loads.read_bytes": 1571184,
-        "root.loads.reply_bytes": 785832,
-        "root.loads.transcript_bytes": 785592
+        "root.journal.transcript_bytes": 1039548,
+        "root.loads.bytes": 1039784,
+        "root.loads.read_bytes": 2079088,
+        "root.loads.reply_bytes": 1039784,
+        "root.loads.transcript_bytes": 1039544
       }
     },
     "workers": [

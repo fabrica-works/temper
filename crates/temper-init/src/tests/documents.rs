@@ -80,6 +80,7 @@ fn the_owned_example_offers_openai_keys_and_chatgpts_sign_in() {
     assert_eq!(endpoint["transport"], "tls");
     assert_eq!(endpoint["server_name"], "api.openai.com");
     assert_eq!(endpoint["headers"], parse(b"[]"));
+    assert_eq!(endpoint["models"][0]["reasoning_item"], 65_536_u32);
 }
 
 #[test]

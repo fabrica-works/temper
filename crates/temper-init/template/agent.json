@@ -40,7 +40,7 @@
           },
           "window": 1048576,
           "output": 8192,
-          "reasoning_item": 2048,
+          "reasoning_item": 65536,
           "head": 60000,
           "idle": 30000
         }

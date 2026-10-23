@@ -11,8 +11,14 @@ fn run(seed: u64) -> (String, &'static str) {
     let mut rng = Rng::new(seed);
     let slot = u32::try_from(size_of::<Record>()).expect("small slot");
     let keep = u32::try_from(rng.below(4) + 1).expect("four rows");
-    let limits =
-        Limits { loads: 1, rows: 4, bytes: keep * (slot + 4), reply_bytes: 4 * (slot + 4), transcript_bytes: 4 };
+    let limits = Limits {
+        read_bytes: 65_536,
+        loads: 1,
+        rows: 4,
+        bytes: keep * (slot + 4),
+        reply_bytes: 4 * (slot + 4),
+        transcript_bytes: 4,
+    };
     let mut domain = Loads::new(&limits);
     let mut out = Queue::with_capacity(1);
     let owner = loads::begin(

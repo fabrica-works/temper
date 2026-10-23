@@ -1472,11 +1472,10 @@ fn the_template_agent_refuses_jigs_small_hub_turn_bound_before_serving() {
     let path = scratch.path().join("temper.json");
     let mut document: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
     let hub = jig_protocol_config::profile(jig_protocol_config::Profile::Small).hub;
-    for limits in [&mut document["engine"]["limits"]["overrides"]] {
-        limits["hub.turn_bytes"] = hub.turn_bytes.into();
-        limits["hub.transcript_bytes"] = hub.transcript_bytes.into();
-        limits["hub.turn_queue_bytes"] = hub.turn_queue_bytes.into();
-    }
+    let limits = &mut document["engine"]["limits"]["overrides"];
+    limits["hub.turn_bytes"] = hub.turn_bytes.into();
+    limits["hub.transcript_bytes"] = hub.transcript_bytes.into();
+    limits["hub.turn_queue_bytes"] = hub.turn_queue_bytes.into();
     fs::write(&path, serde_json::to_vec(&document).expect("JSON")).expect("deployment");
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_temper"))
         .arg("serve")

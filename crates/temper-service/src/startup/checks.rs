@@ -1,6 +1,7 @@
 //! Checks across standalone's parts before any service is made.
 use super::{Problems, What};
 use crate::{limits, settings};
+use alloc::boxed::Box;
 use jig_domain_fleet as fleet;
 use jig_protocol_config::{self as config, Path, Segment};
 use skein_io::Addr;
@@ -406,10 +407,10 @@ fn worker_limit(member: &[u8]) -> Path {
     at(0, Path::root().member(b"workers")).member(b"limits").member(b"overrides").member(member)
 }
 /// The resume window as jig's hub counts it, excluding answered calls
-/// (jig's domain/hosts.md; hosted.rs, conversation_fits).
+/// (jig's `domain/hosts.md`; hosted.rs, `conversation_fits`).
 fn resume_window(bytes: u32) -> Option<u64> {
     let bytes = u64::from(bytes);
-    let carrier = u64::try_from(size_of::<alloc::boxed::Box<[u8]>>()).ok()?;
+    let carrier = u64::try_from(size_of::<Box<[u8]>>()).ok()?;
     bytes.checked_add(carrier.checked_sub(4)?.checked_mul(bytes / 4)?)
 }
 fn short(problems: &mut Problems, path: Path, bytes: u64, of: &'static [u8], needs: Option<u64>) {
