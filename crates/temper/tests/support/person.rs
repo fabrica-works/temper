@@ -100,7 +100,8 @@ pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
     Script {
         begin: Begin::Token,
         steps: Box::new([
-            Step::Go { address: Address::ConnectModel { way: None } },
+            // A sign-in started from another client is drawn on Accounts (README 11).
+            Step::Go { address: Address::Accounts },
             Step::See { find: Find::exactly_named(Role::Status, signing), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Region, card.as_bytes()), within: START_WITHIN },
             Step::See {
