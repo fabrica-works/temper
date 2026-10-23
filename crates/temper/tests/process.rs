@@ -2003,13 +2003,13 @@ fn a_worker_pushes_to_github_by_its_installations_token() {
 // worker, so only the coder's change is placed, by s1's workspace after the
 // stop.
 #[test]
-#[ignore = "backlog: R1, finding 10's root: on processes, kit's landing news can wake A between its question and the green light, and the fake LLM picks a turn by the count of replies said, so A's script falls out of step; comes off at case-2's M2 head (testing.md 2.6)"]
 fn the_opener_runs_on_ws_and_s1_as_processes() {
     use temper_real_loop_world::case::{self, acts, oracle};
     let run = support::case::run(
         &["ws", "s1"],
         case::fixture_placed(),
         case::scripts::step_4_1,
+        case::scripts::step_4_1_rules,
         acts::step_4_1(),
         &[case::DIRECTOR, case::A, case::CODER, case::REVIEW],
     );

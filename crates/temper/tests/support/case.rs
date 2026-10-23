@@ -1,7 +1,7 @@
 //! The reference case on the cluster's processes (domain/testing.md, 2.6 and 5.3).
 use super::{Ended, Scratch, WITHIN, cluster, ctl};
 use serde_json::{Value, json};
-use skein_fake_llm_domain::api::{Finish, Line, Script};
+use skein_fake_llm_domain::api::{Finish, Line, Rule, Script};
 use skein_io::kernel::Exit;
 use skein_lib::{Time, base64};
 use skein_shell::{Clock, Host};
@@ -63,10 +63,12 @@ fn write(path: &Path, document: &Value) {
 fn text(bytes: &[u8]) -> &str {
     std::str::from_utf8(bytes).expect("case UTF-8")
 }
-fn encode(scripts: &[Script]) -> Value {
+fn encode(scripts: &[Script], rules: &[Box<[Rule]>]) -> Value {
+    assert_eq!(scripts.len(), rules.len(), "index-parallel turn rules");
     scripts
         .iter()
-        .map(|script| {
+        .zip(rules)
+        .map(|(script, rules)| {
             let turns: Vec<_> = script
                 .turns
                 .iter()
@@ -94,7 +96,11 @@ fn encode(scripts: &[Script]) -> Value {
                     json!({"lines": lines, "finish": finish, "tokens": turn.tokens})
                 })
                 .collect();
-            json!({"cue": text(&script.cue), "turns": turns})
+            let mut script = json!({"cue": text(&script.cue), "turns": turns});
+            if !rules.is_empty() {
+                script["inputs"] = rules.iter().map(|rule| json!({"cue":text(&rule.cue),"turn":rule.turn})).collect();
+            }
+            script
         })
         .collect()
 }
@@ -137,6 +143,7 @@ pub fn run(
     workers: &[&str],
     fixture: Fixture,
     scripts: fn(SocketAddr) -> Box<[Script]>,
+    rules: fn() -> Box<[Box<[Rule]>]>,
     steps: Vec<calls::Step>,
     placed: &[u64],
 ) -> Run {
@@ -177,6 +184,7 @@ pub fn run(
         phases: Vec::new(),
         fixture,
         scripts,
+        rules,
         hosts,
         git,
         steps: steps.into(),
@@ -220,6 +228,7 @@ struct Judge {
     phases: Vec<(&'static str, skein_lib::Duration)>,
     fixture: Fixture,
     scripts: fn(SocketAddr) -> Box<[Script]>,
+    rules: fn() -> Box<[Box<[Rule]>]>,
     hosts: SocketAddr,
     git: PathBuf,
     steps: VecDeque<calls::Step>,
@@ -443,7 +452,7 @@ impl Referee<cluster::Root> for Judge {
                 let path = directory.join("llm.json");
                 let mut document = read(&path);
                 document["models"] = json!([{"name":"fake","window":1_048_576,"output":8192},{"name":"owner","window":1_048_576,"output":8192}]);
-                document["cued"] = encode(&(self.scripts)(address));
+                document["cued"] = encode(&(self.scripts)(address), &(self.rules)());
                 write(&path, &document);
                 self.members.up(&["llm"]);
                 self.stage = Stage::Llm;
@@ -548,11 +557,67 @@ impl Referee<cluster::Root> for Judge {
         Some(self.members.next_deadline().map_or(self.deadline, |at| at.min(self.deadline)))
     }
     fn overdue(&self, now: Time) -> Option<String> {
-        (now >= self.deadline).then(|| format!("case processes waited in {:?}", self.stage))
+        (now >= self.deadline).then(|| {
+            let flight = self
+                .ran
+                .last()
+                .map_or_else(|| "none".into(), |step| format!("{}: {}", self.ran.len() - 1, describe(step)));
+            let next = self
+                .steps
+                .front()
+                .map_or_else(|| "none".into(), |step| format!("{}: {}", self.ran.len(), describe(step)));
+            let message = format!("case processes waited in {:?}; act in flight {flight}; next act {next}", self.stage);
+            eprintln!("{message}");
+            message
+        })
     }
     fn passed(&self) -> bool {
         self.members.passed()
     }
+}
+fn describe(step: &calls::Step) -> String {
+    use calls::Step;
+    match step {
+        Step::FixtureReady => "FixtureReady".into(),
+        Step::Terminal(_) => "Terminal".into(),
+        Step::Advance => "Advance".into(),
+        Step::AddWorker { name } => format!("AddWorker {name}"),
+        Step::StopWorker { name } => format!("StopWorker {name}"),
+        Step::StartWorker { name } => format!("StartWorker {name}"),
+        Step::Probe { at } => format!("Probe at {}", at.0),
+        Step::Release { at } => format!("Release at {}", at.0),
+        Step::Contended { calls } => format!("Contended {calls:?}"),
+        Step::SignIn { at } => format!("SignIn at {}", at.0),
+        Step::SameParty { at } => format!("SameParty at {}", at.0),
+        Step::Held { name } => format!("Held {}", String::from_utf8_lossy(name)),
+        Step::Kill { call } => format!("Kill call {call}"),
+        Step::Call { at, argv } => format!("Call at {}: {}", at.0, describe_argv(argv)),
+        Step::Start { at, argv } => format!("Start at {}: {}", at.0, describe_argv(argv)),
+        Step::Join { call } => format!("Join call {call}"),
+        Step::Watching { call } => format!("Watching call {call}"),
+        Step::Until { at, argv, holds, early } => format!(
+            "Until at {}: {}; holds {:?}; early {:?}",
+            at.0,
+            describe_argv(argv),
+            String::from_utf8_lossy(holds),
+            String::from_utf8_lossy(early),
+        ),
+    }
+}
+fn describe_argv(argv: &calls::Argv) -> String {
+    argv.0
+        .iter()
+        .map(|arg| match arg {
+            calls::Arg::Lit(word) => (*word).into(),
+            calls::Arg::Number(number) => number.to_string(),
+            calls::Arg::File(name) => format!("file({name})"),
+            calls::Arg::Task(call) => format!("task(call {call})"),
+            calls::Arg::Delegate(call) => format!("delegate(call {call})"),
+            calls::Arg::Digest(call) => format!("digest(call {call})"),
+            calls::Arg::ActivityBefore(call) => format!("activity-before(call {call})"),
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 fn success(call: &Ended) {
     assert_eq!(
