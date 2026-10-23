@@ -20,7 +20,7 @@ fn a_core_refusal_carries_jigs_refusal_bytes_unchanged() {
 }
 
 #[test]
-fn version_four_request_answer_and_forges_goldens_round_trip() {
+fn version_six_request_answer_and_forges_goldens_round_trip() {
     use temper_client_protocol_wire as wire;
     for bytes in [
         include_bytes!("../../../crates/temper-client-protocol-wire/golden/v1/record_requesting_smallest.bin")
@@ -43,5 +43,174 @@ fn version_four_request_answer_and_forges_goldens_round_trip() {
     ] {
         let record = wire::decode_forges(bytes, &v1::CEILINGS).expect("forges golden");
         assert_eq!(wire::forges(&record).as_ref(), bytes);
+    }
+}
+
+fn project() -> v1::SetUpProject {
+    v1::SetUpProject::Existing(
+        v1::ExistingProject::new(&v1::CEILINGS, v1::ExistingProjectParts { project: 7 })
+            .expect("record within schema ceilings"),
+    )
+}
+fn first(state: v1::FirstState) -> v1::FirstRepository {
+    v1::FirstRepository::new(
+        &v1::CEILINGS,
+        v1::FirstRepositoryParts {
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+            project: project(),
+            state,
+        },
+    )
+    .expect("record within schema ceilings")
+}
+#[test]
+fn setup_and_every_first_repository_state_round_trip_at_version_six() {
+    use temper_client_protocol_wire as wire;
+    assert_eq!(wire::CLIENT_VERSION, 6);
+    for project in [
+        project(),
+        v1::SetUpProject::New(
+            v1::NewProject::new(&v1::CEILINGS, v1::NewProjectParts { name: b"Next".as_slice().into() })
+                .expect("record within schema ceilings"),
+        ),
+    ] {
+        let request = v1::Requesting::new(
+            &v1::CEILINGS,
+            v1::RequestingParts {
+                request: v1::Request::SetUp(
+                    v1::SetUp::new(
+                        &v1::CEILINGS,
+                        v1::SetUpParts {
+                            forge: 3,
+                            org: b"work".as_slice().into(),
+                            repository: b"hello".as_slice().into(),
+                            project,
+                        },
+                    )
+                    .expect("record within schema ceilings"),
+                ),
+            },
+        )
+        .expect("record within schema ceilings");
+        assert_eq!(wire::decode_requesting(&wire::requesting(&request), &v1::CEILINGS), Some(request));
+    }
+    for state in [
+        v1::FirstState::Making,
+        v1::FirstState::Made(
+            v1::Made::new(&v1::CEILINGS, v1::MadeParts { id: u64::MAX }).expect("record within schema ceilings"),
+        ),
+        v1::FirstState::Failed(
+            v1::CreateFailed::new(&v1::CEILINGS, v1::CreateFailedParts { step: v1::CreateStep::Admin })
+                .expect("record within schema ceilings"),
+        ),
+        v1::FirstState::Failed(
+            v1::CreateFailed::new(&v1::CEILINGS, v1::CreateFailedParts { step: v1::CreateStep::Org })
+                .expect("record within schema ceilings"),
+        ),
+        v1::FirstState::Failed(
+            v1::CreateFailed::new(&v1::CEILINGS, v1::CreateFailedParts { step: v1::CreateStep::Repository })
+                .expect("record within schema ceilings"),
+        ),
+        v1::FirstState::Failed(
+            v1::CreateFailed::new(&v1::CEILINGS, v1::CreateFailedParts { step: v1::CreateStep::File })
+                .expect("record within schema ceilings"),
+        ),
+    ] {
+        let row = v1::ForgeRow::new(
+            &v1::CEILINGS,
+            v1::ForgeRowParts {
+                number: 3,
+                kind: v1::Kind::Forgejo,
+                mode: v1::Mode::Owned,
+                connection: v1::Connection::Connecting,
+                offer: v1::Offer::NotOffered,
+                first: Some(first(state)),
+            },
+        )
+        .expect("record within schema ceilings");
+        let mut rows = skein_lib::List::with_capacity(1);
+        rows.push(row).expect("one row capacity");
+        let rows =
+            v1::Forges::new(&v1::CEILINGS, v1::ForgesParts { forges: rows }).expect("record within schema ceilings");
+        assert_eq!(wire::decode_forges(&wire::forges(&rows), &v1::CEILINGS), Some(rows));
+    }
+}
+
+#[test]
+fn first_repository_names_are_bounded_at_construction_and_decode() {
+    // Tiny receiving bounds exercise both sides of each new byte field without a large fixture.
+    for size in [2, 3] {
+        let name = vec![b'x'; size].into_boxed_slice();
+        let mut limits = v1::CEILINGS;
+        limits.set_up_org = 2;
+        limits.set_up_repository = 2;
+        limits.new_project_name = 2;
+        limits.first_repository_org = 2;
+        limits.first_repository_repository = 2;
+        for field in 0..3 {
+            let parts = v1::SetUpParts {
+                forge: 3,
+                org: if field == 0 { name.clone() } else { b"o".as_slice().into() },
+                repository: if field == 1 { name.clone() } else { b"r".as_slice().into() },
+                project: if field == 2 {
+                    v1::SetUpProject::New(
+                        v1::NewProject::new(&v1::CEILINGS, v1::NewProjectParts { name: name.clone() })
+                            .expect("record within schema ceilings"),
+                    )
+                } else {
+                    project()
+                },
+            };
+            assert_eq!(v1::SetUp::new(&limits, parts.clone()).is_ok(), size == 2, "setup field {field}");
+            let record = v1::SetUp::new(&v1::CEILINGS, parts).expect("record within schema ceilings");
+            let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length fits usize"));
+            record.encode(&mut writer).expect("measured room");
+            assert_eq!(
+                v1::SetUp::decode(&limits, &mut Reader::new(&writer.finish())).is_ok(),
+                size == 2,
+                "setup field {field}"
+            );
+        }
+        for field in 0..2 {
+            let parts = v1::FirstRepositoryParts {
+                org: if field == 0 { name.clone() } else { b"o".as_slice().into() },
+                repository: if field == 1 { name.clone() } else { b"r".as_slice().into() },
+                project: project(),
+                state: v1::FirstState::Making,
+            };
+            assert_eq!(v1::FirstRepository::new(&limits, parts.clone()).is_ok(), size == 2, "row field {field}");
+            let record = v1::FirstRepository::new(&v1::CEILINGS, parts).expect("record within schema ceilings");
+            let mut writer = Writer::new(usize::try_from(record.measure()).expect("measured length fits usize"));
+            record.encode(&mut writer).expect("measured room");
+            assert_eq!(
+                v1::FirstRepository::decode(&limits, &mut Reader::new(&writer.finish())).is_ok(),
+                size == 2,
+                "row field {field}"
+            );
+        }
+    }
+    for size in [1024, 1025] {
+        let name = vec![b'x'; size].into_boxed_slice();
+        assert_eq!(
+            v1::NewProject::new(&v1::CEILINGS, v1::NewProjectParts { name: name.clone() }).is_ok(),
+            size == 1024
+        );
+        for org in [true, false] {
+            let parts = v1::SetUpParts {
+                forge: 3,
+                org: if org { name.clone() } else { b"o".as_slice().into() },
+                repository: if org { b"r".as_slice().into() } else { name.clone() },
+                project: project(),
+            };
+            assert_eq!(v1::SetUp::new(&v1::CEILINGS, parts).is_ok(), size == 1024);
+            let parts = v1::FirstRepositoryParts {
+                org: if org { name.clone() } else { b"o".as_slice().into() },
+                repository: if org { b"r".as_slice().into() } else { name.clone() },
+                project: project(),
+                state: v1::FirstState::Making,
+            };
+            assert_eq!(v1::FirstRepository::new(&v1::CEILINGS, parts).is_ok(), size == 1024);
+        }
     }
 }

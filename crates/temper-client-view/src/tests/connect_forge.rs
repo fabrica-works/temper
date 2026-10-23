@@ -13,7 +13,7 @@ pub(super) fn row(
     connection: w::Connection,
     offer: w::Offer,
 ) -> w::ForgeRow {
-    w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap()
+    w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { first: None, number, kind, mode, connection, offer }).unwrap()
 }
 pub(super) fn rows(connection: w::Connection, offer: w::Offer) -> List<w::ForgeRow> {
     let mut rows = List::with_capacity(2);

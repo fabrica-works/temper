@@ -161,8 +161,22 @@ pub fn demo(record: &[u8], limits: &w::Limits) -> Option<forge::Demo> {
 }
 
 #[must_use]
-pub fn set_up(forge: u16, limits: &w::Limits) -> Option<jig_client::Family> {
-    let request = w::SetUp::new(limits, w::SetUpParts { forge }).ok()?;
+pub fn set_up(
+    forge: u16,
+    org: Box<[u8]>,
+    repository: Box<[u8]>,
+    project: forge::forges::SetUpProject,
+    limits: &w::Limits,
+) -> Option<jig_client::Family> {
+    let project = match project {
+        forge::forges::SetUpProject::Existing(project) => {
+            w::SetUpProject::Existing(w::ExistingProject::new(limits, w::ExistingProjectParts { project }).ok()?)
+        }
+        forge::forges::SetUpProject::New(name) => {
+            w::SetUpProject::New(w::NewProject::new(limits, w::NewProjectParts { name }).ok()?)
+        }
+    };
+    let request = w::SetUp::new(limits, w::SetUpParts { forge, org, repository, project }).ok()?;
     let record = w::Requesting::new(limits, w::RequestingParts { request: w::Request::SetUp(request) }).ok()?;
     Some(jig_client::Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::requesting(&record) })
 }
@@ -183,12 +197,15 @@ pub fn set_up_answer(record: &jig_client::Family, limits: &w::Limits) -> Option<
             w::SetUpRefusal::NotOffered => R::NotOffered,
             w::SetUpRefusal::NotUnderTheBox => R::NotUnderTheBox,
             w::SetUpRefusal::Busy => R::Busy,
+            w::SetUpRefusal::NewProject => R::NewProject,
+            w::SetUpRefusal::Invalid => R::Invalid,
         }),
         w::Outcome::Unknown => O::Unknown,
         w::Outcome::Adopted(_) | w::Outcome::CoreRefused(_) | w::Outcome::ForgeRefused(_) => return None,
     })
 }
 #[must_use]
+#[expect(clippy::manual_map, reason = "the translation uses explicit matches (programming-model.md, 10)")]
 pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Row]>> {
     use forge::forges::{Connection as C, Kind, Mode, Offer, Row, Step};
     let record = wire::decode_forges(bytes, limits)?.into_parts();
@@ -231,9 +248,38 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 w::Offer::NotUnderTheBox => Offer::NotUnderTheBox,
                 w::Offer::Offered => Offer::Offered,
             },
+            first: match row.first {
+                Some(first) => Some(first_from(first)),
+                None => None,
+            },
             connection,
         })
         .ok()?;
     }
     Some(rows.into_boxed())
+}
+
+fn first_from(first: w::FirstRepository) -> forge::forges::First {
+    use forge::forges::{CreateStep, First, FirstState, SetUpProject};
+    let first = first.into_parts();
+    First {
+        org: first.org,
+        repository: first.repository,
+        project: match first.project {
+            w::SetUpProject::Existing(project) => SetUpProject::Existing(project.project()),
+            w::SetUpProject::New(project) => SetUpProject::New(project.into_parts().name),
+        },
+        state: match first.state {
+            w::FirstState::Making => FirstState::Making,
+            w::FirstState::Made(value) => FirstState::Made { id: value.id() },
+            w::FirstState::Failed(value) => FirstState::Failed {
+                step: match value.step() {
+                    w::CreateStep::Admin => CreateStep::Admin,
+                    w::CreateStep::Org => CreateStep::Org,
+                    w::CreateStep::Repository => CreateStep::Repository,
+                    w::CreateStep::File => CreateStep::File,
+                },
+            },
+        },
+    }
 }

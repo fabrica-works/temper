@@ -51,9 +51,9 @@ fn expected_given() -> skein_forge_setup::given::Given {
         api_name: b"temper-api".as_slice().into(),
         git_name: b"temper-git".as_slice().into(),
         limits: skein_forge_setup::limits::Limits {
+            orgs: 8,
             files: 1,
             file_bytes: 4096,
-            orgs: 8,
             reachable: 8,
             repositories: crate::limits::small().repositories,
             deadline: Duration::from_secs(120),

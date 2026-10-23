@@ -11,9 +11,12 @@ use temper_client_domain::forge::{
 };
 use temper_client_protocol_wire::{self as wire, v1 as w};
 fn row(connection: C) -> Row {
-    Row { number: 3, kind: Kind::Forgejo, mode: Mode::Owned, offer: Offer::Offered, connection }
+    Row { first: None, number: 3, kind: Kind::Forgejo, mode: Mode::Owned, offer: Offer::Offered, connection }
 }
 fn record(connection: w::Connection) -> client::Family {
+    record_first(connection, None)
+}
+fn record_first(connection: w::Connection, first: Option<w::FirstRepository>) -> client::Family {
     let limits = forge::wire_limits(&f::limits_root().domain.forge).unwrap();
     let mut forges = List::with_capacity(1);
     forges
@@ -21,6 +24,7 @@ fn record(connection: w::Connection) -> client::Family {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    first,
                     number: 3,
                     kind: w::Kind::Forgejo,
                     mode: w::Mode::Owned,
@@ -48,6 +52,9 @@ fn forge_calls_round_trip_through_argv_json_and_help() {
         &["forges"][..],
         &["forge-setup", "3"],
         &["forge-setup", "3", "--key", "setup"],
+        &["forge-setup", "3", "--org", "team", "--repository", "widget", "--project", "shop"],
+        &["wait", "forges", "--until", "made:3"],
+        &["forge-setup", "3", "--project", ""],
         &["wait", "forges", "--until", "settled"],
         &["wait", "forges", "--since", "0123456789abcdef", "--until", "connected:3", "--timeout", "2s"],
     ] {
@@ -64,6 +71,10 @@ fn forge_calls_round_trip_through_argv_json_and_help() {
         &["forge-setup", "65536"],
         &["forge-setup", "0"],
         &["wait", "forges", "--until", "busy"],
+        &["wait", "forges", "--until", "made:x"],
+        &["wait", "forges", "--until", "made:0"],
+        &["wait", "forges", "--until", "made:65536"],
+        &["wait", "forges", "--until", "made:"],
         &["wait", "forges", "--until", "connected:x"],
         &["wait", "forges", "--until", "connected:65536"],
         &["wait", "forges", "--until", "connected:0"],
@@ -109,8 +120,11 @@ fn every_state_renders_as_text_and_structured_json() {
         let json = forges::print_rows(Some(&rows), true, None, &f::limits_root());
         assert_eq!(plain.status, 0);
         assert_eq!(json.status, 0);
-        let document =
-            concat(&[br#"{"forges":[{"number":3,"kind":"forgejo","mode":"owned","offer":"offered","#, fields, b"}]}"]);
+        let document = concat(&[
+            br#"{"forges":[{"number":3,"kind":"forgejo","mode":"owned","offer":"offered","#,
+            fields,
+            br#","first":null}]}"#,
+        ]);
         let digest = jig::digest::Digest::of(&document).hex();
         let expected = concat(&[
             b"forge 3 \xc2\xb7 Forgejo \xc2\xb7 owned \xc2\xb7 ",
@@ -240,7 +254,7 @@ fn timeout_prints_the_current_document_and_watch_refusals_keep_their_status() {
 fn setup_answers_print_their_words_json_and_status() {
     let limits = forge::wire_limits(&f::limits_root().domain.forge).unwrap();
     for (outcome, expected, status) in [
-        (w::Outcome::SettingUp, b"setting up\nnext: wait forges --until settled\n".as_slice(), 0),
+        (w::Outcome::SettingUp, b"setting up\n".as_slice(), 0),
         (w::Outcome::Unknown, b"unknown\n", 2),
         (w::Outcome::SetUpRefused(w::SetUpRefused::new(&limits, w::SetUpRefusedParts { why: w::SetUpRefusal::Busy }).unwrap()), b"refused: busy\n", 2),
         (w::Outcome::SetUpRefused(w::SetUpRefused::new(&limits, w::SetUpRefusedParts { why: w::SetUpRefusal::NotOffered }).unwrap()), b"refused: not offered\n", 2),
@@ -254,6 +268,11 @@ fn setup_answers_print_their_words_json_and_status() {
             let w::Request::SetUp(request) = wire::decode_requesting(&record.bytes, &limits).unwrap().into_parts().request else { panic!("set up"); };
             assert_eq!(request.forge(), 3);
             root.adoption_answer(call, outcome.clone());
+            if status == 0 {
+                assert!(root.answer(call).is_none());
+                assert!(root.progress.as_slice().last().is_some());
+                continue;
+            }
             let printed = root.answer(call).unwrap();
             assert_eq!(printed.status, status);
             let bytes = if status == 0 { &printed.stdout } else { &printed.stderr };
@@ -277,9 +296,9 @@ fn setup_keeps_drawn_keys_and_recovers_the_answer_in_its_own_words() {
         root.deliver(c::Delivery::Me(Box::new(f::me(f::PARTY))));
         root.adoption_answer(0, w::Outcome::SettingUp);
         let expected = if json {
-            b"{\"operation\":\"forge-setup\",\"outcome\":{\"setting_up\":{},\"next\":\"wait forges --until settled\"}}\n".as_slice()
+            b"{\"operation\":\"forge-setup\",\"outcome\":{\"setting_up\":{}}}\n".as_slice()
         } else {
-            b"kept: forge-setup setting up\nnext: wait forges --until settled\n"
+            b"kept: forge-setup setting up\n"
         };
         assert_eq!(root.kept_lines.as_slice(), &[Box::<[u8]>::from(expected)]);
     }
@@ -346,4 +365,233 @@ fn concat(parts: &[&[u8]]) -> Box<[u8]> {
         out.put(part).unwrap();
     }
     out.finish()
+}
+
+fn first_record(state: w::FirstState) -> w::FirstRepository {
+    w::FirstRepository::new(
+        &w::CEILINGS,
+        w::FirstRepositoryParts {
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+            project: w::SetUpProject::Existing(
+                w::ExistingProject::new(&w::CEILINGS, w::ExistingProjectParts { project: 1 }).unwrap(),
+            ),
+            state,
+        },
+    )
+    .unwrap()
+}
+fn made() -> w::FirstState {
+    w::FirstState::Made(w::Made::new(&w::CEILINGS, w::MadeParts { id: 42 }).unwrap())
+}
+#[test]
+fn setup_defaults_flags_and_project_names_are_carried_in_the_request() {
+    const WORDS_WITH_ONE_FLAG: u32 = 4;
+    for (flags, org, repository, project) in [
+        (&[][..], b"work".as_slice(), b"hello".as_slice(), 1),
+        (&["--org", "team"][..], b"team", b"hello", 1),
+        (&["--repository", "widget"][..], b"work", b"widget", 1),
+        (&["--project", "7"][..], b"work", b"hello", 7),
+        (&["--project", "shop"][..], b"work", b"hello", f::PROJECT),
+    ] {
+        let mut root = f::signed_in(f::PARTY);
+        let mut words = List::with_capacity(WORDS_WITH_ONE_FLAG);
+        words.push("forge-setup").unwrap();
+        words.push("3").unwrap();
+        for word in flags {
+            words.push(*word).unwrap();
+        }
+        let call = root.submit(words.as_slice());
+        let client::Ask::Family { record, .. } = root.adoption_bytes(call) else { panic!("family") };
+        let w::Request::SetUp(value) =
+            wire::decode_requesting(&record.bytes, &w::CEILINGS).unwrap().into_parts().request
+        else {
+            panic!("setup")
+        };
+        assert_eq!((value.org(), value.repository()), (org, repository));
+        let w::SetUpProject::Existing(value) = value.project() else { panic!("existing project") };
+        assert_eq!(value.project(), project);
+    }
+}
+#[test]
+fn an_unknown_project_is_sent_as_new_and_both_new_refusals_exit_two() {
+    for (why, words) in [
+        (w::SetUpRefusal::NewProject, b"a new project".as_slice()),
+        (w::SetUpRefusal::Invalid, b"invalid: the organization, repository or project name is empty or too long"),
+    ] {
+        let mut root = f::signed_in(f::PARTY);
+        let call = root.submit(&["forge-setup", "3", "--project", "Next"]);
+        let client::Ask::Family { record, .. } = root.adoption_bytes(call) else { panic!("family") };
+        let w::Request::SetUp(value) =
+            wire::decode_requesting(&record.bytes, &w::CEILINGS).unwrap().into_parts().request
+        else {
+            panic!("setup")
+        };
+        let w::SetUpProject::New(value) = value.project() else { panic!("new project") };
+        assert_eq!(value.name(), b"Next");
+        root.adoption_answer(
+            call,
+            w::Outcome::SetUpRefused(w::SetUpRefused::new(&w::CEILINGS, w::SetUpRefusedParts { why }).unwrap()),
+        );
+        let printed = root.answer(call).unwrap();
+        assert_eq!(printed.status, 2);
+        assert!(skein_lib::bytes::find(&printed.stderr, words).is_some());
+    }
+}
+#[test]
+fn made_sends_the_home_adoption_with_its_stable_key_and_prints_its_answer() {
+    for home_taken in [false, true] {
+        let mut root = f::signed_in(f::PARTY);
+        let call = root.submit(&["forge-setup", "3", "--org", "team", "--repository", "widget", "--project", "shop"]);
+        root.adoption_answer(call, w::Outcome::SettingUp);
+        assert!(root.answer(call).is_none());
+        assert_eq!(root.progress.as_slice(), &[Box::<[u8]>::from(b"setting up\n".as_slice())]);
+        deliver(&mut root, record_first(w::Connection::Connecting, Some(first_record(w::FirstState::Making))));
+        assert!(root.answer(call).is_none());
+        deliver(&mut root, record_first(w::Connection::Connecting, Some(first_record(made()))));
+        assert!(root.answer(call).is_none(), "creation precedes the forge's connection");
+        deliver(
+            &mut root,
+            record_first(
+                w::Connection::Connected(
+                    w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 1, login: b"temper".as_slice().into() })
+                        .unwrap(),
+                ),
+                Some(first_record(made())),
+            ),
+        );
+        let adopted = root.sent_adoption(call);
+        assert_eq!((adopted.project, adopted.forge, adopted.home, adopted.ci), (f::PROJECT, 3, true, true));
+        assert_eq!(
+            (adopted.owner.as_ref(), adopted.name.as_ref(), adopted.landing.as_ref()),
+            (b"team".as_slice(), b"widget".as_slice(), b"main".as_slice())
+        );
+        assert_eq!(adopted.role, w::Role::Owned);
+        assert_eq!(adopted.prefix.as_ref(), b"temper/");
+        assert!(adopted.checks.is_empty());
+        assert_eq!(root.sent_name(call), Some(crate::key::engine(&f::name(b"first-repository-3"))));
+        assert_eq!(root.closed.len(), 1);
+        root.adoption_answer(
+            call,
+            if home_taken { f::forge_refused(w::ForgeReason::Refused) } else { f::adopted_with_unknown_protection() },
+        );
+        if home_taken {
+            assert!(root.answer(call).is_none());
+            assert!(!root.sent_adoption(call).home);
+            assert_eq!(root.sent_name(call), Some(crate::key::engine(&f::name(b"first-repository-additional-3"))));
+            root.adoption_answer(call, f::adopted_with_unknown_protection());
+        }
+        assert_eq!(root.answer(call).unwrap().status, 0);
+        assert!(root.answer(call).is_none(), "one terminal answer");
+    }
+}
+#[test]
+fn setup_failure_names_the_creation_or_box_step_and_exits_one() {
+    let mut cases = List::with_capacity(5);
+    cases
+        .push((
+            w::Connection::SetUpFailed(
+                w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"preparing".as_slice().into() }).unwrap(),
+            ),
+            None,
+            b"Set up failed: preparing".as_slice(),
+        ))
+        .unwrap();
+    for (step, words) in [
+        (w::CreateStep::Admin, b"checking the admin's token".as_slice()),
+        (w::CreateStep::Org, b"making the organization"),
+        (w::CreateStep::Repository, b"making the repository"),
+        (w::CreateStep::File, b"adding the starter workflow"),
+    ] {
+        cases
+            .push((
+                w::Connection::Connecting,
+                Some(first_record(w::FirstState::Failed(
+                    w::CreateFailed::new(&w::CEILINGS, w::CreateFailedParts { step }).unwrap(),
+                ))),
+                words,
+            ))
+            .unwrap();
+    }
+    for (connection, first, words) in cases.into_boxed() {
+        let mut root = f::signed_in(f::PARTY);
+        let call = root.submit(&["forge-setup", "3"]);
+        root.adoption_answer(call, w::Outcome::SettingUp);
+        deliver(&mut root, record_first(connection, first));
+        let printed = root.answer(call).unwrap();
+        assert_eq!(printed.status, 1);
+        assert!(skein_lib::bytes::find(&printed.stderr, words).is_some());
+        assert_eq!(root.closed.len(), 1);
+        assert!(crate::root::next_deadline(&root.root).is_none());
+    }
+}
+#[test]
+fn made_wait_requires_the_named_forges_first_repository_to_be_made() {
+    let mut root = f::signed_in(f::PARTY);
+    let call = root.submit(&["wait", "forges", "--until", "made:3"]);
+    for first in [None, Some(first_record(w::FirstState::Making))] {
+        deliver(
+            &mut root,
+            record_first(
+                w::Connection::Connected(
+                    w::Connected::new(&w::CEILINGS, w::ConnectedParts { id: 1, login: b"temper".as_slice().into() })
+                        .unwrap(),
+                ),
+                first,
+            ),
+        );
+        assert!(root.answer(call).is_none(), "connected alone is insufficient");
+    }
+    deliver(&mut root, record_first(w::Connection::Connecting, Some(first_record(made()))));
+    assert_eq!(root.answer(call).unwrap().status, 0);
+    assert_eq!(root.closed.len(), 1);
+    let mut row = row(C::Connecting);
+    row.first = Some(forge::forges::First {
+        org: b"work".as_slice().into(),
+        repository: b"hello".as_slice().into(),
+        project: forge::forges::SetUpProject::Existing(1),
+        state: forge::forges::FirstState::Made { id: 42 },
+    });
+    assert!(!forges::holds(&[row], b"made:4"));
+}
+#[test]
+fn first_repository_text_and_json_name_every_state_and_creation_step() {
+    use forge::forges::{CreateStep, First, FirstState, SetUpProject};
+    for (state, words, field) in [
+        (FirstState::Making, b"Making work/hello".as_slice(), br#""state":"making""#.as_slice()),
+        (FirstState::Made { id: 42 }, b"work/hello made, in 1", br#""state":"made","id":42"#),
+        (
+            FirstState::Failed { step: CreateStep::Admin },
+            b"Making work/hello failed: checking the admin's token",
+            br#""state":"failed","step":"admin"#,
+        ),
+        (
+            FirstState::Failed { step: CreateStep::Org },
+            b"Making work/hello failed: making the organization",
+            br#""state":"failed","step":"org"#,
+        ),
+        (
+            FirstState::Failed { step: CreateStep::Repository },
+            b"Making work/hello failed: making the repository",
+            br#""state":"failed","step":"repository"#,
+        ),
+        (
+            FirstState::Failed { step: CreateStep::File },
+            b"Making work/hello failed: adding the starter workflow",
+            br#""state":"failed","step":"file"#,
+        ),
+    ] {
+        let mut row = row(C::Connecting);
+        row.first = Some(First {
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+            project: SetUpProject::Existing(1),
+            state,
+        });
+        let plain = forges::print_rows(Some(&[row.clone()]), false, None, &f::limits_root());
+        assert!(skein_lib::bytes::find(&plain.stdout, words).is_some());
+        let json = forges::print_rows(Some(&[row]), true, None, &f::limits_root());
+        assert!(f::json_has(&json, br#""first":{"org":"work","repository":"hello","project":{"existing":1}"#));
+        assert!(f::json_has(&json, field));
+    }
 }

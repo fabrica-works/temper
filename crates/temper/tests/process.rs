@@ -627,6 +627,7 @@ fn a_forgejo_set_up_from_the_client_starts_again_by_its_record() {
         // take seconds; allow three minutes, plus ten seconds to stop and reap.
         steps.extend([
             Step::Run(Call::new(&["wait", "forges", "--until", "settled", "--timeout", "180s"])),
+            Step::Run(Call::new(&["forges", "--json"])),
             Step::Run(Call::new(&["forges"])),
         ]);
         let clock = skein_shell::Clock::new();
@@ -697,7 +698,7 @@ fn assert_forgejo_setup(
             String::from_utf8_lossy(&call.stderr)
         );
     }
-    assert_eq!(calls.len(), if run == "first" { 6 } else { 3 }, "all ctl calls ran: {stderr}");
+    assert_eq!(calls.len(), if run == "first" { 7 } else { 4 }, "all ctl calls ran: {stderr}");
     if run == "first" {
         assert!(
             String::from_utf8_lossy(&calls[1].stdout)
@@ -714,6 +715,17 @@ fn assert_forgejo_setup(
         assert_eq!(forge["offer"], "offered");
         assert_eq!(forge["state"], "not_set_up");
         assert!(calls[3].stdout.starts_with(b"setting up\n"));
+        let adoption = String::from_utf8_lossy(&calls[3].stdout);
+        assert!(adoption.contains("work/hello"), "ctl printed the first adoption: {adoption}");
+        let made = support::ctl::json(&calls[5]);
+        let row =
+            made["forges"].as_array().expect("forges rows").iter().find(|row| row["number"] == 3).expect("forge 3");
+        assert_eq!(row["first"]["state"], "made");
+        assert_eq!(row["first"]["project"]["existing"], 1);
+        assert_eq!(row["first"]["org"], "work");
+        assert_eq!(row["first"]["repository"], "hello");
+        assert!(row["first"]["id"].as_u64().is_some_and(|id| id > 0));
+        assert_eq!(row["state"], "connected");
         // Preparation is silent on success; Forgejo's startup
         // and the runner's lines reach the box with their step prefixes.
         for step in ["forgejo 3: ", "runner 3: "] {
@@ -727,7 +739,7 @@ fn assert_forgejo_setup(
     }
     let stdout = String::from_utf8_lossy(&calls.last().expect("forges read").stdout);
     let user = stdout.lines().find_map(|line| {
-        line.strip_prefix("forge 3 · Forgejo · owned · Connected as temper (")?.strip_suffix(')')?.parse::<u64>().ok()
+        line.strip_prefix("forge 3 · Forgejo · owned · Connected as temper (")?.split(')').next()?.parse::<u64>().ok()
     });
     assert!(user.is_some_and(|user| user != 0), "{run}: forges row: {stdout}; box: {stderr}");
     let user = user.expect("connected bot's ID");

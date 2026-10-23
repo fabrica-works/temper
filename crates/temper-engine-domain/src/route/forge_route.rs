@@ -1983,8 +1983,11 @@ pub(crate) fn outputs(
     for _ in 0..out.len() {
         let request = out.pop().expect("connector output count");
         match request {
-            forge::Request::SetUp { forge, request } => {
-                assert!(super::now(domain, Request::SetUp { forge, request }), "forge set up door reserved");
+            forge::Request::SetUp { forge, request, org, repository } => {
+                assert!(
+                    super::now(domain, Request::SetUp { forge, request, org, repository }),
+                    "forge set up door reserved"
+                );
             }
 
             forge::Request::ApplicationPart { request, adoption, repository } => {

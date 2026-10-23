@@ -230,7 +230,7 @@ fn decode_value(table: &[&Tool], doc: &Document, at: u32, spec: &Argument, limit
     let kind = doc.token(at).ok_or(Usage::Json)?.kind;
     match spec.kind {
         Kind::Number | Kind::NumberRange { .. } | Kind::Count | Kind::Duration => require(doc, at, JsonKind::Number)?,
-        Kind::Project if kind == JsonKind::Number => {}
+        Kind::Project { .. } if kind == JsonKind::Number => {}
         Kind::Word { .. }
         | Kind::Text
         | Kind::NamedNumber { .. }
@@ -240,7 +240,7 @@ fn decode_value(table: &[&Tool], doc: &Document, at: u32, spec: &Argument, limit
         | Kind::Digest
         | Kind::Condition
         | Kind::Subject
-        | Kind::Project
+        | Kind::Project { .. }
         | Kind::Turn
         | Kind::Cursor
         | Kind::Group
@@ -435,15 +435,14 @@ fn encode_tool(tool: &Tool, out: &mut Encoder) {
                     out.key(b"max");
                     out.unsigned(max);
                 }
-                Kind::NamedNumber { words, prefix, min, max } => {
+                Kind::NamedNumber { words, prefixes, min, max } => {
                     out.key(b"set");
                     out.array_start();
                     for word in words {
                         out.string(word);
                     }
                     out.array_end();
-                    out.key(b"prefix");
-                    out.string(prefix);
+                    prefixes_json(prefixes, out);
                     out.key(b"min");
                     out.unsigned(min);
                     out.key(b"max");
@@ -459,7 +458,7 @@ fn encode_tool(tool: &Tool, out: &mut Encoder) {
                 | Kind::Digest
                 | Kind::Condition
                 | Kind::Subject
-                | Kind::Project
+                | Kind::Project { .. }
                 | Kind::Turn
                 | Kind::Cursor
                 | Kind::Group
@@ -500,7 +499,7 @@ fn kind_word(kind: Kind) -> &'static [u8] {
         Kind::NamedNumber { .. } => b"string",
         Kind::Condition => b"condition",
         Kind::Subject => b"subject",
-        Kind::Project => b"project",
+        Kind::Project { .. } => b"project",
         Kind::Turn => b"turn",
         Kind::Cursor => b"cursor",
         Kind::Group => b"group",
@@ -516,4 +515,13 @@ fn argument_name(name: &[u8]) -> Box<[u8]> {
         out.put(&[if *byte == b'-' { b'_' } else { *byte }]).expect("one byte per name byte");
     }
     out.finish()
+}
+
+fn prefixes_json(prefixes: &[&[u8]], out: &mut Encoder) {
+    out.key(b"prefixes");
+    out.array_start();
+    for prefix in prefixes {
+        out.string(prefix);
+    }
+    out.array_end();
 }

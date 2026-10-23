@@ -144,7 +144,7 @@ pub struct Adoption {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Ask {
     Adopt(Adoption),
-    SetUp { forge: u16 },
+    SetUp { forge: u16, org: Box<[u8]>, repository: Box<[u8]>, project: SetUpProject },
 }
 /// A retained application answer; only adoption outcomes are durable.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -188,7 +188,34 @@ pub enum Offer {
     NotUnderTheBox,
     Offered,
 }
-/// One configured forge, including its current connection and setup offer.
+/// The project selected for the first repository (protocol/setup.md, 6.7).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SetUpProject {
+    Existing(u32),
+    New(Box<[u8]>),
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CreateStep {
+    Admin,
+    Org,
+    Repository,
+    File,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FirstState {
+    Making,
+    Made { id: u64 },
+    Failed { step: CreateStep },
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct First {
+    pub org: Box<[u8]>,
+    pub repository: Box<[u8]>,
+    pub project: SetUpProject,
+    pub state: FirstState,
+}
+
+/// One configured forge, including its connection, offer and first repository.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Row {
     pub number: u16,
@@ -196,6 +223,7 @@ pub struct Row {
     pub mode: Mode,
     pub connection: Connection,
     pub offer: Offer,
+    pub first: Option<First>,
 }
 /// The deployment's forges, ordered by number (domain/forge.md, 4.1).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -602,6 +630,8 @@ pub enum SetUpRefusal {
     NotOffered,
     NotUnderTheBox,
     Busy,
+    NewProject,
+    Invalid,
 }
 /// Installation information for the deployment's page (protocol/forge.md, 2.4).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -620,6 +650,14 @@ pub enum Event {
         forge: u16,
         request: Token,
         answer: SetUpAnswer,
+    },
+    FirstMade {
+        forge: u16,
+        id: u64,
+    },
+    FirstFailed {
+        forge: u16,
+        step: CreateStep,
     },
     Connection {
         forge: u16,
@@ -874,6 +912,8 @@ pub enum Request {
     SetUp {
         forge: u16,
         request: Token,
+        org: Box<[u8]>,
+        repository: Box<[u8]>,
     },
     /// The deployment's forges document changed.
     MarkedForges,
