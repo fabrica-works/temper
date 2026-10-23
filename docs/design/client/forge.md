@@ -430,7 +430,7 @@ and `connect-forge.html`.
   their own work (`../STATUS.md`).
 - **The playground's forge,** the fake the demo names, follows under
   the level-2 heading "The playground", folded, while the demo's forge
-  half holds (`README.md`, 4.8): "Playground forge · the playground's,
+  half holds (`README.md`, 4.8): "Playground forge · the playground’s,
   until a forge of yours connects · OWNER/NAME"; opened, its Account
   line. Once the demo has ended (`../draft/first-run.md`, 2.3), it
   shows nowhere.
@@ -468,8 +468,9 @@ and `connect-forge.html`.
     "An organization, or none for your account" and its button; then
     "Connect an App of your own", "Its id, and its private key as
     GitHub gives it.", "On GitHub, set the App’s setup URL to
-    http://LISTENER/forges/N/github/setup, and give it the permissions
-    and events temper’s guide lists.", its fields "App id" and "Private
+    temper’s address followed by /forges/N/github/setup, and give it
+    the permissions and events temper’s guide lists." (the client
+    knows no address of its own to print), its fields "App id" and "Private
     key" and its button; then "A pasted value is sent once and shown
     nowhere, then or after." Until GitHub's connect (the FORGE
     requests' `Connect`, `README.md`, section 8), both buttons are
