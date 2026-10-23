@@ -615,6 +615,13 @@ impl Judge {
         }
         self.processed = batch.ends().len();
         self.map_channels(&ctl::json(batch.ends().last().expect("placement hosts")));
+        assert!(
+            ["ws", "s1", "s2"].iter().all(|name| self.assigned.contains(*name)),
+            "every started worker held a run: assigned {:?}; channels {:?}; placed {:?}",
+            self.assigned,
+            self.channels,
+            self.workers
+        );
         self.stage = Stage::Acts;
     }
     fn finish_acts(&mut self, now: Time, root: &mut cluster::Root) {
