@@ -42,6 +42,9 @@ draft to landed change.
   temper's client, through temper's own App.
 - [`docs/guide/forgejo.md`](docs/guide/forgejo.md): a Forgejo connected
   from temper's client, managed, owned or connected.
+- [`docs/guide/server.md`](docs/guide/server.md): temper on a server,
+  behind a TLS proxy, with Google's sign-in and a worker on another
+  host, redeployed from `main`.
 - [`docs/design/STATUS.md`](docs/design/STATUS.md): how far the code is
   from the design.
 - skein's foundation, which temper follows: `programming-model.md`,

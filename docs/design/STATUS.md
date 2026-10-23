@@ -79,6 +79,7 @@ Open fake scripts use final text; Finite finish calls and all chat bounds stay.
 | `qa.md` | partly | built: S's guarded `ctl`, scripted story and output parser, exact `NOTICE`, and private end-state judgment with unit/process tests in `lab/`. Left: runnable experiment documents, check adapters and the first campaign, after skein's lab runtime and the owned interfaces in section 11 |
 | `../guide/github.md` | no | all: connecting GitHub from the client by the manifest flow, installing the App on more accounts, adding repositories, landing directly or through the merge queue: github |
 | `../guide/forgejo.md` | no | all: Forgejo connected, managed and owned from the client: github, after jig's request carrying a value and a jig repin |
+| `../guide/server.md` | partly | 10: the LLM account carried across a redeploy by `temper ctl export` and `import`: accounts-move's M3 |
 
 `client/mockups/` is reference material for the client's look and the
 order of its pages, not contract (`client/README.md`, 3.5).
