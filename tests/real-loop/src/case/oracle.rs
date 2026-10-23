@@ -36,6 +36,7 @@ pub struct Told {
 pub struct Kit {
     pub main: BTreeMap<Vec<u8>, Vec<u8>>,
     pub merged_green: bool,
+    pub pulls: Vec<Pull>,
 }
 impl Told {
     /// The oracle's per-query view, shared with process-tier observation readers.
@@ -95,7 +96,11 @@ impl Observed {
             documents,
             commands: Vec::new(),
             told,
-            kit: Kit { main: ran.forge().main().clone(), merged_green: ran.forge().merged_green() },
+            kit: Kit {
+                pulls: pull_digest(ran.forge().observations()),
+                main: ran.forge().main().clone(),
+                merged_green: ran.forge().merged_green(),
+            },
         }
     }
 }
@@ -141,6 +146,12 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::Plan,
         Agent::Planner,
         Agent::Subowner,
+        Agent::Direction,
+        Agent::StoryOwner,
+        Agent::OverlapOwner,
+        Agent::X3Writer,
+        Agent::PlannedWriter,
+        Agent::StoryWriter,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -494,7 +505,7 @@ mod tests {
                     credential: Some(0),
                 },
             ],
-            kit: Kit { main, merged_green: true },
+            kit: Kit { pulls: Vec::new(), main, merged_green: true },
         }
     }
 
@@ -760,7 +771,7 @@ mod account_tests {
             ]),
             commands: Vec::new(),
             told: vec![told(Agent::A, HELD_A_SPEC, 0), told(Agent::A, HELD_A_SPEC, 1)],
-            kit: Kit { main: BTreeMap::new(), merged_green: false },
+            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
         }
     }
     #[test]
@@ -1078,7 +1089,7 @@ mod pace_tests {
                 told(Agent::Survey, "Begin", DEFAULT_MODEL, 1),
                 told(Agent::Director, &format!("Note 1 revision 1: {PACE_NOTE}\n{PACE_ANSWER}\n"), DEFAULT_MODEL, 0),
             ],
-            kit: Kit { main: BTreeMap::new(), merged_green: false },
+            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
         }
     }
     #[test]
@@ -1432,7 +1443,7 @@ mod restart_tests {
         Observed {
             documents,
             commands: Vec::new(),
-            kit: Kit { main: BTreeMap::new(), merged_green: false },
+            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
             told: vec![
                 told(
                     Agent::Hang,
@@ -1790,6 +1801,7 @@ mod rules_tests {
             ],
             commands: Vec::new(),
             kit: Kit {
+                pulls: Vec::new(),
                 main: BTreeMap::from([(RULES_FILE.as_bytes().to_vec(), NEW_RULES.as_bytes().to_vec())]),
                 merged_green: false,
             },
@@ -2071,7 +2083,7 @@ mod shape_tests {
                 told(Agent::Mover, NEW_BRIEF, &[user(NEW_BRIEF), user("Continue")]),
             ],
             commands: Vec::new(),
-            kit: Kit { main: BTreeMap::new(), merged_green: false },
+            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
         }
     }
     fn rejects(observed: &Observed, promise: Promise, what: &str) {
@@ -2531,6 +2543,7 @@ mod pause_tests {
                 told(Agent::Pause, BOWNER_REPORT.into()),
             ],
             kit: Kit {
+                pulls: Vec::new(),
                 main: BTreeMap::from([(H1_DOC.as_bytes().to_vec(), H1_WORDS.as_bytes().to_vec())]),
                 merged_green: true,
             },
@@ -3053,7 +3066,7 @@ mod plan_tests {
         Observed {
             documents,
             commands: Vec::new(),
-            kit: Kit { main: BTreeMap::new(), merged_green: true },
+            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: true },
             told: vec![
                 noted,
                 told(Agent::Planner, &opening),
@@ -3198,6 +3211,689 @@ mod plan_tests {
             ["line"] = json!({});
         for observed in [early, overlap, unordered, unended] {
             assert!(!step_5_5(&observed).is_empty());
+        }
+    }
+}
+
+// Act 2, step 5.4 (domain/testing.md, 5.3)
+/// The forge's pull lifecycle; comments are outside this step's promises.
+#[derive(Clone, Debug)]
+pub struct Pull {
+    pub number: u64,
+    pub branch: Vec<u8>,
+    pub opened: u64,
+    pub merged: bool,
+    pub closed: bool,
+    pub deleted: Option<u64>,
+}
+fn pull_digest(records: &[skein_fake_forge_domain::Observation]) -> Vec<Pull> {
+    use skein_fake_forge_domain::Observation;
+    let mut pulls = Vec::<Pull>::new();
+    for record in records {
+        match record {
+            Observation::Opened { number, branches: Some(branches), .. } => pulls.push(Pull {
+                number: *number,
+                branch: branches.head.to_vec(),
+                opened: branches.commit,
+                merged: false,
+                closed: false,
+                deleted: None,
+            }),
+            Observation::Closed { number, .. } => {
+                if let Some(pull) = pulls.iter_mut().find(|pull| pull.number == *number) {
+                    pull.closed = true;
+                }
+            }
+            Observation::Merged { number, .. } => {
+                if let Some(pull) = pulls.iter_mut().find(|pull| pull.number == *number) {
+                    pull.merged = true;
+                }
+            }
+            Observation::Deleted { branch, at, .. } => {
+                if let Some(pull) = pulls.iter_mut().rev().find(|pull| pull.branch == branch.as_ref()) {
+                    pull.deleted = Some(*at);
+                }
+            }
+            Observation::Opened { branches: None, .. }
+            | Observation::Moved { .. }
+            | Observation::Reopened { .. }
+            | Observation::Labelled { .. }
+            | Observation::Revised { .. }
+            | Observation::Depends { .. }
+            | Observation::Requested { .. }
+            | Observation::Defined { .. }
+            | Observation::Commented { .. }
+            | Observation::Edited { .. }
+            | Observation::Removed { .. }
+            | Observation::Reviewed { .. }
+            | Observation::Reported { .. }
+            | Observation::Enqueued { .. }
+            | Observation::Group { .. }
+            | Observation::Dequeued { .. }
+            | Observation::Refused { .. }
+            | Observation::Rejected { .. }
+            | Observation::Wiki { .. } => {}
+        }
+    }
+    pulls
+}
+
+const DIRECTION_AMENDED: Promise = Promise::Must("amendment (exact)");
+const DIRECTION_CANCELLED: Promise = Promise::Must("cancel, with work kept under its closed pull");
+const DIRECTION_OVERLAP: Promise = Promise::Must("grants by convention, with footprints as detection");
+const DIRECTION_NEWS: Promise = Promise::Add("B's overlap news is kept for its release");
+
+#[must_use]
+pub fn step_5_4(observed: &Observed) -> Vec<Miss> {
+    use super::{
+        B_FILE, DEFERRED_NOTE, DEFERRED_NOTE_NUMBER, DEFERRED_WORDS, DIRECTION, DIRECTION_BRIEF, DIRECTION_REASON,
+        DIRECTION_REPORT, DIRECTION_REVISION, OVERLAP_OWNER, OVERLAP_OWNER_REPORT, PLANNED, PLANNED_CANCEL_REASON,
+        STORY_OWNER, STORY_OWNER_REPORT, STORY_WORDS, X3, X3_CANCEL_REASON, X3_FILE,
+    };
+    let mut misses = Vec::new();
+    direction_identities(observed, &mut misses);
+    let a = task_document(observed, Read::StoryOwnerEnded);
+    step_check(
+        &mut misses,
+        "5.4",
+        text(a, "/instructions/bytes") == DIRECTION_BRIEF
+            && a.pointer("/instructions/cut") == Some(&Value::Bool(false))
+            && number(a, "/spec_revision/value") == Some(DIRECTION_REVISION)
+            && plan_deliveries(observed, Agent::StoryOwner, DIRECTION_BRIEF) == 1,
+        DIRECTION_AMENDED,
+        "A must hold the whole new direction at its revision and hear the amendment once",
+    );
+    step_check(
+        &mut misses,
+        "5.4",
+        plan_tool_results(observed, Agent::Direction, b"amend").iter().any(|(_, args, _)| {
+            args["target"] == STORY_OWNER
+                && args["revision"] == DIRECTION_REVISION - 1
+                && args["amendment"]["instructions"] == DIRECTION_BRIEF
+                && args["amendment"]["reason"] == DIRECTION_REASON
+        }),
+        DIRECTION_AMENDED,
+        "the director must amend A with the new direction and its reason",
+    );
+    for (read, task, by, reason) in [
+        (Read::X3Ended, X3, STORY_OWNER, X3_CANCEL_REASON),
+        (Read::PlannedEnded, PLANNED, OVERLAP_OWNER, PLANNED_CANCEL_REASON),
+    ] {
+        let doc = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "5.4",
+            text(doc, "/chip/phase") == "ended"
+                && number(doc, "/result/ending/task/cancelled/by/task") == Some(by)
+                && text(doc, "/result/ending/task/cancelled/reason/bytes") == reason
+                && number(doc, "/chip/details/owner/details/live_delegates") == Some(0),
+            DIRECTION_CANCELLED,
+            &format!("task {task}'s subtree must end cancelled by {by} with its reason"),
+        );
+    }
+    step_check(
+        &mut misses,
+        "5.4",
+        plan_note_recalled(observed, Agent::StoryOwner, DEFERRED_NOTE_NUMBER, DEFERRED_NOTE, DEFERRED_WORDS)
+            && DEFERRED_WORDS.contains(&format!("Task {X3} (x3)")),
+        DIRECTION_CANCELLED,
+        "A must write a project note naming x3 and its deferred plan, then recall it",
+    );
+    let landed = task_document(observed, Read::StoryLanded);
+    step_check(
+        &mut misses,
+        "5.4",
+        text(landed, "/chip/phase") == "ended"
+            && number(landed, "/result/ending/task/done/change/kind") == Some(1)
+            && number(landed, "/result/value/change/part/connector") == Some(1)
+            && text(landed, "/result/value/change/part/kind") == "result"
+            && observed.kit.merged_green
+            && observed.kit.main.get(B_FILE.as_bytes()).is_some_and(|words| words == STORY_WORDS.as_bytes())
+            && !observed.kit.main.contains_key(X3_FILE.as_bytes()),
+        DIRECTION_OVERLAP,
+        "a1 must land green changing B's file, while main excludes x3's file",
+    );
+    direction_pulls(observed, &mut misses);
+    direction_news(observed, &mut misses);
+    for (read, task, report) in [
+        (Read::StoryOwnerEnded, STORY_OWNER, STORY_OWNER_REPORT),
+        (Read::DirectionBEnded, OVERLAP_OWNER, OVERLAP_OWNER_REPORT),
+        (Read::DirectionEnded, DIRECTION, DIRECTION_REPORT),
+    ] {
+        let doc = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "5.4",
+            number(doc, "/chip/task") == Some(task)
+                && number(doc, "/project") == Some(PROJECT)
+                && text(doc, "/chip/phase") == "ended"
+                && text(doc, "/result/value/report/bytes") == report,
+            DIRECTION_NEWS,
+            &format!("task {task} must finish its report"),
+        );
+    }
+    misses
+}
+
+fn direction_identities(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{DIRECTION, OVERLAP_OWNER, PLANNED, STORY_CHANGE, STORY_OWNER, X3};
+    for (read, task, parent) in [
+        (Read::X3Open, X3, STORY_OWNER),
+        (Read::X3Ended, X3, STORY_OWNER),
+        (Read::PlannedRunning, PLANNED, OVERLAP_OWNER),
+        (Read::PlannedEnded, PLANNED, OVERLAP_OWNER),
+        (Read::StoryLanded, STORY_CHANGE, STORY_OWNER),
+        (Read::DirectionBHeld, OVERLAP_OWNER, DIRECTION),
+        (Read::DirectionBPending, OVERLAP_OWNER, DIRECTION),
+        (Read::DirectionBEnded, OVERLAP_OWNER, DIRECTION),
+        (Read::StoryOwnerEnded, STORY_OWNER, DIRECTION),
+    ] {
+        let doc = task_document(observed, read);
+        step_check(
+            misses,
+            "5.4",
+            number(doc, "/chip/task") == Some(task)
+                && number(doc, "/project") == Some(PROJECT)
+                && number(doc, "/requester/task") == Some(parent),
+            DIRECTION_OVERLAP,
+            &format!("{read:?} must identify task {task} under {parent} in project {PROJECT}"),
+        );
+    }
+}
+
+fn direction_pulls(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{DIRECTION, STORY_CHANGE, STORY_PULL_NUMBER, X3, X3_CODER, X3_PULL_NUMBER};
+    let x3_branch = format!("temper/{DIRECTION}/c{X3}");
+    let a1_branch = format!("temper/{DIRECTION}/c{STORY_CHANGE}");
+    let x3 = observed.kit.pulls.iter().find(|pull| pull.branch == x3_branch.as_bytes());
+    let a1 = observed.kit.pulls.iter().find(|pull| pull.branch == a1_branch.as_bytes());
+    step_check(
+        misses,
+        "5.4",
+        observed.kit.pulls.len() == 2
+            && x3.is_some_and(|pull| {
+                pull.number == X3_PULL_NUMBER && pull.closed && !pull.merged && pull.deleted == Some(pull.opened)
+            })
+            && a1.is_some_and(|pull| pull.number == STORY_PULL_NUMBER && pull.merged),
+        DIRECTION_CANCELLED,
+        "only x3 and a1 must open pulls; x3's unmerged pull must close and its branch be deleted at its opening head",
+    );
+    let produced = task_document(observed, Read::X3Produced);
+    step_check(
+        misses,
+        "5.4",
+        number(produced, "/chip/task") == Some(X3_CODER)
+            && number(produced, "/requester/task") == Some(X3)
+            && number(produced, "/project") == Some(PROJECT)
+            && text(produced, "/chip/phase") == "ended"
+            && number(produced, "/result/value/change/kind") == Some(2)
+            && x3.is_some_and(|pull| {
+                text(produced, "/result/value/change/words/bytes") == direction_commit(pull.opened)
+            }),
+        DIRECTION_CANCELLED,
+        "x3's pull must open at the head its coder produced and pushed",
+    );
+}
+
+fn direction_commit(commit: u64) -> String {
+    use std::fmt::Write;
+    let mut hex = String::new();
+    for byte in &skein_fake_forge_protocol::routes::object(commit).bytes[..20] {
+        write!(hex, "{byte:02x}").expect("commit hex");
+    }
+    hex
+}
+fn direction_news(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{B_FILE, OVERLAP_HOLD_REVISION, OVERLAP_OWNER, PLANNED};
+    let held = task_document(observed, Read::DirectionBHeld);
+    let pending = task_document(observed, Read::DirectionBPending);
+    for (read, doc) in [(Read::DirectionBHeld, held), (Read::DirectionBPending, pending)] {
+        step_check(
+            misses,
+            "5.4",
+            text(doc, "/chip/phase") == "held"
+                && number(doc, "/hold/owner/revision") == Some(OVERLAP_HOLD_REVISION)
+                && number(doc, "/hold/owner/reason/stopped_by/party") == Some(1),
+            DIRECTION_NEWS,
+            &format!("{read:?}: B must remain held at the person's Stop"),
+        );
+    }
+    let planned = task_document(observed, Read::PlannedRunning);
+    step_check(
+        misses,
+        "5.4",
+        planned.pointer("/spec/specification/parameters").and_then(Value::as_array).is_some_and(|parameters| {
+            parameters.iter().any(|parameter| {
+                number(parameter, "/bytes/name") == Some(6) && text(parameter, "/bytes/value/bytes") == B_FILE
+            })
+        }) && number(planned, "/chip/task") == Some(PLANNED),
+        DIRECTION_OVERLAP,
+        "h1 must name B's file as its planned footprint before it produces a pull",
+    );
+    let pending_rows = check_activity(observed, Read::DirectionBPending);
+    let news: Vec<_> = pending_rows
+        .iter()
+        .filter(|row| {
+            text(row, "/line/words/kind/news/class") == "wakes"
+                && text(row, "/line/words/words").starts_with("forge landing ")
+        })
+        .collect();
+    let stopped = number(held, "/activity");
+    let ended = task_document(observed, Read::DirectionBEnded);
+    let rows: Vec<_> = check_activity(observed, Read::DirectionBEnded)
+        .into_iter()
+        .chain(check_activity(observed, Read::DirectionBFirst))
+        .collect();
+    let release = rows
+        .iter()
+        .find(|row| number(row, "/line/decided/revision") == Some(OVERLAP_HOLD_REVISION + 1))
+        .and_then(|row| number(row, "/position"));
+    let same_attempt = number(held, "/chip/details/owner/details/attempt").is_some()
+        && number(held, "/chip/details/owner/details/attempt")
+            == number(pending, "/chip/details/owner/details/attempt");
+    step_check(
+        misses,
+        "5.4",
+        same_attempt
+            && release.zip(number(pending, "/activity")).is_some_and(|(release, head)| release > head)
+            && stopped.zip(release).is_some_and(|(stop, release)| {
+                stop < release
+                    && rows.iter().all(|row| {
+                        !number(row, "/position").is_some_and(|at| at > stop && at < release)
+                            || row.pointer("/line/run_began").is_none()
+                    })
+            })
+            && rows.iter().any(|row| {
+                row.pointer("/line/run_began").is_some()
+                    && number(row, "/position").zip(release).is_some_and(|(at, release)| at > release)
+            })
+            && ended["hold"].is_null(),
+        DIRECTION_NEWS,
+        "B must run no new attempt during its hold and begin its next attempt only after Release",
+    );
+    let landing = text(task_document(observed, Read::StoryLanded), "/result/value/change/words/bytes");
+    step_check(
+        misses,
+        "5.4",
+        news.len() == 1
+            && news.first().is_some_and(|row| {
+                let words = text(row, "/line/words/words");
+                let suffix = landing.get(..8).map(|head| format!(" -> {head}"));
+                suffix.is_some_and(|suffix| words.ends_with(&suffix))
+                    && number(row, "/position").zip(stopped).is_some_and(|(at, stop)| at > stop)
+                    && plan_deliveries(observed, Agent::OverlapOwner, &words) == 1
+            }),
+        DIRECTION_NEWS,
+        "a1's overlapping landing must wait in B's held inbox and be told to B exactly once after Release",
+    );
+    step_check(
+        misses,
+        "5.4",
+        plan_attempts(observed, &[Read::DirectionBEnded, Read::DirectionBFirst], OVERLAP_OWNER, 2),
+        DIRECTION_NEWS,
+        "B's complete journal must show its two non-overlapping attempts",
+    );
+}
+
+#[cfg(test)]
+mod direction_tests {
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+    use skein_fake_llm_domain::api::{Message, Part, Role};
+
+    fn input(words: &str) -> Message {
+        Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
+    }
+    fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
+        [
+            Message {
+                role: Role::Assistant,
+                parts: Box::new([Part::ToolCall {
+                    id: id.as_bytes().into(),
+                    name: name.as_bytes().into(),
+                    arguments: serde_json::to_vec(args).expect("arguments").into(),
+                }]),
+            },
+            Message {
+                role: Role::User,
+                parts: Box::new([Part::ToolOutput {
+                    id: id.as_bytes().into(),
+                    output: output.as_bytes().into(),
+                    is_error: false,
+                }]),
+            },
+        ]
+    }
+    fn told(agent: Agent, history: &[Message]) -> Told {
+        Told::new(agent.cue(), b"fake", None, history).expect("agent cue")
+    }
+    fn documents() -> BTreeMap<Read, Value> {
+        let mut documents = BTreeMap::new();
+        for (read, task, parent) in [
+            (Read::X3Open, X3, STORY_OWNER),
+            (Read::X3Produced, X3_CODER, X3),
+            (Read::X3Ended, X3, STORY_OWNER),
+            (Read::PlannedRunning, PLANNED, OVERLAP_OWNER),
+            (Read::PlannedEnded, PLANNED, OVERLAP_OWNER),
+            (Read::StoryLanded, STORY_CHANGE, STORY_OWNER),
+            (Read::DirectionBHeld, OVERLAP_OWNER, DIRECTION),
+            (Read::DirectionBPending, OVERLAP_OWNER, DIRECTION),
+            (Read::DirectionBEnded, OVERLAP_OWNER, DIRECTION),
+            (Read::StoryOwnerEnded, STORY_OWNER, DIRECTION),
+            (Read::DirectionEnded, DIRECTION, 0),
+        ] {
+            documents.insert(read, json!({"task":{
+                "chip":{"task":task,"phase":"ended","details":{"owner":{"details":{"attempt":1,"live_delegates":0}}}},
+                "project":PROJECT,"requester":{"task":parent},"hold":null,
+                "result":{"value":{}}
+            }}));
+        }
+        for (read, by, reason) in
+            [(Read::X3Ended, STORY_OWNER, X3_CANCEL_REASON), (Read::PlannedEnded, OVERLAP_OWNER, PLANNED_CANCEL_REASON)]
+        {
+            documents.get_mut(&read).expect("cancelled")["task"]["result"]["ending"] =
+                json!({"task":{"cancelled":{"by":{"task":by},"reason":{"bytes":reason}}}});
+        }
+        for (read, report) in [
+            (Read::StoryOwnerEnded, STORY_OWNER_REPORT),
+            (Read::DirectionBEnded, OVERLAP_OWNER_REPORT),
+            (Read::DirectionEnded, DIRECTION_REPORT),
+        ] {
+            documents.get_mut(&read).expect("report")["task"]["result"]["value"] = json!({"report":{"bytes":report}});
+        }
+        let a = &mut documents.get_mut(&Read::StoryOwnerEnded).expect("A")["task"];
+        a["instructions"] = json!({"bytes":DIRECTION_BRIEF,"cut":false});
+        a["spec_revision"] = json!({"value":DIRECTION_REVISION});
+        documents.get_mut(&Read::X3Produced).expect("coder")["task"]["result"]["value"] =
+            json!({"change":{"kind":2,"words":{"bytes":direction_commit(7)}}});
+        let a1 = &mut documents.get_mut(&Read::StoryLanded).expect("a1")["task"];
+        a1["result"] = json!({"ending":{"task":{"done":{"change":{"kind":1}}}},
+            "value":{"change":{"part":{"connector":1,"kind":"result"},"words":{"bytes":direction_commit(8)}}}});
+        documents.get_mut(&Read::PlannedRunning).expect("h1")["task"]["spec"] = json!({"specification":{
+            "parameters":[{"bytes":{"name":6,"value":{"bytes":B_FILE,"cut":false}}}]
+        }});
+        let news = format!("forge landing 12345678 -> {}", &direction_commit(8)[..8]);
+        let rows: Vec<_> = [
+            json!({"run_began":{"attempt":1}}),
+            json!({"run_ended":{"attempt":1}}),
+            json!({"decided":{"revision":OVERLAP_HOLD_REVISION}}),
+            json!({"words":{"message":1,"kind":{"news":{"class":"wakes"}},"words":news}}),
+            json!({"decided":{"revision":OVERLAP_HOLD_REVISION+1}}),
+            json!({"run_began":{"attempt":2}}),
+            json!({"run_ended":{"attempt":2}}),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(at, line)| {
+            json!({"event":{"owner":{"source":{
+                "task":OVERLAP_OWNER,"position":at+1,"line":line
+            }}}})
+        })
+        .rev()
+        .collect();
+        for (read, head) in [(Read::DirectionBHeld, 3), (Read::DirectionBPending, 4)] {
+            let doc = documents.get_mut(&read).expect("held");
+            doc["task"]["chip"]["phase"] = json!("held");
+            doc["task"]["activity"] = json!(head);
+            doc["task"]["hold"] =
+                json!({"owner":{"revision":OVERLAP_HOLD_REVISION,"reason":{"stopped_by":{"party":1}}}});
+            doc["activity"] = json!({"rows":if head == 4 { vec![rows[3].clone()] } else { Vec::new() }});
+        }
+        documents.get_mut(&Read::DirectionBEnded).expect("B")["activity"] =
+            json!({"cut":false,"after":null,"before":{"value":"older"},"rows":rows[..3]});
+        documents.insert(
+            Read::DirectionBFirst,
+            json!({"cut":false,"before":null,"after":{"value":"newer"},"rows":rows[3..]}),
+        );
+        documents
+    }
+
+    fn met() -> Observed {
+        let documents = documents();
+        let news = format!("forge landing 12345678 -> {}", &direction_commit(8)[..8]);
+        let amendment = tool(
+            "amend",
+            "amend",
+            &json!({"target":STORY_OWNER,"revision":DIRECTION_REVISION-1,
+            "amendment":{"instructions":DIRECTION_BRIEF,"reason":DIRECTION_REASON}}),
+            "Amended",
+        );
+        let mut a = vec![input(DIRECTION_BRIEF)];
+        a.extend(tool(
+            "note",
+            "note",
+            &json!({"scope":{"kind":"project","project":PROJECT},
+            "description":DEFERRED_NOTE,"body":DEFERRED_WORDS}),
+            "Note 1 revision 1 written",
+        ));
+        let noted = told(Agent::StoryOwner, &a);
+        a.extend(tool(
+            "recall",
+            "recall",
+            &json!({"kind":"name","name":DEFERRED_NOTE_NUMBER}),
+            &format!("Note {DEFERRED_NOTE_NUMBER} revision 1: {DEFERRED_NOTE}\n{DEFERRED_WORDS}\n"),
+        ));
+        Observed {
+            documents,
+            commands: Vec::new(),
+            told: vec![
+                told(Agent::Direction, &amendment),
+                noted,
+                told(Agent::StoryOwner, &a),
+                told(Agent::OverlapOwner, &[input("Begin B's work.")]),
+                told(Agent::OverlapOwner, &[input("Begin B's work."), input(&news)]),
+            ],
+            kit: Kit {
+                main: BTreeMap::from([(B_FILE.as_bytes().to_vec(), STORY_WORDS.as_bytes().to_vec())]),
+                merged_green: true,
+                pulls: vec![
+                    Pull {
+                        number: 1,
+                        branch: format!("temper/{DIRECTION}/c{X3}").into_bytes(),
+                        opened: 7,
+                        merged: false,
+                        closed: true,
+                        deleted: Some(7),
+                    },
+                    Pull {
+                        number: 2,
+                        branch: format!("temper/{DIRECTION}/c{STORY_CHANGE}").into_bytes(),
+                        opened: 8,
+                        merged: true,
+                        closed: false,
+                        deleted: None,
+                    },
+                ],
+            },
+        }
+    }
+    #[test]
+    fn new_direction_and_deferred_overlap_meet_the_checkpoint() {
+        assert_met(&step_5_4(&met()));
+    }
+    #[test]
+    fn every_required_document_field_rejects_a_mutation() {
+        for (read, paths) in [
+            (
+                Read::StoryOwnerEnded,
+                vec!["/task/instructions/bytes", "/task/instructions/cut", "/task/spec_revision/value"],
+            ),
+            (
+                Read::X3Produced,
+                vec![
+                    "/task/chip/task",
+                    "/task/chip/phase",
+                    "/task/requester/task",
+                    "/task/project",
+                    "/task/result/value/change/kind",
+                    "/task/result/value/change/words/bytes",
+                ],
+            ),
+            (
+                Read::X3Ended,
+                vec![
+                    "/task/result/ending/task/cancelled/by/task",
+                    "/task/result/ending/task/cancelled/reason/bytes",
+                    "/task/chip/details/owner/details/live_delegates",
+                ],
+            ),
+            (
+                Read::PlannedEnded,
+                vec![
+                    "/task/result/ending/task/cancelled/by/task",
+                    "/task/result/ending/task/cancelled/reason/bytes",
+                    "/task/chip/details/owner/details/live_delegates",
+                ],
+            ),
+            (
+                Read::PlannedRunning,
+                vec![
+                    "/task/spec/specification/parameters/0/bytes/name",
+                    "/task/spec/specification/parameters/0/bytes/value/bytes",
+                ],
+            ),
+            (
+                Read::StoryLanded,
+                vec![
+                    "/task/result/ending/task/done/change/kind",
+                    "/task/result/value/change/part/connector",
+                    "/task/result/value/change/part/kind",
+                    "/task/result/value/change/words/bytes",
+                ],
+            ),
+            (
+                Read::DirectionBHeld,
+                vec![
+                    "/task/chip/phase",
+                    "/task/hold/owner/revision",
+                    "/task/hold/owner/reason/stopped_by/party",
+                    "/task/chip/details/owner/details/attempt",
+                    "/task/activity",
+                ],
+            ),
+            (
+                Read::DirectionBPending,
+                vec![
+                    "/task/chip/phase",
+                    "/task/hold/owner/revision",
+                    "/task/hold/owner/reason/stopped_by/party",
+                    "/task/chip/details/owner/details/attempt",
+                    "/task/activity",
+                    "/activity/rows/0/event/owner/source/line/words/kind/news/class",
+                    "/activity/rows/0/event/owner/source/line/words/words",
+                ],
+            ),
+            (
+                Read::DirectionBEnded,
+                vec!["/activity/cut", "/activity/after", "/activity/rows/2/event/owner/source/line/decided/revision"],
+            ),
+            (Read::DirectionBFirst, vec!["/cut", "/before"]),
+        ] {
+            for path in paths {
+                let mut observed = met();
+                let value = observed.documents.get_mut(&read).expect("document").pointer_mut(path).expect("field");
+                *value = if value.is_null() { json!("unexpected") } else { Value::Null };
+                assert!(!step_5_4(&observed).is_empty(), "{read:?}{path}");
+            }
+        }
+    }
+    #[test]
+    fn identities_and_reports_reject_a_mutation() {
+        for (read, _, _) in [
+            (Read::X3Open, X3, STORY_OWNER),
+            (Read::X3Ended, X3, STORY_OWNER),
+            (Read::PlannedRunning, PLANNED, OVERLAP_OWNER),
+            (Read::PlannedEnded, PLANNED, OVERLAP_OWNER),
+            (Read::StoryLanded, STORY_CHANGE, STORY_OWNER),
+            (Read::DirectionBHeld, OVERLAP_OWNER, DIRECTION),
+            (Read::DirectionBPending, OVERLAP_OWNER, DIRECTION),
+            (Read::DirectionBEnded, OVERLAP_OWNER, DIRECTION),
+            (Read::StoryOwnerEnded, STORY_OWNER, DIRECTION),
+        ] {
+            for path in ["/task/chip/task", "/task/project", "/task/requester/task"] {
+                let mut observed = met();
+                *observed.documents.get_mut(&read).expect("read").pointer_mut(path).expect("field") = Value::Null;
+                assert!(!step_5_4(&observed).is_empty(), "{read:?}{path}");
+            }
+        }
+        for read in [Read::StoryOwnerEnded, Read::DirectionBEnded, Read::DirectionEnded] {
+            for path in ["/task/chip/task", "/task/project", "/task/chip/phase", "/task/result/value/report/bytes"] {
+                let mut observed = met();
+                *observed.documents.get_mut(&read).expect("read").pointer_mut(path).expect("field") = Value::Null;
+                assert!(!step_5_4(&observed).is_empty(), "{read:?}{path}");
+            }
+        }
+    }
+    #[test]
+    fn the_closed_pull_must_keep_the_pushed_head_and_h1_must_open_nothing() {
+        for mutation in 0..8 {
+            let mut observed = met();
+            match mutation {
+                0 => {
+                    observed.kit.pulls.remove(0);
+                }
+                1 => observed.kit.pulls[0].closed = false,
+                2 => observed.kit.pulls[0].merged = true,
+                3 => observed.kit.pulls[0].deleted = None,
+                4 => observed.kit.pulls[0].deleted = Some(99),
+                5 => observed.kit.pulls[0].opened = 99,
+                6 => observed.kit.pulls[1].merged = false,
+                7 => observed.kit.pulls.push(Pull {
+                    number: 3,
+                    branch: format!("temper/{DIRECTION}/c{PLANNED}").into_bytes(),
+                    opened: 9,
+                    merged: false,
+                    closed: true,
+                    deleted: Some(9),
+                }),
+                _ => unreachable!(),
+            }
+            assert!(!step_5_4(&observed).is_empty(), "mutation {mutation}");
+        }
+        let mut red = met();
+        red.kit.merged_green = false;
+        let mut absent = met();
+        absent.kit.main.clear();
+        let mut old = met();
+        old.kit.main.insert(X3_FILE.as_bytes().to_vec(), X3_WORDS.as_bytes().to_vec());
+        for observed in [red, absent, old] {
+            assert!(!step_5_4(&observed).is_empty());
+        }
+    }
+    #[test]
+    fn news_cannot_be_doubled_or_lost_and_a_run_cannot_start_during_the_hold() {
+        let mut doubled = met();
+        let extra = doubled.told[4].history[1].clone();
+        doubled.told[4].history = [doubled.told[4].history.to_vec(), vec![extra]].concat().into();
+        let mut lost = met();
+        lost.told.pop();
+        let mut during = met();
+        during.documents.get_mut(&Read::DirectionBFirst).expect("older")["rows"][0]["event"]["owner"]["source"]["line"] =
+            json!({"run_began":{"attempt":2}});
+        let mut early = met();
+        early.documents.get_mut(&Read::DirectionBEnded).expect("B")["activity"]["rows"][2]["event"]["owner"]["source"]
+            ["position"] = json!(2);
+        for observed in [doubled, lost, during, early] {
+            assert!(!step_5_4(&observed).is_empty());
+        }
+    }
+    #[test]
+    fn amendment_and_note_must_be_real_completed_tools() {
+        for at in [0, 2] {
+            let mut observed = met();
+            observed.told.remove(at);
+            assert!(!step_5_4(&observed).is_empty());
+        }
+        let mut missing = met();
+        missing.told[1].history = Box::new([]);
+        missing.told[2].history = Box::new([]);
+        let mut duplicate = met();
+        duplicate.told[2].history = [duplicate.told[2].history.to_vec(), vec![input(DIRECTION_BRIEF)]].concat().into();
+        let mut prose = met();
+        prose.told[0].history = vec![input(DIRECTION_BRIEF)].into();
+        for observed in [missing, duplicate, prose] {
+            assert!(!step_5_4(&observed).is_empty());
         }
     }
 }

@@ -60,6 +60,18 @@ pub enum Read {
     PlannerFirst,
     PlanEnded,
     SubownerEnded,
+    X3Open,
+    X3Produced,
+    X3Ended,
+    PlannedRunning,
+    PlannedEnded,
+    StoryLanded,
+    DirectionBHeld,
+    DirectionBPending,
+    DirectionBEnded,
+    DirectionBFirst,
+    StoryOwnerEnded,
+    DirectionEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -519,5 +531,123 @@ pub fn step_5_5() -> Vec<calls::Step> {
         call(D1, argv!["activity", number(PLANNER), "--before", calls::activity_before(5), "--json"]),
         call(D1, argv!["activity", number(PLANNER), "--before", calls::activity_before(6), "--json"]),
         call(D1, argv!["task", number(SUBOWNER), "--json"]),
+    ]
+}
+
+// Act 2, step 5.4 (domain/testing.md, 5.3)
+pub const READS_5_4: &[(Read, usize)] = &[
+    (Read::X3Open, 7),
+    (Read::X3Produced, 8),
+    (Read::PlannedRunning, 12),
+    (Read::DirectionBHeld, 15),
+    (Read::X3Ended, 18),
+    (Read::StoryLanded, 22),
+    (Read::DirectionBPending, 23),
+    (Read::PlannedEnded, 26),
+    (Read::DirectionBEnded, 27),
+    (Read::DirectionBFirst, 28),
+    (Read::StoryOwnerEnded, 30),
+    (Read::DirectionEnded, 31),
+];
+#[must_use]
+pub fn step_5_4() -> Vec<calls::Step> {
+    use super::{
+        Agent, B_DELEGATE_HOLD, DIRECTION, DIRECTION_MESSAGE, DIRECTION_PERSON, OVERLAP_HOLD_REVISION, OVERLAP_OWNER,
+        PLANNED, PLANNED_CANCEL_REASON, PLANNED_CODER, PLANNED_CODING_HOLD, STORY_CHANGE, STORY_OWNER,
+        STORY_RECALL_HOLD, STORY_REVIEWER, X3, X3_CANCEL_REASON, X3_CODER, X3_REVIEW_HOLD, X3_REVIEWER,
+    };
+    vec![
+        sign_in(D1),
+        call(
+            D1,
+            argv![
+                "adopt",
+                "--project",
+                number(PROJECT),
+                "--owner",
+                "acme",
+                "--name",
+                "app",
+                "--landing",
+                "main",
+                "--no-home",
+                "--key",
+                "adopt-kit"
+            ],
+        ),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "direction", DIRECTION_PERSON]),
+        call(D1, argv!["wait", "task", number(DIRECTION), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(STORY_OWNER), "--until", "replied"]),
+        // Fake Pieces keep the named runs writing until ReleaseHold.
+        // Step::Held instead gates engine requests (the task's addendum 2).
+        calls::until(D1, argv!["task", number(X3), "--json"], Agent::Review.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(X3_REVIEWER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["task", number(X3), "--activity", "32", "--json"]),
+        call(D1, argv!["task", number(X3_CODER), "--json"]),
+        calls::release_hold(B_DELEGATE_HOLD),
+        calls::until(D1, argv!["task", number(OVERLAP_OWNER), "--json"], Agent::PlannedWriter.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(PLANNED), "--json"], b"\"live_delegates\":1", b"\"task\""),
+        calls::until(D1, argv!["task", number(PLANNED_CODER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["task", number(PLANNED), "--activity", "32", "--json"]),
+        // B parks after its wait, as in 5.2; its 1 ms waiting observation
+        // need not still be live when the held coder has been read.
+        call(D1, argv!["wait", "task", number(OVERLAP_OWNER), "--until", "phase:idle"]),
+        call(D1, argv!["stop", number(OVERLAP_OWNER), "--key", "stop-b"]),
+        calls::until(
+            D1,
+            argv!["task", number(OVERLAP_OWNER), "--activity", "32", "--json"],
+            b"\"phase\":\"held\"",
+            b"\"task\"",
+        ),
+        call(D1, argv!["message", number(DIRECTION), "--key", "new-direction", DIRECTION_MESSAGE]),
+        calls::until(D1, argv!["task", number(X3), "--json"], X3_CANCEL_REASON.as_bytes(), b"\"task\""),
+        calls::release_hold(X3_REVIEW_HOLD),
+        calls::until(D1, argv!["task", number(X3), "--activity", "32", "--json"], b"\"phase\":\"ended\"", b"\"task\""),
+        // The cancellation's result reaches A asynchronously. Read its new
+        // delegate card before polling the fresh change's task number.
+        calls::until(D1, argv!["task", number(STORY_OWNER), "--json"], Agent::StoryWriter.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(STORY_CHANGE), "--json"], Agent::Review.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(STORY_REVIEWER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        calls::release_hold(X3_REVIEW_HOLD),
+        calls::until(
+            D1,
+            argv!["task", number(STORY_CHANGE), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        call(D1, argv!["task", number(OVERLAP_OWNER), "--activity", "32", "--json"]),
+        call(
+            D1,
+            argv!["release", number(OVERLAP_OWNER), "--hold", number(OVERLAP_HOLD_REVISION), "--key", "release-b"],
+        ),
+        calls::until(D1, argv!["task", number(PLANNED), "--json"], PLANNED_CANCEL_REASON.as_bytes(), b"\"task\""),
+        calls::release_hold(PLANNED_CODING_HOLD),
+        calls::until(
+            D1,
+            argv!["task", number(PLANNED), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        calls::until(
+            D1,
+            argv!["task", number(OVERLAP_OWNER), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        call(D1, argv!["activity", number(OVERLAP_OWNER), "--before", calls::activity_before(27), "--json"]),
+        calls::until(D1, argv!["task", number(STORY_OWNER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        calls::release_hold(STORY_RECALL_HOLD),
+        calls::until(
+            D1,
+            argv!["task", number(STORY_OWNER), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        calls::until(
+            D1,
+            argv!["task", number(DIRECTION), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
     ]
 }
