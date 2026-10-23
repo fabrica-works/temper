@@ -10,7 +10,7 @@ use skein_lib::{List, Token};
 use skein_ui::{Act, Role};
 use temper_client_domain::{
     self as d,
-    pages::accounts::{Act as A, Operation, Selection},
+    pages::accounts::{Act as A, Operation, Row},
 };
 const PROVIDER: u32 = 17;
 const SOURCE: u32 = 43;
@@ -49,7 +49,7 @@ fn a_cards_region_is_named_by_its_heading() {
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
     let heading = tree.nodes().iter().find(|node| node.role == Role::Heading { level: 3 }).unwrap();
-    assert!(tree.nodes().iter().any(|node| node.role == Role::Region && node.name == heading.name));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Disclosure && node.name == heading.name));
 }
 #[test]
 fn a_plan_card_names_the_plan_display_brand_and_holder() {
@@ -233,6 +233,42 @@ fn the_accounts_page_keeps_sign_ins_beyond_rows() {
     assert!(shown(document(3)).contains("Sign-in in progress: source 3"));
 }
 #[test]
+fn a_sign_in_without_an_account_row_stays_visible_at_page_level() {
+    for count in [0, 1] {
+        let (mut root, watch) = fixtures::account_root();
+        let mut doc = document(count);
+        doc.signing = List::with_capacity(1);
+        doc.signing
+            .push(c::OwnerAccountSignIn {
+                source: SOURCE,
+                provider: PROVIDER,
+                holder: c::OwnerAccountHolder::Party(73),
+            })
+            .unwrap();
+        deliver(&mut root, watch, doc);
+        let mut view = fixtures::view();
+        let tree = fixtures::build(&mut view, &root);
+        let status = fixtures::person_find(
+            tree,
+            Role::Status,
+            b"Sign-in in progress: source 43 \xc2\xb7 LLM provider 17 \xc2\xb7 Person 73",
+        )
+        .expect("another client's sign-in stays visible before it has an account row");
+        let at = tree.nodes().iter().position(|node| node.id == status).unwrap();
+        assert!(!tree.nodes().iter().enumerate().any(|(start, node)| {
+            node.role == Role::Disclosure && start < at && at < start + usize::try_from(node.size).unwrap()
+        }));
+    }
+}
+#[test]
+fn a_sign_in_in_an_omitted_row_stays_visible_without_duplicating_drawn_rows() {
+    let doc = document(1);
+    let counts = fixtures::limits().accounts;
+    assert_eq!(shown_at(doc.clone(), counts).matches("Sign-in in progress: source 1").count(), 1);
+    let shown = shown_at(doc, d::limits::AccountLimits { accounts: 0, ..counts });
+    assert!(shown.contains("Sign-in in progress: source 1 · LLM provider 17 · Person 73"));
+}
+#[test]
 fn the_accounts_page_preserves_supplied_order() {
     let text = shown(document(3));
     assert!(text.find("Account 1").unwrap() < text.find("Account 3").unwrap());
@@ -255,10 +291,9 @@ fn the_accounts_page_caps_uses() {
 }
 fn key_draft() -> (d::Domain, crate::View) {
     let (mut root, watch) = fixtures::account_root();
-    deliver(&mut root, watch, document(0));
+    deliver(&mut root, watch, card_document(b"openai", b"alice@example.com", c::OwnerAccountKind::SignIn));
     let mut view = fixtures::view();
-    press(&mut view, &mut root, Role::TextField, b"Provider number", Act::Input { value: Box::from(b"17".as_slice()) });
-    press(&mut view, &mut root, Role::TextField, b"Account number", Act::Input { value: Box::from(b"1".as_slice()) });
+    press(&mut view, &mut root, Role::Button, b"Add an API key", Act::Press);
     press(
         &mut view,
         &mut root,
@@ -291,7 +326,7 @@ fn a_held_key_has_an_empty_view_value() {
 fn sending_a_key_writes_an_empty_field() {
     let (mut root, mut view) = key_draft();
     let before = key_field(&view).value.as_ref().unwrap().written;
-    press(&mut view, &mut root, Role::Button, b"Add key to account", Act::Press);
+    press(&mut view, &mut root, Role::Button, b"Add key", Act::Press);
     fixtures::build(&mut view, &root);
     let value = key_field(&view).value.as_ref().unwrap();
     assert!(value.text.is_empty());
@@ -434,8 +469,6 @@ fn a_supplied_reset_is_visible() {
 #[test]
 fn sign_in_ends_preserve_their_typed_details() {
     use c::{OwnerAccountEnd as E, OwnerAccountFailure as F, OwnerAccountRefusal as R};
-    let (mut root, watch) = fixtures::account_root();
-    let mut view = fixtures::view();
     for (end, expected) in [
         (E::Made { account: 29, declined: true }, b"You signed in without plan usage.".as_slice()),
         (E::Renewed { account: 29, declined: false }, b"same account again; account 29"),
@@ -447,16 +480,16 @@ fn sign_in_ends_preserve_their_typed_details() {
     ] {
         let mut doc = document(0);
         doc.last_end = Some(c::OwnerAccountLastEnd { source: SOURCE, end });
-        deliver(&mut root, watch, doc);
-        assert!(skein_lib::bytes::find(&fixtures::text(fixtures::build(&mut view, &root)), expected).is_some());
+        assert!(skein_lib::bytes::find(&sign_in_end_words(doc, end), expected).is_some());
     }
 }
 fn sign_in_end_words(mut doc: c::OwnerAccounts, end: c::OwnerAccountEnd) -> Vec<u8> {
     doc.last_end = Some(c::OwnerAccountLastEnd { source: SOURCE, end });
-    let (mut root, watch) = fixtures::account_root();
-    deliver(&mut root, watch, doc);
-    let mut view = fixtures::view();
-    let tree = fixtures::build(&mut view, &root);
+    let mut b = skein_ui::Builder::new(&fixtures::tree_limits());
+    b.open(Role::Main);
+    crate::pages::accounts::end(&mut b, &fixtures::words(), &end, &doc.accounts);
+    b.close();
+    let tree = b.finish();
     for (index, status) in tree.nodes().iter().enumerate() {
         if status.role != Role::Status {
             continue;
@@ -470,7 +503,7 @@ fn sign_in_end_words(mut doc: c::OwnerAccounts, end: c::OwnerAccountEnd) -> Vec<
             return words;
         }
     }
-    panic!("sign-in end status");
+    fixtures::text(&tree).into_vec()
 }
 #[test]
 fn a_completed_sign_in_names_the_plan_and_display() {
@@ -525,8 +558,8 @@ fn answer_account_operation(root: &mut d::Domain, operation: Operation, outcome:
     let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
     let mut out = skein_lib::Queue::with_capacity(d::max_out(&limits));
     for act in [
-        A::Select { selection: Selection { account: Some(1), source: Some(1), ..Default::default() } },
-        A::Submit { name: [98; 16], operation },
+        A::KeyFor { row: Row { holder: c::AccountHolder::Own, account: 1 }, source: None },
+        A::Submit { name: [98; 16], row: Row { holder: c::AccountHolder::Own, account: 1 }, operation },
         A::Confirm,
     ] {
         d::step(root, &env, d::Event::Act { action: d::Action::Pages(d::pages::Act::Accounts(act)) }, &mut out);
@@ -563,10 +596,9 @@ fn answer_account_operation(root: &mut d::Domain, operation: Operation, outcome:
 fn only_settled_account_statuses_have_the_done_style() {
     use crate::accounts::words::{self, Word as W};
     for (outcome, word, done) in [
-        (None, W::Settled, true),
         (
             Some((
-                Operation::SignOut,
+                Operation::SignOut { source: 1 },
                 c::OwnerOutcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },
             )),
             W::Confirmed,
@@ -574,7 +606,7 @@ fn only_settled_account_statuses_have_the_done_style() {
         ),
         (
             Some((
-                Operation::SignOut,
+                Operation::SignOut { source: 1 },
                 c::OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: Box::new([]) },
             )),
             W::Unconfirmed,
@@ -582,7 +614,7 @@ fn only_settled_account_statuses_have_the_done_style() {
         ),
         (
             Some((
-                Operation::RemoveKey,
+                Operation::RemoveKey { source: 1 },
                 c::OwnerOutcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) },
             )),
             W::Removed,
@@ -590,7 +622,7 @@ fn only_settled_account_statuses_have_the_done_style() {
         ),
         (
             Some((
-                Operation::RemoveKey,
+                Operation::RemoveKey { source: 1 },
                 c::OwnerOutcome::AccountRemoved { confirmed: false, failed_hosts: Box::new([]) },
             )),
             W::RemovedUnconfirmed,
@@ -657,11 +689,8 @@ mod memory_literal;
 // Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
 // Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
 // The flow's three state words (444 B).
-// The Accounts navigation's two state words (296 B).
-// ConnectForge's and the welcome's forge words, and 128 more phrase segments (11,588 B).
-// The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6994622580;
+const ACCOUNT_BYTES: u64 = 10348343792;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -722,17 +751,7 @@ fn owner_root() -> (d::Domain, Token) {
         &link,
     )
     .unwrap();
-    fixtures::root_event(
-        &mut root,
-        d::Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched {
-                    watch,
-                    event: c::WatchEvent::Delivered(c::Delivery::OwnerDeployment(Box::new(deployment))),
-                },
-            },
-        },
-    );
+    deliver_deployment(&mut root, watch, deployment);
     (root, watch)
 }
 #[test]
@@ -746,42 +765,22 @@ fn an_owner_sees_deployment_accounts_after_their_own() {
     );
     assert!(skein_lib::bytes::find(&text, b"Account 41").is_some());
 }
-fn invalid_number(view: &mut crate::View, root: &d::Domain) -> Option<d::Event> {
-    let node = fixtures::find(fixtures::build(view, root), Role::TextField, b"Account number").unwrap();
-    crate::event(view, node, Act::Input { value: Box::from(b"not-a-number".as_slice()) })
-}
 #[test]
-fn invalid_number_input_does_not_dispatch() {
+fn the_rows_offer_no_number_fields() {
     let (root, mut view) = key_draft();
-    assert!(invalid_number(&mut view, &root).is_none());
-}
-#[test]
-fn invalid_number_input_preserves_a_key() {
-    let (mut root, mut view) = key_draft();
-    if let Some(event) = invalid_number(&mut view, &root) {
-        fixtures::root_event(&mut root, event);
-    }
-    assert!(root.pages().accounts().unwrap().request.has_key());
-}
-#[test]
-fn invalid_numbers_disable_submission() {
-    let (root, mut view) = key_draft();
-    invalid_number(&mut view, &root);
-    let node = fixtures::find(fixtures::build(&mut view, &root), Role::Button, b"Add key to account").unwrap();
-    let button = view.tree().nodes().iter().find(|n| n.id == node).unwrap();
-    assert!(button.states.as_slice().contains(&skein_ui::State::Disabled));
-    assert!(crate::event(&mut view, node, Act::Press).is_none());
-}
-#[test]
-fn cancel_refreshes_invalid_number_fields() {
-    let (mut root, mut view) = key_draft();
-    invalid_number(&mut view, &root);
-    let before = root.pages().accounts().unwrap().request.key_written();
-    press(&mut view, &mut root, Role::Button, b"Cancel", Act::Press);
     let tree = fixtures::build(&mut view, &root);
-    for field in tree.nodes().iter().filter(|n| n.role == Role::TextField) {
-        assert!(field.value.as_ref().unwrap().written > before);
+    for name in [b"Provider number".as_slice(), b"Account number", b"Source number"] {
+        assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(name)));
     }
+}
+#[test]
+fn cancel_refreshes_the_rows_secret_field() {
+    let (mut root, mut view) = key_draft();
+    let before = root.pages().accounts().unwrap().request.key_written();
+    // Cancel also belongs to an editor before its first request.
+    action(&mut root, A::Cancel);
+    fixtures::build(&mut view, &root);
+    assert!(key_field(&view).value.as_ref().unwrap().written > before);
 }
 
 #[test]
@@ -806,51 +805,48 @@ fn spent_has_its_own_time_word() {
 fn confirmation_words(operation: Operation) -> String {
     let (mut root, watch) = fixtures::account_root();
     deliver(&mut root, watch, document(1));
-    action(&mut root, A::Select { selection: Selection { account: Some(1), source: Some(1), ..Default::default() } });
-    action(&mut root, A::Submit { name: [72; 16], operation });
+    action(&mut root, A::KeyFor { row: Row { holder: c::AccountHolder::Own, account: 1 }, source: None });
+    action(&mut root, A::Submit { name: [72; 16], row: Row { holder: c::AccountHolder::Own, account: 1 }, operation });
     let mut view = fixtures::view();
     String::from_utf8(fixtures::text(fixtures::build(&mut view, &root)).into_vec()).unwrap()
 }
 #[test]
 fn sign_out_confirmation_names_its_source() {
     assert!(
-        confirmation_words(Operation::SignOut)
+        confirmation_words(Operation::SignOut { source: 1 })
             .contains("Sign this source out? · Your own accounts · Account 1 · Source 1")
     );
 }
 #[test]
 fn key_removal_confirmation_names_its_source() {
     assert!(
-        confirmation_words(Operation::RemoveKey)
+        confirmation_words(Operation::RemoveKey { source: 1 })
             .contains("Remove this key? · Your own accounts · Account 1 · Source 1")
     );
 }
 #[test]
 fn account_removal_confirmation_names_its_holder() {
     let (mut root, _) = owner_root();
+    action(&mut root, A::KeyFor { row: Row { holder: c::AccountHolder::Deployment, account: 41 }, source: None });
     action(
         &mut root,
-        A::Select {
-            selection: Selection { holder: c::AccountHolder::Deployment, account: Some(41), ..Default::default() },
+        A::Submit {
+            name: [72; 16],
+            row: Row { holder: c::AccountHolder::Deployment, account: 41 },
+            operation: Operation::RemoveAccount,
         },
     );
-    action(&mut root, A::Submit { name: [72; 16], operation: Operation::RemoveAccount });
     let mut view = fixtures::view();
     let text = String::from_utf8(fixtures::text(fixtures::build(&mut view, &root)).into_vec()).unwrap();
     assert!(text.contains("Remove this account and all its sources? · The deployment's accounts · Account 41"));
 }
 #[test]
-fn the_current_holder_is_pressed() {
-    let (mut root, _) = owner_root();
-    action(
-        &mut root,
-        A::Select { selection: Selection { holder: c::AccountHolder::Deployment, ..Default::default() } },
-    );
+fn a_deployment_row_offers_no_sign_in() {
+    let (root, _) = owner_root();
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
-    let control = tree.nodes().iter().find(|n| n.name.as_deref() == Some(b"Use deployment accounts")).unwrap();
-    assert!(control.states.as_slice().contains(&skein_ui::State::Pressed));
-    assert!(!control.states.as_slice().contains(&skein_ui::State::Selected));
+    assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Use deployment accounts")));
+    assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Continue with ChatGPT")));
 }
 #[test]
 fn an_account_without_a_provider_has_one_separator() {
@@ -870,17 +866,7 @@ fn an_empty_deployment_names_its_empty_list() {
     let (mut root, watch) = owner_root();
     let mut doc = root.pages().accounts().unwrap().deployment(root.client()).unwrap().clone();
     doc.accounts = List::with_capacity(0);
-    fixtures::root_event(
-        &mut root,
-        d::Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched {
-                    watch,
-                    event: c::WatchEvent::Delivered(c::Delivery::OwnerDeployment(Box::new(doc))),
-                },
-            },
-        },
-    );
+    deliver_deployment(&mut root, watch, doc);
     let mut view = fixtures::view();
     let text = String::from_utf8(fixtures::text(fixtures::build(&mut view, &root)).into_vec()).unwrap();
     assert!(text.contains("Deployment accountsNo accounts shown."));
@@ -904,7 +890,7 @@ fn sign_ins_past_the_count_are_named() {
     assert!(shown_at(document(3), counts).contains("Sign-ins left out: 1"));
 }
 #[test]
-fn duplicate_numbers_offer_one_rank_control() {
+fn each_source_row_offers_its_rank_control() {
     let mut doc = document(16);
     for at in 0..doc.accounts.len() {
         let row = doc.accounts.get_mut(at).unwrap();
@@ -918,10 +904,10 @@ fn duplicate_numbers_offer_one_rank_control() {
     }
     let (mut root, watch) = fixtures::account_root();
     deliver(&mut root, watch, doc);
-    action(&mut root, A::Select { selection: Selection { account: Some(1), source: Some(1), ..Default::default() } });
+    action(&mut root, A::KeyFor { row: Row { holder: c::AccountHolder::Own, account: 1 }, source: None });
     let mut view = bounded_view(fixtures::limits().accounts);
     let tree = fixtures::build(&mut view, &root);
-    assert_eq!(tree.nodes().iter().filter(|n| n.name.as_deref() == Some(b"Move source up")).count(), 1);
+    assert_eq!(tree.nodes().iter().filter(|n| n.name.as_deref() == Some(b"Move source up")).count(), 16 * 8);
 }
 #[test]
 fn bindings_at_capacity_refuse_another_control() {
@@ -940,24 +926,16 @@ fn deployment_source_confirmation_names_its_account() {
     let mut sources = List::with_capacity(1);
     sources.push(source(43)).unwrap();
     doc.accounts.get_mut(0).unwrap().sources = sources;
-    fixtures::root_event(
-        &mut root,
-        d::Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched {
-                    watch,
-                    event: c::WatchEvent::Delivered(c::Delivery::OwnerDeployment(Box::new(doc))),
-                },
-            },
-        },
-    );
+    deliver_deployment(&mut root, watch, doc);
+    action(&mut root, A::KeyFor { row: Row { holder: c::AccountHolder::Deployment, account: 41 }, source: Some(43) });
     action(
         &mut root,
-        A::Select {
-            selection: Selection { holder: c::AccountHolder::Deployment, source: Some(43), ..Default::default() },
+        A::Submit {
+            name: [72; 16],
+            row: Row { holder: c::AccountHolder::Deployment, account: 41 },
+            operation: Operation::RemoveKey { source: 43 },
         },
     );
-    action(&mut root, A::Submit { name: [72; 16], operation: Operation::RemoveKey });
     let mut view = fixtures::view();
     let text = String::from_utf8(fixtures::text(fixtures::build(&mut view, &root)).into_vec()).unwrap();
     assert!(text.contains("Remove this key? · The deployment's accounts · Account 41 · Source 43"));
@@ -972,17 +950,7 @@ fn deployment_accounts_past_the_count_are_named() {
         rows.push(row.clone()).unwrap();
     }
     doc.accounts = rows;
-    fixtures::root_event(
-        &mut root,
-        d::Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched {
-                    watch,
-                    event: c::WatchEvent::Delivered(c::Delivery::OwnerDeployment(Box::new(doc))),
-                },
-            },
-        },
-    );
+    deliver_deployment(&mut root, watch, doc);
     let mut counts = fixtures::limits().accounts;
     counts.accounts = 2;
     let mut view = bounded_view(counts);
@@ -1026,7 +994,7 @@ fn typing_a_key_keeps_the_write_revision() {
 
 #[test]
 fn accounts_show_the_configured_workers_program_observation() {
-    let mut doc = document(1);
+    let mut doc = card_document(b"anthropic", b"work-login", c::OwnerAccountKind::Program);
     let mut programs = List::with_capacity(1);
     programs
         .push(c::OwnerProgramLogin {
@@ -1053,4 +1021,221 @@ fn accounts_show_the_configured_workers_program_observation() {
         text.contains("configured-worker") && text.contains("work-login") && text.contains("other-method"),
         "{text}"
     );
+}
+
+#[test]
+fn accounts_are_folded_disclosures_with_their_state_and_line() {
+    let (mut root, watch) = fixtures::account_root();
+    deliver(&mut root, watch, card_document(b"openai", b"alice", c::OwnerAccountKind::SignIn));
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    let row = tree.nodes().iter().find(|node| node.styles.as_slice().contains(&crate::look::ACCOUNT_ROW)).unwrap();
+    assert!(!row.states.as_slice().contains(&skein_ui::State::Expanded));
+    let summary = core::str::from_utf8(row.description.as_ref().unwrap()).unwrap();
+    assert!(summary.contains("Ready"));
+    assert!(summary.contains("Your own work, and projects where you’re the only member"));
+    assert!(summary.contains("no task uses it now"));
+    // Opening is native shell state; every row keeps its content in the semantic tree.
+    let at = tree.nodes().iter().position(|n| n.id == row.id).unwrap();
+    let content = &tree.nodes()[at..at + usize::try_from(row.size).unwrap()];
+    for name in
+        [b"Pays for".as_slice(), b"Used by", b"Waiting for it", b"Add an API key", b"Sign out", b"Remove account"]
+    {
+        assert!(content.iter().any(|n| n.name.as_deref() == Some(name)), "{name:?}");
+    }
+}
+#[test]
+fn a_limited_plan_offers_resume_and_moves_the_first_later_key() {
+    let (mut root, watch) = fixtures::account_root();
+    let mut doc = card_document(b"openai", b"alice", c::OwnerAccountKind::SignIn);
+    let row = doc.accounts.get_mut(0).unwrap();
+    row.sources.get_mut(0).unwrap().state = c::OwnerAccountState::Later { until: None };
+    let sign_in = row.sources.get(0).unwrap().clone();
+    row.sources = List::with_capacity(3);
+    row.sources.push(sign_in).unwrap();
+    row.sources.push(source(2)).unwrap();
+    row.sources.push(source(3)).unwrap();
+    deliver(&mut root, watch, doc);
+    let mut view = fixtures::view();
+    let text = String::from_utf8(fixtures::text(fixtures::build(&mut view, &root)).into_vec()).unwrap();
+    assert!(text.contains("temper reached its usage limit on your ChatGPT plan. Tasks on it wait."));
+    let node = fixtures::find(view.tree(), Role::Button, b"Use the API key first").unwrap();
+    let Some(d::Event::Act { action }) = crate::event(&mut view, node, Act::Press) else { panic!("row act") };
+    assert_eq!(
+        action,
+        d::Action::Pages(d::pages::Act::Accounts(A::Submit {
+            name: root.pages().account_name(),
+            row: Row { holder: c::AccountHolder::Own, account: 1 },
+            operation: Operation::MoveSource { source: 2, place: 1 }
+        }))
+    );
+}
+#[test]
+fn declined_plan_usage_belongs_to_the_ending_named_account() {
+    let (mut root, watch) = fixtures::account_root();
+    let mut doc = document(2);
+    for index in 0..doc.accounts.len() {
+        let row = doc.accounts.get_mut(index).unwrap();
+        row.provider_name = Some(text(b"openai"));
+        row.sources.get_mut(0).unwrap().kind = c::OwnerAccountKind::SignIn;
+    }
+    doc.last_end =
+        Some(c::OwnerAccountLastEnd { source: 1, end: c::OwnerAccountEnd::Made { account: 2, declined: true } });
+    deliver(&mut root, watch, doc);
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    let row = tree
+        .nodes()
+        .iter()
+        .position(|n| n.role == Role::Heading { level: 3 } && n.name.as_ref().unwrap().starts_with(b"ChatGPT"))
+        .unwrap();
+    let text = String::from_utf8(fixtures::text(tree).into_vec()).unwrap();
+    assert!(text.contains("You signed in without plan usage."));
+    assert!(tree.nodes().iter().skip(row).any(|n| n.name.as_deref() == Some(b"Use an API key")));
+}
+#[test]
+fn none_of_your_own_offers_the_connect_model_link() {
+    let (mut root, watch) = fixtures::account_root();
+    deliver(&mut root, watch, document(0));
+    let mut view = fixtures::view();
+    let text = String::from_utf8(fixtures::text(fixtures::build(&mut view, &root)).into_vec()).unwrap();
+    assert!(text.contains("No model of yours yet."));
+    assert!(fixtures::find(view.tree(), Role::Link, b"Connect a model").is_some());
+}
+#[test]
+fn each_account_state_draws_its_words_and_state_controls() {
+    for (state, word, act) in [
+        (c::OwnerAccountState::Granted, "Ready", None),
+        (
+            c::OwnerAccountState::Later { until: None },
+            "temper reached its usage limit on your ChatGPT plan. Tasks on it wait.",
+            Some(b"Resume".as_slice()),
+        ),
+        (
+            c::OwnerAccountState::Later { until: Some(skein_lib::Wall::EPOCH) },
+            "Limited by OpenAI until",
+            Some(b"Resume".as_slice()),
+        ),
+        (c::OwnerAccountState::SignInAgain, "Signed out of ChatGPT.", Some(b"Continue with ChatGPT".as_slice())),
+        (
+            c::OwnerAccountState::Misconfigured,
+            "OpenAI refused temper's sign-in. Check the configuration's registration.",
+            None,
+        ),
+        (
+            c::OwnerAccountState::Unloaded { at: c::OwnerAccountPlace::File, why: c::OwnerAccountUnread::Unreadable },
+            "Cannot load File: Unreadable",
+            None,
+        ),
+    ] {
+        let (mut root, watch) = fixtures::account_root();
+        let mut doc = card_document(b"openai", b"alice", c::OwnerAccountKind::SignIn);
+        doc.accounts.get_mut(0).unwrap().sources.get_mut(0).unwrap().state = state;
+        deliver(&mut root, watch, doc);
+        let mut view = fixtures::view();
+        let tree = fixtures::build(&mut view, &root);
+        let shown = String::from_utf8(fixtures::text(tree).into_vec()).unwrap();
+        assert!(shown.contains(word), "{state:?}: {shown}");
+        if let Some(act) = act {
+            assert!(fixtures::find(tree, Role::Button, act).is_some(), "{state:?}");
+        }
+    }
+}
+#[test]
+fn a_programs_missing_login_names_its_host_command_and_check() {
+    let (mut root, watch) = fixtures::account_root();
+    let mut doc = card_document(b"anthropic", b"claude-alice", c::OwnerAccountKind::Program);
+    doc.accounts.get_mut(0).unwrap().sources.get_mut(0).unwrap().usable = false;
+    let mut programs = List::with_capacity(1);
+    programs
+        .push(c::OwnerProgramLogin {
+            name: b"claude-alice".as_slice().into(),
+            state: Some(c::OwnerProgramState::NotSignedIn),
+            sign_out: None,
+            cleanup: false,
+            cut: false,
+        })
+        .unwrap();
+    doc.program_hosts = List::with_capacity(1);
+    doc.program_hosts
+        .push(c::OwnerProgramHost {
+            name: b"worker".as_slice().into(),
+            channel: 1,
+            connected: true,
+            awaiting_logins: false,
+            programs,
+            cut: false,
+        })
+        .unwrap();
+    deliver(&mut root, watch, doc);
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    let shown = String::from_utf8(fixtures::text(tree).into_vec()).unwrap();
+    assert!(shown.contains("Claude Code isn't signed in for 'claude-alice' on worker."));
+    assert!(shown.contains("temper program-login claude-alice"));
+    assert!(fixtures::find(tree, Role::Button, b"Check again").is_some());
+    assert!(fixtures::find(tree, Role::Button, b"Sign out on every machine").is_some());
+}
+#[test]
+fn an_outcome_is_in_the_disclosure_that_sent_the_act() {
+    let (mut root, watch) = fixtures::account_root();
+    deliver(&mut root, watch, document(2));
+    answer_account_operation(
+        &mut root,
+        Operation::SignOut { source: 1 },
+        c::OwnerOutcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },
+    );
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    let rows: Vec<_> = tree
+        .nodes()
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| n.styles.as_slice().contains(&crate::look::ACCOUNT_ROW))
+        .collect();
+    for (number, (at, row)) in rows.into_iter().enumerate() {
+        let content = &tree.nodes()[at..at + usize::try_from(row.size).unwrap()];
+        assert_eq!(
+            content.iter().any(|n| n.name.as_deref() == Some(b"Signed out; revocation confirmed.")),
+            number == 0
+        );
+    }
+}
+
+fn deliver_deployment(root: &mut d::Domain, watch: Token, doc: c::OwnerDeployment) {
+    fixtures::root_event(
+        root,
+        d::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: c::WatchEvent::Delivered(c::Delivery::OwnerDeployment(Box::new(doc))),
+                },
+            },
+        },
+    );
+}
+#[test]
+fn deployment_account_facts_exclude_waiting_tasks_from_its_users() {
+    const RUNNING: u64 = 4;
+    const WAITING: u64 = 9;
+    let (mut root, watch) = owner_root();
+    let mut doc = root.pages().accounts().unwrap().deployment(root.client()).unwrap().clone();
+    let row = doc.accounts.get_mut(0).unwrap();
+    let mut chip = fixtures::task::document().chip;
+    row.runs = List::with_capacity(2);
+    for task in [RUNNING, WAITING] {
+        chip.task = task;
+        row.runs.push(chip.clone()).unwrap();
+    }
+    row.waiting = List::with_capacity(1);
+    row.waiting.push(chip).unwrap();
+    deliver_deployment(&mut root, watch, doc);
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    for (name, value) in [(b"Used by".as_slice(), b"T4".as_slice()), (b"Waiting for it", b"T9")] {
+        let at = tree.nodes().iter().position(|n| n.role == Role::Region && n.name.as_deref() == Some(name)).unwrap();
+        let row = &tree.nodes()[at..at + usize::try_from(tree.nodes()[at].size).unwrap()];
+        assert!(row.iter().any(|n| n.role == Role::Description && n.name.as_deref() == Some(value)), "{name:?}");
+    }
 }

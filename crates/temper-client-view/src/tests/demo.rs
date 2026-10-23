@@ -331,14 +331,30 @@ fn the_playground_chooser_names_the_provider_and_model_but_keeps_the_configured_
 }
 
 #[test]
-fn the_playground_account_heading_uses_its_delivered_provider_number() {
+fn the_playground_account_is_in_its_own_folded_section() {
     // The fixture supplies no provider name and an old display name: the demo's
     // public provider number alone identifies the playground's account.
     let root = f::demo_root(Address::Accounts, f::PROJECT, true);
     let view = f::page_view(&root);
+    let nodes = view.tree().nodes();
+    let mut count = None;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == (Role::Heading { level: 2 })
+            && node.name.as_deref() == Some(b"Your accounts")
+            && let Some(node) = nodes.get(index + usize::try_from(node.size).unwrap())
+        {
+            count = node.name.as_deref();
+        }
+    }
+    assert_eq!(count, Some(b"0".as_slice()));
+    assert!(f::find(view.tree(), Role::Paragraph, b"No model of yours yet.").is_some());
     assert!(
-        f::find(view.tree(), Role::Heading { level: 3 }, b"Playground API key \xc2\xb7 held by the deployment")
-            .is_some()
+        f::find(
+            view.tree(),
+            Role::Disclosure,
+            "Scripted model · the playground’s, until a model of yours connects · held by the deployment".as_bytes()
+        )
+        .is_some()
     );
 }
 

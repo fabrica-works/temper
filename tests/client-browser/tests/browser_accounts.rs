@@ -47,7 +47,11 @@ fn the_accounts_page_returns_after_a_key_send() {
         see(accounts()),
         // Leaving the flow drops its sign-in state; the accounts watch retains the live source.
         press(b"Accounts", Role::Link),
-        see(Find::text(b"No sign-ins in progress.")),
+        see(Find::exactly_named(Role::Heading { level: 2 }, b"Your accounts")),
+        see(Find::named(Role::Disclosure, b"Test provider API key")),
+        Step::Person(PersonStep::Press { find: Find::named(Role::Disclosure, b"Test provider API key") }),
+        see(Find::exactly_named(Role::Button, b"Replace")),
+        see(Find::exactly_named(Role::Button, b"Remove account")),
     ]));
     assert_eq!(Harness::new(tier.setup()).run(&mut [&mut script]), Outcome::Done);
 }

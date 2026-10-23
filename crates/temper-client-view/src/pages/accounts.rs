@@ -1,17 +1,18 @@
 //! Whole supplied account lists, with no local account or source policy (client/README.md, 5.5).
 use crate::{
     accounts::{
-        self as bindings, Bindings, Field, Meaning,
+        Bindings, Meaning,
         words::{self, Word as W},
     },
     words::Words,
 };
 use alloc::boxed::Box;
+mod rows;
 use jig_client::contract as c;
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
 use temper_client_domain::{
     Domain,
-    pages::accounts::{self, Act, Broken, Operation},
+    pages::accounts::{self, Broken},
 };
 pub(super) fn run(b: &mut Builder, w: &Words, word: W) {
     b.run(Run::Plain, &words::say(w, word, &[]));
@@ -68,15 +69,6 @@ fn named_control(
         b.state(State::Disabled);
     }
     b.close();
-}
-fn holder(b: &mut Builder, w: &Words, value: c::OwnerAccountHolder) {
-    match value {
-        c::OwnerAccountHolder::Deployment => run(b, w, W::Deployment),
-        c::OwnerAccountHolder::Party(party) => {
-            run(b, w, W::Party);
-            number(b, w, party);
-        }
-    }
 }
 fn kind(b: &mut Builder, w: &Words, value: c::OwnerAccountKind) {
     run(
@@ -225,127 +217,7 @@ fn state(b: &mut Builder, w: &Words, source: &c::OwnerAccountSource) {
         b.run(Run::Plain, &words::say(w, W::UsageUntil, &[Hole::Wall(at)]));
     }
 }
-#[expect(
-    clippy::too_many_arguments,
-    reason = "borrow the common fields of party and deployment accounts without copying documents"
-)]
-fn account(
-    b: &mut Builder,
-    root: &Domain,
-    w: &Words,
-    number_value: u32,
-    place: u32,
-    provider: Option<u32>,
-    provider_name_value: Option<&c::DocumentText>,
-    display: &c::DocumentText,
-    held: c::OwnerAccountHolder,
-    plan: bool,
-    uses: Option<&skein_lib::List<c::OwnerAccountUse>>,
-    sources: &skein_lib::List<c::OwnerAccountSource>,
-    cut: bool,
-    counts: temper_client_domain::limits::AccountLimits,
-) {
-    let supplied_name = provider_name(provider_name_value).unwrap_or(b"");
-    let playground = match root.forge().demo() {
-        Some(demo) => provider == Some(demo.provider),
-        None => false,
-    };
-    let shown_name = crate::choice::provider_shown(root, provider, supplied_name, w);
-    let name = if playground || !supplied_name.is_empty() { Some(shown_name.as_ref()) } else { None };
-    let heading =
-        heading(w, number_value, provider, name, display, held, plan, sources, accounts::current_me(root.client()));
-    b.open(Role::Region);
-    b.name(&heading);
-    crate::cards::text(b, Role::Heading { level: 3 }, &heading);
-    b.open(Role::Paragraph);
-    b.style(crate::look::DETAILS);
-    b.open(Role::Text);
-    run(b, w, W::Account);
-    number(b, w, u64::from(number_value));
-    b.close();
-    b.close();
-    b.open(Role::Paragraph);
-    b.open(Role::Text);
-    run(b, w, W::Place);
-    number(b, w, u64::from(place));
-    b.run(Run::Plain, b" \xc2\xb7 ");
-    holder(b, w, held);
-    if plan {
-        b.run(Run::Plain, b" \xc2\xb7 ");
-        run(b, w, W::Plan);
-    }
-    match uses {
-        None => {
-            b.run(Run::Plain, b" \xc2\xb7 ");
-            run(b, w, W::DefaultUses);
-        }
-        Some(uses) => {
-            if !uses.is_empty() {
-                b.run(Run::Plain, b" \xc2\xb7 ");
-                run(b, w, W::Uses);
-            }
-            for value in uses.iter().take(usize::try_from(counts.uses).expect("u32 fits")) {
-                b.close();
-                b.open(Role::Text);
-                match value {
-                    c::OwnerAccountUse::Party(p) => {
-                        run(b, w, W::Party);
-                        number(b, w, *p);
-                    }
-                    c::OwnerAccountUse::Project(p) => {
-                        run(b, w, W::Project);
-                        number(b, w, u64::from(*p));
-                    }
-                }
-                b.run(Run::Plain, b"; ");
-            }
-            if uses.len() > counts.uses {
-                run(b, w, W::UsesOmitted);
-                number(b, w, u64::from(uses.len().saturating_sub(counts.uses)));
-            }
-        }
-    }
-    let name_cut = match provider_name_value {
-        Some(name) => name.cut,
-        None => false,
-    };
-    if cut || display.cut || name_cut {
-        b.run(Run::Plain, b" \xc2\xb7 ");
-        run(b, w, W::Cut);
-    }
-    b.close();
-    b.close();
-    b.open(Role::List);
-    for source in sources.iter().take(usize::try_from(counts.sources).expect("u32 fits")) {
-        b.open(Role::Item);
-        b.open(Role::Text);
-        match (source.kind, name) {
-            (c::OwnerAccountKind::SignIn, Some(name)) => {
-                b.run(Run::Plain, &named(w, W::PlanSignIn, words::provider_words(name).1));
-            }
-            (c::OwnerAccountKind::Program, _) => {
-                b.run(Run::Plain, &named(w, W::CodeLogin, source.name.as_deref().unwrap_or(b"")));
-            }
-            _ => kind(b, w, source.kind),
-        }
-        b.run(Run::Plain, b" \xc2\xb7 ");
-        state(b, w, source);
-        b.close();
-        b.open(Role::Text);
-        b.style(crate::look::DETAILS);
-        run(b, w, W::Source);
-        number(b, w, u64::from(source.number));
-        b.run(Run::Plain, b" \xc2\xb7 ");
-        run(b, w, W::Place);
-        number(b, w, u64::from(source.place));
-        b.close();
-        b.close();
-    }
-    b.close();
-    omitted(b, w, W::SourcesOmitted, sources.len(), counts.sources);
-    b.close();
-}
-pub(super) fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd, rows: &skein_lib::List<c::OwnerAccountLine>) {
+pub(crate) fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd, rows: &skein_lib::List<c::OwnerAccountLine>) {
     b.open(Role::Status);
     b.open(Role::Text);
     match end {
@@ -442,9 +314,7 @@ fn refused(b: &mut Builder, w: &Words, refusal: c::OwnerAccountRefusal) {
     };
     run(b, w, word);
 }
-#[expect(clippy::too_many_lines, reason = "the account lists and their creation link are drawn in page order")]
 pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, text_per_node: u32) {
-    let counts = bindings.counts();
     b.open(Role::Main);
     b.style(crate::look::MAIN);
     b.style(crate::look::PAGE);
@@ -455,203 +325,109 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     text(b, w, Role::Heading { level: 1 }, W::Accounts);
     b.close();
     text(b, w, Role::Heading { level: 2 }, W::Own);
-    if let Some(to) = bindings.insert(Meaning::Go(temper_client_domain::Address::ConnectModel { way: None })) {
-        crate::flow::control(b, crate::flow::Control::Link { name: &words::say(w, W::ConnectAdd, &[]), to });
-    }
     if let Some(doc) = accounts::document(root.client()) {
-        if doc.accounts.is_empty() {
-            text(b, w, Role::Paragraph, W::Empty);
+        let mut count = 0_u64;
+        for row in &doc.accounts {
+            if !rows::demo(root, row.provider) {
+                count = count.checked_add(1).expect("received accounts fit");
+            }
         }
-        for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
-            account(
-                b,
-                root,
-                w,
-                row.number,
-                row.place,
-                row.provider,
-                row.provider_name.as_ref(),
-                &row.display,
-                row.holder,
-                row.plan,
-                row.uses.as_ref(),
-                &row.sources,
-                row.cut,
-                counts,
-            );
+        crate::cards::text(b, Role::Paragraph, &words::say(w, W::Number, &[Hole::Number(count)]));
+        connect(b, w, bindings, W::ConnectAdd);
+        if count == 0 {
+            text(b, w, Role::Paragraph, W::NoOwn);
+            connect(b, w, bindings, W::Connect);
         }
-        omitted(b, w, W::AccountsOmitted, doc.accounts.len(), counts.accounts);
-        for signing in doc.signing.iter().take(usize::try_from(counts.sign_ins).expect("u32 fits")) {
-            b.open(Role::Status);
-            b.open(Role::Text);
-            run(b, w, W::Signing);
-            number(b, w, u64::from(signing.source));
-            b.run(Run::Plain, b" \xc2\xb7 ");
-            run(b, w, W::Provider);
-            number(b, w, u64::from(signing.provider));
-            b.run(Run::Plain, b" \xc2\xb7 ");
-            holder(b, w, signing.holder);
-            b.close();
-            b.close();
+        let mut shown = 0;
+        for row in &doc.accounts {
+            if rows::demo(root, row.provider) || shown >= bindings.counts().accounts {
+                continue;
+            }
+            rows::own(b, root, w, bindings, row, text_per_node);
+            shown = shown.checked_add(1).expect("displayed rows fit");
         }
-        omitted(b, w, W::SignInsOmitted, doc.signing.len(), counts.sign_ins);
-        super::account_programs::hosts(b, w, &doc.program_hosts, counts, text_per_node);
-        if doc.settled {
-            done(b, w, W::Settled);
-        }
-        if let Some(last) = &doc.last_end {
-            fact(b, w, W::LastEnd, u64::from(last.source));
-            end(b, w, &last.end, &doc.accounts);
-        }
+        omitted(b, w, W::AccountsOmitted, u32::try_from(count).expect("received rows fit"), bindings.counts().accounts);
+        signings_without_rows(b, root, w, doc, bindings.counts());
         if doc.cut {
             text(b, w, Role::Status, W::Cut);
         }
-    } else {
-        text(b, w, Role::Status, W::Unknown);
     }
-    if let Some(form) = root.pages().accounts() {
-        if is_owner(root) {
-            text(b, w, Role::Heading { level: 2 }, W::Deployment);
-            if let Some(doc) = form.deployment(root.client()) {
-                if doc.accounts.is_empty() {
-                    text(b, w, Role::Paragraph, W::Empty);
-                }
-                for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
-                    account(
-                        b,
-                        root,
-                        w,
-                        row.number,
-                        row.place,
-                        row.provider,
-                        row.provider_name.as_ref(),
-                        &row.display,
-                        row.holder,
-                        row.plan,
-                        row.uses.as_ref(),
-                        &row.sources,
-                        row.cut,
-                        counts,
-                    );
-                }
-                omitted(b, w, W::AccountsOmitted, doc.accounts.len(), counts.accounts);
-                if doc.cut {
-                    text(b, w, Role::Status, W::Cut);
-                }
-            } else {
-                text(b, w, Role::Status, W::Unknown);
+    if let Some(page) = root.pages().accounts()
+        && is_owner(root)
+    {
+        text(b, w, Role::Heading { level: 2 }, W::Deployment);
+        if let Some(doc) = page.deployment(root.client()) {
+            if doc.accounts.is_empty() {
+                text(b, w, Role::Paragraph, W::Empty);
+            }
+            for row in doc.accounts.iter().take(usize::try_from(bindings.counts().accounts).expect("u32 fits")) {
+                rows::deployment(b, root, w, bindings, row, text_per_node);
+            }
+            omitted(b, w, W::AccountsOmitted, doc.accounts.len(), bindings.counts().accounts);
+            if doc.cut {
+                text(b, w, Role::Status, W::Cut);
             }
         }
-        form_page(b, root, w, bindings, form, text_per_node);
+    }
+    if let Some((_, halves)) = root.demo()
+        && halves.model
+    {
+        text(b, w, Role::Heading { level: 2 }, W::Playground);
+        b.open(Role::Disclosure);
+        b.style(crate::look::ACCOUNT_ROW);
+        b.name(&words::say(w, W::PlaygroundAccount, &[]));
+        text(b, w, Role::Paragraph, W::PlaygroundWords);
+        b.close();
     }
     b.close();
     b.close();
 }
-fn form_page(
+fn signings_without_rows(
     b: &mut Builder,
     root: &Domain,
     w: &Words,
-    bindings: &mut Bindings,
-    form: &accounts::Accounts,
-    text_per_node: u32,
+    doc: &c::OwnerAccounts,
+    counts: temper_client_domain::limits::AccountLimits,
 ) {
-    let counts = bindings.counts();
-    let busy = match &form.request.pending {
-        Some(p) => p.outcome.is_none(),
-        None => false,
-    };
-    outcome(b, root, w, &form.request, text_per_node);
-    b.open(Role::Form);
-    b.name(&words::say(w, W::Accounts, &[]));
-    for (holder, word) in [(c::AccountHolder::Own, W::OwnChoice), (c::AccountHolder::Deployment, W::DeploymentChoice)] {
-        if holder == c::AccountHolder::Deployment && !is_owner(root) {
+    for signing in doc.signing.iter().take(usize::try_from(counts.sign_ins).expect("bounded sign-ins")) {
+        let mut in_row = false;
+        let mut shown = 0_u32;
+        for row in &doc.accounts {
+            if rows::demo(root, row.provider) || shown >= counts.accounts {
+                continue;
+            }
+            shown = shown.checked_add(1).expect("displayed rows fit");
+            for source in &row.sources {
+                in_row |= source.number == signing.source;
+            }
+        }
+        if in_row {
             continue;
         }
-        control(
-            b,
-            w,
-            bindings,
-            word,
-            Meaning::Action(Act::Select { selection: accounts::Selection { holder, ..Default::default() } }),
-            busy,
-            form.selection.holder == holder,
-        );
-    }
-    for (field, word, value) in [
-        (Field::Provider, W::ProviderField, form.selection.provider),
-        (Field::Account, W::AccountField, form.selection.account),
-        (Field::Source, W::SourceField, form.selection.source),
-    ] {
-        let Some(binding) = bindings.insert(Meaning::Field(field, form.selection)) else { continue };
-        b.open(Role::Slot);
-        b.style(crate::look::CARD);
-        b.open(Role::TextField);
-        b.name(&words::say(w, word, &[]));
-        let text: Box<[u8]> = match value {
-            Some(n) => words::say(w, W::Number, &[Hole::Number(u64::from(n))]),
-            None => Box::new([]),
-        };
-        b.value(&text, form.request.key_written());
-        b.bind(binding);
-        if bindings.invalid_field(field) {
-            b.state(State::Invalid);
-        }
-        if busy {
-            b.state(State::Disabled);
+        b.open(Role::Status);
+        b.open(Role::Text);
+        run(b, w, W::Signing);
+        number(b, w, u64::from(signing.source));
+        b.run(Run::Plain, b" \xc2\xb7 ");
+        run(b, w, W::Provider);
+        number(b, w, u64::from(signing.provider));
+        b.run(Run::Plain, b" \xc2\xb7 ");
+        match signing.holder {
+            c::OwnerAccountHolder::Deployment => run(b, w, W::Deployment),
+            c::OwnerAccountHolder::Party(party) => {
+                run(b, w, W::Party);
+                number(b, w, party);
+            }
         }
         b.close();
         b.close();
     }
-    key_field(b, w, bindings, &form.request, busy);
-    let busy = busy || bindings.invalid();
-    if bindings.invalid() {
-        text(b, w, Role::Alert, W::Selection);
+    omitted(b, w, W::SignInsOmitted, doc.signing.len(), counts.sign_ins);
+}
+fn connect(b: &mut Builder, w: &Words, bindings: &mut Bindings, word: W) {
+    if let Some(to) = bindings.insert(Meaning::Go(temper_client_domain::Address::ConnectModel { way: None })) {
+        crate::flow::control(b, crate::flow::Control::Link { name: &words::say(w, word, &[]), to });
     }
-    b.open(Role::Slot);
-    b.style(crate::look::CARD);
-    let name = root.pages().account_name();
-    for (operation, word) in [
-        (Operation::AddKey, W::AddKeyToAccount),
-        (Operation::ReplaceKey, W::ReplaceKey),
-        (Operation::SignOut, W::SignOut),
-        (Operation::RemoveKey, W::RemoveKey),
-        (Operation::RemoveAccount, W::RemoveAccount),
-        (Operation::Resume, W::Resume),
-    ] {
-        control(
-            b,
-            w,
-            bindings,
-            word,
-            bindings::submit(name, operation),
-            busy || (operation == Operation::AddKey && form.selection.account.is_none()),
-            false,
-        );
-    }
-    // Rank controls use the engine's one-based positions, never provider or holder preference.
-    if let Some(doc) = accounts::document(root.client()) {
-        for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
-            if form.selection.account == Some(row.number) && form.selection.holder == c::AccountHolder::Own {
-                rank(b, w, bindings, name, form, row.place, &row.sources, busy);
-                break;
-            }
-        }
-    }
-    if let Some(doc) = form.deployment(root.client()) {
-        for row in doc.accounts.iter().take(usize::try_from(counts.accounts).expect("u32 fits")) {
-            if form.selection.account == Some(row.number) && form.selection.holder == c::AccountHolder::Deployment {
-                rank(b, w, bindings, name, form, row.place, &row.sources, busy);
-                break;
-            }
-        }
-    }
-    if let Some((_, ask)) = &form.request.confirm {
-        confirmation(b, root, w, form, ask);
-        control(b, w, bindings, W::Confirm, Meaning::Action(Act::Confirm), busy, false);
-    }
-    control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false, false);
-    b.close();
-    b.close();
 }
 pub(super) fn key_field(
     b: &mut Builder,
@@ -772,73 +548,6 @@ pub(super) fn outcome(
         }
     }
 }
-#[expect(clippy::too_many_arguments, reason = "rank controls share the current form and supplied source positions")]
-fn rank(
-    b: &mut Builder,
-    w: &Words,
-    bindings: &mut Bindings,
-    name: skein_lib::RequestKey,
-    form: &accounts::Accounts,
-    place: u32,
-    sources: &skein_lib::List<c::OwnerAccountSource>,
-    busy: bool,
-) {
-    if place > 1
-        && let Some(up) = place.checked_sub(1)
-    {
-        control(
-            b,
-            w,
-            bindings,
-            W::UpAccount,
-            bindings::submit(name, Operation::MoveAccount { place: up }),
-            busy,
-            false,
-        );
-    }
-    if let Some(down) = place.checked_add(1) {
-        control(
-            b,
-            w,
-            bindings,
-            W::DownAccount,
-            bindings::submit(name, Operation::MoveAccount { place: down }),
-            busy,
-            false,
-        );
-    }
-    for source in sources.iter().take(usize::try_from(bindings.counts().sources).expect("u32 fits")) {
-        if form.selection.source != Some(source.number) {
-            continue;
-        }
-        if source.place > 1
-            && let Some(up) = source.place.checked_sub(1)
-        {
-            control(
-                b,
-                w,
-                bindings,
-                W::UpSource,
-                bindings::submit(name, Operation::MoveSource { place: up }),
-                busy,
-                false,
-            );
-        }
-        if let Some(down) = source.place.checked_add(1) {
-            control(
-                b,
-                w,
-                bindings,
-                W::DownSource,
-                bindings::submit(name, Operation::MoveSource { place: down }),
-                busy,
-                false,
-            );
-        }
-        break;
-    }
-}
-
 fn is_owner(root: &Domain) -> bool {
     match accounts::current_me(root.client()) {
         Some(me) => me.deployment_role == Some(c::HeldRole::Owner),
