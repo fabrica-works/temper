@@ -812,8 +812,8 @@ and 10).
   own, each a step of the case run as the real loop runs it, on the
   case's library unchanged, by `crates/temper/tests/support/case.rs`:
   - **What runs:** `lab/cluster/`'s members (../protocol/README.md,
-    15.5): the fake forge serving kit, the case's one repository, at
-    its `id` with its `tree` (4.2); the fake LLM playing the step's
+    15.5): the fake forge serving kit, the case's repository, at its
+    `id` with its `tree` (4.2), and one inert repository (below); the fake LLM playing the step's
     scripts (`case/scripts.rs`), written into its document once the
     forge's address is known, its queries recorded (4.1); the engine
     alone; and the case's workers alone, named as the case names them,
@@ -1054,9 +1054,9 @@ skein's (skein's `fake-llm.md`):
   first and at each pass that observed or lost, and one more at its
   stop, under the same write-failure rule, and each query the peer
   observed is one JSON line, in order: `{"observation": "query",
-  "credential", "model", "system", "messages"}`, `credential` the index of the account's
-  credential that the call presented, or null for none it holds, never
-  a value; `model` and `system` the call's; `messages` its history, each
+  "credential", "model", "system", "messages"}`, `credential` the
+  index of the account's credential that the call presented, or null
+  for none it holds, never a value; `model` and `system` the call's; `messages` its history, each
   `{"role", "parts"}`, `role` `user` or `assistant`, each part one of
   `{"text"}`, `{"opaque"}`, `{"tool_call": {"id", "name", "arguments"}}`
   and `{"tool_output": {"id", "output", "is_error"}}`. Every byte string
@@ -1066,8 +1066,8 @@ skein's (skein's `fake-llm.md`):
   records for its life, with no drain, so the process holds them under
   the caps the real loop's hosted peer runs the whole case under,
   smith's, 256 records and 4 MiB: at the count's cap the stream ends
-  with `{"observation": "records_full", "capacity"}` and the fake exits non-zero before a
-  record is lost, as the GitHub layer's git records do (4.2), and a
+  with `{"observation": "records_full", "capacity"}` and the fake
+  exits non-zero before a record is lost, as the GitHub layer's git records do (4.2), and a
   record past the bytes' cap stops it non-zero. Without the flag the
   peer records nothing.
 - **Its issuer,** skein's fake issuer (`skein-fake-oauth`; skein's
@@ -1168,7 +1168,7 @@ loopback (section 5). temper's worlds add:
   each content text, within the domain's content limits, in place of
   the seed's three files. Either every repository names an `id`, each
   distinct, or none does and ids follow the document's order. So the
-  reference case's kit is the forge's one repository at the id the
+  reference case's kit is the forge's first repository, at the id the
   case's scripts name, its first commit the case's draft (5.3). Its
   git route's `objects` call gives a commit's tree, which the case's
   referee reads for main once the last merge is observed, before the
