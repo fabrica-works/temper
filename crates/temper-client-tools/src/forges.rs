@@ -25,6 +25,51 @@ pub const SET_UP: Tool = Tool {
     keyed: Keyed::Optional,
     area: 6,
 };
+pub const CONNECT: Tool = Tool {
+    name: b"forge-connect",
+    line: b"Connect an existing GitHub App; other ways are not offered yet",
+    result: b"forge-connect",
+    forms: &[
+        &[
+            positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
+            positional(
+                b"way",
+                b"github-app",
+                Kind::Word { set: &[b"github-app"] },
+                Required,
+                b"github, forgejo and forgejo-admin are not offered yet",
+            ),
+            positional(b"id", b"ID", Kind::NumberRange { min: 1, max: u64::MAX }, Required, b"GitHub App id"),
+            positional(b"file", b"FILE", Kind::File, Required, b"Private PEM key file; at most 4090 bytes"),
+        ],
+        &[
+            positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
+            positional(b"way", b"github", Kind::Word { set: &[b"github"] }, Required, b"Not offered yet"),
+        ],
+        &[
+            positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
+            positional(
+                b"way",
+                b"forgejo|forgejo-admin",
+                Kind::Word { set: &[b"forgejo", b"forgejo-admin"] },
+                Required,
+                b"Not offered yet",
+            ),
+            positional(b"file", b"FILE", Kind::Literal, Required, b"Not offered yet; no file is read"),
+        ],
+    ],
+    keyed: Keyed::Required,
+    area: 6,
+};
+pub const INSTALL: Tool = Tool {
+    name: b"forge-install",
+    line: b"Print a fresh GitHub App installation link",
+    result: b"forge-install",
+    forms: &[&[positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number")]],
+    keyed: Keyed::Optional,
+    area: 6,
+};
+mod connection;
 pub const DEMO_START: Tool = Tool {
     name: b"demo-start",
     line: b"Start the playground; run again to finish what is not done",
@@ -88,6 +133,7 @@ pub(crate) struct Forges {
     watches: BTreeMap<Handle, Watching>,
     adopting: BTreeMap<Key, Adopting>,
     json: bool,
+    connections: BTreeMap<Key, connection::Pending>,
 }
 #[derive(Debug)]
 struct Intent {
@@ -122,11 +168,14 @@ impl Forges {
             watches: BTreeMap::new(),
             adopting: BTreeMap::new(),
             json: false,
+            connections: BTreeMap::new(),
         }
     }
     pub(crate) fn calls(&self) -> usize {
-        self.waiting
+        self.connections
             .len()
+            .checked_add(self.waiting.len())
+            .expect("bounded calls")
             .checked_add(self.pending.len())
             .expect("bounded calls")
             .checked_add(self.adopting.len())
@@ -152,7 +201,12 @@ impl Forges {
 }
 pub(crate) fn owns(call: &jig::call::Call) -> bool {
     let name = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name;
-    name == READ.name || name == SET_UP.name || name == DEMO_START.name || (name == WAIT.name && call.form == 1)
+    name == READ.name
+        || name == SET_UP.name
+        || name == DEMO_START.name
+        || name == CONNECT.name
+        || name == INSTALL.name
+        || (name == WAIT.name && call.form == 1)
 }
 fn live(client: &Client) -> bool {
     let Some(doc) = client.document(Handle { asker: crate::root::RUNNER.asker(), number: 0 }) else { return false };
@@ -180,6 +234,10 @@ pub(crate) fn ready(state: &mut Forges, client: &Client, env: &Env<Limits>, out:
 }
 #[expect(clippy::manual_map, reason = "the domain matches without closures")]
 fn send(state: &mut Forges, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
+    if connection::owns(&called.call) {
+        connection::send(state, env, called, out);
+        return;
+    }
     if called.value.is_some() || jig::argv::check(crate::table::TOOLS, &called.call, &env.limits.tools).is_err() {
         let printed = render::failure(b"invalid forge call", called.json, 1);
         finish(called, printed, out);
@@ -245,41 +303,11 @@ fn finish(called: Called, printed: jig::Printed, out: &mut Queue<Out>) {
     out.push(Out::Printed { number: called.number, printed });
 }
 pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told: &Told, out: &mut Queue<Out>) {
+    if connection::told(state, env, told, out) {
+        return;
+    }
     match told {
-        Told::Kept { key, request } => {
-            let jig_client::Ask::Family { scope: jig_client::contract::Scope::Deployment, record } = request else {
-                return;
-            };
-            if record.family != temper_client_protocol_wire::FORGE
-                || record.version != temper_client_protocol_wire::CLIENT_VERSION
-            {
-                return;
-            }
-            let Some(limits) = temper_client_domain::forge::wire_limits(&env.limits.domain.forge) else { return };
-            let Some(request) = temper_client_protocol_wire::decode_requesting(&record.bytes, &limits) else { return };
-            let intent = match request.into_parts().request {
-                temper_client_protocol_wire::v1::Request::SetUp(request) => {
-                    let request = request.into_parts();
-                    Some(Intent {
-                        forge: request.forge,
-                        org: request.org,
-                        repository: request.repository,
-                        project: match request.project {
-                            temper_client_protocol_wire::v1::SetUpProject::Existing(project) => {
-                                SetUpProject::Existing(project.project())
-                            }
-                            temper_client_protocol_wire::v1::SetUpProject::New(project) => {
-                                SetUpProject::New(project.into_parts().name)
-                            }
-                        },
-                    })
-                }
-                temper_client_protocol_wire::v1::Request::StartDemo => None,
-                temper_client_protocol_wire::v1::Request::Adopt(_)
-                | temper_client_protocol_wire::v1::Request::Return(_) => return,
-            };
-            state.pending.insert(*key, SettingUp { intent, called: None });
-        }
+        Told::Kept { key, request } => restore(state, env, *key, request),
         Told::Answered { key, outcome } => {
             if let Some(adopting) = state.adopting.remove(key) {
                 adopted(state, env, adopting, outcome, out);
@@ -345,6 +373,42 @@ pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told:
         | Told::Text { .. }
         | Told::Page { .. } => {}
     }
+}
+fn restore(state: &mut Forges, env: &Env<Limits>, key: Key, request: &jig_client::Ask) {
+    let jig_client::Ask::Family { scope: jig_client::contract::Scope::Deployment, record } = request else {
+        return;
+    };
+    if record.family != temper_client_protocol_wire::FORGE
+        || record.version != temper_client_protocol_wire::CLIENT_VERSION
+    {
+        return;
+    }
+    let Some(limits) = temper_client_domain::forge::wire_limits(&env.limits.domain.forge) else { return };
+    let Some(request) = temper_client_protocol_wire::decode_requesting(&record.bytes, &limits) else { return };
+    let intent = match request.into_parts().request {
+        temper_client_protocol_wire::v1::Request::SetUp(request) => {
+            let request = request.into_parts();
+            Some(Intent {
+                forge: request.forge,
+                org: request.org,
+                repository: request.repository,
+                project: match request.project {
+                    temper_client_protocol_wire::v1::SetUpProject::Existing(project) => {
+                        SetUpProject::Existing(project.project())
+                    }
+                    temper_client_protocol_wire::v1::SetUpProject::New(project) => {
+                        SetUpProject::New(project.into_parts().name)
+                    }
+                },
+            })
+        }
+        temper_client_protocol_wire::v1::Request::StartDemo => None,
+        temper_client_protocol_wire::v1::Request::Adopt(_)
+        | temper_client_protocol_wire::v1::Request::Return(_)
+        | temper_client_protocol_wire::v1::Request::Connect(_)
+        | temper_client_protocol_wire::v1::Request::Install(_) => return,
+    };
+    state.pending.insert(key, SettingUp { intent, called: None });
 }
 // MeProject does not expose a home, and forge-setup reads only me and forges.
 // A taken home can therefore be discovered only by the adoption's refusal.

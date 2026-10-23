@@ -652,6 +652,9 @@ pub fn resume(journal: &mut Journal, out: &mut Queue<Output>) {
             | crate::Output::Busy(_)
             | crate::Output::Drained
             | crate::Output::Return { .. }
+            | crate::Output::Connect { .. }
+            | crate::Output::Install { .. }
+            | crate::Output::EraseCarried { .. }
             | crate::Output::Stop) => out.push(Output::Now(request)),
         }
     }

@@ -989,6 +989,9 @@ pub fn records(
             b"forge_component.log_catch_up_ms (at most 86400000 ms / 24 h)",
         );
     }
+    if limits.routes.query_bytes == 0 {
+        against(problems, b"routes.query_bytes", b"positive query bound");
+    }
     let value = limits.records.value_bytes;
     if value == 0 || value > secret_value_bound(jig, limits).unwrap_or(0) {
         against(problems, b"records.value_bytes", b"engine.limits.store.value");

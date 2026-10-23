@@ -121,6 +121,8 @@ impl Protocol {
     pub fn adopt_as(&mut self, role: top::Role) {
         for attempt in 0..8 {
             self.event(top::Event::Application {
+                role: None,
+                carried: None,
                 request: Token::new(100 + attempt),
                 token: Token::new(100 + attempt),
                 retention: Duration::from_secs(60),
@@ -456,6 +458,10 @@ impl Protocol {
                 }
                 other @ (top::Request::DemoStart { .. }
                 | top::Request::SetUpGroup { .. }
+                | top::Request::Connect { .. }
+                | top::Request::Install { .. }
+                | top::Request::CarriedUnused { .. }
+                | top::Request::EraseCarried { .. }
                 | top::Request::SetUp { .. }
                 | top::Request::Resource { .. }
                 | top::Request::Taken { .. }

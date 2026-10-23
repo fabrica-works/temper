@@ -1,0 +1,4 @@
+forge-install F [--key NAME]
+Print a fresh GitHub App installation link
+Result: forge-install
+  forge: Forge number

@@ -146,6 +146,8 @@ pub enum Ask {
     Adopt(Adoption),
     SetUp { forge: u16, org: Box<[u8]>, repository: Box<[u8]>, project: SetUpProject },
     StartDemo,
+    Connect { forge: u16, app: core::num::NonZeroU64 },
+    Install { forge: u16, back: Option<Box<[u8]>> },
 }
 /// A retained application answer; only adoption outcomes are durable.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -153,6 +155,30 @@ pub enum Answered {
     Adopt(ApplicationOutcome),
     SetUp(SetUpAnswer),
     StartDemo(StartAnswer),
+    Connect(ConnectAnswer),
+    Install(InstallAnswer),
+}
+/// Public forge admission refusals (client/README.md, 8).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ForgeRefusal {
+    Role,
+    NoSuchForge,
+    NotTaken,
+    Connected,
+    NotConnected,
+    Busy,
+    NoKey,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ConnectAnswer {
+    Connecting,
+    Refused(ForgeRefusal),
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum InstallAnswer {
+    Link(Box<[u8]>),
+    Connecting,
+    Refused(ForgeRefusal),
 }
 /// The start is answered once both are done, *running*, or at the first that
 /// fails, *start failed*, naming why (protocol/setup.md, 8.4).
@@ -682,6 +708,22 @@ pub enum Event {
     },
     /// The box ended its pipe (domain/forge.md, 4.1).
     BoxClosed,
+    /// The routing's answer to a core-admitted connect request.
+    ConnectAnswered {
+        forge: u16,
+        request: Token,
+        answer: ConnectAnswer,
+    },
+    InstallAnswered {
+        forge: u16,
+        request: Token,
+        answer: InstallAnswer,
+    },
+    ConnectEnded {
+        forge: u16,
+        request: Token,
+        connected: bool,
+    },
     /// The routing's answer to a core-admitted setup request.
     SetUpAnswered {
         forge: u16,
@@ -711,6 +753,8 @@ pub enum Event {
         token: Token,
         retention: skein_lib::Duration,
         ask: Ask,
+        role: Option<jig_domain_people::Role>,
+        carried: Option<jig_domain_core::Carried>,
     },
     /// The core's answer to the application's adoption part.
     ApplicationAnswered {
@@ -959,6 +1003,23 @@ pub enum Request {
         request: Token,
         org: Box<[u8]>,
         repository: Box<[u8]>,
+    },
+    Connect {
+        forge: u16,
+        request: Token,
+        app: core::num::NonZeroU64,
+        carried: jig_domain_core::Carried,
+    },
+    Install {
+        forge: u16,
+        request: Token,
+        back: Option<Box<[u8]>>,
+    },
+    CarriedUnused {
+        number: u64,
+    },
+    EraseCarried {
+        number: u64,
     },
     /// The deployment's forges document changed.
     MarkedForges,

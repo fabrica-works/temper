@@ -414,6 +414,7 @@ impl Judge {
         argv.0
             .iter()
             .map(|arg| match arg {
+                calls::Arg::GithubApp => panic!("GithubApp unsupported"),
                 calls::Arg::Lit(word) => (*word).into(),
                 calls::Arg::Number(n) => n.to_string(),
                 calls::Arg::File(name) => {
@@ -615,6 +616,7 @@ impl Judge {
                 // No delivery barrier: ended documents are retained (domain/testing.md, 2.6).
             }
             Step::Terminal(_) => panic!("Terminal unsupported"),
+            Step::Browse { .. } => panic!("Browse unsupported"),
         }
         // The oracle's commands are the acts' verbs (Observed::with_commands).
         self.ran.push(step);
@@ -894,6 +896,7 @@ fn describe(step: &calls::Step) -> String {
     use calls::Step;
     match step {
         Step::FixtureReady => "FixtureReady".into(),
+        Step::Browse { call } => format!("Browse call {call}"),
         Step::Terminal(_) => "Terminal".into(),
         Step::ReleaseHold { name } => format!("ReleaseHold {}", String::from_utf8_lossy(name)),
         Step::Advance => "Advance".into(),
@@ -926,6 +929,7 @@ fn describe_argv(argv: &calls::Argv) -> String {
         .iter()
         .map(|arg| match arg {
             calls::Arg::Lit(word) => (*word).into(),
+            calls::Arg::GithubApp => "github-app".into(),
             calls::Arg::Number(number) => number.to_string(),
             calls::Arg::File(name) => format!("file({name})"),
             calls::Arg::Task(call) => format!("task(call {call})"),

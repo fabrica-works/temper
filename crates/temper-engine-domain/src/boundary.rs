@@ -368,6 +368,8 @@ pub enum ApplicationAnswer {
     Adopt(forge::ApplicationOutcome),
     SetUp(forge::SetUpAnswer),
     StartDemo(forge::StartAnswer),
+    Connect(forge::ConnectAnswer),
+    Install(forge::InstallAnswer),
     Returning,
 }
 #[derive(Debug)]
@@ -495,6 +497,20 @@ pub enum Request {
         request: Token,
         org: Box<[u8]>,
         repository: Box<[u8]>,
+    },
+    Connect {
+        forge: u16,
+        request: Token,
+        app: ::core::num::NonZeroU64,
+        carried: jig_domain_core::Carried,
+    },
+    Install {
+        forge: u16,
+        request: Token,
+        back: Option<Box<[u8]>>,
+    },
+    EraseCarried {
+        number: u64,
     },
     /// Run the staged plan named by this token; credential values stay in routing.
     Setup {

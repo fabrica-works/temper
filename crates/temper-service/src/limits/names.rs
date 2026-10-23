@@ -17,6 +17,7 @@ pub(super) fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), 
         };
     }
     match name {
+        b"routes.query_bytes" => limits.routes.query_bytes = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.journal.commits" => limits.root.journal.commits = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.journal.held" => limits.root.journal.held = u32::try_from(value).or(Err(Refused::Range))?,
         b"root.journal.writes" => limits.root.journal.writes = u32::try_from(value).or(Err(Refused::Range))?,

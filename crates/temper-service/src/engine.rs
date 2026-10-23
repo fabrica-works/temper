@@ -56,7 +56,8 @@ impl Engine {
         first_periods: List<(u32, u64)>,
     ) -> Result<Self, jig_protocol_config::Problems> {
         let forge_records = crate::forge::records::Loader::new(&children.limits, &children.workers.forges);
-        let Children { accounts, workers, clients, demo, forge, setup, notes, limits: own } = children;
+        let Children { accounts, workers, mut clients, demo, forge, setup, notes, limits: own } = children;
+        clients.query_bytes = own.routes.query_bytes;
         let max_out = root::max_out(limits);
         let capacity = max_out.checked_mul(2).expect("root routing room");
         let credentials = values.identities.numbers();
@@ -377,6 +378,8 @@ pub(crate) fn answer(engine: &mut Engine) {
                 if owner == crate::forge::records::LOAD {
                     if let jig_protocol_store::Event::SecretsLoaded { rows, next, .. } = event {
                         engine.forge_records.loaded(rows, next);
+                    } else if let jig_protocol_store::Event::Erased { .. } = event {
+                        engine.forge_records.erased();
                     } else {
                         stop::unavailable(engine, b"forge records");
                     }

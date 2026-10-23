@@ -1,0 +1,320 @@
+//! One-shot pasted connections and durable installation requests (client/tools.md, 5.5).
+use super::{CONNECT, Forges, INSTALL, domain, finish, number_arg};
+use crate::{
+    jig::{
+        self,
+        call::number,
+        render::{self, Text},
+        runner::{Called, Out},
+    },
+    root::Limits,
+};
+use alloc::boxed::Box;
+use jig_client::{Answered, Ask, Family, contract as c};
+use jig_client::{Event, Key, Outcome, Told};
+use skein_json::writer::Encoder;
+use skein_lib::{Env, Queue};
+use temper_client_domain::owner::Owner;
+use temper_client_protocol_wire::{self as wire, v1 as w};
+
+#[derive(Debug)]
+pub(super) struct Pending {
+    forge: u16,
+    install: bool,
+    called: Option<Called>,
+}
+pub(super) fn owns(call: &jig::call::Call) -> bool {
+    let name = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name;
+    name == CONNECT.name || name == INSTALL.name
+}
+fn request(forge: u16, app: Option<u64>, limits: &Limits) -> Option<Ask> {
+    let bounds = temper_client_domain::forge::wire_limits(&limits.domain.forge)?;
+    let request = match app {
+        Some(id) => w::Request::Connect(
+            w::Connect::new(
+                &bounds,
+                w::ConnectParts {
+                    forge,
+                    how: w::How::GithubApp(w::GitHubApp::new(&bounds, w::GitHubAppParts { id }).ok()?),
+                },
+            )
+            .ok()?,
+        ),
+        None => w::Request::Install(w::Install::new(&bounds, w::InstallParts { forge, back: None }).ok()?),
+    };
+    let record = w::Requesting::new(&bounds, w::RequestingParts { request }).ok()?;
+    Some(Ask::Family {
+        scope: c::Scope::Deployment,
+        record: Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::requesting(&record) },
+    })
+}
+#[expect(clippy::manual_map, reason = "the domain matches without closures")]
+pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, out: &mut Queue<Out>) {
+    if jig::argv::check(crate::table::TOOLS, &called.call, &env.limits.tools).is_err() {
+        let printed = render::failure(b"invalid forge call", called.json, 1);
+        finish(called, printed, out);
+        return;
+    }
+    if crate::table::TOOLS.get(usize::from(called.call.tool)).expect("parsed tool").name == CONNECT.name
+        && called.call.form != 0
+    {
+        let printed = render::failure(
+            b"github, forgejo and forgejo-admin are not offered yet; use forge-connect F github-app ID FILE --key NAME",
+            called.json,
+            2,
+        );
+        finish(called, printed, out);
+        return;
+    }
+    let install = crate::table::TOOLS.get(usize::from(called.call.tool)).expect("parsed tool").name == INSTALL.name;
+    let forge = u16::try_from(number_arg(&called.call)).expect("checked forge number");
+    let app = if install { None } else { number(&called.call, 2) };
+    let value = called.value.take();
+    if value.is_some() == install {
+        let printed =
+            render::failure(b"forge-connect requires a private key file; forge-install takes no value", called.json, 1);
+        finish(called, printed, out);
+        return;
+    }
+    let Some(request) = request(forge, app, &env.limits) else {
+        let printed = render::failure(b"forge request encoding failed", called.json, 1);
+        finish(called, printed, out);
+        return;
+    };
+    let key = Key { asker: Owner::Forge.asker(), number: (u64::from(called.call_number) << 32u32) | 5 };
+    let name = match &called.call.key {
+        Some(name) => Some(crate::key::engine(name)),
+        None => None,
+    };
+    let event = match value {
+        Some(pem) => {
+            let Some(value) = domain::pasted_app_key(pem.expose()) else {
+                let printed = render::failure(b"App key file must contain 1 to 4090 bytes", called.json, 1);
+                finish(called, printed, out);
+                return;
+            };
+            Event::Carry { key, name: name.expect("connect requires a key"), request, value }
+        }
+        None => Event::Send { key, name, request },
+    };
+    state.connections.insert(key, Pending { forge, install, called: Some(called) });
+    out.push(Out::Client { event });
+}
+pub(super) fn told(state: &mut Forges, env: &Env<Limits>, told: &Told, out: &mut Queue<Out>) -> bool {
+    match told {
+        Told::Kept { key, request: Ask::Family { scope: c::Scope::Deployment, record } }
+            if record.family == wire::FORGE && record.version == wire::CLIENT_VERSION =>
+        {
+            let Some(bounds) = temper_client_domain::forge::wire_limits(&env.limits.domain.forge) else { return false };
+            let Some(request) = wire::decode_requesting(&record.bytes, &bounds) else { return false };
+            let forge = match request.into_parts().request {
+                w::Request::Install(value) => value.forge(),
+                w::Request::Return(_)
+                | w::Request::Adopt(_)
+                | w::Request::SetUp(_)
+                | w::Request::StartDemo
+                | w::Request::Connect(_) => {
+                    return false;
+                }
+            };
+            state.connections.insert(*key, Pending { forge, install: true, called: None });
+            true
+        }
+        Told::Answered { key, outcome } => {
+            let Some(pending) = state.connections.remove(key) else { return false };
+            let json = match &pending.called {
+                Some(called) => called.json,
+                None => state.json,
+            };
+            let printed = print(&pending, outcome, json, &env.limits);
+            match pending.called {
+                Some(called) => finish(called, printed, out),
+                None => out.push(Out::Kept { line: if printed.status == 0 { printed.stdout } else { printed.stderr } }),
+            }
+            true
+        }
+        Told::Kept { .. }
+        | Told::Link { .. }
+        | Told::Dropped { .. }
+        | Told::Pending { .. }
+        | Told::Changed { .. }
+        | Told::Ended { .. }
+        | Told::Text { .. }
+        | Told::Page { .. } => false,
+    }
+}
+#[derive(Debug)]
+enum Answer {
+    Connecting,
+    Link(Box<[u8]>),
+    Refused(w::ForgeRefusal),
+    Entrance(c::EntranceRefusal),
+    Unknown,
+}
+fn answer(value: &Answered, limits: &Limits) -> Option<Answer> {
+    let record = match value {
+        Answered::Family(record) => record,
+        Answered::Jig(c::Answer::Refused { refusal, .. }) => {
+            return Some(Answer::Entrance(c::EntranceRefusal::new(refusal.clone()).ok()?));
+        }
+        Answered::Jig(c::Answer::Done(_)) => return None,
+    };
+    if record.family != wire::FORGE || record.version != wire::CLIENT_VERSION {
+        return None;
+    }
+    let bounds = temper_client_domain::forge::wire_limits(&limits.domain.forge)?;
+    let mut reader = skein_lib::Reader::new(&record.bytes);
+    let value = w::Answer::decode(&bounds, &mut reader).ok()?;
+    if !reader.is_empty() {
+        return None;
+    }
+    match value.into_parts().outcome {
+        w::Outcome::Connecting => Some(Answer::Connecting),
+        w::Outcome::Link(value) => Some(Answer::Link(value.into_parts().address)),
+        w::Outcome::ConnectRefused(value) => Some(Answer::Refused(value.into_parts().why)),
+        w::Outcome::Unknown => Some(Answer::Unknown),
+        w::Outcome::Returning
+        | w::Outcome::Adopted(_)
+        | w::Outcome::CoreRefused(_)
+        | w::Outcome::ForgeRefused(_)
+        | w::Outcome::SettingUp
+        | w::Outcome::SetUpRefused(_)
+        | w::Outcome::Running
+        | w::Outcome::StartRefused(_)
+        | w::Outcome::StartFailed(_) => None,
+    }
+}
+fn text(forge: u16, install: bool, answer: &Answer, kept: bool, limits: &Limits, out: &mut Text) {
+    if kept {
+        out.put(b"kept: forge-install ");
+    }
+    match answer {
+        Answer::Connecting => {
+            out.put(b"connecting\n");
+            if !install {
+                out.put(b"temper ctl DIRECTORY wait forges --until connected:");
+                out.number(u64::from(forge));
+                out.put(b"\n");
+            }
+        }
+        Answer::Link(address) => {
+            out.put(b"Open this address in a browser on the engine's machine:\n");
+            out.put(address);
+            out.put(b"\ntemper ctl DIRECTORY wait forges --until settled\n");
+        }
+        Answer::Refused(why) => {
+            out.put(domain::connect_refusal(why).1);
+            out.put(b"\n");
+        }
+        Answer::Entrance(why) => {
+            render::acts::refusal(why.refusal(), &render::document::phrasebook(limits.tools.text), out);
+            out.put(b"\n");
+        }
+        Answer::Unknown => out.put(b"unknown\n"),
+    }
+}
+fn json(answer: &Answer, kept: bool, out: &mut Encoder) {
+    if kept {
+        out.object_start();
+        out.key(b"operation");
+        out.string(b"forge-install");
+        out.key(b"outcome");
+    }
+    out.object_start();
+    match answer {
+        Answer::Connecting => {
+            out.key(b"connecting");
+            out.object_start();
+            out.object_end();
+        }
+        Answer::Link(address) => {
+            out.key(b"link");
+            out.object_start();
+            out.key(b"address");
+            out.string(address);
+            out.object_end();
+        }
+        Answer::Refused(why) => {
+            out.key(b"refused");
+            out.object_start();
+            out.key(b"why");
+            out.string(domain::connect_refusal(why).0);
+            out.object_end();
+        }
+        Answer::Entrance(why) => {
+            out.key(b"entrance_refused");
+            out.object_start();
+            out.key(b"refusal");
+            render::document::refusal_json(why.refusal(), out);
+            out.object_end();
+        }
+        Answer::Unknown => {
+            out.key(b"unknown");
+            out.object_start();
+            out.object_end();
+        }
+    }
+    out.object_end();
+    if kept {
+        out.object_end();
+    }
+}
+fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits) -> jig::Printed {
+    let forge = pending.forge;
+    let install = pending.install;
+    let kept = pending.called.is_none();
+    let answer = match outcome {
+        Outcome::Answered(value) => answer(value, limits),
+        Outcome::Unknown => Some(Answer::Unknown),
+        Outcome::Held | Outcome::Limit | Outcome::Unconfirmed | Outcome::NotKept | Outcome::Unsent | Outcome::Lost => {
+            let mut operation =
+                render::outcome::Operation::of(&request(forge, None, limits).expect("checked forge limits"));
+            operation.word = if install { b"forge-install" } else { b"forge-connect" };
+            if !install && let Some(called) = &pending.called {
+                operation.value_name.clone_from(&called.call.key);
+            }
+            if kept {
+                return jig::Printed {
+                    status: 1,
+                    stdout: Box::default(),
+                    stderr: render::outcome::kept(&operation, outcome, structured, None, &limits.tools),
+                };
+            }
+            return render::outcome::print(&operation, outcome, structured, None, &limits.tools);
+        }
+    };
+    let Some(answer) = answer else { return render::failure(b"forge answer decoding failed", structured, 1) };
+    let status = match &answer {
+        Answer::Connecting => u8::from(install),
+        Answer::Link(_) if !install => {
+            return render::failure(b"forge answer does not fit connect", structured, 1);
+        }
+        Answer::Link(_) => 0,
+        Answer::Refused(_) | Answer::Entrance(_) => 2,
+        Answer::Unknown => 1,
+    };
+    let bytes = if structured {
+        let bounds = skein_json::writer::Limits { depth: 8, length: limits.tools.text };
+        let mut measure = Encoder::measure(&bounds);
+        json(&answer, kept, &mut measure);
+        let Ok(size) = measure.measured() else { return render::failure(b"result limit", true, 1) };
+        let mut out = Encoder::write(size, &bounds);
+        json(&answer, kept, &mut out);
+        let bytes = out.finish();
+        if kept { render::outcome::newline(&bytes) } else { bytes }
+    } else {
+        let mut measure = Text::measure();
+        text(forge, install, &answer, kept, limits, &mut measure);
+        let mut out = Text::writing_exact(measure);
+        text(forge, install, &answer, kept, limits, &mut out);
+        out.finish()
+    };
+    if bytes.len() > usize::try_from(limits.tools.text).expect("text fits") {
+        return render::failure(b"result limit", structured, 1);
+    }
+    if status == 0 {
+        jig::Printed { status, stdout: bytes, stderr: Box::default() }
+    } else {
+        jig::Printed { status, stdout: Box::default(), stderr: bytes }
+    }
+}

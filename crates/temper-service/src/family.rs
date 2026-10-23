@@ -76,6 +76,42 @@ pub fn to_root(
                         request: root::Application::Return { source: value.source, path: value.path },
                     }));
                 }
+                value @ (w::Request::Connect(_) | w::Request::Install(_)) => {
+                    let request = match value {
+                        w::Request::Connect(value) => {
+                            let app = match value.how() {
+                                w::How::GithubApp(app) => app.id(),
+                            };
+                            forge::Ask::Connect {
+                                forge: value.forge(),
+                                app: core::num::NonZeroU64::new(app).expect("decoded nonzero App"),
+                            }
+                        }
+                        w::Request::Install(value) => {
+                            let value = value.into_parts();
+                            if let Some(back) = &value.back
+                                && !return_path(back)
+                            {
+                                return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable {
+                                    to: reply_to,
+                                })));
+                            }
+                            forge::Ask::Install { forge: value.forge, back: value.back }
+                        }
+                        w::Request::Adopt(_) | w::Request::SetUp(_) | w::Request::Return(_) | w::Request::StartDemo => {
+                            unreachable!("connect or install")
+                        }
+                    };
+                    return Ok(root::Event::Party(root::PartyInput::Application {
+                        scope,
+                        reply_to,
+                        sign_in,
+                        key,
+                        digest,
+                        carried,
+                        request: root::Application::Forge(request),
+                    }));
+                }
                 w::Request::StartDemo => {
                     return Ok(root::Event::Party(root::PartyInput::Application {
                         scope,
@@ -379,6 +415,7 @@ fn encoded_role(role: forge::Role) -> w::Role {
 }
 /// Encode one durable terminal, or the unknown terminal past its retention.
 #[must_use]
+#[expect(clippy::too_many_lines, reason = "one exhaustive family outcome translation")]
 pub fn answer(
     outcome: Option<temper_engine_domain::ApplicationAnswer>,
     limits: &w::Limits,
@@ -449,6 +486,33 @@ pub fn answer(
                 .ok()?,
             )
         }
+        Some(
+            root::ApplicationAnswer::Connect(forge::ConnectAnswer::Connecting)
+            | root::ApplicationAnswer::Install(forge::InstallAnswer::Connecting),
+        ) => w::Outcome::Connecting,
+        Some(root::ApplicationAnswer::Install(forge::InstallAnswer::Link(address))) => {
+            w::Outcome::Link(w::Link::new(limits, w::LinkParts { address }).ok()?)
+        }
+        Some(
+            root::ApplicationAnswer::Connect(forge::ConnectAnswer::Refused(why))
+            | root::ApplicationAnswer::Install(forge::InstallAnswer::Refused(why)),
+        ) => w::Outcome::ConnectRefused(
+            w::ConnectRefused::new(
+                limits,
+                w::ConnectRefusedParts {
+                    why: match why {
+                        forge::ForgeRefusal::Role => w::ForgeRefusal::Role,
+                        forge::ForgeRefusal::NoSuchForge => w::ForgeRefusal::NoSuchForge,
+                        forge::ForgeRefusal::NotTaken => w::ForgeRefusal::NotTaken,
+                        forge::ForgeRefusal::Connected => w::ForgeRefusal::Connected,
+                        forge::ForgeRefusal::NotConnected => w::ForgeRefusal::NotConnected,
+                        forge::ForgeRefusal::Busy => w::ForgeRefusal::Busy,
+                        forge::ForgeRefusal::NoKey => w::ForgeRefusal::NoKey,
+                    },
+                },
+            )
+            .ok()?,
+        ),
         Some(root::ApplicationAnswer::StartDemo(answer)) => start_answer(answer, limits)?,
         Some(temper_engine_domain::ApplicationAnswer::SetUp(forge::SetUpAnswer::SettingUp)) => w::Outcome::SettingUp,
         Some(temper_engine_domain::ApplicationAnswer::SetUp(forge::SetUpAnswer::Refused(why))) => {

@@ -244,7 +244,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 443415523271979,
+    "memory_bytes": 443415555934907,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -1254,6 +1254,7 @@
         "forge.client.repositories": 3,
         "forge.output": 82,
         "forge.repositories": 3,
+        "routes.query_bytes": 2048,
         "root.journal.transcript_bytes": 1039548,
         "root.loads.bytes": 1039784,
         "root.loads.read_bytes": 2079088,

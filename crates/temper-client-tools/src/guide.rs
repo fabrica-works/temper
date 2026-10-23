@@ -36,6 +36,18 @@ disconnect, forget, rank and retry resolve a unique --source sign_in|key|program
 forget without --source removes the whole account; rank without it moves the account.
 connect prints a browser address and wait accounts --until settled, then exits once durable.
 
+Connect an existing GitHub App with its private PEM file:
+  temper ctl DIRECTORY forge-connect 3 github-app 4242 FILE --key app-3
+  temper ctl DIRECTORY wait forges --until connected:3
+Only github-app is offered; github, forgejo and forgejo-admin exit 2 as not offered yet.
+The private file must be regular, owned by you, with no group or other permissions.
+PEM is 1 to 4090 bytes after one final newline; the carried bundle is at most 4096 bytes.
+It is sent once, never kept or replayed; use the same --key and file to recover a lost answer.
+Install the connected App on another account by opening the printed address on the engine's machine:
+  temper ctl DIRECTORY forge-install 3
+  temper ctl DIRECTORY wait forges --until settled
+The tools print links; they never open a browser. A stopped install prints connecting and exits 1.
+
 Start the built-in playground, or finish a previous failed start:
   temper ctl DIRECTORY demo-start --key playground
 It waits for running; not offered exits 2, a start failure exits 1 and names why.
@@ -49,7 +61,7 @@ Without these flags the template's choice or engine default is sent unchanged.
 A model change preserves the supplied account and sub-agent choices; there is no --account flag.
 Unknown model or effort names fail locally (exit 1), without sending.
 
-Name keys for chat, message, close, adopt, connect, add-key and declare; other acts accept an optional --key NAME.
+Name keys for chat, message, close, adopt, connect, add-key, declare and forge-connect; other acts accept an optional --key NAME.
 Names are one to 64 lower-case letters, digits or hyphens.
 Give each agent a distinct prefix, such as investigate-41; reads and waits need no key.
 A repeat keeps its name, party and ask within retention. A changed template or bound in me

@@ -93,3 +93,77 @@ fn json_cannot_name_a_key_file() {
     assert_eq!(f.exit(), Some(Exit::Code(1)));
     assert!(!f.opened(b"directory"));
 }
+
+const APP: &[&[u8]] = &[b"forge-connect", b"3", b"github-app", b"4242", b"/linked-parent/link-file", b"--key", b"app"];
+const APP_BOUND: &[u8] = &[b'p'; 4090];
+const APP_OVER: &[u8] = &[b'p'; 4091];
+const APP_NEWLINE: &[u8] = &{
+    let mut bytes = [b'p'; 4091];
+    bytes[4090] = b'\n';
+    bytes
+};
+
+fn app_file_refused(f: &fixtures::Frame) {
+    assert_eq!(f.exit(), Some(Exit::Code(1)));
+    assert!(!f.opened(b"directory"));
+    assert_eq!(f.requests(), 0);
+    assert!(skein_lib::bytes::find(f.stderr(), b"/linked-parent/link-file").is_some());
+    if !f.link.is_empty() && f.link != b"\n" {
+        assert!(skein_lib::bytes::find(f.stderr(), f.link).is_none());
+    }
+}
+#[test]
+fn an_app_key_requires_a_private_owned_regular_file_and_refuses_symlinks() {
+    for (kind, mode, owner) in [
+        (Kind::Directory, 0o600, 7),
+        (Kind::Other, 0o600, 7),
+        (Kind::File, 0o640, 7),
+        (Kind::File, 0o606, 7),
+        (Kind::File, 0o600, 8),
+    ] {
+        let mut f = fixtures::Frame::act(APP);
+        f.link = b"fake-app-key";
+        f.input_stat = Some(Stat { kind, mode, owner, size: f.link.len() as u64, links: 1 });
+        f.drain();
+        app_file_refused(&f);
+    }
+    for error in [Error::TooManyLinks, Error::NotFound] {
+        let mut f = fixtures::Frame::act(APP);
+        f.link = b"fake-app-key";
+        f.linked_leaf = Some(error);
+        f.drain();
+        app_file_refused(&f);
+    }
+}
+#[test]
+fn an_app_key_refuses_empty_and_oversized_files_before_opening_directory() {
+    for file in [b"".as_slice(), b"\n", APP_OVER, OVER_BOUND] {
+        let mut f = fixtures::Frame::act(APP);
+        f.link = file;
+        f.drain();
+        app_file_refused(&f);
+    }
+}
+#[test]
+fn an_app_key_strips_one_final_lf_and_reserves_six_bytes_for_the_bundle() {
+    for (file, pem) in [
+        (b"fake-pem\n".as_slice(), b"fake-pem".as_slice()),
+        (b"fake-pem\n\n", b"fake-pem\n"),
+        (APP_BOUND, APP_BOUND),
+        (APP_NEWLINE, APP_BOUND),
+    ] {
+        let mut f = fixtures::Frame::act(APP);
+        f.link = file;
+        f.sign_in_then_deliver_me();
+        assert_eq!(f.carried_keys.len(), 1);
+        let mut expected = vec![1, 1, 11, 0];
+        expected.extend_from_slice(&u16::try_from(pem.len()).expect("bounded PEM").to_le_bytes());
+        expected.extend_from_slice(pem);
+        assert_eq!(f.carried_keys[0].expose(), expected);
+        assert!(f.stdout().is_empty());
+        assert!(f.stderr().is_empty());
+        if let Some(store) = f.stored(b"store") {
+            assert!(skein_lib::bytes::find(store, pem).is_none());
+        }
+    }
+}

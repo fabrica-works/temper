@@ -8,6 +8,8 @@ fn an_adoption_locates_its_repository_before_any_other_read() {
     outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
@@ -43,6 +45,8 @@ fn an_adoption_refuses_fields_outside_its_bounds_before_a_call() {
             outputs(
                 &mut d,
                 Event::Application {
+                    role: None,
+                    carried: None,
                     request: Token::new(4),
                     token: Token::new(9),
                     retention: Duration::from_secs(60),
@@ -65,6 +69,8 @@ fn a_core_refusal_is_kept_as_jigs_refusal() {
     outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
@@ -90,6 +96,8 @@ fn a_full_outcome_table_answers_the_application_again_busy() {
         outputs(
             &mut d,
             Event::Application {
+                role: None,
+                carried: None,
                 request,
                 token: request,
                 retention: Duration::from_secs(60),
@@ -104,6 +112,8 @@ fn a_full_outcome_table_answers_the_application_again_busy() {
     let requests = outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(99),
             token: Token::new(99),
             retention: Duration::from_secs(60),
@@ -122,6 +132,8 @@ fn a_kept_outcome_is_saved_with_the_end_of_its_retention() {
     let requests = outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
@@ -145,6 +157,8 @@ fn an_outcome_past_its_retention_is_erased_at_the_next_application() {
     let requests = outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(10),
             retention: Duration::from_secs(60),
@@ -161,6 +175,8 @@ fn not_installed_is_a_terminal_application_refusal_rather_than_a_retry() {
     outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
@@ -200,6 +216,8 @@ fn a_configured_forge_without_a_writer_refuses_adoption_before_any_read() {
     outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),
@@ -222,6 +240,8 @@ fn a_stopped_forge_keeps_its_writer_but_refuses_adoption_before_a_read() {
     outputs(
         &mut d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(4),
             token: Token::new(9),
             retention: Duration::from_secs(60),

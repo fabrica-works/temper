@@ -175,6 +175,23 @@ impl ServiceHost {
     pub(crate) fn github(path: PathBuf, signals: Fd, fixture: crate::github::Fixture) -> Self {
         Self::with_shape(path, signals, None, false, None, Some(fixture))
     }
+    pub(crate) fn make_github_app(&mut self, peer: &mut skein_fake_peers::forge::Peer) {
+        if self.github.is_some_and(|fixture| !fixture.connected) {
+            self.github_seen.app = Some(crate::github::make_app(peer, self.clients.expect("clients"), &self.path));
+        }
+    }
+    fn github_documents(&self, forge: SocketAddr) {
+        let Some(fixture) = self.github else { return };
+        crate::github::write(&self.path, forge, self.clients.expect("fixed clients"), fixture)
+            .expect("GitHub documents");
+        if fixture.connected {
+            temper_github_app::seed(
+                &self.path.join("state"),
+                &temper_github_app::records(&temper_github_app::APP, 1, &[crate::github::INSTALLATION], forge),
+            )
+            .expect("durable App seed");
+        }
+    }
     /// Settled lives in order; `ran()` and `linked()` retain their aggregate history.
     #[must_use]
     pub fn lives(&self) -> &[Life] {
@@ -300,15 +317,7 @@ impl Host for ServiceHost {
                 if let Some(fixture) = self.fixture {
                     crate::forge::write(&self.path, forge, &fixture).expect("forge documents");
                 }
-                if let Some(fixture) = self.github {
-                    crate::github::write(&self.path, forge, self.clients.expect("fixed clients"), fixture)
-                        .expect("GitHub documents");
-                    temper_github_app::seed(
-                        &self.path.join("state"),
-                        &temper_github_app::records(&temper_github_app::APP, 1, &[crate::github::INSTALLATION], forge),
-                    )
-                    .expect("durable App seed");
-                }
+                self.github_documents(forge);
                 if let Some(shape) = &self.cluster {
                     shape.write(self.path.parent().expect("cluster scratch"));
                 }

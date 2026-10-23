@@ -100,16 +100,17 @@ enum Handoff {
 /// The bounded forge connector subtree.
 #[derive(Debug)]
 pub struct Domain {
-    configured: Map<u16, crate::Configured>,
+    pub(crate) configured: Map<u16, crate::Configured>,
     pub(crate) under_box: bool,
     pub(crate) demo: Option<crate::DemoConfig>,
     pub(crate) demo_state: Option<crate::DemoState>,
     pub(crate) demo_pending: Map<Token, Token>,
     pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
-    connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
+    pub(crate) connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
     first: Map<u16, crate::First>,
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,
     setup_pending: Map<Token, Token>,
+    pub(crate) connect: crate::connect::State,
     installations: Map<(u16, u64), crate::Installation>,
     pub(crate) repositories: Map<skein_forge::api::Repository, Repository>,
     names: Map<u64, Box<[Name]>>,
@@ -248,6 +249,9 @@ impl Domain {
     #[must_use]
     #[expect(clippy::manual_map, reason = "step code uses explicit matches (programming-model.md, 10)")]
     pub fn application_answer(&self, token: Token) -> Option<crate::Answered> {
+        if let Some(answer) = self.connect.answers.get(&token) {
+            return Some(answer.clone());
+        }
         if let Some(answer) = self.demo_answers.get(&token) {
             return Some(crate::Answered::StartDemo(answer.clone()));
         }
@@ -455,6 +459,7 @@ impl Domain {
             first: Map::with_capacity(l.client.repositories),
             setup_unknown: None,
             setup_pending: Map::with_capacity(l.applications),
+            connect: crate::connect::State::new(l.applications),
             installations: Map::with_capacity(l.client.rows),
             repositories: Map::with_capacity(l.repositories),
             names: Map::with_capacity(l.tasks),
@@ -899,6 +904,9 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             }
             out.push(Request::MarkedForges);
         }
+        Event::ConnectAnswered { forge, request, answer } => crate::connect::connected(d, forge, request, answer, out),
+        Event::InstallAnswered { forge, request, answer } => crate::connect::installed(d, forge, request, answer, out),
+        Event::ConnectEnded { forge, request, connected } => crate::connect::ended(d, forge, request, connected, out),
         Event::SetUpAnswered { forge, request, answer } => {
             if d.demo_pending.contains_key(&request) {
                 if let crate::SetUpAnswer::Refused(_) = answer {
@@ -963,7 +971,10 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 let _gone = d.installations.remove(&(forge, installation));
             }
         },
-        Event::Application { request, token, retention, ask } => match ask {
+        Event::Application { request, token, retention, ask, role, carried } => match ask {
+            ask @ (crate::Ask::Connect { .. } | crate::Ask::Install { .. }) => {
+                crate::connect::start(d, request, token, ask, role, carried, out);
+            }
             crate::Ask::StartDemo => crate::demo::start(d, request, token, out),
             crate::Ask::Adopt(adoption) => adoption::start(d, env, request, token, retention, adoption, out),
             crate::Ask::SetUp { forge, org, repository, project } => {

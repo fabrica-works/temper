@@ -20,6 +20,8 @@ const GOLDENS: &[(Option<u8>, &str)] = &[
     (Some(20), "help_pending"),
     (Some(17), "help_adopt"),
     (Some(31), "help_amend"),
+    (Some(37), "help_forge_connect"),
+    (Some(38), "help_forge_install"),
 ];
 #[test]
 fn the_help_prints_as_its_golden_files() {
@@ -73,6 +75,8 @@ const USAGES: &[&[u8]] = &[
     b"forges\n",
     b"forge-setup F [--org O] [--repository R] [--project P] [--key NAME]\n",
     b"demo-start [--key NAME]\n",
+    b"forge-connect F github-app ID FILE --key NAME\nforge-connect F github --key NAME\nforge-connect F forgejo|forgejo-admin FILE --key NAME\n",
+    b"forge-install F [--key NAME]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

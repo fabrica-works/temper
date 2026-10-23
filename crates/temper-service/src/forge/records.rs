@@ -65,6 +65,7 @@ pub(crate) struct Loader {
 enum Phase {
     Load { after: Option<u64> },
     Connect { index: usize },
+    Sweep { number: u64, asked: bool },
     Name { after: u32 },
     Done,
 }
@@ -86,18 +87,32 @@ impl Loader {
     }
     pub(crate) fn loading(&self) -> bool {
         match self.phase {
-            Phase::Load { .. } => true,
+            Phase::Load { .. } | Phase::Sweep { .. } => true,
             Phase::Connect { .. } | Phase::Name { .. } | Phase::Done => false,
         }
     }
     pub(crate) fn done(&self) -> bool {
         matches_done(&self.phase)
     }
+    pub(crate) fn erasing(&self, number: u64) -> bool {
+        match self.phase {
+            Phase::Sweep { number: held, asked: true } => held == number,
+            Phase::Sweep { asked: false, .. }
+            | Phase::Load { .. }
+            | Phase::Connect { .. }
+            | Phase::Name { .. }
+            | Phase::Done => false,
+        }
+    }
+    pub(crate) fn erased(&mut self) {
+        let Phase::Sweep { number, asked: true } = self.phase else { unreachable!("startup erase terminal") };
+        self.phase = Phase::Load { after: Some(number) };
+    }
     pub(crate) fn loaded(&mut self, rows: Box<[jig_protocol_store::SecretRow]>, next: Option<u64>) {
         for row in rows {
-            // Inspect the number alone. Carried rows belong to temper-13, including their bytes.
+            // The value is never inspected; restart has no live connect.
             if row.number >= records::CARRIED {
-                self.phase = Phase::Connect { index: 0 };
+                self.phase = Phase::Sweep { number: row.number, asked: false };
                 return;
             }
             #[cfg(test)]
@@ -105,15 +120,15 @@ impl Loader {
             self.rows.push(row.number, row.value, self.value_bytes);
         }
         self.phase = match next {
-            Some(after) if after < records::CARRIED => Phase::Load { after: Some(after) },
-            Some(_) | None => Phase::Connect { index: 0 },
+            Some(after) => Phase::Load { after: Some(after) },
+            None => Phase::Connect { index: 0 },
         };
     }
 }
 fn matches_done(phase: &Phase) -> bool {
     match phase {
         Phase::Done => true,
-        Phase::Load { .. } | Phase::Connect { .. } | Phase::Name { .. } => false,
+        Phase::Load { .. } | Phase::Sweep { .. } | Phase::Connect { .. } | Phase::Name { .. } => false,
     }
 }
 pub(crate) fn advance(engine: &mut crate::engine::Engine) {
@@ -132,6 +147,13 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                     engine.forge_records.loaded(rows, next);
                 }
                 Some(_) | None => crate::stop::unavailable(engine, b"forge records"),
+            }
+        }
+        Phase::Sweep { number, asked } => {
+            if !asked && engine.store.room() {
+                engine.forge_records.phase = Phase::Sweep { number, asked: true };
+                let decision = temper_engine_domain::carried_at_start(number);
+                crate::route::request(engine, decision);
             }
         }
         Phase::Connect { index } => {

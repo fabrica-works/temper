@@ -14,6 +14,8 @@ fn start(d: &mut Domain, number: u64) -> Box<[Request]> {
     outputs(
         d,
         Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(number),
             token: Token::new(number.checked_add(100).unwrap()),
             retention: Duration::from_secs(60),

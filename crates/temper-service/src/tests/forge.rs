@@ -593,7 +593,7 @@ fn startup_records() -> skein_lib::List<(u64, skein_lib::Secret)> {
     clippy::too_many_lines,
     reason = "one paged startup proves routing and retention beside its existing handoffs"
 )]
-fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
+fn records_start_erases_carried_rows_before_connecting_without_decoding_them() {
     use jig_protocol_store::{SecretOwner, Secrets};
     use skein_lib::List;
     use temper_protocol_records::{self as records, NotConnected};
@@ -630,11 +630,19 @@ fn records_start_routes_two_pages_without_erasing_or_reading_carried_values() {
         service.engine.as_ref().expect("engine").forge_records.rows.forge(77).is_none(),
         "unconfigured values are not retained"
     );
-    assert_eq!(service.engine.as_ref().expect("engine").store.forge_loads.len(), 2);
-    for cursor in &service.engine.as_ref().expect("engine").store.forge_loads {
-        assert!(cursor.is_none_or(|number| number < records::CARRIED));
+    assert_eq!(service.engine.as_ref().expect("engine").store.forge_loads.len(), 4);
+    assert_eq!(service.engine.as_ref().expect("engine").store.erases, 2);
+    for number in [records::CARRIED, records::CARRIED + 1] {
+        let Some(jig_protocol_store::Event::Secret { value: None, .. }) = service
+            .engine
+            .as_mut()
+            .unwrap()
+            .store
+            .secrets(Token::new(125), Secrets::Get { owner: SecretOwner::Application, number })
+        else {
+            panic!("surviving carried row erased")
+        };
     }
-    assert_eq!(service.engine.as_ref().expect("engine").store.erases, 0);
     for number in &service.engine.as_ref().expect("engine").forge_records.inspected {
         assert!(*number < records::CARRIED);
     }
@@ -732,6 +740,9 @@ fn an_unkept_installation_only_emits_its_diagnostic() {
 fn assert_records_untouched(service: &mut crate::Service, kept: &skein_lib::List<(u64, skein_lib::Secret)>) {
     use jig_protocol_store::{SecretOwner, Secrets};
     for (number, original) in kept {
+        if *number >= temper_protocol_records::CARRIED {
+            continue;
+        }
         let Some(jig_protocol_store::Event::Secret { value: Some(found), .. }) = service
             .engine
             .as_mut()
@@ -808,5 +819,5 @@ fn a_records_key_that_cannot_sign_stops_only_its_forge() {
     assert_eq!(service.end(), None);
     face.select(1);
     assert!(face.sent().starts_with(b"GET /api/v1/user "));
-    assert_eq!(service.engine.as_ref().expect("engine").store.erases, 0);
+    assert_eq!(service.engine.as_ref().expect("engine").store.erases, 2);
 }

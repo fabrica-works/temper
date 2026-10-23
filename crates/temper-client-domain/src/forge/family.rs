@@ -106,6 +106,9 @@ pub fn answer(record: &jig_client::Family, limits: &w::Limits, link: &link::Limi
         }),
         w::Outcome::Unknown => forge::Answer::Unknown,
         w::Outcome::Returning
+        | w::Outcome::Connecting
+        | w::Outcome::Link(_)
+        | w::Outcome::ConnectRefused(_)
         | w::Outcome::SettingUp
         | w::Outcome::SetUpRefused(_)
         | w::Outcome::Running
@@ -211,6 +214,9 @@ pub fn set_up_answer(record: &jig_client::Family, limits: &w::Limits) -> Option<
         }),
         w::Outcome::Unknown => O::Unknown,
         w::Outcome::Returning
+        | w::Outcome::Connecting
+        | w::Outcome::Link(_)
+        | w::Outcome::ConnectRefused(_)
         | w::Outcome::Adopted(_)
         | w::Outcome::CoreRefused(_)
         | w::Outcome::ForgeRefused(_)

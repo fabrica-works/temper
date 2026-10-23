@@ -1,6 +1,7 @@
 use crate::*;
 mod adoption;
 mod change;
+mod connect;
 mod demo;
 mod fixtures;
 mod panel;
@@ -299,6 +300,10 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
         | Request::SetUpGroup { .. }
+        | Request::Connect { .. }
+        | Request::Install { .. }
+        | Request::CarriedUnused { .. }
+        | Request::EraseCarried { .. }
         | Request::SetUp { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("permission call"),
@@ -354,6 +359,10 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
         | Request::SetUpGroup { .. }
+        | Request::Connect { .. }
+        | Request::Install { .. }
+        | Request::CarriedUnused { .. }
+        | Request::EraseCarried { .. }
         | Request::SetUp { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("branches call"),
@@ -409,6 +418,10 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::ApplicationAgain { .. }
         | Request::MarkedForges
         | Request::SetUpGroup { .. }
+        | Request::Connect { .. }
+        | Request::Install { .. }
+        | Request::CarriedUnused { .. }
+        | Request::EraseCarried { .. }
         | Request::SetUp { .. }
         | Request::DemoStart { .. }
         | Request::RestartDone { .. } => panic!("settings follows collision read"),
@@ -1299,6 +1312,8 @@ fn routing_tables_take_every_installation_with_the_connection_components_bounds(
 
 fn setup_application(forge: u16, request: Token, token: Token) -> Event {
     Event::Application {
+        role: None,
+        carried: None,
         request,
         token,
         retention: Duration::from_secs(60),
@@ -1459,6 +1474,8 @@ fn a_new_project_is_refused_before_any_box_effect_or_first_repository() {
         let request = Token::new(91);
         let token = Token::new(92);
         let event = Event::Application {
+            role: None,
+            carried: None,
             request,
             token,
             retention: Duration::from_secs(60),
@@ -1530,7 +1547,14 @@ fn setup_names_are_validated_at_admission_on_both_sides_of_the_name_bound() {
                 step(
                     &mut d,
                     &env,
-                    Event::Application { request, token, retention: Duration::from_secs(60), ask },
+                    Event::Application {
+                        role: None,
+                        carried: None,
+                        request,
+                        token,
+                        retention: Duration::from_secs(60),
+                        ask,
+                    },
                     &mut emitted,
                 );
                 if accepted {
@@ -1575,7 +1599,18 @@ fn admitted_setup_projects_its_fields_as_making_and_the_next_admission_replaces_
             project: first.project.clone(),
         };
         assert_eq!(
-            outputs(&mut d, Event::Application { request, token, retention: Duration::from_secs(60), ask }).as_ref(),
+            outputs(
+                &mut d,
+                Event::Application {
+                    role: None,
+                    carried: None,
+                    request,
+                    token,
+                    retention: Duration::from_secs(60),
+                    ask
+                }
+            )
+            .as_ref(),
             [
                 Request::MarkedForges,
                 Request::SetUp { forge: 1, request, org: org.into(), repository: repository.into() }

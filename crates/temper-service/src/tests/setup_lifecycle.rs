@@ -1,3 +1,4 @@
+#![expect(clippy::disallowed_methods, reason = "ordinary test assertions inspect captured requests")]
 use super::*;
 use crate::setup::lifecycle;
 use skein_forge_connection::{self as connection, Change};
@@ -648,4 +649,387 @@ fn pending_reconcile_wakes_the_loop_only_when_a_run_slot_is_available() {
         !service.engine.as_ref().expect("engine").setup.lifecycle_ready(service.engine.as_ref().expect("engine")),
         "the reconcile now owns the forge"
     );
+}
+
+fn carried_pem() -> (Secret, Secret) {
+    let der = skein_fake_forge_github::keys::KEYS[0];
+    let size = skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, u32::try_from(der.len()).unwrap())
+        .unwrap();
+    let mut writer = skein_lib::Writer::new(
+        usize::try_from(size)
+            .unwrap()
+            .checked_add(b"-----BEGIN RSA PRIVATE KEY-----\n".len())
+            .unwrap()
+            .checked_add(b"\n-----END RSA PRIVATE KEY-----\n".len())
+            .unwrap(),
+    );
+    writer.put(b"-----BEGIN RSA PRIVATE KEY-----\n").unwrap();
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Standard, der, &mut writer).unwrap();
+    writer.put(b"\n-----END RSA PRIVATE KEY-----\n").unwrap();
+    let pem = Secret::new(writer.finish());
+    let mut bundle = skein_lib::Writer::new(pem.expose().len().checked_add(6).unwrap());
+    bundle.put(&[1, 1, 11, 0]).unwrap();
+    bundle.put(&u16::try_from(pem.expose().len()).unwrap().to_le_bytes()).unwrap();
+    bundle.put(pem.expose()).unwrap();
+    (pem, Secret::new(bundle.finish()))
+}
+fn paste_start(service: &mut crate::Service, bundle: Secret, digest: [u8; 32]) {
+    use jig_protocol_store::{SecretOwner, Secrets};
+    let engine = service.engine.as_mut().unwrap();
+    engine.store.secrets(
+        Token::new(901),
+        Secrets::Keep { owner: SecretOwner::Application, number: records::CARRIED, value: bundle },
+    );
+    let Some(StoreEvent::Kept { .. }) = engine.store.above.pop() else { panic!("carried seed kept") };
+    public::connect(
+        engine,
+        1,
+        Token::new(90),
+        core::num::NonZeroU64::new(7).unwrap(),
+        jig_domain_core::Carried { number: records::CARRIED, digest },
+    );
+}
+#[expect(clippy::wildcard_enum_match_arm, reason = "test rejects all unrelated forge events")]
+#[expect(clippy::disallowed_macros, reason = "test formats captured records to scan for PEM")]
+fn paste_ended(service: &mut crate::Service, connected: bool, pem: &[u8]) {
+    let engine = service.engine.as_mut().unwrap();
+    assert!(engine.setup.public.is_empty(), "run releases the PEM");
+    assert_eq!(engine.store.erases, 0, "routing waits for the root's erase decision");
+    let mut ended = 0_u32;
+    while let Some(event) = engine.events.pop() {
+        let text = alloc::format!("{event:?}");
+        assert!(!contains(text.as_bytes(), pem));
+        if let root::Event::Forge(event) = event {
+            match *event {
+                domain::Event::ConnectEnded { forge: 1, request, connected: actual } => {
+                    assert_eq!((request, actual), (Token::new(90), connected));
+                    ended = ended.checked_add(1).unwrap();
+                }
+                domain::Event::ConnectAnswered { answer: domain::ConnectAnswer::Connecting, .. } => {}
+                _ => panic!("unexpected paste event"),
+            }
+        }
+    }
+    assert_eq!(ended, 1);
+    for note in &engine.notes {
+        if let crate::Note::BoxLink { line } = note {
+            assert!(!contains(line, pem));
+        }
+        assert!(!contains(alloc::format!("{note:?}").as_bytes(), pem));
+    }
+    while engine.notes.pop().is_some() {}
+    if connected {
+        let rows = engine.forge_records.rows.forge(1).unwrap();
+        for item in [Item::AppId, Item::AppSlug, Item::AppKey, Item::User, Item::Origin] {
+            assert!(!contains(rows.get(item).unwrap(), pem), "only decoded items are kept");
+        }
+        assert_eq!(rows.get(Item::AppKey).unwrap(), skein_fake_forge_github::keys::KEYS[0]);
+    }
+    for (_, write) in &engine.setup.writes {
+        assert!(!contains(write.value.expose(), pem));
+    }
+    // The root's decision is covered through its real admitted application in domain tests.
+    crate::route::request(engine, root::Request::EraseCarried { number: records::CARRIED });
+    assert_eq!(engine.store.erases, 1);
+    while let Some(event) = engine.store.above.pop() {
+        if let StoreEvent::Erased { .. } = event {
+            answer(engine, event);
+        }
+    }
+    assert_eq!(engine.forge.starts.len(), u32::from(connected));
+    let Some(StoreEvent::Secret { value: None, .. }) = engine.store.secrets(
+        Token::new(902),
+        jig_protocol_store::Secrets::Get {
+            owner: jig_protocol_store::SecretOwner::Application,
+            number: records::CARRIED,
+        },
+    ) else {
+        panic!("carried row erased")
+    };
+}
+#[test]
+fn paste_reads_the_carried_pem_keeps_identity_then_origin_connects_and_erases_after_root_decides() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let (pem, bundle) = carried_pem();
+    let digest = skein_lib::sha256::digest(bundle.expose());
+    paste_start(&mut service, bundle, digest);
+    let mut face = Face::new();
+    face.sent(&mut service);
+    let (_, host::Answer::Read(Some(read))) = service.engine.as_mut().unwrap().setup.answers.pop().unwrap() else {
+        panic!("Pasted read")
+    };
+    assert_eq!(read.expose(), pem.expose());
+    assert!(!contains(&face.wire.received, pem.expose()));
+    face.reply(&mut service, br#"{"id":7,"slug":"app-fixture","permissions":{},"events":[]}"#);
+    face.sent(&mut service);
+    face.reply(&mut service, br#"{"id":9,"login":"app-fixture[bot]"}"#);
+    face.sent(&mut service);
+    face.reply(&mut service, br#"{"url":"https://app-fixture.invalid/","content_type":"json","insecure_ssl":"0"}"#);
+    for item in [Item::AppId, Item::AppSlug, Item::AppKey, Item::User] {
+        assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
+        keep_next(&mut service, item);
+        face.turn(&mut service);
+    }
+    assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
+    keep_next(&mut service, Item::Origin);
+    assert!(service.engine.as_ref().unwrap().forge.starts.is_empty(), "Connect waits for root-directed durable erase");
+    paste_ended(&mut service, true, pem.expose());
+    service.engine.as_mut().unwrap().forge.above.push(connection::Event::Connected { forge: 1 });
+    crate::engine::forge_pass(service.engine.as_mut().unwrap());
+    let event = service.engine.as_mut().unwrap().events.pop().expect("Connected tells the root");
+    let root::Event::Forge(connection) = &event else { panic!("root connection event") };
+    let domain::Event::Connection { state: domain::Connection::Connected { .. }, .. } = connection.as_ref() else {
+        panic!("Connected event")
+    };
+    service.engine.as_mut().unwrap().step(event);
+    advance(service.engine.as_mut().unwrap());
+    assert_eq!(service.engine.as_ref().unwrap().setup.runs.first().unwrap().1.kind, Kind::Reconcile);
+}
+#[test]
+fn a_changed_digest_writes_nothing_logs_the_reason_and_erases_after_root_decides() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let (pem, bundle) = carried_pem();
+    paste_start(&mut service, bundle, [0; 32]);
+    assert!(service.engine.as_ref().unwrap().setup.writes.is_empty());
+    assert!(service.engine.as_ref().unwrap().setup.io.is_empty());
+    assert!(service.engine.as_ref().unwrap().notes.iter().any(|note| if let crate::Note::BoxLink { line } = note {
+        line.as_ref() == b"the pasted value changed"
+    } else {
+        false
+    }));
+    paste_ended(&mut service, false, pem.expose());
+}
+#[test]
+fn a_stopped_paste_erases_its_carried_row_and_keeps_no_pem_in_its_terminal() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let (pem, bundle) = carried_pem();
+    let digest = skein_lib::sha256::digest(bundle.expose());
+    paste_start(&mut service, bundle, digest);
+    let mut face = Face::new();
+    face.sent(&mut service);
+    // Valid JSON with a different App proves that a host stop uses the same cleanup path.
+    face.reply(&mut service, br#"{"id":8,"slug":"other-app","permissions":{},"events":[]}"#);
+    assert!(service.engine.as_ref().unwrap().setup.writes.is_empty());
+    paste_ended(&mut service, false, pem.expose());
+}
+#[test]
+fn a_carried_bundle_of_the_wrong_item_is_not_a_key() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let bundle = Secret::new(Box::from([1, 1, 1, 0, 1, 0, 42]));
+    let digest = skein_lib::sha256::digest(bundle.expose());
+    paste_start(&mut service, bundle, digest);
+    assert!(service.engine.as_ref().unwrap().notes.iter().any(|note| if let crate::Note::BoxLink { line } = note {
+        line.as_ref() == b"the pasted value is not a key"
+    } else {
+        false
+    }));
+    assert!(service.engine.as_ref().unwrap().setup.writes.is_empty());
+}
+
+fn install_link(service: &mut crate::Service, back: Option<&[u8]>) -> Box<[u8]> {
+    public::install(service.engine.as_mut().unwrap(), 1, Token::new(91), back.map(Box::from));
+    assert!(service.engine.as_ref().unwrap().events.is_empty(), "the link waits for Done");
+    for _ in 0_u32..8 {
+        advance(service.engine.as_mut().unwrap());
+    }
+    let engine = service.engine.as_mut().unwrap();
+    let mut link = None;
+    while let Some(event) = engine.events.pop() {
+        if let root::Event::Forge(event) = event {
+            let domain::Event::InstallAnswered { request, answer: domain::InstallAnswer::Link(url), .. } = *event
+            else {
+                panic!("install link")
+            };
+            assert_eq!(request, Token::new(91));
+            link = Some(url);
+        }
+    }
+    let link = link.expect("Install Done answers the link");
+    assert!(engine.setup.public.is_empty());
+    let at = skein_lib::bytes::find(&link, b"state=").unwrap().checked_add(6).unwrap();
+    Box::from(&link[at..])
+}
+fn setup_target(state: &[u8]) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(
+        b"/forges/1/github/setup?installation_id=22&setup_action=install&state="
+            .len()
+            .checked_add(state.len())
+            .unwrap(),
+    );
+    writer.put(b"/forges/1/github/setup?installation_id=22&setup_action=install&state=").unwrap();
+    writer.put(state).unwrap();
+    writer.finish()
+}
+fn visit(service: &mut crate::Service, method: &[u8], target: &[u8]) -> fixtures::http::Peer {
+    let mut peer = fixtures::http::Peer::new(service.engine.as_mut().unwrap(), method, target, &[], None);
+    pump_visit(service, &mut peer);
+    peer
+}
+fn pump_visit(service: &mut crate::Service, peer: &mut fixtures::http::Peer) {
+    for _ in 0_u32..4 {
+        peer.pump(service.engine.as_mut().unwrap(), false);
+        advance(service.engine.as_mut().unwrap());
+    }
+    peer.pump(service.engine.as_mut().unwrap(), false);
+}
+fn status(peer: &fixtures::http::Peer, code: &[u8]) {
+    assert!(contains(peer.received(), code), "response: {}", core::str::from_utf8(peer.received()).unwrap());
+    for header in [b"Cache-Control: no-store".as_slice(), b"Referrer-Policy: no-referrer"] {
+        assert!(contains(peer.received(), header));
+    }
+}
+fn complete_accept(service: &mut crate::Service, peer: &mut fixtures::http::Peer) {
+    assert!(peer.received().is_empty(), "HTTP waits for Accept");
+    let mut face = Face::new();
+    face.sent(service);
+    face.reply(service, br#"{"id":22,"app_id":7,"account":{"id":122,"login":"account-fixture","type":"Organization"},"target_type":"Organization","created_at":"1970-01-01T00:00:00Z","suspended_at":null}"#);
+    assert!(peer.received().is_empty(), "HTTP waits for Accepted's durable keep");
+    keep_next(service, Item::Accepted);
+    pump_visit(service, peer);
+}
+#[test]
+fn install_stop_answers_connecting_without_a_link() {
+    let mut service = service(8, Duration::from_secs(3600));
+    public::install(service.engine.as_mut().unwrap(), 1, Token::new(91), None);
+    assert!(service.engine.as_ref().unwrap().events.is_empty());
+    for _ in 0_u32..8 {
+        advance(service.engine.as_mut().unwrap());
+    }
+    let Some(root::Event::Forge(event)) = service.engine.as_mut().unwrap().events.pop() else {
+        panic!("Install stop answer")
+    };
+    assert_eq!(
+        *event,
+        domain::Event::InstallAnswered { forge: 1, request: Token::new(91), answer: domain::InstallAnswer::Connecting }
+    );
+}
+#[test]
+fn setup_accept_redirects_to_back_after_done_and_a_refresh_is_ended() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let state = install_link(&mut service, Some(b"/forges?from=connect"));
+    let target = setup_target(&state);
+    let mut peer = visit(&mut service, b"GET", &target);
+    complete_accept(&mut service, &mut peer);
+    status(&peer, b"303");
+    assert!(contains(peer.received(), b"Location: /forges?from=connect"));
+    let again = visit(&mut service, b"GET", &target);
+    status(&again, b"410");
+    assert!(contains(again.received(), b"This link has ended"));
+}
+#[test]
+fn setup_accept_without_back_answers_its_close_tab_page() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let state = install_link(&mut service, None);
+    let mut peer = visit(&mut service, b"GET", &setup_target(&state));
+    complete_accept(&mut service, &mut peer);
+    status(&peer, b"200");
+    assert!(contains(peer.received(), b"temper has the installation; you may close this tab."));
+}
+#[test]
+fn setup_unknown_state_is_ended_without_calling_github() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let peer = visit(&mut service, b"GET", &setup_target(b"unknown"));
+    status(&peer, b"410");
+    assert!(service.engine.as_ref().unwrap().setup.io.is_empty());
+}
+#[test]
+fn setup_expired_state_is_ended() {
+    let mut service = service(8, Duration::from_secs(3));
+    app(&mut service);
+    let state = install_link(&mut service, Some(b"/forges"));
+    service.engine.as_mut().unwrap().env.now = Time::ZERO.saturating_add(Duration::from_secs(3));
+    let peer = visit(&mut service, b"GET", &setup_target(&state));
+    status(&peer, b"410");
+}
+#[test]
+fn setup_accept_stop_answers_the_ended_page() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let state = install_link(&mut service, Some(b"/forges"));
+    let mut peer = visit(&mut service, b"GET", &setup_target(&state));
+    let mut face = Face::new();
+    face.sent(&mut service);
+    face.reply(&mut service, br#"{"id":23,"app_id":7,"account":{"id":122,"login":"account-fixture","type":"Organization"},"target_type":"Organization","created_at":"1970-01-01T00:00:00Z","suspended_at":null}"#);
+    pump_visit(&mut service, &mut peer);
+    status(&peer, b"410");
+}
+#[test]
+fn setup_request_uses_and_removes_the_back_entry_without_accepting() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    let state = install_link(&mut service, Some(b"/forges?first=1&next=2"));
+    let mut target = skein_lib::Writer::new(
+        b"/forges/1/github/setup?setup_action=request&state=".len().checked_add(state.len()).unwrap(),
+    );
+    target.put(b"/forges/1/github/setup?setup_action=request&state=").unwrap();
+    target.put(&state).unwrap();
+    let target = target.finish();
+    let peer = visit(&mut service, b"GET", &target);
+    status(&peer, b"200");
+    assert!(contains(peer.received(), b"GitHub sent a request, not an installation"));
+    assert!(contains(peer.received(), b"href=\"/forges?first=1&amp;next=2\""));
+    assert!(service.engine.as_ref().unwrap().setup.io.is_empty());
+    assert!(service.engine.as_ref().unwrap().setup.backs.is_empty());
+    let peer = visit(&mut service, b"GET", &target);
+    status(&peer, b"410");
+}
+#[test]
+fn setup_without_state_redirects_an_already_accepted_installation_to_forges() {
+    let mut service = service(8, Duration::from_secs(3600));
+    accepted(&mut service, &[22]);
+    let peer = visit(&mut service, b"GET", b"/forges/1/github/setup?installation_id=22&setup_action=update");
+    status(&peer, b"303");
+    assert!(contains(peer.received(), b"Location: /forges"));
+}
+#[test]
+fn setup_without_state_refuses_a_stray_installation() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let peer = visit(&mut service, b"GET", b"/forges/1/github/setup?installation_id=22&setup_action=install");
+    status(&peer, b"410");
+}
+#[test]
+fn setup_malformed_queries_are_bad_requests() {
+    for query in [
+        b"".as_slice(),
+        b"installation_id=0&setup_action=install",
+        b"installation_id=22&setup_action=other",
+        b"state=%GG&setup_action=request",
+        b"state=s&state=s&setup_action=request",
+    ] {
+        let mut service = service(8, Duration::from_secs(3600));
+        let mut target = skein_lib::Writer::new(b"/forges/1/github/setup?".len().checked_add(query.len()).unwrap());
+        target.put(b"/forges/1/github/setup?").unwrap();
+        target.put(query).unwrap();
+        let peer = visit(&mut service, b"GET", &target.finish());
+        status(&peer, b"400");
+    }
+}
+#[test]
+fn setup_queries_past_the_configured_bound_are_bad_requests() {
+    let mut service = service(8, Duration::from_secs(3600));
+    service.engine.as_mut().unwrap().clients.query_bytes = 1;
+    let peer = visit(&mut service, b"GET", b"/forges/1/github/setup?setup_action=request&state=s");
+    status(&peer, b"400");
+}
+#[test]
+fn setup_non_get_is_method_not_allowed() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let peer = visit(&mut service, b"POST", b"/forges/1/github/setup");
+    status(&peer, b"405");
+}
+#[test]
+fn setup_unconfigured_forge_is_not_found() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let peer = visit(&mut service, b"GET", b"/forges/2/github/setup");
+    status(&peer, b"404");
+}
+#[test]
+fn setup_forgejo_is_not_found() {
+    let mut service = service(8, Duration::from_secs(3600));
+    service.engine.as_mut().unwrap().workers.forges[0].kind = crate::settings::Kind::Forgejo;
+    let peer = visit(&mut service, b"GET", b"/forges/1/github/setup");
+    status(&peer, b"404");
 }

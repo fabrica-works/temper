@@ -80,10 +80,14 @@ pub fn class(call: &Call) -> Class {
 /// Key files have a separate purpose and never feed the ordinary text input.
 pub(crate) fn key_file(call: &Call) -> Option<&[u8]> {
     let name = TOOLS.get(usize::from(call.tool))?.name;
-    if name != rows::ADD_KEY.name && name != rows::REPLACE_KEY.name {
+    let index = if name == b"forge-connect" && call.form == 0 {
+        3
+    } else if name == rows::ADD_KEY.name || name == rows::REPLACE_KEY.name {
+        1
+    } else {
         return None;
-    }
-    match call.values.get(1)? {
+    };
+    match call.values.get(index)? {
         Some(Values::One(Value::File(path))) => Some(path),
         _ => None,
     }
@@ -108,4 +112,9 @@ pub fn text_files(parsed: &Parsed) -> Vec<(u8, Box<[u8]>)> {
         }
     }
     files
+}
+
+/// PEM has six bytes of carried-bundle framing within jig's 4096-byte bound.
+pub(crate) fn key_bytes(call: &Call) -> u32 {
+    if TOOLS[usize::from(call.tool)].name == b"forge-connect" { 4090 } else { temper_client_tools::limits::KEY_BYTES }
 }

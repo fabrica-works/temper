@@ -1,6 +1,8 @@
 //! Durable setup needs and held manifest pages (protocol/forge.md, 2.6).
 pub(crate) mod diagnostics;
 pub(crate) mod lifecycle;
+pub(crate) mod public;
+mod routes;
 mod settings;
 use alloc::boxed::Box;
 use jig_protocol_store::Event as StoreEvent;
@@ -25,6 +27,10 @@ pub(crate) struct Layer {
     unserved: Map<u16, &'static [u8]>,
     pub(crate) staged: Map<Token, host::Plan>,
     runs: Map<Token, Run>,
+    public: Map<Token, public::Caller>,
+    backs: Queue<public::ReturnTo>,
+    pastes: Map<u64, u16>,
+    erases: Map<Token, u16>,
     lifecycle: lifecycle::Lifecycle,
     writes: Map<Token, Write>,
     next_write: u64,
@@ -144,6 +150,14 @@ pub(crate) fn worst_case(
         )?
         .checked_add(Map::<Token, host::Plan>::worst_case(l.runs)?)?
         .checked_add(Map::<Token, Run>::worst_case(l.runs)?)?
+        // One Get bundle is transient while its decoded PEM takes the final run slot.
+        .checked_add(4096)?
+        .checked_add(Map::<Token, public::Caller>::worst_case(l.runs)?)?
+        .checked_add(Map::<u64, u16>::worst_case(l.forges)?)?
+        .checked_add(Map::<Token, u16>::worst_case(l.forges)?)?
+        .checked_add(u64::from(l.runs).checked_mul(4096 + 512)?)?
+        .checked_add(Queue::<public::ReturnTo>::worst_case(l.states)?)?
+        .checked_add(u64::from(l.states).checked_mul(STATE_TEXT_BYTES + 512)?)?
         .checked_add(
             name.checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?
                 .max(STOPPED_TEXT_BYTES)
@@ -212,6 +226,10 @@ impl Layer {
             unserved: Map::with_capacity(limits.forges),
             staged: Map::with_capacity(limits.runs),
             runs: Map::with_capacity(limits.runs),
+            public: Map::with_capacity(limits.runs),
+            backs: Queue::with_capacity(limits.states),
+            pastes: Map::with_capacity(limits.forges),
+            erases: Map::with_capacity(limits.forges),
             lifecycle: lifecycle::Lifecycle::new(limits.forges, installations),
             writes: Map::with_capacity(limits.runs.checked_add(limits.forges).expect("setup writes")),
             next_write: 1,
@@ -257,6 +275,8 @@ impl Layer {
         self.lifecycle.adoptions = Map::with_capacity(self.env.limits.forges);
         self.lifecycle.reconcile = Map::with_capacity(self.env.limits.forges);
         self.pages = Queue::with_capacity(self.env.limits.states);
+        self.backs = Queue::with_capacity(self.env.limits.states);
+        self.public = Map::with_capacity(self.env.limits.runs);
         self.staged = Map::with_capacity(self.env.limits.runs);
         if self.component.is_some() {
             self.down(host::Request::Close);
@@ -388,6 +408,9 @@ fn matches_app_plan(plan: &host::Plan) -> bool {
     }
 }
 fn ended(engine: &mut crate::engine::Engine, run: Token, end: root::SetupEnd) {
+    if public::ended(engine, run, &end) {
+        return;
+    }
     engine.events.push(root::Event::Setup { run, end });
 }
 fn begin(engine: &mut crate::engine::Engine) {
@@ -412,6 +435,7 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
     engine.setup.env.now = engine.env.now;
     engine.setup.env.wall = engine.env.wall;
     begin(engine);
+    routes::advance(engine);
     for _ in 0..engine.setup.pages.len() {
         if !due(
             match engine.setup.pages.iter().next() {
@@ -449,7 +473,15 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                 let forge = engine.setup.runs.get(&run).expect("live setup run").forge;
                 match need {
                     host::Need::Read(item) => {
-                        let item = item_record(item);
+                        if item == skein_forge_setup::item::Item::Pasted {
+                            let value = match engine.setup.public.get(&run) {
+                                Some(public::Caller::Connect { pem, .. }) => pem.clone(),
+                                Some(public::Caller::Install { .. } | public::Caller::Accept { .. }) | None => None,
+                            };
+                            engine.setup.down(host::Request::Answer { run, answer: host::Answer::Read(value) });
+                            continue;
+                        }
+                        let item = item_record(item).expect("record item");
                         let files = match engine.setup.lifecycle.adoptions.get(&forge) {
                             Some(adoption) => adoption.files.as_ref(),
                             None => None,
@@ -472,7 +504,13 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                         engine.setup.down(host::Request::Answer { run, answer });
                     }
                     host::Need::Write { item, bytes } => {
-                        lifecycle::keep(engine, forge, item_record(item), bytes.expose(), Purpose::Host(run));
+                        lifecycle::keep(
+                            engine,
+                            forge,
+                            item_record(item).expect("host never writes Pasted"),
+                            bytes.expose(),
+                            Purpose::Host(run),
+                        );
                     }
                 }
             }
@@ -487,6 +525,16 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
     lifecycle::advance(engine);
 }
 pub(crate) fn answer(engine: &mut crate::engine::Engine, event: StoreEvent) {
+    if let StoreEvent::Erased { owner } = event {
+        if let Some(forge) = engine.setup.erases.remove(&owner)
+            && !engine.setup.closing
+            && engine.drain.is_none()
+            && engine.end.is_none()
+        {
+            lifecycle::connect(engine, forge);
+        }
+        return;
+    }
     if let StoreEvent::Kept { owner } = event {
         let write = engine.setup.writes.remove(&owner).expect("setup keep owner");
         engine.forge_records.rows.push(write.number, write.value, engine.setup.value_bytes);
@@ -497,9 +545,9 @@ pub(crate) fn answer(engine: &mut crate::engine::Engine, event: StoreEvent) {
         crate::stop::unavailable(engine, b"forge records");
     }
 }
-fn item_record(item: skein_forge_setup::item::Item) -> Item {
+fn item_record(item: skein_forge_setup::item::Item) -> Option<Item> {
     use skein_forge_setup::item::Item as I;
-    match item {
+    Some(match item {
         I::AdminToken => Item::AdminToken,
         I::ApiToken => Item::ApiToken,
         I::GitToken => Item::GitToken,
@@ -509,8 +557,8 @@ fn item_record(item: skein_forge_setup::item::Item) -> Item {
         I::AppSlug => Item::AppSlug,
         I::AppKey => Item::AppKey,
         I::Accepted => Item::Accepted,
-        I::Pasted => unreachable!("temper-13 provides carried paste rows"),
-    }
+        I::Pasted => return None,
+    })
 }
 #[expect(
     clippy::disallowed_macros,

@@ -293,6 +293,7 @@ fn stop_from_settled_still_releases_the_drain_terminal() {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "the exhaustive output rejection includes public forge requests")]
 fn stopping_continues_projection_deferred_finishing_without_new_commits() {
     use jig_domain_core as core;
     use jig_domain_tasks as tasks;
@@ -375,6 +376,9 @@ fn stopping_continues_projection_deferred_finishing_without_new_commits() {
                 Request::Party(crate::PartyRequest::Deliver(crate::Delivery::WebReply { .. })) => {}
                 other @ (Request::Setup { .. }
                 | Request::SetUpGroup { .. }
+                | Request::Connect { .. }
+                | Request::Install { .. }
+                | Request::EraseCarried { .. }
                 | Request::SetUp { .. }
                 | Request::Return { .. }
                 | Request::Store(_)

@@ -28,6 +28,7 @@ pub struct Clients {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
     pub setup: temper_forge_setup::limits::Host,
+    pub routes: Routes,
     pub records: Records,
     pub forges: Forges,
     pub forge_component: skein_forge_connection::Limits,
@@ -36,6 +37,11 @@ pub struct Limits {
     pub checkout: checkout::Limits,
     pub git_component: temper_worker_protocol_git::Limits,
     pub clients: Clients,
+}
+/// Forge routes' query bound (protocol/configuration.md, 7).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Routes {
+    pub query_bytes: u32,
 }
 /// Routing bounds (protocol/configuration.md, 7).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -286,6 +292,7 @@ pub const SOCKETS: u32 = 64;
 pub fn profile(profile: Profile) -> Limits {
     match profile {
         Profile::Small => Limits {
+            routes: Routes { query_bytes: 2048 },
             setup: temper_forge_setup::limits::host(),
             records: Records { value_bytes: 4096 },
             forges: Forges { installations: FORGE_INSTALLATIONS, log_origins: 4 },

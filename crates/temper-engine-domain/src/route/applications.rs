@@ -22,13 +22,16 @@ pub(super) fn start(domain: &mut Domain, admission: Admission, request: Applicat
     domain.next_application_owner = domain.next_application_owner.checked_add(1).expect("application owner counter");
     let Admission { reply_to, sign_in, key, digest, scope, carried } = admission;
     let scope = match &request {
-        Application::Forge(forge::Ask::SetUp { .. } | forge::Ask::StartDemo) => people::ApplicationScope::Deployment,
+        Application::Forge(
+            forge::Ask::SetUp { .. } | forge::Ask::StartDemo | forge::Ask::Connect { .. } | forge::Ask::Install { .. },
+        ) => people::ApplicationScope::Deployment,
         Application::Forge(forge::Ask::Adopt(_)) => scope,
         Application::Return { .. } => people::ApplicationScope::Own,
     };
     if request == Application::Forge(forge::Ask::StartDemo) {
         domain.application_demo = Some(super::demo::Context { sign_in, key, carried });
     }
+    domain.application_carried = carried;
     domain.application = Some((owner, request));
     domain.work.push(Work::Core(core::Event::Application {
         reply_to,
@@ -48,11 +51,12 @@ pub(super) fn admitted(
     token: Token,
     owner: Token,
     retention: Duration,
-    now: skein_lib::Time,
-    wall: skein_lib::Wall,
+    role: Option<people::Role>,
+    env: &skein_lib::Env<crate::Limits>,
 ) {
     let (held, ask) = domain.application.take().expect("one admitted application value");
     assert_eq!(held, owner, "the core admits the application's owner");
+    let carried = domain.application_carried.take();
     match ask {
         Application::Forge(ask) => {
             if let Some(context) = domain.application_demo.take() {
@@ -62,14 +66,14 @@ pub(super) fn admitted(
                 }
                 assert!(domain.demo_contexts.insert(request, context).is_ok(), "bounded admitted starts");
             }
-            domain.work.push(Work::Forge(forge::Event::Application { request, token, retention, ask }));
+            domain.work.push(Work::Forge(forge::Event::Application { request, token, retention, ask, role, carried }));
         }
         Application::Return { source, path } => {
             // Only live keyed answers need a volatile marker; the core bounds their room.
             loop {
                 let mut expired = None;
                 for (held, until) in &domain.returns {
-                    if until.0 <= now || until.1 <= wall {
+                    if until.0 <= env.now || until.1 <= env.wall {
                         expired = Some(*held);
                         break;
                     }
@@ -82,8 +86,8 @@ pub(super) fn admitted(
                 .insert(
                     token,
                     (
-                        now.saturating_add(retention),
-                        skein_lib::Wall::from_nanos(wall.as_nanos().saturating_add(retention.as_nanos())),
+                        env.now.saturating_add(retention),
+                        skein_lib::Wall::from_nanos(env.wall.as_nanos().saturating_add(retention.as_nanos())),
                     ),
                 )
                 .expect("one marker per retained key");
@@ -98,6 +102,7 @@ pub(super) fn drop(domain: &mut Domain, owner: Token) {
         assert_eq!(*held, owner, "drop names the application owner");
         domain.application = None;
         domain.application_demo = None;
+        domain.application_carried = None;
     }
 }
 
@@ -128,6 +133,8 @@ pub(super) fn answer(domain: &Domain, token: Token) -> Option<ApplicationAnswer>
         Some(forge::Answered::Adopt(answer)) => Some(ApplicationAnswer::Adopt(answer)),
         Some(forge::Answered::SetUp(answer)) => Some(ApplicationAnswer::SetUp(answer)),
         Some(forge::Answered::StartDemo(answer)) => Some(ApplicationAnswer::StartDemo(answer)),
+        Some(forge::Answered::Connect(answer)) => Some(ApplicationAnswer::Connect(answer)),
+        Some(forge::Answered::Install(answer)) => Some(ApplicationAnswer::Install(answer)),
         None => None,
     }
 }

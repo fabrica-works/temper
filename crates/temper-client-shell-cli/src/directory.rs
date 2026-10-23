@@ -396,7 +396,7 @@ impl Directory {
         self.class = class;
         self.stage = Stage::Start;
     }
-    pub(crate) fn load_key(&mut self, path: &[u8]) {
+    pub(crate) fn load_key(&mut self, path: &[u8], max: u32) {
         if self.file_root.is_none() {
             self.fail(b"key file could not be read: file has no parent");
             return;
@@ -405,7 +405,7 @@ impl Directory {
         if self.closing {
             return;
         }
-        self.link_max = temper_client_tools::limits::KEY_BYTES + 1;
+        self.link_max = max + 1;
         self.stage = Stage::KeyOpen;
     }
     fn close_text_root(&mut self) -> Option<Token> {

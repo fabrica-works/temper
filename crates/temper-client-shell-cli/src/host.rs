@@ -620,7 +620,16 @@ impl Host for OneShot {
             self.directory.progress(now);
         }
         if let Some(error) = self.directory.error.take() {
-            self.fail(&error);
+            if let Some(Parsed::Call { call, json }) = self.call.take() {
+                if arguments::key_file(&call).is_some() {
+                    self.key_file_fail(&call, &error);
+                } else {
+                    self.fail(&error);
+                }
+                self.call = Some(Parsed::Call { call, json });
+            } else {
+                self.fail(&error);
+            }
         }
         if !self.preparing || self.status.is_some() {
             self.link_progress(now, wall);

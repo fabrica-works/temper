@@ -677,6 +677,9 @@ pub fn settle_root(
                 }
                 root::Request::Setup { .. }
                 | root::Request::SetUpGroup { .. }
+                | root::Request::Connect { .. }
+                | root::Request::Install { .. }
+                | root::Request::EraseCarried { .. }
                 | root::Request::SetUp { .. }
                 | root::Request::Return { .. }
                 | root::Request::Forge { .. }

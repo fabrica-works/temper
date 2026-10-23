@@ -80,7 +80,13 @@ impl Harness {
             .request
         {
             w::Request::Adopt(adopt) => adopt,
-            w::Request::Return(_) | w::Request::SetUp(_) | w::Request::StartDemo => panic!("expected adoption"),
+            w::Request::Return(_)
+            | w::Request::SetUp(_)
+            | w::Request::StartDemo
+            | w::Request::Connect(_)
+            | w::Request::Install(_) => {
+                panic!("expected adoption")
+            }
         })
         .into_parts()
     }

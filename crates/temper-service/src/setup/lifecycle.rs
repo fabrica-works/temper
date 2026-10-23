@@ -15,6 +15,7 @@ use temper_protocol_records::{self as records, Item};
 pub(super) enum Kind {
     Manifest,
     Convert,
+    Paste,
     Install,
     Accept,
     Reconcile,
@@ -206,7 +207,7 @@ pub(super) fn kind(plan: &host::Plan) -> Kind {
         host::Plan::Reconcile { .. } => Kind::Reconcile,
         host::Plan::Adopt { .. } => Kind::Adopt,
         host::Plan::Create { .. } => Kind::LocalCreate,
-        host::Plan::Paste { .. } => unreachable!("temper-13 stages Paste"),
+        host::Plan::Paste { .. } => Kind::Paste,
         host::Plan::TakeOver { .. } => Kind::LocalTakeOver,
         host::Plan::Check { .. } => unreachable!("Check is not staged"),
         host::Plan::Reachable { .. } => unreachable!("temper-10 stages Reachable"),
@@ -259,6 +260,7 @@ pub(super) fn keep(engine: &mut crate::engine::Engine, forge: u16, item: Item, b
 pub(super) enum Purpose {
     Host(Token),
     Origin(Token),
+    PasteOrigin(Token),
     LocalOrigin(Token),
     Deleted(u16),
 }
@@ -296,6 +298,16 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
                 None => connect_local(engine, forge),
             }
         }
+    }
+    if kind == Kind::Paste {
+        if let reconcile::Outcome::Lacking { lacking } = &outcome
+            && !lacking.is_empty()
+        {
+            engine.notes.push(crate::Note::ForgeLacking { number: forge, names: super::diagnostics::names(lacking) });
+        }
+        let origin = records::origin(connection::settings::Kind::GitHub, &configured(engine, forge).api).encode();
+        keep(engine, forge, Item::Origin, &origin, Purpose::PasteOrigin(token));
+        return;
     }
     if kind == Kind::Convert {
         let config = configured(engine, forge);
@@ -388,6 +400,10 @@ fn finish(engine: &mut crate::engine::Engine, token: Token, end: root::SetupEnd)
 }
 pub(super) fn kept(engine: &mut crate::engine::Engine, purpose: Purpose) {
     match purpose {
+        Purpose::PasteOrigin(run) => {
+            let forge = engine.setup.runs.get(&run).expect("paste waits on Origin").forge;
+            finish(engine, run, root::SetupEnd::Done { forge, outcome: root::SetupOutcome::Done });
+        }
         Purpose::LocalOrigin(run) => {
             let active = engine.setup.runs.remove(&run).expect("reconcile waits for Origin Kept");
             if !create_local(engine, active.forge) {
@@ -415,7 +431,7 @@ fn configured(engine: &crate::engine::Engine, number: u16) -> &crate::settings::
     }
     unreachable!("configured setup forge")
 }
-fn connect(engine: &mut crate::engine::Engine, forge: u16) {
+pub(super) fn connect(engine: &mut crate::engine::Engine, forge: u16) {
     let expected = records::origin(connection::settings::Kind::GitHub, &configured(engine, forge).api);
     let access = match engine.forge_records.rows.forge(forge) {
         Some(rows) => {
@@ -546,7 +562,7 @@ pub(crate) fn installation(
         installation_event(engine, forge, installation, Some(info));
     }
 }
-fn next_run(lifecycle: &mut Lifecycle) -> Token {
+pub(super) fn next_run(lifecycle: &mut Lifecycle) -> Token {
     assert!(lifecycle.next_run < (1_u64 << 60_u32), "internal setup names");
     let run = Token::new(crate::tokens::SETUP | lifecycle.next_run);
     lifecycle.next_run = lifecycle.next_run.checked_add(1).expect("setup run names");

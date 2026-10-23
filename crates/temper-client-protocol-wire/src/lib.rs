@@ -42,7 +42,7 @@ pub const fn owner(number: u16) -> Option<Owner> {
     }
 }
 /// Every record's version, served by both ends (client/README.md, 4.6).
-pub const CLIENT_VERSION: u32 = 8;
+pub const CLIENT_VERSION: u32 = 9;
 
 /// The deployment's maximum number of forges (client/README.md, 4.6).
 pub const FORGES: u32 = 16;
@@ -74,6 +74,8 @@ pub struct Bounds {
 #[must_use]
 pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
     let limits = v1::Limits {
+        install_back_some: 512,
+        link_address: ADDRESS_BYTES,
         forges_forges: FORGES,
         return_path: 512,
         set_up_failed_why: SET_UP_WHY_BYTES,
@@ -214,6 +216,17 @@ pub fn decode_requesting(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Reques
     let record = v1::Requesting::decode(limits, &mut reader).ok()?;
     if !reader.is_empty() {
         return None;
+    }
+    match record.request() {
+        v1::Request::Connect(connect) => match connect.how() {
+            v1::How::GithubApp(app) if app.id() == 0 => return None,
+            v1::How::GithubApp(_) => {}
+        },
+        v1::Request::Install(_)
+        | v1::Request::Return(_)
+        | v1::Request::Adopt(_)
+        | v1::Request::SetUp(_)
+        | v1::Request::StartDemo => {}
     }
     Some(record)
 }

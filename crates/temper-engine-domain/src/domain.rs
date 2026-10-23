@@ -49,6 +49,7 @@ pub struct Domain {
     pub(crate) run_workspaces: Map<u64, PreparedWorkspace>,
     pub(crate) forge: forge::Domain,
     pub(crate) application: Option<(Token, crate::Application)>,
+    pub(crate) application_carried: Option<jig_domain_core::Carried>,
     pub(crate) application_demo: Option<crate::route::demo::Context>,
     pub(crate) demo_contexts: Map<Token, crate::route::demo::Context>,
     pub(crate) demo_start: Option<crate::route::demo::Start>,
@@ -303,6 +304,7 @@ impl Domain {
             run_workspaces: Map::with_capacity(limits.tasks.tasks),
             forge,
             application: None,
+            application_carried: None,
             application_demo: None,
             demo_contexts: Map::with_capacity(limits.forge.applications),
             demo_start: None,
@@ -590,6 +592,9 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             Request::Stop => domain.stop_pending = true,
             request @ (Request::Worker(_)
             | Request::Party(_)
+            | Request::Connect { .. }
+            | Request::Install { .. }
+            | Request::EraseCarried { .. }
             | Request::Setup { .. }
             | Request::SetUpGroup { .. }
             | Request::SetUp { .. }

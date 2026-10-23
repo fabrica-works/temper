@@ -297,6 +297,9 @@ impl Protocol {
             | engine::Request::Party(_)
             | engine::Request::Forge { .. }
             | engine::Request::SetUpGroup { .. }
+            | engine::Request::Connect { .. }
+            | engine::Request::Install { .. }
+            | engine::Request::EraseCarried { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)

@@ -57,6 +57,11 @@ impl Ran {
         let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
         &caller.calls
     }
+    #[must_use]
+    pub fn browsed(&self) -> &[calls::Browsed] {
+        let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
+        &caller.browsed
+    }
     /// What the person read from the hosted terminal.
     #[must_use]
     pub fn terminal(&self) -> &terminal::Read {

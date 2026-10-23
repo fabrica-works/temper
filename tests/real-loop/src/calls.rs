@@ -1,5 +1,9 @@
 //! Hosted commands observed through their pipes, exit and a service watch cue.
 use crate::fixtures;
+mod browse;
+pub use browse::Browsed;
+use browse::Browser;
+const BROWSER: usize = usize::MAX - 1;
 use skein_io::kernel::{Complete, Done, Exit, Fd, Op, OpenHow, Pipe, Signal, Spawn, Submit, Way};
 use skein_lib::{Queue, Time, Token, Wall};
 use skein_shell::Host;
@@ -15,6 +19,7 @@ pub enum Arg {
     Digest(usize),
     ActivityBefore(usize),
     Number(u64),
+    GithubApp,
     File(&'static str),
 }
 impl From<&'static str> for Arg {
@@ -28,6 +33,9 @@ macro_rules! argv { ($($word:expr),* $(,)?) => { $crate::calls::Argv(vec![$($cra
 pub enum Step {
     /// Finish runtime fixture provisioning before recording the story calls.
     FixtureReady,
+    Browse {
+        call: usize,
+    },
     /// A person at the hosted terminal.
     Terminal(crate::terminal::Act),
     Advance,
@@ -93,6 +101,16 @@ pub enum Step {
         holds: &'static [u8],
         early: &'static [u8],
     },
+}
+/// Follow the installation link printed by a completed ctl call.
+#[must_use]
+pub fn browse(call: usize) -> Step {
+    Step::Browse { call }
+}
+/// The id handed to the person by the fake's manifest conversion.
+#[must_use]
+pub fn github_app() -> Arg {
+    Arg::GithubApp
 }
 /// Start a configured worker and wait for its link before the next act.
 #[must_use]
@@ -260,6 +278,9 @@ enum Recording {
 }
 pub(crate) struct Caller {
     recording: Recording,
+    pub(crate) github_app: Option<u64>,
+    pub(crate) browsed: Vec<Browsed>,
+    browser: Option<Browser>,
     pub(crate) released: bool,
     pub(crate) advanced: Cell<bool>,
     pub(crate) hold_released: Cell<bool>,
@@ -292,7 +313,8 @@ impl Caller {
     pub(crate) fn held_names(&self) -> impl Iterator<Item = &[u8]> {
         self.steps.iter().filter_map(|step| match step {
             Step::Held { name } => Some(*name),
-            Step::FixtureReady
+            Step::Browse { .. }
+            | Step::FixtureReady
             | Step::ReleaseHold { .. }
             | Step::Terminal(_)
             | Step::StopWorker { .. }
@@ -358,13 +380,18 @@ impl Caller {
         caller
     }
     pub(crate) fn new(steps: Vec<Step>, scratch: PathBuf, root: Fd) -> Self {
+        let browsers = steps.iter().filter(|step| matches!(step, Step::Browse { .. })).count();
         let memory = u64::try_from((steps.len() + 1) * (OUTPUT * 4 + 4096)).expect("caller memory")
+            + Browser::MEMORY * u64::try_from(browsers).expect("browser count")
             + crate::terminal::Typist::worst_case()
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
             + Queue::<Submit>::worst_case(ROOM).expect("submissions");
         let count = steps.len();
         Self {
             recording: Recording::Story,
+            github_app: None,
+            browsed: Vec::with_capacity(browsers),
+            browser: None,
             released: false,
             advanced: Cell::new(false),
             hold_released: Cell::new(false),
@@ -405,7 +432,7 @@ impl Caller {
     }
     fn submit(&mut self, call: usize, kind: Op) {
         self.serial += 1;
-        if call != usize::MAX {
+        if call < BROWSER {
             self.running[call].as_mut().expect("running command").pending += 1;
         }
         self.owners.insert(Token::new(self.serial), call);
@@ -424,7 +451,8 @@ impl Caller {
                 ];
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
-            Step::FixtureReady
+            Step::Browse { .. }
+            | Step::FixtureReady
             | Step::ReleaseHold { .. }
             | Step::Terminal(_)
             | Step::StopWorker { .. }
@@ -462,6 +490,7 @@ impl Caller {
                         .as_bytes()
                         .into()
                 }
+                Arg::GithubApp => self.github_app.expect("person made the App").to_string().into_bytes().into(),
                 Arg::Number(number) => number.to_string().into_bytes().into(),
                 Arg::File(name) => self.scratch.join(name).as_os_str().as_bytes().into(),
             });
@@ -528,6 +557,12 @@ impl Caller {
             return;
         }
         let index = self.owners.remove(&complete.op).expect("operation owner");
+        if index == BROWSER {
+            if let Some(op) = self.browser.as_mut().expect("browser step").complete(complete) {
+                self.submit(BROWSER, op);
+            }
+            return;
+        }
         if index == usize::MAX {
             match (complete.kind, complete.result.expect("probe operation")) {
                 (Op::Open { .. }, Done::Fd(fd)) => {
@@ -678,7 +713,10 @@ impl Caller {
         self.current = None;
         true
     }
-    fn terminal_act(&mut self) -> bool {
+    fn interactive_act(&mut self) -> bool {
+        if let Step::Browse { call } = self.steps[self.next] {
+            return self.browse_act(call);
+        }
         let Step::Terminal(act) = &self.steps[self.next] else { panic!("terminal step") };
         self.terminal.act(
             act,
@@ -698,6 +736,21 @@ impl Caller {
         self.watched = false;
         true
     }
+    fn browse_act(&mut self, call: usize) -> bool {
+        if self.browser.is_none() {
+            assert!(self.running[call].is_none(), "browse a completed call");
+            let browser = Browser::new(call, &self.calls[call].stdout);
+            let op = browser.start();
+            self.browser = Some(browser);
+            self.submit(BROWSER, op);
+            return false;
+        }
+        if !self.browser.as_ref().expect("browser").done {
+            return false;
+        }
+        self.browsed.push(self.browser.take().expect("finished browser").seen);
+        true
+    }
     fn advance(&mut self, now: Time) {
         if matches!(self.steps.get(self.next), Some(Step::Held { .. })) && self.held.get() {
             // Issue the following kill in this pass, before the hosted caller's next turn.
@@ -708,8 +761,8 @@ impl Caller {
             return;
         };
         match step {
-            Step::Terminal(_) => {
-                if !self.terminal_act() {
+            Step::Browse { .. } | Step::Terminal(_) => {
+                if !self.interactive_act() {
                     return;
                 }
             }
@@ -803,6 +856,7 @@ impl Caller {
     }
     fn can_advance(&self) -> bool {
         match self.steps.get(self.next) {
+            Some(Step::Browse { .. }) => self.browser.as_ref().is_none_or(|browser| browser.done),
             Some(Step::Terminal(act)) => self.terminal.ready(act, self.links.get()),
             Some(Step::FixtureReady) => self.running.iter().all(Option::is_none),
             Some(Step::StopWorker { .. } | Step::StartWorker { .. }) => self.worker_ready.get(),
@@ -859,6 +913,7 @@ impl Host for Caller {
             && self.root.is_none()
             && self.probe.is_none()
             && self.owners.is_empty()
+            && self.browser.is_none()
             && self.terminal.is_empty()
     }
     fn worst_case(&self) -> u64 {

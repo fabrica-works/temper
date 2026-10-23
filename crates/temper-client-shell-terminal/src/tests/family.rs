@@ -18,7 +18,13 @@ fn an_adoption_round_trips_through_the_family_record() {
             .request
         {
             w::Request::Adopt(adopt) => adopt,
-            w::Request::Return(_) | w::Request::SetUp(_) | w::Request::StartDemo => panic!("expected adoption"),
+            w::Request::Connect(_)
+            | w::Request::Install(_)
+            | w::Request::Return(_)
+            | w::Request::SetUp(_)
+            | w::Request::StartDemo => {
+                panic!("expected adoption")
+            }
         })
         .into_parts();
         assert_eq!((value.project, value.home, value.forge), (adoption.project, adoption.home, adoption.forge));

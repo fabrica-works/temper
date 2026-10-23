@@ -174,7 +174,9 @@ pub(crate) fn adopted(
                 forge::ApplicationOutcome::CoreRefused(_) | forge::ApplicationOutcome::ForgeRefused(_),
             )
             | forge::Answered::SetUp(_)
-            | forge::Answered::StartDemo(_),
+            | forge::Answered::StartDemo(_)
+            | forge::Answered::Connect(_)
+            | forge::Answered::Install(_),
         )
         | None => forge::StartAnswer::Failed(forge::StartFailure::Adoption),
     };

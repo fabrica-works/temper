@@ -33,12 +33,14 @@ pub(crate) fn protocol_limits() -> skein_fake_forge_protocol::Limits {
 
 #[derive(Clone, Copy)]
 pub struct Fixture {
+    /// Seeded App records and acme installation; false exercises a person connecting.
+    pub connected: bool,
     pub config: fn() -> layer::Config,
     pub configure: fn(&mut Value, &mut Value, SocketAddr),
 }
 #[must_use]
 pub fn fixture() -> Fixture {
-    Fixture { config, configure: |_, _, _| {} }
+    Fixture { connected: true, config, configure: |_, _, _| {} }
 }
 fn config() -> layer::Config {
     let mut accounts = List::with_capacity(2);
@@ -139,8 +141,15 @@ pub struct Branch {
     pub head: u64,
     pub tree: BTreeMap<Vec<u8>, Vec<u8>>,
 }
+/// The App returned to the person by the fake's conversion, never a real key.
+pub struct MadeApp {
+    pub id: u64,
+    pub pem: Secret,
+}
+
 #[derive(Default)]
 pub struct Seen {
+    pub app: Option<MadeApp>,
     pub git_calls: Vec<layer::GitCall>,
     /// Total successful mints; the pin exposes no per-installation mint counters.
     pub minted: u64,
@@ -251,13 +260,75 @@ impl State {
             fixtures::SEED,
         )
         .expect("GitHub peer");
-        let id = peer
-            .github_layer_mut()
-            .expect("GitHub layer")
-            .installations_mut()
-            .install(ACME, b"acme", Kind::Organization, Reach::All, Wall::EPOCH)
-            .expect("acme installed");
-        assert_eq!(id, INSTALLATION, "layer's first installation");
+        if fixture.connected {
+            let id = peer
+                .github_layer_mut()
+                .expect("GitHub layer")
+                .installations_mut()
+                .install(ACME, b"acme", Kind::Organization, Reach::All, Wall::EPOCH)
+                .expect("acme installed");
+            assert_eq!(id, INSTALLATION, "layer's first installation");
+        }
         (Self { handle }, peer)
     }
+}
+
+/// Stand in for the person's developer-settings work, before any ctl call.
+pub(crate) fn make_app(peer: &mut Peer, clients: SocketAddr, path: &Path) -> MadeApp {
+    use skein_forge::github::{pin, request::Method, setup};
+    use skein_lib::{ReplyTo, Token};
+    use std::fmt::Write as _;
+    let origin = format!("http://{clients}");
+    let setup_url = format!("{origin}/forges/1/github/setup");
+    let redirect = format!("{origin}/forges/1/github/redirect");
+    let manifest = setup::manifest(
+        &setup::Values {
+            name: b"temper-person",
+            url: origin.as_bytes(),
+            hook_url: b"https://temper-test.invalid/",
+            redirect_url: redirect.as_bytes(),
+            setup_url: setup_url.as_bytes(),
+        },
+        &protocol_limits().documents.writer,
+    )
+    .expect("temper manifest");
+    // Percent-encode the form value, including JSON punctuation and URL queries.
+    let mut form = String::from("manifest=");
+    for byte in &manifest {
+        write!(form, "%{byte:02X}").expect("form byte");
+    }
+    let layer = peer.github_layer_mut().expect("GitHub layer");
+    assert_eq!(layer.installations().iter().count(), 0, "person starts with no installation");
+    let now = skein_shell::Clock::new().now().wall;
+    let page = layer.page(
+        &layer::pages::Page { method: Method::Post, target: b"/settings/apps/new?state=person", body: form.as_bytes() },
+        now,
+    );
+    assert_eq!(page.status, 200, "developer settings accepts temper's manifest");
+    let html = std::str::from_utf8(&page.body).expect("creation page");
+    let code = html.split_once("?code=").expect("conversion link").1.split('&').next().expect("code");
+    let target = format!("/app-manifests/{code}/conversions");
+    let layer::service::Outcome::Reply(reply) = layer.request(
+        &layer::service::Request {
+            validator: None,
+            method: Method::Post,
+            target: target.as_bytes(),
+            authorization: None,
+            version: Some(pin::API_VERSION.as_bytes()),
+            agent: true,
+            body: b"",
+        },
+        now,
+        ReplyTo::new(Token::new(1)),
+    ) else {
+        panic!("conversion replies without domain I/O")
+    };
+    assert_eq!(reply.status, 201, "fake converts the person's App");
+    let value: Value = serde_json::from_slice(&reply.body).expect("conversion JSON");
+    let app = MadeApp {
+        id: value["id"].as_u64().expect("converted App id"),
+        pem: Secret::new(value["pem"].as_str().expect("converted PEM").as_bytes().into()),
+    };
+    fixtures::private(&path.join("github-app.pem"), app.pem.expose()).expect("private downloaded key");
+    app
 }

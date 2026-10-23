@@ -1985,6 +1985,16 @@ pub(crate) fn outputs(
     for _ in 0..out.len() {
         let request = out.pop().expect("connector output count");
         match request {
+            forge::Request::CarriedUnused { number } => emit(decision, &env.limits, Delivery::CarriedUnused { number }),
+            forge::Request::EraseCarried { number } => {
+                assert!(super::now(domain, Request::EraseCarried { number }), "erase door");
+            }
+            forge::Request::Connect { forge, request, app, carried } => {
+                assert!(super::now(domain, Request::Connect { forge, request, app, carried }), "connect door");
+            }
+            forge::Request::Install { forge, request, back } => {
+                assert!(super::now(domain, Request::Install { forge, request, back }), "install door");
+            }
             forge::Request::DemoStart { request } => super::demo::start(domain, env, decision, request),
             forge::Request::SetUpGroup { forge, request } => {
                 assert!(super::now(domain, Request::SetUpGroup { forge, request }), "demo box group door reserved");

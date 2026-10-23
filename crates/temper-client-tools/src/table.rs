@@ -43,6 +43,8 @@ pub const TOOLS: &[&Tool] = &[
     &crate::forges::READ,
     &crate::forges::SET_UP,
     &crate::forges::DEMO_START,
+    &crate::forges::CONNECT,
+    &crate::forges::INSTALL,
 ];
 pub fn parse(words: &[&[u8]]) -> Result<Parsed, Usage> {
     argv::parse(TOOLS, words, &crate::limits::tools())

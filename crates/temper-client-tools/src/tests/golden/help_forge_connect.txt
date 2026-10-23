@@ -1,0 +1,14 @@
+forge-connect F github-app ID FILE --key NAME
+forge-connect F github --key NAME
+forge-connect F forgejo|forgejo-admin FILE --key NAME
+Connect an existing GitHub App; other ways are not offered yet
+Result: forge-connect
+  forge: Forge number
+  way: github, forgejo and forgejo-admin are not offered yet
+  id: GitHub App id
+  file: Private PEM key file; at most 4090 bytes
+  forge: Forge number
+  way: Not offered yet
+  forge: Forge number
+  way: Not offered yet
+  file: Not offered yet; no file is read

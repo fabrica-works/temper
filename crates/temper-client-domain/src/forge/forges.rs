@@ -555,3 +555,36 @@ pub(crate) fn adopted(
     }
     true
 }
+
+/// Bundle a pasted App's PEM for jig's carried value (protocol/credentials.md, 2.2).
+/// The caller strips one final LF before supplying these bytes.
+#[must_use]
+pub fn pasted_app_key(pem: &[u8]) -> Option<skein_lib::Secret> {
+    if pem.is_empty() || pem.len() > 4090 {
+        return None;
+    }
+    let length = u16::try_from(pem.len()).ok()?;
+    let mut out = skein_lib::Writer::new(pem.len().checked_add(6)?);
+    out.put(&[1, 1, 11, 0]).ok()?;
+    out.put(&length.to_le_bytes()).ok()?;
+    out.put(pem).ok()?;
+    Some(skein_lib::Secret::new(out.finish()))
+}
+
+/// Stable names and words for forge connection refusals (client/README.md, 4.6).
+#[must_use]
+pub fn connect_refusal(why: &temper_client_protocol_wire::v1::ForgeRefusal) -> (&'static [u8], &'static [u8]) {
+    match why {
+        temper_client_protocol_wire::v1::ForgeRefusal::Role => (b"role", b"not the deployment's owner"),
+        temper_client_protocol_wire::v1::ForgeRefusal::NoSuchForge => (b"no_such_forge", b"no such forge"),
+        temper_client_protocol_wire::v1::ForgeRefusal::NotTaken => (b"not_taken", b"not taken by this forge"),
+        temper_client_protocol_wire::v1::ForgeRefusal::Connected => {
+            (b"connected", b"connected already: forge-replace replaces its key")
+        }
+        temper_client_protocol_wire::v1::ForgeRefusal::NotConnected => {
+            (b"not_connected", b"not connected: connect the App first")
+        }
+        temper_client_protocol_wire::v1::ForgeRefusal::Busy => (b"busy", b"busy"),
+        temper_client_protocol_wire::v1::ForgeRefusal::NoKey => (b"no_key", b"no key"),
+    }
+}

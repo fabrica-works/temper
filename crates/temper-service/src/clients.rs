@@ -13,6 +13,7 @@ use temper_engine_domain as root;
 pub mod bundle;
 #[cfg(test)]
 mod demo_tests;
+mod github;
 pub(crate) mod policy;
 pub(crate) mod printed;
 pub mod translation;
@@ -31,6 +32,9 @@ pub struct Clients {
     mount_out: Queue<http::Request>,
     server_out: Queue<crate::server::Routed>,
     replies: Map<Token, bundle::Reply>,
+    github: Map<Token, github::Reply>,
+    pub(crate) github_calls: Queue<(Token, skein_http::server::Call)>,
+    pub(crate) query_bytes: u32,
     send: u32,
     bundle: Option<bundle::Bundle>,
     component_closed: bool,
@@ -200,6 +204,9 @@ impl Clients {
             mount_out: Queue::with_capacity(room),
             server_out: Queue::with_capacity(room),
             replies: Map::with_capacity(crate::limits::server(&config.limits).connections),
+            github: Map::with_capacity(crate::limits::server(&config.limits).connections),
+            github_calls: Queue::with_capacity(crate::limits::server(&config.limits).connections),
+            query_bytes: 2048,
             send: crate::limits::server(&config.limits).http.send,
             bundle: None,
             component_closed: false,
@@ -260,6 +267,7 @@ impl Clients {
                 || !self.demo_ready.is_empty()
                 || !self.out.is_empty()
                 || !self.early.is_empty()
+                || !self.github_calls.is_empty()
                 || !self.io.is_empty()
                 || !self.links.is_empty()
                 || match self.next_deadline() {
@@ -332,12 +340,16 @@ impl Clients {
                     let claimed = http::claims(&http_settings(), &head);
                     if claimed && self.mount.room() > 0 {
                         self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
+                    } else if !claimed && github::claims(&head.target) {
+                        self.github_call(call, head);
                     } else {
                         self.serve_call(call, &head, claimed);
                     }
                 }
                 crate::server::Routed::Http { call, event } => {
-                    if self.replies.get(&call).is_some() {
+                    if self.github.contains_key(&call) {
+                        self.github_event(call, event);
+                    } else if self.replies.get(&call).is_some() {
                         self.serve_event(call, event);
                     } else {
                         self.mount.down(&self.mount_env, http::Event::Http { call, event }, &mut self.mount_out);
@@ -550,6 +562,18 @@ pub fn worst_case(
         .checked_add(kit::worst_case(limits)?)?
         .checked_add(http::worst_case(mapping)?)?
         .checked_add(Map::<Token, bundle::Reply>::worst_case(transport.connections)?)?
+        // Current query decoding and measured page construction, before ownership moves.
+        .checked_add(u64::from(transport.http.head).checked_add(4096)?)?
+        .checked_add(Map::<Token, github::Reply>::worst_case(transport.connections)?)?
+        .checked_add(Queue::<(Token, skein_http::server::Call)>::worst_case(transport.connections)?)?
+        .checked_add(
+            u64::from(transport.connections).checked_mul(
+                u64::from(transport.http.head).checked_add(4096)?.checked_add(
+                    u64::from(transport.http.headers)
+                        .checked_mul(u64::try_from(::core::mem::size_of::<skein_http::Header>()).ok()?)?,
+                )?,
+            )?,
+        )?
         .checked_add(u64::from(transport.connections).checked_mul(u64::from(transport.http.head))?)?
         .checked_add(crate::server::worst_case(transport)?)?
         .checked_add(Queue::<crate::server::Routed>::worst_case(room)?)?

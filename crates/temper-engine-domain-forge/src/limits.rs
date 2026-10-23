@@ -94,6 +94,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     let judges = Map::<u32, Box<[Criterion]>>::worst_case(l.judge_projects)?
         .checked_add(criteria.checked_mul(u64::from(l.judge_projects).checked_add(1)?)?)?;
     crate::adoption::worst_case(l)?
+        .checked_add(crate::connect::worst_case(l.applications)?)?
         .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
         .checked_add(Map::<skein_lib::Token, crate::StartAnswer>::worst_case(l.applications)?)?
         .checked_add(u64::from(l.applications).checked_mul(256)?)?

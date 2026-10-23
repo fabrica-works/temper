@@ -1204,7 +1204,7 @@ fn demo_start_outcomes_encode_every_failure_and_unknown() {
 }
 
 #[test]
-fn return_paths_are_bounded_visible_paths_on_this_listener() {
+fn return_and_install_paths_are_bounded_visible_paths_on_this_listener() {
     let mut at_bound = [b'a'; 512];
     at_bound[0] = b'/';
     let mut past_bound = [b'a'; 513];
@@ -1224,40 +1224,79 @@ fn return_paths_are_bounded_visible_paths_on_this_listener() {
         ("connect", b"/accounts/connect?provider=1&way=sign-in&source=7", true),
         ("welcome", b"/welcome?at=ready", true),
         ("path colon", b"/a:b?c=d#e", true),
+        ("path scheme", b"/https://x", true),
+        ("forges", b"/forges?x=1&y=2", true),
     ] {
         assert_eq!(family::return_path(path), accepted, "{name}");
         // Oversized values cannot pass the wire's own bound; all other rows also cross decode.
         if path.len() <= 512 {
-            let request = w::Requesting::new(
-                &w::CEILINGS,
-                w::RequestingParts {
-                    request: w::Request::Return(
-                        w::Return::new(&w::CEILINGS, w::ReturnParts { source: 7, path: path.into() }).unwrap(),
-                    ),
-                },
-            )
-            .unwrap();
-            let result = family::to_root(
-                exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&request)),
-                &[],
-                None,
-                &w::CEILINGS,
-            );
-            if accepted {
-                let root::Event::Party(root::PartyInput::Application {
-                    request: root::Application::Return { source: 7, path: actual },
-                    ..
-                }) = result.unwrap()
-                else {
-                    panic!("{name}: return")
-                };
-                assert_eq!(actual.as_ref(), path, "{name}");
-            } else {
-                let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *result.unwrap_err() else {
-                    panic!("{name}: undecodable")
-                };
-                assert_eq!(to, REPLY, "{name}");
+            for request in [
+                w::Request::Return(
+                    w::Return::new(&w::CEILINGS, w::ReturnParts { source: 7, path: path.into() }).unwrap(),
+                ),
+                w::Request::Install(
+                    w::Install::new(&w::CEILINGS, w::InstallParts { forge: 1, back: Some(path.into()) }).unwrap(),
+                ),
+            ] {
+                let request = w::Requesting::new(&w::CEILINGS, w::RequestingParts { request }).unwrap();
+                let result = family::to_root(
+                    exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&request)),
+                    &[],
+                    None,
+                    &w::CEILINGS,
+                );
+                if accepted {
+                    let root::Event::Party(root::PartyInput::Application { request, .. }) = result.unwrap() else {
+                        panic!("{name}: application")
+                    };
+                    let actual = match request {
+                        root::Application::Return { source, path } => {
+                            assert_eq!(source, 7, "{name}");
+                            path
+                        }
+                        root::Application::Forge(ask) => {
+                            let forge::Ask::Install { forge, back: Some(back) } = ask else {
+                                panic!("{name}: install")
+                            };
+                            assert_eq!(forge, 1, "{name}");
+                            back
+                        }
+                    };
+                    assert_eq!(actual.as_ref(), path, "{name}");
+                } else {
+                    let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *result.unwrap_err() else {
+                        panic!("{name}: undecodable")
+                    };
+                    assert_eq!(to, REPLY, "{name}");
+                }
             }
         }
     }
+}
+
+#[test]
+fn install_without_a_back_is_admitted() {
+    let request = w::Requesting::new(
+        &w::CEILINGS,
+        w::RequestingParts {
+            request: w::Request::Install(
+                w::Install::new(&w::CEILINGS, w::InstallParts { forge: 1, back: None }).unwrap(),
+            ),
+        },
+    )
+    .unwrap();
+    let event = family::to_root(
+        exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&request)),
+        &[],
+        None,
+        &w::CEILINGS,
+    )
+    .unwrap();
+    let root::Event::Party(root::PartyInput::Application {
+        request: root::Application::Forge(forge::Ask::Install { forge: 1, back: None }),
+        ..
+    }) = event
+    else {
+        panic!("install without back")
+    };
 }

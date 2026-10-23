@@ -266,6 +266,8 @@ fn ask(service: &mut crate::Service, number: u64) {
         state: domain::Connection::SetUpFailed { why: b"retry".as_slice().into() },
     })));
     engine.step(root::Event::Forge(Box::new(domain::Event::Application {
+        role: None,
+        carried: None,
         request: Token::new(number),
         token: Token::new(number.checked_add(1).unwrap()),
         retention: Duration::from_secs(60),

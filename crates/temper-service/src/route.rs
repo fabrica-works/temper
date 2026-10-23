@@ -28,6 +28,11 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
             engine.box_link.ask(forge, request, &mut out);
             box_link::drain(engine, &mut out);
         }
+        root::Request::Connect { forge, request, app, carried } => {
+            crate::setup::public::connect(engine, forge, request, app, carried);
+        }
+        root::Request::Install { forge, request, back } => crate::setup::public::install(engine, forge, request, back),
+        root::Request::EraseCarried { number } => crate::setup::public::erase(engine, number),
         root::Request::Setup { run } => crate::setup::request(engine, run),
         root::Request::Store(request) => store(engine, request),
         root::Request::Account(request) => {
@@ -58,6 +63,9 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
                 | Event::Connection { .. }
                 | Event::Installation { .. }
                 | Event::BoxClosed
+                | Event::ConnectAnswered { .. }
+                | Event::InstallAnswered { .. }
+                | Event::ConnectEnded { .. }
                 | Event::SetUpAnswered { .. }
                 | Event::FirstMade { .. }
                 | Event::FirstFailed { .. } => {}

@@ -37,7 +37,7 @@ impl OneShot {
                 self.finish(0, false);
             }
             Parsed::Call { call, .. } if arguments::key_file(call).is_some() => {
-                self.directory.load_key(arguments::key_file(call).expect("key file"));
+                self.directory.load_key(arguments::key_file(call).expect("key file"), arguments::key_bytes(call));
             }
             Parsed::Call { call, .. } => {
                 if let Some((index, path)) = text_file(call) {
@@ -79,8 +79,15 @@ impl OneShot {
             },
             Parsed::Call { call, json } if arguments::key_file(&call).is_some() => {
                 let stripped = bytes.strip_suffix(b"\n").unwrap_or(&bytes);
-                if stripped.is_empty() || stripped.len() > temper_client_tools::limits::KEY_BYTES as usize {
-                    self.fail(b"key file must contain 1 to 4096 bytes after one final newline");
+                if stripped.is_empty() || stripped.len() > arguments::key_bytes(&call) as usize {
+                    self.key_file_fail(
+                        &call,
+                        if arguments::key_bytes(&call) == 4090 {
+                            b"key file must contain 1 to 4090 bytes after one final newline"
+                        } else {
+                            b"key file must contain 1 to 4096 bytes after one final newline"
+                        },
+                    );
                     return;
                 }
                 self.value = Some(skein_lib::Secret::new(stripped.into()));
@@ -102,6 +109,16 @@ impl OneShot {
                 self.call = Some(Parsed::Call { call, json });
                 self.prepare_start();
             }
+        }
+    }
+    pub(super) fn key_file_fail(&mut self, call: &jig::call::Call, reason: &[u8]) {
+        if TOOLS[usize::from(call.tool)].name == b"forge-connect" {
+            let mut message = reason.to_vec();
+            message.extend_from_slice(b": ");
+            message.extend_from_slice(arguments::key_file(call).expect("key file"));
+            self.fail(&message);
+        } else {
+            self.fail(reason);
         }
     }
     pub(super) fn preparation_pending(&self, now: Time) -> bool {

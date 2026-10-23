@@ -232,7 +232,7 @@ pub(crate) fn run_github(
     scripts: Scripts,
     steps: impl FnOnce() -> Vec<crate::calls::Step>,
 ) -> skein_world::real::Outcome<Proc> {
-    let (state, peer) = crate::github::State::new(fixture);
+    let (state, mut peer) = crate::github::State::new(fixture);
     let mut world = World::new_controlled(|controls| {
         let mut judge = cluster_judge(controls, &[], None);
         judge.github = Some(state);
@@ -248,8 +248,11 @@ pub(crate) fn run_github(
             released: None,
         }))
     });
-    world
-        .spawn_signals(|signals| Proc::Service(Box::new(ServiceHost::github(scratch.path().into(), signals, fixture))));
+    world.spawn_signals(|signals| {
+        let mut service = ServiceHost::github(scratch.path().into(), signals, fixture);
+        service.make_github_app(&mut peer);
+        Proc::Service(Box::new(service))
+    });
     // This story provisions its account explicitly, retaining every ctl output.
     host(&mut world, scratch.path(), steps, true, 1);
     world.spawn(|| Proc::Forge(Box::new(peer)));
@@ -585,7 +588,7 @@ fn github_cues(
     state: &crate::github::State,
     peer: &mut Llm,
     service: &mut ServiceHost,
-    caller: &Caller,
+    caller: &mut Caller,
     children: &mut [Proc],
 ) {
     let Proc::Forge(forge) = &mut children[0] else { panic!("GitHub root") };
@@ -595,6 +598,7 @@ fn github_cues(
     {
         peer.peer = llm::peer(llm::scripted(scripts(address))).expect("bound GitHub scripts");
     }
+    caller.github_app = service.github_seen.app.as_ref().map(|app| app.id);
     service.github_seen.checkpoint(forge, &caller.calls);
     if service.is_empty() {
         service.github_seen.collect(forge, &state.handle);

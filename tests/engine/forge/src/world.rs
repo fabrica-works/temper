@@ -300,6 +300,8 @@ impl World {
 
     pub fn adopt_as(&mut self, role: top::Role) {
         self.event(top::Event::Application {
+            role: None,
+            carried: None,
             request: Token::new(100),
             token: Token::new(100),
             retention: Duration::from_secs(60),
@@ -588,6 +590,10 @@ impl World {
                 other @ (top::Request::DemoStart { .. }
                 | top::Request::SetUpGroup { .. }
                 | top::Request::SetUp { .. }
+                | top::Request::Connect { .. }
+                | top::Request::Install { .. }
+                | top::Request::CarriedUnused { .. }
+                | top::Request::EraseCarried { .. }
                 | top::Request::Resource { .. }
                 | top::Request::Taken { .. }
                 | top::Request::Refused { .. }

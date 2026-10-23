@@ -1,25 +1,36 @@
-//! GitHub story 6: the worker's clone and push authenticate on the layer's git route.
+//! A person connects and installs their App, then one chat clones and pushes as it.
 use serde_json::Value;
 use temper_real_loop_world::{
     Exit, Ran, argv,
-    calls::{D1, call, file, number, sign_in, task},
+    calls::{D1, browse, call, file, github_app, number, sign_in, task},
     github, landing, run_github,
 };
 
 // The fresh deployment allocates chat 1, procedure 2, and its coder 3.
 const CODER: u64 = 3;
-const UMBRA: usize = 3;
-const CHAT: usize = 5;
+const INSTALL: usize = 5;
+const UMBRA: usize = 7;
+const CHAT: usize = 9;
 const PROCEDURE: u64 = 2;
-const DELIVERED: usize = 8;
+const DELIVERED: usize = 12;
 
 #[test]
-fn a_chats_clone_and_push_carry_its_installations_token() {
-    let ran = run_github(github::fixture(), scripts, || {
+fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token() {
+    let mut fixture = github::fixture();
+    fixture.connected = false;
+    let ran = run_github(fixture, scripts, || {
         vec![
             sign_in(D1),
             call(D1, argv!["add-key", "1", file("fixture.key"), "--deployment", "--key", "github-llm"]),
             call(D1, argv!["wait", "accounts", "--until", "usable"]),
+            call(
+                D1,
+                argv!["forge-connect", "1", "github-app", github_app(), file("github-app.pem"), "--key", "github-app"],
+            ),
+            call(D1, argv!["wait", "forges", "--until", "connected:1"]),
+            call(D1, argv!["forge-install", "1", "--key", "github-install"]),
+            browse(INSTALL),
+            call(D1, argv!["wait", "forges", "--until", "settled"]),
             call(
                 D1,
                 argv![
@@ -69,7 +80,13 @@ fn a_chats_clone_and_push_carry_its_installations_token() {
     }
     let refused: Value = serde_json::from_slice(&ran.calls()[UMBRA].stderr).expect("refused adoption JSON");
     assert_eq!(refused["forge_refused"]["reason"], "no_access", "{refused}");
+    let [visit] = ran.browsed() else { panic!("one installation visit") };
+    assert_eq!(visit.call, INSTALL);
+    assert_eq!(visit.hops, [302, 200], "fake install redirects to temper's setup route");
+    assert_eq!(visit.body, b"temper has the installation; you may close this tab.");
     let seen = ran.github();
+    let app = seen.app.as_ref().expect("the person made an App");
+    assert_ne!(app.id, temper_github_app::APP.id, "conversion replaced the fixture's App");
     assert_eq!(seen.git_after_call[UMBRA], 0, "no git call before the uninstalled adoption completed");
     assert_eq!(seen.installations, [(github::INSTALLATION, 10, b"acme".to_vec())], "only acme has an installation");
     assert!(seen.minted >= 1, "the secrets scan accompanies real token minting");
@@ -112,22 +129,29 @@ fn no_installation_token_pattern_or_app_key_outside_the_secrets_store(ran: &Ran,
         Writer,
         base64::{self, Alphabet},
     };
-    let key = skein_fake_forge_github::keys::KEYS[temper_github_app::APP.key];
+    let pem = ran.github().app.as_ref().expect("converted App").pem.expose();
+    let text = std::str::from_utf8(pem).expect("PEM text");
+    let compact: String = text.lines().filter(|line| !line.starts_with("-----")).collect();
+    let key = base64::decode(Alphabet::Standard, compact.as_bytes(), 4096).expect("converted key DER");
     let size = base64::encoded_len(Alphabet::Standard, u32::try_from(key.len()).expect("test key length"))
         .expect("base64 length");
     let mut encoded = Writer::new(usize::try_from(size).expect("base64 size"));
-    base64::encode(Alphabet::Standard, key, &mut encoded).expect("base64 key");
+    base64::encode(Alphabet::Standard, &key, &mut encoded).expect("base64 key");
     let encoded = encoded.finish();
     let clean = |bytes: &[u8]| {
         assert!(
             !bytes.windows(40).any(|part| part.starts_with(b"ghs_") && part[4..].iter().all(u8::is_ascii_alphanumeric)),
             "minted-token pattern outside jig's secrets store"
         );
-        assert!(skein_lib::bytes::find(bytes, key).is_none(), "App DER outside jig's secrets store");
+        assert!(skein_lib::bytes::find(bytes, pem).is_none(), "App PEM outside jig's secrets store");
+        assert!(skein_lib::bytes::find(bytes, &key).is_none(), "App DER outside jig's secrets store");
         assert!(skein_lib::bytes::find(bytes, &encoded).is_none(), "App base64 outside jig's secrets store");
     };
     for path in files {
         clean(&std::fs::read(path).expect("scratch file"));
+    }
+    for visit in ran.browsed() {
+        clean(&visit.body);
     }
     for call in ran.calls() {
         clean(&call.stdout);
@@ -137,12 +161,17 @@ fn no_installation_token_pattern_or_app_key_outside_the_secrets_store(ran: &Ran,
 
 // Walk once for both checks, never following a symlink into the secrets store.
 fn files_outside_the_secrets_store(ran: &Ran) -> Vec<std::path::PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
     let secrets = ran.path().join("state/secrets");
     assert!(secrets.is_dir(), "the excluded directory is jig's secrets store");
+    // The person's original download is the sole deliberate plaintext input.
+    // Exclude exactly this path; every other scratch file and all ctl output are scanned.
+    let downloaded = ran.path().join("github-app.pem");
+    assert_eq!(std::fs::metadata(&downloaded).expect("download").permissions().mode() & 0o777, 0o600);
     let mut files = Vec::new();
     let mut pending = vec![ran.path().to_path_buf()];
     while let Some(path) = pending.pop() {
-        if path == secrets {
+        if path == secrets || path == downloaded {
             continue;
         }
         let metadata = std::fs::symlink_metadata(&path).expect("scratch metadata");

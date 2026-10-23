@@ -1,4 +1,4 @@
-family temper-client-wire 8
+family temper-client-wire 9
 
 # The role, as temper-engine-domain-forge's Role, in its order.
 enum Role { owned, adopted, fork, context }
@@ -16,7 +16,11 @@ enum SetUpProject { existing: ExistingProject, new: NewProject }
 record SetUp { forge: u16 org: bytes 1024 repository: bytes 1024 project: SetUpProject }
 record Return { source: u32 path: bytes 512 }
 # start_demo: the demo document's start (client/README.md, 4.6; protocol/setup.md, 8.4).
-enum Request { adopt: Adopt, set_up: SetUp, start_demo, return_: Return }
+record GitHubApp { id: u64 }
+enum How { github_app: GitHubApp }
+record Connect { forge: u16 how: How }
+record Install { forge: u16 back: option bytes 512 }
+enum Request { adopt: Adopt, set_up: SetUp, start_demo, return_: Return, connect: Connect, install: Install }
 versioned record Requesting { request: Request }
 enum SetUpRefusal { not_offered, not_under_the_box, busy, new_project, invalid }
 record SetUpRefused { why: SetUpRefusal }
@@ -83,7 +87,10 @@ record Adopted { forge: u16 repository: u32 owner: bytes 1024 name: bytes 1024 r
 record CoreRefused { refusal: bytes 16777209 }
 enum ForgeReason { no_such_forge, not_found, no_access, refused, in_flight, too_large, unreachable, invalid_answer }
 record ForgeRefused { reason: ForgeReason }
+enum ForgeRefusal { role, no_such_forge, not_taken, connected, not_connected, busy, no_key }
+record ConnectRefused { why: ForgeRefusal }
+record Link { address: bytes 2048 }
 # unknown: the outcome's retention ended (02.2's Delivery::Application
 # outcome None; client/README.md, 4.7, "unknown past the retention").
-enum Outcome { adopted: Adopted, core_refused: CoreRefused, forge_refused: ForgeRefused, unknown, setting_up, set_up_refused: SetUpRefused, running, start_refused: StartRefused, start_failed: StartFailed, returning }
+enum Outcome { adopted: Adopted, core_refused: CoreRefused, forge_refused: ForgeRefused, unknown, setting_up, set_up_refused: SetUpRefused, running, start_refused: StartRefused, start_failed: StartFailed, returning, connecting, link: Link, connect_refused: ConnectRefused }
 versioned record Answer { outcome: Outcome }

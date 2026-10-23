@@ -59,6 +59,8 @@ fn limits_take_each_bound_from_its_source_field() {
     assert_eq!(
         fixtures::limits(),
         v1::Limits {
+            install_back_some: 512,
+            link_address: crate::ADDRESS_BYTES,
             forges_forges: crate::FORGES,
             return_path: 512,
             set_up_failed_why: crate::SET_UP_WHY_BYTES,
@@ -615,4 +617,51 @@ fn demo_states_round_trip_at_smallest_and_ceiling() {
     let record =
         v1::Requesting::new(&limits, v1::RequestingParts { request: v1::Request::StartDemo }).expect("start request");
     assert_eq!(crate::decode_requesting(&crate::requesting(&record), &limits), Some(record));
+}
+
+#[test]
+fn pasted_apps_round_trip_and_check_nonzero_id() {
+    let limits = fixtures::limits();
+    for id in [0, 1, u64::MAX] {
+        let app = v1::GitHubApp::new(&limits, v1::GitHubAppParts { id }).unwrap();
+        let connect = v1::Connect::new(&limits, v1::ConnectParts { forge: 1, how: v1::How::GithubApp(app) }).unwrap();
+        let record =
+            v1::Requesting::new(&limits, v1::RequestingParts { request: v1::Request::Connect(connect) }).unwrap();
+        let decoded = crate::decode_requesting(&crate::requesting(&record), &limits);
+        assert_eq!(decoded, if id == 0 { None } else { Some(record) });
+    }
+}
+
+#[test]
+fn connect_outcomes_round_trip() {
+    let limits = fixtures::limits();
+    let mut outcomes = List::with_capacity(9);
+    for outcome in [
+        v1::Outcome::Connecting,
+        v1::Outcome::Link(
+            v1::Link::new(&limits, v1::LinkParts { address: Box::from(b"https://forge.test/install".as_slice()) })
+                .unwrap(),
+        ),
+    ] {
+        outcomes.push(outcome).unwrap();
+    }
+    for why in [
+        v1::ForgeRefusal::Role,
+        v1::ForgeRefusal::NoSuchForge,
+        v1::ForgeRefusal::NotTaken,
+        v1::ForgeRefusal::Connected,
+        v1::ForgeRefusal::NotConnected,
+        v1::ForgeRefusal::Busy,
+        v1::ForgeRefusal::NoKey,
+    ] {
+        outcomes
+            .push(v1::Outcome::ConnectRefused(
+                v1::ConnectRefused::new(&limits, v1::ConnectRefusedParts { why }).unwrap(),
+            ))
+            .unwrap();
+    }
+    for outcome in outcomes.into_boxed() {
+        let record = v1::Answer::new(&limits, v1::AnswerParts { outcome }).unwrap();
+        assert_eq!(v1::Answer::decode(&limits, &mut Reader::new(&crate::answer(&record))).unwrap(), record);
+    }
 }

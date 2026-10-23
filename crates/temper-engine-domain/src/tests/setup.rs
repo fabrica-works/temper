@@ -1,4 +1,6 @@
 //! Keyed setup and the deployment document through the real core (domain/root.md, 5.1).
+#![expect(clippy::disallowed_methods, reason = "ordinary test assertions inspect captured requests")]
+#![expect(clippy::match_like_matches_macro, reason = "explicit test patterns; matches is banned by the subset")]
 use super::resume_fixture::{config, root_with_config};
 use crate::{Delivery, Domain, Event, Limits, PartyInput, PartyRequest, Request, StoreInput, StoreRequest};
 use alloc::boxed::Box;
@@ -10,9 +12,11 @@ const SIGN_IN: u64 = 10;
 const WATCHER: Token = Token::new(30);
 
 fn signed_in(role: Option<people::Role>) -> (Domain, Env<Limits>) {
+    signed_in_on(role, forge::Kind::Forgejo)
+}
+fn signed_in_on(role: Option<people::Role>, kind: forge::Kind) -> (Domain, Env<Limits>) {
     let mut config = config(1);
-    config.forges =
-        Box::new([forge::Configured { number: 1, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: true }]);
+    config.forges = Box::new([forge::Configured { number: 1, kind, mode: forge::Mode::Owned, asked: true }]);
     config.under_box = true;
     let (mut domain, env) = root_with_config(config);
     domain.core.people = people::Domain::new(&env.limits.people, Box::new([]), 1);
@@ -67,6 +71,9 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Request]> {
                 request @ (Request::SetUpGroup { .. }
                 | Request::SetUp { .. }
                 | Request::Return { .. }
+                | Request::Connect { .. }
+                | Request::Install { .. }
+                | Request::EraseCarried { .. }
                 | Request::Setup { .. }
                 | Request::Store(_)
                 | Request::Worker(_)
@@ -213,5 +220,125 @@ fn row(connection: forge::Connection) -> forge::Row {
         mode: forge::Mode::Owned,
         connection,
         offer: forge::Offer::Offered,
+    }
+}
+
+fn public_request(ask: forge::Ask, carried: Option<jig_domain_core::Carried>) -> Event {
+    Event::Party(PartyInput::Application {
+        // Public forge operations must be admitted on deployment even when a caller names a project.
+        scope: people::ApplicationScope::Project(1),
+        reply_to: ReplyTo::new(Token::new(90)),
+        sign_in: SIGN_IN,
+        key: [44; 16],
+        digest: [44; 32],
+        carried,
+        request: crate::Application::Forge(ask),
+    })
+}
+#[test]
+fn public_connect_preserves_the_admitted_owner_and_carry_then_root_orders_its_erase() {
+    let (mut domain, env) = signed_in_on(Some(people::Role::Owner), forge::Kind::GitHub);
+    let carried = jig_domain_core::Carried { number: 1_u64 << 63_u32, digest: [73; 32] };
+    crate::try_step(
+        &mut domain,
+        &env,
+        public_request(forge::Ask::Connect { forge: 1, app: core::num::NonZeroU64::new(7).unwrap() }, Some(carried)),
+    )
+    .unwrap();
+    let requests = settle(&mut domain, &env);
+    let [Request::Connect { forge: 1, request, app, carried: value }] = requests.as_ref() else {
+        panic!("connect: {requests:?}")
+    };
+    assert_eq!((app.get(), *value), (7, carried));
+    let request = *request;
+    crate::try_step(
+        &mut domain,
+        &env,
+        Event::Forge(Box::new(forge::Event::ConnectAnswered {
+            forge: 1,
+            request,
+            answer: forge::ConnectAnswer::Connecting,
+        })),
+    )
+    .unwrap();
+    assert_eq!(
+        settle(&mut domain, &env).as_ref(),
+        [Request::Party(PartyRequest::Deliver(Delivery::Application {
+            to: ReplyTo::new(Token::new(90)),
+            outcome: Some(crate::ApplicationAnswer::Connect(forge::ConnectAnswer::Connecting))
+        }))]
+    );
+    crate::try_step(
+        &mut domain,
+        &env,
+        Event::Forge(Box::new(forge::Event::ConnectEnded { forge: 1, request, connected: false })),
+    )
+    .unwrap();
+    assert_eq!(settle(&mut domain, &env).as_ref(), [Request::EraseCarried { number: carried.number }]);
+}
+#[test]
+fn public_install_defers_the_keyed_answer_until_its_run_answers() {
+    let (mut domain, env) = signed_in_on(Some(people::Role::Owner), forge::Kind::GitHub);
+    connection(&mut domain, &env, forge::Connection::Connected { id: 1, login: Box::from(b"app[bot]".as_slice()) });
+    crate::try_step(&mut domain, &env, public_request(forge::Ask::Install { forge: 1, back: None }, None)).unwrap();
+    let requests = settle(&mut domain, &env);
+    let [Request::Install { forge: 1, request, back: None }] = requests.as_ref() else {
+        panic!("install: {requests:?}")
+    };
+    let answer = forge::InstallAnswer::Link(Box::from(b"http://fake/install".as_slice()));
+    crate::try_step(
+        &mut domain,
+        &env,
+        Event::Forge(Box::new(forge::Event::InstallAnswered { forge: 1, request: *request, answer: answer.clone() })),
+    )
+    .unwrap();
+    assert_eq!(
+        settle(&mut domain, &env).as_ref(),
+        [Request::Party(PartyRequest::Deliver(Delivery::Application {
+            to: ReplyTo::new(Token::new(90)),
+            outcome: Some(crate::ApplicationAnswer::Install(answer))
+        }))]
+    );
+}
+
+#[test]
+fn public_connect_refuses_other_deployment_roles_and_names_their_carry_unused_once() {
+    for role in [people::Role::Member, people::Role::Maintainer, people::Role::Observer] {
+        let (mut domain, env) = signed_in_on(Some(role), forge::Kind::GitHub);
+        let carried = jig_domain_core::Carried { number: 1_u64 << 63_u32, digest: [73; 32] };
+        crate::try_step(
+            &mut domain,
+            &env,
+            public_request(
+                forge::Ask::Connect { forge: 1, app: core::num::NonZeroU64::new(7).unwrap() },
+                Some(carried),
+            ),
+        )
+        .unwrap();
+        let requests = settle(&mut domain, &env);
+        assert!(!requests.iter().any(|r| if let Request::Connect { .. } = r { true } else { false }));
+        assert_eq!(
+            requests
+                .iter()
+                .filter(|r| if let Request::Party(PartyRequest::Deliver(Delivery::CarriedUnused { number })) = r {
+                    *number == carried.number
+                } else {
+                    false
+                })
+                .count(),
+            1
+        );
+        assert!(requests.iter().any(|r| {
+            if let Request::Party(PartyRequest::Deliver(Delivery::Application {
+                outcome:
+                    Some(crate::ApplicationAnswer::Connect(forge::ConnectAnswer::Refused(forge::ForgeRefusal::Role))),
+                ..
+            })) = r
+            {
+                true
+            } else {
+                false
+            }
+        }));
     }
 }

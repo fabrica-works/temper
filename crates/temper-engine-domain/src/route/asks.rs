@@ -61,8 +61,8 @@ pub(crate) fn ask(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             super::applications::drop(domain, owner);
             None
         }
-        core::Ask::Application { request, token, owner, retention, .. } => {
-            super::applications::admitted(domain, request, token, owner, retention, env.now, env.wall);
+        core::Ask::Application { request, token, owner, retention, role, .. } => {
+            super::applications::admitted(domain, request, token, owner, retention, role, env);
             None
         }
         core::Ask::ApplicationPartAnswered { request, outcome } => {

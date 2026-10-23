@@ -40,3 +40,11 @@ pub use limits::{BriefBudgets, BriefLimits, FACTS, Limits, VIEWS, WATCHES_PER_ST
 pub use link::{hello_bounds, inbox_words};
 pub use route::{Approval, Freshness, Gate, HostDelivery, HostRequest, LandingRule, adopt_repository_ask};
 pub use translate::{Config, LandingPolicy};
+
+/// Startup's secret-free decision (protocol/credentials.md, 2.2).
+/// Runs are volatile; every surviving carried row is no longer in use.
+#[must_use]
+pub fn carried_at_start(number: u64) -> Request {
+    assert!(number >= 1_u64 << 63_u32, "carried number space");
+    Request::EraseCarried { number }
+}

@@ -715,6 +715,9 @@ impl World {
             )
             | engine::Request::Account(_)
             | engine::Request::SetUpGroup { .. }
+            | engine::Request::Connect { .. }
+            | engine::Request::Install { .. }
+            | engine::Request::EraseCarried { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Return { .. }
             | engine::Request::Setup { .. }
@@ -750,6 +753,9 @@ impl World {
             | engine::Request::Forge { .. }
             | engine::Request::Account(_)
             | engine::Request::SetUpGroup { .. }
+            | engine::Request::Connect { .. }
+            | engine::Request::Install { .. }
+            | engine::Request::EraseCarried { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Return { .. }
             | engine::Request::Setup { .. }
