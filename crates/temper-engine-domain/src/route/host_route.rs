@@ -30,15 +30,37 @@ pub(crate) struct Flight {
     pub task: u64,
     pub attempt: u64,
     pub key: Option<CallKey>,
-    pub changed: Option<crate::Changed>,
+    pub render: FlightRender,
     pub name: Box<[u8]>,
     pub tool: Box<[u8]>,
+}
+
+/// Only one tool's rendering context is kept per flight. Boxing the change
+/// keeps the slot the same size as the existing amendment context.
+#[derive(Debug)]
+pub(crate) enum FlightRender {
+    Plain,
+    Amended(crate::Changed),
+    Change(Box<ChangeChoice>),
+}
+
+#[derive(Debug)]
+pub(crate) struct ChangeChoice {
+    named: Option<Box<[u8]>>,
+    project: u32,
 }
 
 pub(crate) fn decode(domain: &mut Domain, to: ReplyTo, task: u64, attempt: u64, call: fleet::Call) {
     let right = to.into_token();
     let to = ReplyTo::new(right);
-    let flight = Flight { task, attempt, key: None, changed: None, name: call.name.clone(), tool: call.tool.clone() };
+    let flight = Flight {
+        task,
+        attempt,
+        key: None,
+        render: FlightRender::Plain,
+        name: call.name.clone(),
+        tool: call.tool.clone(),
+    };
     assert!(domain.host_calls.insert(right, flight).is_ok(), "typed flights fit fleet calls");
     super::now(
         domain,
@@ -80,13 +102,21 @@ pub(crate) fn decoded(domain: &mut Domain, env: &Env<Limits>, decision: &mut Dec
         domain.work.push(Work::Fleet(fleet::Event::Relayed { to, answer: id.token() }));
         return;
     }
-    let flight = domain.host_calls.get_mut(&right).expect("current typed flight");
-    flight.key = Some(key);
-    flight.changed = if let crate::Tool::Amend { amendment, .. } = &body.tool {
-        Some(crate::Changed::amendment(amendment))
+    let render = if let crate::Tool::Change { repository, .. } = &body.tool {
+        match domain.core.tasks.delegation(key.task) {
+            Some(context) => {
+                FlightRender::Change(Box::new(ChangeChoice { named: repository.clone(), project: context.project }))
+            }
+            None => FlightRender::Plain,
+        }
+    } else if let crate::Tool::Amend { amendment, .. } = &body.tool {
+        FlightRender::Amended(crate::Changed::amendment(amendment))
     } else {
-        None
+        FlightRender::Plain
     };
+    let flight = domain.host_calls.get_mut(&right).expect("current typed flight");
+    flight.render = render;
+    flight.key = Some(key);
     let id = domain.payloads.insert(Some(Payload::Call { key, body })).expect("fleet call reserved payload room");
     relay_payload(domain, env, decision, to, Token::new(key.task), Token::new(key.attempt), id.token());
 }
@@ -102,11 +132,29 @@ pub(crate) fn render(domain: &mut Domain, limits: &Limits, decision: &mut Decisi
         settled(domain, limits, decision, to, call);
         return;
     }
-    // Fresh and unsettled replay replies both carry only the core revision.
-    let answer = if let (CallAnswer::Revised { task, revision }, Some(changed)) = (&answer, flight.changed) {
-        CallAnswer::Amended { task: *task, revision: *revision, changed }
-    } else {
-        answer
+    // Fresh and unsettled replay replies carry only the core's part.
+    let answer = match &flight.render {
+        FlightRender::Amended(changed) => {
+            if let CallAnswer::Revised { task, revision } = answer {
+                CallAnswer::Amended { task, revision, changed: *changed }
+            } else {
+                answer
+            }
+        }
+        FlightRender::Change(change) => {
+            if let CallAnswer::DelegationRefused(problem) = &answer
+                && problem.why == jig_domain_tasks::Refusal::Unknown
+            {
+                CallAnswer::ChangeRefused {
+                    problem: Box::new(problem.clone()),
+                    named: change.named.clone(),
+                    repositories: super::forge_route::change_repositories(domain, change.project),
+                }
+            } else {
+                answer
+            }
+        }
+        FlightRender::Plain => answer,
     };
     emit(
         decision,

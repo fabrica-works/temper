@@ -183,3 +183,63 @@ fn pushed_heads_route_only_to_their_own_forges_hold() {
         };
     }
 }
+
+#[test]
+fn writable_repositories_include_only_the_requested_project() {
+    let (domain, _) = two_forges();
+    assert_eq!(domain.forge.writable_repositories(5).len(), 2);
+    assert!(domain.forge.writable_repositories(1).is_empty());
+}
+
+#[test]
+fn writable_repositories_exclude_context_and_missing_push() {
+    use super::forge;
+    let (mut domain, env) = two_forges();
+    let mut out = skein_lib::Queue::with_capacity(forge::max_out(&env.limits.forge));
+    let mut context = adopted(1);
+    context.role = forge::Role::Context;
+    let mut read_only = adopted(3);
+    read_only.kinds.push = false;
+    for repository in [context, read_only] {
+        forge::step(
+            &mut domain.forge,
+            &skein_lib::Env { now: env.now, wall: env.wall, limits: env.limits.forge },
+            forge::Event::Restore { record: forge::Stored::Repository(repository) },
+            &mut out,
+        );
+    }
+    assert!(domain.forge.writable_repositories(5).is_empty());
+}
+
+#[test]
+fn writable_repositories_exclude_an_ended_forge() {
+    use super::forge;
+    let (mut domain, env) = two_forges();
+    domain.forge.configure_demo(Some(forge::DemoConfig {
+        provider: 1,
+        adoption: forge::Adoption {
+            project: 5,
+            home: true,
+            forge: 1,
+            host: Box::from(&b"forge.example"[..]),
+            owner: Box::from(&b"org"[..]),
+            name: Box::from(&b"repo"[..]),
+            prefix: Box::from(&b"temper/"[..]),
+            role: forge::Role::Owned,
+            landing: Box::from(&b"main"[..]),
+            ci: true,
+            checks: Box::new([]),
+        },
+        deadline: skein_lib::Duration::from_secs(60),
+    }));
+    let mut out = skein_lib::Queue::with_capacity(forge::max_out(&env.limits.forge));
+    forge::step(
+        &mut domain.forge,
+        &skein_lib::Env { now: env.now, wall: env.wall, limits: env.limits.forge },
+        forge::Event::Restore { record: forge::Stored::Demo(forge::Demo { forge: 1, state: forge::DemoState::Ended }) },
+        &mut out,
+    );
+    let repositories = domain.forge.writable_repositories(5);
+    assert_eq!(repositories.len(), 1);
+    assert_eq!(repositories[0].provider.forge, 3);
+}

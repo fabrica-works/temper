@@ -108,6 +108,9 @@ pub enum CallAnswer {
     DelegationDenied { answer: jig_domain_authority::Answer, findings: Box<[jig_domain_authority::Finding]> },
     /// A whole batch refused by structural or finite-funding admission.
     DelegationRefused(jig_domain_tasks::Problem),
+    /// Render-only repository choice feedback; only the underlying refusal is stored.
+    /// Box the problem to keep the existing answer slots within their allocation budget.
+    ChangeRefused { problem: Box<jig_domain_tasks::Problem>, named: Option<Box<[u8]>>, repositories: Box<[Box<[u8]>]> },
     /// A note write's durable name and revision.
     NoteWritten { name: u64, revision: u32 },
     /// One bounded notes recall page.
@@ -190,6 +193,9 @@ impl CallAnswer {
                 jig_domain_core::CallPart::DelegationDenied { answer: *answer, findings: findings.clone() }
             }
             CallAnswer::DelegationRefused(problem) => jig_domain_core::CallPart::DelegationRefused(problem.clone()),
+            CallAnswer::ChangeRefused { problem, .. } => {
+                jig_domain_core::CallPart::DelegationRefused(problem.as_ref().clone())
+            }
             CallAnswer::NoteWritten { name, revision } => {
                 jig_domain_core::CallPart::NoteWritten { name: *name, revision: *revision }
             }
@@ -804,6 +810,19 @@ pub(crate) fn call_answer_bytes(answer: &CallAnswer) -> Option<u64> {
         | CallAnswer::DelegationRefused(_)
         | CallAnswer::NoteWritten { .. }
         | CallAnswer::NoteRefused(_) => Some(0),
+        CallAnswer::ChangeRefused { named, repositories, .. } => {
+            let mut bytes = u64::try_from(repositories.len())
+                .ok()?
+                .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?
+                .checked_add(u64::try_from(size_of::<jig_domain_tasks::Problem>()).ok()?)?;
+            if let Some(named) = named {
+                bytes = bytes.checked_add(u64::try_from(named.len()).ok()?)?;
+            }
+            for name in repositories {
+                bytes = bytes.checked_add(u64::try_from(name.len()).ok()?)?;
+            }
+            Some(bytes)
+        }
         CallAnswer::NoteRecalled { entries, .. } => {
             let mut bytes = u64::try_from(entries.len())
                 .ok()?

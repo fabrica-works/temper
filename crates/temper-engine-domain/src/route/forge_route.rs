@@ -1691,6 +1691,127 @@ pub(crate) fn start_change(domain: &mut Domain, env: &Env<Limits>, context: &tas
     true
 }
 
+/// The code-2 procedure's repository and landing parameters, shared by chat
+/// changes and deployment queue repairs (domain/agent.md, 4.3.1).
+fn change_parameters(connector: u16, provider: skein_forge::api::Repository, base: Box<[u8]>) -> [tasks::Parameter; 2] {
+    [
+        tasks::Parameter::Resource { name: 1, connector, resource: forge::tag(provider.forge, provider.repository) },
+        tasks::Parameter::Bytes { name: 2, value: base },
+    ]
+}
+
+fn repository_name(repository: &forge::Repository) -> Box<[u8]> {
+    let count = repository
+        .owner
+        .len()
+        .checked_add(repository.name.len())
+        .expect("bounded repository name")
+        .checked_add(1)
+        .expect("repository slash");
+    let count = u32::try_from(count).expect("bounded repository name");
+    let mut name = List::with_capacity(count);
+    append(&mut name, &repository.owner);
+    append(&mut name, b"/");
+    append(&mut name, &repository.name);
+    name.into_boxed()
+}
+
+/// Bounded display names, attached to an unsettled change flight only.
+pub(crate) fn change_repositories(domain: &Domain, project: u32) -> Box<[Box<[u8]>]> {
+    let repositories = domain.forge.writable_repositories(project);
+    let mut names = List::with_capacity(u32::try_from(repositories.len()).expect("bounded repositories"));
+    for repository in &repositories {
+        names.push(repository_name(repository)).expect("bounded repositories");
+    }
+    names.into_boxed()
+}
+
+/// Expand a chat's request; ordinary delegation shape and authority admission
+/// still decide the resulting batch by its original call name.
+pub(crate) fn chat_change(
+    domain: &Domain,
+    env: &Env<Limits>,
+    context: &tasks::DelegationContext,
+    words: Box<[u8]>,
+    named: Option<&[u8]>,
+) -> Result<super::Delegate, tasks::Refusal> {
+    let repositories = domain.forge.writable_repositories(context.project);
+    let mut chosen = None;
+    for repository in &repositories {
+        let fits = match named {
+            Some(named) => repository_name(repository).as_ref() == named,
+            None => repositories.len() == 1,
+        };
+        if fits {
+            if chosen.is_some() {
+                return Err(tasks::Refusal::Unknown);
+            }
+            chosen = Some(*repository);
+        }
+    }
+    let repository = chosen.ok_or(tasks::Refusal::Unknown)?;
+    let available = context
+        .numbers
+        .budget
+        .checked_sub(context.numbers.spent)
+        .ok_or(tasks::Refusal::Funding)?
+        .checked_sub(context.numbers.spent_below)
+        .ok_or(tasks::Refusal::Funding)?
+        .checked_sub(context.numbers.reserved)
+        .ok_or(tasks::Refusal::Funding)?;
+    let spend = available / 2;
+    if spend <= domain.core.authority.rules().minimum_run_spend {
+        return Err(tasks::Refusal::Funding);
+    }
+    let mut authority = context.authority.clone();
+    let mut grants = List::with_capacity(u32::try_from(authority.grants.len()).expect("bounded grants"));
+    for grant in &authority.grants {
+        if grant.connector == domain.config.forge_connector && forge::CHANGE_KINDS.contains(&grant.kind) {
+            grants.push(grant.clone()).expect("narrowed grants fit");
+        }
+    }
+    authority.grants = grants.into_boxed();
+    let mut kinds = List::with_capacity(2);
+    kinds.push(tasks::AuthorityExecutor::Charter(domain.config.forge_charter)).expect("producer kind");
+    let gates =
+        configured_gates(domain, env, repository, &repository.settings.default_branch).ok_or(tasks::Refusal::Spec)?;
+    for gate in &gates {
+        if gate_executor(domain, gate.kind) == tasks::Executor::Person(tasks::PersonAddress::Role(1))
+            && !kinds.as_slice().contains(&tasks::AuthorityExecutor::Role(1))
+        {
+            kinds.push(tasks::AuthorityExecutor::Role(1)).expect("one person gate role");
+        }
+    }
+    authority.delegation.kinds = kinds.into_boxed();
+    authority.delegation.tasks = 4.min(context.tasks_left.saturating_sub(1));
+    authority.delegation.depth = 2.min(authority.delegation.depth.saturating_sub(1));
+    authority.budget.spend = spend;
+    authority.notes = tasks::Scopes(0);
+    authority.note_resources = Box::new([]);
+    Ok(super::Delegate {
+        executor: tasks::Executor::Procedure { connector: domain.config.forge_connector, code: 2 },
+        spec: tasks::Spec {
+            words,
+            parameters: Box::new(change_parameters(
+                domain.config.forge_connector,
+                repository.provider,
+                repository.settings.default_branch.clone(),
+            )),
+            inputs: Box::new([]),
+        },
+        contract: tasks::Contract::Change { connector: domain.config.forge_connector, kind: 1, words: 128 },
+        authority,
+        llm: None,
+        symbolic_grants: Box::new([]),
+        dependencies: Box::new([]),
+        wake: tasks::WakePolicy::DEFAULT,
+        tracked: None,
+        label: 0,
+        flags: tasks::Flags::PLAIN,
+        budget: people::Budget::Named,
+    })
+}
+
 fn child_authority(context: &tasks::DelegationContext) -> Option<tasks::Authority> {
     let mut authority = context.authority.clone();
     let available = context
@@ -1842,15 +1963,12 @@ fn start_queue_repair(domain: &mut Domain, env: &Env<Limits>, task: u64) -> bool
     let repair = seed.number();
     let provider = row.repository;
     let base = row.base.clone();
+    let [repository_parameter, base_parameter] = change_parameters(domain.config.forge_connector, provider, base);
     let spec = tasks::Spec {
         words: Box::from(&b"Repair landing branch CI"[..]),
         parameters: Box::new([
-            tasks::Parameter::Resource {
-                name: 1,
-                connector: domain.config.forge_connector,
-                resource: forge::tag(provider.forge, provider.repository),
-            },
-            tasks::Parameter::Bytes { name: 2, value: base },
+            repository_parameter,
+            base_parameter,
             tasks::Parameter::Number { name: 5, value: u64::try_from(i32::MAX).expect("positive priority") },
             tasks::Parameter::Number { name: 9, value: 1 },
         ]),

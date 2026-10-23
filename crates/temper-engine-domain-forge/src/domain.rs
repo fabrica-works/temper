@@ -797,6 +797,22 @@ impl Domain {
         if adopted.project == project { Some(adopted) } else { None }
     }
 
+    /// Adopted repositories in this project that still permit a workspace push.
+    #[must_use]
+    pub fn writable_repositories(&self, project: u32) -> Box<[&Repository]> {
+        let mut repositories = List::with_capacity(self.repositories.capacity());
+        for (_, repository) in &self.repositories {
+            if repository.project == project
+                && repository.role != Role::Context
+                && repository.kinds.push
+                && !self.forge_ended(repository.provider.forge)
+            {
+                repositories.push(repository).expect("bounded adopted repositories");
+            }
+        }
+        repositories.into_boxed()
+    }
+
     /// This project's explicitly selected home repository, when adopted.
     #[must_use]
     #[expect(clippy::manual_find, reason = "the strict subset uses explicit iteration instead of iterator closures")]

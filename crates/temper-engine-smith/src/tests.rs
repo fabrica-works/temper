@@ -228,6 +228,7 @@ fn every_declared_tool_decodes_its_minimum_shape_and_rejects_a_wrong_shape() {
         (b"read_permission", br#"{"repository":{"forge":1,"repository":2},"read":{"user":1}}"#, br#"{"repository":{"forge":1,"repository":2},"read":{}}"#),
         (b"effect_forge", br#"{"repository":{"forge":1,"repository":2},"resource":{"kind":"repository"},"write":{"kind":"close","number":3}}"#, br#"{"repository":{"forge":1,"repository":2},"resource":{},"write":{"kind":"close","number":3}}"#),
         (b"subscribe_forge", br#"{"topic":{"repository":{"forge":1,"repository":2},"kind":"pull","number":3}}"#, br#"{"topic":{}}"#),
+        (b"change", br#"{"words":"edit README"}"#, br#"{"words":""}"#),
         (b"delegate", br#"{"batch":[]}"#, br#"{"batch":{}}"#),
         (b"amend", br#"{"target":3,"revision":1,"amendment":{"reason":"x"}}"#, br#"{"target":3,"amendment":{}}"#),
         (b"message", br#"{"target":3,"form":"words","words":"x"}"#, br#"{"target":3,"form":"unknown","words":"x"}"#),
@@ -884,5 +885,93 @@ fn dependency_refusals_without_tasks_are_plain_lines() {
         ] {
             refusal_words(why, blocked.clone(), expected);
         }
+    }
+}
+
+#[test]
+fn change_decodes_words_and_an_optional_repository() {
+    for input in [br#"{"words":"edit README"}"#.as_slice(), br#"{"words":"edit README","repository":"work/hello"}"#] {
+        let call = decoded(b"change", input).expect("change is declared and decoded");
+        assert_eq!(call.completion, 2);
+        assert_eq!(call.position, 1);
+        let engine::Tool::Change { words, repository } = call.tool else { panic!("change") };
+        assert_eq!(words.as_ref(), b"edit README");
+        assert_eq!(repository.as_deref(), if input.contains(&b'/') { Some(b"work/hello".as_slice()) } else { None });
+    }
+}
+
+#[test]
+fn change_refuses_missing_words() {
+    assert_eq!(decoded(b"change", b"{}"), Err(Problem::Missing));
+}
+
+#[test]
+fn change_refuses_empty_words() {
+    assert_eq!(decoded(b"change", br#"{"words":""}"#), Err(Problem::Range));
+}
+
+#[test]
+fn change_refuses_non_string_words() {
+    assert_eq!(decoded(b"change", br#"{"words":1}"#), Err(Problem::Type));
+}
+
+#[test]
+fn change_refuses_malformed_repository_names() {
+    for name in ["", "hello", "/hello", "work/", "work/hello/other"] {
+        let input = format!(r#"{{"words":"edit README","repository":"{name}"}}"#);
+        assert_eq!(decoded(b"change", input.as_bytes()), Err(Problem::Range));
+    }
+}
+
+#[test]
+fn a_delegate_executor_or_grant_denial_suggests_change() {
+    use jig_domain_authority::{Answer, Finding, Source};
+    for finding in [Finding::Executor { source: Source::Task }, Finding::Grant { source: Source::Task }] {
+        let rendered =
+            answer(&engine::CallAnswer::DelegationDenied { answer: Answer::Refuse, findings: Box::new([finding]) });
+        assert!(rendered.error());
+        assert!(rendered.text().ends_with(b"For a change to a repository, call change with what to change."));
+        assert!(rendered.text().len() <= run::HostAnswer::CAPACITY);
+    }
+}
+
+#[test]
+#[expect(clippy::manual_map, reason = "the strict subset constructs optional text without closures")]
+fn change_repository_refusals_render_the_three_choices() {
+    struct Case {
+        named: Option<&'static [u8]>,
+        repositories: &'static [&'static [u8]],
+        expected: &'static [u8],
+    }
+    for case in [
+        Case { named: None, repositories: &[], expected: b"this project has no repository to change" },
+        Case {
+            named: None,
+            repositories: &[b"work/hello", b"work/other"],
+            expected: b"name the repository: work/hello, work/other",
+        },
+        Case {
+            named: Some(b"work/x"),
+            repositories: &[b"work/hello"],
+            expected: b"no repository work/x here; this project has: work/hello",
+        },
+    ] {
+        let mut repositories = skein_lib::List::with_capacity(2);
+        for name in case.repositories {
+            repositories.push(Box::from(*name)).expect("fixture repositories");
+        }
+        let requested = match case.named {
+            Some(name) => Some(Box::from(name)),
+            None => None,
+        };
+        let value = engine::CallAnswer::ChangeRefused {
+            problem: Box::new(tasks::Problem::new(None, tasks::Refusal::Unknown)),
+            named: requested,
+            repositories: repositories.into_boxed(),
+        };
+        let rendered = answer(&value);
+        assert!(rendered.error());
+        assert_eq!(rendered.text(), case.expected);
+        assert!(rendered.text().len() <= run::HostAnswer::CAPACITY);
     }
 }

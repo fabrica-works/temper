@@ -124,20 +124,51 @@ fn rendered(answer: &CallAnswer) -> Result<HostAnswer, Problem> {
             }
             false
         }
+        CallAnswer::ChangeRefused { named, repositories, .. } => {
+            if repositories.is_empty() {
+                text.add(b"this project has no repository to change")?;
+            } else {
+                match named {
+                    Some(named) => {
+                        text.add(b"no repository ")?;
+                        text.add(named)?;
+                        text.add(b" here; this project has: ")?;
+                    }
+                    None => text.add(b"name the repository: ")?,
+                }
+                for (at, repository) in repositories.iter().enumerate() {
+                    if at != 0 {
+                        text.add(b", ")?;
+                    }
+                    text.add(repository)?;
+                }
+            }
+            true
+        }
         CallAnswer::ForgeEffectRefused(refusal) => {
             text.add(b"Forge effect refused: ")?;
             forge_error(&mut text, *refusal)?;
             true
         }
-        CallAnswer::ForgeEffectDenied { answer, findings }
+        value @ (CallAnswer::ForgeEffectDenied { answer, findings }
         | CallAnswer::ToolDenied { answer, findings }
-        | CallAnswer::DelegationDenied { answer, findings } => {
+        | CallAnswer::DelegationDenied { answer, findings }) => {
             text.add(b"Authority ")?;
             authority(&mut text, *answer)?;
             text.add(b": ")?;
+            let mut change_hint = false;
             for finding in findings {
                 finding_text(&mut text, *finding)?;
                 text.add(b"; ")?;
+                if let CallAnswer::DelegationDenied { .. } = value
+                    && let jig_domain_authority::Finding::Executor { .. } | jig_domain_authority::Finding::Grant { .. } =
+                        finding
+                {
+                    change_hint = true;
+                }
+            }
+            if change_hint {
+                text.add(b"For a change to a repository, call change with what to change.")?;
             }
             true
         }

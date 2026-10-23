@@ -21,6 +21,9 @@ mod paths;
 #[path = "forge_routes/delegates.rs"]
 mod delegates;
 
+#[path = "forge_routes/change_tool.rs"]
+mod change_tool;
+
 struct World {
     creating: jig_core_world::fixtures::Creating,
     root: engine::Domain,

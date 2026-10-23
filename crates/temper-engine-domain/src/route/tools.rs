@@ -53,6 +53,30 @@ pub(crate) fn relay_payload(
                 return;
             }
             match body.tool {
+                Tool::Change { words, repository } => {
+                    let expanded = match domain.core.tasks.delegation(key.task) {
+                        Some(context) => forge_route::chat_change(domain, env, &context, words, repository.as_deref()),
+                        None => Err(tasks::Refusal::Unknown),
+                    };
+                    let tool = match expanded {
+                        Ok(member) => Tool::Delegate { batch: Box::new([member]) },
+                        Err(why) => Tool::Rejected(why),
+                    };
+                    let expanded = super::checked_call(
+                        crate::Call { completion: key.completion, position: key.position, tool },
+                        &env.limits,
+                    );
+                    let Tool::Delegate { batch } = expanded.tool else {
+                        let Tool::Rejected(why) = expanded.tool else { unreachable!("expanded change shape") };
+                        domain.work.push(Work::Core(core::Event::NamedAnswer {
+                            to: reply_to,
+                            key,
+                            part: core::CallPart::DelegationRefused(tasks::Problem::new(None, why)),
+                        }));
+                        return;
+                    };
+                    delegate_call(domain, env, decision, reply_to, key, batch, false, Box::new([]));
+                }
                 Tool::Unavailable => {
                     domain.work.push(Work::Core(core::Event::NamedAnswer {
                         to: reply_to,

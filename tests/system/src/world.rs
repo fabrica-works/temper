@@ -243,7 +243,8 @@ fn agent_for_with_options(
     settings.cancel_at = cancel_at;
     settings.budget = charter.budget;
     settings.limits.run.budget = charter.budget;
-    settings.limits.run.host_tools = 34;
+    settings.limits.run.host_tools =
+        u32::try_from(temper_engine_smith::tools(Duration::from_secs(10)).len()).expect("tool count");
     settings.limits.run.brief_sections = 16;
     settings.limits.session.spend = charter.budget.spend;
     let scripts = match script {

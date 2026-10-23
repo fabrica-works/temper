@@ -11,7 +11,7 @@ use std::collections::VecDeque;
 use jig_domain_host as host;
 use skein_fake_checkout::Checkout as Disk;
 use skein_fake_llm_domain::api::Script;
-use skein_lib::{ReplyTo, Time, Token};
+use skein_lib::{Duration, ReplyTo, Time, Token};
 use smith_agent_world::{Job, Settings, World as Agent};
 use smith_domain as smith;
 use smith_domain_run as run;
@@ -247,7 +247,8 @@ impl Process {
         settings.resume = transcript.is_some();
         settings.budget = charter.budget;
         settings.limits.run.budget = charter.budget;
-        settings.limits.run.host_tools = 34;
+        settings.limits.run.host_tools =
+            u32::try_from(temper_engine_smith::tools(Duration::from_secs(10)).len()).expect("tool count");
         settings.limits.run.brief_sections = 16;
         settings.limits.session.spend = charter.budget.spend;
         let event = smith::Event::Start {

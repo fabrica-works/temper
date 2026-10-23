@@ -86,6 +86,9 @@ pub struct Kinds {
     pub issue: bool,
     pub branch: bool,
 }
+/// Forge grants needed by the change procedure (domain/forge.md, sections 6 and 8).
+pub const CHANGE_KINDS: [u16; 6] = [2, 3, 4, 10, 11, 12];
+
 /// One adopted repository, with provider name and project ownership.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Repository {
