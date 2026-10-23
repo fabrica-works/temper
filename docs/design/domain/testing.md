@@ -1004,9 +1004,11 @@ and 10).
     `added_keys` (../protocol/setup.md, 8.4), written by the fake at
     the path the act names; a script's failing line (4.5's) is the
     document's `fail`, failing the credential the script names. And
-    after the chat act, outside them too,
-    the director's chat is waited running once, with its document,
-    since it can end before an act reads it live. The cluster's steps
+    after the chat act, outside them too, where
+    the step has more than one worker, the director's chat is waited
+    running once, with its document, since it can end before an act
+    reads it live and its channel names its worker; with ws alone it
+    can only run there. The cluster's steps
     are the harness's: a worker added is started (`Members::up`) and
     waited linked; a worker stopped is ended (`Members::stop_one`) and
     waited ended, its directories kept; a worker started again is
