@@ -25,6 +25,8 @@ pub trait Client {
 pub enum Notice {
     SignedIn,
     SignInAgain,
+    SignInBusy,
+    SignInFull { sign_ins: u32, earliest: skein_lib::Wall, link_until: skein_lib::Wall },
     SignInRefused,
     SignedOut,
     Credential { party: u64, token: Secret },
@@ -78,7 +80,7 @@ impl Loop {
             terminal_operations,
             directory,
             link,
-            lines: waiting::Waiting::new(requests.checked_add(3).expect("waiting line room")),
+            lines: waiting::Waiting::new(requests.checked_add(4).expect("waiting line room")),
             built: 0,
             retry: None,
             backoff: limits.first,
@@ -139,12 +141,21 @@ impl Loop {
                 self.link = None;
                 self.retry = None;
             }
-            Notice::SignInAgain => {
+            notice @ (Notice::SignInAgain | Notice::SignInBusy) => {
                 if self.link.is_some() {
-                    self.wait(Box::from(*b"signing in: no answer from the engine; trying again"));
+                    self.wait(if matches!(notice, Notice::SignInBusy) {
+                        Box::from(b"signing in: the engine is busy; trying again".as_slice())
+                    } else {
+                        Box::from(b"signing in: no answer from the engine; trying again".as_slice())
+                    });
                     self.retry = Some(now.saturating_add(self.backoff));
                     self.backoff = self.backoff.saturating_mul(2).min(self.limits.most);
                 }
+            }
+            Notice::SignInFull { sign_ins, earliest, link_until } => {
+                self.failure =
+                    Some(temper_client_domain::sign_in::full_line("temper open", sign_ins, earliest, link_until));
+                self.close();
             }
             Notice::SignInRefused => {
                 self.failure =
@@ -207,11 +218,12 @@ impl Loop {
     #[must_use]
     pub fn worst_case(&self) -> Option<u64> {
         let line = u64::try_from(self.directory.len().checked_add(160)?).ok()?;
+        let failure = line.max(temper_client_domain::sign_in::full_line_bound("temper open")?);
         let waiting = self.lines.capacity();
         Queue::<Box<[u8]>>::worst_case(waiting)?
             .checked_add(line.checked_mul(u64::from(waiting))?)?
             .checked_add(u64::try_from(self.directory.len()).ok()?)?
-            .checked_add(line)?
+            .checked_add(failure)?
             .checked_add(u64::try_from(self.link.as_ref().map_or(0, |link| link.expose().len())).ok()?)
     }
 }

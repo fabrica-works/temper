@@ -275,13 +275,28 @@ impl OneShot {
                     true
                 } else { false }
             });
-            let again = signed && sign_in::not_ready(&event);
             self.root_event(event);
-            if again {
-                self.signing.as_mut().expect("link sign-in").again(self.env.now, self.until.expect("sign-in deadline"));
-            } else if signed && self.root.client().link().credential.is_none() {
-                self.fail(b"the sign-in link was refused");
-                return;
+            if signed && self.root.client().link().credential.is_none() {
+                use jig_client::NotSignedIn;
+                match self.root.client().link().not_signed_in {
+                    Some(reason @ (NotSignedIn::NotReady | NotSignedIn::Busy)) => {
+                        let signing = self.signing.as_mut().expect("link sign-in");
+                        signing.last = Some(reason);
+                        signing.again(self.env.now, self.until.expect("sign-in deadline"));
+                    }
+                    Some(NotSignedIn::Full { sign_ins, earliest, link_until }) => {
+                        self.output.push(
+                            true,
+                            temper_client_domain::sign_in::full_line("temper ctl", sign_ins, earliest, link_until),
+                        );
+                        self.finish(1, false);
+                        return;
+                    }
+                    None => {
+                        self.fail(b"the sign-in link was refused");
+                        return;
+                    }
+                }
             }
         }
     }
@@ -497,6 +512,10 @@ impl OneShot {
             self.directory.close();
         }
         if self.status.is_none() && self.until.is_some_and(|at| now >= at) {
+            if self.signing.as_ref().is_some_and(|signing| signing.last == Some(jig_client::NotSignedIn::Busy)) {
+                self.fail(b"temper is busy; this link stays usable until it expires");
+                return;
+            }
             let address = std::str::from_utf8(self.directory.address.as_deref().expect("loaded address"))
                 .expect("numeric address");
             self.fail(format!("the engine at {address} did not answer within 30 s").as_bytes());

@@ -84,6 +84,61 @@ fn a_refused_or_lost_startup_link_keeps_the_stored_credential() {
         assert_eq!(host.signing(), Some(if refused { Signing::Refused } else { Signing::Lost }));
     }
 }
+#[test]
+fn busy_keeps_the_link_and_held_token_for_the_next_sign_in() {
+    use jig_client_protocol_wire as w;
+    let (mut host, signing, _) = fixtures::link_chat(Some(fixtures::credential()));
+    let answer = w::SignInAnswer::Busy;
+    let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+    answer.encode(&mut writer).expect("answer room");
+    host.transport(jig_client::Event::Reply { exchange: signing, message: writer.finish() });
+    assert_eq!(host.signing(), Some(Signing::Busy));
+    assert!(matches!(host.notices(), Some(Shown::Terminal(crate::terminal::Notice::SignInBusy))));
+    assert_eq!(host.credential, Some(fixtures::credential()));
+    assert!(host.saving_signing.is_none());
+    host.sign_in(fixtures::LINK).expect("same printed link");
+    let mut retry = None;
+    for (exchange, out) in &host.authentication {
+        assert!(!out, "retry signs in");
+        assert!(retry.replace(*exchange).is_none(), "one retry");
+    }
+    host.transport(jig_client::Event::Reply {
+        exchange: retry.expect("next sign-in exchange"),
+        message: fixtures::sign_in_answer(None),
+    });
+    assert_eq!(host.signing(), Some(Signing::SignedIn { party: CURRENT_PARTY }));
+    assert_eq!(
+        host.root.client().link().credential,
+        Some(&fixtures::credential()),
+        "the retry's With::Link carried the same held token"
+    );
+    assert!(host.saving_signing.is_none(), "the held sign-in writes no token");
+}
+
+#[test]
+fn full_installs_nothing_and_hands_both_times_to_the_terminal() {
+    use jig_client_protocol_wire as w;
+    let (mut host, signing, _) = fixtures::link_chat(Some(fixtures::credential()));
+    let earliest = skein_lib::Wall::from_nanos(3_600_000_000_000);
+    let link_until = skein_lib::Wall::from_nanos(300_000_000_000);
+    let answer = w::SignInAnswer::Full(
+        w::SignInsFull::new(
+            &w::CEILINGS,
+            w::SignInsFullParts { sign_ins: 2, earliest: earliest.as_nanos(), link_until: link_until.as_nanos() },
+        )
+        .expect("full answer"),
+    );
+    let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("answer size"));
+    answer.encode(&mut writer).expect("answer room");
+    host.transport(jig_client::Event::Reply { exchange: signing, message: writer.finish() });
+    assert_eq!(host.signing(), Some(Signing::Full { sign_ins: 2, earliest, link_until }));
+    assert!(
+        matches!(host.notices(), Some(Shown::Terminal(crate::terminal::Notice::SignInFull { sign_ins: 2, earliest: t, link_until: u })) if t == earliest && u == link_until)
+    );
+    assert!(host.root.client().link().credential.is_none());
+    assert_eq!(host.credential, Some(fixtures::credential()));
+    assert!(host.saving_signing.is_none());
+}
 
 #[test]
 fn first_link_sign_in_recovers_the_cancelled_nonempty_activity_read() {

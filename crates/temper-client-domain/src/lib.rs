@@ -18,6 +18,7 @@ pub mod limits;
 pub mod owner;
 pub mod pages;
 mod route;
+pub mod sign_in;
 pub use address::{Address, Choice, ModelWay, Place, Step, WayKind};
 pub use boundary::{Action, Event, Fact, Request};
 pub use domain::{Domain, fire, new, new_departing, next_deadline, shown, step, take, unlinked, unlinked_departing};

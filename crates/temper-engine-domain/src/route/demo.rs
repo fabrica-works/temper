@@ -149,6 +149,7 @@ pub(crate) fn reply(
         | people::Reply::SignedIn { .. }
         | people::Reply::SignedOut
         | people::Reply::Again(_)
+        | people::Reply::Full { .. }
         | people::Reply::Refused(_) => false,
     };
     if phase == Phase::Account && kept {

@@ -195,10 +195,8 @@ fn a_fresh_link_keeps_the_sign_in_held() {
 #[test]
 fn a_full_pool_says_so_and_the_same_link_signs_in_once_one_ends() {
     use support::ctl::{Call, Step, Story};
-    const FULL_CTL: &str =
-        "temper ctl: all 2 sign-ins are in use; the earliest ends at {T}; this link stays usable until it expires\n";
-    const FULL_OPEN: &str =
-        "temper open: all 2 sign-ins are in use; the earliest ends at {T}; this link stays usable until it expires\n";
+    const FULL_CTL: &str = "temper ctl: all 2 sign-ins are in use; the earliest ends at {T}; this link stays usable until {U}; after that, temper serve prints a fresh one when it is tried\n";
+    const FULL_OPEN: &str = "temper open: all 2 sign-ins are in use; the earliest ends at {T}; this link stays usable until {U}; after that, temper serve prints a fresh one when it is tried\n";
     const REFUSED: &[u8] = b"temper ctl: the sign-in link was refused\n";
     let scratch = ctl_scratch("full_pool_same_link");
     let sign_in = |name| Step::Run(Call::sign_in().in_directory(name));
@@ -264,18 +262,27 @@ fn a_full_pool_says_so_and_the_same_link_signs_in_once_one_ends() {
     }
     // The tier's engine fixture selects Small; configuration overrides the pool, not its lifetime.
     // jig's protocol-config profile/small.rs supplies people.sign_in_lifetime (24 hours).
-    let lifetime = jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.people.sign_in_lifetime;
-    let full = |index: usize, step: &str, words, owner, mismatches: &mut Vec<String>| {
-        pool_full(&seen.calls[index], step, words, seen.spans[owner], lifetime, mismatches)
+    let profile = jig_protocol_config::profile(jig_protocol_config::Profile::Small);
+    let full = |index: usize, step: &str, words, owner, link, mismatches: &mut Vec<String>| {
+        pool_full(
+            &seen.calls[index],
+            step,
+            words,
+            [seen.spans[owner], seen.link_spans[link]],
+            [profile.core.people.sign_in_lifetime, profile.clients.link_span],
+            mismatches,
+        )
     };
-    let a_ctl = full(4, "5", FULL_CTL, 0, &mut mismatches);
-    let a_open = full(5, "6", FULL_OPEN, 0, &mut mismatches);
+    // jig's protocol-config profile/small.rs supplies clients.link_span (five minutes).
+    // link_spans encloses the call that made serve print the link and the step that waited for it.
+    let a_ctl = full(4, "5", FULL_CTL, 0, 1, &mut mismatches);
+    let a_open = full(5, "6", FULL_OPEN, 0, 1, &mut mismatches);
     if let (Some(ctl), Some(open)) = (a_ctl, a_open)
         && ctl != open
     {
-        mismatches.push(format!("step 6: expiry {open} differs from step 5's {ctl}"));
+        mismatches.push(format!("step 6: expiries {open:?} differ from step 5's {ctl:?}"));
     }
-    full(10, "10", FULL_OPEN, 2, &mut mismatches);
+    full(10, "10", FULL_OPEN, 2, 2, &mut mismatches);
     for (index, step, token) in [(4, "5", 0), (5, "6", 1)] {
         if seen.tokens[index][token].is_some() {
             mismatches.push(format!("step {step}: {}/token exists", ["c", "d"][token]));
@@ -321,26 +328,34 @@ fn pool_full(
     ended: &support::Ended,
     step: &str,
     words: &str,
-    (began, end): (skein_lib::Wall, skein_lib::Wall),
-    lifetime: Duration,
+    windows: [(skein_lib::Wall, skein_lib::Wall); 2],
+    spans: [Duration; 2],
     mismatches: &mut Vec<String>,
-) -> Option<u64> {
-    let (prefix, suffix) = words.split_once("{T}").expect("one expiry hole");
-    let time = ended.stderr.strip_prefix(prefix.as_bytes()).and_then(|rest| rest.strip_suffix(suffix.as_bytes()));
-    let parsed = time.and_then(pool_utc_second);
+) -> Option<(u64, u64)> {
+    let (prefix, rest) = words.split_once("{T}").expect("one sign-in expiry hole");
+    let (middle, suffix) = rest.split_once("{U}").expect("one link expiry hole");
+    let times = ended.stderr.strip_prefix(prefix.as_bytes()).and_then(|rest| rest.strip_suffix(suffix.as_bytes()));
+    let parsed = times.and_then(|times| {
+        let second = times.get(20..)?.strip_prefix(middle.as_bytes())?;
+        Some((pool_utc_second(times.get(..20)?)?, pool_utc_second(second)?))
+    });
     if ended.exit != Some(Exit::Code(1)) || parsed.is_none() {
         mismatches.push(format!(
-            "step {step}: exit {:?}, stderr {:?}; expected Code(1), {words:?} with T in UTC to the second",
+            "step {step}: exit {:?}, stderr {:?}; expected Code(1), {words:?} with T and U in UTC to the second",
             ended.exit,
             String::from_utf8_lossy(&ended.stderr)
         ));
     }
-    if let Some(second) = parsed {
-        let first = (began.as_nanos() + lifetime.as_nanos()) / 1_000_000_000;
-        let last = (end.as_nanos() + lifetime.as_nanos()) / 1_000_000_000;
-        if second < first || second > last {
-            mismatches
-                .push(format!("step {step}: expiry {second} outside [{first}, {last}] (sign-in step plus lifetime)"));
+    if let Some((sign_in, link)) = parsed {
+        for ((name, second), ((began, end), span)) in
+            [("T", sign_in), ("U", link)].into_iter().zip(windows.into_iter().zip(spans))
+        {
+            let first = (began.as_nanos() + span.as_nanos()) / 1_000_000_000;
+            let last = (end.as_nanos() + span.as_nanos()) / 1_000_000_000;
+            if second < first || second > last {
+                mismatches
+                    .push(format!("step {step}: {name} expiry {second} outside [{first}, {last}] (step plus span)"));
+            }
         }
     }
     parsed

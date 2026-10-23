@@ -91,6 +91,25 @@ pub(crate) fn unavailable(root: &Domain) -> Option<crate::words::Word> {
         jig_client::Link::Starting | jig_client::Link::Live | jig_client::Link::Offline => None,
     }
 }
+pub(crate) fn unavailable_main(builder: &mut Builder, root: &Domain, words: &crate::words::Words) {
+    use crate::words::Word;
+    use jig_client::NotSignedIn;
+    use skein_ui::phrases::Hole;
+    if root.client().link().state == jig_client::Link::SignedOut {
+        match root.client().link().not_signed_in {
+            Some(NotSignedIn::Full { sign_ins, earliest, link_until }) => words.text(
+                builder,
+                Word::SignInFull,
+                &[Hole::Number(u64::from(sign_ins)), Hole::Wall(earliest), Hole::Wall(link_until)],
+            ),
+            Some(NotSignedIn::Busy) => words.text(builder, Word::SignInBusy, &[]),
+            Some(NotSignedIn::NotReady) => words.text(builder, Word::SignInNotReady, &[]),
+            None => words.text(builder, Word::SignedOutMain, &[]),
+        }
+    } else {
+        words.text(builder, Word::OutOfDateMain, &[]);
+    }
+}
 pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
     let pages = root.pages();
     let me = pages.me(root.client());

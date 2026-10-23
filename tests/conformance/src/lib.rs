@@ -733,7 +733,7 @@ fn delivered(peers: &mut Peers, clock: Clock, delivery: root::Delivery) {
             // Admission pressure is retried; a refusal saves no answer
             // (jig b7bdd9e8: refusal facts and `Again`).
             match &reply {
-                people::Reply::Again(_) => {
+                people::Reply::Again(_) | people::Reply::Full { .. } => {
                     peers.ask_retries.insert(call, clock.now + 1_000_000_000);
                 }
                 people::Reply::Outcome(_) | people::Reply::Refused(_) | people::Reply::SignedIn { .. } => {

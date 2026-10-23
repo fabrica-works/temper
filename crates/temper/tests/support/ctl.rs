@@ -75,7 +75,10 @@ pub enum Step {
     Pause,
     Resume,
     NextLink,
-    Open { directory: &'static str, until: Option<&'static [u8]> },
+    Open {
+        directory: &'static str,
+        until: Option<&'static [u8]>,
+    },
 }
 pub struct Story<'a> {
     scratch: &'a Path,
@@ -106,6 +109,8 @@ pub struct Seen {
     pub serve: Ended,
     pub mismatches: Vec<String>,
     pub spans: Vec<(Wall, Wall)>,
+    /// The call that requested a replacement link through the step that waited for it.
+    pub link_spans: Vec<(Wall, Wall)>,
     /// Token modes after each call, in the order passed to `Story::measured`.
     pub tokens: Vec<Vec<Option<u32>>>,
 }
@@ -310,6 +315,7 @@ pub struct Calls {
     began: Option<Wall>,
     wall: Wall,
     spans: Vec<(Wall, Wall)>,
+    link_spans: Vec<(Wall, Wall)>,
     tokens: Vec<Vec<Option<u32>>>,
     mismatches: Vec<String>,
     steps: VecDeque<Step>,
@@ -417,6 +423,7 @@ impl Calls {
             began: None,
             wall: Wall::from_nanos(0),
             spans: Vec::new(),
+            link_spans: Vec::new(),
             tokens: Vec::new(),
             mismatches: Vec::new(),
             steps: steps.into(),
@@ -552,6 +559,9 @@ impl Calls {
                     self.selected = next;
                 }
                 self.action = None;
+                if let Some((began, _)) = self.spans.last() {
+                    self.link_spans.push((*began, self.wall));
+                }
                 self.finish_step(false);
             }
         }
@@ -840,6 +850,7 @@ pub fn run(story: Story<'_>) -> Seen {
         serve,
         mismatches: std::mem::take(&mut calls.mismatches),
         spans: std::mem::take(&mut calls.spans),
+        link_spans: std::mem::take(&mut calls.link_spans),
         tokens: std::mem::take(&mut calls.tokens),
     }
 }
