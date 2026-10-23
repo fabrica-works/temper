@@ -5,8 +5,10 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::Path,
 };
+mod documents;
 #[path = "turn_bounds.rs"]
 pub mod turn_bounds;
+pub(crate) use documents::Documents;
 /// A second key the fake LLM peer accepts, for the accounts' stories.
 pub const SECOND_KEY: &[u8] = b"real-loop-second-llm-key";
 pub const TOKEN: &[u8] = jig_channel_world::fixtures::TOKEN;
@@ -71,6 +73,12 @@ pub fn documents(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> (serde
 
 /// Create the standalone tree; every private directory and file has its final mode.
 pub fn write(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> std::io::Result<()> {
+    files(directory)?;
+    let (agent, config) = documents(directory, llm, forge);
+    private(&directory.join("agent.json"), &serde_json::to_vec(&agent)?)?;
+    private(&directory.join("temper.json"), &serde_json::to_vec(&config)?)
+}
+pub(crate) fn files(directory: &Path) -> std::io::Result<()> {
     for name in ["", "accounts", "secrets", "charters", "state", "clients"] {
         std::fs::create_dir_all(directory.join(name))?;
         std::fs::set_permissions(directory.join(name), std::fs::Permissions::from_mode(0o700))?;
@@ -84,9 +92,7 @@ pub fn write(directory: &Path, llm: SocketAddr, forge: SocketAddr) -> std::io::R
     private(&directory.join("secrets/forge-1.user"), b"42\n")?;
     private(&directory.join("secrets/forge-1.api-token"), b"forge-1-api-token-value")?;
     private(&directory.join("secrets/forge-1.git-token"), b"forge-1-git-token-value")?;
-    let (agent, config) = documents(directory, llm, forge);
-    private(&directory.join("agent.json"), &serde_json::to_vec(&agent)?)?;
-    private(&directory.join("temper.json"), &serde_json::to_vec(&config)?)
+    Ok(())
 }
 pub(crate) fn private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(path)?.write_all(bytes)
@@ -183,18 +189,12 @@ pub fn lost_chat() -> Vec<crate::calls::Step> {
 }
 
 /// The key smoke uses the standard `OpenAI` route rather than the Codex account route.
-pub(crate) fn key_documents(directory: &Path) -> std::io::Result<()> {
-    let path = directory.join("agent.json");
-    let mut agent: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+pub(crate) fn key(agent: &mut serde_json::Value, config: &mut serde_json::Value) {
     agent["endpoints"][0]["provider"] = "openai".into();
     agent["endpoints"][0]["dialect"] = 3.into();
-    let config_path = directory.join("temper.json");
-    let mut config: serde_json::Value = serde_json::from_slice(&std::fs::read(&config_path)?)?;
     config["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
     config["engine"]["limits"]["overrides"]["people.projects"] = 2.into();
     config["engine"]["limits"]["overrides"]["authority.projects"] = 2.into();
     // Each project needs its period and the owner's pool in the tasks ledger.
     config["engine"]["limits"]["overrides"]["tasks.funders"] = 4.into();
-    private(&config_path, &serde_json::to_vec(&config)?)?;
-    private(&path, &serde_json::to_vec(&agent)?)
 }

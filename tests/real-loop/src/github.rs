@@ -117,15 +117,19 @@ fn config() -> layer::Config {
         faults: layer::Faults { reset: 0, drop: 0, server_error: 0 },
     }
 }
-pub(crate) fn write(path: &Path, address: SocketAddr, clients: SocketAddr, fixture: Fixture) -> std::io::Result<()> {
-    let mut value: Value = serde_json::from_slice(&std::fs::read(path.join("temper.json"))?)?;
-    let mut agent: Value = serde_json::from_slice(&std::fs::read(path.join("agent.json"))?)?;
+pub(crate) fn configure(
+    value: &mut Value,
+    agent: &mut Value,
+    address: SocketAddr,
+    clients: SocketAddr,
+    fixture: Fixture,
+) {
     value["application"]["clients"]["listener"] = json!({"socket":clients.to_string()});
     value["application"]["forges"] = json!([{"number":1,"kind":"github","api":{"socket":address.to_string()},
         "transport":"plaintext","git":format!("http://{address}"),"web":format!("http://{address}")}]);
     value["application"]["identities"] = json!([{"number":1,"forge":1,"login":null,"author":null}]);
     // Use the landing world's procedure and capacities, without a landing rule.
-    (landing::fixture().configure)(&mut value, &mut agent, address);
+    (landing::fixture().configure)(value, agent, address);
     value["application"]["landing"]["projects"] = json!([]);
     value["application"]["limits"]["overrides"]["forge_component.log_poll_ms"] = 10.into();
     // Adoption must reach the forge for either account, rather than fail authority first.
@@ -141,10 +145,8 @@ pub(crate) fn write(path: &Path, address: SocketAddr, clients: SocketAddr, fixtu
         broaden(&mut project["policy"]["roles"][0]["authority"]["grants"]);
         broaden(&mut project["policy"]["projections"]);
     }
-    (fixture.configure)(&mut value, &mut agent, address);
-    fixtures::turn_bounds::apply(&mut value, fixtures::turn_bounds::turn_body(&agent));
-    fixtures::private(&path.join("temper.json"), &serde_json::to_vec(&value)?)?;
-    fixtures::private(&path.join("agent.json"), &serde_json::to_vec(&agent)?)
+    (fixture.configure)(value, agent, address);
+    fixtures::turn_bounds::apply(value, fixtures::turn_bounds::turn_body(agent));
 }
 
 #[derive(Debug)]

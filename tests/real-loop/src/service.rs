@@ -60,7 +60,7 @@ pub struct ServiceHost {
     pub(crate) github_seen: crate::github::Seen,
     cues: Vec<Cue>,
     links: u32,
-    direct_key: bool,
+    documents: Option<fixtures::Documents>,
     path: PathBuf,
     signals: Fd,
     forge: Option<TcpListener>,
@@ -97,19 +97,9 @@ impl ServiceHost {
         let address = forge
             .as_ref()
             .map_or(([127, 0, 0, 1], 0).into(), |listener| listener.local_addr().expect("held forge address"));
-        fixtures::write(&path, address, address).expect("stand-in standalone documents");
-        if direct_key {
-            fixtures::key_documents(&path).expect("standard key route");
-        }
-        if let Some(fixture) = fixture {
-            crate::forge::write(&path, address, &fixture).expect("forge documents");
-        }
-        if let Some(fixture) = github {
-            crate::github::write(&path, address, clients.expect("fixed clients"), fixture).expect("GitHub documents");
-        }
-        if let Some(shape) = &cluster {
-            shape.write(path.parent().expect("cluster scratch"));
-        }
+        let documents =
+            fixtures::Documents::new(&path, address, direct_key, fixture, github, clients, cluster.as_ref());
+        documents.write(&path);
         let roots = Self::directories(&path, cluster.is_some());
         let config = std::fs::read(roots.document()).expect("standalone document");
         let mut envelope = temper::envelope_in(&roots, &config).expect("standalone admission envelope");
@@ -155,7 +145,7 @@ impl ServiceHost {
             seen: crate::forge::Seen::default(),
             cues: Vec::with_capacity(cue::CUES),
             links: 0,
-            direct_key,
+            documents: Some(documents),
             path,
             signals,
             forge,
@@ -185,10 +175,8 @@ impl ServiceHost {
                 Some(crate::github::make_app(peer, self.clients.expect("clients"), &self.path, fixture));
         }
     }
-    fn github_documents(&self, forge: SocketAddr) {
+    fn seed_github_app(&self, forge: SocketAddr) {
         let Some(fixture) = self.github else { return };
-        crate::github::write(&self.path, forge, self.clients.expect("fixed clients"), fixture)
-            .expect("GitHub documents");
         if fixture.connected {
             temper_github_app::seed(
                 &self.path.join("state"),
@@ -315,17 +303,10 @@ impl Host for ServiceHost {
                 .forge_address
                 .unwrap_or_else(|| self.forge.as_ref().expect("held forge").local_addr().expect("forge address"));
             if self.state != LifeState::Second {
-                fixtures::write(&self.path, address, forge).expect("bound standalone documents");
-                if self.direct_key {
-                    fixtures::key_documents(&self.path).expect("standard key route");
-                }
-                if let Some(fixture) = self.fixture {
-                    crate::forge::write(&self.path, forge, &fixture).expect("forge documents");
-                }
-                self.github_documents(forge);
-                if let Some(shape) = &self.cluster {
-                    shape.write(self.path.parent().expect("cluster scratch"));
-                }
+                let mut documents = self.documents.take().expect("one story's built documents");
+                documents.bind(address, forge, self.cluster.as_ref());
+                documents.write(&self.path);
+                self.seed_github_app(forge);
             }
             let mut service = temper::prepare_in(&Self::directories(&self.path, self.cluster.is_some()))
                 .expect("standalone preparation");

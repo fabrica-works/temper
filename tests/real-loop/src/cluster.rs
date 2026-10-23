@@ -85,7 +85,12 @@ impl Shape {
     pub(crate) fn ready(&self) -> bool {
         !matches!(self, Self::Worker { engine: None, .. } | Self::Worker { started: false, .. })
     }
-    pub(crate) fn write(&self, path: &Path) {
+    pub(crate) fn documents(
+        &self,
+        path: &Path,
+        mut document: serde_json::Value,
+        agent: &mut serde_json::Value,
+    ) -> serde_json::Value {
         use serde_json::json;
         let config = path.join("config");
         let data = path.join("data");
@@ -96,9 +101,6 @@ impl Shape {
                 .create(path.join(name))
                 .expect("cluster directories");
         }
-        let mut document: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(data.join("temper.json")).expect("base document"))
-                .expect("base JSON");
         // Link deadlines exceed PATIENCE, so load cannot lose a link or run in this story.
         // Loss and grace belong to the engine's domain world (domain/testing.md, 2.4).
         // The stop bound stays below fleet grace (protocol/README.md, 15.3).
@@ -137,12 +139,7 @@ impl Shape {
                 for (limit, size) in [("hub.turns", 1), ("hub.held", 1), ("hub.program_sources", 0)] {
                     worker["limits"]["overrides"][limit] = size.into();
                 }
-                let mut agent: serde_json::Value =
-                    serde_json::from_slice(&std::fs::read(data.join("agent.json")).expect("agent document"))
-                        .expect("agent JSON");
                 agent["profile"]["policy"]["unacknowledged"] = 1.into();
-                fixtures::private(&data.join("agent.json"), &serde_json::to_vec(&agent).expect("agent JSON"))
-                    .expect("cluster agent");
                 worker["name"] = (*name).into();
                 worker["secret"] = format!("secrets/{name}.secret").into();
                 worker["engine"] = json!({"socket": engine.unwrap_or(([127,0,0,1],0).into()).to_string()});
@@ -157,9 +154,8 @@ impl Shape {
                 .expect("fixture secret");
             }
         }
-        fixtures::private(&config.join("temper.json"), &serde_json::to_vec(&document).expect("cluster document"))
-            .expect("private cluster document");
         std::fs::copy(data.join("charters/chat.txt"), config.join("charters/chat.txt")).expect("configuration charter");
+        document
     }
 }
 
