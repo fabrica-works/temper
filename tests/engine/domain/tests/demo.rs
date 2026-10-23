@@ -93,6 +93,19 @@ fn demo_start_adds_the_deployments_account_and_adopts_the_repository_once() {
 }
 
 #[test]
+fn demo_start_replays_its_retained_answer_without_repeating_acts() {
+    let (mut d, sign_in) = driver(true, false);
+    start(&mut d, sign_in, 81, true);
+    let calls = d.forge.as_ref().expect("fake forge").calls;
+    d.delivered.clear();
+    start(&mut d, sign_in, 81, true);
+    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::Running))]);
+    assert_eq!(keeps(&d), 1);
+    assert_eq!(d.forge.as_ref().expect("fake forge").calls, calls);
+    assert!(matches!(d.delivered.first(), Some(Delivery::CarriedUnused { number: 81 })));
+}
+
+#[test]
 fn demo_start_fails_when_its_account_is_refused_or_the_key_is_missing() {
     for carry in [false, true] {
         let (mut d, sign_in) = driver(true, false);
@@ -237,4 +250,10 @@ fn a_busy_box_link_fails_the_demo_start_with_the_groups_reason() {
             why: b"busy".as_slice().into()
         })))]
     );
+    connection(&mut d, forge::Connection::Connected { id: 1, login: b"temper".as_slice().into() });
+    d.delivered.clear();
+    start(&mut d, sign_in, 82, true);
+    assert_eq!(answers(&d), [Some(forge::Answered::StartDemo(forge::StartAnswer::Running))]);
+    assert_eq!(keeps(&d), 1);
+    assert!(matches!(d.delivered.first(), Some(Delivery::CarriedUnused { number: 82 })));
 }
