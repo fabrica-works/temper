@@ -6,17 +6,21 @@ from urllib.parse import unquote_to_bytes, urlsplit
 
 
 def origin(url):
-    """Only numeric loopback HTTP, with an explicit port; never return a path."""
+    """Require an exact numeric loopback HTTP origin with an explicit port."""
     try:
         parts = urlsplit(url)
         if (parts.scheme != 'http' or parts.username is not None or parts.password is not None
                 or parts.port is None or not 1 <= parts.port <= 65535
+                or '%' in (parts.hostname or '')
                 or not ipaddress.ip_address(parts.hostname).is_loopback):
             raise ValueError
         host = parts.hostname
         if ':' in host:
             host = '[' + host + ']'
-        return f'http://{host}:{parts.port}/'
+        public = f'http://{host}:{parts.port}/'
+        if url != public:
+            raise ValueError
+        return public
     except (ValueError, TypeError):
         raise ValueError('public loopback origin unavailable') from None
 
@@ -63,7 +67,9 @@ def credential(line):
         decoded = base64.urlsafe_b64decode(secret + b'=')
         if len(decoded) != 32 or base64.urlsafe_b64encode(decoded).rstrip(b'=') != secret:
             raise ValueError
-        public = origin(text[:-1])
+        public = origin('http://' + parts.netloc + '/')
+        if text[:-1] != public[:-1] + parts.path + '?' + parts.query:
+            raise ValueError
         return line, public
     except (ValueError, UnicodeError):
         raise ValueError('engine emitted a malformed sign-in line') from None
