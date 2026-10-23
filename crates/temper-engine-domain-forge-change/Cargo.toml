@@ -3,6 +3,7 @@ name = "temper-engine-domain-forge-change"
 description = "Pure change procedure and landing queue policy for the forge connector"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

@@ -3,6 +3,7 @@ name = "temper-protocol-worker-wire"
 description = "temper's bounded application parts on jig's channel"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

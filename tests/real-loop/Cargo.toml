@@ -3,6 +3,7 @@ name = "temper-real-loop-world"
 description = "Temper's standalone service and hosted tools on one real kernel"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

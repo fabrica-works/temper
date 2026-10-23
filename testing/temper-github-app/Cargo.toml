@@ -3,6 +3,7 @@ name = "temper-github-app"
 description = "The fake GitHub App and its durable start records"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

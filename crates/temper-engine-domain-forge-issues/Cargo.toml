@@ -3,6 +3,7 @@ name = "temper-engine-domain-forge-issues"
 description = "Pure goal issue projection for the forge connector"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

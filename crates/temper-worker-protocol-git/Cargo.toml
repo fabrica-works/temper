@@ -3,6 +3,7 @@ name = "temper-worker-protocol-git"
 description = "The checkout git component"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

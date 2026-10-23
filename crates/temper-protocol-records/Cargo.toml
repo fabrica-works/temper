@@ -3,6 +3,7 @@ name = "temper-protocol-records"
 description = "Versioned forge records and startup access"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

@@ -3,6 +3,7 @@ name = "temper-engine-domain-forge"
 description = "Forge connector top: resources, topics, outbox and child routing"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

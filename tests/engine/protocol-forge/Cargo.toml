@@ -3,6 +3,7 @@ name = "temper-engine-protocol-forge-world"
 description = "Forge component against recorded HTTP answers and scripted io"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

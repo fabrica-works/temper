@@ -3,6 +3,7 @@ name = "temper-fake-git-hosted"
 description = "Git invocations hosted on the world's files and fake forge"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

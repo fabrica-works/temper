@@ -3,6 +3,7 @@ name = "temper-fake-claude"
 description = "Executable entry point for smith's pinned Claude Code fake"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

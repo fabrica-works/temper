@@ -3,6 +3,7 @@ name = "temper-client-bundle"
 description = "The browser's bundle, built and embedded at temper's build (client/browser.md, 2.6)"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 build = "build/main.rs"

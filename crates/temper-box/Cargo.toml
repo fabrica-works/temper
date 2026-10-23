@@ -3,6 +3,7 @@ name = "temper-box"
 description = "The box's ordered processes and restart policy"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

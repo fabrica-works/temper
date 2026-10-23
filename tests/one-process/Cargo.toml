@@ -3,6 +3,7 @@ name = "temper-one-process-world"
 description = "Temper's service, native person and hosted agents on one simulated kernel"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

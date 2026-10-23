@@ -3,6 +3,7 @@ name = "temper-fake-git"
 description = "The fake git program's core: its checks, answers, step core and transports"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

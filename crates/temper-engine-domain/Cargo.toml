@@ -3,6 +3,7 @@ name = "temper-engine-domain"
 description = "The engine root composing jig and the forge, sans-io"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
