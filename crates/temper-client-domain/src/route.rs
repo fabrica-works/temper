@@ -60,6 +60,7 @@ pub(crate) fn pages(root: &mut Domain, env: &Env<Limits>, event: crate::pages::E
     for _ in 0..child.len() {
         match child.pop().expect("counted pages output") {
             crate::pages::Request::Client(event) => client(root, env, event, out),
+            crate::pages::Request::Replace { address } => out.push(Request::Show { address, replace: true }),
             crate::pages::Request::Show { address } => out.push(Request::Show { address, replace: false }),
         }
     }
@@ -131,6 +132,9 @@ pub(crate) fn route_client(
 }
 pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told, out: &mut Queue<Request>) {
     use jig_client::Told;
+    if crate::departure::told(root, env, &told, out) {
+        return;
+    }
     let asker = match &told {
         Told::Link { link } => {
             pages(root, env, crate::pages::Event::Link { link: *link }, out);
@@ -229,6 +233,7 @@ fn suggest(root: &mut Domain, env: &Env<Limits>, cue: u8, out: &mut Queue<Reques
     while let Some(request) = child.pop() {
         match request {
             crate::pages::Request::Client(event) => client(root, env, event, out),
+            crate::pages::Request::Replace { address } => out.push(Request::Show { address, replace: true }),
             crate::pages::Request::Show { address } => out.push(Request::Show { address, replace: false }),
         }
     }

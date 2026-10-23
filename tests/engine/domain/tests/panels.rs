@@ -21,7 +21,7 @@ fn driver() -> Driver {
         key: [95; 16],
         digest: [5; 32],
         carried: None,
-        request: forge::Ask::Adopt(fixtures::adoption(1)),
+        request: temper_engine_domain::Application::Forge(forge::Ask::Adopt(fixtures::adoption(1))),
     }));
     driver.settle();
     driver.send(root::Event::Forge(Box::new(forge::Event::Change {

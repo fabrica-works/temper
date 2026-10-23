@@ -742,6 +742,7 @@ impl World {
                 | engine::Request::Account(_)
                 | engine::Request::SetUpGroup { .. }
                 | engine::Request::SetUp { .. }
+                | engine::Request::Return { .. }
                 | engine::Request::Setup { .. }
                 | engine::Request::Busy(_)
                 | engine::Request::Drained

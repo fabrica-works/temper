@@ -39,7 +39,9 @@ fn a_first_run_welcome_without_a_demo() {
         &mut root,
         d::Event::Went {
             place: Place::Address(Address::Welcome {
-                step: Step::Model { way: Some(d::ModelWay { provider: accounts::PROVIDER, kind: d::WayKind::Key }) },
+                step: Step::Model {
+                    way: Some(d::ModelWay { source: None, provider: accounts::PROVIDER, kind: d::WayKind::Key }),
+                },
             }),
         }
         .into(),

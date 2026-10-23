@@ -21,6 +21,8 @@ use temper_engine_domain_world::{direct::Driver, store::Store, walking};
 pub struct Joint {
     pub engine: Driver,
     pub sign_ins: u32,
+    pub leaves: Vec<Box<[u8]>>,
+    pub refuse_return: bool,
     set_ups: Vec<(u16, Token)>,
     pub demo: Option<temper_client_protocol_wire::v1::DemoAnswer>,
     pub demo_starts: Vec<skein_lib::RequestKey>,
@@ -548,6 +550,8 @@ impl Joint {
         Joint {
             engine,
             sign_ins: 0,
+            leaves: Vec::new(),
+            refuse_return: false,
             set_ups: Vec::new(),
             demo: None,
             demo_starts: Vec::new(),
@@ -677,7 +681,45 @@ impl Joint {
         }
         false
     }
+    fn refused_return(&mut self, who: ClientId, request: &Request) -> bool {
+        if self.refuse_return
+            && let Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family { record, .. }, .. },
+                    },
+            } = request
+            && let Some(decoded) = temper_client_protocol_wire::decode_requesting(
+                &record.bytes,
+                &temper_client_protocol_wire::v1::CEILINGS,
+            )
+            && matches!(decoded.request(), temper_client_protocol_wire::v1::Request::Return(_))
+        {
+            self.callbacks.push((
+                who,
+                RootEvent::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Answer {
+                            attempt: *attempt,
+                            envelope: RequestEnvelope::Final,
+                            why: None,
+                            answer: Some(jig_client::Answered::Jig(jig_client::contract::Answer::Refused {
+                                refusal: jig_client::contract::Refusal::Unknown,
+                                at: None,
+                            })),
+                        },
+                    },
+                }
+                .into(),
+            ));
+            return true;
+        }
+        false
+    }
     fn request(&mut self, who: ClientId, mut request: Request) {
+        if self.refused_return(who, &request) {
+            return;
+        }
         if self.offline_until.is_some() || self.transport.sign_in(who).is_none() {
             if let Request::Client {
                 request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, value: Some(_), .. } },

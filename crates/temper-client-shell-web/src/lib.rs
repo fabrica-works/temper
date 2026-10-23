@@ -97,7 +97,8 @@ impl Shell {
                 Report::Fetch(report) => self.host.heard(adapter::fetched(report)),
                 Report::Carried(reports, stored) => self.host.carried(reports, stored),
             }
-            let requests = adapter::requests(self.host.requests());
+            let mut requests = adapter::requests(self.host.requests());
+            requests.navigate = self.host.navigate.take();
             let stored = !requests.writes.is_empty() || !requests.removes.is_empty();
             let mut carried = Vec::new();
             transport::carry(requests, &mut self.store, &mut self.platform, &mut carried);

@@ -212,6 +212,10 @@ fn flush(
 ) {
     Temper::take(root, env, out);
     while let Some(request) = out.pop() {
+        if let temper_client_domain::Request::Leave { to } = request {
+            front.leaves.push(to);
+            continue;
+        }
         match Temper::duty(request) {
             Duty::Wire(request) => front.wire(CLIENT, env.now, env.wall, request),
             Duty::Show { address, .. } => Temper::step(root, env, Temper::went(address), out),
@@ -374,4 +378,18 @@ fn demo_answer(running: bool) -> temper_client_protocol_wire::v1::DemoAnswer {
         },
     )
     .expect("demo fixture")
+}
+
+/// Fresh page on the same engine and person, with an explicit departure policy.
+pub fn reopen(front: &mut Joint, root: &mut Root, address: temper_client_domain::Address, departing: bool) {
+    let seed = fixtures::SEED.wrapping_add(1);
+    // Close the previous client's watches before replacing its root.
+    front.detach(CLIENT);
+    front.hello(CLIENT);
+    *root = Root::Person(Box::new(if departing {
+        temper_client_domain::unlinked_departing(&front.limits, seed)
+    } else {
+        temper_client_domain::unlinked(&front.limits, seed)
+    }));
+    event(front, root, Temper::start(address, Vec::new(), 0));
 }

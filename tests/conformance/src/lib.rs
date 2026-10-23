@@ -593,7 +593,7 @@ impl Application for Temper {
                         key: [91; 16],
                         digest: [5; 32],
                         carried: None,
-                        request: forge::Ask::Adopt(forge::Adoption {
+                        request: temper_engine_domain::Application::Forge(forge::Ask::Adopt(forge::Adoption {
                             project: 1,
                             home: true,
                             forge: temper_engine_forge_world::REPO.forge,
@@ -605,7 +605,7 @@ impl Application for Temper {
                             landing: b"main".as_slice().into(),
                             ci: true,
                             checks: Box::new([]),
-                        }),
+                        })),
                     }));
                 }
                 if peers.adopted && !peers.chatted {
@@ -716,7 +716,10 @@ fn delivered(peers: &mut Peers, clock: Clock, delivery: root::Delivery) {
     let mut requires = Vec::new();
     match delivery {
         root::Delivery::Application { to, outcome } => {
-            assert!(matches!(outcome, Some(forge::Answered::Adopt(forge::ApplicationOutcome::Adopted(_)))));
+            assert!(matches!(
+                outcome,
+                Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::Adopted(_)))
+            ));
             let call = to.into_token().raw();
             if let Some(key) = peers.requests.remove(&call) {
                 requires.push(r::Receipt::Party(1, key));

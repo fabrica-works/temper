@@ -15,6 +15,8 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
             engine.box_link.ask(forge, request, &mut out);
             box_link::drain(engine, &mut out);
         }
+        // T3 gives this checked return to skein's accounts component.
+        root::Request::Return { .. } => {}
         root::Request::SetUp { forge, request, org, repository } => {
             crate::setup::lifecycle::first(engine, forge, org, repository);
             let mut out = skein_lib::Queue::with_capacity(3);

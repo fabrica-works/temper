@@ -175,7 +175,7 @@ fn all_model_way_addresses_print_and_read_including_the_welcome() {
         (WayKind::Program, b"/accounts/connect?provider=17&way=program", b"/welcome?at=model&provider=17&way=program"),
         (WayKind::Key, b"/accounts/connect?provider=17&way=key", b"/welcome?at=model&provider=17&way=key"),
     ] {
-        let way = Some(ModelWay { provider: 17, kind });
+        let way = Some(ModelWay { source: None, provider: 17, kind });
         for (address, expected) in
             [(Address::ConnectModel { way }, path), (Address::Welcome { step: Step::Model { way } }, welcome)]
         {
@@ -255,4 +255,27 @@ fn the_welcomes_forge_step_carries_its_choice() {
         parse(b"/welcome?forge=3&at=model"),
         Place::Address(Address::Welcome { step: Step::Model { way: None } })
     );
+}
+
+#[test]
+fn a_return_source_is_printed_and_read_only_on_a_sign_in_way() {
+    for base in [b"/accounts/connect?".as_slice(), b"/welcome?at=model&".as_slice()] {
+        for (query, canonical) in [
+            ("provider=1&way=sign-in&source=7", "provider=1&way=sign-in&source=7"),
+            ("source=7&provider=1&way=sign-in", "provider=1&way=sign-in&source=7"),
+            ("provider=1&way=sign-in&source=4294967295", "provider=1&way=sign-in&source=4294967295"),
+            ("provider=1&way=sign-in&source=4294967296", "provider=1&way=sign-in"),
+            ("provider=1&way=sign-in&source=07", "provider=1&way=sign-in"),
+            ("provider=1&way=sign-in&source=bad", "provider=1&way=sign-in"),
+            ("provider=1&way=key&source=7", "provider=1&way=key"),
+            ("provider=1&way=program&source=7", "provider=1&way=program"),
+        ] {
+            let mut input = skein_lib::Writer::new(base.len().checked_add(query.len()).expect("query fits"));
+            input.put(base).expect("base fits");
+            input.put(query.as_bytes()).expect("query fits");
+            let input = input.finish();
+            let Place::Address(address) = parse(&input) else { panic!("known path") };
+            assert_eq!(print(&address).strip_prefix(base).expect("same path"), canonical.as_bytes(), "{query}");
+        }
+    }
 }

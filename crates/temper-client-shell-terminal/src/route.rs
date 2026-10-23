@@ -13,6 +13,7 @@ pub enum Notice {
     Unread,
     Served { family: u16, versions: Option<VersionRange> },
     Unasked,
+    Leave { to: Box<[u8]> },
     Fact(link::Fact),
 }
 /// Each root obligation has exactly one destination.
@@ -34,6 +35,7 @@ pub fn down(request: client::Request) -> Down {
     match request {
         client::Request::Client { request } => Down::Shell(request),
         client::Request::Show { address, replace } => Down::Duty(Duty::Show { address, replace }),
+        client::Request::Leave { to } => Down::Notice(Notice::Leave { to }),
         client::Request::SignOut => Down::Duty(Duty::SignOut),
         client::Request::Dropped { count } => Down::Notice(Notice::Dropped { count }),
         client::Request::Fact { fact } => Down::Duty(Duty::Fact(fact)),

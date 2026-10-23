@@ -716,6 +716,7 @@ impl World {
             | engine::Request::Account(_)
             | engine::Request::SetUpGroup { .. }
             | engine::Request::SetUp { .. }
+            | engine::Request::Return { .. }
             | engine::Request::Setup { .. }
             | engine::Request::Busy(_)
             | engine::Request::Drained
@@ -750,6 +751,7 @@ impl World {
             | engine::Request::Account(_)
             | engine::Request::SetUpGroup { .. }
             | engine::Request::SetUp { .. }
+            | engine::Request::Return { .. }
             | engine::Request::Setup { .. }
             | engine::Request::ToChild(_)
             | engine::Request::Busy(_)
@@ -793,7 +795,7 @@ impl World {
                 assert_eq!(to.into_token(), ADOPTION);
                 assert!(matches!(
                     outcome,
-                    Some(temper_engine_domain_forge::Answered::Adopt(
+                    Some(temper_engine_domain::ApplicationAnswer::Adopt(
                         temper_engine_domain_forge::ApplicationOutcome::Adopted(_)
                     ))
                 ));
@@ -879,7 +881,7 @@ impl World {
                 key: [90; 16],
                 digest: [5; 32],
                 carried: None,
-                request: temper_engine_domain_forge::Ask::Adopt(adoption()),
+                request: temper_engine_domain::Application::Forge(temper_engine_domain_forge::Ask::Adopt(adoption())),
             }));
         }
     }

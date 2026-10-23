@@ -173,13 +173,17 @@ pub(crate) fn held(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisi
         }
         core::Held::Drained => emit(decision, &env.limits, Delivery::Drained),
         core::Held::Applied { to, token, .. } => {
-            let outcome = domain.forge.application_answer(token);
             let right = to.into_token();
             let to = skein_lib::ReplyTo::new(right);
             if super::demo::owns(right) {
+                let outcome = domain.forge.application_answer(token);
                 super::demo::adopted(domain, env, decision, outcome);
             } else {
-                emit(decision, &env.limits, Delivery::Application { to, outcome });
+                emit(
+                    decision,
+                    &env.limits,
+                    Delivery::Application { to, outcome: super::applications::answer(domain, token) },
+                );
             }
         }
         core::Held::ApplicationDelivery { .. } => {
