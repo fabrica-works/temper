@@ -380,8 +380,15 @@ impl Judge {
                 .expect("closed installation record")
                 .expect("installation observation");
         }
-        let moved: Vec<_> = rows.iter().filter(|row| row["observation"] == "moved").collect();
-        assert_eq!(moved.len(), 1, "Must: one moved branch across both lives");
+        // Only the push's branch: once CI passes, the change may merge and move
+        // main in either life; the landing's Musts are not this story's.
+        let moved: Vec<_> =
+            rows.iter().filter(|row| row["observation"] == "moved" && row["branch"] != "main").collect();
+        assert_eq!(moved.len(), 1, "Must: one pushed branch across both lives");
+        let identity = &self.identity.as_ref().expect("first identity")["id"];
+        for row in rows.iter().filter(|row| row["observation"] == "moved" && row["branch"] == "main") {
+            assert_eq!(&row["by"], identity, "Must: the base branch moves only by temper's own App");
+        }
         assert_eq!(moved[0]["repository"], "acme/app");
         assert_ne!(moved[0]["branch"], "main");
         assert!(moved[0]["from"].is_null(), "push creates its branch");
