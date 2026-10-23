@@ -990,6 +990,7 @@ impl Judge {
         );
     }
     fn map_channels(&mut self, accounts: &Value) {
+        assert_eq!(accounts["cut"], false, "complete placement hosts: {}", accounts["accounts"]["deployment_facts"]);
         let hosts = accounts
             .pointer("/accounts/deployment_facts/program_hosts")
             .and_then(Value::as_array)
