@@ -1290,6 +1290,15 @@ section 8; testing-strategy.md, 2.9).
   needing sign-in fails the test the same way, naming the account's state
   and its reset, since its task would wait for it (jig's
   `domain/authority.md`, 8.3).
+- **The owned-forge landing story,**
+  `a_person_asks_chatgpt_to_land_a_change_on_the_owned_forge`, run by
+  `scripts/proof-live.sh forge-land`: a fresh ChatGPT sign-in, init's shipped
+  charters and real Responses on `gpt-6-luna`; the chat chooses `change`, a
+  tagged README line lands on work/hello with CI green, and a fresh client
+  finds the same chat, pull and merge hash after the box restarts on its three
+  directories, without another provider sign-in, push or merge. It closes the
+  chat and drains the box; the sitting allows ten minutes for sign-in, forty
+  minutes in total and 1–25 completions.
 - **Its referee:** the process tier's, without the restart; and the
   completions, counted from the engine's transcripts. Each completion is
   a turn of main's conversation on either backend: on the program

@@ -132,7 +132,7 @@ fn pushed(directory: &Path, forge: &Throwaway, baseline: &[u8]) -> Option<Push> 
     }
     None
 }
-fn account_ready(value: &Value) {
+pub fn account_ready(value: &Value) {
     let account = value["accounts"]["party"]
         .as_array()
         .expect("person's accounts")
@@ -370,7 +370,25 @@ pub fn run(directory: &Path, forge: &Throwaway, deadline: Duration) -> Pushed {
 
 #[must_use]
 pub fn completions(directory: &Path) -> u32 {
-    let value = fs::read(directory.join("temper.json")).expect("configuration");
+    count_completions(directory, &super::configuration::directories(directory))
+}
+
+/// Init's configuration and transcripts live under separate private roots.
+#[must_use]
+pub fn deployment_completions(paths: &[PathBuf; 3]) -> u32 {
+    use std::os::unix::ffi::OsStrExt;
+    let flags: Vec<Box<[u8]>> = ["--config", "--data", "--cache"]
+        .into_iter()
+        .zip(paths)
+        .flat_map(|(flag, path)| [Box::from(flag.as_bytes()), Box::from(path.as_os_str().as_bytes())])
+        .collect();
+    let (directories, _) = temper::directories::resolve(&flags, &[], b"/").expect("live directories");
+    count_completions(&paths[0], &directories)
+}
+
+fn count_completions(config: &Path, directories: &temper::directories::Directories) -> u32 {
+    use std::os::unix::ffi::OsStrExt;
+    let value = fs::read(config.join("temper.json")).expect("configuration");
     let document = jig_protocol_config::document(
         &value,
         &jig_protocol_config::DocumentLimits { bytes: 1 << 20, tokens: 1 << 20, depth: 32 },
@@ -380,11 +398,11 @@ pub fn completions(directory: &Path) -> u32 {
         .expect("object")
         .member(&document, b"engine")
         .expect("engine member");
-    let engine = jig_protocol_config::engine(&document, at, &super::configuration::directories(directory).jig())
-        .expect("engine configuration");
+    let engine = jig_protocol_config::engine(&document, at, &directories.jig()).expect("engine configuration");
     let limits = codec::limits(&engine.limits.core).expect("store codec limits");
     let mut paths = Vec::new();
-    files(&directory.join("state/transcripts"), &mut paths);
+    let deployment = Path::new(std::ffi::OsStr::from_bytes(&engine.deployment.directory));
+    files(&deployment.join("transcripts"), &mut paths);
     let mut count = 0;
     for path in paths {
         let bytes = fs::read(path).expect("transcript");
