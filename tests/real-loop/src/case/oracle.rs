@@ -92,6 +92,14 @@ impl Observed {
                 told.push(query);
             }
         }
+        // The model peer observes the delivered brief even when the run ends
+        // before a ctl read could see it. Keep the first query after Release.
+        if let Some(fresh) =
+            told.iter().find(|query| query.agent == Agent::Rules && contains(&query.system, super::NEW_RULES))
+        {
+            documents
+                .insert(Read::RulesFreshBrief, serde_json::json!({"system": String::from_utf8_lossy(&fresh.system)}));
+        }
         Self {
             documents,
             commands: Vec::new(),
@@ -1561,6 +1569,7 @@ pub fn step_5_1(observed: &Observed) -> Vec<Miss> {
     let mut misses = Vec::new();
     rules_controls(&mut misses, observed);
     rules_director(&mut misses, observed);
+    rules_fresh_tail(&mut misses, observed);
     rules_owner(&mut misses, observed);
     rules_messages_and_endings(&mut misses, observed);
     misses
@@ -1655,6 +1664,23 @@ fn rules_director(misses: &mut Vec<Miss>, observed: &Observed) {
     ] {
         step_check(misses, "5.1", met, promise, what);
     }
+}
+
+fn rules_fresh_tail(misses: &mut Vec<Miss>, observed: &Observed) {
+    let system = text(document(observed, Read::RulesFreshBrief), "/system");
+    let tail = system.split_once("Transcript tail").map(|(_, rest)| rest.split("\n#").next().unwrap_or(rest));
+    step_check(
+        misses,
+        "5.1",
+        tail.is_some_and(|tail| {
+            tail.contains("call delegate:")
+                && tail.contains(super::SCOPE_SPEC)
+                && tail.contains(&format!("result: Delegated tasks: {}", super::SCOPE))
+                && !tail.contains("[earlier bytes not text, cut]")
+        }),
+        RULES_FRESH,
+        "the director's fresh brief must have a Transcript tail holding its earlier committed turn text",
+    );
 }
 
 fn rules_owner(misses: &mut Vec<Miss>, observed: &Observed) {
@@ -1796,6 +1822,13 @@ mod rules_tests {
             .collect();
         json!({"task":{"chip":{"task":task}},"activity":{"rows":rows}})
     }
+    fn fresh_tail() -> String {
+        format!(
+            "## Transcript tail\n\ncall delegate: {}\nresult: Delegated tasks: {}\n",
+            super::super::SCOPE_SPEC,
+            SCOPE
+        )
+    }
     fn met() -> Observed {
         let fresh = vec![user(&format!("{SCOPE}: {SCOPE_QUESTION}"))];
         let mut later = fresh.clone();
@@ -1814,6 +1847,7 @@ mod rules_tests {
                     "task":RULES,"line":{"words":{"message":SCOPE_QUESTION_NUMBER,"by":{"task":SCOPE},
                         "kind":"question","words":SCOPE_QUESTION}}}}}}]}}),
                 ),
+                (Read::RulesFreshBrief, json!({"system": fresh_tail()})),
                 (Read::RulesEnded, ended(RULES, RULES_REPORT)),
                 (Read::ScopeEnded, ended(SCOPE, SCOPE_REPORT)),
                 (Read::RulesActivity, endings(RULES, &[json!("finished"), json!({"failed":{"class":"agent"}})])),
@@ -1963,6 +1997,27 @@ mod rules_tests {
         observed.told[A_ANSWERED].history = Box::new([user(DROPPED_RULE), user(SCOPE_ANSWER)]);
         rejects(&observed, RULES_DROPPED, "no message");
     }
+    #[test]
+    fn a_fresh_tail_must_hold_committed_turn_text_without_a_binary_marker() {
+        for system in [
+            String::new(),
+            "Transcript tail\n[earlier bytes not text, cut]\n".into(),
+            "Transcript tail\n[a turn not readable as text]\n".into(),
+            format!("{}[earlier bytes not text, cut]\n", fresh_tail()),
+            fresh_tail().replace("Transcript tail", "Task"),
+            fresh_tail().replace(super::super::SCOPE_SPEC, "other task"),
+            fresh_tail().replace("result: Delegated tasks: 2", "result: delegation refused"),
+            format!("## Transcript tail\n\n## Notes\n{}", fresh_tail()),
+        ] {
+            let mut observed = met();
+            observed.documents.get_mut(&Read::RulesFreshBrief).expect("fresh brief")["system"] = system.into();
+            rejects(&observed, RULES_FRESH, "Transcript tail");
+        }
+        let mut observed = met();
+        observed.documents.remove(&Read::RulesFreshBrief);
+        rejects(&observed, RULES_FRESH, "Transcript tail");
+    }
+
     #[test]
     fn no_run_may_start_invalid_and_hide_behind_its_retry() {
         for read in [Read::RulesActivity, Read::ScopeActivity] {
