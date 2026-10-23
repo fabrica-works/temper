@@ -31,7 +31,8 @@ pub enum Step {
     /// A person at the hosted terminal.
     Terminal(crate::terminal::Act),
     Advance,
-    /// Commit the person's named file on the fake forge's main.
+    /// Commit the person's named file on the fake forge's main. One `Advance` or
+    /// `Push` per story: the forge moves once, and a second completes with nothing pushed.
     Push {
         path: &'static [u8],
         words: &'static [u8],
