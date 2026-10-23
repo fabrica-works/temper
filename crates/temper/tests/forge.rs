@@ -442,7 +442,6 @@ fn forge_fetch_command() {
                 port: 3000,
                 bot: "temper",
                 person: "ada",
-                orgs: &["acme"],
             },
         );
         let path = scratch.path().join("temper.json");
@@ -455,6 +454,7 @@ fn forge_fetch_command() {
         let file = scratch.path().join("forgejo/17.0.0/forgejo");
         match row {
             "managed" => {
+                document["application"]["setup"][0]["orgs"] = serde_json::json!(["acme"]);
                 document["application"]["setup"][0]["mode"] =
                     serde_json::json!({"managed":{"admin_token":"admin_token"}});
             }

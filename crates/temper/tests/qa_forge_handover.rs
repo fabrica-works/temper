@@ -42,7 +42,7 @@ fn configured(case: &str) -> Scratch {
     let scratch = Scratch::new(case);
     let _ = owned::tier_configuration(scratch.path());
     // The process fixture also supports legacy CLI reconcile. This story uses
-    // setup.md 8's file-free owned form and nested person.orgs instead.
+    // setup.md 8's file-free owned form.
     owned::configuration_value(scratch.path(), |value| {
         let application = &mut value["application"];
         let forge = application["forges"][0].as_object_mut().expect("forge object");
@@ -50,9 +50,6 @@ fn configured(case: &str) -> Scratch {
             forge.remove(key);
         }
         application["identities"][0].as_object_mut().expect("identity object").remove("token");
-        let setup = &mut application["setup"][0];
-        let orgs = setup.as_object_mut().expect("setup object").remove("orgs").expect("fixture orgs");
-        setup["mode"]["owned"]["person"]["orgs"] = orgs;
     });
     scratch
 }

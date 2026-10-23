@@ -324,7 +324,6 @@ fn verb() {
     managed["application"]["setup"][0]["orgs"] = serde_json::json!(["playground"]);
     managed["application"]["setup"][0]["mode"] = serde_json::json!({"managed":{"admin_token":"admin_token"}});
     let mut owned = crate::tests::configuration::old_form_check_document(&root);
-    owned["application"]["setup"][0]["orgs"] = serde_json::json!(["playground"]);
     owned["application"]["setup"][0]["mode"] = serde_json::json!({"owned":{
         "forgejo":"/fixture/forgejo", "runner":null, "listen":{"socket":"127.0.0.1:9"},
         "person":{"login":"ada","email":"ada@example.test"}

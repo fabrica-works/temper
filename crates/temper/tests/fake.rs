@@ -367,7 +367,6 @@ fn refused_deployment_start(root: &Path) {
                     port: 9,
                     bot: "temper",
                     person: "ada",
-                    orgs: &["acme"],
                 },
             ),
             "managed" => {

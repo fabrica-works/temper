@@ -231,8 +231,6 @@ fn configured(forge: &Forge) -> crate::Service {
     let mut config = local_config(true, false);
     config.setup[0].entry.asked = true;
     config.setup[0].entry.orgs = Box::new([]);
-    let temper_forge_setup::setup::Mode::Owned(owned) = &mut config.setup[0].entry.mode else { panic!("owned") };
-    owned.orgs = Box::new([]);
     config.webhooks =
         Some(skein_forge_connection::hooks::Webhooks { listener: skein_io::Addr::Ip(([127, 0, 0, 1], 7101).into()) });
     let mut store = fixtures::records_store();

@@ -56,7 +56,7 @@ fn reconcile_refuses_records_only_owned_and_fake_without_writing_files() {
         if owned {
             value["application"]["setup"][0]["mode"] = serde_json::json!({"owned":{
                 "forgejo":"/fixture/forgejo", "runner":null, "listen":{"socket":"127.0.0.1:9"},
-                "person":{"login":"ada","email":"ada@example.test","orgs":["acme"]}
+                "person":{"login":"ada","email":"ada@example.test"}
             }});
         }
         let deployment = crate::setup::check(&serde_json::to_vec(&value).expect("fixture JSON"), &directories)
