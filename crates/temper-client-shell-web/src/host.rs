@@ -128,9 +128,9 @@ impl Host {
             });
         }
     }
-    // A step's writes are one durability answer: a first successful write
-    // cannot release held requests before a later refused write is heard.
-    pub fn carried(&mut self, reports: Vec<skein_ui_web::transport::Carried>, stored: bool) {
+    // The root can step the client several times in one turn. Each Save or
+    // Erase needs its own answer, after the whole turn's storage has finished.
+    pub fn carried(&mut self, reports: Vec<skein_ui_web::transport::Carried>, writes: u32) {
         let mut refused = false;
         for report in reports {
             match jig_client_shell_web::adapter::carried(report) {
@@ -144,15 +144,25 @@ impl Host {
                 | Heard::StreamEnded) => self.heard(report),
             }
         }
-        if stored {
+        for _ in 0..writes {
             self.client(if refused { jig_client::Event::NotStored } else { jig_client::Event::Stored });
         }
     }
+    #[cfg(test)]
     pub fn requests(&mut self) -> Vec<Asked> {
+        self.duties().0
+    }
+    pub fn duties(&mut self) -> (Vec<Asked>, u32) {
         let mut asked = Vec::new();
+        let mut writes = 0_u32;
         while let Some(request) = self.out.pop() {
             match request {
-                Request::Client { request } => self.carry(request, &mut asked),
+                Request::Client { request } => {
+                    if matches!(request, jig_client::Request::Save { .. } | jig_client::Request::Erase { .. }) {
+                        writes = writes.checked_add(1).expect("bounded client write batches");
+                    }
+                    self.carry(request, &mut asked);
+                }
                 Request::Show { address, replace } => {
                     if address != self.address {
                         let path = print(&address);
@@ -169,7 +179,7 @@ impl Host {
             }
         }
         root::take(&mut self.root, &self.env, &mut self.out);
-        asked
+        (asked, writes)
     }
     fn carry(&mut self, request: jig_client::Request, asked: &mut Vec<Asked>) {
         match request {

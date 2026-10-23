@@ -119,7 +119,11 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   terminal's file does (`README.md`, section 7); from the adoption form
   (section 6), a pending adoption is among them, a kept request
   (`README.md`, 4.6). Each load of the page is a client of its own, with
-  its own stream (jig's `protocol/browser.md`, section 10).
+  its own stream (jig's `protocol/browser.md`, section 10). The root can
+  step the client several times in one turn (a sign-in's answer saves its
+  `Return` and erases the answered request): each write the client asks
+  for (`Save`, `Erase`) is answered once, after the turn's whole storage
+  has finished, and every one is refused if any write was refused.
 - **What the terminal says in lines of its own** (`README.md`, 3.4 and
   6.6): another party's kept work and kept work dropped have no place
   in the browser, whose small store lives as long as its tab, of one
