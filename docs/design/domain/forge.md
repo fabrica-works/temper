@@ -612,6 +612,10 @@ judged on (8.7).
   head's, the base tip's and the CI a topic publishes (7.1) are read
   and folded alike, on every forge: on Forgejo the checks are
   its statuses, each context's latest, so its CI reads as before.
+  Where no required checks are named, the pull request's own read,
+  which folds every row of its head the same way (skein's
+  `forge-github.md`, 4.4), is the head's CI when it is at the head, and
+  no second read is made.
 
 ### 5.4 The request budget
 
