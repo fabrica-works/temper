@@ -312,12 +312,8 @@
     const setup = demo?.state === 'not started' && (!ownForge() || !usableModel());
     const words = !ownForge() && !usableModel() ? 'temper has no forge and no model yet.' : !ownForge() ? 'temper has no forge yet.' : 'temper has no model yet.';
     const settingUp = world.forges.some(f => f.mode !== 'fake' && ['setting up', 'connecting'].includes(f.state));
-    const banner = setup ? `<aside class="first-run-banner" aria-label="Setup"><p>${words} ${welcomeMark()}</p><div class="terminal-proposal-actions">${settingUp ? forgeBannerAct('welcome.html') : ''}${modelBannerAct('welcome.html')}<a href="${esc(u('welcome.html'))}">Continue setting up</a>${!ownForge() ? tryDemo() : ''}</div></aside>` : demoBanner();
+    const banner = setup ? `<aside class="first-run-banner" aria-label="Setup"><p>${words} ${welcomeMark()}</p><div class="terminal-proposal-actions">${settingUp ? forgeBannerAct('welcome.html') : ''}<a href="${esc(u('welcome.html'))}">Continue setting up</a>${!ownForge() ? tryDemo() : ''}</div></aside>` : demoBanner();
     return banner ? `<div class="demo-strip">${banner}</div>` : '';
-  }
-  // A sign-in under way, in the strip, as a forge's set-up is.
-  function modelBannerAct(target) {
-    return world.signIn?.state === 'waiting' ? `<span class="banner-status">${fact('temper: the sign-in, under way', 'ChatGPT · waiting for you in your browser')}</span> <a href="${esc(u(target || 'connect-model.html?way=chatgpt'))}">View</a>` : '';
   }
   function forgeBannerAct(target) {
     const f = world.forges.find(f => f.mode !== 'fake' && ['setting up', 'connecting'].includes(f.state));
@@ -1164,18 +1160,12 @@
       </div></details>`;
   }
 
-  // A sign-in under way, before it makes an account.
-  function signingInRow() {
-    return `<details class="card forge-row account-row"><summary><div class="forge-name">${conf('the provider’s plan, in temper’s words', 'ChatGPT')}<small>OpenAI · for you</small></div><span class="tag amber">${fact('temper: the sign-in, under way', 'Signing in')}</span><div class="forge-summary-line"><p class="muted tiny">${fact('temper: the sign-in’s deadline', esc(`Waiting for you in your browser, until ${hm(world.signIn.until)}`))}</p></div></summary><div class="card-pad"><a class="text-link" href="${esc(u('connect-model.html?way=chatgpt'))}">Open its sign-in ›</a></div></details>`;
-  }
-
   function accountNavMark() {
     const own = ownAccounts();
     const needs = own.some(a => ['refused', 'needs sign-in', 'misconfigured', 'unloaded'].includes(accountState(a)));
-    const signing = world.signIn?.state === 'waiting';
     const limited = own.some(a => accountState(a) === 'limited');
-    if (!needs && !signing && !limited) return '';
-    return `<i class="nav-mark ${needs ? 'red' : 'amber'}" aria-label="${needs ? 'an account needs you' : signing ? 'a sign-in is under way' : 'an account is limited'}"></i>`;
+    if (!needs && !limited) return '';
+    return `<i class="nav-mark ${needs ? 'red' : 'amber'}" aria-label="${needs ? 'an account needs you' : 'an account is limited'}"></i>`;
   }
 
   // The ChatGPT row in each other state, built on the world's own.
@@ -1188,7 +1178,7 @@
   pages.accounts = () => {
     const own = ownAccounts();
     const play = demoRunning() ? world.accounts.find(a => a.provider === demo.provider) : null;
-    const rows = [...(world.signIn?.state === 'waiting' ? [signingInRow()] : []), ...own.map(a => accountRow(a))];
+    const rows = own.map(a => accountRow(a));
     const windows = own.some(a => a.sources.some(s => s.kind === 'program' && s.usage));
     const key = { name: 'sam-key', kind: 'key', use: 'Idle' };
     const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the ChatGPT row in each state of client README 5.5’s table, and an API key’s and a Claude subscription’s rows, to compare.</p>${[
@@ -1212,25 +1202,16 @@
   };
 
   // Connecting a model (client README, 5.5): Choose, then Signing in for
-  // ChatGPT or Details for a key, then Ready. Continue with ChatGPT starts
-  // the sign-in at once. ChatGPT's sign-in is drawn whole; a key's form and
+  // ChatGPT or Details for a key, then Ready. Continue with ChatGPT opens
+  // ChatGPT's sign-in in the same tab, and the engine's listener sends the
+  // browser back. ChatGPT's sign-in is drawn whole; a key's form and
   // Claude's subscription are sketched, for the context.
-  const SIGN_IN = 'https://auth.openai.com/api/accounts/authorize?response_type=code&client_id=…&redirect_uri=http%3A%2F%2F127.0.0.1%3A1455%2Fauth%2Fcallback&scope=openid+profile+email+offline_access+…&code_challenge=…&state=Qm7v…';
   const wayLabel = w => conf('a way the configuration offers to connect a model', esc(w));
   function modelChoices(signIn, keyForm = 'connect-model.html?way=key') {
     const ways = world.config.ways || [];
     const chatgpt = ways.find(w => w.startsWith('Continue with'));
     const key = ways.find(w => w.startsWith('Use an') && w.endsWith('API key'));
-    return `<div class="forge-choices model-choices">${chatgpt ? `<section class="card card-pad"><h3>ChatGPT</h3><p>Your ChatGPT plan. Sign in with your ChatGPT account, and temper’s agents use your plan’s included usage.</p><p class="muted tiny">In a browser on the engine’s machine · about a minute</p><a class="button primary" href="${esc(u(signIn))}">${wayLabel(chatgpt)}</a></section>` : ''}${key ? `<section class="card card-pad"><h3>An OpenAI API key</h3><p>A key from OpenAI’s platform. What temper’s agents use is billed to the key’s organization.</p><p class="muted tiny">Pasted here · at once</p><a class="button" href="${esc(u(keyForm))}">${wayLabel(key)}</a></section>` : ''}</div>`;
-  }
-  const portFold = () => `<details class="forge-elsewhere model-elsewhere"><summary>Your browser is on another machine?</summary><p>ChatGPT sends your browser back to ${conf('the sign-in’s fixed redirect, in the configuration', '127.0.0.1:1455')} on its own machine. Forward that port to the engine’s machine first, and keep the tunnel open while you sign in:</p><pre><code>${conf('the sign-in’s fixed port, in the configuration', 'ssh -L 1455:127.0.0.1:1455 HOST')}</code></pre><p class="muted tiny">HOST is the engine’s machine. Codex’s own sign-in uses the same port: finish or cancel one before you start the other.</p></details>`;
-  function signingIn(until = world.signIn?.until ?? world.now + 10) {
-    return `<h3>Signing in to ChatGPT</h3>
-      <p>Open this address in a browser on the engine’s machine:</p>
-      <pre><code>${fact('temper: the sign-in’s address, made for this sign-in alone', `<a href="#" data-later="Mockup: ChatGPT’s sign-in opens in a new tab. Once you approve, ChatGPT sends the browser back to temper, and this page moves on.">${esc(SIGN_IN)}</a>`)}</code></pre>
-      <div class="button-row"><a class="button primary" href="#" data-later="Mockup: ChatGPT’s sign-in opens in a new tab. Once you approve, ChatGPT sends the browser back to temper, and this page moves on.">Open ChatGPT’s sign-in ↗</a><button class="button" data-later="Mockup: the sign-in ends, and its address with it; Connect a model is back at its start.">Cancel</button></div>
-      <p class="muted tiny">${fact('temper: the sign-in’s deadline, the profile’s', esc(`Waiting for you in your browser. The address works once, until ${hm(until)}, and ends if temper restarts.`))}</p>
-      ${portFold()}`;
+    return `<div class="forge-choices model-choices">${chatgpt ? `<section class="card card-pad"><h3>ChatGPT</h3><p>Your ChatGPT plan. Sign in with your ChatGPT account, and temper’s agents use your plan’s included usage.</p><p class="muted tiny">In a browser on the engine’s machine · about a minute</p><a class="button primary" href="${esc(u(signIn))}">${wayLabel(chatgpt)}</a></section>` : ''}${key ? `<section class="card card-pad"><h3>An OpenAI API key</h3><p>A key from OpenAI’s platform. What temper’s agents use is billed to the key’s organization.</p><p class="muted tiny">Pasted here · at once</p><a class="button" href="${esc(u(keyForm))}">${wayLabel(key)}</a></section>` : ''}</div>${chatgpt ? `<p class="gap-note">${ahead('return', 'the engine’s listener answering ChatGPT’s return with a redirect to the page that started the sign-in: jig and skein’s oauth.md draw no answer')} Continue with ChatGPT opens ChatGPT’s sign-in in this tab; once you approve, temper sends the browser back here. Assumed, not detected: the browser is on the engine’s machine. Elsewhere, ChatGPT’s return to 127.0.0.1:1455 fails, and the sign-in waits out its deadline.</p>` : ''}`;
   }
   function chatgptReady(a, wasPlayground) {
     const s = a.sources[0];
@@ -1262,37 +1243,28 @@
         <p class="muted tiny">Claude Code asks you to sign in. temper never reads its login.</p>
         <button class="button" data-later="Mockup: the login is declared; its row on Accounts says, for each host, whether Claude Code is signed in there.">Use your Claude subscription</button></div>`;
   }
-  // The tab ChatGPT sends the browser back to, at the engine's listener.
-  function callbackTab(ok) {
-    return `<div class="browser-tab"><div class="browser-bar">${esc(`127.0.0.1:1455/auth/callback?code=…&state=Qm7v…`)}</div><div class="browser-page"><p class="browser-brand">✳ temper</p>${ok ? '<h3>Signed in to ChatGPT</h3><p>You can close this tab and go back to temper.</p>' : '<h3>temper couldn’t finish signing in</h3><p>Go back to temper: Connect a model says why.</p>'}</div></div>`;
-  }
   const modelSteps = (current, way) => flowSteps(current, '', ['Choose', way === 'key' ? 'Details' : 'Signing in', 'Ready']);
   const endingCard = (words, acts, mark = '', failed = true) => `<h3>Signing in to ChatGPT ${mark}</h3><p${failed ? ' class="forge-failure"' : ''}>${words}</p>${acts ? `<div class="button-row">${acts}</div>` : ''}`;
 
   pages['connect-model'] = () => {
-    const waiting = world.signIn?.state === 'waiting';
-    const way = params.get('way') || (waiting ? 'chatgpt' : null);
+    const way = params.get('way');
     const a = ownAccounts().find(a => a.provider === 'OpenAI' && isPlan(a));
     const wasPlayground = demoRunning();
-    // Continue with ChatGPT leads to the step that draws what it starts.
+    // Continue with ChatGPT leads to the step where the browser is back.
     const signIn = worldKey === 'first-run-real' ? 'connect-model.html?way=chatgpt&step=3' : 'connect-model.html?way=chatgpt&step=5';
     let current = 0;
     let body = modelChoices(signIn);
-    if (way === 'chatgpt' && waiting) { current = 1; body = flowWrap(signingIn()); }
-    else if (way === 'chatgpt' && a) { current = 2; body = flowWrap(chatgptReady(a, wasPlayground)); }
+    if (way === 'chatgpt' && a) { current = 2; body = flowWrap(chatgptReady(a, wasPlayground)); }
     else if (way === 'key') { current = 1; body = flowWrap(keyForm()); }
     const back = way === 'key' ? `<p><a class="text-link" href="${esc(u('connect-model.html'))}">‹ All ways</a></p>` : '';
     const again = '<button class="button primary" data-later="Mockup: a fresh sign-in, with a new address.">Continue with ChatGPT</button>';
     const key = '<button class="button" data-later="Mockup: the key’s form.">Use an API key</button>';
-    const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the sign-in while it waits, the tab ChatGPT sends the browser back to, each other ending, and the other ways.</p>${[
-      ['Signing in: waiting for you in your browser', 1, signingIn(world.now + 10)],
-      ['The browser’s tab, once ChatGPT sends it back', 1, `<h3>In the browser ${ahead('callback page', 'what the engine’s loopback listener answers the browser: skein’s oauth.md draws no page')}</h3><div class="browser-tabs">${callbackTab(true)}${callbackTab(false)}</div>`],
+    const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: each other ending of ChatGPT’s sign-in, back in temper, and the other ways.</p>${[
       ['The same account again', 1, endingCard(fact('jig: a sign-in to a subject the person already holds', esc(`That’s ${a ? a.sources[0].name : 'sam@example.com'} again. To add another account, sign out of ChatGPT in your browser first, then Continue with ChatGPT.`)), again, '', false)],
       ['Signed in without plan usage', 1, endingCard(fact('jig: the sign-in refused, plan usage declined', 'You signed in without plan usage.'), again + key)],
       ['Not eligible', 1, endingCard(fact('jig: the sign-in refused, not eligible', 'This ChatGPT account can’t be used for plan usage in temper. Plan usage needs an eligible ChatGPT plan.'), `${key}<button class="button" data-later="Mockup: sign out of ChatGPT in your browser first; then a fresh sign-in.">Sign in to another account</button>`)],
       ['Another person holds that account', 1, endingCard(fact('jig: the sign-in refused, a subject another holder holds', 'Another person here holds that ChatGPT account. To use one of yours, sign out of ChatGPT in your browser first, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in refused for a subject another holder holds (jig’s accounts.md, 3.3): client README 5.5 has no words yet'))],
-      ['Cancelled, or past its deadline', 1, endingCard(fact('skein: the sign-in ended, cancelled or expired', esc(`The sign-in ended at ${hm(world.now + 10)}: no answer came from ChatGPT in time.`)), again, ahead('words', 'a sign-in cancelled or expired: client README 5.5 has no words yet'))],
-      ['The port is taken', 1, endingCard(fact('temper: the loopback listener couldn’t bind the fixed port', 'temper can’t listen on 127.0.0.1:1455: another program has it, such as Codex’s own sign-in. Finish or close that sign-in, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in whose fixed port is taken: client README 5.5 has no words yet'))],
+      ['The port is taken, before ChatGPT opens', 1, endingCard(fact('temper: the loopback listener couldn’t bind the fixed port', 'temper can’t listen on 127.0.0.1:1455: another program has it, such as Codex’s own sign-in. Finish or close that sign-in, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in whose fixed port is taken: client README 5.5 has no words yet'))],
       ['Misconfigured', 1, endingCard(fact('jig: the sign-in refused by the provider, misconfigured', 'OpenAI refused temper’s sign-in. Check the configuration’s registration.'), '')],
       ['An OpenAI API key: its details', 1, keyForm(), 'key'],
       ['Your Claude subscription, where the configuration offers it', 1, claudeSketch(), 'key'],
@@ -1453,7 +1425,7 @@
     const at = params.get('at') || (demoRunning() ? 'demo' : !startedForge ? 'welcome' : !usableModel() ? 'model' : 'ready');
     const views = ['welcome', 'forge', 'model', 'ready'];
     const current = views.includes(at) ? at : 'welcome';
-    const way = params.get('way') || (world.signIn?.state === 'waiting' ? 'chatgpt' : null);
+    const way = params.get('way');
     const back = (current === 'forge' && params.has('forge')) || (current === 'model' && way) ? current : views[Math.max(0, views.indexOf(current) - 1)];
     const foot = `<div class="welcome-foot"><a class="text-link" href="${esc(u(`welcome.html?at=${back}`))}">‹ Back</a><a class="text-link" href="${esc(u('chats.html'))}">Later</a>${!ownForge() ? tryDemo('Try the playground instead') : ''}</div>`;
     const heading = (text, tag = 'h2') => `<${tag}>${text} ${welcomeMark()}</${tag}>`;
@@ -1476,9 +1448,9 @@
       content = `${heading('Connect a forge')}<p class="muted welcome-lead">Where your repositories live: temper’s agents push branches and open pull requests there.</p>${which ? flowWrap(details) : forgeChoices('welcome.html?at=forge&forge=')}${foot}`;
     } else if (current === 'model') {
       const status = f?.state === 'setting up' ? `<div class="welcome-status">${fact('temper: the forge’s name and set-up state', esc(`${forgeName(f)} · ${f.state}`))}${eachStep()}</div>` : '';
-      // Connect a model's Choose and Signing in, or a key's Details, within
-      // the wizard; its Ready is the wizard's.
-      const body = way === 'chatgpt' && world.signIn?.state === 'waiting' ? flowWrap(signingIn()) : way === 'key' ? flowWrap(keyForm()) : modelChoices('welcome.html?at=model&world=first-run-real&step=3', 'welcome.html?at=model&way=key');
+      // Connect a model's Choose, or a key's Details, within the wizard;
+      // ChatGPT's sign-in returns to the wizard's Almost ready.
+      const body = way === 'key' ? flowWrap(keyForm()) : modelChoices('welcome.html?at=ready&world=first-run-real&step=3', 'welcome.html?at=model&way=key');
       const variants = worldKey === 'first-run-real' ? `<section class="mock-variants" id="other-states"><h2>Other ways, where the configuration offers them</h2>${flowWrap(claudeSketch())}<p style="margin-top:14px">ChatGPT’s other endings, and the account’s other states, are drawn in the first run: <a class="text-link" href="${esc(u('connect-model.html?world=first-run&step=5#other-states'))}">Connect a model</a> and <a class="text-link" href="${esc(u('accounts.html?world=first-run&step=5#other-states'))}">Accounts</a>.</p></section>` : '';
       content = `${status}${heading('Connect a model')}<p class="muted welcome-lead">temper’s agents run on it: on a plan you sign in to, or on a key.</p>${body}${foot}${variants}`;
     } else {

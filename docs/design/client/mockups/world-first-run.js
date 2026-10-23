@@ -205,7 +205,7 @@
         ['accounts.html', 'Accounts: ChatGPT · sam@example.com, folded; the scripted model gone'],
         ['chats.html', 'Chats: no playground’s start; the banner, a playground forge alone'],
         ['chat.html?task=T1', 'T1: its composer’s line, Using ChatGPT plan'],
-        ['connect-model.html#other-states', 'Connect a model, below: the sign-in waiting, its other endings, a key and Claude'],
+        ['connect-model.html#other-states', 'Connect a model, below: the sign-in’s other endings, a key and Claude'],
         ['accounts.html#other-states', 'Accounts, below: the ChatGPT row in each state, and a key’s and Claude’s rows'],
         ['chats.html#other-states', 'Chats, below: a plan’s first use, and a limited plan'],
         ['connect-forge.html', 'Connect a forge: GitHub, Forgejo on this machine, a Forgejo elsewhere'],
@@ -218,7 +218,6 @@
           sources: [{ name: 'sam@example.com', kind: 'sign-in', since: 14, use: 'Idle' }] });
         Object.assign(w.tasks.T1, { model: 'gpt-6-luna', account: 'ChatGPT' });
         w.config.next = { account: 'ChatGPT', model: 'gpt-6-luna' };
-        w.signIn = { state: 'signed in' };
       },
     },
     {
