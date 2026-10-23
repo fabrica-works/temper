@@ -58,7 +58,8 @@ pub(crate) fn banner(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut B
     {
         return;
     }
-    b.open(Role::Slot);
+    b.open(Role::Region);
+    b.name(&w.say(W::AccountRegion, &[]));
     b.style(crate::look::ACCOUNTS);
     line(b, w, W::AccountBanner, &[]);
     if let Some(me) = temper_client_domain::pages::accounts::current_me(root.client()) {
@@ -362,13 +363,42 @@ fn using(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w: &Words) {
         Some(_) => draft.original.as_ref(),
         None => draft.requested.as_ref(),
     };
+    if let Some((name, provider)) = model_words(root, task, choice, draft.project(), w) {
+        using_line(b, root, task, choice, provider, name, w);
+    } else {
+        line(b, w, W::UsingDefault, &[]);
+    }
+}
+
+/// Ready uses the same model and effort words as a new chat's composer.
+pub(crate) fn new_chat_model(root: &Domain, w: &Words) -> Box<[u8]> {
+    let project = root.pages().project();
+    let choice = match (temper_client_domain::pages::accounts::current_me(root.client()), project) {
+        (Some(me), Some(project)) => match jig_client::shapes::template(me, project, jig_client::shapes::CHAT) {
+            Some(template) => template.llm.as_ref(),
+            None => None,
+        },
+        _ => None,
+    };
+    match model_words(root, None, choice, project, w) {
+        Some((name, _)) => name,
+        None => w.say(W::DefaultModel, &[]),
+    }
+}
+fn model_words(
+    root: &Domain,
+    task: Option<&c::Task>,
+    choice: Option<&c::LlmChoice>,
+    project: Option<u32>,
+    w: &Words,
+) -> Option<(Box<[u8]>, Option<u32>)> {
     let me = temper_client_domain::pages::accounts::current_me(root.client());
     let doc = temper_client_domain::pages::accounts::document(root.client());
     let payer = match me {
         Some(me) => payer(me, task),
         None => None,
     };
-    let models = match (me, draft.project()) {
+    let models = match (me, project) {
         (Some(me), Some(project)) => choice::models(me, project),
         _ => None,
     };
@@ -392,10 +422,7 @@ fn using(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w: &Words) {
         Some(choice) => choice.main.model.bytes(),
         None => match model {
             Some(model) => model.name.bytes(),
-            None => {
-                line(b, w, W::UsingDefault, &[]);
-                return;
-            }
+            None => return None,
         },
     };
     let mut name = model_shown(name, w);
@@ -408,7 +435,7 @@ fn using(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w: &Words) {
         Some(model) => model.provider,
         None => None,
     };
-    using_line(b, root, task, choice, provider, name, w);
+    Some((name, provider))
 }
 fn using_line(
     b: &mut Builder,

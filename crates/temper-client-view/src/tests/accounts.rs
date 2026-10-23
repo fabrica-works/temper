@@ -697,7 +697,7 @@ mod memory_literal;
 // The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
 // The demo start's words, full failure text and retry nodes (1,724,026 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 10350070042;
+const ACCOUNT_BYTES: u64 = 10350070338;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

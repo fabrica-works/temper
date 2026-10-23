@@ -232,6 +232,8 @@ pub enum Word {
     NeedsAccount,
     AccountReadinessUnknown,
     AccountBanner,
+    AccountRegion,
+    DefaultModel,
     AccountSignIn,
     AccountProgram,
     AccountKey,
@@ -525,8 +527,8 @@ pub enum Word {
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
-const PHRASES: u32 = 1010;
-const ALL: [Word; 477] = [
+const PHRASES: u32 = 1012;
+const ALL: [Word; 479] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -743,6 +745,8 @@ const ALL: [Word; 477] = [
     Word::NeedsAccount,
     Word::AccountReadinessUnknown,
     Word::AccountBanner,
+    Word::AccountRegion,
+    Word::DefaultModel,
     Word::AccountSignIn,
     Word::AccountProgram,
     Word::AccountKey,
@@ -1233,6 +1237,8 @@ impl Word {
             Self::NeedsAccount => 1021,
             Self::AccountReadinessUnknown => 1022,
             Self::AccountBanner => 1000,
+            Self::AccountRegion => 1833,
+            Self::DefaultModel => 1834,
             Self::AccountSignIn => 1001,
             Self::AccountProgram => 1002,
             Self::AccountKey => 1003,
@@ -1877,6 +1883,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::WaitingAccount => (&[b"Waiting account: ", b""], &[Number]),
         Word::NeedsAccount => (&[b"needs an account"], &[]),
         Word::AccountReadinessUnknown => (&[b"Account readiness unknown"], &[]),
+        Word::AccountRegion => (&[b"LLM account"], &[]),
+        Word::DefaultModel => (&[b"the default model"], &[]),
         Word::AccountBanner => (&[b"Agents need an LLM account to run."], &[]),
         Word::AccountSignIn => (&[b"Sign in with an LLM provider"], &[]),
         Word::AccountProgram => (&[b"Use a program login"], &[]),

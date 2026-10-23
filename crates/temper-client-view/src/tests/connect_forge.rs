@@ -91,7 +91,7 @@ fn choose_draws_a_card_per_choice_in_order() {
     );
     let regions: Vec<_> =
         view.tree().nodes().iter().filter(|n| n.role == Role::Region).filter_map(|n| n.name.as_deref()).collect();
-    assert_eq!(regions, [b"GitHub".as_slice(), b"Forgejo on this machine", b"A Forgejo elsewhere"]);
+    assert_eq!(regions, [b"LLM account".as_slice(), b"GitHub", b"Forgejo on this machine", b"A Forgejo elsewhere"]);
     assert_eq!(
         press(&root, Role::Link, b"Show how"),
         d::Action::Pages(pages::Act::Go { address: Address::ConnectForge { forge: Some(Choice::Elsewhere) } })

@@ -191,6 +191,7 @@ fn signing_document() -> jig_client::contract::OwnerAccounts {
     let mut doc =
         super::accounts::card_document(b"openai", b"alice@example.com", jig_client::contract::OwnerAccountKind::SignIn);
     doc.accounts.clear();
+    doc.usable = false;
     doc
 }
 #[test]
@@ -230,4 +231,73 @@ fn ready_names_a_usable_account_before_a_sign_in_under_way() {
     let view = f::page_view(&root);
     node(view.tree(), Role::Paragraph, "Model: ChatGPT · alice@example.com · OpenAI · held by Pat");
     assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
+}
+
+fn configured_model_document() -> jig_client::contract::OwnerAccounts {
+    let mut document = signing_document();
+    document.signing.clear();
+    document.usable = true;
+    document
+}
+fn configured_model_fixture(address: Address) -> d::Domain {
+    let (mut root, watch) = f::forge_root_accounts(
+        address,
+        super::connect_forge::rows(
+            temper_client_protocol_wire::v1::Connection::Connecting,
+            temper_client_protocol_wire::v1::Offer::Offered,
+        ),
+    );
+    let document = configured_model_document();
+    super::accounts::deliver(&mut root, watch, document);
+    root
+}
+#[test]
+fn ready_names_the_configured_model_without_an_account_row() {
+    let root = configured_model_fixture(Address::Welcome { step: Step::Ready });
+    let view = f::page_view(&root);
+    node(view.tree(), Role::Paragraph, "Model: the default model");
+    assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
+}
+#[test]
+fn the_setup_strip_continues_to_ready_with_a_configured_model() {
+    let root = configured_model_fixture(Address::Chats);
+    assert_eq!(
+        press(&root, Role::Link, "Continue setting up"),
+        d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Ready } })
+    );
+}
+
+#[test]
+fn ready_names_the_new_chat_templates_model_and_effort() {
+    use jig_client::contract as c;
+    let text_bytes = f::limits().client.domain.text;
+    let (mut root, me_watch, _, _, accounts_watch) =
+        f::root_at_full(Address::Welcome { step: Step::Ready }, &f::limits(), b"Shop");
+    let template_root = f::chat::messaging_root();
+    let mut me = pages::accounts::current_me(template_root.client()).unwrap().clone();
+    let project = me.projects.get_mut(0).unwrap();
+    let template = project.templates.get_mut(0).unwrap();
+    template.llm = Some(c::LlmChoice {
+        account: None,
+        main: c::ModelEffort {
+            model: c::Text::new(b"configured-model".as_slice().into(), text_bytes).unwrap(),
+            effort: Some(c::Text::new(b"high".as_slice().into(), text_bytes).unwrap()),
+        },
+        subagents: skein_lib::List::with_capacity(0),
+    });
+    f::root_event(
+        &mut root,
+        d::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: me_watch,
+                    event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(me))),
+                },
+            },
+        },
+    );
+    let document = configured_model_document();
+    super::accounts::deliver(&mut root, accounts_watch.unwrap(), document);
+    let view = f::page_view(&root);
+    node(view.tree(), Role::Paragraph, "Model: configured-model · high");
 }

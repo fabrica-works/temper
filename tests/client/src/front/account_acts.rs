@@ -58,11 +58,18 @@ pub fn program_fixture(seed: u64) -> (Joint, Root) {
 }
 #[must_use]
 pub fn empty_fixture(seed: u64) -> (Joint, Root) {
+    without_deployment_account(fixture(seed))
+}
+/// A `ChatGPT` sign-in with no configured model already usable.
+#[must_use]
+pub fn empty_plan_fixture(seed: u64) -> (Joint, Root) {
+    without_deployment_account(plan_fixture(seed))
+}
+fn without_deployment_account((mut front, mut root): (Joint, Root)) -> (Joint, Root) {
     use temper_client_domain::pages::{
         Act as PageAct,
         accounts::{Act, Operation, Row},
     };
-    let (mut front, mut root) = fixture(seed);
     let domain = root.person();
     let account = domain
         .pages()

@@ -210,7 +210,7 @@ fn a_fresh_page_at_the_return_address_follows_the_watch_to_ready_without_departi
     assert!(front.leaves.is_empty());
 }
 fn departing_welcome_sign_in() -> (Joint, Root, u32) {
-    let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    let (mut front, mut root) = accounts::empty_plan_fixture(fixtures::SEED);
     accounts::reopen(&mut front, &mut root, Address::Welcome { step: d::Step::Model { way: None } }, true);
     press(&mut front, &mut root, Role::Button, b"Continue with ChatGPT", skein_ui::Act::Press);
     let source = accounts::signing(&front);
