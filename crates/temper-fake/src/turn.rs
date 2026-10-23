@@ -1,4 +1,5 @@
 //! The two turn spellings, shared with the box's asked scripts (protocol/setup.md, 8.4).
+mod failure;
 use crate::{Refusal, read};
 use alloc::boxed::Box;
 use core::mem::size_of;
@@ -11,7 +12,7 @@ use skein_json::{
 };
 use skein_lib::List;
 
-/// A checked turn: text, or explicit text/call lines, finish and token count.
+/// A checked turn: text, or explicit lines, finish and token count.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Turn {
     value: api::Turn,
@@ -19,10 +20,10 @@ pub struct Turn {
 impl Turn {
     /// Reads and checks either spelling at its document path.
     pub fn read(d: &Document, at: u32, p: &Path) -> Result<Self, Refusal> {
-        Self::read_pieces(d, at, p, false)
+        Self::read_standalone(d, at, p, None)
     }
-    /// The standalone document also permits text deltas, including named holds.
-    pub(crate) fn read_pieces(d: &Document, at: u32, p: &Path, allow_pieces: bool) -> Result<Self, Refusal> {
+    /// The standalone document permits pieces and failures for its accepted credentials.
+    pub(crate) fn read_standalone(d: &Document, at: u32, p: &Path, credentials: Option<u32>) -> Result<Self, Refusal> {
         let token = d.token(at).ok_or(read::why(p, b"missing"))?;
         if token.kind == Kind::String {
             let text = read::text(d, at, crate::ANSWER_BYTES, p)?;
@@ -50,11 +51,21 @@ impl Turn {
         let items = read::list(d, lines_at, 1, &p.member(b"lines"))?;
         let mut lines = List::with_capacity(items.len());
         for (i, at) in items.iter().enumerate() {
-            let line = line(d, *at, &read::index(&p.member(b"lines"), i), allow_pieces)?;
+            let line = line(d, *at, &read::index(&p.member(b"lines"), i), credentials)?;
             lines.push(line).expect("bounded lines");
         }
         let value = api::Turn { lines: lines.into_boxed(), finish, tokens };
         check_answer(&value, p)?;
+        // Let skein own line-position rules; diagnose the individual turn before
+        // the document's joint script check loses its path.
+        if credentials.is_some() {
+            let scripts =
+                api::Scripts { cued: Box::new([]), asked: Box::new([]), otherwise: Box::new([value.clone()]) };
+            let menu = api::Menu { arguments: Box::new([]), invalid: Box::new([]) };
+            if skein_fake_llm_domain::Domain::played(&crate::llm::LIMITS, 0, scripts, menu).is_err() {
+                return Err(read::why(p, b"invalid turn"));
+            }
+        }
         Ok(Self { value })
     }
 }
@@ -64,13 +75,20 @@ pub fn into_skein(turn: Turn) -> api::Turn {
     turn.value
 }
 
-fn line(d: &Document, at: u32, p: &Path, allow_pieces: bool) -> Result<Line, Refusal> {
+fn line(d: &Document, at: u32, p: &Path, credentials: Option<u32>) -> Result<Line, Refusal> {
     let mut o = read::object(d, at, p)?;
     let text_at = o.member(d, b"text");
     let call_at = o.member(d, b"call");
     let args_at = o.member(d, b"arguments");
-    let pieces_at = if allow_pieces { o.member(d, b"pieces") } else { None };
+    let pieces_at = if credentials.is_some() { o.member(d, b"pieces") } else { None };
+    let fail_at = if credentials.is_some() { o.member(d, b"fail") } else { None };
     read::finish(o, d, p)?;
+    if let Some(at) = fail_at {
+        if text_at.is_some() || call_at.is_some() || args_at.is_some() || pieces_at.is_some() {
+            return Err(read::why(p, b"expected fail alone"));
+        }
+        return failure::read(d, at, credentials.expect("standalone failure"), &p.member(b"fail"));
+    }
     if let Some(at) = pieces_at {
         if text_at.is_some() || call_at.is_some() || args_at.is_some() {
             return Err(read::why(p, b"expected pieces alone"));
@@ -170,9 +188,8 @@ fn check_answer(turn: &api::Turn, p: &Path) -> Result<(), Refusal> {
                 }
                 bytes
             }
-            Line::Fail { .. } | Line::Opaque { .. } => {
-                unreachable!("only the two checked line spellings")
-            }
+            Line::Fail { credentials, .. } => credentials.len().checked_mul(size_of::<u32>()).expect("sixteen indices"),
+            Line::Opaque { .. } => unreachable!("no opaque document lines"),
         };
         size = size.checked_add(u64::try_from(bytes).expect("bounded line")).expect("eight bounded lines");
     }

@@ -75,7 +75,7 @@ pub(crate) fn llm(
         limits.observations = l::LLM_OBSERVATIONS;
         limits.observation_bytes = l::LLM_OBSERVATION_BYTES;
     }
-    let peer = skein_fake_peers::llm::Peer::new(
+    let mut peer = skein_fake_peers::llm::Peer::new(
         configuration.listen,
         if configuration.tls { skein_fake_peers::Transport::Tls } else { skein_fake_peers::Transport::Plaintext },
         limits,
@@ -92,5 +92,8 @@ pub(crate) fn llm(
         configuration.domain,
         llm::LIMITS,
     )?;
+    for key in configuration.added_keys {
+        peer.accept(Credential::key(key.expose().into()))?;
+    }
     if recording { Ok(peer) } else { Ok(peer.without_records()) }
 }

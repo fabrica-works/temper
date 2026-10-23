@@ -185,6 +185,20 @@ fn refused_start() {
             reason: "File exists (os error 17)",
         },
         Row {
+            name: "added_key",
+            kind: "llm",
+            document: {
+                let mut doc = llm_document(&scratch.path().join("added_key"), true);
+                doc["added_keys"] = json!([scratch.path().join("added_key/second.key")]);
+                Some(doc)
+            },
+            files: &["second.key"],
+            directories: &[],
+            observations: None,
+            path: Some("second.key"),
+            reason: "File exists (os error 17)",
+        },
+        Row {
             name: "admin_token",
             kind: "forge",
             document: forge("admin_token"),
@@ -1441,5 +1455,41 @@ fn llm_refuses_a_hold_without_control() {
     assert_eq!(output.stderr, b"temper fake llm: control: required when a piece has a hold\n");
     assert!(output.stdout.is_empty());
     assert!(!scratch.path().join("key").exists(), "refusal creates no outputs");
+    scratch.remove();
+}
+
+#[test]
+fn llm_fails_a_credential_its_line_names_and_accepts_the_added_key() {
+    use temper_fake::credential::{KEY, added_key, credential};
+    let scratch = support::Scratch::new("fake_llm_failing_credentials");
+    let dir = scratch.path();
+    let mut doc = llm_document(dir, false);
+    doc["added_keys"] = json!([dir.join("second.key")]);
+    let turn =
+        |error| json!({"lines":[{"fail":{"error":error,"credentials":[0]}},{"text":"ok"}],"finish":"stop","tokens":1});
+    doc["asked"][0]["turns"] = json!([turn(json!("unauthorized"))]);
+    doc["cued"] = json!([{"cue":"limited","turns":[turn(json!({"exhausted":{"retry_after_ms":1000}}))]}]);
+    let path = dir.join("llm.json");
+    document(&path, &doc);
+    let run = Running::start("llm", &path, None);
+    let primary = credential(23, KEY);
+    let second = credential(23, added_key(0));
+    private_hex(&dir.join("key"), &primary);
+    private_hex(&dir.join("second.key"), &second);
+    assert_ne!(primary, second);
+    let auth = |key: &[u8]| format!("Bearer {}", std::str::from_utf8(key).expect("hex key"));
+    let refused = request(run.address, "POST", "/v1/responses", &auth(&primary), CHAT);
+    assert!(refused.starts_with(b"HTTP/1.1 401 "), "{}", String::from_utf8_lossy(&refused));
+    assert_eq!(body(&refused)["error"]["code"], "invalid_api_key");
+    let accepted = request(run.address, "POST", "/v1/responses", &auth(&second), CHAT);
+    assert!(accepted.starts_with(b"HTTP/1.1 200 "), "{}", String::from_utf8_lossy(&accepted));
+    assert!(String::from_utf8_lossy(&accepted).contains("\"text\":\"ok\""));
+    let mut limited: Value = serde_json::from_slice(CHAT).expect("query");
+    limited["instructions"] = json!("limited");
+    let limited = serde_json::to_vec(&limited).expect("query");
+    let exhausted = request(run.address, "POST", "/v1/responses", &auth(&primary), &limited);
+    assert!(exhausted.starts_with(b"HTTP/1.1 429 "), "{}", String::from_utf8_lossy(&exhausted));
+    assert_eq!(body(&exhausted)["error"]["resets_in_seconds"], 1);
+    run.stop();
     scratch.remove();
 }

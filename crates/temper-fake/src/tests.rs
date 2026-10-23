@@ -96,7 +96,7 @@ fn llm_document_checks() {
         (
             "/otherwise",
             json!([{"lines":[{"fail":"x"}],"finish":"stop","tokens":1}]),
-            "otherwise[0].lines[0].fail: unknown member\n",
+            "otherwise[0].lines[0].fail: wrong value kind\n",
         ),
         (
             "/otherwise",
@@ -470,7 +470,10 @@ fn seeded_credentials() {
     let mut previous = alloc::collections::BTreeSet::new();
     for seed in [0_u64, 23] {
         let before = answer(&doc, seed, query(b"", b"other"));
-        for stream in [credential::KEY, credential::ADMIN_TOKEN] {
+        let streams = [credential::KEY, credential::ADMIN_TOKEN]
+            .into_iter()
+            .chain((0..credential::ADDED_KEYS).map(credential::added_key));
+        for stream in streams {
             let key = credential(seed, stream);
             assert_eq!(key, credential(seed, stream));
             assert!(key.iter().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b)));
@@ -645,7 +648,7 @@ fn standalone_pieces_and_control() {
         let checked = llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
         assert_eq!(checked.control(), Some("[::1]:0".parse().unwrap()));
         let d = crate::read::document(&serde_json::to_vec(&doc["otherwise"][0]).unwrap()).unwrap();
-        let turn = turn::into_skein(turn::Turn::read_pieces(&d, 0, &Path::root(), true).unwrap());
+        let turn = turn::into_skein(turn::Turn::read_standalone(&d, 0, &Path::root(), Some(1)).unwrap());
         let api::Line::Pieces { pieces } = &turn.lines[0] else { panic!("pieces preserved") };
         assert_eq!(pieces.len(), 8);
         assert_eq!(pieces[0].text.as_ref(), b"delta");
@@ -825,4 +828,157 @@ fn control_shutdown_with_a_partial_head() {
     assert!(exchange.pop().is_none());
     assert!(exchange.release().is_none());
     assert!(exchange.done());
+}
+
+fn failing_turn(error: Value, credentials: Value) -> Value {
+    json!({"lines":[{"fail":{"error":error,"credentials":credentials}}],"finish":"stop","tokens":1})
+}
+
+#[test]
+fn llm_failing_lines_decode_each_error() {
+    use api::Error;
+    use skein_lib::Duration;
+    for (encoded, error) in [
+        (json!("overloaded"), Error::Overloaded),
+        (json!("unavailable"), Error::Unavailable),
+        (json!("context_too_long"), Error::ContextTooLong),
+        (json!("unauthorized"), Error::Unauthorized),
+        (json!("refused"), Error::Refused),
+        (json!("unsupported"), Error::Unsupported),
+        (json!("invalid_request"), Error::InvalidRequest),
+        (json!({"rate_limited":{"retry_after_ms":1}}), Error::RateLimited { retry_after: Duration::from_millis(1) }),
+        (
+            json!({"rate_limited":{"retry_after_ms":u64::MAX}}),
+            Error::RateLimited { retry_after: Duration::from_millis(u64::MAX) },
+        ),
+        (json!({"exhausted":{"retry_after_ms":1000}}), Error::Exhausted { retry_after: Some(Duration::from_secs(1)) }),
+        (json!({"exhausted":{"retry_after_ms":null}}), Error::Exhausted { retry_after: None }),
+    ] {
+        for credentials in [json!([]), json!([0, 15])] {
+            let mut doc = llm_document();
+            doc["added_keys"] = json!((0..15).map(|i| format!("/tmp/added-{i}")).collect::<Vec<_>>());
+            doc["cued"] =
+                json!([{"cue":"script","turns":["first",failing_turn(encoded.clone(), credentials.clone())]}]);
+            let doc = llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
+            let domain = doc.domain(23);
+            assert_eq!(
+                domain.scripts()[0].turns[1].lines.as_ref(),
+                &[api::Line::Fail {
+                    error,
+                    report: api::Report::none(),
+                    credentials: if credentials.as_array().unwrap().is_empty() {
+                        Box::new([])
+                    } else {
+                        Box::new([0, 15])
+                    },
+                }]
+            );
+        }
+    }
+}
+
+#[test]
+fn llm_failing_lines_refuse_invalid_members() {
+    for (error, credentials, suffix) in [
+        (json!("mystery"), json!([]), "error: unknown error\n"),
+        (json!({"mystery":{}}), json!([]), "error.mystery: unknown member\n"),
+        (
+            json!({"rate_limited":{"retry_after_ms":0}}),
+            json!([]),
+            "error.rate_limited.retry_after_ms: must be at least 1\n",
+        ),
+        (json!({"exhausted":{"retry_after_ms":0}}), json!([]), "error.exhausted.retry_after_ms: must be at least 1\n"),
+        (
+            json!({"rate_limited":{"retry_after_ms":null}}),
+            json!([]),
+            "error.rate_limited.retry_after_ms: wrong value kind\n",
+        ),
+        (json!({"exhausted":{"retry_after_ms":-1}}), json!([]), "error.exhausted.retry_after_ms: past its bound\n"),
+        (json!({"exhausted":{"retry_after_ms":1,"extra":0}}), json!([]), "error.exhausted.extra: unknown member\n"),
+        (json!({"exhausted":{}}), json!([]), "error.exhausted.retry_after_ms: missing\n"),
+        (json!({}), json!([]), "error: expected one error\n"),
+        (
+            json!({"rate_limited":{"retry_after_ms":1},"exhausted":{"retry_after_ms":null}}),
+            json!([]),
+            "error: expected one error\n",
+        ),
+        (json!("unauthorized"), json!([0, 0]), "credentials[1]: must be unique\n"),
+        (json!("unauthorized"), json!([1]), "credentials[0]: must index an accepted credential\n"),
+        (json!("unauthorized"), json!([4_294_967_296_u64]), "credentials[0]: past its bound\n"),
+        (json!("unauthorized"), json!((0..17).collect::<Vec<_>>()), "credentials: past its bound\n"),
+    ] {
+        let mut doc = llm_document();
+        doc["cued"] = json!([{"cue":"script","turns":["first",failing_turn(error, credentials)]}]);
+        let expected = format!("cued[0].turns[1].lines[0].fail.{suffix}");
+        assert_eq!(
+            llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap_err().line().as_ref(),
+            expected.as_bytes()
+        );
+    }
+}
+
+#[test]
+fn llm_added_keys_checks() {
+    let mut doc = llm_document();
+    assert!(llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap().added_keys().is_empty());
+    doc["added_keys"] = json!([]);
+    assert!(llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap().added_keys().is_empty());
+    doc["added_keys"] = json!([format!("/{}", "x".repeat(4095))]);
+    llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
+    let keys = (0..15).map(|i| format!("/tmp/added-{i}")).collect::<Vec<_>>();
+    doc["added_keys"] = json!(keys);
+    doc["otherwise"] = json!([failing_turn(json!("unauthorized"), json!((0..16).collect::<Vec<_>>()))]);
+    let checked = llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
+    assert_eq!(checked.added_keys().iter().map(|key| core::str::from_utf8(key).unwrap()).collect::<Vec<_>>(), keys);
+    let key = credential(23, credential::KEY);
+    llm::peer(llm::configuration(&checked, &key, 23)).unwrap();
+    for (paths, expected) in [
+        (json!(["/tmp/other", "/tmp/other"]), "added_keys[1]: must be unique and other than key\n"),
+        (json!(["/tmp/key"]), "added_keys[0]: must be unique and other than key\n"),
+        (json!((0..16).map(|i| format!("/tmp/added-{i}")).collect::<Vec<_>>()), "added_keys: past its bound\n"),
+        (json!(["relative"]), "added_keys[0]: must be an absolute path without NUL\n"),
+        (json!(["/tmp/\u{0}"]), "added_keys[0]: must be an absolute path without NUL\n"),
+        (json!([format!("/{}", "x".repeat(4096))]), "added_keys[0]: past its bound\n"),
+    ] {
+        let mut doc = llm_document();
+        doc["added_keys"] = paths;
+        assert_eq!(
+            llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap_err().line().as_ref(),
+            expected.as_bytes()
+        );
+    }
+}
+
+#[test]
+fn llm_failure_positions_are_checked_by_skein() {
+    for group in ["cued", "asked", "otherwise"] {
+        for (credentials, tail, valid) in [
+            (json!([]), json!({"text":"ok"}), false),
+            (json!([0]), json!({"text":"ok"}), true),
+            (json!([0]), json!({"pieces":[{"text":"ok","hold":null}]}), false),
+        ] {
+            let mut turn = failing_turn(json!("unauthorized"), credentials);
+            turn["lines"].as_array_mut().unwrap().push(tail);
+            let mut doc = llm_document();
+            let turns = json!(["first", turn]);
+            doc[group] = if group == "otherwise" { turns } else { json!([{"cue":"script","turns":turns}]) };
+            let decoded = llm::Document::decode(&serde_json::to_vec(&doc).unwrap());
+            if valid {
+                decoded.unwrap();
+            } else {
+                let path = if group == "otherwise" { "otherwise[1]".into() } else { format!("{group}[0].turns[1]") };
+                assert_eq!(decoded.unwrap_err().line().as_ref(), format!("{path}: invalid turn\n").as_bytes());
+            }
+        }
+    }
+}
+
+#[test]
+fn deployment_refuses_failing_lines() {
+    let mut doc = demo::fixture();
+    doc["application"]["demo"]["llm"]["otherwise"] = json!([failing_turn(json!("unauthorized"), json!([]))]);
+    assert_eq!(
+        demo::read(&doc).unwrap_err().line().as_ref(),
+        b"application.demo.llm.otherwise[0].lines[0].fail: unknown member\n"
+    );
 }

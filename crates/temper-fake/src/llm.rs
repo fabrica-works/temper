@@ -1,6 +1,6 @@
 //! The QA model's document and played scripts (protocol/setup.md, 8.4).
 pub mod observations;
-use crate::{Refusal, read, turn};
+use crate::{Refusal, credential, read, turn};
 use alloc::boxed::Box;
 use core::net::SocketAddr;
 use jig_protocol_config::Path;
@@ -21,6 +21,7 @@ pub struct Document {
     listen: SocketAddr,
     control: Option<SocketAddr>,
     key: Box<[u8]>,
+    added_keys: Box<[Box<[u8]>]>,
     root: Option<Box<[u8]>>,
     models: Box<[Model]>,
     scripts: api::Scripts,
@@ -34,6 +35,7 @@ impl Document {
         let listen_at = read::required(&mut o, &d, b"listen", &p)?;
         let control_at = o.member(&d, b"control");
         let key = read::field(&mut o, &d, b"key", crate::limits::PATH_BYTES, &p)?;
+        let added_keys_at = o.member(&d, b"added_keys");
         let tls_at = read::required(&mut o, &d, b"tls", &p)?;
         let models_at = read::required(&mut o, &d, b"models", &p)?;
         let cued_at = read::required(&mut o, &d, b"cued", &p)?;
@@ -46,6 +48,12 @@ impl Document {
             None => None,
         };
         read::absolute(&key, &p.member(b"key"))?;
+        let added_keys = match added_keys_at {
+            Some(at) => added_keys(&d, at, &key, &p.member(b"added_keys"))?,
+            None => Box::new([]),
+        };
+        let credentials =
+            u32::try_from(added_keys.len()).expect("fifteen added keys").checked_add(1).expect("primary key");
         let root = if read::is_null(&d, tls_at) {
             None
         } else {
@@ -57,19 +65,19 @@ impl Document {
             Some(root)
         };
         let models = models(&d, models_at, &p.member(b"models"))?;
-        let (cued, cued_rules) = scripts_with_inputs(&d, cued_at, &p.member(b"cued"), true)?;
-        let (asked, asked_rules) = scripts_with_inputs(&d, asked_at, &p.member(b"asked"), true)?;
+        let (cued, cued_rules) = scripts_with_inputs(&d, cued_at, &p.member(b"cued"), Some(credentials))?;
+        let (asked, asked_rules) = scripts_with_inputs(&d, asked_at, &p.member(b"asked"), Some(credentials))?;
         let scripts = api::Scripts {
             cued,
             asked,
-            otherwise: turns_allowing_pieces(&d, otherwise_at, &p.member(b"otherwise"), true)?,
+            otherwise: standalone_turns(&d, otherwise_at, &p.member(b"otherwise"), Some(credentials))?,
         };
         if control.is_none() && holds(&scripts) {
             return Err(read::why(&p.member(b"control"), b"required when a piece has a hold"));
         }
         let rules = api::Rules { cued: cued_rules, asked: asked_rules };
         check_inputs(&scripts, &rules, &p.member(b"otherwise"))?;
-        Ok(Self { listen, control, key, root, models, scripts, rules })
+        Ok(Self { listen, control, key, added_keys, root, models, scripts, rules })
     }
     pub(crate) fn checked(
         listen: SocketAddr,
@@ -81,7 +89,7 @@ impl Document {
     ) -> Result<Self, Refusal> {
         check_scripts(&scripts, &p.member(b"otherwise"))?;
         let rules = api::Rules { cued: counted_rules(&scripts.cued), asked: counted_rules(&scripts.asked) };
-        Ok(Self { listen, control: None, key, root, models, scripts, rules })
+        Ok(Self { listen, control: None, key, added_keys: Box::new([]), root, models, scripts, rules })
     }
     #[must_use]
     pub fn listen(&self) -> SocketAddr {
@@ -96,6 +104,10 @@ impl Document {
         &self.key
     }
     #[must_use]
+    pub fn added_keys(&self) -> &[Box<[u8]>] {
+        &self.added_keys
+    }
+    #[must_use]
     pub fn root(&self) -> Option<&[u8]> {
         self.root.as_deref()
     }
@@ -103,7 +115,7 @@ impl Document {
     pub fn models(&self) -> &[Model] {
         &self.models
     }
-    /// No menu, failure or latency. Unknown model names receive the same scripts:
+    /// No menu, random failure or latency. Unknown model names receive the same scripts:
     /// skein's provider retains no model list and performs no per-model admission.
     #[must_use]
     pub fn domain(&self, seed: u64) -> domain::Domain {
@@ -111,7 +123,7 @@ impl Document {
             .expect("checked scripts and rules")
     }
 }
-/// `OpenAI`'s public-route configuration, accepting exactly the supplied key.
+/// `OpenAI`'s public-route configuration, accepting the primary and added keys.
 /// Typed wire codecs are constructed by the peer factory; the document's advertised
 /// models stay here beside the played domain, which has no per-model admission.
 #[derive(Debug)]
@@ -120,25 +132,49 @@ pub struct Configuration {
     pub control: Option<SocketAddr>,
     pub tls: bool,
     pub key: skein_lib::Secret,
+    pub added_keys: Box<[skein_lib::Secret]>,
     pub models: Box<[Model]>,
     pub domain: domain::Domain,
 }
 /// The public `OpenAI` Responses route; no Codex account id is configured.
 pub const ROUTE: &[u8] = b"/v1/responses";
-/// Builds the played domain without a menu, failures or latency, and its one key.
+/// Builds the played domain without a menu or latency, and its accepted keys.
 #[must_use]
 pub fn configuration(document: &Document, key: &[u8], seed: u64) -> Configuration {
+    let mut added_keys = List::with_capacity(u32::try_from(document.added_keys.len()).expect("fifteen keys"));
+    for i in 0..u32::try_from(document.added_keys.len()).expect("fifteen keys") {
+        let key = credential::credential(seed, credential::added_key(i));
+        added_keys.push(skein_lib::Secret::new(skein_lib::bytes::copy_of(&key))).expect("fifteen keys");
+    }
     Configuration {
         listen: document.listen,
         control: document.control,
         tls: document.root.is_some(),
         key: skein_lib::Secret::new(skein_lib::bytes::copy_of(key)),
+        added_keys: added_keys.into_boxed(),
         models: document.models.clone(),
         domain: document.domain(seed),
     }
 }
 fn empty_menu() -> api::Menu {
     api::Menu { arguments: Box::new([]), invalid: Box::new([]) }
+}
+fn added_keys(d: &Json, at: u32, key: &[u8], p: &Path) -> Result<Box<[Box<[u8]>]>, Refusal> {
+    let items = match jig_protocol_config::read::list(d, at, credential::ADDED_KEYS) {
+        Ok(items) => items,
+        Err(w) => return Err(read::kind(p, w)),
+    };
+    let mut keys = List::<Box<[u8]>>::with_capacity(items.len());
+    for (i, at) in items.iter().enumerate() {
+        let p = read::index(p, i);
+        let path = read::text(d, *at, crate::limits::PATH_BYTES, &p)?;
+        read::absolute(&path, &p)?;
+        if path.as_ref() == key || keys.as_slice().contains(&path) {
+            return Err(read::why(&p, b"must be unique and other than key"));
+        }
+        keys.push(path).expect("fifteen added keys");
+    }
+    Ok(keys.into_boxed())
 }
 fn models(d: &Json, at: u32, p: &Path) -> Result<Box<[Model]>, Refusal> {
     let items = read::list(d, at, 1, p)?;
@@ -218,15 +254,15 @@ fn check_inputs(scripts: &api::Scripts, rules: &api::Rules, p: &Path) -> Result<
     }
 }
 pub(crate) fn scripts(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Script]>, Refusal> {
-    Ok(scripts_with_inputs(d, at, p, false)?.0)
+    Ok(scripts_with_inputs(d, at, p, None)?.0)
 }
 type InputRules = Box<[Box<[api::Rule]>]>;
-/// A standalone document's scripts may carry `inputs` and held pieces; the deployment's carry neither.
+/// Only standalone scripts may carry input rules, pieces and failing lines.
 fn scripts_with_inputs(
     d: &Json,
     at: u32,
     p: &Path,
-    standalone: bool,
+    credentials: Option<u32>,
 ) -> Result<(Box<[api::Script]>, InputRules), Refusal> {
     let items = read::list(d, at, 0, p)?;
     let mut out = List::<api::Script>::with_capacity(items.len());
@@ -236,7 +272,7 @@ fn scripts_with_inputs(
         let mut o = read::object(d, *at, &p)?;
         let cue = read::field(&mut o, d, b"cue", crate::limits::CUE_BYTES, &p)?;
         let turns_at = read::required(&mut o, d, b"turns", &p)?;
-        let inputs_at = if standalone { o.member(d, b"inputs") } else { None };
+        let inputs_at = if credentials.is_some() { o.member(d, b"inputs") } else { None };
         read::finish(o, d, &p)?;
         read::nonempty(&cue, &p.member(b"cue"))?;
         for prev in &out {
@@ -244,7 +280,7 @@ fn scripts_with_inputs(
                 return Err(read::why(&p.member(b"cue"), b"must be unique"));
             }
         }
-        let turns = turns_allowing_pieces(d, turns_at, &p.member(b"turns"), standalone)?;
+        let turns = standalone_turns(d, turns_at, &p.member(b"turns"), credentials)?;
         let inputs = match inputs_at {
             Some(at) => inputs(d, at, turns.len(), &p.member(b"inputs"))?,
             None => Box::new([]),
@@ -284,13 +320,13 @@ fn inputs(d: &Json, at: u32, turns: usize, p: &Path) -> Result<Box<[api::Rule]>,
     Ok(rules.into_boxed())
 }
 pub(crate) fn turns(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Turn]>, Refusal> {
-    turns_allowing_pieces(d, at, p, false)
+    standalone_turns(d, at, p, None)
 }
-fn turns_allowing_pieces(d: &Json, at: u32, p: &Path, allow_pieces: bool) -> Result<Box<[api::Turn]>, Refusal> {
+fn standalone_turns(d: &Json, at: u32, p: &Path, credentials: Option<u32>) -> Result<Box<[api::Turn]>, Refusal> {
     let items = read::list(d, at, 1, p)?;
     let mut out = List::with_capacity(items.len());
     for (i, at) in items.iter().enumerate() {
-        let turn = turn::Turn::read_pieces(d, *at, &read::index(p, i), allow_pieces)?;
+        let turn = turn::Turn::read_standalone(d, *at, &read::index(p, i), credentials)?;
         out.push(turn::into_skein(turn)).expect("eight turns");
     }
     Ok(out.into_boxed())

@@ -317,36 +317,42 @@ fn forge_document(source: &Source, seed: u64, created: &mut Created) -> Result<(
     }
 }
 
+fn llm_configuration(source: &Source, seed: u64, created: &mut Created) -> Result<llm::Configuration, String> {
+    Ok(match source {
+        Source::Document(path) => {
+            let bytes = read_document(path, temper_fake::DOCUMENT_BYTES)?;
+            let document =
+                llm::Document::decode(&bytes).map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
+            let key = credential(seed, credential::KEY);
+            created.file(super::path(document.key()), &key)?;
+            for (i, path) in document.added_keys().iter().enumerate() {
+                let stream = credential::added_key(u32::try_from(i).expect("fifteen added keys"));
+                created.file(super::path(path), &credential(seed, stream))?;
+            }
+            if let Some(root) = document.root() {
+                created.file(super::path(root), skein_fake_peers::transport::ROOT)?;
+            }
+            llm::configuration(&document, &key, seed)
+        }
+        Source::Demo { directories } => {
+            let bytes = read_document(&directories.document(), super::CONFIG_BYTES)?;
+            let deployment = super::setup::check(&bytes, &directories.jig())?;
+            let demo = deployment.demo.ok_or("application.demo is null: the deployment has no demo")?;
+            let path = super::path(demo.llm().key());
+            let file = skein_shell::read_private_file(path, demo::KEY_FILE_BYTES, skein_shell::effective_user())
+                .map_err(|why| format!("{}: {}", path.display(), super::unread(why)))?;
+            let key = demo::key(file.expose()).map_err(|why| format!("{}: {}", path.display(), why.reason()))?;
+            llm::configuration(demo.llm(), key, seed)
+        }
+        Source::Setup { .. } => unreachable!("LLM has document and demo forms"),
+    })
+}
+
 fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_shell::Kernel), String> {
     let mut control_address = None;
     let (peer, shared, observations, writer, buffer) = match arguments.kind {
         Kind::Llm => {
-            let configuration = match &arguments.source {
-                Source::Document(path) => {
-                    let bytes = read_document(path, temper_fake::DOCUMENT_BYTES)?;
-                    let document = llm::Document::decode(&bytes)
-                        .map_err(|why| String::from_utf8_lossy(&why.line()).into_owned())?;
-                    let key = credential(arguments.seed, credential::KEY);
-                    created.file(super::path(document.key()), &key)?;
-                    if let Some(root) = document.root() {
-                        created.file(super::path(root), skein_fake_peers::transport::ROOT)?;
-                    }
-                    llm::configuration(&document, &key, arguments.seed)
-                }
-                Source::Demo { directories } => {
-                    let bytes = read_document(&directories.document(), super::CONFIG_BYTES)?;
-                    let deployment = super::setup::check(&bytes, &directories.jig())?;
-                    let demo = deployment.demo.ok_or("application.demo is null: the deployment has no demo")?;
-                    let path = super::path(demo.llm().key());
-                    let file =
-                        skein_shell::read_private_file(path, demo::KEY_FILE_BYTES, skein_shell::effective_user())
-                            .map_err(|why| format!("{}: {}", path.display(), super::unread(why)))?;
-                    let key =
-                        demo::key(file.expose()).map_err(|why| format!("{}: {}", path.display(), why.reason()))?;
-                    llm::configuration(demo.llm(), key, arguments.seed)
-                }
-                Source::Setup { .. } => unreachable!("LLM has document and demo forms"),
-            };
+            let configuration = llm_configuration(&arguments.source, arguments.seed, created)?;
             control_address = configuration.control;
             let observations = arguments
                 .observations
