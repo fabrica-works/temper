@@ -1658,7 +1658,9 @@ them as it does any Forgejo.
     `fake-llm.md`'s `Domain::played`; skein's `fake-forge.md`'s
     `Service::new`), 0 when absent, as the box runs it; in a document's
     form, its credentials' too (below);
-  - `--observations FILE`, the fake forge's alone: FILE created new at
+  - `--observations FILE`, the fake forge's, and in a document's form
+    the fake LLM's, whose lines are its queries
+    (`../domain/testing.md`, 4.1): FILE created new at
     0o600, its first line a checkpoint, `{"observations_lost":0}`,
     written before the ready line, and each observation its domain
     makes (skein's `fake-forge.md`, 2.4) drained after each pass, as a
@@ -1681,7 +1683,8 @@ them as it does any Forgejo.
   whatever bytes the failed write left, with no later checkpoint to
   certify lines it lost.
 
-  Both peers run `without_records`, with the flags or without them.
+  Both peers run `without_records`, with the flags or without them,
+  but the fake LLM given `--observations`, which records its queries.
 - **From a document of its own,** `temper fake llm --document FILE` and
   `temper fake forge --document FILE`, the QA loop's form, which reads
   no deployment: FILE is a fake's configuration, a JSON object, as
@@ -1704,7 +1707,7 @@ them as it does any Forgejo.
   | `listen` | an address, jig's format | a socket address on loopback, port 0 for the kernel's |
   | `admin_token` | an absolute path | the handover's file, which the fake writes (below) |
   | `owner` | a Forgejo login | other than the bot's and `temper-admin` |
-  | `repositories` | a list of `{"name", "landing", "ci"}` | as `fake.repositories` are; `ci` `{"path", "green"}`, or null for every head passing: `path` a file's path in the repository, relative, none of the seed's, and `green` non-empty text, both within the domain's content limits |
+  | `repositories` | a list of `{"name", "landing", "ci"}`, each with `id` and `tree` optional | as `fake.repositories` are; `ci` `{"path", "green"}`, or null for every head passing: `path` a file's path in the repository, relative, none of the seed's, and `green` non-empty text, both within the domain's content limits; `id` and `tree` as `../domain/testing.md`, 4.2, gives them |
 
   The box's derivation gives `cued` none, `tls` and each `ci` null.
 - **Its outputs,** in a document's form, where the box's fakes read the
