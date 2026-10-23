@@ -54,7 +54,11 @@ class Filtering(unittest.TestCase):
         self.assertEqual(private, LINK)
         self.assertEqual(public, 'http://127.0.0.1:7601/')
         self.assertEqual(origin('http://[::1]:7602/'), 'http://[::1]:7602/')
-        for value in ('https://127.0.0.1:7601/', 'http://example.test:7601/', 'http://u:p@127.0.0.1:7601/'):
+        for value in ('https://127.0.0.1:7601/', 'http://example.test:7601/', 'http://u:p@127.0.0.1:7601/',
+                      'http://127.0.0.1:7601', 'http://127.0.0.1:7601/path',
+                      'http://127.0.0.1:7601/?x=1', 'http://127.0.0.1:7601/#',
+                      'http://[::1%lo]:7601/',
+                      'http://127.0.0.1:7601/\n', LINK.decode().strip()):
             with self.assertRaises(ValueError):
                 origin(value)
 
@@ -80,29 +84,93 @@ class Filtering(unittest.TestCase):
                         os.close(write_fd)
                 self.assertEqual(Path(directory, stream).read_bytes(), b'kept\ntail')
 
-    def test_ready_link_last_is_private_in_records_and_events(self):
+    def engine(self):
+        run = host.Run.__new__(host.Run)
+        run.public = run.link = None
+        run.known = {}
+        run.ms = lambda: 5
+        run.events = []
+        run.event = lambda event, **fields: run.events.append(dict(event=event, **fields))
+        manifest = json.loads((ROOT / 'experiment.json').read_bytes())
+        definition = next(p for p in manifest['processes'] if p['name'] == 'engine')
+        record = dict(name='engine', group='processes', captures={}, ready_ms=None)
+        run.records = {'engine': record}
+        run.items = {'proc-engine': dict(record=record, definition=definition, ready=set())}
+        return run
+
+    def public_ready(self, run):
+        for listener, port in (('clients', 7601), ('workers', 7602), ('webhooks', 7603)):
+            run.line('proc-engine', 'stderr',
+                     f'listening {listener} 127.0.0.1:{port}\n'.encode(), None, True)
+
+    def test_public_readiness_and_private_link_in_either_order(self):
         for link_first in (True, False):
-            run = host.Run.__new__(host.Run)
-            run.public = run.link = None
-            run.known = {}
-            run.ms = lambda: 5
-            events = []
-            run.event = lambda event, **fields: events.append(dict(event=event, **fields))
-            rules = [dict(stream='stdout', prefix='http://', capture='link'),
-                     dict(stream='stderr', prefix='listening clients ', capture='clients')]
-            record = dict(name='engine', group='processes', captures={}, ready_ms=None)
-            run.items = {'proc-engine': dict(record=record, definition=dict(ready=rules), ready=set())}
-            calls = [('stdout', b'', LINK, True), ('stderr', b'listening clients 127.0.0.1:7601\n', None, True)]
+            run = self.engine()
+            if link_first:
+                run.line('proc-engine', 'stdout', b'', LINK, True)
+                self.assertIsNone(run.records['engine']['ready_ms'])
+                self.assertFalse(run.startup_ready('engine'))
+            self.public_ready(run)
+            self.assertEqual(run.records['engine']['ready_ms'], 5)
+            self.assertEqual(run.startup_ready('engine'), link_first)
             if not link_first:
-                calls.reverse()
-            for args in calls:
-                run.line('proc-engine', *args)
-            self.assertEqual(record['ready_ms'], 5)
+                run.line('proc-engine', 'stdout', b'', LINK, True)
+            self.assertTrue(run.startup_ready('engine'))
             self.assertEqual(run.link, LINK)
-            saved = json.dumps([record, events, run.known]).encode()
-            self.assertNotIn(LINK.strip(), saved)
+            self.assertEqual(len(run.items['proc-engine']['ready']), 3)
+            self.assertEqual(set(run.records['engine']['captures']), {'clients', 'workers', 'webhooks'})
+            self.assertNotIn('proc.engine.ready.link', run.known)
+            saved = json.dumps([run.records, run.events, run.known]).encode()
             self.assertNotIn(b'AAAA', saved)
-            self.assertEqual(record['captures']['link'], 'http://127.0.0.1:7601/')
+            self.assertEqual(len(run.events), 1)
+
+    def test_invalid_mismatched_repeated_and_incomplete_links_fail_safely(self):
+        for value in (LINK[:-1], b'warning ' + LINK,
+                      LINK.replace(b'7601', b'7609'), LINK.replace(b'http://', b'HTtP://')):
+            run = self.engine()
+            self.public_ready(run)
+            with self.assertRaises(host.Halt) as error:
+                run.line('proc-engine', 'stdout', b'', value, value.endswith(b'\n'))
+            self.assertNotIn('AAAA', str(error.exception))
+        run = self.engine()
+        self.public_ready(run)
+        run.line('proc-engine', 'stdout', b'', LINK, True)
+        run.link = None  # Already delivered: repetition is still forbidden.
+        with self.assertRaisesRegex(host.Halt, 'more than one'):
+            run.line('proc-engine', 'stdout', b'', LINK, True)
+        run = self.engine()
+        run.line('proc-engine', 'stdout', b'', LINK.replace(b'7601', b'7609'), True)
+        with self.assertRaisesRegex(host.Halt, 'differs'):
+            self.public_ready(run)
+
+    def test_missing_link_uses_original_startup_deadline_and_cleans_up(self):
+        run = self.engine()
+        with tempfile.TemporaryDirectory() as directory, host.store.open_lab(directory + '/lab') as lab:
+            run.lab, run.base = lab, 'missing'
+            run.args = types.SimpleNamespace(seed='1', unit='inert-unit')
+            run.exp = dict(processes=[run.items['proc-engine']['definition']], dirs=[], collect=[], actions=[])
+            run.order = ['engine']
+            run.cost = dict(ready_seconds=120, command_seconds=240, stop_seconds=20)
+            run.schedule = dict(start_order=[], draws={})
+            run.bounds, run.failures, run.errors, run.undecided = [], [], [], []
+            run.interrupted = None
+            run.start_child = Mock(return_value='proc-engine')
+            run.finish = lambda: run.errors
+            run.stop_all = Mock(return_value=False)
+            run.collect_live = Mock()
+            def wait(predicate, deadline):
+                self.assertEqual(deadline, 130)
+                self.public_ready(run)
+                self.assertFalse(predicate())
+                return False
+            run.wait = wait
+            with patch.object(host.time, 'monotonic', return_value=10), patch.object(
+                    host.native, 'Host', return_value=types.SimpleNamespace(root='/inert')):
+                errors = run.run()
+            self.assertIn('readiness deadline passed', errors[0]['detail'])
+            self.assertEqual(run.bounds, [dict(name='ready_seconds', who='engine')])
+            run.stop_all.assert_called_once()
+            run.collect_live.assert_not_called()
 
 
 class Collection(unittest.TestCase):
@@ -155,7 +223,7 @@ class Collection(unittest.TestCase):
         run = host.Run.__new__(host.Run)
         with tempfile.TemporaryDirectory() as directory, host.store.open_lab(directory + '/lab') as lab:
             run.lab, run.base = lab, 'test-run'
-            run.args = types.SimpleNamespace(unit='inert-unit')
+            run.args = types.SimpleNamespace(seed='1', unit='inert-unit')
             run.exp = dict(processes=[], dirs=[], collect=[], actions=[])
             run.order, run.records, run.items = [], {}, {'proc-engine': dict(empty=True)}
             run.cost = dict(stop_seconds=20, ready_seconds=120, command_seconds=240)
@@ -232,37 +300,7 @@ class StopBudgets(unittest.TestCase):
 
 class Manifest(unittest.TestCase):
     def manifest(self):
-        exp = json.loads((ROOT.parent / 'cluster/experiment.json').read_bytes())
-        exp['processes'][0]['argv'] += ['--seed', '{seed.llm}']
-        exp['processes'].insert(0, dict(name='forge', env={}, memory_bytes=None,
-            argv=['{artifact.temper}', 'fake', 'forge', '--document', '{proc.forge.dir}/forge.json',
-                  '--ready', 'listening ', '--seed', '{seed.forge}', '--observations',
-                  '{proc.forge.dir}/observations.jsonl'],
-            ready=[dict(stream='stdout', prefix='listening ', capture='address')]))
-        prefix = ['{artifact.temper}', 'ctl', '{dir.client}']
-        arguments = [
-            ['sign-in', '-'],
-            ['add-key', '1', '{proc.llm.dir}/llm.key', '--deployment', '--key', 'lab-llm'],
-            ['wait', 'accounts', '--until', 'usable', '--timeout', '200'],
-            ['wait', 'forges', '--until', 'connected:1', '--timeout', '200'],
-            ['adopt', '--project', '1', '--forge', '1', '--owner', 'fake', '--name', 'widget',
-             '--landing', 'main', '--key', 'lab-adopt']]
-        exp['actions'] = [dict(name=name, argv=prefix + argv, env={})
-                          for name, argv in zip(host.ACTION_NAMES, arguments)]
-        exp['actions'][0]['stdin'] = '{proc.engine.ready.link}\n'
-        exp['actions'].append(dict(name='story', env={}, argv=['/bin/sh', '{experiment}/smoke/story',
-            '{artifact.temper}', '{dir.client}', '{proc.engine.ready.clients}']))
-        exp['dirs'] = ['client']
-        exp['collect'] = [dict(name='observations', env={}, scan=[], argv=['/bin/cp',
-            '{proc.forge.dir}/observations.jsonl', '{collect.dir}/observations.jsonl']),
-            dict(name='store', env={}, scan=[], argv=['/bin/cp', '-R', '--',
-                 '{proc.engine.dir}/data/state/store/.', '{collect.dir}/.'])]
-        exp['checks'] = [dict(name='end-state', env={}, argv=['{experiment}/checks/end-state',
-            '{collected.observations}/observations.jsonl', '{proc.forge.ready.address}']),
-            dict(name='promises', env={}, argv=['{artifact.temper}', 'fake', 'forge', 'check',
-                 '--config', '{proc.engine.dir}/config', '--data', '{proc.engine.dir}/data',
-                 '--cache', '{proc.engine.dir}/cache', '1',
-                 '{collected.observations}/observations.jsonl', '{collected.store}'])]
+        exp = json.loads((ROOT / 'experiment.json').read_bytes())
         settings = dict(costs={exp['cost']: dict(ready_seconds=120, command_seconds=240, stop_seconds=20)})
         return exp, settings
 
@@ -274,6 +312,18 @@ class Manifest(unittest.TestCase):
             lambda e: e['processes'][0].update(argv=['/usr/bin/true']),
             lambda e: e['actions'].reverse(),
             lambda e: e['actions'][0].update(stdin='credential'),
+            lambda e: e['actions'][0].update(stdin='{proc.engine.ready.link}\n'),
+            lambda e: e['processes'][0].update(stdin='/tmp/link'),
+            lambda e: e['actions'][1].update(stdin=''),
+            lambda e: e['collect'][0].update(stdin=''),
+            lambda e: e['checks'][0].update(stdin=''),
+            lambda e: e['actions'][0].update({'await': {}}),
+            lambda e: e['processes'][2]['ready'].append(
+                dict(stream='stdout', prefix='http://', capture='link')),
+            lambda e: e['processes'][2]['ready'][0].update(capture='link'),
+            lambda e: e['processes'][2]['files'].append(
+                dict(path='{proc.engine.ready.link}', **{'from': 'engine.json'})),
+            lambda e: e['actions'][-1]['argv'].__setitem__(-1, '{proc.engine.ready.clients}'),
             lambda e: e['actions'][-1]['argv'].__setitem__(-1, '{proc.engine.ready.link}'),
             lambda e: e['checks'][1]['argv'].__setitem__(-1, '{proc.engine.dir}/data/state/store'),
             lambda e: e['actions'][1].update(env={'HOME': '/tmp'})]
@@ -285,6 +335,35 @@ class Manifest(unittest.TestCase):
         settings['costs'][exp['cost']]['command_seconds'] = 241
         with self.assertRaises(host.Halt):
             host.contract(exp, settings)
+
+
+class StoryOrigin(unittest.TestCase):
+    def test_complete_origin_reaches_spawn_unchanged_and_invalid_origin_never_spawns(self):
+        with tempfile.TemporaryDirectory() as directory, host.store.open_lab(directory + '/lab') as lab:
+            run = host.Run.__new__(host.Run)
+            run.lab, run.base = lab, 'story-origin'
+            programs = [dict(path=p, sha256='keyed') for p in ('/bin/sh', '/usr/bin/python3', '/usr/bin/env')]
+            run.key = dict(lab=dict(programs=programs, runner='selected'))
+            run.host = types.SimpleNamespace(spawn=Mock(return_value=dict(pid=1)))
+            run.ms = lambda: 1
+            run.event = Mock()
+            run.items, run.commands = {}, []
+            run.render = lambda text: {'{experiment}': '/s', '{artifact.temper}': '/temper',
+                                     '{dir.client}': '/client'}.get(text, text)
+            definition = dict(name='story', env={'PATH': '/usr/bin:/bin'}, argv=[
+                '/bin/sh', '/s/smoke/story', '/temper', '/client', 'http://127.0.0.1:7601/'])
+            with patch.object(host.cli, '_program', side_effect=lambda path: dict(path=path, sha256='keyed')), patch.object(
+                    host.cli, '_runner_digest', return_value='selected'):
+                run.start_child('actions', definition, deadline=240)
+                self.assertEqual(run.host.spawn.call_args.args[1], definition['argv'])
+                for value in ('http://http://127.0.0.1:7601/', 'http://127.0.0.1:7601/path',
+                              LINK.decode().strip()):
+                    definition['argv'][-1] = value
+                    with self.assertRaises(host.Halt):
+                        run.start_child('actions', definition, deadline=240)
+                run.host.spawn.assert_called_once()
+            for output in run.items['actions-story']['outputs'].values():
+                os.close(output['fd'])
 
 
 class Records(unittest.TestCase):

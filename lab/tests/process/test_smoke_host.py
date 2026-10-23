@@ -45,22 +45,43 @@ def emit(mode):
             signal.pause()
             os._exit(0)
         return 7
-    if mode == '--emit':
-        os.write(2, b'listening clients 127.0.0.1:7601\n')
-        os.write(1, b'canary-before\n')
+    if mode.startswith('--emit-'):
+        # Synchronize the two streams without timing assumptions. Both halves
+        # still use the manifest's real public lines and private link format.
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGUSR1})
         link = synthetic_link()
-        for chunk in (link[:7], link[7:41], link[41:]):
-            os.write(1, chunk)
-        os.write(2, b'malformed ' + link)
+        public = (b'listening clients 127.0.0.1:7601\n'
+                  b'listening workers 127.0.0.1:7602\n'
+                  b'listening webhooks 127.0.0.1:7603\n')
+        os.write(1, b'canary-before\n')
+        if mode == '--emit-link-first':
+            for chunk in (link[:7], link[7:41], link[41:]):
+                os.write(1, chunk)
+            signal.sigwait({signal.SIGUSR1})
+            os.write(2, public)
+        else:
+            os.write(2, public)
+            signal.sigwait({signal.SIGUSR1})
+            if mode == '--emit-public-first':
+                os.write(1, link)
+            elif mode == '--emit-malformed':
+                os.write(1, b'malformed ' + link)
+            elif mode == '--emit-repeated':
+                os.write(1, link + link)
+            elif mode == '--emit-mismatch':
+                os.write(1, link.replace(b'7601', b'7609'))
+            elif mode == '--emit-incomplete':
+                os.write(1, link[:-1])
+                os.close(1)
     else:
         os.write(1, b'canary-ready yes\n')
     signal.pause()
     return 0
 
 
-def canary_run(lab, unit):
+def canary_run(lab, unit, case, native_host=None):
     run = host.Run.__new__(host.Run)
-    run.lab, run.base = lab, 'canary'
+    run.lab, run.base = lab, case
     run.args = types.SimpleNamespace(seed='1', unit=unit)
     run.cost = dict(command_seconds=240, ready_seconds=120, stop_seconds=20)
     programs = {}
@@ -80,7 +101,7 @@ def canary_run(lab, unit):
     run.mkdir('scratch/waiter')
     run.known['proc.engine.dir'] = str(lab.root / run.base / 'scratch/engine')
     run.known['proc.waiter.dir'] = str(lab.root / run.base / 'scratch/waiter')
-    run.host = host.native.Host(unit, '/usr/bin/systemctl', run.cost)
+    run.host = native_host if native_host is not None else host.native.Host(unit, '/usr/bin/systemctl', run.cost)
     run.wake_r, wake_w = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
     return run, wake_w
 
@@ -93,37 +114,78 @@ def definition(name, mode, ready=()):
 def worker(unit, root):
     os.umask(0o077)
     with host.store.open_lab(Path(root) / 'lab') as lab, lab.lock():
-        run, wake_w = canary_run(lab, unit)
+        # Validate the checked-in S declaration, rather than inventing a link
+        # capture for this fixture. The process is synthetic; the IO host is real.
+        manifest = json.loads((ROOT / 'experiment.json').read_bytes())
+        host.contract(manifest, dict(costs={manifest['cost']: dict(
+            ready_seconds=120, command_seconds=240, stop_seconds=20)}))
+        rules = next(p['ready'] for p in manifest['processes'] if p['name'] == 'engine')
+        modes = ('link-first', 'public-first', 'malformed', 'repeated', 'mismatch', 'incomplete', 'missing')
+        native_host = None
+        for mode in modes:
+            run, wake_w = canary_run(lab, unit, mode, native_host)
+            native_host = run.host
+            try:
+                deadline = time.monotonic() + 120
+                run.start_child('processes', definition('engine', '--emit-' + mode, rules), deadline=deadline)
+                observe = run.observe
+                released = False
+                def observe_ordered():
+                    nonlocal released
+                    observe()
+                    first = run.link is not None if mode == 'link-first' else run.records['engine']['ready_ms'] is not None
+                    if first and not released:
+                        assert not run.startup_ready('engine')
+                        released = True
+                        run.host.signal_first('proc-engine', signal.SIGUSR1)
+                run.observe = observe_ordered
+                if mode in ('link-first', 'public-first'):
+                    assert run.wait(lambda: run.startup_ready('engine'), deadline)
+                    assert run.command('actions', definition('sign-in', '--consume'))
+                    assert run.link is None
+                    assert 'link' not in run.records['engine']['captures']
+                    assert 'proc.engine.ready.link' not in run.known
+                    assert len(run.items['proc-engine']['ready']) == len(rules)
+                    run.start_child('processes', definition('waiter', '--idle', [
+                        dict(stream='stdout', prefix='canary-ready ', capture='ack')]), deadline=time.monotonic() + 120)
+                    assert run.wait(lambda: run.startup_ready('waiter'), time.monotonic() + 120)
+                elif mode == 'missing':
+                    assert run.wait(lambda: released, deadline)
+                    assert not run.startup_ready('engine')
+                else:
+                    try:
+                        run.wait(lambda: False, deadline)
+                        raise AssertionError('invalid bootstrap was not refused')
+                    except host.Halt as error:
+                        assert b'AAAA' not in str(error).encode()
+                run.observe = observe
+                assert run.stop_all()
+                assert run.link is None
+                assert not run.host.children
+                assert all(r['memory']['peak_bytes'] > 0 for r in run.records.values())
+                assert all(r['memory']['tree_peak_bytes'] > 0 for r in run.records.values())
+                assert all(r['stdin'] is None for r in run.commands)
+                assert not list(lab.root.rglob('*stdin*'))
+                events = [json.loads(line) for line in lab.read(run.base + '/events.jsonl').splitlines()]
+                if mode in ('link-first', 'public-first'):
+                    assert [e['name'] for e in events if e['event'] == 'signal'] == ['waiter', 'engine']
+                encoded = json.dumps([run.records, run.commands, events]).encode()
+                assert b'AAAA' not in encoded
+                for file in lab.root.rglob('*'):
+                    if file.is_file():
+                        assert b'AAAA' not in file.read_bytes()
+            finally:
+                run.observe = observe
+                run.stop_all()
+                os.close(run.wake_r)
+                os.close(wake_w)
+        run, wake_w = canary_run(lab, unit, 'exits', native_host)
         try:
-            rules = [dict(stream='stdout', prefix='http://', capture='link'),
-                     dict(stream='stderr', prefix='listening clients ', capture='clients')]
-            run.start_child('processes', definition('engine', '--emit', rules), deadline=time.monotonic() + 120)
-            assert run.wait(lambda: run.records['engine']['ready_ms'] is not None, time.monotonic() + 120)
-            assert run.command('actions', definition('sign-in', '--consume'))
-            assert run.link is None
-            run.start_child('processes', definition('waiter', '--idle', [
-                dict(stream='stdout', prefix='canary-ready ', capture='ack')]), deadline=time.monotonic() + 120)
-            assert run.wait(lambda: run.records['waiter']['ready_ms'] is not None, time.monotonic() + 120)
-            assert run.stop_all()
-            assert not run.host.children
-            assert all(r['memory']['peak_bytes'] > 0 for r in run.records.values())
-            assert all(r['memory']['tree_peak_bytes'] > 0 for r in run.records.values())
-            assert run.commands[0]['stdin'] is None
-            assert not list(lab.root.rglob('*stdin*'))
-            events = [json.loads(line) for line in lab.read('canary/events.jsonl').splitlines()]
-            assert [e['name'] for e in events if e['event'] == 'signal'] == ['waiter', 'engine']
-            encoded = json.dumps([run.records, run.commands]).encode()
-            assert synthetic_link().strip() not in encoded
-            assert b'AAAA' not in encoded
-            for file in lab.root.rglob('*'):
-                if file.is_file():
-                    assert synthetic_link().strip() not in file.read_bytes()
-                    assert b'AAAA' not in file.read_bytes()
             # A real forked descendant outliving its first process must be
             # observed, killed by cgroup, and awaited through tree emptiness.
             run.cleaning = False
             run.mkdir('scratch/exiting')
-            run.known['proc.exiting.dir'] = str(lab.root / 'canary/scratch/exiting')
+            run.known['proc.exiting.dir'] = str(lab.root / run.base / 'scratch/exiting')
             run.start_child('processes', definition('exiting', '--early-exit'), deadline=time.monotonic() + 120)
             try:
                 run.wait(lambda: False, time.monotonic() + 120)
@@ -212,6 +274,6 @@ if __name__ == '__main__':
         sys.exit(bootstrap_canary())
     if len(sys.argv) == 4 and sys.argv[1] == '--worker':
         sys.exit(worker(sys.argv[2], sys.argv[3]))
-    if len(sys.argv) == 2 and sys.argv[1] in ('--emit', '--consume', '--idle', '--early-exit', '--failure'):
+    if len(sys.argv) == 2 and (sys.argv[1].startswith('--emit-') or sys.argv[1] in ('--consume', '--idle', '--early-exit', '--failure')):
         sys.exit(emit(sys.argv[1]))
     unittest.main()
