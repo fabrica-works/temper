@@ -984,14 +984,15 @@ temper box
   `box.grace_ms`, a second signal, `box.grace_ms` again, then a close;
   a step that exits during it is not restarted, and a once step still
   running is closed with them. Once they are all closed the box answers
-  `stopped FORGE`, the group dormant, and runs on; a termination signal
-  during it stops the box as above, which closes them too.
+  `stopped FORGE`, the group dormant, says `box: forge FORGE's group
+  stopped` on its stderr, and runs on; a termination signal during it
+  stops the box as above, which closes them too.
 - **Its streams:** `temper serve`'s stdout, the sign-in links, is the
   box's stdout, as is, but for its first line when a link step follows
   it, which is that step's (8.4). Every other line a step writes, to its stdout or
   its stderr, goes to the box's stderr prefixed `<step>: `; the box's own
   lines are prefixed `box: `, such as `box: <step> gave up after <n>
-  restarts`. Each step gets the box's environment; `temper forge run`
+  restarts` and `box: forge <n>'s group stopped`. Each step gets the box's environment; `temper forge run`
   clears it for Forgejo (6.4). Forgejo logs to its own files.
 - **Its children** are skein-io's (skein's `io.md`, section 6), each in a
   process group of its own; closing one kills its group, so nothing the
@@ -2533,7 +2534,7 @@ it checks of this document:
   demo started and connected, then a second box on the same
   directories, its document given a second fake forge, which runs in
   its place, unasked, and connects at serve's start: the demo ends
-  (8.4), the box's stderr names the demo's group closed and `stopped`,
+  (8.4), the box's stderr says `box: forge 1's group stopped` (7.2),
   `wait forges` lists the second forge alone, and `temper ctl
   demo-start` is answered not offered. A third box starts nothing of
   the demo's group, and answers the same.
