@@ -137,7 +137,7 @@ fn a_program_way_shows_the_default_name_and_the_command_on_each_host() {
 
 fn flow_fixture(kind: d::WayKind) -> (d::Domain, skein_lib::Token) {
     let (mut root, me_watch, _, _, accounts_watch) = fixtures::root_at_full(
-        d::Address::ConnectModel { way: Some(d::ModelWay { provider: PROVIDER, kind }) },
+        d::Address::ConnectModel { way: Some(d::ModelWay { source: None, provider: PROVIDER, kind }) },
         &fixtures::limits(),
         b"Shop",
     );
@@ -172,6 +172,7 @@ fn sent(root: &mut d::Domain, act: M) -> skein_lib::Token {
             } => Some(*attempt),
             d::Request::Client { .. }
             | d::Request::Show { .. }
+            | d::Request::Leave { .. }
             | d::Request::SignOut
             | d::Request::Dropped { .. }
             | d::Request::Fact { .. } => None,
@@ -368,7 +369,7 @@ fn the_accounts_banner_links_each_way_to_its_address_and_is_hidden_in_the_flow()
         assert_eq!(
             crate::act(&mut view, id, Act::Press),
             Some(d::Action::Pages(d::pages::Act::Go {
-                address: d::Address::ConnectModel { way: Some(d::ModelWay { provider: PROVIDER, kind }) }
+                address: d::Address::ConnectModel { way: Some(d::ModelWay { source: None, provider: PROVIDER, kind }) }
             }))
         );
     }
@@ -395,7 +396,7 @@ fn ready_remembers_that_the_playgrounds_scripted_model_stepped_aside() {
     me.providers = List::with_capacity(1);
     me.providers.push(offer(provider, b"openai", false, false)).unwrap();
     let (mut root, accounts_watch) = fixtures::demo_frame_with_watch(
-        d::Address::ConnectModel { way: Some(d::ModelWay { provider, kind: d::WayKind::Key }) },
+        d::Address::ConnectModel { way: Some(d::ModelWay { source: None, provider, kind: d::WayKind::Key }) },
         fixtures::PROJECT,
         true,
         None,
@@ -413,4 +414,40 @@ fn ready_remembers_that_the_playgrounds_scripted_model_stepped_aside() {
     super::accounts::deliver(&mut root, accounts_watch, doc);
     assert!(!root.demo().unwrap().1.model);
     assert!(words(&root).contains("The playground’s scripted model stepped aside."));
+}
+
+#[test]
+fn a_returned_source_waits_for_the_watch_with_its_signing_card_alone() {
+    let (mut root, _) = flow_fixture(d::WayKind::SignIn);
+    assert!(d::pages::accounts::document(root.client()).is_none());
+    fixtures::root_event(
+        &mut root,
+        d::Event::Went {
+            place: d::Place::Address(d::Address::ConnectModel {
+                way: Some(d::ModelWay { provider: PROVIDER, kind: d::WayKind::SignIn, source: Some(43) }),
+            }),
+        },
+    );
+    assert!(words(&root).contains("Signing in"));
+    assert!(fixtures::find(fixtures::page_view(&root).tree(), Role::Button, b"Continue with ChatGPT").is_none());
+    assert!(root.pages().connect_model().unwrap().request.pending.is_none());
+}
+#[test]
+fn a_returned_source_draws_the_same_ending_words_as_an_own_sign_in() {
+    let (mut root, watch) = flow_fixture(d::WayKind::SignIn);
+    fixtures::root_event(
+        &mut root,
+        d::Event::Went {
+            place: d::Place::Address(d::Address::ConnectModel {
+                way: Some(d::ModelWay { provider: PROVIDER, kind: d::WayKind::SignIn, source: Some(43) }),
+            }),
+        },
+    );
+    let mut doc = super::accounts::card_document(b"openai", b"alice@example.com", c::OwnerAccountKind::SignIn);
+    doc.signing.clear();
+    doc.last_end =
+        Some(c::OwnerAccountLastEnd { source: 43, end: c::OwnerAccountEnd::Made { account: 1, declined: true } });
+    super::accounts::deliver(&mut root, watch, doc);
+    assert!(words(&root).contains("You signed in without plan usage."));
+    assert!(fixtures::find(fixtures::page_view(&root).tree(), Role::Button, b"Continue with ChatGPT").is_some());
 }

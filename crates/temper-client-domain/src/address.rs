@@ -30,6 +30,7 @@ pub enum Choice {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ModelWay {
+    pub source: Option<u32>,
     pub provider: u32,
     pub kind: WayKind,
 }
@@ -336,7 +337,15 @@ fn print_way(base: &[u8], way: Option<ModelWay>, separator: &[u8]) -> Box<[u8]> 
         WayKind::Program => b"program",
         WayKind::Key => b"key",
     };
-    let parts = [base, separator, b"provider=", provider.as_bytes(), b"&way=", kind];
+    let source = match (way.kind, way.source) {
+        (WayKind::SignIn, Some(source)) => Some(Decimal::of(u64::from(source))),
+        _ => None,
+    };
+    let (source_name, source_value) = match &source {
+        Some(source) => (b"&source=".as_slice(), source.as_bytes()),
+        None => (b"".as_slice(), b"".as_slice()),
+    };
+    let parts = [base, separator, b"provider=", provider.as_bytes(), b"&way=", kind, source_name, source_value];
     let mut size = 0_usize;
     for part in parts {
         size = size.checked_add(part.len()).expect("way address fits");
@@ -350,6 +359,7 @@ fn print_way(base: &[u8], way: Option<ModelWay>, separator: &[u8]) -> Box<[u8]> 
 fn parse_way(query: &[u8]) -> Option<ModelWay> {
     let mut provider = None;
     let mut kind = None;
+    let mut source = None;
     let mut rest = query;
     for _ in 0..query.len() {
         if rest.is_empty() {
@@ -362,6 +372,10 @@ fn parse_way(query: &[u8]) -> Option<ModelWay> {
             if provider.is_none() {
                 provider = project_decimal(value);
             }
+        } else if let Some(value) = field.strip_prefix(b"source=") {
+            if source.is_none() {
+                source = project_decimal(value);
+            }
         } else if let Some(value) = field.strip_prefix(b"way=")
             && kind.is_none()
         {
@@ -373,5 +387,6 @@ fn parse_way(query: &[u8]) -> Option<ModelWay> {
             };
         }
     }
-    Some(ModelWay { provider: provider?, kind: kind? })
+    let kind = kind?;
+    Some(ModelWay { provider: provider?, kind, source: if kind == WayKind::SignIn { source } else { None } })
 }

@@ -48,7 +48,7 @@ pub fn to_root(
                         key,
                         digest,
                         carried,
-                        request: forge::Ask::SetUp {
+                        request: temper_engine_domain::Application::Forge(forge::Ask::SetUp {
                             forge: value.forge,
                             org: value.org,
                             repository: value.repository,
@@ -56,7 +56,24 @@ pub fn to_root(
                                 w::SetUpProject::Existing(value) => forge::SetUpProject::Existing(value.project()),
                                 w::SetUpProject::New(value) => forge::SetUpProject::New(value.into_parts().name),
                             },
-                        },
+                        }),
+                    }));
+                }
+                w::Request::Return(value) => {
+                    let value = value.into_parts();
+                    if !return_path(&value.path) {
+                        return Err(Box::new(kit::Event::Application(kit::FromApplication::Undecodable {
+                            to: reply_to,
+                        })));
+                    }
+                    return Ok(root::Event::Party(root::PartyInput::Application {
+                        scope,
+                        reply_to,
+                        sign_in,
+                        key,
+                        digest,
+                        carried,
+                        request: root::Application::Return { source: value.source, path: value.path },
                     }));
                 }
                 w::Request::Adopt(value) => value,
@@ -75,7 +92,7 @@ pub fn to_root(
                 sign_in,
                 key,
                 digest,
-                request: forge::Ask::Adopt(forge::Adoption {
+                request: temper_engine_domain::Application::Forge(forge::Ask::Adopt(forge::Adoption {
                     project: a.project,
                     home: a.home,
                     forge: a.forge,
@@ -87,7 +104,7 @@ pub fn to_root(
                     landing: a.landing,
                     ci: a.ci,
                     checks: a.checks.into_boxed(),
-                }),
+                })),
                 carried,
             }))
         }
@@ -347,86 +364,93 @@ fn encoded_role(role: forge::Role) -> w::Role {
 /// Encode one durable terminal, or the unknown terminal past its retention.
 #[must_use]
 pub fn answer(
-    outcome: Option<forge::Answered>,
+    outcome: Option<temper_engine_domain::ApplicationAnswer>,
     limits: &w::Limits,
     jig: &jig_client_protocol_wire::v13::Limits,
 ) -> Option<Box<[u8]>> {
     let outcome = match outcome {
-        Some(forge::Answered::Adopt(forge::ApplicationOutcome::Adopted(a))) => w::Outcome::Adopted(
-            w::Adopted::new(
-                limits,
-                w::AdoptedParts {
-                    forge: a.repository.forge,
-                    repository: a.repository.repository,
-                    owner: a.owner,
-                    name: a.name,
-                    role: encoded_role(a.role),
-                    home: a.home,
-                    kinds: w::Kinds::new(
-                        limits,
-                        w::KindsParts {
-                            skein_bools: [
-                                a.kinds.read,
-                                a.kinds.push,
-                                a.kinds.open,
-                                a.kinds.land,
-                                a.kinds.review,
-                                a.kinds.status,
-                                a.kinds.comment,
-                                a.kinds.issue,
-                                a.kinds.branch,
-                            ],
-                        },
-                    )
-                    .ok()?,
-                    protection: protection(a.protection, limits)?,
-                },
+        Some(root::ApplicationAnswer::Returning) => w::Outcome::Returning,
+        Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::Adopted(a))) => {
+            w::Outcome::Adopted(
+                w::Adopted::new(
+                    limits,
+                    w::AdoptedParts {
+                        forge: a.repository.forge,
+                        repository: a.repository.repository,
+                        owner: a.owner,
+                        name: a.name,
+                        role: encoded_role(a.role),
+                        home: a.home,
+                        kinds: w::Kinds::new(
+                            limits,
+                            w::KindsParts {
+                                skein_bools: [
+                                    a.kinds.read,
+                                    a.kinds.push,
+                                    a.kinds.open,
+                                    a.kinds.land,
+                                    a.kinds.review,
+                                    a.kinds.status,
+                                    a.kinds.comment,
+                                    a.kinds.issue,
+                                    a.kinds.branch,
+                                ],
+                            },
+                        )
+                        .ok()?,
+                        protection: protection(a.protection, limits)?,
+                    },
+                )
+                .ok()?,
             )
-            .ok()?,
-        ),
-        Some(forge::Answered::Adopt(forge::ApplicationOutcome::CoreRefused(value))) => {
+        }
+        Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::CoreRefused(value))) => {
             let value = refusals::refusal(value, jig).ok()?;
             let mut bytes = Writer::new(usize::try_from(value.measure()).ok()?);
             value.encode(&mut bytes).ok()?;
             w::Outcome::CoreRefused(w::CoreRefused::new(limits, w::CoreRefusedParts { refusal: bytes.finish() }).ok()?)
         }
-        Some(forge::Answered::Adopt(forge::ApplicationOutcome::ForgeRefused(reason))) => w::Outcome::ForgeRefused(
-            w::ForgeRefused::new(
-                limits,
-                w::ForgeRefusedParts {
-                    reason: match reason {
-                        forge::AdoptionRefusal::NoSuchForge => w::ForgeReason::NoSuchForge,
-                        forge::AdoptionRefusal::NotFound => w::ForgeReason::NotFound,
-                        // temper-07 adds not_installed to the client wire.
-                        forge::AdoptionRefusal::NotInstalled | forge::AdoptionRefusal::NoAccess => {
-                            w::ForgeReason::NoAccess
-                        }
-                        forge::AdoptionRefusal::Refused => w::ForgeReason::Refused,
-                        forge::AdoptionRefusal::InFlight => w::ForgeReason::InFlight,
-                        forge::AdoptionRefusal::TooLarge => w::ForgeReason::TooLarge,
-                        forge::AdoptionRefusal::Unreachable => w::ForgeReason::Unreachable,
-                        forge::AdoptionRefusal::InvalidAnswer => w::ForgeReason::InvalidAnswer,
+        Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::ForgeRefused(reason))) => {
+            w::Outcome::ForgeRefused(
+                w::ForgeRefused::new(
+                    limits,
+                    w::ForgeRefusedParts {
+                        reason: match reason {
+                            forge::AdoptionRefusal::NoSuchForge => w::ForgeReason::NoSuchForge,
+                            forge::AdoptionRefusal::NotFound => w::ForgeReason::NotFound,
+                            // temper-07 adds not_installed to the client wire.
+                            forge::AdoptionRefusal::NotInstalled | forge::AdoptionRefusal::NoAccess => {
+                                w::ForgeReason::NoAccess
+                            }
+                            forge::AdoptionRefusal::Refused => w::ForgeReason::Refused,
+                            forge::AdoptionRefusal::InFlight => w::ForgeReason::InFlight,
+                            forge::AdoptionRefusal::TooLarge => w::ForgeReason::TooLarge,
+                            forge::AdoptionRefusal::Unreachable => w::ForgeReason::Unreachable,
+                            forge::AdoptionRefusal::InvalidAnswer => w::ForgeReason::InvalidAnswer,
+                        },
                     },
-                },
+                )
+                .ok()?,
             )
-            .ok()?,
-        ),
-        Some(forge::Answered::SetUp(forge::SetUpAnswer::SettingUp)) => w::Outcome::SettingUp,
-        Some(forge::Answered::SetUp(forge::SetUpAnswer::Refused(why))) => w::Outcome::SetUpRefused(
-            w::SetUpRefused::new(
-                limits,
-                w::SetUpRefusedParts {
-                    why: match why {
-                        forge::SetUpRefusal::NotOffered => w::SetUpRefusal::NotOffered,
-                        forge::SetUpRefusal::NotUnderTheBox => w::SetUpRefusal::NotUnderTheBox,
-                        forge::SetUpRefusal::Busy => w::SetUpRefusal::Busy,
-                        forge::SetUpRefusal::NewProject => w::SetUpRefusal::NewProject,
-                        forge::SetUpRefusal::Invalid => w::SetUpRefusal::Invalid,
+        }
+        Some(temper_engine_domain::ApplicationAnswer::SetUp(forge::SetUpAnswer::SettingUp)) => w::Outcome::SettingUp,
+        Some(temper_engine_domain::ApplicationAnswer::SetUp(forge::SetUpAnswer::Refused(why))) => {
+            w::Outcome::SetUpRefused(
+                w::SetUpRefused::new(
+                    limits,
+                    w::SetUpRefusedParts {
+                        why: match why {
+                            forge::SetUpRefusal::NotOffered => w::SetUpRefusal::NotOffered,
+                            forge::SetUpRefusal::NotUnderTheBox => w::SetUpRefusal::NotUnderTheBox,
+                            forge::SetUpRefusal::Busy => w::SetUpRefusal::Busy,
+                            forge::SetUpRefusal::NewProject => w::SetUpRefusal::NewProject,
+                            forge::SetUpRefusal::Invalid => w::SetUpRefusal::Invalid,
+                        },
                     },
-                },
+                )
+                .ok()?,
             )
-            .ok()?,
-        ),
+        }
         None => w::Outcome::Unknown,
     };
     let answer = w::Answer::new(limits, w::AnswerParts { outcome }).ok()?;
@@ -559,4 +583,24 @@ fn first_repository(first: forge::First, limits: &w::Limits) -> Option<w::FirstR
         w::FirstRepositoryParts { org: first.org, repository: first.repository, project, state },
     )
     .ok()
+}
+
+/// A bounded path on this clients listener, checked before root admission (client/README.md, 8).
+pub(crate) fn return_path(path: &[u8]) -> bool {
+    if path.is_empty() || path.len() > 512 || path.first() != Some(&b'/') || path.get(1) == Some(&b'/') {
+        return false;
+    }
+    for byte in path {
+        if !(0x21..=0x7e).contains(byte) || *byte == b'\\' {
+            return false;
+        }
+    }
+    for byte in path {
+        match byte {
+            b'/' | b'?' | b'#' => break,
+            b':' => return false,
+            _ => {}
+        }
+    }
+    true
 }

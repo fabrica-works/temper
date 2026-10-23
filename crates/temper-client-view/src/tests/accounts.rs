@@ -352,7 +352,7 @@ pub(super) fn sign_in_address(address: &[u8]) -> d::Domain {
         &mut root,
         d::Event::Went {
             place: d::Place::Address(d::Address::ConnectModel {
-                way: Some(d::ModelWay { provider: PROVIDER, kind: d::WayKind::SignIn }),
+                way: Some(d::ModelWay { source: None, provider: PROVIDER, kind: d::WayKind::SignIn }),
             }),
         },
     );
@@ -365,6 +365,7 @@ pub(super) fn sign_in_address(address: &[u8]) -> d::Domain {
             } => Some(*attempt),
             d::Request::Client { .. }
             | d::Request::Show { .. }
+            | d::Request::Leave { .. }
             | d::Request::SignOut
             | d::Request::Dropped { .. }
             | d::Request::Fact { .. } => None,
@@ -573,6 +574,7 @@ fn answer_account_operation(root: &mut d::Domain, operation: Operation, outcome:
             } => Some(*attempt),
             d::Request::Client { .. }
             | d::Request::Show { .. }
+            | d::Request::Leave { .. }
             | d::Request::SignOut
             | d::Request::Dropped { .. }
             | d::Request::Fact { .. } => None,

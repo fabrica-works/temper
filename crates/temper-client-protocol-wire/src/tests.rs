@@ -60,6 +60,7 @@ fn limits_take_each_bound_from_its_source_field() {
         fixtures::limits(),
         v1::Limits {
             forges_forges: crate::FORGES,
+            return_path: 512,
             set_up_failed_why: crate::SET_UP_WHY_BYTES,
             connected_login: 16,
             stopped_reason: 16,

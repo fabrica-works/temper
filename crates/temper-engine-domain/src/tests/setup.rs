@@ -65,6 +65,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Request]> {
                 }
                 Request::ToChild(released) => crate::try_step(domain, env, Event::Released(released)).unwrap(),
                 request @ (Request::SetUp { .. }
+                | Request::Return { .. }
                 | Request::Setup { .. }
                 | Request::Store(_)
                 | Request::Worker(_)
@@ -88,12 +89,12 @@ fn setup(key: u8) -> Event {
         key: [key; 16],
         digest: [key; 32],
         carried: None,
-        request: forge::Ask::SetUp {
+        request: crate::Application::Forge(forge::Ask::SetUp {
             forge: 1,
             org: b"work".as_slice().into(),
             repository: b"hello".as_slice().into(),
             project: forge::SetUpProject::Existing(1),
-        },
+        }),
     })
 }
 fn connection(domain: &mut Domain, env: &Env<Limits>, state: forge::Connection) {
@@ -121,7 +122,7 @@ fn a_keyed_setup_answers_the_client_and_the_same_key_replays_without_asking_the_
     .unwrap();
     let expected = Request::Party(PartyRequest::Deliver(Delivery::Application {
         to: ReplyTo::new(Token::new(90)),
-        outcome: Some(forge::Answered::SetUp(forge::SetUpAnswer::SettingUp)),
+        outcome: Some(crate::ApplicationAnswer::SetUp(forge::SetUpAnswer::SettingUp)),
     }));
     assert_eq!(settle(&mut domain, &env).as_ref(), [expected]);
     crate::try_step(&mut domain, &env, setup(1)).unwrap();
@@ -129,7 +130,7 @@ fn a_keyed_setup_answers_the_client_and_the_same_key_replays_without_asking_the_
         settle(&mut domain, &env).as_ref(),
         [Request::Party(PartyRequest::Deliver(Delivery::Application {
             to: ReplyTo::new(Token::new(90)),
-            outcome: Some(forge::Answered::SetUp(forge::SetUpAnswer::SettingUp)),
+            outcome: Some(crate::ApplicationAnswer::SetUp(forge::SetUpAnswer::SettingUp)),
         }))]
     );
 }
@@ -197,7 +198,7 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
     };
     crate::try_step(&mut domain, &env, setup(1)).unwrap();
     for request in settle(&mut domain, &env) {
-        if let Request::SetUp { .. } = request {
+        if let Request::SetUp { .. } | Request::Return { .. } = request {
             panic!("a party without a deployment role never reaches the box")
         }
     }

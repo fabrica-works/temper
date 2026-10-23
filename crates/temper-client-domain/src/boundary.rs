@@ -1,5 +1,6 @@
 //! Temper's child actions and the shell's obligations.
 use crate::{Address, Place};
+use alloc::boxed::Box;
 use skein_lib::List;
 /// A view act routed exhaustively to its child.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,9 +27,22 @@ pub enum Fact {
 /// One shell obligation; keyed sends come only from the table.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
-    Client { request: jig_client::Request },
-    Show { address: Address, replace: bool },
+    Client {
+        request: jig_client::Request,
+    },
+    Show {
+        address: Address,
+        replace: bool,
+    },
+    /// Send the page away to this address, once (client/README.md, 3.5).
+    Leave {
+        to: Box<[u8]>,
+    },
     SignOut,
-    Dropped { count: u32 },
-    Fact { fact: Fact },
+    Dropped {
+        count: u32,
+    },
+    Fact {
+        fact: Fact,
+    },
 }

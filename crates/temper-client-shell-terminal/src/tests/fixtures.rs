@@ -320,7 +320,11 @@ fn populate_page(
                     client::step(root, env, Event::Went { place: client::Place::Address(next) }, out);
                 }
             }
-            Request::Client { .. } | Request::SignOut | Request::Fact { .. } | Request::Dropped { .. } => {}
+            Request::Client { .. }
+            | Request::Leave { .. }
+            | Request::SignOut
+            | Request::Fact { .. }
+            | Request::Dropped { .. } => {}
         }
     }
 }

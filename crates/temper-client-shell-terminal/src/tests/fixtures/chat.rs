@@ -144,6 +144,7 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
             }
             Request::Client { .. }
             | Request::Show { .. }
+            | Request::Leave { .. }
             | Request::SignOut
             | Request::Dropped { .. }
             | Request::Fact { .. } => None,

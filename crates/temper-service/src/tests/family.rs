@@ -66,7 +66,7 @@ fn an_adopt_reaches_the_root_with_its_forges_host() {
     assert_eq!((reply_to, sign_in, key, digest), (REPLY, 3, [5; 16], [7; 32]));
     assert_eq!(
         request,
-        forge::Ask::Adopt(forge::Adoption {
+        root::Application::Forge(forge::Ask::Adopt(forge::Adoption {
             project: 7,
             home: true,
             forge: 1,
@@ -78,7 +78,7 @@ fn an_adopt_reaches_the_root_with_its_forges_host() {
             landing: b"main".as_slice().into(),
             ci: true,
             checks: Box::new([2, 3]),
-        })
+        }))
     );
 }
 #[test]
@@ -91,7 +91,7 @@ fn an_adopt_naming_no_configured_forge_reaches_the_root_with_no_host() {
     )
     .unwrap();
     let root::Event::Party(root::PartyInput::Application { request, .. }) = event else { panic!("adoption") };
-    let forge::Ask::Adopt(request) = request else { panic!("adoption") };
+    let root::Application::Forge(forge::Ask::Adopt(request)) = request else { panic!("adoption") };
     assert!(request.host.is_empty());
     assert_eq!(request.forge, 1);
 }
@@ -284,7 +284,7 @@ fn a_git_base_with_a_port_keeps_it_in_the_host() {
 fn encoded(outcome: Option<forge::ApplicationOutcome>) -> w::Outcome {
     let jig = jig_protocol_config::profile(jig_protocol_config::Profile::Small).clients.wire;
     let outcome = match outcome {
-        Some(outcome) => Some(forge::Answered::Adopt(outcome)),
+        Some(outcome) => Some(temper_engine_domain::ApplicationAnswer::Adopt(outcome)),
         None => None,
     };
     let bytes = family::answer(outcome, &w::CEILINGS, &jig).unwrap();
@@ -821,12 +821,12 @@ fn setup_requests_preserve_the_keyed_envelope_and_forge() {
             3,
             [5; 16],
             [7; 32],
-            forge::Ask::SetUp {
+            root::Application::Forge(forge::Ask::SetUp {
                 forge: 3,
                 org: b"work".as_slice().into(),
                 repository: b"hello".as_slice().into(),
                 project: forge::SetUpProject::Existing(1)
-            }
+            })
         )
     );
 }
@@ -883,7 +883,7 @@ fn setup_outcomes_use_the_family_answer_including_unknown() {
         ),
     ] {
         let outcome = match outcome {
-            Some(outcome) => Some(forge::Answered::SetUp(outcome)),
+            Some(outcome) => Some(temper_engine_domain::ApplicationAnswer::SetUp(outcome)),
             None => None,
         };
         let bytes = family::answer(outcome, &w::CEILINGS, &jig).unwrap();
@@ -1027,12 +1027,12 @@ fn setup_projects_and_first_repository_states_translate_without_losing_fields() 
         let root::Event::Party(root::PartyInput::Application { request, .. }) = event else { panic!("application") };
         assert_eq!(
             request,
-            forge::Ask::SetUp {
+            root::Application::Forge(forge::Ask::SetUp {
                 forge: 3,
                 org: b"team".as_slice().into(),
                 repository: b"widget".as_slice().into(),
                 project: project.clone()
-            }
+            })
         );
         for state in [
             forge::FirstState::Making,
@@ -1089,14 +1089,76 @@ fn new_project_and_invalid_setup_refusals_translate_to_the_wire() {
         (forge::SetUpRefusal::NewProject, w::SetUpRefusal::NewProject),
         (forge::SetUpRefusal::Invalid, w::SetUpRefusal::Invalid),
     ] {
-        let bytes =
-            family::answer(Some(forge::Answered::SetUp(forge::SetUpAnswer::Refused(domain))), &w::CEILINGS, &jig)
-                .unwrap();
+        let bytes = family::answer(
+            Some(temper_engine_domain::ApplicationAnswer::SetUp(forge::SetUpAnswer::Refused(domain))),
+            &w::CEILINGS,
+            &jig,
+        )
+        .unwrap();
         let w::Outcome::SetUpRefused(value) =
             w::Answer::decode(&w::CEILINGS, &mut Reader::new(&bytes)).unwrap().into_parts().outcome
         else {
             panic!("refusal")
         };
         assert_eq!(value.why(), &wire);
+    }
+}
+
+#[test]
+fn return_paths_are_bounded_visible_paths_on_this_listener() {
+    let mut at_bound = [b'a'; 512];
+    at_bound[0] = b'/';
+    let mut past_bound = [b'a'; 513];
+    past_bound[0] = b'/';
+    for (name, path, accepted) in [
+        ("bound", at_bound.as_slice(), true),
+        ("past bound", past_bound.as_slice(), false),
+        ("empty", b"".as_slice(), false),
+        ("root", b"/", true),
+        ("authority", b"//x", false),
+        ("backslash", b"/\\x", false),
+        ("space", b"/a b", false),
+        ("scheme", b"http://x", false),
+        ("control", b"/a\n", false),
+        ("non ASCII", b"/\x80", false),
+        ("delete", b"/\x7f", false),
+        ("connect", b"/accounts/connect?provider=1&way=sign-in&source=7", true),
+        ("welcome", b"/welcome?at=ready", true),
+        ("path colon", b"/a:b?c=d#e", true),
+    ] {
+        assert_eq!(family::return_path(path), accepted, "{name}");
+        // Oversized values cannot pass the wire's own bound; all other rows also cross decode.
+        if path.len() <= 512 {
+            let request = w::Requesting::new(
+                &w::CEILINGS,
+                w::RequestingParts {
+                    request: w::Request::Return(
+                        w::Return::new(&w::CEILINGS, w::ReturnParts { source: 7, path: path.into() }).unwrap(),
+                    ),
+                },
+            )
+            .unwrap();
+            let result = family::to_root(
+                exchange(wire::FORGE, wire::CLIENT_VERSION, wire::requesting(&request)),
+                &[],
+                None,
+                &w::CEILINGS,
+            );
+            if accepted {
+                let root::Event::Party(root::PartyInput::Application {
+                    request: root::Application::Return { source: 7, path: actual },
+                    ..
+                }) = result.unwrap()
+                else {
+                    panic!("{name}: return")
+                };
+                assert_eq!(actual.as_ref(), path, "{name}");
+            } else {
+                let kit::Event::Application(kit::FromApplication::Undecodable { to }) = *result.unwrap_err() else {
+                    panic!("{name}: undecodable")
+                };
+                assert_eq!(to, REPLY, "{name}");
+            }
+        }
     }
 }
