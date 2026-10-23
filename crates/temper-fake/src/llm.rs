@@ -23,6 +23,7 @@ pub struct Document {
     root: Option<Box<[u8]>>,
     models: Box<[Model]>,
     scripts: api::Scripts,
+    rules: api::Rules,
 }
 impl Document {
     pub fn decode(bytes: &[u8]) -> Result<Self, Refusal> {
@@ -50,12 +51,12 @@ impl Document {
             Some(root)
         };
         let models = models(&d, models_at, &p.member(b"models"))?;
-        let scripts = api::Scripts {
-            cued: scripts(&d, cued_at, &p.member(b"cued"))?,
-            asked: scripts(&d, asked_at, &p.member(b"asked"))?,
-            otherwise: turns(&d, otherwise_at, &p.member(b"otherwise"))?,
-        };
-        Self::checked(listen, key, root, models, scripts, &p)
+        let (cued, cued_rules) = scripts_with_inputs(&d, cued_at, &p.member(b"cued"), true)?;
+        let (asked, asked_rules) = scripts_with_inputs(&d, asked_at, &p.member(b"asked"), true)?;
+        let scripts = api::Scripts { cued, asked, otherwise: turns(&d, otherwise_at, &p.member(b"otherwise"))? };
+        let rules = api::Rules { cued: cued_rules, asked: asked_rules };
+        check_inputs(&scripts, &rules, &p.member(b"otherwise"))?;
+        Ok(Self { listen, key, root, models, scripts, rules })
     }
     pub(crate) fn checked(
         listen: SocketAddr,
@@ -66,7 +67,8 @@ impl Document {
         p: &Path,
     ) -> Result<Self, Refusal> {
         check_scripts(&scripts, &p.member(b"otherwise"))?;
-        Ok(Self { listen, key, root, models, scripts })
+        let rules = api::Rules { cued: counted_rules(&scripts.cued), asked: counted_rules(&scripts.asked) };
+        Ok(Self { listen, key, root, models, scripts, rules })
     }
     #[must_use]
     pub fn listen(&self) -> SocketAddr {
@@ -88,7 +90,8 @@ impl Document {
     /// skein's provider retains no model list and performs no per-model admission.
     #[must_use]
     pub fn domain(&self, seed: u64) -> domain::Domain {
-        domain::Domain::played(&LIMITS, seed, self.scripts.clone(), empty_menu()).expect("checked scripts")
+        domain::Domain::played_by_input(&LIMITS, seed, self.scripts.clone(), empty_menu(), self.rules.clone())
+            .expect("checked scripts and rules")
     }
 }
 /// `OpenAI`'s public-route configuration, accepting exactly the supplied key.
@@ -175,21 +178,45 @@ pub(crate) fn check_models(models: &[Model], p: &Path, indexed: bool) -> Result<
     }
     Ok(())
 }
+fn counted_rules(scripts: &[api::Script]) -> InputRules {
+    let mut rules = List::with_capacity(u32::try_from(scripts.len()).expect("eight scripts"));
+    for _ in scripts {
+        rules.push(Box::<[api::Rule]>::default()).expect("eight scripts");
+    }
+    rules.into_boxed()
+}
+fn empty_rules() -> api::Rules {
+    api::Rules { cued: Box::new([]), asked: Box::new([]) }
+}
 pub(crate) fn check_scripts(scripts: &api::Scripts, p: &Path) -> Result<(), Refusal> {
+    check_inputs(scripts, &empty_rules(), p)
+}
+fn check_inputs(scripts: &api::Scripts, rules: &api::Rules, p: &Path) -> Result<(), Refusal> {
     // The domain owns the joint byte accounting, including every wrapper.
-    match domain::Domain::played(&LIMITS, 0, scripts.clone(), empty_menu()) {
+    match domain::Domain::played_by_input(&LIMITS, 0, scripts.clone(), empty_menu(), rules.clone()) {
         Ok(_) => Ok(()),
         Err(_) => Err(read::why(p, b"scripts past their joint byte bound")),
     }
 }
 pub(crate) fn scripts(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Script]>, Refusal> {
+    Ok(scripts_with_inputs(d, at, p, false)?.0)
+}
+type InputRules = Box<[Box<[api::Rule]>]>;
+fn scripts_with_inputs(
+    d: &Json,
+    at: u32,
+    p: &Path,
+    by_input: bool,
+) -> Result<(Box<[api::Script]>, InputRules), Refusal> {
     let items = read::list(d, at, 0, p)?;
     let mut out = List::<api::Script>::with_capacity(items.len());
+    let mut rules = List::with_capacity(items.len());
     for (i, at) in items.iter().enumerate() {
         let p = read::index(p, i);
         let mut o = read::object(d, *at, &p)?;
         let cue = read::field(&mut o, d, b"cue", crate::limits::CUE_BYTES, &p)?;
         let turns_at = read::required(&mut o, d, b"turns", &p)?;
+        let inputs_at = if by_input { o.member(d, b"inputs") } else { None };
         read::finish(o, d, &p)?;
         read::nonempty(&cue, &p.member(b"cue"))?;
         for prev in &out {
@@ -198,9 +225,43 @@ pub(crate) fn scripts(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Script]>,
             }
         }
         let turns = turns(d, turns_at, &p.member(b"turns"))?;
+        let inputs = match inputs_at {
+            Some(at) => inputs(d, at, turns.len(), &p.member(b"inputs"))?,
+            None => Box::new([]),
+        };
+        rules.push(inputs).expect("eight scripts");
         out.push(api::Script { cue, turns }).expect("eight scripts");
     }
-    Ok(out.into_boxed())
+    Ok((out.into_boxed(), rules.into_boxed()))
+}
+fn inputs(d: &Json, at: u32, turns: usize, p: &Path) -> Result<Box<[api::Rule]>, Refusal> {
+    const RULES: u32 = 16;
+    let items = match jig_protocol_config::read::list(d, at, RULES) {
+        Ok(items) => items,
+        Err(w) => return Err(read::kind(p, w)),
+    };
+    if items.is_empty() {
+        return Err(read::why(p, b"must be non-empty"));
+    }
+    let mut rules = List::with_capacity(items.len());
+    for (i, at) in items.iter().enumerate() {
+        let p = read::index(p, i);
+        let mut o = read::object(d, *at, &p)?;
+        let cue = read::field(&mut o, d, b"cue", crate::limits::CUE_BYTES, &p)?;
+        let turn_at = read::required(&mut o, d, b"turn", &p)?;
+        read::finish(o, d, &p)?;
+        if cue.is_empty()
+            != (i.checked_add(1).expect("sixteen rules") == usize::try_from(items.len()).expect("sixteen rules"))
+        {
+            return Err(read::why(&p.member(b"cue"), b"only the last rule must have an empty cue"));
+        }
+        let turn = read::integer(d, turn_at, u64::from(u32::MAX), &p.member(b"turn"))?;
+        if turn >= u64::try_from(turns).expect("eight turns") {
+            return Err(read::why(&p.member(b"turn"), b"must index this script's turns"));
+        }
+        rules.push(api::Rule { cue, turn: u32::try_from(turn).expect("eight turns") }).expect("sixteen rules");
+    }
+    Ok(rules.into_boxed())
 }
 pub(crate) fn turns(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Turn]>, Refusal> {
     let items = read::list(d, at, 1, p)?;

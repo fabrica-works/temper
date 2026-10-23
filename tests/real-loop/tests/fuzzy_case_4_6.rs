@@ -18,8 +18,14 @@ fn a_restarted_workstation_keeps_the_directors_question_and_answers_it_once() {
     // the hang past the grace, a fenced attempt still running, a stalled run's bound, three questions, no single point, the reboot's faults: testing.md 5.3's 4.6 row
     // All workers start together. The first configured free slot is ws; its
     // first-life assignments below check that the chat actually started there.
-    let cluster =
-        run_cluster_forge(WORKERS, &[], case::fixture_4_6(), case::scripts::step_4_6, || acts::step_4_6(FIRST_ACT));
+    let cluster = run_cluster_forge(
+        WORKERS,
+        &[],
+        case::fixture_4_6(),
+        case::scripts::step_4_6,
+        case::scripts::step_4_6_rules,
+        || acts::step_4_6(FIRST_ACT),
+    );
     for (at, called) in cluster.calls().iter().enumerate() {
         assert_eq!(called.exit, Some(Exit::Code(0)), "call {at}: {}", String::from_utf8_lossy(&called.stderr));
     }

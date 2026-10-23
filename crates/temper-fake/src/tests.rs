@@ -404,6 +404,67 @@ fn llm_answers() {
     }
 }
 #[test]
+fn llm_input_rule_bounds() {
+    let rows = [
+        (json!([]), "inputs: must be non-empty"),
+        (json!((0..17).map(|_| json!({"cue":"", "turn":0})).collect::<Vec<_>>()), "inputs: past its bound"),
+        (json!([{"cue":"x".repeat(257),"turn":0},{"cue":"","turn":0}]), "inputs[0].cue: past its bound"),
+        (json!([{"cue":"é".repeat(129),"turn":0},{"cue":"","turn":0}]), "inputs[0].cue: past its bound"),
+        (json!([{"cue":"x","turn":0}]), "inputs[0].cue: only the last rule must have an empty cue"),
+        (json!([{"cue":"","turn":0},{"cue":"x","turn":0}]), "inputs[0].cue: only the last rule must have an empty cue"),
+        (json!([{"cue":"","turn":0},{"cue":"","turn":0}]), "inputs[0].cue: only the last rule must have an empty cue"),
+        (json!([{"cue":"","turn":2}]), "inputs[0].turn: must index this script's turns"),
+        (json!([{"cue":"","turn":-1}]), "inputs[0].turn: past its bound"),
+        (json!([{"cue":"","turn":0,"extra":1}]), "inputs[0].extra: unknown member"),
+        (json!([{"turn":0}]), "inputs[0].cue: missing"),
+        (json!([{"cue":""}]), "inputs[0].turn: missing"),
+    ];
+    for group in ["cued", "asked"] {
+        for (inputs, expected) in &rows {
+            let mut doc = llm_document();
+            doc[group] = json!([{"cue":"script", "turns":["first","second"], "inputs":inputs}]);
+            let refused = llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap_err();
+            assert_eq!(refused.line().as_ref(), format!("{group}[0].{expected}\n").as_bytes());
+        }
+    }
+    let mut doc = llm_document();
+    doc["otherwise"] =
+        json!([{"lines":[{"text":"fallback"}],"finish":"stop","tokens":2,"inputs":[{"cue":"","turn":0}]}]);
+    assert_eq!(
+        llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap_err().line().as_ref(),
+        b"otherwise[0].inputs: unknown member\n",
+    );
+}
+
+#[test]
+fn llm_input_rules_play_the_selected_turn() {
+    // Both group indices retain their own table; absent inputs still count.
+    for group in ["cued", "asked"] {
+        let mut doc = llm_document();
+        let mut inputs = vec![json!({"cue":"é".repeat(128),"turn":1})];
+        inputs.extend((0..14).map(|i| json!({"cue":format!("unused {i}"),"turn":0})));
+        inputs.push(json!({"cue":"","turn":0}));
+        doc[group] = json!([
+            {"cue":"counted", "turns":["counted answer"]},
+            {"cue":"script", "turns":["default answer","selected answer"], "inputs":inputs},
+        ]);
+        let doc = llm::Document::decode(&serde_json::to_vec(&doc).unwrap()).unwrap();
+        for (cue, request, expected) in [
+            ("script", "é".repeat(128), "selected answer"),
+            ("script", "other".into(), "default answer"),
+            ("counted", "other".into(), "counted answer"),
+        ] {
+            let query = if group == "cued" {
+                query(cue.as_bytes(), request.as_bytes())
+            } else {
+                query(b"", format!("{cue} {request}").as_bytes())
+            };
+            assert_eq!(answer(&doc, 23, query).parts.as_ref(), &[api::Part::Text { text: expected.as_bytes().into() }]);
+        }
+    }
+}
+
+#[test]
 fn seeded_credentials() {
     let doc = llm::Document::decode(&serde_json::to_vec(&llm_document()).unwrap()).unwrap();
     let mut previous = alloc::collections::BTreeSet::new();
