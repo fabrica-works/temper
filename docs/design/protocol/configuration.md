@@ -349,10 +349,9 @@ under; it must be the `number` of one of `engine.charters`. Feeds
 **`setup`:** the forges' setup, a list of at most one entry per forge,
 `[]` for none, and never missing (section 10). Its members, their bounds
 and the checks of the forge's own members against each entry are
-setup.md, section 8's. An owned forge's orgs are its person's,
-`mode.owned.person.orgs`, which reconcile makes when missing; a setup
-names no other orgs (the code still takes an owned entry's older `orgs`
-in their place, never both, until temper-15: setup.md, section 8).
+setup.md, section 8's. An owned entry names no org: its org is its
+first repository's, which the set up makes (setup.md, 6.7), and
+reconcile makes none.
 `temper serve` checks it whole, and the engine's setup host reconciles
 each managed and owned forge at each start, and an owned forge whose setup says `"start": "asked"` once the box has
 started it (setup.md, 7.1; the setup host in the engine). A fake forge
@@ -599,7 +598,7 @@ have one, an engine alone none. Each:
   | `forge_component.log_catch_up_ms` | `log_catch_up` (default 24 h): how far back the delivery log is read when a forge starts again within one process (skein's `forge-connection.md`, 6.5); at most a day, the log's own reach. temper keeps no `guid` across process starts: a process's first read of a forge's log keeps the newest and reads nothing back, and skein's forge client reads each adopted repository afresh at restart |
   | `forge_component.log_pages` | the pages one read of the delivery log takes (default 10) |
   | `forge_component.delivery_bytes` | a delivery read from the log (default 1 MiB) |
-  | `setup.orgs` | a setup's org list: Owned names exactly one of `orgs` (until temper-15) and `mode.owned.person.orgs` |
+  | `setup.orgs` | a managed entry's `orgs` (until temper-15); an owned entry names none |
   | `setup.deadline_ms` | a setup plan's run, its wait for the forge among it |
   | `setup.backoff_ms`, `setup.backoff_max_ms` | a setup plan's first request made again, doubling |
   | `setup.states` | the setup host's states, held in memory, for the manifest's and the installation's returns |

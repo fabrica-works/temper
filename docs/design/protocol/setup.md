@@ -77,7 +77,7 @@ section 16; connecting GitHub, section 17.
   client asks for its setup (8.3, 7.1).
 - **Reconcile converges at every start** of a managed or owned Forgejo,
   in the engine: the bot user, made when missing and otherwise checked,
-  never edited; its two tokens; an owned forge's person's orgs; and each
+  never edited; its two tokens; and each
   adopted repository's access, the bot a collaborator with write and the
   repository's hook; each made when missing, repaired when changed, and
   left alone otherwise (section 5).
@@ -118,7 +118,7 @@ section 16; connecting GitHub, section 17.
 |---|---|---|---|---|
 | Runs the forge and CI's runner | the person | the person | temper | temper: its fake forge, `temper fake forge`, whose CI answers each push itself; no runner |
 | Makes temper's bot, its tokens, its access and the webhooks | the person | temper: on Forgejo with a site admin's token; on GitHub, an App from temper's manifest | temper, with an admin it makes | temper, with the admin the fake is seeded with |
-| temper is given, on Forgejo | the bot's two tokens, pasted; optionally a webhooks' secret | a site admin's token, pasted | the Forgejo and runner binaries, or `"fetched"` for temper's (6.6); an address on loopback; the person's login, email and orgs | an address on loopback; the seed's owner and repositories |
+| temper is given, on Forgejo | the bot's two tokens, pasted; optionally a webhooks' secret | a site admin's token, pasted | the Forgejo and runner binaries, or `"fetched"` for temper's (6.6); an address on loopback; the person's login and email | an address on loopback; the seed's owner and repositories |
 | temper is given, on GitHub | an App's id and its private key, pasted | the person's steps in their browser, from a link temper prints | none: GitHub is never owned | none: the fake is a Forgejo |
 
 - **Fake is owned's layers,** with temper's fake forge in place of
@@ -378,7 +378,7 @@ otherwise nothing but the setup host runs it or writes what it makes.
   | the forge's number | the forge's `number` (configuration.md, section 3) |
   | the bot's login and email | the setup's `bot.login` and `bot.email` (section 8); at a connect as its admin of a forge connected before, the connected user's login (5.5) |
   | the tokens' names | `temper-api` for the API's, `temper-git` for git's |
-  | the orgs, and their owner | `mode.owned.person.orgs` and `mode.owned.person.login` when owned (6.5); none when managed or fake |
+  | the orgs, and their owner | none: reconcile makes no org; an owned forge's org is its first repository's, made by `Create` (6.7) |
   | the repositories | the forge's adopted repositories, the root's, restored before the start's reconcile |
   | the name a failure gives the admin | `temper-admin` |
   | the listener's address | `application.webhooks.listener`'s, when configured; none otherwise. Each hook's URL, `http://<address>/hooks/<number>`, is derived from it (skein's `forge-setup.md`, 4.1) |
@@ -474,7 +474,7 @@ otherwise nothing but the setup host runs it or writes what it makes.
 - **Inputs:** the Forgejo binary, and the runner's, or no runner, each
   an absolute path or `"fetched"`, temper's pinned build in the cache
   (6.6); the address Forgejo listens on, a socket address on loopback;
-  the person's login, email and orgs; the runner's labels, capacity and
+  the person's login and email; the runner's labels, capacity and
   `PATH`; the forge's directory.
 - **The binaries are checked** by every command that runs them: the
   first line of each one's version equal to temper's pin, Forgejo's and
@@ -679,9 +679,8 @@ files: at a first preparation, and for a runner older than its pin
   `temper forge reconcile` remains a command for those forges alone.
   A records-only owned or fake entry is refused: "forge N starts from
   its records: `temper serve` takes its handover".
-- **Then reconcile runs as managed's** (section 5), and makes each of
-  the person's orgs that is missing, owned by the person (`POST
-  /api/v1/admin/users/{person}/orgs`).
+- **Then reconcile runs as managed's** (section 5), and makes no org:
+  the set up's org is its first repository's, made by `Create` (6.7).
 - **Then the first repository,** at the box's `started`, when the set
   up asked for one (6.7): `Create`, before the forge's connect.
 - **A forge not prepared,** with neither a handover nor an `AdminToken`
@@ -1071,8 +1070,7 @@ running its commands, and the client names them (6.5).
                   "labels": ["temper-host:host"], "capacity": 1,
                   "path": "/usr/local/bin:/usr/bin:/bin"},
        "listen": {"socket": "127.0.0.1:3000"},
-       "person": {"login": "ada", "email": "ada@example.invalid",
-                  "orgs": ["work"]}}}},
+       "person": {"login": "ada", "email": "ada@example.invalid"}}}},
     {"forge": 3, "directory": "demo/forge",
      "bot": {"login": "temper", "email": "temper@example.invalid"},
      "mode": {"fake": {
@@ -1094,18 +1092,18 @@ running its commands, and the client names them (6.5).
   | `owned.mirror` | absent, or `{"forgejo", "runner"}`, each an origin | each `https://HOST` or `https://HOST:PORT`, no path: where `temper forge fetch` asks for the pinned paths (6.6) |
   | `owned.runner` | the runner's members, or null for none | `capacity` at least 1; `labels` at least one, at most 8 |
   | `owned.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned and fake forges |
-  | `owned.person` | `{"login", "email", "orgs"}` | a Forgejo login other than the bot's and `temper-admin`; `orgs` at least one, at most `setup.orgs`, each a Forgejo org name |
+  | `owned.person` | `{"login", "email"}` | a Forgejo login other than the bot's and `temper-admin` |
   | `fake.listen` | an address, jig's format | as `owned.listen` |
   | `fake.git` | a data path | the demo's git, a link to `temper fake git` (8.2, 8.4): the program the engine names in each of the forge's repositories' records, for the worker to spawn in place of `workers[].git` (channel.md, section 4) |
   | `fake.owner` | a Forgejo login | other than the bot's and `temper-admin`: the user who owns the fake's repositories |
   | `fake.repositories` | a list of `{"name", "landing"}` | at least 1, at most 8, each `name` a Forgejo repository name, unique ignoring ASCII case as Forgejo's are, and `landing` a branch name; their contents are `temper-fake`'s (8.4) |
 
-  The code reads an owned entry's orgs from `person.orgs`, and still
-  takes the entry's own `orgs`, the older form, in their place, never
-  both; a managed entry keeps its `orgs` and a fake entry has none,
-  until the entry's form is brought to this table (temper-15). The set
-  up's org is made by its first repository's `Create` (6.7), whether or
-  not `person.orgs` names it; `person.orgs` goes (section 15).
+  An owned entry names no org: its org is its first repository's,
+  made by `Create` (6.7). An owned entry that still gives
+  `person.orgs`, or the entry's own older `orgs`, is refused as an
+  unknown member, naming its path. A managed entry keeps its `orgs`,
+  at least one and at most `setup.orgs`, and a fake entry has none,
+  until the entry's form is brought to this table (temper-15).
 
 - **A Forgejo with no `setup` entry** is connected's alone; GitHub takes
   no entry (section 17).
@@ -2516,13 +2514,15 @@ it checks of this document:
   connected and `playground/widget` adopted into project 1. The owner sends
   "Add CSV export to widget" to the project's chat, which runs on the
   demo model with no pick (8.3); the chat's last message says the
-  change landed, its delegated task ended landed, and the test's own
-  clone of `playground/widget` by the demo's link, run as the worker runs
-  git, holds `main` one commit past the seeded head, its `src/main.rs`
-  the coding agent's edit (8.4). The test reads the one hook on
-  `playground/widget`, at the box's webhooks' listener, on the fake's API with
-  the handover's token, and prints each box run's time, asserting no
-  time. A delivery's acceptance is shown by
+  change landed, its delegated task ended landed, and the landed
+  change's merge commit, the id temper's own read of the change gives,
+  holds on the fake the seeded head as its first parent and the seeded
+  files with `src/main.rs` the coding agent's edit (8.4): the test reads
+  the commit's tree, file bytes and parents by the fake's `POST
+  /.fake/git/objects` (skein's `fake-forge.md`), which takes no token,
+  so the story reads no credential. The test prints each box run's
+  time, asserting no time. It reads no hook, since the fake's hook
+  read takes a token. A delivery's acceptance is shown by
   `tests/real-loop/tests/forge.rs`'s
   `a_forge_delivery_is_accepted_by_the_engines_listener`; its secret's
   matching is checked by the step tests. A second box on the same
@@ -2549,7 +2549,12 @@ it checks of this document:
   --until settled`, goes through "Setting up" and "Connecting" to
   "Connected as temper", with no restart, and its first repository made,
   `work/hello`; the call adopts it into project 1, "Default" (6.7). The
-  workflow's push has run on the owned runner. The owner's first task
+  workflow's push has run on the owned runner: before the owner's first
+  task, the runner's output, which the box gives on its stderr as
+  `runner 3: ` lines, says it took a task on `work/hello`, main's
+  push's, since no pull exists yet. It shows the run taken, not its
+  verdict: no read of temper's says CI at a repository's `main`, and
+  the story reads no credential. The owner's first task
   in the project, on the fake LLM, changes `hello`: its worker clones
   it, its pull's run of the starter workflow passes, and it lands; the
   test reads it all through temper's own reads, with no credential:
@@ -2571,9 +2576,7 @@ it checks of this document:
 
 Each is intended; what it needs is named with it.
 
-- **After the first repository** (6.7): the configuration's
-  `person.orgs` goes, since the set up's form picks the org, made once.
-  "New repository" on a connected owned or managed card is the general
+- **After the first repository** (6.7): "New repository" on a connected owned or managed card is the general
   form of the same flow, with the same fields and `Create`, a managed
   forge's org needing an owner. A new project, named in the form,
   waits on jig's projects at runtime (MakeProject); until jig carries
