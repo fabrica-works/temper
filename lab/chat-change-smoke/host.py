@@ -543,6 +543,24 @@ class Run:
         self.event('store_copy_complete')
         self.command('checks', next(c for c in self.exp['checks'] if c['name'] == 'promises'))
 
+    def check_processes(self):
+        for name, record in self.records.items():
+            panic = [f for f in self.failures if f['kind'] == 'panic' and f['signature'].startswith('panic/' + name + '/')]
+            failures, unknown = checks.process(name, record, panic)
+            end = record.get('exit')
+            # runner.checks.process deliberately permits requested stops. S has
+            # no planted kill: every service must exit zero on graceful stop.
+            # Keep the runner's panic classification and existing forced-kill
+            # cause (bound/survivor), rather than counting that kill twice.
+            kill_cause = end is not None and end['killed'] and any(
+                f['signature'] in ('bound/stop_seconds/' + name, 'survivor/' + name) for f in self.failures)
+            if end is not None and end['stopped'] and end.get('status') != 0 and not panic and not kill_cause:
+                reason = 'exit:' + str(end['status']) if 'status' in end else 'signal:' + end['signal']
+                failures.append(checks.failure('stop/' + name + '/' + reason, 'stop',
+                    'service did not exit zero after requested stop', ['proc/' + name + '/stderr']))
+            self.failures.extend(f for f in failures if f not in self.failures)
+            self.undecided.extend(unknown)
+
     def finish(self):
         if self.host is not None and not self.host.children:
             for name in ('observations', 'end-state', 'store'):
@@ -566,11 +584,7 @@ class Run:
                     pass
                 except BaseException as error:
                     self.errors.append(dict(what='freeze/' + name, detail=type(error).__name__))
-        for name, record in self.records.items():
-            panic = [f for f in self.failures if f['kind'] == 'panic' and f['signature'].startswith('panic/' + name + '/')]
-            failures, unknown = checks.process(name, record, panic)
-            self.failures.extend(f for f in failures if f not in self.failures)
-            self.undecided.extend(unknown)
+        self.check_processes()
         for i, failure in enumerate(self.failures):
             failure['id'] = 'failure-' + str(i + 1)
         if getattr(self, 'interrupted', None) is not None and not any(e['what'] == 'interrupted' for e in self.errors):

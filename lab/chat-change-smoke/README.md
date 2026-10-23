@@ -95,15 +95,19 @@ Before a run, join and review these contracts:
   fake writer's flush-before-reply contract. A checkpoint or story exit
   alone is insufficient; missing proof must stay unknown. Parent review of
   that argument and the case-2 contracts remains required before a run.
-- **Page owners:** canonical byte-copy assertions in
-  `lab/tests/unit/test_cluster_web.py::FilesTests` will need routing to
+- **Page copies, joined:** canonical byte-copy assertions in
+  `lab/tests/unit/test_cluster_web.py::FilesTests` cover
   `lab/cluster-web/{agent.json,llm.json,chat.txt,engine.json,w1.json,w2.json,experiment.json}`
   and its coding-file addition. The cluster-web → look-live copy chain in
-  `lab/tests/unit/test_look_live.py::FilesTests` must then follow, including
-  its inherited process contracts and added coding template. Those files
-  and tests are not changed or suppressed here.
+  `lab/tests/unit/test_look_live.py::FilesTests` follows, including its
+  inherited process contracts and coding template. The web bundle/browser
+  actions and look-live cue/charter-time overrides remain. These copies
+  inherit canonical QA at the current branch; case-2's forge, records-only
+  setup and fake-git process contracts still need propagation after that
+  canonical join. The removed startup link readiness also leaves the page
+  seed's old sign-in placeholder awaiting its owner's private-bootstrap join.
 
-Targeted verification on 2026-10-23, through `heavy`: 45 tests passed in
+Assembly verification at `32c1a95b4` on 2026-10-23, through `heavy`: 45 tests passed in
 0.357 s (10 assembly, 16 end-state, 5 ctl-output, 14 shell/canary). A separate
 six-test downstream file check took 0.007 s: the four look-live checks passed;
 `test_cluster_web.FilesTests.test_copies_and_engine_line` failed for

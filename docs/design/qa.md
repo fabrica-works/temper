@@ -151,7 +151,11 @@ forge    temper fake forge; ready "listening " → address
   native contained process trees. It owns the stream handling that
   removes the private link before any persistence. It does not use
   the runner's runtime for a linked run. The runner's driver and
-  campaign execution for H and P remain a separate prerequisite.
+  campaign execution for H and P remain a separate prerequisite. S requires
+  every service's requested graceful stop to exit zero; nonzero exits and
+  unexpected signals fail even with empty trees and successful checks.
+  Existing panic, survivor and forced-stop bound observations retain their
+  classifications and the existing stop allowances.
 
 ### 4.2 Its processes
 
@@ -282,7 +286,13 @@ S adds one action, `story`: `/bin/sh {experiment}/smoke/story` with
 through the wrapper: `chat --project 1 --key smoke-chat` with the words
 of 3.3; the chat's number from `done: task N, chat`; `wait task N
 --until ended --timeout 220`; `task N --tree`. It exits 0 only when the
-chat ended, which it does after its delegate's result (7.1).
+named chat has settled successfully after its delegate's result (7.1).
+Both documents must show its historical `result: Completed` (with optional
+report words), and the tree's root must agree with the document's settled
+phase. A generic `Ended` phase alone is insufficient: failed, cancelled,
+deleted and withdrawn endings fail the story. This reads the current text
+projection from `temper-client-tools`'s `jig/render/document/result_words.rs`;
+landing still requires the independent evidence of section 8.
 
 ## 6. The driver
 

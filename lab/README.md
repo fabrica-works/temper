@@ -38,7 +38,10 @@ file is provided. The wrapper rejects sign-in URLs as its trusted prefix.
 The story asks for NOTICE, reads its created task number, waits for ended
 with timeout 220 and reads the task tree. Seed waits are 200; the approved
 cost class is ready120/command240/stop20. No new budget or polling schedule
-is introduced. Ended can include failure and never establishes landing.
+is introduced. Both reads require the chat's successful historical result
+and the tree must show the same settled root phase. Ended alone can include
+failure and never establishes landing. S also requires every service to
+exit zero after requested stop, retaining its existing stop allowances.
 The independent live check reads observations and C/P objects; the promises
 check reads an engine store copy only after engine exit and empty trees.
 See [checks/README.md](chat-change-smoke/checks/README.md) for its existing
