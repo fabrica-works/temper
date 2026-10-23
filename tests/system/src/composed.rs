@@ -718,6 +718,7 @@ impl World {
             | engine::Request::Connect { .. }
             | engine::Request::Install { .. }
             | engine::Request::EraseCarried { .. }
+            | engine::Request::StopGroup { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Return { .. }
             | engine::Request::Setup { .. }
@@ -756,6 +757,7 @@ impl World {
             | engine::Request::Connect { .. }
             | engine::Request::Install { .. }
             | engine::Request::EraseCarried { .. }
+            | engine::Request::StopGroup { .. }
             | engine::Request::SetUp { .. }
             | engine::Request::Return { .. }
             | engine::Request::Setup { .. }

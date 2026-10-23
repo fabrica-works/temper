@@ -341,6 +341,7 @@ pub fn incoming(
         | engine::Request::Connect { .. }
         | engine::Request::Install { .. }
         | engine::Request::EraseCarried { .. }
+        | engine::Request::StopGroup { .. }
         | engine::Request::SetUp { .. }
         | engine::Request::Return { .. }
         | engine::Request::Setup { .. }

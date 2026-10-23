@@ -165,7 +165,9 @@ fn first_other_connection_ends_once_from_none_or_running_and_answers_held_starts
             assert_eq!(d.demo_state(), Some(DemoState::Ended));
             assert!(d.forge_ended(1));
             assert!(!d.forge_ended(2));
-            assert_eq!(d.forges().rows.iter().map(|row| row.number).collect::<Vec<_>>(), [2]);
+            let forges = d.forges();
+            let [forge] = forges.rows.as_ref() else { panic!("only the other forge remains listed") };
+            assert_eq!(forge.number, 2);
             assert_eq!(d.offer(1), Offer::NotOffered);
             if running {
                 assert!(sent.contains(&Request::ApplicationDone { request: Token::new(1), token: Token::new(101) }));
@@ -267,10 +269,14 @@ fn an_ended_home_does_not_prevent_a_new_home_adoption() {
     );
     let sent = outputs(&mut d, Event::Adopt { request: Token::new(4) });
     assert!(sent.is_empty());
-    assert!(ready(&mut d).iter().any(|r| matches!(
-        r,
-        Request::Call { op: skein_forge::api::Op::Read(skein_forge::api::Read::Permission { .. }), .. }
-    )));
+    let mut permission = false;
+    for request in ready(&mut d).as_ref() {
+        if let Request::Call { op: skein_forge::api::Op::Read(skein_forge::api::Read::Permission { .. }), .. } = request
+        {
+            permission = true;
+        }
+    }
+    assert!(permission);
     assert_eq!(d.application_outcome(Token::new(104)), None);
 }
 
