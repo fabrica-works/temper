@@ -229,30 +229,7 @@ impl FakeForge {
             if let fake::Request::Reply { to, result } = request {
                 let call = to.into_token();
                 let Some(pending) = self.pending.remove(&call) else { continue };
-                if let (
-                    api::Op::Read(api::Read::Statuses { commit, .. } | api::Read::Checks { commit }),
-                    Ok(raw::Answer::Statuses(statuses)),
-                ) = (&pending.op, &result)
-                    && self
-                        .domain
-                        .branches(b"org/repo")
-                        .iter()
-                        .any(|(branch, head)| branch.as_ref() != b"main" && translate::commit(*head) == *commit)
-                {
-                    let mut resource = observations::repository();
-                    resource.path.extend([b"branch".to_vec(), b"main".to_vec()]);
-                    self.new_observations.borrow_mut().push(r::Observed::Read {
-                        resource,
-                        state: if !statuses.is_empty()
-                            && statuses.iter().all(|status| status.state == raw::Check::Passed)
-                        {
-                            Some(observations::value(commit))
-                        } else {
-                            None
-                        },
-                        at: clock.now,
-                    });
-                }
+                self.observe_ci(clock, &pending.op, &result);
                 let key = pending.effect.as_ref().map(|(key, ..)| *key);
                 if let Some((key, write, copy, before)) = pending.effect {
                     let (kind, resources, condition, target) = raw_parts(&write);
@@ -307,6 +284,46 @@ impl FakeForge {
         self.domain.reclaim();
         events
     }
+    // The referee's CI evidence comes from the native answer, including the
+    // pull read that supplies CI when no contexts require a separate head read.
+    fn observe_ci(&self, clock: Clock, op: &api::Op, result: &Result<raw::Answer, raw::Error>) {
+        let (commit, passed) =
+            if let (api::Op::Read(api::Read::Statuses { commit, .. }), Ok(raw::Answer::Statuses(statuses))) =
+                (op, result)
+            {
+                (*commit, !statuses.is_empty() && statuses.iter().all(|status| status.state == raw::Check::Passed))
+            } else if let (api::Op::Read(api::Read::Checks { commit }), Ok(raw::Answer::Checks(checks))) = (op, result)
+            {
+                (*commit, !checks.is_empty() && checks.iter().all(|check| check.status.state == raw::Check::Passed))
+            } else if let (
+                api::Op::Read(api::Read::Pull { .. } | api::Read::PullFor { .. }),
+                Ok(raw::Answer::Pull(pull)),
+            ) = (op, result)
+            {
+                (
+                    translate::commit(pull.commit),
+                    !pull.statuses.is_empty() && pull.statuses.iter().all(|status| status.state == raw::Check::Passed),
+                )
+            } else {
+                return;
+            };
+        if !self
+            .domain
+            .branches(b"org/repo")
+            .iter()
+            .any(|(branch, head)| branch.as_ref() != b"main" && translate::commit(*head) == commit)
+        {
+            return;
+        }
+        let mut resource = observations::repository();
+        resource.path.extend([b"branch".to_vec(), b"main".to_vec()]);
+        self.new_observations.borrow_mut().push(r::Observed::Read {
+            resource,
+            state: passed.then(|| observations::value(&commit)),
+            at: clock.now,
+        });
+    }
+
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "all observations are retained while branch ownership uses only movement and deletion"
