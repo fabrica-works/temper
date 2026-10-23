@@ -480,6 +480,7 @@ impl World {
             answered: Box::new([]),
             assignment: host::RunAssignment {
                 identity: [7; 16],
+                live: host::LiveAsk::NONE,
                 run: RUN,
                 attempt: ATTEMPT,
                 workspace: Some(host::Workspace { workstream: WORKSTREAM, items: Token::new(0) }),

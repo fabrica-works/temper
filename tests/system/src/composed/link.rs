@@ -48,6 +48,7 @@ pub fn assignment(assignment: &engine::Assignment) -> (host::Assignment, wire::W
         messages: messages(&assignment.messages),
         assignment: host::RunAssignment {
             identity: identity(assignment.task, assignment.conversation),
+            live: assignment.live,
             run: Token::new(assignment.task),
             attempt: Token::new(assignment.attempt),
             workspace,

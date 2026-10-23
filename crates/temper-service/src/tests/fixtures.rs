@@ -559,6 +559,7 @@ pub fn assignment_with_settings(
         task: 7,
         attempt: 2,
         conversation: 2,
+        live: jig_domain_host::LiveAsk::NONE,
         charter: 1,
         run: Box::new(temper_engine_domain::RunCharter {
             ended_by: jig_domain_tasks::EndedBy::Result,

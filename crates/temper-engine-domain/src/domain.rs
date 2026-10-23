@@ -71,6 +71,7 @@ pub struct Domain {
     pub(crate) work: Queue<Work>,
     pub(crate) facts: Queue<Fact>,
     pub(crate) facts_lost: u64,
+    pub(crate) pieces_dropped: u64,
 }
 
 impl Domain {
@@ -308,6 +309,7 @@ impl Domain {
             work: Queue::with_capacity(route_bound(limits).expect("valid routes")),
             facts: Queue::with_capacity(crate::limits::FACTS),
             facts_lost: 0,
+            pieces_dropped: 0,
             config: root_config,
             limits: *limits,
         })
@@ -382,6 +384,13 @@ impl Domain {
     /// The oldest of the root's own facts not drained yet.
     pub fn pop_fact(&mut self) -> Option<Fact> {
         self.facts.pop()
+    }
+
+    /// Live pieces dropped for an unkept kind or an offset beyond the views' u32
+    /// (jig's `domain/hosts.md`, 6.5; `domain/engine.md`, 11).
+    #[must_use]
+    pub const fn pieces_dropped(&self) -> u64 {
+        self.pieces_dropped
     }
 
     /// How many of the root's own facts were dropped for want of room.

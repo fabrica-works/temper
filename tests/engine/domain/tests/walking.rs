@@ -189,6 +189,7 @@ fn walking_referee_rejects_wrong_task_or_uncommitted_or_duplicate_assignment() {
         task: task.number,
         attempt: task.attempt,
         conversation: task.attempt,
+        live: jig_domain_host::LiveAsk::NONE,
         charter: 1,
         run: Box::new(engine::RunCharter {
             ended_by: jig_domain_tasks::EndedBy::Result,
