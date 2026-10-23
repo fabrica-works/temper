@@ -380,7 +380,9 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   its watch's end because it ended. For `task N`, completion is checked
   by the task's number and terminal phase as below; its answer says
   how it ended.
-- **`wait task N --until ended` watches first.** A watch on a subject
+- **A task wait whose condition a terminal task can hold watches first.**
+  These conditions are `ended` and `replied`; terminal `phase:<phase>`
+  conditions are usage errors as above. A watch on a subject
   that has ended is refused `Unknown` (jig's
   `client/domain/contract.md`, sections 6 and 7.2). On that opening
   refusal or `SubjectEnded`, the tool reads N through the existing
@@ -389,17 +391,23 @@ wait SUBJECT [--since DIGEST] [--until CONDITION] [--timeout DURATION]
   is N and its phase is terminal. `Unknown` alone never means success.
   A nonterminal or wrong-number result fails visibly; it cannot succeed or
   leave the wait hanging. A valid terminal uses the ordinary result
-  renderer. Unknown, hidden or forgotten history keeps status 2;
+  renderer and meets the wait when its condition holds on that task;
+  otherwise it answers not met, `ended`, exit 3, with the final document
+  and its digest. Unknown, hidden or forgotten history keeps status 2;
   Busy, sign-out and read failures keep their ordinary statuses (6.3).
   The read follows the watch, so the engine's retained-load durability
-  barrier leaves no gap at live retirement. This adds no retry or
-  timer policy and changes no other condition or run/tree wait.
+  barrier leaves no gap at live retirement. Conditions no terminal task
+  holds (`held`, `waiting-on-me` and live phases) take no terminal read:
+  `SubjectEnded` answers not met with the last document and its digest,
+  and an opening `Unknown` keeps status 2. Run/tree waits retain their
+  watch-based completion; there is no additional retry or timer policy.
 - **`--timeout`:** 300 seconds by default, at most 3600; answered with
   the current document, its digest, and that the condition is not met
   (6.3).
 - **A watch that ends under a wait** (jig's `client/domain/contract.md`,
   7.2) answers it: met where the condition is `ended` and the subject
-  ended, with `task N` first requiring the matching terminal read above;
+  ended. For `task N`, `ended` and `replied` first require the matching
+  terminal read above and answer according to the condition on that task;
   refused where the party may no longer see the subject; failed
   where the sign-in ended; otherwise, not met, with the last document
   and its digest (6.3). An engine that stops ends no watch: jig's
