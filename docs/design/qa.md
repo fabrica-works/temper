@@ -235,8 +235,8 @@ stay outside configuration directories (`protocol/configuration.md`, 12).
     `git` `{artifact.git}`, and agent `{artifact.temper}` with their
     own `config/agent.json`; secret/digest pairs match the canonical
     cluster registrations;
-  - a webhook listener on `127.0.0.1:0`, its actual bound address made
-    available to reconcile through the pending serve interface;
+  - a webhook listener on `127.0.0.1:0`, its actual bound address supplied to
+    setup before reconcile creates a hook;
     the clients' listener `127.0.0.1:0`, no bundle; `demo` null.
     Keep temper's existing polling fallback; add no experiment polling
     loop or shortened polling schedule as a delivery substitute.
@@ -634,7 +634,7 @@ through the director.
 | the git route's `objects` (skein's `fake-forge.md`, section 4) | skein's fake forge | 8.4 |
 | TLS on the fake LLM with skein's test root, and the root's file to trust | first-run | M1; no plaintext variant |
 | fake forge deliveries across processes to the hook registered on serve's bound webhook address | first-run | M1's story |
-| serve's actual bound webhook address available to reconcile (serve reconciling a fake forge at its start, from its handover and records, is built: forgejo-setup's M4), after which the fake forge joins `lab/cluster/` (`protocol/README.md`, 15.5); its listeners' ready lines, `listening <listener> <address>` on stderr (`protocol/README.md`, 15.3), are built, the webhooks' address from skein's 14h (skein's `forge-connection.md`, 6.4) | serve's CLI owner, routed from QA's S2 by the director | delivery readiness; the cluster's fake forge |
+| **Met:** serve reconciles a fresh fake forge from its handover and records at start, and supplies its actual bound webhook address before setup creates hooks; its listeners print `listening <listener> <address>` on stderr (`protocol/README.md`, 15.3). The fake forge's integration into `lab/cluster/` remains the cluster's (`protocol/README.md`, 15.5). | serve's CLI and forge setup owners | delivery readiness; the cluster's fake forge |
 | fake-owned key/token derivation from decimal u64 seeds and 0600 output files named by the experiment; exact interfaces | first-run, director 253's default | seed, setup handover; runner invents no bytes |
 | `wait forges --until connected:1` (area 6) | github | the seed, as the demo's |
 | serve's link on its stdout, or a private channel for it | the director (the serve survey) | the seed's sign-in |
