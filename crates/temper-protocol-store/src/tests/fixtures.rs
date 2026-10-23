@@ -140,7 +140,7 @@ fn client_key(random: &mut Rng) -> skein_forge_client::Key {
 #[expect(clippy::disallowed_macros, reason = "property inputs number canonical member addresses")]
 pub fn key(random: &mut Rng) -> top::Key {
     let number = random.next_u64();
-    match random.below(19) {
+    match random.below(20) {
         0 => top::Key::Call(top::NamedCall {
             task: number,
             attempt: random.next_u64(),
@@ -164,7 +164,8 @@ pub fn key(random: &mut Rng) -> top::Key {
         15 => top::Key::Application(number),
         16 => top::Key::Writer(u16::try_from(random.below(65_536)).expect("u16")),
         17 => top::Key::Demo(u16::try_from(random.below(65_536)).expect("u16")),
-        _ => top::Key::Binding(alloc::format!("member{number}@example.com").into_bytes().into_boxed_slice()),
+        18 => top::Key::Binding(alloc::format!("member{number}@example.com").into_bytes().into_boxed_slice()),
+        _ => top::Key::DemoAct([u8::try_from(random.below(256)).expect("byte"); 16]),
     }
 }
 pub fn core_keys() -> [jig_domain_core::Key; 4] {
@@ -521,7 +522,7 @@ pub fn answers_without_item_pieces() -> [skein_forge::api::Answer; 19] {
         Answer::Located { repository: 27 },
     ]
 }
-pub fn encoded(value: &crate::v8::Error) -> Box<[u8]> {
+pub fn encoded(value: &crate::v9::Error) -> Box<[u8]> {
     let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("measured error length"));
     value.encode(&mut writer).expect("measured room");
     writer.finish()
@@ -573,13 +574,13 @@ pub fn item_answers() -> [skein_forge::api::Answer; 3] {
         Answer::Reviews { reviews: Box::new([review(), review()]), more: true },
     ]
 }
-pub fn encoded_row(row: &crate::v8::Row) -> Box<[u8]> {
+pub fn encoded_row(row: &crate::v9::Row) -> Box<[u8]> {
     let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).expect("measured row length"));
     row.encode(&mut writer).expect("measured room");
     writer.finish()
 }
-pub fn item_piece_row(items: Box<[u8]>) -> crate::v8::Row {
-    use crate::v8 as w;
+pub fn item_piece_row(items: Box<[u8]>) -> crate::v9::Row {
+    use crate::v9 as w;
     let answer = w::Answer::Items(
         w::ItemsAnswer::new(&w::CEILINGS, w::ItemsAnswerParts { items, more: false, now: 1 }).expect("piece ceiling"),
     );

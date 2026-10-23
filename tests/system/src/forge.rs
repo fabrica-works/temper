@@ -81,6 +81,8 @@ impl World {
                 limits.brief.budgets.ci = 384;
                 limits.brief.brief_bytes = 768;
                 limits.tasks.tasks = 12;
+                // The demo's end may select every live task (temper's `worst_case`).
+                limits.forge.tasks = limits.tasks.tasks;
                 limits.tasks.project_tasks = 12;
                 limits.tasks.delegates = 4;
                 limits.tasks.tree_tasks = 12;

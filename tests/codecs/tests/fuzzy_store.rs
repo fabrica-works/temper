@@ -26,7 +26,7 @@ fn key(bytes: &[u8]) {
 fn golden(bytes: &[u8], bounds: &Bounds) {
     record(bytes, bounds);
     // Value's goldens hold each family; prepend Row's version to reach its decoder.
-    let mut versioned = vec![0_u8, 8];
+    let mut versioned = vec![0_u8, 9];
     versioned.extend_from_slice(bytes);
     record(&versioned, bounds);
 }
@@ -39,11 +39,28 @@ fn row_and_key(row: &forge::Stored, rng: &mut Rng, bounds: &Bounds) {
     key(&bytes);
     key(&temper_codecs_world::mutated(rng, &bytes));
 }
+fn end_act(rng: &mut Rng, bounds: &Bounds) {
+    let act = if rng.below(2) == 0 {
+        forge::DemoActKind::Close {
+            project: u32::try_from(rng.below(u64::from(u32::MAX))).expect("u32"),
+            task: rng.next_u64(),
+        }
+    } else {
+        forge::DemoActKind::RemoveAccount { account: u32::try_from(rng.below(u64::from(u32::MAX))).expect("u32") }
+    };
+    let row = forge::Stored::DemoAct(forge::DemoAct { key: [u8::try_from(rng.below(256)).expect("byte"); 16], act });
+    let bytes = records::encode(&row);
+    record(&bytes, bounds);
+    record(&temper_codecs_world::mutated(rng, &bytes), bounds);
+    let bytes = keys::encode(&forge::stored_key(&row), u32::MAX).expect("act key");
+    key(&bytes);
+    key(&temper_codecs_world::mutated(rng, &bytes));
+}
 #[test]
 fn store_decoders_never_panic_and_reencode_the_same() {
     let bounds = temper_protocol_store::bounds(&LIMITS).expect("fixture limits fit");
     let mut rng = Rng::new(0x7e3d_0405);
-    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v8");
+    let goldens = temper_codecs_world::goldens("crates/temper-protocol-store/golden/v9");
     for _ in 0..2_000 {
         let address = format!("member{}@example.com", rng.next_u64()).into_bytes().into_boxed_slice();
         let binding =
@@ -56,6 +73,7 @@ fn store_decoders_never_panic_and_reencode_the_same() {
             state: if rng.below(2) == 0 { forge::DemoState::Running } else { forge::DemoState::Ended },
         });
         row_and_key(&demo, &mut rng, &bounds);
+        end_act(&mut rng, &bounds);
         let writer = forge::Stored::Writer(skein_forge_client::Writer {
             forge: u16::try_from(rng.below(65_536)).expect("u16"),
             author: rng.next_u64().max(1),
