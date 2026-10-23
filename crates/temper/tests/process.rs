@@ -779,8 +779,8 @@ fn first_run(restart: bool) {
             support::person::demo_chat(
                 3,
                 b"Add a dark theme to widget",
-                b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the demo model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.",
-                b"The demo changes nothing.",
+                b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.",
+                b"The playground changes nothing.",
             ),
             temper_fake::seed::KEY_FOUND_LINE,
         ),

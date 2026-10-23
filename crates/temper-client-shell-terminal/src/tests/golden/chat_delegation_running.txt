@@ -19,7 +19,7 @@ Conversation:
   Add CSV export to widget
   Temper
   00:00
-  I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.
+  I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.
   Task 2:
     T2 · CHANGE
     * Running

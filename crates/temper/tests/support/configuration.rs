@@ -77,7 +77,7 @@ pub fn flags(directory: &Path) -> Vec<std::ffi::OsString> {
 pub fn fake_entry(entry: &mut serde_json::Value, listen: &str) {
     entry.as_object_mut().expect("setup entry").remove("orgs");
     entry["mode"] = serde_json::json!({"fake": {
-        "listen": {"socket": listen}, "git": "demo/bin/git", "owner": "demo",
+        "listen": {"socket": listen}, "git": "demo/bin/git", "owner": "playground",
         "repositories": [{"name": "widget", "landing": "main"}]
     }});
 }

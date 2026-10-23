@@ -23,7 +23,7 @@ pub(super) fn fixture() -> Value {
     }));
     d["application"]["setup"][0].as_object_mut().unwrap().remove("orgs");
     d["application"]["setup"][0]["mode"] = json!({"fake":{
-        "listen":{"socket":"127.0.0.1:3000"},"git":"demo/bin/git", "owner":"demo",
+        "listen":{"socket":"127.0.0.1:3000"},"git":"demo/bin/git", "owner":"playground",
         "repositories":[{"name":"widget","landing":"main"}]
     }});
     d["application"]["demo"] = json!({"llm":{
@@ -384,12 +384,12 @@ fn demo_answers_the_brief() {
     value["application"]["demo"]["llm"]["asked"] = json!([
         {"cue":"Add CSV export to widget","turns":[{
             "lines":[{"text":"Export CSV"},{"call":"finish","arguments":{
-                "form":"report","text":"The demo changes nothing.","fields":{}
+                "form":"report","text":"The playground changes nothing.","fields":{}
             }}],"finish":"tool_calls","tokens":3
         }]},
         {"cue":"Add a dark theme to widget","turns":[{
             "lines":[{"text":"Use dark colours"},{"call":"finish","arguments":{
-                "form":"report","text":"The demo changes nothing.","fields":{}
+                "form":"report","text":"The playground changes nothing.","fields":{}
             }}],"finish":"tool_calls","tokens":4
         }]}
     ]);
@@ -429,7 +429,7 @@ fn demo_answers_the_brief() {
             parts.push(Part::ToolCall {
                 id: b"call_0000000000000001".as_slice().into(),
                 name: b"finish".as_slice().into(),
-                arguments: br#"{"fields":{},"form":"report","text":"The demo changes nothing."}"#.as_slice().into(),
+                arguments: br#"{"fields":{},"form":"report","text":"The playground changes nothing."}"#.as_slice().into(),
             });
         }
         assert_eq!(answer.parts.as_ref(), parts.as_slice(), "{name}");
@@ -499,16 +499,16 @@ fn call(answer: &api::Answer, name: &[u8]) -> Value {
 fn the_csv_chat_delegates_waits_and_reports_landing_before_waiting_again() {
     let answers = answers(CHAT, RESUMED_CHAT, 3);
     assert_eq!(answers[0].parts.len(), 2);
-    assert_eq!(answers[0].parts[0], Part::Text { text: "I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes().into() });
+    assert_eq!(answers[0].parts[0], Part::Text { text: "I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.".as_bytes().into() });
     let delegate = call(&answers[0], b"delegate");
     assert_eq!(delegate["batch"][0]["executor"], json!({"kind":"procedure","connector":1,"code":2}));
     assert_eq!(delegate["batch"][0]["spec"]["words"], "Export widget's table as CSV");
     assert_eq!(answers[1].parts.len(), 1);
     assert_eq!(call(&answers[1], b"wait"), json!({}));
     assert_eq!(answers[2].parts.len(), 2);
-    assert_eq!(answers[2].parts[0], Part::Text { text: "CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes().into() });
+    assert_eq!(answers[2].parts[0], Part::Text { text: "CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.".as_bytes().into() });
     assert_eq!(call(&answers[2], b"wait"), json!({}));
-    assert_eq!(answers.iter().map(|a| a.usage.output).collect::<Vec<_>>(), [Some(256), Some(2), Some(30)]);
+    assert_eq!(answers.iter().map(|a| a.usage.output).collect::<Vec<_>>(), [Some(259), Some(2), Some(30)]);
 }
 
 #[test]
@@ -535,10 +535,10 @@ fn the_csv_coding_agent_reads_edits_and_finishes_the_change() {
         call(&answers[2], b"finish"),
         json!({"form":"change","fields":{
             "title":"Add CSV export to widget",
-            "body":"widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted demo change."
+            "body":"widget --csv prints the table as CSV: a header line, then a line for each row. This was a scripted change."
         }})
     );
-    assert_eq!(answers.iter().map(|a| a.usage.output).collect::<Vec<_>>(), [Some(7), Some(116), Some(48)]);
+    assert_eq!(answers.iter().map(|a| a.usage.output).collect::<Vec<_>>(), [Some(7), Some(116), Some(47)]);
 }
 
 #[test]

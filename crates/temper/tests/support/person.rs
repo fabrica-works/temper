@@ -185,11 +185,11 @@ pub fn demo_change() -> Script {
             Step::See { find: Find::exactly_named(Role::Paragraph, b"You").within(conversation()), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Paragraph, b"Add CSV export to widget").within(conversation()), within: START_WITHIN },
             Step::See {
-                find: Find::text("I’ll delegate this change in demo/widget. It will push a branch, open a pull request, check CI and land into main on Demo forge.".as_bytes()).within(conversation()),
+                find: Find::text("I’ll delegate this change in playground/widget. It will push a branch, open a pull request, check CI and land into main on Playground forge.".as_bytes()).within(conversation()),
                 within: START_WITHIN,
             },
             Step::See {
-                find: Find::text("CSV export is available from widget’s table. The change landed on Demo forge. This was a scripted demo change.".as_bytes()).within(conversation()),
+                find: Find::text("CSV export is available from widget’s table. The change landed on Playground forge. This was a scripted change.".as_bytes()).within(conversation()),
                 within: DEMO_LANDS_WITHIN,
             },
             // client/README.md, 5.4: the committed opening turn fits whole.

@@ -225,7 +225,7 @@ fn repository() -> d::Stored {
         home: true,
         provider: REPO,
         host: b"forge".as_slice().into(),
-        owner: b"demo".as_slice().into(),
+        owner: b"playground".as_slice().into(),
         name: b"widget".as_slice().into(),
         prefix: b"temper/".as_slice().into(),
         role: d::Role::Owned,
@@ -288,10 +288,10 @@ const BOUNDARY: &[u8] = b"{\"boundary\":{\"lines\":1,\"lost\":0}}\n";
 const TWO_LINES: &[u8] = b"{\"boundary\":{\"lines\":2,\"lost\":0}}\n";
 const PROFILE: &[u8] = b"{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":0}},\"decisions_complete\":true}\n";
 const DECIDED_PROFILE: &[u8] = b"{\"profile\":{\"client\":7,\"marker\":[\"<!-- temper:key \",\" -->\\n\"],\"owned_branches\":[\"temper/\"],\"allowed\":[\"comment\",\"merge\",\"close\"],\"bounds\":{\"objects\":256,\"decisions\":1}},\"decisions_complete\":true}\n";
-const DECISION: &[u8] = b"{\"decision\":{\"repository\":\"demo/widget\",\"number\":1,\"head\":2}}\n";
-const MERGE: &[u8] = b"{\"observation\":\"merged\",\"repository\":\"demo/widget\",\"number\":1,\"base\":\"main\",\"head\":2,\"commit\":3,\"by\":7}\n";
+const DECISION: &[u8] = b"{\"decision\":{\"repository\":\"playground/widget\",\"number\":1,\"head\":2}}\n";
+const MERGE: &[u8] = b"{\"observation\":\"merged\",\"repository\":\"playground/widget\",\"number\":1,\"base\":\"main\",\"head\":2,\"commit\":3,\"by\":7}\n";
 const ORDER: &[u8] =
-    b"{\"fail\":\"promise/order/demo%2Fwidget/1/2\",\"summary\":\"a merge with no decision at its head\"}\n";
+    b"{\"fail\":\"promise/order/playground%2Fwidget/1/2\",\"summary\":\"a merge with no decision at its head\"}\n";
 const INVALID_DOCUMENT: &[u8] = b"temper fake forge check: engine: missing\ntemper fake forge check: workers: missing\ntemper fake forge check: application: missing\n";
 fn expected(status: u8, stdout: &[u8], stderr: &[u8]) -> Outcome {
     Outcome { status, stdout: stdout.into(), stderr: stderr.into() }
@@ -321,10 +321,10 @@ fn verb() {
     let mut no_entry = document.clone();
     no_entry["application"]["setup"] = serde_json::json!([]);
     let mut managed = crate::tests::configuration::old_form_check_document(&root);
-    managed["application"]["setup"][0]["orgs"] = serde_json::json!(["demo"]);
+    managed["application"]["setup"][0]["orgs"] = serde_json::json!(["playground"]);
     managed["application"]["setup"][0]["mode"] = serde_json::json!({"managed":{"admin_token":"admin_token"}});
     let mut owned = crate::tests::configuration::old_form_check_document(&root);
-    owned["application"]["setup"][0]["orgs"] = serde_json::json!(["demo"]);
+    owned["application"]["setup"][0]["orgs"] = serde_json::json!(["playground"]);
     owned["application"]["setup"][0]["mode"] = serde_json::json!({"owned":{
         "forgejo":"/fixture/forgejo", "runner":null, "listen":{"socket":"127.0.0.1:9"},
         "person":{"login":"ada","email":"ada@example.test"}

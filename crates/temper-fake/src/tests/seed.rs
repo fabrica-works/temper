@@ -13,7 +13,7 @@ const ADOPT: &[&str] = &[
     "--project",
     "1",
     "--owner",
-    "demo",
+    "playground",
     "--name",
     "widget",
     "--landing",
@@ -162,7 +162,7 @@ fn plan() -> Plan {
     let fake = Fake {
         listen: "127.0.0.1:3000".parse().unwrap(),
         git: b"/data/demo/bin/git".as_slice().into(),
-        owner: b"demo".as_slice().into(),
+        owner: b"playground".as_slice().into(),
         repositories: Box::new([
             Repository { name: b"widget".as_slice().into(), landing: b"main".as_slice().into() },
             Repository { name: b"second".as_slice().into(), landing: b"trunk".as_slice().into() },
