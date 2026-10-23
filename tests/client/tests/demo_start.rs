@@ -137,7 +137,7 @@ fn add_model(front: &mut Joint, root: &mut Root) {
     go(
         front,
         root,
-        Address::ConnectModel { way: Some(d::ModelWay { provider: accounts::PROVIDER + 1, kind: d::WayKind::Key }) },
+        Address::ConnectModel { way: Some(d::ModelWay { source: None, provider: accounts::PROVIDER + 1, kind: d::WayKind::Key }) },
     );
     pump(front, root, d::Event::AccountKey { value: skein_lib::Secret::new(b"test-private-key".as_slice().into()) });
     press(front, root, b"Add key");
