@@ -149,35 +149,14 @@ pub fn visible(mut tree: skein_ui::Tree) -> skein_ui::Tree {
     tree
 }
 pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
-    copy_frame(source, false)
-}
-/// Keep the existing transcript goldens' frame fixed; live frame controls have their own assertion.
-pub fn golden_frame(source: &skein_ui::Tree) -> skein_ui::Tree {
-    copy_frame(source, true)
-}
-fn copy_frame(source: &skein_ui::Tree, historical: bool) -> skein_ui::Tree {
     let mut builder = skein_ui::Builder::new(&tree_limits());
     let mut open = Vec::new();
-    let mut skip = 0_usize;
     for (index, node) in source.nodes().iter().enumerate() {
         while open.last().is_some_and(|end| *end == index) {
             builder.close();
             open.pop();
         }
-        if index < skip {
-            continue;
-        }
-        if historical && node.role == skein_ui::Role::Link && node.name.as_deref() == Some(b"Forges") {
-            skip = index.checked_add(usize::try_from(node.size).expect("subtree fits")).expect("subtree end");
-            continue;
-        }
-        let connect =
-            historical && node.role == skein_ui::Role::Link && node.name.as_deref() == Some(b"Connect a forge");
-        builder.open(if connect { skein_ui::Role::Button } else { node.role });
-        if connect {
-            builder.state(skein_ui::State::Disabled);
-        }
-
+        builder.open(node.role);
         if let Some(region) = node.region {
             builder.region(region);
         }
@@ -196,14 +175,10 @@ fn copy_frame(source: &skein_ui::Tree, historical: bool) -> skein_ui::Tree {
         if let Some(value) = &node.value {
             builder.value(&value.text, value.written);
         }
-        if let Some(binding) = node.binding
-            && !connect
-        {
+        if let Some(binding) = node.binding {
             builder.bind(binding);
         }
-        if let Some(link) = node.link
-            && !connect
-        {
+        if let Some(link) = node.link {
             builder.link(link);
         }
         if let Some(external) = &node.external {

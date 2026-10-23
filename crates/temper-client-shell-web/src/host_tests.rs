@@ -265,8 +265,9 @@ mod memory_literal;
 // The flow's three state words (444 B).
 // The Accounts navigation's two state words (296 B).
 // ConnectForge's and the welcome's forge words and nodes, and 128 more phrase segments (77,364 B).
+// The Forges page, the setup strip and the dot's words (2,664 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388821447;
+const WEB_BYTES: u64 = 274388824111;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

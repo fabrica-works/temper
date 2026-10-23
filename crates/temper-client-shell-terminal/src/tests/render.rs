@@ -54,7 +54,7 @@ fn each_fixture_page_prints_as_its_golden_file() {
         ("every_role", fixtures::every_role()),
         ("control_text", fixtures::control_text()),
     ] {
-        let print = fixtures::print(&fixtures::golden_frame(&tree));
+        let print = fixtures::print(&tree);
         if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some() {
             std::fs::write(fixtures::golden(name), print.text.as_slice()).expect("write golden file");
         }

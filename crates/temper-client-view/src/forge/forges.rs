@@ -47,7 +47,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 b.style(look::FORGE_ROW);
                 b.name(&w.say(
                     Word::ForgePlaygroundSummary,
-                    &[Hole::Name(forge::words::lossy(&demo.owner)), Hole::Name(forge::words::lossy(&demo.name))],
+                    &[Hole::Name(demo.owner.clone()), Hole::Name(demo.name.clone())],
                 ));
                 account(b, w, row);
                 b.close();
@@ -56,11 +56,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     }
     b.close();
 }
-fn connection(w: &Words, row: &Row) -> Box<[u8]> {
+fn connection(row: &Row) -> Box<[u8]> {
     match &row.connection {
-        Connection::Connected { login, .. } => {
-            w.say(Word::ForgeRowConnected, &[Hole::Name(forge::words::lossy(login))])
-        }
+        Connection::Connected { login, .. } => forge::words::forge_connected_as(login),
         Connection::NotConnected
         | Connection::NotSetUp
         | Connection::SettingUp { .. }
@@ -77,9 +75,9 @@ fn personal(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, 
         Kind::Forgejo => Word::ForgeOther,
         Kind::GitHub => Word::ForgeGitHub,
     };
-    b.description(&w.say(
-        Word::ForgeSummary,
-        &[Hole::Number(u64::from(row.number)), Hole::Name(w.say(kind, &[])), Hole::Name(connection(w, row))],
+    b.description(&forge::words::forge_summary(
+        &w.say(Word::ForgeSummary, &[Hole::Number(u64::from(row.number)), Hole::Name(w.say(kind, &[]))]),
+        &connection(row),
     ));
     account(b, w, row);
     match row.connection {
@@ -108,11 +106,7 @@ fn account(b: &mut Builder, w: &Words, row: &Row) {
     if let Connection::Connected { id, login } = &row.connection {
         b.open(Role::Slot);
         connect::text(b, w, Role::Term, Word::ForgeAccountLabel);
-        crate::cards::text(
-            b,
-            Role::Description,
-            &w.say(Word::ForgeAccount, &[Hole::Name(forge::words::lossy(login)), Hole::Number(*id)]),
-        );
+        crate::cards::text(b, Role::Description, &forge::words::forge_account(login, *id));
         b.close();
     }
 }
