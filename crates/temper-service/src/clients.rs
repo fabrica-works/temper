@@ -314,8 +314,6 @@ impl Clients {
         {
             failed = true;
         }
-        // The server must observe the terminal bind event before the engine
-        // aborts, or it waits forever for the listener to finish opening.
         if let io::Event::Listening { addr, .. } = &event
             && let Some(address) = addr.socket()
         {
@@ -324,6 +322,8 @@ impl Clients {
             self.mount.down(&self.mount_env, http::Event::Listening { hosts }, &mut self.mount_out);
         }
         let previous = self.server.listening();
+        // The server must observe the terminal bind event before the engine
+        // aborts, or it waits forever for the listener to finish opening.
         self.server.up(event, &mut self.server_out);
         if self.server.listening() != previous {
             self.listening = self.server.listening();
