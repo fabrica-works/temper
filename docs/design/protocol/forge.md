@@ -542,9 +542,9 @@ of the routing in `temper-service`, its lines and the root's asks in,
 its lines, the root's states and its answers out, hosted on the
 service's io.
 
-- **Under the box alone.** `temper serve --box` adopts fds 3 and 4
-  (setup.md, 7.1), and the link writes its lines on fd 3 and holds one
-  read on fd 4, a line at most `box.line_bytes` (configuration.md,
+- **Under the box alone.** `temper serve --box` adopts the box's pipe,
+  the two fds after its listeners (setup.md, 7.1), and the link writes
+  its lines on the first and holds one read on the second, a line at most `box.line_bytes` (configuration.md,
   section 7), its line feed included, as the box counts it. Without `--box` there is no pipe and
   no link; the engine's forge domain, told so at its construction,
   refuses every ask "not under the box" (`../domain/forge.md`, 4.1).
@@ -589,7 +589,7 @@ service's io.
   a line whose word, forge number or step the link does not know; and a
   line past `box.line_bytes`, named by its bound, skipped to its line
   feed.
-- **The pipe closed:** fd 4 at its end, or a read or a write on the
+- **The pipe closed:** the box's end of it closed, or a read or a write on the
   pipe failing, ends the link, named in the log once, and the link
   tells the root `BoxClosed`: the forge domain fails an ask in flight,
   "the box closed the pipe", and offers no set up after it

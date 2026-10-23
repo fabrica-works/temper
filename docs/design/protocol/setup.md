@@ -617,6 +617,15 @@ files: at a first preparation, and for a runner older than its pin
   preparation runs under one: the preparation takes Forgejo's lock, and
   the runner's too when it writes the runner's files (6.3), and refuses,
   naming the forge, while one it needs is held.
+- **Hands Forgejo its listener,** when the box gave it one (7.1):
+  descriptor 3, with `LISTEN_FDS=1`. It checks that the descriptor
+  listens at the setup's `listen` (skein's `listener_at`, `shell.md`,
+  6.6), refusing otherwise, naming the descriptor and the address it
+  found, leaves it open across the exec, and adds `LISTEN_FDS=1` to the
+  spec's environment. Forgejo then takes the socket whose address its
+  `app.ini` names, in place of binding it (its `modules/graceful`, which
+  reads no `LISTEN_PID`). Given none, as under every other arrangement
+  (7.4), Forgejo binds its address itself.
 - **Replaces itself** (`execve`) by `forgejo web` or `forgejo-runner
   daemon`, with the spec's arguments and the spec's environment alone:
   cleared, then `HOME` in the forge's directory, `PATH`, and git's
@@ -874,7 +883,7 @@ temper box
 │                                     these, the forge's group: here, or asked (below)
 └── temper serve DIRS --box           long: its own tree (README.md, section 4); its setup
 │                                     host takes each handover and reconciles (section 5);
-│                                     fds 3 and 4 its pipe to the box (below)
+│                                     its listeners from fd 3, then its pipe to the box (below)
 ```
 
 - **An empty configuration directory,** absent or with no entry, is
@@ -908,12 +917,34 @@ temper box
   and the box stops the group (below, 7.2): a box started after the end
   runs none of it, since serve never asks again (8.4). A fake forge
   other than the demo's runs in its place, unasked.
+- **The listeners are the box's,** every step's, from the box's start
+  to its end, a dormant group's among them: so that the port a step
+  reports is its own from before it starts, and a second first run's
+  init finds the first one's ports taken (8.2). Each step names its
+  listeners, the socket addresses the document gives it (7.3): `temper
+  serve` the clients' and the webhooks' listeners, a fake its `listen`,
+  `temper forge run N forgejo` the owned forge's `listen`. On a first
+  run the box keeps the sockets `temper init` chose (8.2); on a later
+  start it opens each at the document's address before any step, with
+  skein's `open_listener`, and a port taken refuses its start, naming
+  the port and the document, as any start is refused. It holds each
+  one, never accepting, and gives it to its step at every spawn, a
+  restart's among them, as the descriptors 3, 4, … in the step's order,
+  with `LISTEN_FDS` set to their count in the step's environment and
+  dropped from its own: systemd's convention, which skein's shell reads
+  (skein's `shell.md`, 6.6) and Forgejo reads as well (6.4). The step's
+  own `Listen` for that address then takes the socket it was given
+  (skein's `io.md`, 3.2), so nothing above io knows it was given one. A
+  step with no listener is given none, and no `LISTEN_FDS`.
 - **The pipe,** two of them, made again at each spawn of `temper
-  serve`: its fd 3, serve to box, and its fd 4, box to serve. `--box`
-  tells `temper serve` to adopt them, and a serve given `--box` whose
-  fd 3 or 4 is not an open pipe refuses its start, naming the fd;
-  without it, as under every other arrangement (7.4), serve has no pipe
-  and leaves fds 3 and 4 alone. One line each, ending in a line
+  serve`, at the two descriptors after its listeners: 3 + *n*, serve to
+  box, and 4 + *n*, box to serve, *n* its listeners' count, so fds 5
+  and 6 under the default document's two. `--box` tells `temper serve`
+  to adopt them, and a serve given `--box` whose descriptor 3 + *n* or
+  4 + *n* is not an open pipe refuses its start, naming the fd, *n*
+  being the `LISTEN_FDS` it was given, 0 without it; without `--box`, as
+  under every other arrangement (7.4), serve has no pipe and leaves
+  those descriptors alone. One line each, ending in a line
   feed, `FORGE` the forge's number:
 
   | Line | From | Says |
@@ -1085,7 +1116,8 @@ temper box
   does not read: `Playground` for the demo's, `Forge N (Forgejo)` for
   an owned forge's. `before` is its place in the order:
   the index in `always` it runs just before (its length puts it last).
-  Each step carries its `Stage`, whose word its `step` lines carry. The
+  Each step carries its `Stage`, whose word its `step` lines carry, and
+  its listeners, the socket addresses the box holds and gives it (7.1). The
   machine's step tests drive a group from dormant to `started`, and to
   `failed`, and a started one to `stopped`, by lines and exits alone
   (13.1).
@@ -1476,8 +1508,11 @@ directory is empty (7.1).
     same rule;
   - *the webhooks' listener's port:* 8371, by the same rule (8.3). The
     five sockets, the clients', these three and the webhooks', are held
-    until all five ports are chosen, so that no two are the same, then
-    closed. The port is written fixed, since the setup host gives the
+    until all five ports are chosen, so that no two are the same; then
+    `temper init` closes them, and `temper box`, whose first run ran
+    init in its own process, keeps them, and holds each for its step
+    from then on (7.1), so that no port it wrote is free between init and
+    the step's bind. The port is written fixed, since the setup host gives the
     hook's address from the document at its start (5.3); a listener
     bound to port 0, its hooks given the address it reports, is later.
 - **What it says,** on stderr: `init: wrote <path>` for each file;
@@ -2734,6 +2769,14 @@ it checks of this document:
   box is up, the chat reads cancelled by the deployment, `Ended with
   the playground`, and the deployment holds no account of the demo's
   provider.
+- **Two first runs, one after the other,** a test of its own: a first
+  run's box, signed in, then a second box on three other empty scratch
+  directories while the first runs. The second's init finds the first's
+  ports held and writes the ports the kernel assigns (8.2); both sign
+  in, and each one's demo starts and answers a suggested request,
+  neither reaching the other's fakes. No first-run story takes a lock
+  on the default ports: each box holds its own (7.1), so the stories
+  run beside each other as any others do.
 - **A start a restart cut short,** a test of its own: a first run's
   box stopped once the demo's start has written running and before its
   forge connects; a second box on the same directories, with no client
