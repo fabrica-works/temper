@@ -31,8 +31,6 @@ pub fn page(
     builder.name(&title);
     builder.open(Role::Slot);
     builder.style(crate::look::CARD);
-    builder.open(Role::Slot);
-    builder.style(crate::look::CARD);
     for (field, word) in
         [(forge::Text::Forge, Word::Forge), (forge::Text::Owner, Word::Owner), (forge::Text::Name, Word::Name)]
     {
@@ -88,7 +86,6 @@ pub fn page(
     if let Some(answer) = &form.outcome {
         outcome(builder, form, answer, words, text_limit);
     }
-    builder.close();
     builder.close();
 }
 fn text_field(

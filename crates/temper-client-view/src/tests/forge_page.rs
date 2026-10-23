@@ -364,3 +364,39 @@ fn the_adoption_region_is_named_by_its_heading_and_contains_the_whole_form() {
         }
     }
 }
+
+#[test]
+fn the_adoption_region_holds_the_form_with_no_card_around_it() {
+    let mut view = fixtures::view();
+    let root = fixtures::adoption_page(fixtures::PROJECT, b"shop");
+    let tree = fixtures::build(&mut view, &root);
+    let nodes = tree.nodes();
+    let mut region = None;
+    for (index, node) in nodes.iter().enumerate() {
+        if node.role == Role::Region && node.name.as_deref() == Some(b"Adopt a repository into shop") {
+            region = Some(index);
+        }
+    }
+    let at = region.expect("adoption region");
+    let end = at + usize::try_from(nodes[at].size).unwrap();
+    let mut children = skein_lib::List::with_capacity(nodes[at].size);
+    let mut child = at + 1;
+    while child < end {
+        children.push(child).unwrap();
+        child += usize::try_from(nodes[child].size).unwrap();
+    }
+    assert_eq!(child, end, "direct children fill the region");
+    let [fields, roles, ..] = children.as_slice() else { panic!("the form's parts are direct children") };
+    assert_eq!(nodes[*fields].role, Role::Slot);
+    assert!(nodes[*fields].styles.as_slice().contains(&crate::look::CARD));
+    let expected = [b"Forge number".as_slice(), b"Owner", b"Name"];
+    let mut names = skein_lib::List::with_capacity(u32::try_from(expected.len()).unwrap());
+    for node in &nodes[*fields + 1..*roles] {
+        if node.role == Role::TextField {
+            names.push(node.name.as_deref().expect("named field")).unwrap();
+        }
+    }
+    assert_eq!(names.as_slice(), expected);
+    assert_eq!(nodes[*roles].role, Role::ChoiceGroup);
+    assert_eq!(nodes[*roles].name.as_deref(), Some(b"Role".as_slice()));
+}
