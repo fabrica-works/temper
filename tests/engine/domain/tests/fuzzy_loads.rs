@@ -7,18 +7,24 @@ use temper_engine_domain::{
     loads::{self, Limits, Loads, Request},
 };
 
-fn run(seed: u64) -> (String, &'static str) {
-    let mut rng = Rng::new(seed);
+/// One load of four rows, keeping `keep` of them, each with 4 transcript bytes.
+fn limits(keep: u32) -> Limits {
     let slot = u32::try_from(size_of::<Record>()).expect("small slot");
-    let keep = u32::try_from(rng.below(4) + 1).expect("four rows");
-    let limits = Limits {
+    Limits {
         read_bytes: 65_536,
         loads: 1,
         rows: 4,
         bytes: keep * (slot + 4),
         reply_bytes: 4 * (slot + 4),
         transcript_bytes: 4,
-    };
+    }
+}
+
+fn run(seed: u64) -> (String, &'static str) {
+    let mut rng = Rng::new(seed);
+    let slot = u32::try_from(size_of::<Record>()).expect("small slot");
+    let keep = u32::try_from(rng.below(4) + 1).expect("four rows");
+    let limits = limits(keep);
     let mut domain = Loads::new(&limits);
     let mut out = Queue::with_capacity(1);
     let owner = loads::begin(
