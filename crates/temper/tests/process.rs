@@ -844,9 +844,9 @@ fn first_run(restart: bool) {
         ),
         (
             "second",
-            // After the first run's chat, task 1, and its change, task 2.
+            // After chat 1, its change 2, and the change's review gate 3.
             support::person::demo_chat(
-                3,
+                4,
                 b"Add a dark theme to widget",
                 b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.",
             ),
