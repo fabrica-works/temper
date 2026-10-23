@@ -15,6 +15,7 @@ pub(crate) enum Proc {
     Service(Box<ServiceHost>),
     Caller(Box<Caller>),
     Ctl(Box<crate::calls::Recorded>),
+    Terminal(Box<temper_client_shell_terminal::terminal::Terminal>),
     Agent(Box<skein_world::PipeHost<smith_agent_shell::Agent>>),
     Git(Box<temper_fake_git_hosted::Git<temper_fake_git_hosted::Typed>>),
     GitRoute(Box<temper_fake_git::Git<temper_fake_git::Route>>),
@@ -27,6 +28,7 @@ impl Proc {
             Self::Service(h) => h.as_ref(),
             Self::Caller(h) => h.as_ref(),
             Self::Ctl(h) => h.as_ref(),
+            Self::Terminal(h) => h.as_ref(),
             Self::Agent(h) => h.as_ref(),
             Self::Git(h) => h.as_ref(),
             Self::GitRoute(h) => h.as_ref(),
@@ -39,6 +41,7 @@ impl Proc {
             Self::Service(h) => h.as_mut(),
             Self::Caller(h) => h.as_mut(),
             Self::Ctl(h) => h.as_mut(),
+            Self::Terminal(h) => h.as_mut(),
             Self::Agent(h) => h.as_mut(),
             Self::Git(h) => h.as_mut(),
             Self::GitRoute(h) => h.as_mut(),
@@ -229,6 +232,15 @@ fn host<R: Referee<Proc>>(
         },
         fixtures::ctl_roots,
     );
+    world.host_roots(
+        HostedProgram {
+            program: crate::terminal::OPEN.into(),
+            make: crate::terminal::host,
+            instances: 1,
+            operations: crate::terminal::operations(),
+        },
+        crate::terminal::roots,
+    );
     let configuration = smith_agent_shell::config::read(&path.join("agent.json")).expect("agent operation bound");
     world.host_roots(
         HostedProgram {
@@ -386,7 +398,7 @@ impl Referee<Proc> for Judge {
             service.arm_watch(call);
             caller.watched = service.delivered();
         }
-        if caller.is_empty() && !self.stopping {
+        if caller.is_empty() && terminals_settled(children) && !self.stopping {
             for (position, _) in self.workers.iter().enumerate() {
                 self.controls.signal(caller_end + position, ServiceSignal::Terminate);
             }
@@ -414,6 +426,15 @@ impl Referee<Proc> for Judge {
                     && service.workers_address.is_some()
                     && worker.cluster.as_ref().is_some_and(|shape| !shape.ready()))
         });
+        if let Some(terminal) = children
+            .iter()
+            .rev()
+            .find_map(|proc| if let Proc::Terminal(terminal) = proc { Some(terminal) } else { None })
+        {
+            caller.terminal.refused.set(terminal.exit_line().is_some_and(|line| {
+                line.as_ref() == b"temper open: the link was refused: use the fresh link temper serve printed\n"
+            }));
+        }
         caller.held.set(service.held_at(caller.held_index()));
         caller.links.set(service.links());
         let lock_changed = children.iter().any(|proc| match proc {
@@ -429,6 +450,7 @@ impl Referee<Proc> for Judge {
             | Proc::Forge(_)
             | Proc::Service(_)
             | Proc::Caller(_)
+            | Proc::Terminal(_)
             | Proc::Agent(_)
             | Proc::Git(_)
             | Proc::GitRoute(_) => false,
@@ -476,7 +498,7 @@ impl Referee<Proc> for Judge {
                 && !caller.released
                 && workers.iter().all(|proc| matches!(proc, Proc::Service(worker) if !worker_started(worker) || worker.linked() > 0)))
             || (caller.watching.is_some() && (!service.watching() || service.delivered() && !caller.watched))
-            || (caller.is_empty() && !self.stopping)
+            || (caller.is_empty() && terminals_settled(children) && !self.stopping)
             || (service.is_empty() && !self.finished)
         {
             self.wake = Some(now);
@@ -491,6 +513,10 @@ impl Referee<Proc> for Judge {
     fn passed(&self) -> bool {
         self.finished
     }
+}
+
+fn terminals_settled(children: &[Proc]) -> bool {
+    children.iter().all(|proc| !matches!(proc, Proc::Terminal(terminal) if !terminal.is_empty()))
 }
 
 fn github_cues(

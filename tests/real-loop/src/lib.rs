@@ -12,6 +12,7 @@ pub mod landing;
 pub mod llm;
 pub mod scripts;
 pub mod template_bounds;
+pub mod terminal;
 
 /// A real deadline bounds every story, including startup and drain.
 pub const PATIENCE: skein_lib::Duration = skein_lib::Duration::from_secs(20);
@@ -55,6 +56,12 @@ impl Ran {
     pub fn calls(&self) -> &[calls::Called] {
         let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
         &caller.calls
+    }
+    /// What the person read from the hosted terminal.
+    #[must_use]
+    pub fn terminal(&self) -> &terminal::Read {
+        let world::Proc::Caller(caller) = &self.outcome.procs[2] else { panic!("caller root") };
+        &caller.terminal.read
     }
     /// The task number printed by this call's completed act.
     #[must_use]

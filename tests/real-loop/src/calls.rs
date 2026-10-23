@@ -28,6 +28,8 @@ macro_rules! argv { ($($word:expr),* $(,)?) => { $crate::calls::Argv(vec![$($cra
 pub enum Step {
     /// Finish runtime fixture provisioning before recording the story calls.
     FixtureReady,
+    /// A person at the hosted terminal.
+    Terminal(crate::terminal::Act),
     Advance,
     /// Drain a named worker while retaining its root for a restart.
     StopWorker {
@@ -222,7 +224,8 @@ pub struct Called {
 }
 // A complete small rendered turn fits; a pipe chunk alone could miss a split reply.
 const OUTPUT: usize = 65_536;
-const ROOM: u32 = 16 * fixtures::CALLS_AT_ONCE; // Spawn, pipe closes, reads and wait for each call.
+// Spawn, pipe closes, reads and wait for each call, plus the terminal typist.
+const ROOM: u32 = 16 * fixtures::CALLS_AT_ONCE + 8;
 #[derive(Default)]
 struct Running {
     pending: usize,
@@ -246,6 +249,7 @@ pub(crate) struct Caller {
     pub(crate) links: Cell<u32>,
     retry_link: Option<u32>,
     pub(crate) calls: Vec<Called>,
+    pub(crate) terminal: crate::terminal::Typist,
     steps: Vec<Step>,
     next: usize,
     scratch: PathBuf,
@@ -269,6 +273,7 @@ impl Caller {
         self.steps.iter().filter_map(|step| match step {
             Step::Held { name } => Some(*name),
             Step::FixtureReady
+            | Step::Terminal(_)
             | Step::StopWorker { .. }
             | Step::StartWorker { .. }
             | Step::AddWorker { .. }
@@ -326,6 +331,7 @@ impl Caller {
     }
     pub(crate) fn new(steps: Vec<Step>, scratch: PathBuf, root: Fd) -> Self {
         let memory = u64::try_from((steps.len() + 1) * (OUTPUT * 4 + 4096)).expect("caller memory")
+            + crate::terminal::Typist::worst_case()
             + Queue::<Complete>::worst_case(ROOM).expect("completions")
             + Queue::<Submit>::worst_case(ROOM).expect("submissions");
         let count = steps.len();
@@ -339,6 +345,7 @@ impl Caller {
             links: Cell::new(0),
             retry_link: None,
             calls: Vec::with_capacity(count),
+            terminal: crate::terminal::Typist::default(),
             steps,
             next: 0,
             scratch,
@@ -389,6 +396,7 @@ impl Caller {
             }
             Step::Call { at, argv } | Step::Start { at, argv } | Step::Until { at, argv, .. } => (at, argv),
             Step::FixtureReady
+            | Step::Terminal(_)
             | Step::StopWorker { .. }
             | Step::StartWorker { .. }
             | Step::AddWorker { .. }
@@ -484,6 +492,10 @@ impl Caller {
         self.submit(index, Op::Spawn { spawn: Box::new(spawn) });
     }
     fn complete(&mut self, complete: Complete, now: Time) {
+        if crate::terminal::Typist::owns(complete.op) {
+            self.terminal.complete(complete, &mut self.submissions);
+            return;
+        }
         let index = self.owners.remove(&complete.op).expect("operation owner");
         if index == usize::MAX {
             match (complete.kind, complete.result.expect("probe operation")) {
@@ -603,6 +615,9 @@ impl Caller {
         true
     }
     fn finish(&mut self) {
+        if !self.terminal.finish(&mut self.submissions) {
+            return;
+        }
         if self.running.iter().all(Option::is_none)
             && let Some(fd) = self.root.take()
         {
@@ -629,6 +644,17 @@ impl Caller {
             return;
         };
         match step {
+            Step::Terminal(act) => {
+                if !self.terminal.act(
+                    act,
+                    &self.scratch,
+                    self.root.expect("terminal launch root"),
+                    self.links.get(),
+                    &mut self.submissions,
+                ) {
+                    return;
+                }
+            }
             Step::FixtureReady if self.running.iter().any(Option::is_some) => return,
             Step::FixtureReady => self.fixture_ready(),
             Step::AddWorker { .. } if !self.added.replace(false) => return,
@@ -722,6 +748,7 @@ impl Caller {
     }
     fn can_advance(&self) -> bool {
         match self.steps.get(self.next) {
+            Some(Step::Terminal(act)) => self.terminal.ready(act, self.links.get()),
             Some(Step::FixtureReady) => self.running.iter().all(Option::is_none),
             Some(Step::StopWorker { .. } | Step::StartWorker { .. }) => self.worker_ready.get(),
             Some(Step::Advance) => self.advanced.get(),
@@ -738,7 +765,7 @@ impl Caller {
                 self.current.is_none_or(|i| self.running[i].as_ref().is_some_and(|r| r.started))
             }
             Some(_) => self.current.is_none_or(|i| self.running[i].is_none()),
-            None => self.root.is_some() && self.running.iter().all(Option::is_none),
+            None => self.root.is_some() && self.running.iter().all(Option::is_none) && self.terminal.finish_ready(),
         }
     }
 }
@@ -772,7 +799,11 @@ impl Host for Caller {
         None
     }
     fn is_empty(&self) -> bool {
-        self.released && self.root.is_none() && self.probe.is_none() && self.owners.is_empty()
+        self.released
+            && self.root.is_none()
+            && self.probe.is_none()
+            && self.owners.is_empty()
+            && self.terminal.is_empty()
     }
     fn worst_case(&self) -> u64 {
         self.memory
