@@ -28,14 +28,21 @@ rules of section 4.1 hold. Commands' spellings are placeholders.
   again. How often to cut is a knob.
 - **A generation per upgrade** (section 5): the deployment's directory
   holds generations and a small file naming the active one. Translation
-  reads the old generation, never writes it, and switches by one atomic
-  replacement once the new one is whole and checked.
+  works on a copy, never on the old generation, and switches by one
+  atomic replacement once the new one is whole and checked.
 - **Going back** is supported until the new generation's first start
   (3.3); after it, it is a backup's restore, with effects that may be
   made again.
+- **Records first, the disk format later** (6.3). As PostgreSQL tells
+  its own upgrade between versions of its files on disk (`pg_upgrade`)
+  from an application's migrations of its schema and data, an upgrade
+  here has two layers: skein-kv's formats, and jig's and temper's records
+  over them. This draft is the second. skein-kv's formats have not moved
+  since it was written, and translation uses skein-kv as it is.
 - **Translation is a chain of frozen steps** (section 6), one per cut,
   each owner stepping its own families and the values of its own nested
-  in another's. Identities, counters and commit positions are kept;
+  in another's. It works on a copy of the old generation by ordinary
+  commits, so identities, counters and commit positions carry on;
   indexes and transcripts' offsets are rebuilt; every join is checked
   before the switch.
 - **Everything recorded survives** (section 7). An agent resumes its
@@ -57,9 +64,9 @@ rules of section 4.1 hold. Commands' spellings are placeholders.
 
 | Part | Where | Its formats' owners | Across an upgrade |
 |---|---|---|---|
-| the records | the deployment's `store/` | skein-kv's frames and snapshot; jig's component and families; temper's families | translated into the new generation (section 6) |
+| the records | the deployment's `store/` | jig's component and families; temper's families; over skein-kv's frames and snapshot | translated in the new generation, by ordinary commits (section 6); skein-kv's formats unchanged (6.3) |
 | the transcripts | the deployment's `transcripts/` | jig's frames, smith's turns and results inside | rewritten, their offsets rebuilt; smith's bytes kept as written (6.4) |
-| the secrets | the deployment's `secrets/` | skein-kv; jig's records; temper's forge records; skein's OAuth records | translated, every number kept (6.5) |
+| the secrets | the deployment's `secrets/` | jig's records; temper's forge records; skein's OAuth records | translated, every number kept (6.5) |
 | the configuration | the configuration directory: `temper.json`, `agent.json`, charters' instructions | the operator's | read as written (section 10) |
 | small files | the data directory: each forge's setup `state`, the box's records, the demo's, a worker's secret and digest | temper | read in any frozen version (section 10) |
 | an owned Forgejo | its forge's directory | Forgejo, and temper's preparation | its own upgrade, at its preparation (section 11) |
@@ -211,9 +218,10 @@ carries is also stored.
 - **The manifest** names the generation it was translated from, the
   fingerprints it was written in, each family's count before and after
   the translation, and the commit position translation ended at.
-- **Translation reads the old generation and never writes it.** skein-kv
-  recovers the source read-only, keeping an invalid tail where it is
-  rather than cutting it (6.3).
+- **The new generation starts as a copy.** The old generation's files
+  are copied whole into the new one's directory and synced; translation
+  opens the copy, never the original, so whatever recovery or
+  translation writes, the old generation stays as it was.
 - **One atomic switch.** Once the new generation is whole, synced and
   checked (6.6), `active` is replaced by io's replacement sequence:
   written beside, synced, renamed over, the directory synced (skein's
@@ -222,9 +230,9 @@ carries is also stored.
   new one partial; the next `temper upgrade` removes the partial one and
   starts again. After the switch, the new one is whole.
 - **Room for two:** the disk holds two generations until the old is
-  dropped. Translation holds the old map and the new in memory at once,
-  since skein-kv keeps its map in memory: about twice the engine's map
-  budget, while the engine is stopped.
+  dropped. In memory, translation works in one map, where a record whose
+  key changes is held twice until its old key is erased: at most about
+  twice the engine's map budget, while the engine is stopped.
 
 ## 6. Translation
 
@@ -244,8 +252,11 @@ carries is also stored.
   refusals. A value nested in another's family steps by its own owner's
   step, which that owner exposes: temper's step for a family that holds
   jig's refusals calls jig's.
-- **Keys move freely.** A step may change keys and ranges: the new map is
-  written whole, in key order, so no reader ever needs the old keys.
+- **Keys move freely.** A step may change keys and ranges: a record
+  whose key changed is put at its new key and erased at its old in the
+  same commit. Each versioned record names its family's version, so a
+  record already stepped is passed over, and no reader but the tool
+  ever sees the two side by side.
 - **Indexes are rebuilt** from the records, never translated (jig's
   `protocol/store.md`, 7.4).
 
@@ -261,16 +272,24 @@ carries is also stored.
   keyed outcomes and decisions are kept, so a request sent again after
   the upgrade is answered as before.
 
-### 6.3 Below jig: skein-kv
+### 6.3 skein-kv as it is
 
-- **An import at a kept commit position:** the new map's first commit
-  continues the old's numbering, so the deployment's header check and
-  every reference to a commit hold (jig's `protocol/store.md`, section
-  10). Rows imported into a fresh map at commit 1 would break both.
-- **A read-only recovery:** a map recovered from its snapshot and
-  segments with nothing written, an invalid tail kept where it is.
-- **KV's own formats freeze too,** its frames and snapshot, and a later
-  one reads a frozen one through its frozen reader, as any family.
+- **The copy opens as any start opens a store:** skein-kv recovers its
+  snapshot and the log's longest valid prefix (skein's `kv.md`, section
+  3), and jig's checks its format row and the deployment's header (jig's
+  `protocol/store.md`, section 10).
+- **Translation is ordinary commits** through jig's store, each within
+  skein-kv's bounds and each writing the deployment's header, as every
+  commit does. So the commit numbering carries on from the old
+  generation's, the header's check holds at the next open, and every
+  reference to an earlier commit still names it. The format row and the
+  fingerprints are the last commit's.
+- **Nothing new of skein-kv.** Its frames and snapshot have been at
+  version 1 since it was written (skein 288c5423), and this pass leaves
+  them so. The gate fingerprints them as it does every frozen format
+  (section 12), so a change is seen; changing them, after the baseline,
+  waits for an upgrade of their own: a tool of skein's, as `pg_upgrade`
+  is PostgreSQL's, later (section 15).
 
 ### 6.4 Transcripts
 
@@ -492,9 +511,10 @@ the domains:
   promised history equal before and after, no effect made twice, kept
   requests answered as before, the next numbers colliding with none, and
   the task going on, resumed or fresh by smith's version.
-- **Power loss** on skein's crashing disk at every write, sync, directory
-  sync, manifest and switch: the active generation is wholly the old or
-  wholly the checked new, and the translation starts again.
+- **Power loss** on skein's crashing disk at every step of the copy,
+  every commit of the translation, the manifest and the switch: the
+  active generation is wholly the old or wholly the checked new, and the
+  translation starts again from a fresh copy.
 - **Faults:** a full disk, a short write, a failed sync, a malformed
   record, a limit too small, a step missing, an unsettled store.
 - **The engine alone:** the engine upgraded while a worker's run goes on,
@@ -506,17 +526,18 @@ the domains:
 ## 14. Who builds what
 
 The investigation's 16 milestones of 2 to 3 hours, regrouped by owner
-and adjusted for sections 3 to 10:
+and adjusted for sections 3 to 10, less its two of skein-kv (an import
+at a kept commit position, and its faults):
 
 | Owner | What |
 |---|---|
-| skein | read-only recovery; an import at a kept commit position; frozen versions' generated code beside the current, fingerprints, a registry's gate; their crash tests |
+| skein | skein-codec alone: frozen versions' generated code beside the current, fingerprints, a registry's gate; skein-oauth's frozen readers. Nothing of skein-kv |
 | smith | frozen readers of turns and results by version, rendering old turns; its registry |
 | jig | generations and `active` at its open; its families' steps, chain planner and nested steps for applications; transcripts rewritten and offsets rebuilt; secrets' numbers; the joins' check; closing live windows when smith's turns move; the settled stop's core; the engine's wire versions kept |
 | temper | its families' steps; `temper upgrade` (check, switch, back, drop) and `temper versions`; the box's upgrade at start; the configuration's previous release; small files; every marker's version read; the settled stop's connector |
 | all | golden stores per cut; the story through an upgrade; power loss; the process drill; the gate's mutation checks |
 
-About 32 to 48 hours for the full upgrade, then about two milestones for
+About 28 to 42 hours for the full upgrade, then about two milestones for
 the engine alone. Built as the baseline approaches: the full upgrade,
 then the box's, then the engine alone.
 
@@ -536,7 +557,12 @@ then the box's, then the engine alone.
   their own, or only with temper's. Default: with temper's.
 - **Generations kept.** Default: until the operator drops them; the box
   keeps the previous one alone.
-- **Stores larger than two maps in memory.** Default: two maps; a
-  streaming translation if a deployment outgrows it.
+- **Stores larger than twice the map's budget.** Default: one map,
+  translated in place in the copy; a streaming translation if a
+  deployment outgrows it.
+- **skein-kv's own formats,** an upgrade of the disk format below the
+  records. Default: none until they first change; then skein's tool,
+  run before the records' translation, as `pg_upgrade` runs before an
+  application migrates.
 - **Rolling upgrades,** an engine and workers of different wires, by
   negotiated ranges. Out.
