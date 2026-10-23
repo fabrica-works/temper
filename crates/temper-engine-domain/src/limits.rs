@@ -272,6 +272,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(load_bytes)?
         .checked_add(landing_bytes)?
         .checked_add(permission_bytes)?;
+    // Checked Return paths can be owned by the journal and output queues, plus one admission.
+    let returns = u64::from(limits.journal.held)
+        .checked_add(u64::from(limits.journal.deliveries))?
+        .checked_add(u64::from(max_out(limits)).checked_mul(2)?)?
+        .checked_add(1)?;
+    bytes = bytes.checked_add(returns.checked_mul(512)?)?;
     bytes = bytes.checked_add(Queue::<Fact>::worst_case(FACTS)?)?;
     let effects = limits.call_records.checked_add(limits.tasks.tasks)?;
     let brief_fetches = limits.brief.briefs.checked_mul(limits.brief.sections)?.checked_mul(2)?;
@@ -282,6 +288,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<u64, PreparedWorkspace>::worst_case(limits.tasks.tasks)?)?
         .checked_add(u64::from(limits.tasks.tasks).checked_mul(row_bound(limits)?.checked_mul(2)?)?)?
         .checked_add(Map::<Token, forge_route::EffectFlight>::worst_case(effects)?)?
+        .checked_add(Map::<Token, (skein_lib::Time, skein_lib::Wall)>::worst_case(limits.people.requests)?)?
         .checked_add(u64::from(effects).checked_mul(row_bound(limits)?.checked_mul(3)?)?)?
         .checked_add(Map::<Token, Option<forge::Repository>>::worst_case(limits.forge.adoptions)?)?
         .checked_add(

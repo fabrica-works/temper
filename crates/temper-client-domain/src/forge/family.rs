@@ -105,7 +105,7 @@ pub fn answer(record: &jig_client::Family, limits: &w::Limits, link: &link::Limi
             w::ForgeReason::InvalidAnswer => forge::Reason::InvalidAnswer,
         }),
         w::Outcome::Unknown => forge::Answer::Unknown,
-        w::Outcome::SettingUp | w::Outcome::SetUpRefused(_) => return None,
+        w::Outcome::Returning | w::Outcome::SettingUp | w::Outcome::SetUpRefused(_) => return None,
     })
 }
 #[must_use]
@@ -201,7 +201,9 @@ pub fn set_up_answer(record: &jig_client::Family, limits: &w::Limits) -> Option<
             w::SetUpRefusal::Invalid => R::Invalid,
         }),
         w::Outcome::Unknown => O::Unknown,
-        w::Outcome::Adopted(_) | w::Outcome::CoreRefused(_) | w::Outcome::ForgeRefused(_) => return None,
+        w::Outcome::Returning | w::Outcome::Adopted(_) | w::Outcome::CoreRefused(_) | w::Outcome::ForgeRefused(_) => {
+            return None;
+        }
     })
 }
 #[must_use]

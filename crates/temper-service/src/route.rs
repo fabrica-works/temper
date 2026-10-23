@@ -7,6 +7,8 @@ pub(crate) mod box_link;
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher routes root outputs to their components")]
 pub(crate) fn request(engine: &mut Engine, request: root::Request) {
     match request {
+        // T3 gives this checked return to skein's accounts component.
+        root::Request::Return { .. } => {}
         root::Request::SetUp { forge, request, org, repository } => {
             crate::setup::lifecycle::first(engine, forge, org, repository);
             let mut out = skein_lib::Queue::with_capacity(3);

@@ -1,5 +1,6 @@
 //! Temper's pages and forge share one durable jig client.
 use crate::{Event, Limits, Request, forge, route};
+use alloc::boxed::Box;
 use skein_lib::{Env, Queue, Rng, Time};
 #[derive(Debug)]
 pub struct Domain {
@@ -7,14 +8,30 @@ pub struct Domain {
     pub(crate) forge: forge::Side,
     pub(crate) client: jig_client::Client,
     pub(crate) unlinked: bool,
+    pub(crate) departing: bool,
+    pub(crate) returning: Option<(jig_client::Key, Box<[u8]>)>,
 }
 #[must_use]
 pub fn new(limits: &Limits, seed: u64) -> Domain {
     build(limits, seed, false)
 }
+/// A browser root that leaves only after its own sign-in and return answers.
+#[must_use]
+pub fn new_departing(limits: &Limits, seed: u64) -> Domain {
+    let mut root = new(limits, seed);
+    root.departing = true;
+    root
+}
 #[must_use]
 pub fn unlinked(limits: &Limits, seed: u64) -> Domain {
     build(limits, seed, true)
+}
+/// The departing root on the typed transport used by the joined client world.
+#[must_use]
+pub fn unlinked_departing(limits: &Limits, seed: u64) -> Domain {
+    let mut root = unlinked(limits, seed);
+    root.departing = true;
+    root
 }
 fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
     assert!(crate::worst_case(limits).is_some(), "root capacities are checked");
@@ -30,6 +47,8 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
         forge: forge::Side::new(&limits.forge, rng.next_u64()),
         client,
         unlinked,
+        departing: false,
+        returning: None,
     }
 }
 impl Domain {

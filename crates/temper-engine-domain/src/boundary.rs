@@ -356,6 +356,19 @@ pub enum WorkerInput {
     /// The protocol read an ended answer's opaque outcome after the fleet fenced it.
     ResultRead { payload: Token, end: tasks::End },
 }
+/// A keyed request owned by the root, or forwarded to the forge (client/README.md, 8).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Application {
+    Forge(forge::Ask),
+    Return { source: u32, path: Box<[u8]> },
+}
+/// The family's terminal answer; root returns are volatile, like forge setup answers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ApplicationAnswer {
+    Adopt(forge::ApplicationOutcome),
+    SetUp(forge::SetUpAnswer),
+    Returning,
+}
 #[derive(Debug)]
 pub enum PartyInput {
     /// End one authenticated sign-in through the people child (ruling 116).
@@ -369,7 +382,7 @@ pub enum PartyInput {
         sign_in: u64,
         key: [u8; 16],
         digest: [u8; 32],
-        request: forge::Ask,
+        request: Application,
         /// The number and digest of a value the request carried, already kept
         /// in the secrets' store (jig's `protocol/client.md`, 5).
         carried: Option<core::Carried>,
@@ -463,6 +476,11 @@ pub enum PartyInput {
 /// and 4). Every output crosses the journal door in its peer's vocabulary.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// Give this sign-in its checked return path (client/README.md, 8).
+    Return {
+        source: u32,
+        path: Box<[u8]>,
+    },
     /// Routed to the protocol layer's box link; nothing committed (domain/root.md, 5.1).
     SetUp {
         forge: u16,

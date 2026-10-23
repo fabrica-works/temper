@@ -128,6 +128,7 @@ pub struct Protocol {
     pub pending_renders: Vec<(ReplyTo, Box<[u8]>)>,
     /// Each account component request the root made.
     pub accounts: Vec<accounts::Request>,
+    pub returns: Vec<(u32, Box<[u8]>)>,
     /// Worker channels that received their program-source inventory.
     pub sources: Vec<Token>,
     /// Core read loads the world answered as gone.
@@ -256,6 +257,10 @@ impl Protocol {
                     load,
                     result: core::reads::Loaded::Gone,
                 })])
+            }
+            engine::Request::Return { source, path } => {
+                self.returns.push((source, path));
+                Ok(Vec::new())
             }
             engine::Request::Account(request) => {
                 self.accounts.push(request.clone());

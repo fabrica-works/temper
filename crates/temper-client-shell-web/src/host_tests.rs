@@ -23,6 +23,7 @@ fn fixture() -> Host {
             } => Some(*watch),
             Request::Client { .. }
             | Request::Show { .. }
+            | Request::Leave { .. }
             | Request::SignOut
             | Request::Dropped { .. }
             | Request::Fact { .. } => None,
@@ -92,6 +93,7 @@ fn send(host: &mut Host, name: &[u8]) -> Token {
             }
             Request::Client { .. }
             | Request::Show { .. }
+            | Request::Leave { .. }
             | Request::SignOut
             | Request::Dropped { .. }
             | Request::Fact { .. } => None,
@@ -279,7 +281,7 @@ mod memory_literal;
 // Wire 6's SetUp fields and the row's first repository, written by SKEIN_CODEGEN_WRITE=1 (+27,648 B).
 // The setup draft, retained intent and adoption, shared keys and Ready words add 70,031 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274390100134;
+const WEB_BYTES: u64 = 274391148758;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
@@ -437,4 +439,17 @@ fn the_patch_queue_is_reserved_once_at_start() {
     assert!(!host.patches().is_empty());
     assert!(host.patches.is_empty());
     assert_eq!(host.patches.room(), host.bounds.tree.patches);
+}
+
+#[test]
+fn leave_is_one_navigation_in_its_turn_and_none_in_the_next() {
+    let mut host = fixture();
+    host.out.push(Request::Leave { to: b"https://issuer/visit".as_slice().into() });
+    let mut requests = jig_client_shell_web::adapter::requests(host.requests());
+    requests.navigate = host.navigate.take();
+    assert_eq!(requests.navigate.as_deref(), Some(b"https://issuer/visit".as_slice()));
+    host.build();
+    let mut requests = jig_client_shell_web::adapter::requests(host.requests());
+    requests.navigate = host.navigate.take();
+    assert!(requests.navigate.is_none());
 }

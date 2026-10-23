@@ -227,6 +227,7 @@ pub fn incoming(
         | engine::Request::Forge { .. }
         | engine::Request::Account(_)
         | engine::Request::SetUp { .. }
+        | engine::Request::Return { .. }
         | engine::Request::Setup { .. }
         | engine::Request::ToChild(_)
         | engine::Request::Busy(_)

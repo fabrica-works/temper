@@ -1,5 +1,6 @@
 //! The pages and forge share jig's receiving and request bounds.
 use crate::{Request, forge};
+use alloc::boxed::Box;
 use skein_lib::Queue;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -42,5 +43,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(jig_client::worst_case(&limits.client)?)?;
     total = total.checked_add(Queue::<forge::Request>::worst_case(forge::max_out(&limits.forge))?)?;
     total = total.checked_add(u64::from(max_out(limits)).checked_mul(limits.client.domain.document_bytes)?)?;
+    total = total.checked_add(limits.client.domain.document_bytes)?;
+    total = total.checked_add(u64::try_from(size_of::<Option<(jig_client::Key, Box<[u8]>)>>()).ok()?)?;
     total.checked_add(Queue::<Request>::worst_case(max_out(limits))?)
 }

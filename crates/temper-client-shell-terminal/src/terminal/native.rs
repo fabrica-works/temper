@@ -54,7 +54,8 @@ impl Client for NativeClient {
                 }
                 Shown::Notice(route::Notice::Dropped { count }) => return Some(Notice::Dropped { count }),
                 Shown::Notice(
-                    route::Notice::Unread
+                    route::Notice::Leave { .. }
+                    | route::Notice::Unread
                     | route::Notice::Served { .. }
                     | route::Notice::Unasked
                     | route::Notice::Fact(_)

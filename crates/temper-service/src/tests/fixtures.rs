@@ -676,6 +676,7 @@ pub fn settle_root(
                 }
                 root::Request::Setup { .. }
                 | root::Request::SetUp { .. }
+                | root::Request::Return { .. }
                 | root::Request::Forge { .. }
                 | root::Request::Busy(_)
                 | root::Request::Drained

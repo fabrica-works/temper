@@ -135,6 +135,7 @@ pub fn samples() -> [Sample; N] {
 }
 fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: Then) -> Sample {
     let way = temper_client_domain::ModelWay {
+        source: None,
         provider: if kind == temper_client_domain::WayKind::Program { 17 } else { 18 },
         kind,
     };

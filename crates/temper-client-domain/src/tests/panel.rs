@@ -171,6 +171,7 @@ fn another_tasks_page_closes_the_old_panel_and_watches_its_own_subject() {
             }
             Request::Client { .. }
             | Request::Show { .. }
+            | Request::Leave { .. }
             | Request::SignOut
             | Request::Dropped { .. }
             | Request::Fact { .. } => {}

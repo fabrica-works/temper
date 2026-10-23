@@ -42,6 +42,7 @@ pub const fn open(address: &Address) -> bool {
 pub const fn model_way(way: Way) -> ModelWay {
     ModelWay {
         provider: way.provider(),
+        source: None,
         kind: match way {
             Way::SignIn { .. } => WayKind::SignIn,
             Way::Program { .. } => WayKind::Program,
@@ -81,7 +82,7 @@ pub fn way(pages: &Pages, client: &Client) -> Option<Way> {
     let me = accounts::current_me(client)?;
     let page = pages.connect_model()?;
     for way in &accounts::ways(&me.providers, pages.demo_provider, page.holder) {
-        if model_way(*way) == chosen {
+        if model_way(*way).provider == chosen.provider && model_way(*way).kind == chosen.kind {
             return Some(*way);
         }
     }
