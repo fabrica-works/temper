@@ -191,6 +191,7 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             answered,
             grants,
         } => {
+            std::eprintln!("H1 ns={} engine checked-placement run={} attempt={} channel={}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("wall").as_nanos(), task, attempt, run.placement.channel.raw());
             let prepared = Prepared {
                 task,
                 attempt,
@@ -206,7 +207,10 @@ pub(crate) fn now(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decisio
             };
             run_prepared(domain, env, prepared);
         }
-        core::Now::DropAssignment { task } => drop(domain.assignments.remove(&task)),
+        core::Now::DropAssignment { task } => {
+            std::eprintln!("H1 ns={} engine drop-assignment run={} hosts={:?}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("wall").as_nanos(), task, domain.core.fleet.host_views());
+            drop(domain.assignments.remove(&task));
+        },
         core::Now::EffectAnswer { to, key: _, part } => {
             let answer = CallAnswer::from_core(&part).expect("effect wait answer");
             relay_call(domain, &env.limits, decision, to, answer);
