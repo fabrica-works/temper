@@ -544,8 +544,22 @@ impl Judge {
                 if args.first().is_some_and(|verb| verb == "wait") && !args.iter().any(|arg| arg == "--json") {
                     args.push("--json".into());
                 }
-                self.slots.push(batch.ends().len());
-                batch.push(ctl::Step::Run(ctl::Call::new(&args.iter().map(String::as_str).collect::<Vec<_>>())));
+                if matches!(self.steps.front(), Some(Step::StopWorker { name: "ws" })) {
+                    let director = temper_real_loop_world::case::HANG.to_string();
+                    assert_eq!(args, ["wait", "task", &director, "--until", "replied", "--json"]);
+                    batch.push(ctl::Step::Run(ctl::Call::new(&args.iter().map(String::as_str).collect::<Vec<_>>())));
+                    // Replied also accepts WaitingForYou while work is still writing.
+                    // After the committed-read barrier, retain the exact waiting
+                    // observation the oracle requires before stopping ws.
+                    self.slots.push(batch.ends().len() + 1);
+                    batch.push(ctl::Step::Until(
+                        ctl::Call::new(&["task", &director, "--json"]),
+                        b"\"work\":\"waiting\"",
+                    ));
+                } else {
+                    self.slots.push(batch.ends().len());
+                    batch.push(ctl::Step::Run(ctl::Call::new(&args.iter().map(String::as_str).collect::<Vec<_>>())));
+                }
             }
             Step::Start { at, argv } => {
                 assert_eq!(at.0, 1);
