@@ -668,6 +668,9 @@ pub fn fixture_5_4() -> forge::Fixture {
         },
         configure: |value, agent, forge| {
             (fixture().configure)(value, agent, forge);
+            // Delegate/amend/cancel and their wait share one LLM completion.
+            agent["profile"]["declared"]["calls_per_response"] = 2.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
             // Read all three spec parameters, including the planned path (name 6).
             value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
             // The director's two-owner batch was refused: "batch limit".

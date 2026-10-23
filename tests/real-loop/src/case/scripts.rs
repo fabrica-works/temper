@@ -837,16 +837,20 @@ pub fn step_5_4(forge: SocketAddr) -> Box<[Script]> {
         Script {
             cue: Agent::Direction.cue().into(),
             turns: Box::new([
-                call(
-                    b"delegate",
-                    &json!({"batch":[direction_owner(forge, STORY_OWNER_SPEC,30,2,6),direction_owner(forge, OVERLAP_OWNER_SPEC,20,0,2)]}),
+                then_wait(
+                    call(
+                        b"delegate",
+                        &json!({"batch":[direction_owner(forge, STORY_OWNER_SPEC,30,2,6),direction_owner(forge, OVERLAP_OWNER_SPEC,20,0,2)]}),
+                    ),
+                    "A and B own kit's work.",
                 ),
-                wait("A and B own kit's work."),
-                call(
-                    b"amend",
-                    &json!({"target":STORY_OWNER,"revision":DIRECTION_REVISION-1,"amendment":{"instructions":DIRECTION_BRIEF,"reason":DIRECTION_REASON}}),
+                then_wait(
+                    call(
+                        b"amend",
+                        &json!({"target":STORY_OWNER,"revision":DIRECTION_REVISION-1,"amendment":{"instructions":DIRECTION_BRIEF,"reason":DIRECTION_REASON}}),
+                    ),
+                    "A has the new direction.",
                 ),
-                wait("A has the new direction."),
                 report(DIRECTION_REPORT),
             ]),
         },
@@ -872,11 +876,15 @@ pub fn step_5_4(forge: SocketAddr) -> Box<[Script]> {
             turns: Box::new([
                 direction_held(
                     B_DELEGATE_HOLD,
-                    call(b"delegate", &json!({"batch":[direction_change(forge, PLANNED_SPEC,B_FILE,1)]})),
+                    then_wait(
+                        call(b"delegate", &json!({"batch":[direction_change(forge, PLANNED_SPEC,B_FILE,1)]})),
+                        "h1's planned path waits.",
+                    ),
                 ),
-                wait("h1's planned path waits."),
-                call(b"cancel", &json!({"target":PLANNED,"reason":PLANNED_CANCEL_REASON})),
-                wait("h1's cancellation is settling."),
+                then_wait(
+                    call(b"cancel", &json!({"target":PLANNED,"reason":PLANNED_CANCEL_REASON})),
+                    "h1's cancellation is settling.",
+                ),
                 report(OVERLAP_OWNER_REPORT),
             ]),
         },
@@ -894,7 +902,6 @@ pub fn step_5_4(forge: SocketAddr) -> Box<[Script]> {
         Script {
             cue: Agent::StoryWriter.cue().into(),
             turns: Box::new([
-                call(b"read", &json!({"path":B_FILE})),
                 call(b"edit", &json!({"path":B_FILE,"edits":[{"old":B_WORDS,"new":STORY_WORDS}]})),
                 call(b"finish", &json!({"form":"change","fields":{"title":"a1","body":STORY_GREEN}})),
             ]),

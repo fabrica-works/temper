@@ -4172,7 +4172,12 @@ fn direction_news(observed: &Observed, misses: &mut Vec<Miss>) {
     step_check(
         misses,
         "5.4",
-        plan_attempts(observed, &[Read::DirectionBEnded, Read::DirectionBFirst], OVERLAP_OWNER, 2),
+        plan_attempts(
+            observed,
+            &direction_pages(observed, Read::DirectionBEnded, Read::DirectionBFirst),
+            OVERLAP_OWNER,
+            2,
+        ),
         DIRECTION_NEWS,
         "B's complete journal must show its two non-overlapping attempts",
     );
@@ -4207,16 +4212,28 @@ fn direction_messages(observed: &Observed, misses: &mut Vec<Miss>) {
 // 7.1: queued placement losing its selected slot returns the claim without a
 // failed try; jig-domain-fleet's attempt.rs, resume, and jig-domain-core's
 // routing/children.rs translate Recheck to the journal's refused ending).
+// B and the director now fit on one page. Retain support for an earlier
+// page in oracle fixtures: plan_attempts still requires complete, ordered
+// journals, and rejects an absent page whenever the latest has a cursor.
+fn direction_pages(observed: &Observed, latest: Read, earlier: Read) -> Vec<Read> {
+    let mut reads = vec![latest];
+    if observed.documents.contains_key(&earlier) {
+        reads.push(earlier);
+    }
+    reads
+}
 fn direction_attempts(observed: &Observed, misses: &mut Vec<Miss>) {
     use super::{DIRECTION, OVERLAP_OWNER, OVERLAP_RECHECK_ATTEMPT, PLANNED, STORY_CHANGE, STORY_OWNER, X3, X3_CODER};
+    let b_reads = direction_pages(observed, Read::DirectionBEnded, Read::DirectionBFirst);
+    let director_reads = direction_pages(observed, Read::DirectionEnded, Read::DirectionFirst);
     for (task, reads, minimum) in [
         (X3, &[Read::X3Ended][..], 0),
         (X3_CODER, &[Read::X3Produced][..], 1),
         (PLANNED, &[Read::PlannedEnded][..], 0),
         (STORY_CHANGE, &[Read::StoryLanded][..], 0),
         (STORY_OWNER, &[Read::StoryOwnerEnded, Read::StoryOwnerEarlier, Read::StoryOwnerFirst][..], 1),
-        (OVERLAP_OWNER, &[Read::DirectionBEnded, Read::DirectionBFirst][..], 2),
-        (DIRECTION, &[Read::DirectionEnded, Read::DirectionFirst][..], 1),
+        (OVERLAP_OWNER, b_reads.as_slice(), 2),
+        (DIRECTION, director_reads.as_slice(), 1),
     ] {
         step_check(
             misses,
@@ -4486,6 +4503,28 @@ mod direction_tests {
     fn new_direction_and_deferred_overlap_meet_the_checkpoint() {
         assert_met(&step_5_4(&met()));
     }
+    #[test]
+    fn complete_single_page_journals_keep_the_same_checks() {
+        let mut observed = met();
+        for (latest, earlier) in
+            [(Read::DirectionBEnded, Read::DirectionBFirst), (Read::DirectionEnded, Read::DirectionFirst)]
+        {
+            let older = observed.documents.remove(&earlier).expect("earlier page");
+            let page = &mut observed.documents.get_mut(&latest).expect("latest page")["activity"];
+            page["rows"].as_array_mut().expect("rows").extend(older["rows"].as_array().expect("older rows").clone());
+            page["before"] = Value::Null;
+        }
+        assert_met(&step_5_4(&observed));
+        for latest in [Read::DirectionBEnded, Read::DirectionEnded] {
+            let mut missing = observed.clone();
+            missing.documents.get_mut(&latest).expect("latest")["activity"]["before"] = json!({"value":"missing"});
+            assert!(!step_5_4(&missing).is_empty(), "{latest:?} must not omit an earlier page");
+            let mut gap = observed.clone();
+            gap.documents.get_mut(&latest).expect("latest")["activity"]["rows"].as_array_mut().expect("rows").remove(1);
+            assert!(!step_5_4(&gap).is_empty(), "{latest:?} must have no journal gap");
+        }
+    }
+
     #[test]
     fn every_required_document_field_rejects_a_mutation() {
         for (read, paths) in [

@@ -614,9 +614,9 @@ pub fn step_5_6() -> Vec<calls::Step> {
 
 // Act 2, step 5.4 (domain/testing.md, 5.3)
 const DIRECTION_B_ENDED: usize = 30;
-const STORY_OWNER_ENDED: usize = 35;
-const DIRECTION_ENDED: usize = 37;
-const STORY_OWNER_EARLIER: usize = 38;
+const STORY_OWNER_ENDED: usize = 34;
+const DIRECTION_ENDED: usize = 36;
+const STORY_OWNER_EARLIER: usize = 37;
 pub const READS_5_4: &[(Read, usize)] = &[
     (Read::X3Open, 7),
     (Read::X3Produced, 8),
@@ -628,12 +628,10 @@ pub const READS_5_4: &[(Read, usize)] = &[
     (Read::DirectionBPending, 24),
     (Read::PlannedEnded, 28),
     (Read::DirectionBEnded, DIRECTION_B_ENDED),
-    (Read::DirectionBFirst, 31),
     (Read::StoryOwnerEnded, STORY_OWNER_ENDED),
     (Read::DirectionEnded, DIRECTION_ENDED),
     (Read::StoryOwnerEarlier, STORY_OWNER_EARLIER),
-    (Read::DirectionFirst, 39),
-    (Read::StoryOwnerFirst, 40),
+    (Read::StoryOwnerFirst, 38),
 ];
 #[must_use]
 pub fn step_5_4() -> Vec<calls::Step> {
@@ -712,10 +710,7 @@ pub fn step_5_4() -> Vec<calls::Step> {
         call(D1, argv!["task", number(PLANNED), "--activity", "32", "--json"]),
         call(D1, argv!["wait", "task", number(OVERLAP_OWNER), "--until", "ended"]),
         call(D1, argv!["task", number(OVERLAP_OWNER), "--activity", "32", "--json"]),
-        call(
-            D1,
-            argv!["activity", number(OVERLAP_OWNER), "--before", calls::activity_before(DIRECTION_B_ENDED), "--json"],
-        ),
+        // B's batched turns fit its complete journal in this one page.
         // Select the run woken by a1's change result, then await its held
         // writing turn (i2's addendum 2). x3's result was a cancellation.
         calls::until(
@@ -734,7 +729,6 @@ pub fn step_5_4() -> Vec<calls::Step> {
             D1,
             argv!["activity", number(STORY_OWNER), "--before", calls::activity_before(STORY_OWNER_ENDED), "--json"],
         ),
-        call(D1, argv!["activity", number(DIRECTION), "--before", calls::activity_before(DIRECTION_ENDED), "--json"]),
         call(
             D1,
             argv!["activity", number(STORY_OWNER), "--before", calls::activity_before(STORY_OWNER_EARLIER), "--json"],
