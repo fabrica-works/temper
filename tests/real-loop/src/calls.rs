@@ -924,5 +924,5 @@ impl Host for Caller {
     }
 }
 
-mod recorded;
+pub(crate) mod recorded;
 pub(crate) use recorded::Recorded;
