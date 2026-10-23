@@ -551,7 +551,8 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   "All", "Live" and "Closed", and a goal's plan's. Default: not in the
   address; a reload shows "All" (2.3). The inbox's is in its address.
 - **The bundle in the binary,** so that `temper serve` needs no
-  directory. Default: a directory the configuration names (2.2).
+  directory. Default: a directory the configuration names (2.2);
+  `../draft/bundle-in-binary.md` drafts the binary's own.
 - **A dark palette,** following the system's preference as
   `skein-ui.css` does. Default: light only (2.5).
 - **Other browsers** than Chromium are `skein-browser`'s question
