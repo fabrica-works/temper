@@ -8,7 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 LOOK = ROOT / 'lab' / 'look'
 PLANTED = ROOT / 'lab' / 'look-planted'
-SCENES = ('chats', 'chat', 'inbox', 'task', 'accounts', 'first-run', 'adoption')
+SCENES = ('chats', 'chat', 'inbox', 'task', 'accounts', 'first-run', 'adoption', 'connect-model')
 WIDTHS = [dict(name='desktop', width=1440, height=900, mobile=False),
           dict(name='phone', width=390, height=844, mobile=True)]
 

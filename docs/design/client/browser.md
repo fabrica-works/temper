@@ -640,8 +640,16 @@ view draws, never changing a view to suit a sample.
 | `chat-rejecting` | `chat-solo-T10` with Reject pressed: the reason's box |
 | `task-held` | a goal's plan with a held task, Release offered |
 | `task-releasing` | `task-held` with Release pressed: its confirmation |
-| `accounts-signin` | a sign-in started, its address shown |
-| `accounts-refused` | an account's request refused, its alert |
+| `connect-model-choose` | the offered ways and the owner's holder choice |
+| `connect-model-key-details` | a key's secret field and Add key |
+| `connect-model-program-details` | a program's name, command and Declare |
+| `connect-model-signing-in` | a sign-in started, its address an external link |
+| `connect-model-key-ready` | a key kept, Ready with Start a chat |
+| `connect-model-signin-ready` | a sign-in made an account, Ready |
+| `connect-model-declined` | plan usage declined, with another sign-in and a key way |
+| `connect-model-renewed` | the same account again, with another sign-in |
+| `connect-model-refused` | another holder's account refused, with another sign-in |
+| `connect-model-key-lost` | a key request's answer lost, its alert asking for the value again |
 | `task-reference-T28` | the reference world's change T28, queued 2nd after T26 |
 | `task-reference-T24` | the reference world's change T24, landed, its ended task T25 |
 | `task-reference-T12` | the reference world's goal T12, its plan with its ended delegates T13, T14 and T24 |

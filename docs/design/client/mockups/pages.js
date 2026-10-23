@@ -1243,7 +1243,7 @@
         <p class="muted tiny">Claude Code asks you to sign in. temper never reads its login.</p>
         <button class="button" data-later="Mockup: the login is declared; its row on Accounts says, for each host, whether Claude Code is signed in there.">Use your Claude subscription</button></div>`;
   }
-  const modelSteps = (current, way) => flowSteps(current, '', ['Choose', way === 'key' ? 'Details' : 'Signing in', 'Ready']);
+  const modelSteps = (current, way) => flowSteps(current, '', ['Choose', way !== 'chatgpt' ? 'Details' : 'Signing in', 'Ready']);
   const endingCard = (words, acts, mark = '', failed = true) => `<h3>Signing in to ChatGPT ${mark}</h3><p${failed ? ' class="forge-failure"' : ''}>${words}</p>${acts ? `<div class="button-row">${acts}</div>` : ''}`;
 
   pages['connect-model'] = () => {
@@ -1256,7 +1256,8 @@
     let body = modelChoices(signIn);
     if (way === 'chatgpt' && a) { current = 3; body = flowWrap(chatgptReady(a, wasPlayground)); }
     else if (way === 'key') { current = 1; body = flowWrap(keyForm()); }
-    const back = way === 'key' ? `<p><a class="text-link" href="${esc(u('connect-model.html'))}">‹ All ways</a></p>` : '';
+    else if (way === 'program') { current = 1; body = flowWrap(claudeSketch()); }
+    const back = ['key', 'program'].includes(way) ? `<p><a class="text-link" href="${esc(u('connect-model.html'))}">‹ All ways</a></p>` : '';
     const again = '<button class="button primary" data-later="Mockup: a fresh sign-in, with a new address.">Continue with ChatGPT</button>';
     const key = '<button class="button" data-later="Mockup: the key’s form.">Use an API key</button>';
     const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: each other ending of ChatGPT’s sign-in, back in temper, and the other ways.</p>${[

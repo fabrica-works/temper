@@ -139,7 +139,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                 jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(subject) } => {
                     let document = match subject {
                         c::Subject::Me => Some(c::Delivery::Me(Box::new(frame(w)))),
-                        c::Subject::Accounts => Some(c::Delivery::OwnerAccounts(Box::new(accounts(w)))),
+                        c::Subject::Accounts => Some(c::Delivery::OwnerAccounts(Box::new(accounts(w, then)))),
                         c::Subject::Tasks { window, .. } => Some(c::Delivery::Tasks(Box::new(task_window(w, window)))),
                         c::Subject::Inbox { window } => {
                             Some(c::Delivery::OwnerInbox(Box::new(inbox_window(w, window))))
@@ -1618,7 +1618,7 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
     c::ActivityPage { rows, after: None, before: None, cut: false }
 }
 #[expect(clippy::too_many_lines, reason = "literal account and source facts from the mockup worlds")]
-fn accounts(w: World) -> c::OwnerAccounts {
+fn accounts(w: World, then: Then) -> c::OwnerAccounts {
     let mut rows = List::with_capacity(2);
     match w {
         Reference => {
@@ -1669,7 +1669,7 @@ fn accounts(w: World) -> c::OwnerAccounts {
                     name: Some(Box::from("pat@example.com".as_bytes())),
                     place: 1,
                     number: 3,
-                    kind: c::OwnerAccountKind::SignIn,
+                    kind: if then == Then::KeyReady { c::OwnerAccountKind::Key } else { c::OwnerAccountKind::SignIn },
                     state: c::OwnerAccountState::Granted,
                     usable: true,
                     expiring: false,
@@ -1814,7 +1814,32 @@ fn accounts(w: World) -> c::OwnerAccounts {
         program_hosts: hosts,
         accounts: rows,
         signing: List::with_capacity(0),
-        last_end: None,
+        last_end: match then {
+            Then::SignInReady | Then::Declined => Some(c::OwnerAccountLastEnd {
+                source: 43,
+                end: c::OwnerAccountEnd::Made { account: 2, declined: then == Then::Declined },
+            }),
+            Then::Renewed => Some(c::OwnerAccountLastEnd {
+                source: 43,
+                end: c::OwnerAccountEnd::Renewed { account: 2, declined: false },
+            }),
+            Then::SignInRefused => Some(c::OwnerAccountLastEnd {
+                source: 43,
+                end: c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Held { provider: 18 } },
+            }),
+            Then::Shown
+            | Then::Filled
+            | Then::Refused
+            | Then::SignedOut
+            | Then::OutOfDate
+            | Then::Closing
+            | Then::Rejecting
+            | Then::Held
+            | Then::Releasing
+            | Then::SigningIn
+            | Then::AccountRefused
+            | Then::KeyReady => None,
+        },
         usable: true,
         settled: true,
         cut: false,

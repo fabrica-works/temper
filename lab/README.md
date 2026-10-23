@@ -138,7 +138,28 @@ ready by its `main`. The page is the gallery's state by its name
 | `task` | `/task.html?world=solo&task=T3&bare` | `/task-solo-T3.html` | the task's heading, the plan, the budget's card |
 | `accounts` | `/accounts.html?world=solo&bare` | `/accounts-solo.html` | the first account's card |
 | `first-run` | `/chats.html?world=first-run&step=1&bare` | `/chats-first-run-1.html` | the suggested requests, the composer |
+| `connect-model` | `/connect-model.html?world=reference&bare` | `/connect-model-choose.html` | Choose and its offered ways, inside main |
 | `adoption` | none | `/adoption.html` | the form, its first field, its submit button |
+
+The `connect-model` scene compares Choose. Its owner holder buttons and
+configured Anthropic ways are departures citing client README 5.5,
+ConnectModel, Choose and The ways; its named cards and Steps list cite
+5.2, A flow's parts. The mockup's sign-in navigation is a request button
+in the client (5.5, Its address). The gallery's other `connect-model-*`
+pages hold Details, Signing in, Ready and the sign-in's endings. Their
+mockup links preserve the way (`chatgpt`, `key`, or `program`); they are
+comparisons to that way's drawing, not a claim that the mockup plays every
+request outcome. `program` opens the existing subscription sketch at Details.
+
+Those states have three further documented differences, outside this
+Choose capture: Signing in keeps an external link until tab navigation
+and the listener's return exist (client README 5.5, ConnectModel, Signing
+in); every chosen way, including Ready and endings, has “‹ All ways”
+(5.5, Its address); and no distinct ineligible, port-taken or provider
+plan-declined ending is invented without a jig fact (README 11, “A
+sign-in's endings jig gives no fact for”). Consent's `declined`, renewed
+and refused-as-held have jig facts and their own gallery samples. The
+lost key sample retains the former account request alert's meaning.
 
 - **Regions** are found on temper's side by role and name, as a person
   finds them, and on the mockup's by role and name or, where its part

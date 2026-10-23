@@ -24,6 +24,11 @@ pub enum Then {
     Releasing,
     SigningIn,
     AccountRefused,
+    KeyReady,
+    SignInReady,
+    Declined,
+    Renewed,
+    SignInRefused,
 }
 #[derive(Clone, Debug)]
 pub struct Sample {
@@ -32,11 +37,12 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 37;
+pub const N: usize = 45;
 #[must_use]
 pub fn samples() -> [Sample; N] {
     use Then::{
-        AccountRefused, Closing, Filled, Held, OutOfDate, Refused, Rejecting, Releasing, Shown, SignedOut, SigningIn,
+        AccountRefused, Closing, Declined, Filled, Held, KeyReady, OutOfDate, Refused, Rejecting, Releasing, Renewed,
+        Shown, SignInReady, SignInRefused, SignedOut, SigningIn,
     };
     use World::{Bare, FirstRun, Reference, Solo};
     [
@@ -107,15 +113,84 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "task-held", world: Solo, address: Address::Task { task: 3 }, then: Held },
         Sample { name: "task-releasing", world: Solo, address: Address::Task { task: 3 }, then: Releasing },
         Sample {
-            name: "accounts-signin",
+            name: "connect-model-choose",
             world: Reference,
             address: Address::ConnectModel { way: None },
+            then: Shown,
+        },
+        Sample {
+            name: "connect-model-key-details",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::Key }),
+            },
+            then: Shown,
+        },
+        Sample {
+            name: "connect-model-program-details",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay {
+                    provider: 17,
+                    kind: temper_client_domain::WayKind::Program,
+                }),
+            },
+            then: Shown,
+        },
+        Sample {
+            name: "connect-model-signing-in",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
+            },
             then: SigningIn,
         },
         Sample {
-            name: "accounts-refused",
+            name: "connect-model-key-ready",
             world: Reference,
-            address: Address::ConnectModel { way: None },
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::Key }),
+            },
+            then: KeyReady,
+        },
+        Sample {
+            name: "connect-model-signin-ready",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
+            },
+            then: SignInReady,
+        },
+        Sample {
+            name: "connect-model-declined",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
+            },
+            then: Declined,
+        },
+        Sample {
+            name: "connect-model-renewed",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
+            },
+            then: Renewed,
+        },
+        Sample {
+            name: "connect-model-refused",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::SignIn }),
+            },
+            then: SignInRefused,
+        },
+        Sample {
+            name: "connect-model-key-lost",
+            world: Reference,
+            address: Address::ConnectModel {
+                way: Some(temper_client_domain::ModelWay { provider: 18, kind: temper_client_domain::WayKind::Key }),
+            },
             then: AccountRefused,
         },
         Sample { name: "task-reference-T28", world: Reference, address: Address::Task { task: 28 }, then: Shown },
@@ -126,7 +201,7 @@ pub fn samples() -> [Sample; N] {
 }
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
-    if sample.then != Then::Shown {
+    if sample.then != Then::Shown && !matches!(sample.address, Address::ConnectModel { .. }) {
         return None;
     }
     let world = match sample.world {
@@ -139,7 +214,8 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         Address::Chats => ("chats", None),
         Address::Chat { task } => ("chat", Some(task)),
         Address::Inbox { .. } => ("inbox", None),
-        Address::Accounts | Address::ConnectModel { .. } => ("accounts", None),
+        Address::Accounts => ("accounts", None),
+        Address::ConnectModel { .. } => ("connect-model", None),
         Address::Welcome { .. } => ("welcome", None),
         Address::Task { task } => ("task", Some(task)),
         Address::ConnectForge { .. } => ("connect-forge", None),
@@ -165,7 +241,16 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         | Address::Task { .. }
         | Address::Adopt { .. } => String::new(),
     };
-    Some(format!("{page}.html?world={world}{task}{forge}&bare"))
+    let way = if let Address::ConnectModel { way: Some(way) } = sample.address {
+        match way.kind {
+            temper_client_domain::WayKind::SignIn => "&way=chatgpt",
+            temper_client_domain::WayKind::Key => "&way=key",
+            temper_client_domain::WayKind::Program => "&way=program",
+        }
+    } else {
+        ""
+    };
+    Some(format!("{page}.html?world={world}{task}{forge}{way}&bare"))
 }
 #[must_use]
 pub fn domain(sample: &Sample) -> Domain {
@@ -205,7 +290,13 @@ pub fn domain(sample: &Sample) -> Domain {
             },
             &mut out,
         ),
-        Then::SigningIn | Then::AccountRefused => account(&mut root, sample.then == Then::AccountRefused, &mut out),
+        Then::SigningIn
+        | Then::AccountRefused
+        | Then::KeyReady
+        | Then::SignInReady
+        | Then::Declined
+        | Then::Renewed
+        | Then::SignInRefused => account(&mut root, sample.then, &mut out),
     }
     root
 }
@@ -244,7 +335,7 @@ fn adoption(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
         );
     }
     step(root, Event::Act { action: Action::Forge(A::Choose { role: forge::Role::Owned }) }, out);
-    if refused {
+    if key {
         step(root, Event::Act { action: Action::Forge(A::Adopt) }, out);
         step(root, Event::Client { event: jig_client::Event::Stored }, out);
         let attempt = sent_attempt(out);
@@ -267,9 +358,11 @@ fn adoption(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
         );
     }
 }
-fn account(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
+fn account(root: &mut Domain, then: Then, out: &mut Queue<Request>) {
     use temper_client_domain::pages::{accounts::Way, connect_model::Act as A};
-    let way = if refused { Way::Key { provider: 18 } } else { Way::SignIn { provider: 18, plan: true } };
+    let refused = then == Then::AccountRefused;
+    let key = refused || then == Then::KeyReady;
+    let way = if key { Way::Key { provider: 18 } } else { Way::SignIn { provider: 18, plan: true } };
     step(
         root,
         Event::Went {
@@ -279,17 +372,17 @@ fn account(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
         },
         out,
     );
-    if !refused {
+    if !key {
         step(root, Event::Act { action: Action::Pages(Act::ConnectModel(A::SignIn { name: [97; 16], way })) }, out);
     }
-    if refused {
+    if key {
         step(
             root,
             Event::AccountKey { value: skein_lib::Secret::new(Box::from(b"gallery-example-key".as_slice())) },
             out,
         );
     }
-    if refused {
+    if key {
         step(root, Event::Act { action: Action::Pages(Act::ConnectModel(A::Submit { name: [97; 16] })) }, out);
     }
     step(root, Event::Client { event: jig_client::Event::Stored }, out);
@@ -298,6 +391,10 @@ fn account(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
     // the account form explains that the key must be supplied again.
     let answer = if refused {
         None
+    } else if key {
+        Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountKeyKept {
+            source: 3,
+        }))))
     } else {
         Some(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignInStarted {
             source: 43,

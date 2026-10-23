@@ -281,12 +281,58 @@ const HOLDS: [Holds; samples::N] = [
         parts: &[Part::Named { role: Role::Dialog, name: "Release" }],
     },
     Holds {
-        name: "accounts-signin",
+        name: "connect-model-choose",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::Region, name: "Choose" }],
+    },
+    Holds {
+        name: "connect-model-key-details",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::TextField, name: "Key (pasted once)" }],
+    },
+    Holds {
+        name: "connect-model-program-details",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::TextField, name: "Program name" }],
+    },
+    Holds {
+        name: "connect-model-key-ready",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::Status, name: "Added your OpenAI API key" }],
+    },
+    Holds {
+        name: "connect-model-signin-ready",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::Status, name: "Signed in to ChatGPT as ChatGPT" }],
+    },
+    Holds {
+        name: "connect-model-declined",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::Alert, name: "You signed in without plan usage." }],
+    },
+    Holds {
+        name: "connect-model-renewed",
+        heading: "Connect a model",
+        parts: &[Part::Named {
+            role: Role::Status,
+            name: "That's ChatGPT again. To add another account, sign out of ChatGPT in your browser first, then Continue with ChatGPT.",
+        }],
+    },
+    Holds {
+        name: "connect-model-refused",
+        heading: "Connect a model",
+        parts: &[Part::Named {
+            role: Role::Alert,
+            name: "Another person here holds that ChatGPT account. To use one of yours, sign out of ChatGPT in your browser first, then Continue with ChatGPT.",
+        }],
+    },
+    Holds {
+        name: "connect-model-signing-in",
         heading: "Connect a model",
         parts: &[Part::Named { role: Role::Link, name: "Open the sign-in page" }],
     },
     Holds {
-        name: "accounts-refused",
+        name: "connect-model-key-lost",
         heading: "Connect a model",
         parts: &[Part::Named { role: Role::Alert, name: "" }],
     },
@@ -569,7 +615,7 @@ fn print_writes_every_page_and_the_bundle() {
             position = at + link.len();
         }
     }
-    let signin = fs::read_to_string(out.join("accounts-signin.html")).expect("sign-in page");
+    let signin = fs::read_to_string(out.join("connect-model-signing-in.html")).expect("sign-in page");
     assert!(signin.contains("href=\"https://issuer.example/visit/gallery-sign-in\""), "external sign-in href");
     let closing = fs::read_to_string(out.join("chat-closing.html")).expect("confirmation page");
     assert!(closing.contains("<dialog open "), "static confirmation opens");
@@ -650,5 +696,28 @@ fn gallery_chat_clocks_are_separate_leaves_under_the_speakers() {
         let clock_at = who + 1 + usize::try_from(tree.nodes()[who + 1].size).expect("speaker size");
         assert_eq!(tree.nodes()[clock_at].role, Role::Time);
         assert_eq!(tree.nodes()[clock_at].name.as_deref(), Some(clock.as_bytes()));
+    }
+}
+
+#[test]
+fn model_samples_link_their_way_to_the_model_mockup() {
+    use temper_client_domain::{Address, WayKind};
+    for sample in samples::samples() {
+        if let Address::ConnectModel { way } = sample.address {
+            let suffix = match way {
+                None => "",
+                Some(way) => match way.kind {
+                    WayKind::Key => "&way=key",
+                    WayKind::Program => "&way=program",
+                    WayKind::SignIn => "&way=chatgpt",
+                },
+            };
+            assert_eq!(
+                samples::mockup(&sample),
+                Some(format!("connect-model.html?world=reference{suffix}&bare")),
+                "{}",
+                sample.name
+            );
+        }
     }
 }

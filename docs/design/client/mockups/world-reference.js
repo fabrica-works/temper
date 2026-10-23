@@ -26,6 +26,7 @@
         ops: true,
         // What a new chat's first run takes.
         next: { account: 'Claude', model: 'Opus · xhigh' },
+        ways: ['Continue with ChatGPT', 'Use an OpenAI API key'],
         restart: 'temper serve',
       },
 
