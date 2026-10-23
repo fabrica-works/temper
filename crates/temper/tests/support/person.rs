@@ -56,7 +56,6 @@ enum Begin {
     LinkWithOpenAiKey,
     Token,
     Link,
-    Welcome,
     Playground,
 }
 /// The script is separate from the client's production composition.
@@ -93,22 +92,16 @@ pub fn deployment_account() -> Script {
         ]),
     }
 }
-/// The terminal stays on Model to read the sign-in's end, then opens Ready by hand.
+/// The welcome's button leaves the tab; the next observation belongs to its come-back page.
 #[must_use]
 pub fn welcome_sign_in() -> Script {
     use skein_ui::Role;
     Script {
-        begin: Begin::Welcome,
+        begin: Begin::Link,
         steps: Box::new([
             Step::Go { address: Address::Welcome { step: temper_client_domain::Step::Model { way: None } } },
             Step::See { find: Find::exactly_named(Role::Button, b"Continue with ChatGPT"), within: START_WITHIN },
             Step::Press { find: Find::exactly_named(Role::Button, b"Continue with ChatGPT") },
-            Step::See {
-                find: Find::exactly_named(Role::Paragraph, b"Open this address in a browser on the engine's machine:"),
-                within: START_WITHIN,
-            },
-            Step::See { find: Find::exactly_named(Role::Status, b"Signed in to ChatGPT"), within: START_WITHIN },
-            Step::Go { address: Address::Welcome { step: temper_client_domain::Step::Ready } },
             Step::See { find: Find::named(Role::Paragraph, b"Model: ChatGPT"), within: START_WITHIN },
         ]),
     }
@@ -266,6 +259,12 @@ enum ProjectSelection {
     Pending,
     Selected,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Departure {
+    Disabled,
+    Present,
+    Left,
+}
 /// Stdout and the client share one host; the link comes only from the binary.
 pub struct Person {
     pub client: Option<NativeClient>,
@@ -286,6 +285,9 @@ pub struct Person {
     begin: Begin,
     directory: Box<[u8]>,
     seed: u64,
+    departure: Departure,
+    leave: Option<Box<[u8]>>,
+    return_address: Option<Address>,
     completions: Queue<Complete>,
     submissions: Queue<Submit>,
 }
@@ -306,6 +308,31 @@ impl Person {
     #[must_use]
     pub fn new(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
         Self::build(root, Some(input), Some(output), script)
+    }
+    #[must_use]
+    pub fn departing(root: Fd, input: Fd, output: Fd, script: Script) -> Self {
+        let mut person = Self::new(root, input, output, script);
+        person.departure = Departure::Present;
+        person.project = ProjectSelection::Selected;
+        person
+    }
+    pub fn leave(&mut self) -> Option<Box<[u8]>> {
+        self.leave.take()
+    }
+    /// Reopen the departed tab on its kept sign-in, once the native transport has drained.
+    pub fn come_back(&mut self, root: Fd, path: &[u8]) {
+        assert!(self.departure == Departure::Left, "the tab departed");
+        assert!(self.client.as_ref().is_some_and(Host::is_empty), "departing client drained");
+        let temper_client_domain::Place::Address(address) = temper_client_domain::address::parse(path) else {
+            panic!("the listener returned a client address");
+        };
+        self.client = None;
+        self.root = Some(root);
+        self.begin = Begin::Token;
+        self.seed = self.seed.checked_add(1).expect("fresh client seed");
+        self.return_address = Some(address);
+        self.departure = Departure::Present;
+        self.wake = Some(Time::ZERO);
     }
     /// Wait for ctl to finish a sign-in in its own directory; load it through the native shell.
     #[must_use]
@@ -381,8 +408,7 @@ impl Person {
             signing_retry: None,
             signing_backoff: SIGN_IN_FIRST,
             finished: false,
-            // Welcome needs no project selection; the playground chooses its own.
-            project: if matches!(script.begin, Begin::Playground | Begin::Welcome) {
+            project: if script.begin == Begin::Playground {
                 ProjectSelection::Selected
             } else {
                 ProjectSelection::Pending
@@ -392,12 +418,15 @@ impl Person {
             directory: b"private".as_slice().into(),
             // Fresh demo clients must not reuse the same request names when
             // signing the same owner in again on the same deployment.
-            seed: if matches!(script.begin, Begin::Link | Begin::Welcome | Begin::Playground) {
+            seed: if matches!(script.begin, Begin::Link | Begin::Playground) {
                 let seed = skein_shell::crypto_seed().expect("demo client's fresh seed");
                 u64::from_le_bytes(seed.expose()[..8].try_into().expect("eight seed bytes"))
             } else {
                 7
             },
+            departure: Departure::Disabled,
+            leave: None,
+            return_address: None,
             completions: Queue::with_capacity(512),
             submissions: Queue::with_capacity(512),
         }
@@ -442,8 +471,10 @@ impl Person {
                 .parse()
                 .expect("socket address");
             self.signing_until = Some(now.saturating_add(START_WITHIN));
+            let make_client =
+                if self.departure == Departure::Disabled { NativeClient::new } else { NativeClient::departing };
             self.client = Some(
-                NativeClient::new(
+                make_client(
                     Settings {
                         engine: skein_io::Addr::Ip(address),
                         directory: self.directory.clone(),
@@ -455,6 +486,40 @@ impl Person {
                     if self.begin == Begin::Token { Start::Token } else { Start::Link(link.into()) },
                 )
                 .expect("printed sign-in link"),
+            );
+        }
+    }
+    fn notices(&mut self) {
+        let client = self.client.as_mut().expect("native client");
+        while let Some(notice) = client.notices() {
+            if let temper_client_shell_terminal::client::Shown::Notice(
+                temper_client_shell_terminal::route::Notice::Leave { to },
+            ) = notice
+            {
+                assert!(self.departure == Departure::Present, "one tab departure");
+                self.departure = Departure::Left;
+                self.leave = Some(to);
+                client.close();
+                continue;
+            }
+            assert!(
+                !matches!(
+                    notice,
+                    temper_client_shell_terminal::client::Shown::Notice(
+                        temper_client_shell_terminal::route::Notice::Fact(_)
+                    )
+                ),
+                "native person step {} protocol fact: {notice:?}",
+                self.actor.at()
+            );
+            assert!(
+                !matches!(
+                    notice,
+                    temper_client_shell_terminal::client::Shown::Terminal(
+                        temper_client_shell_terminal::terminal::Notice::DirectoryRefused
+                    )
+                ),
+                "private client directory refused"
             );
         }
     }
@@ -480,27 +545,8 @@ impl Person {
                 }
             }
         }
-        while let Some(notice) = client.notices() {
-            assert!(
-                !matches!(
-                    notice,
-                    temper_client_shell_terminal::client::Shown::Notice(
-                        temper_client_shell_terminal::route::Notice::Fact(_)
-                    )
-                ),
-                "native person step {} protocol fact: {notice:?}",
-                self.actor.at()
-            );
-            assert!(
-                !matches!(
-                    notice,
-                    temper_client_shell_terminal::client::Shown::Terminal(
-                        temper_client_shell_terminal::terminal::Notice::DirectoryRefused
-                    )
-                ),
-                "private client directory refused"
-            );
-        }
+        self.notices();
+        let client = self.client.as_mut().expect("native client");
         self.wake = None;
         if self.signing_backoff != SIGN_IN_FIRST
             && let Some(until) = self.signing_until
@@ -524,7 +570,17 @@ impl Person {
             self.wake = Some(now);
         }
         let signing_wake = self.wake;
-        if client.started() && self.project == ProjectSelection::Selected && !self.finished && self.failed.is_none() {
+        if client.started()
+            && let Some(address) = self.return_address.take()
+        {
+            client.go(address);
+        }
+        if client.started()
+            && self.departure != Departure::Left
+            && self.project == ProjectSelection::Selected
+            && !self.finished
+            && self.failed.is_none()
+        {
             let before = self.actor.at();
             match self.actor.next(&mut ReplyFace::new(client.tree()), now) {
                 Next::Do(Doing::Act { node, act }) => assert!(client.act(node, act), "offered person act"),

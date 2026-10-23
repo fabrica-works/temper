@@ -81,7 +81,7 @@ fn a_person_signs_in_with_chatgpt_and_a_chat_on_the_plan_lasts() {
 }
 
 #[test]
-fn a_welcome_sign_in_with_chatgpt_ends_at_ready_and_its_account_survives_a_restart() {
+fn a_welcome_sign_in_with_chatgpt_returns_to_ready_and_its_account_survives_a_restart() {
     let scratch = support::Scratch::new("welcome_sign_in");
     let issuer = support::sign_in::configuration(scratch.path());
     let clock = skein_shell::Clock::new();
