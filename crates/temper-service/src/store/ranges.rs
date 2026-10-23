@@ -120,3 +120,33 @@ pub(super) fn request(owner: skein_lib::Token, flight: &Flight) -> Option<store:
     };
     Some(store::Request::Restore { owner, range, after, rows, bytes })
 }
+
+/// Window rows carry agent-readable text across the protocol/domain boundary.
+/// Each rendering fits one tail, as jig's protocol/store.md, 8.3 prices it.
+pub(super) fn texts(
+    range: &Range,
+    rows: &[temper_engine_domain::Record],
+) -> Option<temper_engine_domain::TranscriptTexts> {
+    if let Range::Core(CoreRange::TaskTranscript { .. }) = range {
+    } else {
+        return None;
+    }
+    let mut texts = skein_lib::List::with_capacity(u32::try_from(rows.len()).expect("bounded transcript rows"));
+    for row in rows {
+        let text = match row {
+            temper_engine_domain::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) => {
+                let bound = u32::try_from(turn.transcript.len())
+                    .expect("bounded stored turn")
+                    .min(temper_engine_domain::TRANSCRIPT_TAIL_BYTES);
+                let limits = jig_protocol_transcript::Limits::new(
+                    bound,
+                    jig_protocol_transcript::TurnLimits { messages: u32::MAX, blocks: u32::MAX, text: bound },
+                );
+                jig_protocol_transcript::brief_text(&limits, &turn.transcript).ok()
+            }
+            temper_engine_domain::Record::Core(_) | temper_engine_domain::Record::Forge { .. } => None,
+        };
+        texts.push(text).expect("one rendering per row");
+    }
+    Some(texts.into_boxed())
+}
