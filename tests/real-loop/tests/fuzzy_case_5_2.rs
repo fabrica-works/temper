@@ -10,9 +10,15 @@ use temper_real_loop_world::{
 
 #[test]
 fn a_stopped_owners_delegates_go_on_and_its_news_waits_for_its_release_without_a_park_or_a_retired_charter() {
-    // Leaves out the director parking B (there is no agent Stop), retiring the
-    // helper's charter (no runtime withdrawal; live tasks refuse restoration
-    // without it), and a second helper. A held review stands for h1 in flight,
+    // Leaves out the director parking B, temper-on-temper.md 6.2's design gap:
+    // an agent's task tools delegate, amend, message, cancel and release, but
+    // none stops a task (crates/temper-engine-smith/src/calls.rs:42-52), so the
+    // director proposes and the person stops. Leaves out retiring the helper's
+    // charter, 6.8 (b), missing: no charter is withdrawn while a deployment
+    // runs, and across a restart a live task on a charter no longer configured
+    // refuses the restore (jig's crates/jig-domain-tasks/src/stored.rs:656), so
+    // the helper's cancel stands for it. Leaves out a second helper. A held
+    // review stands for h1 in flight,
     // not already ready in kit's queue: this fixture's CI passes at once.
     // Nothing acts on the results until B's one release; the person's tour of
     // every owner's work is left out (domain/testing.md, 5.3's 5.2 row).
