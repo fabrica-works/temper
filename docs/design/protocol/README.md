@@ -935,9 +935,11 @@ w1, w2       temper serve DIRS     after the engine: each a worker alone
   the fake process and before serve until temper-15; serve adopts its
   seeded repositories with the handover and `webhook_secret` file,
   then connects with file-built access (setup.md, 8.4; `../qa.md`, 4.3). So
-  `lab/cluster/` holds the fake LLM, the engine and the workers, the
-  engine's one forge connected and unreached, as the process tier's
-  other documents have theirs; its tasks are chats, and its stories'
+  `lab/cluster/` holds the fake forge, the fake LLM, the engine and
+  the workers, the engine's one forge connected and unreached, as the
+  process tier's other documents have theirs, until a story makes it
+  the fake's setup, as the reference case's do (`../domain/testing.md`,
+  2.6); its tasks are chats, and its stories'
   referee the tasks' ends on their named workers and no survivor. A
   chat's run holds its worker's one slot until its charter's idle
   threshold or its time less its reserve, both of which the description
@@ -965,7 +967,7 @@ Each where `../domain/testing.md` puts it (2.4 to 2.6):
 | step tests | each shape read and checked, a document of none refused, naming its path; each line of 15.3 as printed |
 | the engine's domain | two workers at positions 0 and 1, one slot each: two tasks, one placed on each; one lost, its run placed on the other past the grace |
 | the real loop | an engine alone and two workers alone, three services on one ring with their own directories, the workers dialling the engine's listener on loopback: a task on each runs to its end |
-| the process tier | `lab/cluster/` on real processes, as below |
+| the process tier | `lab/cluster/` on real processes, as below, and the reference case's steps on them (`../domain/testing.md`, 2.6 and 5.3) |
 
 The process tier's first stories, one slot on each worker. A temper
 worker takes one slot today: smith gives its agent one run, and the
@@ -1015,6 +1017,12 @@ workers need no more; a worker of several slots is later (15.7).
 These are the reference case's multi-worker steps at their smallest:
 4.1's placement by free slots, 4.3's worker added later, 4.6's hung
 worker (`../draft/reference-case.md`).
+
+- **The reference case's steps,** each a story of its own on the same
+  description, the case's workers named ws, s1 and s2, its fixture
+  applied to the engine's and the workers' documents, its acts by real
+  `temper ctl`, and its oracle over what the processes observed
+  (`../domain/testing.md`, 2.6): 4.1's opener on ws and s1.
 
 ### 15.7 Later
 
