@@ -126,3 +126,7 @@ disallowed_methods = "deny"
 [[test]]
 name = "qa_plan_chat_start"
 path = "tests/qa_plan_chat_start.rs"
+
+[[test]]
+name = "qa_sign_in"
+path = "tests/qa_sign_in.rs"
