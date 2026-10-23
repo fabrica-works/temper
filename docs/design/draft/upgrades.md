@@ -469,9 +469,9 @@ outcomes; the deployment's and installation's ids.
   warning naming its replacement, then refused as unknown, as today
   (`../protocol/configuration.md`, section 2). A deployment that skips a
   release may find a removed member refused, by name.
-- **Runtime records shrink it** (`first-release.md`, 7.1): templates,
-  charters and policies in the store, where patches carry them; the
-  configuration keeps what a start fixes.
+- **Settings in the store shrink it** (`configuring.md`, section 3):
+  charters, templates, policies and rules in the store, where patches
+  carry them; the configuration keeps what a start fixes.
 - **Small files outside the generation,** a forge's setup `state`, the
   box's records, the demo's, a worker's secret and digest: each carries
   its version, is read in any version from the baseline on, and is

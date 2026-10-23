@@ -33,9 +33,10 @@ them. Nothing here is adopted.
   (section 6).
 - **A person configures temper by talking to it:** they describe their
   workflow, as skein's `owners.md` and `director.md` describe ours, and
-  an agent configures temper. Templates, charters and policies become
-  runtime records, so no hot restart is needed; the agent reads
-  documentation built into the binary (section 7).
+  an agent proposes how temper will run it. Settings live in the store,
+  never in the configuration document; new work follows a change while
+  running work keeps what it started under, as `configuring.md` designs
+  (section 7).
 - **The playground runs in the visitor's browser,** fakes only: the
   one-process world built for wasm32, served as static files. An
   investigation found it feasible (section 8).
@@ -74,7 +75,8 @@ them. Nothing here is adopted.
 - **Built now, published at launch.** The copy and the look are taste:
   drafted by Claude, chosen by the user through option pages.
 - **It hosts** the download page (section 9), the documentation's public
-  side (7.3), and links to the forge, dev.fabrig.ai and the playground.
+  side (`configuring.md`, section 7), and links to the forge,
+  dev.fabrig.ai and the playground.
 
 ## 4. git.fabrig.ai, the forge
 
@@ -216,61 +218,24 @@ read-only; `~/src/rust/tmp/roadmap-3/store-upgrades.md`). In short:
 
 ## 7. Configuring temper by talking to it
 
-A person describes the workflow they want, as skein's `owners.md` and
-`director.md` describe ours, and an agent configures temper to run it.
+Designed in `configuring.md`, from a session with the user on
+2026-10-23. In short:
 
-### 7.1 Runtime records
-
-- **Templates, charters and policies become records** in jig's store,
-  changed by requests (a person's or the configuring agent's), each
-  change a proposal that an owner accepts, its history kept. They are
-  needed whatever else is chosen: the agent, the client's pages for them
-  and any later repository all write the same records.
-- **No hot restart for them.** The hot restart (`first-run.md`, section
-  7; `hot-restart-report.md`) stays for what a deployment fixes at its
-  start: listeners, capacities, endpoints, workers.
-- **Projects at runtime lead the way:** jig's `MakeProject` and temper's
-  policies at runtime already move a project's policy into the store.
-  How cheaply the rest follows is a survey's question, against that work.
-
-### 7.2 Configuration in a repository
-
-Open; the user is thinking about it. What was said:
-
-- **A local git repository** in the deployment's data directory, written
-  by temper: history, diffs and rollback, with no forge.
-- **A repository on the connected forge,** changes landed through
-  temper's own gates: configuration as code, reviewed and public on
-  git.fabrig.ai for temper-on-temper. Its hard parts: a start never
-  depends on the forge (only on the last landed copy), credentials never
-  live in it, and a forge that is down blocks changes, not running.
-- **The fake forge, grown a real-git bridge,** as an internal store. The
-  bridge is designed but not built. The concern: the fakes are test
-  doubles, held in memory, with test-grade promises.
-- **A split to weigh:** what concerns working on a product (charters,
-  gates, landing rules) in the product's own repository, as `AGENTS.md`
-  is today (`factory.md`: product knowledge is data in the product's
-  repository); what concerns the deployment (workers, accounts, budgets,
-  capacities) with the deployment.
-
-Whatever is chosen is a source synced into section 7.1's records.
-
-### 7.3 Documentation in the binary
-
-One source of user documentation, with three readers: the site's
-documentation pages, the command line's help, and the agent's context
-in `temper box` and in a deployment. It is written for people who run
-temper, not in the design documents' register.
-
-### 7.4 The configuring agent, and its test
-
-- **Its tools are the requests a person may make,** through the same
-  role and proposal checks: it changes nothing an owner would not be
-  asked about.
-- **Its test exists already:** given `owners.md` and `director.md`, it
-  should produce the encoding `temper-on-temper.md` made by hand. The
-  gaps of section 6.8 there bound it: it can only say what temper's model
-  can.
+- **A person describes how they work,** as skein's `owners.md` and
+  `director.md` describe ours, and an agent proposes how temper will
+  run it; an owner accepts, on a page in plain words.
+- **Structure becomes settings; rules stay text** that runs read, so
+  most changes to a process need no configuring.
+- **Settings live in the store,** never in `temper.json`: charters,
+  templates, the policies projects are made from, the rules and the
+  landing rules. A setting the store does not hold takes the binary's
+  default, and a change is one decision, with no restart.
+- **New work follows a change; running work keeps the charter it
+  started under,** in revisions side by side. Conversations move at
+  their next run, and what a task may do is never pinned.
+- **The documentation is built into the binary,** for the site, the
+  command line and the agent; the agent's test is the encoding
+  `temper-on-temper.md` made by hand.
 
 ## 8. The playground
 
@@ -376,8 +341,9 @@ broken into missions as it starts:
 5. **dev.fabrig.ai,** private first: the forge, the engine and workers
    under systemd, WireGuard, backups; resets until the baseline; then
    public reading; then lanes moved onto it.
-6. **Runtime records,** after projects at runtime; then documentation in
-   the binary and the configuring agent.
+6. **Configuring by talking,** in `configuring.md`'s order: a survey,
+   settings in the store and their revisions, in jig then temper; the
+   pages; documentation in the binary; the configuring agent.
 7. **The download,** from roadmap 2's usable point.
 8. **Upgrades,** designed in `upgrades.md`, built as the baseline
    approaches, with the policy turned on by the user at the baseline.
@@ -394,8 +360,8 @@ broken into missions as it starts:
   or managed, run by systemd and administered by temper. Default:
   whichever needs less new design, decided with roadmap 2's owned
   Forgejo.
-- **Configuration in a repository** (7.2). Default: runtime records
-  only.
+- **Configuration in a repository:** `configuring.md`, section 10.
+  Default: the store alone.
 - **People's names on public pages.** Default: hidden.
 - **Claude for temper-on-temper's first lane,** or ChatGPT alone.
   Default: ChatGPT, roadmap 2's first backend.
