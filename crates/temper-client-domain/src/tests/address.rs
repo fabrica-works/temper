@@ -1,4 +1,7 @@
-use crate::address::{Address, Filter, Kind, Place, parse, print};
+use crate::{
+    ModelWay, Step, WayKind,
+    address::{Address, Filter, Kind, Place, parse, print},
+};
 
 #[test]
 fn each_page_round_trips_through_its_path() {
@@ -134,11 +137,10 @@ fn each_number_spans_its_types_range() {
 
 #[test]
 fn the_welcome_prints_and_parses_each_step() {
-    use crate::Step;
     for (step, path) in [
         (Step::Welcome, b"/welcome".as_slice()),
         (Step::Forge { forge: None }, b"/welcome?at=forge"),
-        (Step::Model, b"/welcome?at=model"),
+        (Step::Model { way: None }, b"/welcome?at=model"),
         (Step::Ready, b"/welcome?at=ready"),
     ] {
         let address = Address::Welcome { step };
@@ -155,9 +157,51 @@ fn a_welcome_query_it_cannot_read_opens_its_first_step() {
         b"/welcome?at=Forge",
         b"/welcome?at=done&at=forge",
     ] {
-        assert_eq!(parse(path), Place::Address(Address::Welcome { step: crate::Step::Welcome }));
+        assert_eq!(parse(path), Place::Address(Address::Welcome { step: Step::Welcome }));
     }
-    assert_eq!(parse(b"/welcome?x=1&at=model&at=forge"), Place::Address(Address::Welcome { step: crate::Step::Model }));
+    assert_eq!(
+        parse(b"/welcome?x=1&at=model&at=forge"),
+        Place::Address(Address::Welcome { step: Step::Model { way: None } })
+    );
+}
+
+#[test]
+fn all_model_way_addresses_print_and_read_including_the_welcome() {
+    for (kind, path, welcome) in [
+        (
+            WayKind::SignIn,
+            b"/accounts/connect?provider=17&way=sign-in".as_slice(),
+            b"/welcome?at=model&provider=17&way=sign-in".as_slice(),
+        ),
+        (WayKind::Program, b"/accounts/connect?provider=17&way=program", b"/welcome?at=model&provider=17&way=program"),
+        (WayKind::Key, b"/accounts/connect?provider=17&way=key", b"/welcome?at=model&provider=17&way=key"),
+    ] {
+        let way = Some(ModelWay { provider: 17, kind });
+        for (address, expected) in
+            [(Address::ConnectModel { way }, path), (Address::Welcome { step: Step::Model { way } }, welcome)]
+        {
+            assert_eq!(print(&address).as_ref(), expected);
+            assert_eq!(parse(expected), Place::Address(address));
+        }
+    }
+    assert_eq!(print(&Address::ConnectModel { way: None }).as_ref(), b"/accounts/connect");
+}
+#[test]
+fn incomplete_or_unreadable_way_fields_are_dropped() {
+    for path in [
+        b"/accounts/connect?provider=17".as_slice(),
+        b"/accounts/connect?way=key",
+        b"/accounts/connect?provider=017&way=key",
+        b"/accounts/connect?provider=4294967296&way=key",
+        b"/accounts/connect?provider=17&way=unknown",
+        b"/accounts/connect?other=17&way=key",
+    ] {
+        assert_eq!(parse(path), Place::Address(Address::ConnectModel { way: None }));
+    }
+    assert_eq!(
+        parse(b"/welcome?at=model&provider=no&way=key"),
+        Place::Address(Address::Welcome { step: Step::Model { way: None } })
+    );
 }
 
 #[test]
@@ -201,9 +245,12 @@ fn the_welcomes_forge_step_carries_its_choice() {
         (Some(crate::Choice::Elsewhere), b"/welcome?at=forge&forge=elsewhere"),
         (None, b"/welcome?at=forge"),
     ] {
-        let address = Address::Welcome { step: crate::Step::Forge { forge } };
+        let address = Address::Welcome { step: Step::Forge { forge } };
         assert_eq!(print(&address).as_ref(), path);
         assert_eq!(parse(path), Place::Address(address));
     }
-    assert_eq!(parse(b"/welcome?forge=3&at=model"), Place::Address(Address::Welcome { step: crate::Step::Model }));
+    assert_eq!(
+        parse(b"/welcome?forge=3&at=model"),
+        Place::Address(Address::Welcome { step: Step::Model { way: None } })
+    );
 }

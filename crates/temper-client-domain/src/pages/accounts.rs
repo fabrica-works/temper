@@ -1,10 +1,10 @@
 //! Borrowed account facts and one bounded form (client/README.md, 3.5–3.6).
 use super::Request;
 use crate::owner::Owner;
-use alloc::boxed::Box;
 use jig_client::{Client, Handle, Latest, State, contract as c};
-use skein_lib::{Queue, Secret};
+use skein_lib::Queue;
 mod acts;
+pub mod request;
 mod ways;
 pub use acts::{Act, Broken, Operation, Pending};
 pub use ways::{Way, ways};
@@ -48,17 +48,10 @@ pub fn document(client: &Client) -> Option<&c::OwnerAccounts> {
 }
 
 #[derive(Debug)]
-#[expect(clippy::partial_pub_fields, reason = "the one-shot field is private and never bound or persisted")]
 pub struct Accounts {
     pub deployment: Option<Handle>,
     pub selection: Selection,
-    pub pending: Option<Pending>,
-    pub confirm: Option<(skein_lib::RequestKey, c::Ask)>,
-    pub broken: Option<Broken>,
-    pub way: Option<Way>,
-    pub program: Box<[u8]>,
-    value: Option<Secret>,
-    written: u64,
+    pub request: request::Request,
 }
 
 impl Default for Accounts {
@@ -70,28 +63,16 @@ impl Default for Accounts {
 impl Accounts {
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            deployment: None,
-            selection: Selection::default(),
-            pending: None,
-            confirm: None,
-            broken: None,
-            way: None,
-            program: Box::new([]),
-            value: None,
-            written: 0,
-        }
+        Self { deployment: None, selection: Selection::default(), request: request::Request::default() }
     }
 
     pub(crate) fn configure(&mut self, owner: bool, next: &mut u64, out: &mut Queue<Request>) {
         if !owner && self.deployment.is_some() && self.selection.holder == c::AccountHolder::Deployment {
-            self.clear_key();
-            self.confirm = None;
+            self.request.clear_key();
+            self.request.confirm = None;
             self.selection.provider = None;
             self.selection.account = None;
             self.selection.source = None;
-            self.way = None;
-            self.program = Box::new([]);
         }
         if owner && self.deployment.is_none() {
             let handle = Handle { asker: Owner::Pages.asker(), number: *next };
@@ -107,11 +88,9 @@ impl Accounts {
     }
 
     pub(crate) fn leave(&mut self, out: &mut Queue<Request>) {
-        self.clear_key();
-        self.confirm = None;
+        self.request.clear_key();
+        self.request.confirm = None;
         self.selection = Selection::default();
-        self.way = None;
-        self.program = Box::new([]);
         if let Some(handle) = self.deployment.take() {
             out.push(Request::Client(jig_client::Event::Unwatch { handle }));
         }
@@ -147,76 +126,4 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(limits.client.domain.document_bytes)?
         .checked_add(32)?
         .checked_add(skein_lib::List::<Way>::worst_case(limits.client.domain.rows.checked_mul(3)?)?)
-}
-
-impl Accounts {
-    #[must_use]
-    pub const fn key_written(&self) -> u64 {
-        self.written
-    }
-    pub(super) fn clear_key(&mut self) {
-        self.value = None;
-        self.written = self.written.checked_add(1).expect("account field writes fit");
-    }
-    #[must_use]
-    pub fn has_key(&self) -> bool {
-        self.value.is_some()
-    }
-    /// Started is an address to visit, never proof of a completed login.
-    #[must_use]
-    pub fn sign_in_state(&self, client: &Client) -> SignInState {
-        let Some((source, _)) = self.started() else {
-            return SignInState::Unknown;
-        };
-        let pending = self.pending.as_ref().expect("started request");
-        if pending.ended {
-            return SignInState::Ended { source };
-        }
-        if let Some(accounts) = document(client) {
-            for signing in &accounts.signing {
-                if signing.source == source {
-                    return SignInState::Signing { source };
-                }
-            }
-        }
-        if pending.name.is_some() { SignInState::Started { source } } else { SignInState::Unknown }
-    }
-    pub(super) fn refresh(&mut self, client: &Client) {
-        let Some((source, _)) = self.started() else {
-            return;
-        };
-        let Some(accounts) = document(client) else {
-            return;
-        };
-        let pending = self.pending.as_mut().expect("started request");
-        let mut signing = false;
-        for row in &accounts.signing {
-            if row.source == source {
-                signing = true;
-            }
-        }
-        let ended = match &accounts.last_end {
-            Some(end) => end.source == source,
-            None => false,
-        };
-        pending.ended |= ended || (!signing && !accounts.cut && (pending.signing || pending.name.is_none()));
-        pending.signing |= signing;
-    }
-    #[must_use]
-    pub fn sign_in_address(&self, client: &Client) -> Option<&[u8]> {
-        match self.sign_in_state(client) {
-            SignInState::Started { .. } | SignInState::Signing { .. } => Some(self.started()?.1),
-            SignInState::Unknown | SignInState::Ended { .. } => None,
-        }
-    }
-    fn started(&self) -> Option<(u32, &[u8])> {
-        if let jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
-            c::OwnerOutcome::AccountSignInStarted { source, address },
-        )))) = self.pending.as_ref()?.outcome.as_ref()?
-        {
-            Some((*source, address))
-        } else {
-            None
-        }
-    }
 }

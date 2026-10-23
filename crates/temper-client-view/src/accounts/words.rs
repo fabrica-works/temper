@@ -5,6 +5,37 @@ use skein_lib::{List, bytes::copy_of};
 use skein_ui::phrases::{Form, Hole, HoleKind, HoleShape, Phrase, PhraseId, PhraseShape, PluralClass, Segment};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Word {
+    Command,
+    PlanRuns,
+    KeyAdded,
+    KeyTitle,
+    KeyTitleA,
+    SignInDescription,
+    PlanPays,
+    ProgramDeclared,
+    DeploymentPays,
+    OwnPays,
+    MisconfiguredPlan,
+    HeldPlan,
+    DeclinedPlan,
+    SteppedAside,
+    PaysFor,
+    ReadyModel,
+    ReadyAccount,
+    StartChat,
+    ProgramRun,
+    KeyRuns,
+    ProgramNote,
+    ProgramDescription,
+    Pasted,
+    KeyDescription,
+    BrowserMinute,
+    ChatDescription,
+    AllWays,
+    SigningIn,
+    Details,
+    Choose,
+    ConnectAdd,
     Accounts,
     Own,
     Deployment,
@@ -154,6 +185,28 @@ pub(crate) enum Word {
     NavLimited,
 }
 const ROWS: &[(Word, &[u8])] = &[
+    (Word::DeploymentPays, "Deployment work".as_bytes()),
+    (Word::OwnPays, "Your own work".as_bytes()),
+    (Word::PlanPays, "Your own work, and projects where you’re the only member".as_bytes()),
+    (Word::MisconfiguredPlan, "OpenAI refused temper's sign-in. Check the configuration's registration.".as_bytes()),
+    (Word::HeldPlan, "Another person here holds that ChatGPT account. To use one of yours, sign out of ChatGPT in your browser first, then Continue with ChatGPT.".as_bytes()),
+    (Word::DeclinedPlan, "You signed in without plan usage.".as_bytes()),
+    (Word::SteppedAside, "The playground’s scripted model stepped aside.".as_bytes()),
+    (Word::PaysFor, "Pays for".as_bytes()),
+    (Word::ReadyModel, "Model".as_bytes()),
+    (Word::ReadyAccount, "Account".as_bytes()),
+    (Word::StartChat, "Start a chat".as_bytes()),
+    (Word::ProgramRun, "Run this on each host temper’s agents run on, in a terminal there:".as_bytes()),
+    (Word::KeyRuns, "temper’s agents now run on it.".as_bytes()),
+    (Word::ProgramNote, "Claude Code asks you to sign in. temper never reads its login.".as_bytes()),
+    (Word::ProgramDescription, "temper runs Claude Code, signed in to your Claude subscription on each host its agents run on. Name the login, then sign in on each host, in a terminal there.".as_bytes()),
+    (Word::Pasted, "Pasted here · at once".as_bytes()),
+    (Word::BrowserMinute, "In a browser on the engine’s machine · about a minute".as_bytes()),
+    (Word::AllWays, "‹ All ways".as_bytes()),
+    (Word::SigningIn, "Signing in".as_bytes()),
+    (Word::Details, "Details".as_bytes()),
+    (Word::Choose, "Choose".as_bytes()),
+    (Word::ConnectAdd, "+ Connect a model".as_bytes()),
     (Word::AccountsOmitted, b"Accounts left out: "),
     (Word::SourcesOmitted, b"Sources left out: "),
     (Word::UsesOmitted, b"Uses left out: "),
@@ -169,7 +222,7 @@ const ROWS: &[(Word, &[u8])] = &[
         b"Account removed; revocation was not confirmed. Disconnect temper in the provider's settings.",
     ),
     (Word::Accounts, b"Accounts"),
-    (Word::Own, b"Your LLM accounts"),
+    (Word::Own, b"Your accounts"),
     (Word::Deployment, b"Deployment accounts"),
     (Word::Unknown, b"Waiting for current account facts."),
     (Word::Empty, b"No accounts shown."),
@@ -321,6 +374,10 @@ const NAMED: &[(Word, &[u8], &[u8])] = &[
     (Word::PlanSignIn, b"", b" sign-in"),
     (Word::CodeLogin, b"Claude Code login ", b""),
     (Word::ProgramCommand, b"On each host, run: temper program-login ", b""),
+    (Word::KeyTitle, "An ".as_bytes(), " API key".as_bytes()),
+    (Word::KeyAdded, "Added your ".as_bytes(), " API key".as_bytes()),
+    (Word::PlanRuns, "temper’s agents now run on your ".as_bytes(), " plan.".as_bytes()),
+    (Word::Command, "temper program-login ".as_bytes(), "".as_bytes()),
 ];
 // PLAN is hole 0 and DISPLAY hole 1; hole 2 repeats PLAN in a renewal.
 struct EndWords {
@@ -339,6 +396,24 @@ const ENDS: &[EndWords] = &[
         indices: &[1, 0, 2],
     },
     EndWords { literals: &[b"Signed in to ", b""], indices: &[0] },
+    EndWords { literals: &[b"Declared your ", " subscription · ".as_bytes(), b""], indices: &[0, 1] },
+    EndWords { literals: &[b"A ", b" API key"], indices: &[0] },
+    EndWords {
+        literals: &[
+            b"A key from ",
+            "’s platform. What temper’s agents use is billed to the key’s organization.".as_bytes(),
+        ],
+        indices: &[0],
+    },
+    EndWords {
+        literals: &[
+            b"Your ",
+            b" plan. Sign in with your ",
+            " account, and temper’s agents use your plan’s included usage.".as_bytes(),
+        ],
+        indices: &[0, 1],
+    },
+    EndWords { literals: &[b"Sign in with your ", b" account."], indices: &[0] },
 ];
 fn id(number: u16) -> PhraseId {
     PhraseId { owner: super::owner(), number }
@@ -358,6 +433,16 @@ pub(crate) fn say(words: &Words, word: Word, holes: &[Hole]) -> Box<[u8]> {
         220
     } else if word == Word::RenewedNamed {
         221
+    } else if word == Word::KeyTitleA {
+        224
+    } else if word == Word::KeyDescription {
+        225
+    } else if word == Word::ChatDescription {
+        226
+    } else if word == Word::SignInDescription {
+        227
+    } else if word == Word::ProgramDeclared {
+        223
     } else if word == Word::MadePlan {
         222
     } else {
@@ -468,7 +553,7 @@ pub(crate) fn capacity(words: &Words) -> Option<u32> {
     for number in 0..u16::try_from(ROWS.len()).ok()? {
         most = most.max(words.book.capacity(id(number))?);
     }
-    for number in [200, 201, 202, 203, 204, 220, 221] {
+    for number in [200, 201, 202, 203, 204, 220, 221, 222, 223, 224, 225, 226, 227] {
         most = most.max(words.book.capacity(id(number))?);
     }
     for index in 0..NAMED.len() {

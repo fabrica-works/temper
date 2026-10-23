@@ -1,15 +1,20 @@
 use skein_lib::Secret;
 use temper_client_domain::{
     self as d,
-    pages::accounts::{Act, Operation, SignInState, Way},
+    pages::{accounts::SignInState, connect_model::Act},
 };
 use temper_client_world::{fixtures, front::account_acts as accounts};
 const NAME: [u8; 16] = [113; 16];
 fn act(act: Act) -> temper_client_world::app::Event {
-    d::Event::Act { action: d::Action::Pages(d::pages::Act::Accounts(act)) }.into()
+    d::Event::Act { action: d::Action::Pages(d::pages::Act::ConnectModel(act)) }.into()
 }
 fn select() -> temper_client_world::app::Event {
-    act(Act::Choose { name: NAME, way: Way::Key { provider: accounts::PROVIDER } })
+    d::Event::Went {
+        place: d::Place::Address(d::Address::ConnectModel {
+            way: Some(d::ModelWay { provider: accounts::PROVIDER, kind: d::WayKind::Key }),
+        }),
+    }
+    .into()
 }
 #[test]
 fn a_lost_key_answer_replays_under_the_same_name_without_a_second_account() {
@@ -21,23 +26,24 @@ fn a_lost_key_answer_replays_under_the_same_name_without_a_second_account() {
         &mut root,
         d::Event::AccountKey { value: Secret::new(Box::from(b"test-private-key".as_slice())) }.into(),
     );
-    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME, operation: Operation::AddAccountKey }));
+    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME }));
     let source = accounts::kept(&mut front);
     accounts::settle(&mut front, &mut root);
     accounts::lost(&mut front, &mut root);
-    let page = root.person().pages().accounts().expect("account fixture state");
-    assert_eq!(page.pending.as_ref().expect("account fixture state").outcome, Some(jig_client::Outcome::Lost));
+    let page = root.person().pages().connect_model().expect("account fixture state");
+    assert_eq!(page.request.pending.as_ref().expect("account fixture state").outcome, Some(jig_client::Outcome::Lost));
     accounts::event(
         &mut front,
         &mut root,
         d::Event::AccountKey { value: Secret::new(Box::from(b"test-private-key".as_slice())) }.into(),
     );
-    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME, operation: Operation::AddAccountKey }));
+    accounts::event(&mut front, &mut root, act(Act::Submit { name: NAME }));
     let root = root.person();
     assert_eq!(
         root.pages()
-            .accounts()
+            .connect_model()
             .expect("account fixture state")
+            .request
             .pending
             .as_ref()
             .expect("account fixture state")
@@ -55,6 +61,11 @@ fn a_lost_key_answer_replays_under_the_same_name_without_a_second_account() {
 fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch() {
     use jig_domain_accounts as a;
     let (mut front, mut root) = accounts::plan_fixture(fixtures::SEED);
+    accounts::event(
+        &mut front,
+        &mut root,
+        d::Event::Went { place: d::Place::Address(d::Address::ConnectModel { way: None }) }.into(),
+    );
     let limits = fixtures::domain_limits();
     let words = fixtures::phrasebooks(&limits);
     let bounds = fixtures::view_bounds(&limits, &words);
@@ -77,7 +88,12 @@ fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch(
     }));
     accounts::settle(&mut front, &mut root);
     assert_eq!(
-        root.person().pages().accounts().expect("account fixture state").sign_in_state(root.person().client()),
+        root.person()
+            .pages()
+            .connect_model()
+            .expect("account fixture state")
+            .request
+            .sign_in_state(root.person().client()),
         SignInState::Signing { source }
     );
     patches = skein_lib::Queue::with_capacity(bounds.tree.patches);
@@ -97,11 +113,14 @@ fn a_sign_in_started_answer_is_followed_by_its_actual_end_on_the_accounts_watch(
     accounts::settle(&mut front, &mut root);
     let root = root.person();
     assert_eq!(
-        root.pages().accounts().expect("account fixture state").sign_in_state(root.client()),
+        root.pages().connect_model().expect("account fixture state").request.sign_in_state(root.client()),
         SignInState::Ended { source }
     );
     assert!(d::pages::accounts::document(root.client()).expect("account fixture state").last_end.is_some());
-    assert_eq!(root.pages().accounts().expect("account fixture state").sign_in_address(root.client()), None);
+    assert_eq!(
+        root.pages().connect_model().expect("account fixture state").request.sign_in_address(root.client()),
+        None
+    );
     patches = skein_lib::Queue::with_capacity(bounds.tree.patches);
     temper_client_view::build(&mut view, root, fixtures::NOW, &mut patches);
     let text: Vec<u8> =
@@ -121,10 +140,11 @@ fn a_client_shows_a_third_account_at_two_rows() {
             &mut root,
             d::Event::AccountKey { value: Secret::new(Box::from(b"test-private-key".as_slice())) }.into(),
         );
-        accounts::event(&mut front, &mut root, act(Act::Submit { name, operation: Operation::AddAccountKey }));
+        accounts::event(&mut front, &mut root, act(Act::Submit { name }));
         accounts::kept(&mut front);
         accounts::settle(&mut front, &mut root);
     }
+    accounts::event(&mut front, &mut root, d::Event::Went { place: d::Place::Address(d::Address::Accounts) }.into());
     let doc = d::pages::accounts::document(root.person().client()).expect("accounts document");
     let third = doc.accounts.get(2).expect("third account decoded whole").number;
     let mut limits = fixtures::domain_limits();

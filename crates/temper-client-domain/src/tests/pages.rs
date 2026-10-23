@@ -2,6 +2,7 @@ mod accounts;
 mod chat;
 mod chats;
 mod choice;
+mod connect_model;
 mod delegation;
 mod inbox;
 mod task;

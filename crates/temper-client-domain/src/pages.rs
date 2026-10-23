@@ -10,6 +10,7 @@ pub mod accounts;
 pub mod chat;
 pub mod chats;
 pub mod choice;
+pub mod connect_model;
 pub mod delegation;
 pub mod inbox;
 pub mod task;
@@ -25,6 +26,9 @@ pub struct Pages {
     chat: Option<chat::Chat>,
     task: Option<task::Task>,
     accounts: accounts::Accounts,
+    connect_model: Option<Box<connect_model::ConnectModel>>,
+    pub(crate) demo_provider: Option<u32>,
+    pub(crate) demo_model: bool,
     pub(crate) choice: choice::Draft,
     accounts_open: bool,
     welcome: Option<welcome::Welcome>,
@@ -44,6 +48,7 @@ pub enum Act {
     SignOut,
     Playground,
     Accounts(accounts::Act),
+    ConnectModel(connect_model::Act),
     ChatWords {
         words: Box<[u8]>,
     },
@@ -146,6 +151,9 @@ impl Pages {
             chat: None,
             task: None,
             accounts: accounts::Accounts::default(),
+            connect_model: None,
+            demo_provider: None,
+            demo_model: false,
             choice: choice::Draft::default(),
             accounts_open: false,
             welcome: None,
@@ -166,6 +174,10 @@ impl Pages {
         if self.accounts_open && self.party.is_some() { Some(&self.accounts) } else { None }
     }
     #[must_use]
+    pub fn connect_model(&self) -> Option<&connect_model::ConnectModel> {
+        if self.party.is_some() { self.connect_model.as_deref() } else { None }
+    }
+    #[must_use]
     pub const fn welcome(&self) -> Option<&welcome::Welcome> {
         self.welcome.as_ref()
     }
@@ -177,7 +189,11 @@ impl Pages {
     }
     #[must_use]
     pub fn account_name(&self) -> skein_lib::RequestKey {
-        if let Some(pending) = &self.accounts.pending
+        let request = match &self.connect_model {
+            Some(page) => &page.request,
+            None => &self.accounts.request,
+        };
+        if let Some(pending) = &request.pending
             && (pending.outcome.is_none()
                 || pending.outcome == Some(jig_client::Outcome::Unsent)
                 || pending.outcome == Some(jig_client::Outcome::Lost))
@@ -274,13 +290,23 @@ impl Pages {
 pub fn me_handle() -> Handle {
     Handle { asker: Owner::Pages.asker(), number: 0 }
 }
+#[expect(clippy::too_many_lines, reason = "one ordered dispatch routes page events and refreshes shared facts")]
 pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Started => started(pages, out),
         Event::Went { address } => went(pages, env, address, out),
         Event::AccountKey { value } => {
-            if pages.accounts_open && accounts::current_me(client).is_some() {
-                pages.accounts.key(value);
+            if let Some(page) = &mut pages.connect_model {
+                page.request.key(value);
+            } else if pages.accounts_open && accounts::current_me(client).is_some() {
+                pages.accounts.request.key(value);
+            }
+        }
+        Event::Act { act: Act::ConnectModel(act) } => {
+            let chosen = connect_model::way(pages, client);
+            if let Some(page) = &mut pages.connect_model {
+                page.playground |= pages.demo_model;
+                page.act(client, &pages.address, chosen, pages.demo_provider, act, &mut pages.serial, out);
             }
         }
         Event::Act { act: Act::Accounts(act) } => {
@@ -290,6 +316,9 @@ pub fn step(pages: &mut Pages, env: &Env<Limits>, client: &Client, event: Event,
         }
         Event::Left => {
             pages.accounts.leave(out);
+            if let Some(mut page) = pages.connect_model.take() {
+                page.leave();
+            }
             pages.welcome = None;
             pages.accounts_open = false;
         }
@@ -389,6 +418,9 @@ fn told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>
 
 fn started(pages: &mut Pages, out: &mut Queue<Request>) {
     pages.accounts.leave(out);
+    if let Some(mut page) = pages.connect_model.take() {
+        page.leave();
+    }
     pages.accounts_open = false;
     pages.welcome = None;
     pages.address = Address::Inbox { filter: crate::address::Filter::ALL };
@@ -451,8 +483,14 @@ fn went(pages: &mut Pages, env: &Env<Limits>, address: Address, out: &mut Queue<
         || pages.address != address
     {
         pages.accounts.leave(out);
-        pages.accounts_open =
-            address == Address::Accounts || address == (Address::Welcome { step: crate::Step::Model });
+        pages.accounts_open = address == Address::Accounts;
+        if connect_model::open(&address) {
+            if pages.connect_model.is_none() {
+                pages.connect_model = Some(Box::new(connect_model::ConnectModel::default()));
+            }
+        } else if let Some(mut page) = pages.connect_model.take() {
+            page.leave();
+        }
         pages.welcome = None;
         if let Address::Welcome { .. } = address {
             pages.welcome = Some(welcome::Welcome::new());
@@ -520,7 +558,28 @@ fn open_result(pages: &mut Pages, task: u64, through: u64, out: &mut Queue<Reque
 }
 
 fn page_told(pages: &mut Pages, client: &Client, told: Told, out: &mut Queue<Request>) -> bool {
-    if pages.accounts.told(client, &told) {
+    if let Some(page) = &mut pages.connect_model {
+        let claim = match &told {
+            Told::Kept { request: jig_client::Ask::Jig(ask), .. } => connect_model::creation(ask),
+            Told::Kept { .. } => false,
+            Told::Answered { .. }
+            | Told::Pending { .. }
+            | Told::Changed { .. }
+            | Told::Link { .. }
+            | Told::Dropped { .. }
+            | Told::Text { .. }
+            | Told::Ended { .. }
+            | Told::Page { .. } => true,
+        };
+        if claim && page.request.told(client, &told) {
+            // Both requests observe watch changes, but answers belong to their own key.
+            if let Told::Changed { .. } = told {
+                pages.accounts.request.refresh(client);
+            }
+            return true;
+        }
+    }
+    if pages.accounts.request.told(client, &told) {
         return true;
     }
     if let Told::Changed { handle } | Told::Ended { handle, .. } = &told
@@ -628,6 +687,7 @@ fn confirmation(pages: &mut Pages, env: &Env<Limits>, client: &Client, act: Act,
         | Act::Choice(_)
         | Act::Project { .. }
         | Act::Accounts(_)
+        | Act::ConnectModel(_)
         | Act::SignOut
         | Act::ChatWords { .. }
         | Act::StartChat
@@ -686,7 +746,7 @@ pub fn max_out(limits: &Limits) -> u32 {
 
 fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
     if let Some(me) = accounts::current_me(client) {
-        let parked = if let Some(pending) = &pages.accounts.pending
+        let parked = if let Some(pending) = &pages.accounts.request.pending
             && let Some(held) = client.pending(pending.key)
         {
             held.party != me.party.number
@@ -695,6 +755,9 @@ fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
         };
         if (pages.party.is_some() && pages.party != Some(me.party.number)) || parked {
             pages.accounts.leave(out);
+            if let Some(mut page) = pages.connect_model.take() {
+                page.leave();
+            }
             pages.accounts = accounts::Accounts::default();
             out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
             out.push(Request::Client(jig_client::Event::Watch {
@@ -708,6 +771,18 @@ fn me_changed(pages: &mut Pages, client: &Client, out: &mut Queue<Request>) {
             pages.choice = choice::Draft::default();
         }
         pages.party = Some(me.party.number);
+        if connect_model::open(&pages.address) {
+            if pages.connect_model.is_none() {
+                pages.connect_model = Some(Box::new(connect_model::ConnectModel::default()));
+            }
+            let page = pages.connect_model.as_mut().expect("open flow has state");
+            if page.holder == jig_client::contract::AccountHolder::Deployment
+                && me.deployment_role != Some(jig_client::contract::HeldRole::Owner)
+            {
+                page.request.clear_key();
+                page.holder = jig_client::contract::AccountHolder::Own;
+            }
+        }
     }
     if let Some(me) = pages.me(client)
         && !contains(me, pages.project)
@@ -739,6 +814,9 @@ fn link_changed(pages: &mut Pages, link: Link, out: &mut Queue<Request>) {
                 out.push(Request::Client(jig_client::Event::Unwatch { handle: accounts::handle() }));
             }
             pages.accounts.leave(out);
+            if let Some(mut page) = pages.connect_model.take() {
+                page.leave();
+            }
             pages.accounts = accounts::Accounts::default();
             pages.choice = choice::Draft::default();
             pages.party = None;

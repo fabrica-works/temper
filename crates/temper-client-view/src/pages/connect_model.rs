@@ -1,0 +1,543 @@
+//! The model connection flow and the welcome's shared Model body.
+use crate::{
+    accounts::{
+        Bindings, Meaning,
+        words::{self, Word as W},
+    },
+    flow::{self, Control},
+    words::{Word, Words},
+};
+use alloc::boxed::Box;
+use jig_client::contract as c;
+use skein_ui::{Builder, Role, Run, State, phrases::Hole};
+use temper_client_domain::{
+    Address, Domain, WayKind,
+    pages::{
+        accounts::{self, SignInState, Way},
+        connect_model::{self as model, Act},
+    },
+};
+
+fn say(w: &Words, word: W) -> Box<[u8]> {
+    words::say(w, word, &[])
+}
+fn named(w: &Words, word: W, name: &[u8]) -> Box<[u8]> {
+    words::say(w, word, &[Hole::Name(crate::choice::shown(name, w))])
+}
+fn text(b: &mut Builder, w: &Words, role: Role, word: W) {
+    crate::cards::text(b, role, &say(w, word));
+}
+fn names(me: &c::Me, way: Way) -> (&[u8], &[u8]) {
+    for offer in &me.providers {
+        if offer.provider == way.provider() {
+            return words::provider_words(offer.name.bytes());
+        }
+    }
+    (b"", b"")
+}
+pub(crate) fn label(me: &c::Me, way: Way, ways: &skein_lib::List<Way>, w: &Words) -> Box<[u8]> {
+    let (brand, plan) = names(me, way);
+    match way {
+        Way::SignIn { plan: true, .. } => named(w, W::Continue, plan),
+        Way::SignIn { plan: false, .. } => named(w, W::SignInBrand, brand),
+        Way::Program { .. } => named(w, W::SubscriptionWay, plan),
+        Way::Key { .. } => {
+            let mut keys = 0_u32;
+            for way in ways {
+                if model::model_way(*way).kind == WayKind::Key {
+                    keys = keys.checked_add(1).expect("provider ways fit");
+                }
+            }
+            if keys == 1 {
+                say(w, W::KeyWayOnly)
+            } else {
+                let word = match brand.first() {
+                    Some(b'a' | b'e' | b'i' | b'o' | b'u' | b'A' | b'E' | b'I' | b'O' | b'U') => W::KeyWayAn,
+                    _ => W::KeyWay,
+                };
+                named(w, word, brand)
+            }
+        }
+    }
+}
+fn go(b: &mut Builder, bindings: &mut Bindings, name: &[u8], address: Address) {
+    if let Some(to) = bindings.insert(Meaning::Go(address)) {
+        flow::control(b, Control::Link { name, to });
+    }
+}
+fn button(b: &mut Builder, bindings: &mut Bindings, name: &[u8], act: Act, busy: bool) {
+    if busy {
+        flow::control(b, Control::Disabled { name });
+    } else if let Some(to) = bindings.insert(Meaning::Model(act)) {
+        flow::control(b, Control::Button { name, to });
+    }
+}
+fn choice(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, way: Way, ways: &skein_lib::List<Way>) {
+    let Some(me) = accounts::current_me(root.client()) else { return };
+    let (brand, plan) = names(me, way);
+    let label = label(me, way, ways, w);
+    let heading = match way {
+        Way::Key { .. } => named(
+            w,
+            match brand.first() {
+                Some(b'a' | b'e' | b'i' | b'o' | b'u' | b'A' | b'E' | b'I' | b'O' | b'U') => W::KeyTitle,
+                _ => W::KeyTitleA,
+            },
+            brand,
+        ),
+        Way::Program { .. } => named(w, W::SubscriptionWay, plan),
+        Way::SignIn { .. } => crate::choice::shown(plan, w),
+    };
+    let (description, note) = match way {
+        Way::SignIn { plan: true, .. } => (
+            words::say(
+                w,
+                W::ChatDescription,
+                &[Hole::Name(crate::choice::shown(plan, w)), Hole::Name(crate::choice::shown(plan, w))],
+            ),
+            W::BrowserMinute,
+        ),
+        Way::SignIn { plan: false, .. } => (named(w, W::SignInDescription, brand), W::BrowserMinute),
+        Way::Key { .. } => (named(w, W::KeyDescription, brand), W::Pasted),
+        Way::Program { .. } => (say(w, W::ProgramDescription), W::ProgramNote),
+    };
+    let meaning = if model::model_way(way).kind == WayKind::SignIn {
+        Meaning::Model(Act::SignIn { name: root.pages().account_name(), way })
+    } else {
+        Meaning::Go(model::address(root.pages().address(), Some(model::model_way(way))))
+    };
+    let Some(to) = bindings.insert(meaning) else { return };
+    let control = if model::model_way(way).kind == WayKind::SignIn {
+        Control::Button { name: &label, to }
+    } else {
+        Control::Link { name: &label, to }
+    };
+    flow::choice(b, &heading, &description, &say(w, note), control);
+}
+fn request_for_way(page: &model::ConnectModel, way: Way) -> bool {
+    let Some(pending) = &page.request.pending else { return false };
+    match (&pending.ask, way) {
+        (c::Ask::SignIn { provider, .. }, Way::SignIn { provider: chosen, .. }) => *provider == chosen,
+        (
+            c::Ask::AccountChange { holder, change: c::AccountChange::AddKey { provider, join: None, .. } },
+            Way::Key { provider: chosen },
+        )
+        | (
+            c::Ask::AccountChange { holder, change: c::AccountChange::DeclareProgram { provider, join: None, .. } },
+            Way::Program { provider: chosen },
+        ) => *provider == chosen && *holder == page.holder,
+        _ => false,
+    }
+}
+fn ready(root: &Domain, way: Way) -> bool {
+    let Some(page) = root.pages().connect_model() else { return false };
+    if !request_for_way(page, way) {
+        return false;
+    }
+    if let Some(p) = &page.request.pending {
+        match (&p.ask, &p.outcome, way) {
+            (
+                c::Ask::AccountChange { change: c::AccountChange::AddKey { provider, join: None, .. }, .. },
+                Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                    c::OwnerOutcome::AccountKeyKept { .. },
+                ))))),
+                Way::Key { provider: chosen },
+            )
+            | (
+                c::Ask::AccountChange { change: c::AccountChange::DeclareProgram { provider, join: None, .. }, .. },
+                Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                    c::OwnerOutcome::AccountProgramDeclared { .. },
+                ))))),
+                Way::Program { provider: chosen },
+            ) => *provider == chosen,
+            (c::Ask::SignIn { provider, .. }, _, Way::SignIn { provider: chosen, .. }) => {
+                *provider == chosen
+                    && match page.request.sign_in_state(root.client()) {
+                        SignInState::Ended { .. } => true,
+                        SignInState::Started { .. } | SignInState::Signing { .. } | SignInState::Unknown => false,
+                    }
+            }
+            _ => false,
+        }
+    } else {
+        false
+    }
+}
+pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, text_per_node: u32) {
+    b.open(Role::Main);
+    b.style(crate::look::MAIN);
+    b.style(crate::look::PAGE);
+    crate::cards::text(b, Role::Heading { level: 1 }, &w.say(Word::ConnectModel, &[]));
+    let way = model::way(root.pages(), root.client());
+    let middle = if match way {
+        Some(Way::SignIn { .. }) => true,
+        Some(Way::Key { .. } | Way::Program { .. }) | None => false,
+    } {
+        W::SigningIn
+    } else {
+        W::Details
+    };
+    let current = match way {
+        Some(way) if ready(root, way) => 2,
+        Some(_) => 1,
+        None => 0,
+    };
+    flow::steps(b, w, &[&say(w, W::Choose), &say(w, middle), &say(w, W::Ready)], current);
+    body(b, root, w, bindings, text_per_node);
+    b.close();
+}
+#[expect(clippy::manual_map, reason = "optional demo facts are read without closures in step code")]
+pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, text_per_node: u32) {
+    let Some(page) = root.pages().connect_model() else { return };
+    let Some(me) = accounts::current_me(root.client()) else { return };
+    let demo = match root.forge().demo() {
+        Some(demo) => Some(demo.provider),
+        None => None,
+    };
+    let ways = accounts::ways(&me.providers, demo, page.holder);
+    let way = model::way(root.pages(), root.client());
+    let busy = match &page.request.pending {
+        Some(p) => p.outcome.is_none(),
+        None => false,
+    };
+    let Some(way) = way else {
+        flow::card(b, &say(w, W::Choose));
+        if me.deployment_role == Some(c::HeldRole::Owner) {
+            for (holder, word) in
+                [(c::AccountHolder::Own, W::OwnChoice), (c::AccountHolder::Deployment, W::DeploymentChoice)]
+            {
+                if let Some(to) = bindings.insert(Meaning::Model(Act::Holder { holder })) {
+                    b.open(Role::Button);
+                    b.name(&say(w, word));
+                    b.bind(to);
+                    if holder == page.holder {
+                        b.state(State::Pressed);
+                    }
+                    if busy {
+                        b.state(State::Disabled);
+                    }
+                    b.close();
+                }
+            }
+        }
+        for way in &ways {
+            choice(b, root, w, bindings, *way, &ways);
+        }
+        super::accounts::outcome(b, root, w, &page.request, text_per_node);
+        b.close();
+        return;
+    };
+    go(b, bindings, &say(w, W::AllWays), model::address(root.pages().address(), None));
+    if ready(root, way) {
+        flow::card(b, &say(w, W::Ready));
+        ready_body(b, root, w, bindings, way, &ways);
+        b.close();
+        return;
+    }
+    match way {
+        Way::SignIn { .. } => {
+            flow::card(b, &say(w, W::SigningIn));
+            if !request_for_way(page, way) || page.request.sign_in_state(root.client()) == SignInState::Unknown {
+                choice(b, root, w, bindings, way, &ways);
+            }
+        }
+        Way::Key { .. } => {
+            flow::card(b, &say(w, W::Details));
+            b.open(Role::Form);
+            b.name(&say(w, W::Details));
+            super::accounts::key_field(b, w, bindings, &page.request, busy);
+            button(b, bindings, &say(w, W::AddKey), Act::Submit { name: root.pages().account_name() }, busy);
+            b.close();
+        }
+        Way::Program { .. } => {
+            flow::card(b, &say(w, W::Details));
+            let name = page.program_name(root.client());
+            b.open(Role::Form);
+            b.name(&say(w, W::Details));
+            if let Some(to) = bindings.insert(Meaning::Program) {
+                b.open(Role::TextField);
+                b.name(&say(w, W::ProgramField));
+                b.value(&name, page.request.key_written());
+                b.bind(to);
+                if !c::valid_program_name(&name) {
+                    b.state(State::Invalid);
+                }
+                if busy {
+                    b.state(State::Disabled);
+                }
+                b.close();
+            }
+            command(b, w, &name);
+            button(
+                b,
+                bindings,
+                &say(w, W::Declare),
+                Act::Submit { name: root.pages().account_name() },
+                busy || !c::valid_program_name(&name),
+            );
+            b.close();
+        }
+    }
+    if request_for_way(page, way) {
+        super::accounts::outcome(b, root, w, &page.request, text_per_node);
+    }
+    if let Some(pending) = &page.request.pending
+        && let Some(jig_client::Outcome::Lost | jig_client::Outcome::Unsent) = &pending.outcome
+    {
+        button(b, bindings, &say(w, W::Cancel), Act::Cancel, false);
+    }
+    b.close();
+}
+fn command(b: &mut Builder, w: &Words, name: &[u8]) {
+    b.open(Role::Paragraph);
+    b.open(Role::Text);
+    b.text(Run::Code, &named(w, W::Command, name));
+    b.close();
+    b.close();
+}
+fn ready_body(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut Bindings,
+    way: Way,
+    ways: &skein_lib::List<Way>,
+) {
+    let Some(page) = root.pages().connect_model() else { return };
+    let Some(me) = accounts::current_me(root.client()) else { return };
+    let (brand, plan) = names(me, way);
+    let Some(pending) = &page.request.pending else { return };
+    match way {
+        Way::Key { .. } => {
+            crate::cards::text(b, Role::Status, &named(w, W::KeyAdded, brand));
+            text(b, w, Role::Paragraph, W::KeyRuns);
+        }
+        Way::Program { .. } => {
+            let name = match &pending.outcome {
+                Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                    c::OwnerOutcome::AccountProgramDeclared { name, .. },
+                ))))) => name.as_ref(),
+                _ => b"",
+            };
+            let label = words::say(
+                w,
+                W::ProgramDeclared,
+                &[Hole::Name(crate::choice::shown(plan, w)), Hole::Name(crate::choice::shown(name, w))],
+            );
+            crate::cards::text(b, Role::Status, &label);
+            text(b, w, Role::Paragraph, W::ProgramRun);
+            command(b, w, name);
+            text(b, w, Role::Paragraph, W::ProgramNote);
+        }
+        Way::SignIn { .. } => {
+            let mut ending = None;
+            if let SignInState::Ended { source } = page.request.sign_in_state(root.client())
+                && let Some(doc) = accounts::document(root.client())
+                && let Some(last) = &doc.last_end
+                && last.source == source
+            {
+                ending = Some(&last.end);
+            }
+            if let Some(end) = ending {
+                if !sign_in_end(b, root, w, way, end) {
+                    button(
+                        b,
+                        bindings,
+                        &label(me, way, ways, w),
+                        Act::SignIn { name: root.pages().account_name(), way },
+                        false,
+                    );
+                    if declined(end) {
+                        for key in ways {
+                            if model::model_way(*key).kind == WayKind::Key && key.provider() == way.provider() {
+                                go(
+                                    b,
+                                    bindings,
+                                    &label(me, *key, ways, w),
+                                    model::address(root.pages().address(), Some(model::model_way(*key))),
+                                );
+                            }
+                        }
+                    }
+                    return;
+                }
+            } else {
+                text(b, w, Role::Status, W::Unknown);
+                return;
+            }
+            crate::cards::text(b, Role::Paragraph, &named(w, W::PlanRuns, plan));
+        }
+    }
+    if model::model_way(way).kind != WayKind::Program {
+        facts(b, root, w, way);
+    }
+    go(b, bindings, &say(w, W::StartChat), Address::Chats);
+    if model::model_way(way).kind == WayKind::SignIn {
+        button(b, bindings, &label(me, way, ways, w), Act::SignIn { name: root.pages().account_name(), way }, false);
+    }
+}
+fn sign_in_end(b: &mut Builder, root: &Domain, w: &Words, way: Way, end: &c::OwnerAccountEnd) -> bool {
+    match end {
+        c::OwnerAccountEnd::Made { declined: true, .. } | c::OwnerAccountEnd::Renewed { declined: true, .. } => {
+            text(b, w, Role::Alert, W::DeclinedPlan);
+        }
+        c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Held { .. } } => {
+            text(b, w, Role::Alert, W::HeldPlan);
+        }
+        c::OwnerAccountEnd::Failed { failure: c::OwnerAccountFailure::Misconfigured } => {
+            text(b, w, Role::Alert, W::MisconfiguredPlan);
+        }
+        c::OwnerAccountEnd::Made { account, .. } | c::OwnerAccountEnd::Renewed { account, .. } => {
+            let Some(me) = accounts::current_me(root.client()) else { return false };
+            let (_, plan) = names(me, way);
+            let mut display = b"".as_slice();
+            if let Some(doc) = accounts::document(root.client()) {
+                for row in &doc.accounts {
+                    if row.number == *account {
+                        display = row.display.bytes();
+                        break;
+                    }
+                }
+            }
+            let renewed = match end {
+                c::OwnerAccountEnd::Renewed { .. } => true,
+                c::OwnerAccountEnd::Made { .. }
+                | c::OwnerAccountEnd::Refused { .. }
+                | c::OwnerAccountEnd::Failed { .. } => false,
+            };
+            let fallback = words::join(&[b"your ", plan, b" account"]);
+            let text = if renewed {
+                words::say(
+                    w,
+                    W::RenewedNamed,
+                    &[
+                        Hole::Name(skein_lib::bytes::copy_of(plan)),
+                        Hole::Name(skein_lib::bytes::copy_of(if display.is_empty() { &fallback } else { display })),
+                        Hole::Name(skein_lib::bytes::copy_of(plan)),
+                    ],
+                )
+            } else if display.is_empty() {
+                named(w, W::MadePlan, plan)
+            } else {
+                words::say(
+                    w,
+                    W::MadeNamed,
+                    &[Hole::Name(skein_lib::bytes::copy_of(plan)), Hole::Name(skein_lib::bytes::copy_of(display))],
+                )
+            };
+            crate::cards::text(b, Role::Status, &text);
+            return !renewed;
+        }
+        c::OwnerAccountEnd::Refused { .. } | c::OwnerAccountEnd::Failed { .. } => {
+            if let Some(doc) = accounts::document(root.client()) {
+                super::accounts::end(b, w, end, &doc.accounts);
+            }
+        }
+    }
+    false
+}
+fn pair(b: &mut Builder, w: &Words, name: W, value: &[u8]) {
+    b.open(Role::Region);
+    b.name(&say(w, name));
+    crate::cards::text(b, Role::Heading { level: 3 }, &say(w, name));
+    crate::cards::text(b, Role::Paragraph, value);
+    b.close();
+}
+fn facts(b: &mut Builder, root: &Domain, w: &Words, way: Way) {
+    let Some(page) = root.pages().connect_model() else { return };
+    let doc = accounts::document(root.client());
+    let Some(me) = accounts::current_me(root.client()) else { return };
+    let (brand, plan) = names(me, way);
+    let account = match doc {
+        Some(doc) => match &page.request.pending.as_ref().expect("ready request").outcome {
+            Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                c::OwnerOutcome::AccountKeyKept { source },
+            ))))) => {
+                let mut found = None;
+                for row in &doc.accounts {
+                    for entry in &row.sources {
+                        if entry.number == *source {
+                            found = Some(row);
+                        }
+                    }
+                }
+                found
+            }
+            _ => match &doc.last_end {
+                Some(c::OwnerAccountLastEnd { end: c::OwnerAccountEnd::Made { account, .. }, .. }) => {
+                    let mut found = None;
+                    for row in &doc.accounts {
+                        if row.number == *account {
+                            found = Some(row);
+                        }
+                    }
+                    found
+                }
+                _ => None,
+            },
+        },
+        None => None,
+    };
+    let display = match account {
+        Some(row) => row.display.bytes(),
+        None => b"",
+    };
+    let name = if model::model_way(way).kind == WayKind::Key {
+        named(w, W::ApiKeyBrand, brand)
+    } else {
+        words::join(&[plan, if display.is_empty() { b"" } else { b" \xc2\xb7 " }, display])
+    };
+    pair(b, w, W::ReadyAccount, &name);
+    // The pinned contract has no resolved-default preview. An explicit chat
+    // template choice is known without making another read.
+    if let Some(project) = root.pages().project()
+        && let Some(template) = jig_client::shapes::template(me, project, jig_client::shapes::CHAT)
+        && let Some(choice) = &template.llm
+    {
+        pair(b, w, W::ReadyModel, &crate::choice::shown(choice.main.model.bytes(), w));
+    }
+    pair(
+        b,
+        w,
+        W::PaysFor,
+        &say(
+            w,
+            if is_plan(way) {
+                W::PlanPays
+            } else if page.holder == c::AccountHolder::Own {
+                W::OwnPays
+            } else {
+                W::DeploymentPays
+            },
+        ),
+    );
+    if page.playground {
+        text(b, w, Role::Paragraph, W::SteppedAside);
+    }
+    if is_plan(way)
+        && let Some(account) = account
+        && let Some(address) = &account.manage_usage
+        && c::valid_manage_usage(address)
+        && skein_ui::markdown::safe_url(address)
+    {
+        b.open(Role::Link);
+        let name = w.say(Word::Usage, &[]);
+        b.name(&name);
+        b.text(Run::Plain, &name);
+        b.external(address);
+        b.close();
+    }
+}
+
+fn declined(end: &c::OwnerAccountEnd) -> bool {
+    match end {
+        c::OwnerAccountEnd::Made { declined, .. } | c::OwnerAccountEnd::Renewed { declined, .. } => *declined,
+        c::OwnerAccountEnd::Refused { .. } | c::OwnerAccountEnd::Failed { .. } => false,
+    }
+}
+fn is_plan(way: Way) -> bool {
+    match way {
+        Way::SignIn { plan, .. } => plan,
+        Way::Key { .. } | Way::Program { .. } => false,
+    }
+}

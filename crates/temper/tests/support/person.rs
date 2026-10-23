@@ -82,10 +82,8 @@ pub fn deployment_account() -> Script {
     Script {
         begin: Begin::LinkWithOpenAiKey,
         steps: Box::new([
-            Step::See {
-                find: Find::exactly_named(Role::Heading { level: 2 }, b"Deployment accounts"),
-                within: START_WITHIN,
-            },
+            Step::Go { address: Address::Accounts },
+            Step::See { find: Find::exactly_named(Role::Heading { level: 1 }, b"Accounts"), within: START_WITHIN },
             Step::See {
                 find: Find::exactly_named(Role::Region, b"OpenAI API key \xc2\xb7 held by the deployment"),
                 within: START_WITHIN,
@@ -102,7 +100,7 @@ pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
     Script {
         begin: Begin::Token,
         steps: Box::new([
-            Step::Go { address: Address::Accounts },
+            Step::Go { address: Address::ConnectModel { way: None } },
             Step::See { find: Find::exactly_named(Role::Status, signing), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Region, card.as_bytes()), within: START_WITHIN },
             Step::See {
@@ -293,20 +291,20 @@ impl Person {
             let key_way: &[u8] =
                 if script.begin == Begin::LinkWithOpenAiKey { b"Use an OpenAI API key" } else { b"Use an API key" };
             let mut setup = vec![
-                Step::Go { address: Address::Accounts },
+                Step::Go { address: Address::ConnectModel { way: None } },
                 Step::See {
-                    find: Find::exactly_named(Role::Heading { level: 2 }, b"Deployment accounts"),
+                    find: Find::exactly_named(Role::Heading { level: 1 }, b"Connect a model"),
                     within: START_WITHIN,
                 },
                 Step::See { find: Find::named(Role::Button, b"Use deployment accounts"), within: START_WITHIN },
                 Step::Press { find: Find::named(Role::Button, b"Use deployment accounts") },
-                Step::Press { find: Find::named(Role::Button, key_way) },
+                Step::Press { find: Find::named(Role::Link, key_way) },
                 Step::Type {
                     find: Find::named(Role::TextField, b"Key (pasted once)"),
                     words: jig_channel_world::fixtures::KEY.into(),
                 },
                 Step::Press { find: Find::named(Role::Button, b"Add key") },
-                Step::See { find: Find::text(b"Key kept as source"), within: START_WITHIN },
+                Step::See { find: Find::text(b"Added your"), within: START_WITHIN },
             ];
             setup.extend(script.steps);
             setup.into_boxed_slice()

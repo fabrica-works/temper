@@ -28,6 +28,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let mut total = crate::pages::task::worst_case(limits)?;
     total = total.checked_add(crate::pages::choice::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::accounts::worst_case(limits)?)?;
+    total = total
+        .checked_add(u64::try_from(size_of::<crate::pages::connect_model::ConnectModel>()).ok()?)?
+        .checked_add(u64::try_from(crate::pages::accounts::KEY_BYTES).ok()?)?
+        .checked_add(limits.client.domain.document_bytes)?
+        .checked_add(32)?;
     total = total.checked_add(crate::pages::inbox::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::chats::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::chat::worst_case(limits)?)?;

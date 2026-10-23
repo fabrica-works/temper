@@ -1152,6 +1152,11 @@ pub fn cut(world: &mut World<Temper, Joint>, agent: jig_client_world::harness::C
 }
 
 #[must_use]
+pub fn model_world(seed: u64) -> World<Temper, Joint> {
+    world_with(seed, Joint::with_model_connections(seed, domain_limits()))
+}
+
+#[must_use]
 pub fn accounts_world(seed: u64) -> World<Temper, Joint> {
     world_with(seed, Joint::with_accounts(seed, domain_limits()))
 }

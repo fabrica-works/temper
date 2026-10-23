@@ -68,6 +68,7 @@ impl View {
         &self.limits
     }
 }
+#[expect(clippy::too_many_lines, reason = "one ordered dispatch draws each address's page")]
 pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>) {
     let shown = temper_client_domain::shown(root).checked_add(view.accounts.revision()).expect("view revisions fit");
     let shown = shown.checked_add(view.clock_revision).expect("view clock revisions fit");
@@ -94,7 +95,8 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
     crate::frame::banner(&mut builder, root, &view.forge_words, &mut view.pages);
     match root.pages().address() {
         temper_client_domain::Address::Welcome { .. } => {}
-        temper_client_domain::Address::Accounts
+        temper_client_domain::Address::ConnectModel { .. }
+        | temper_client_domain::Address::Accounts
         | temper_client_domain::Address::Chats
         | temper_client_domain::Address::Chat { .. }
         | temper_client_domain::Address::Task { .. }
@@ -152,6 +154,14 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
         );
     } else if let temper_client_domain::Address::Task { .. } = root.pages().address() {
         view.task_main(&mut builder, root, &mut times);
+    } else if let temper_client_domain::Address::ConnectModel { .. } = root.pages().address() {
+        crate::pages::connect_model::main(
+            &mut builder,
+            root,
+            &view.forge_words,
+            &mut view.accounts,
+            view.limits.tree.text_per_node,
+        );
     } else if *root.pages().address() == temper_client_domain::Address::Accounts {
         crate::pages::accounts::main(
             &mut builder,

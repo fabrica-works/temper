@@ -4,7 +4,7 @@
     clippy::disallowed_macros,
     reason = "test assertions inspect semantic trees and diagnostic redaction"
 )]
-use super::fixtures;
+use super::{connect_model::text, fixtures};
 use jig_client::contract as c;
 use skein_lib::{List, Token};
 use skein_ui::{Act, Role};
@@ -15,129 +15,7 @@ use temper_client_domain::{
 const PROVIDER: u32 = 17;
 const SOURCE: u32 = 43;
 const ADDRESS: &[u8] = b"https://issuer.example/visit";
-fn offer(provider: u32, name: &[u8], sign_in: bool, program: bool) -> c::ProviderOffer {
-    let mut programs = List::with_capacity(1);
-    if program {
-        programs.push(c::Text::new(Box::from(b"claude_code".as_slice()), 32).unwrap()).unwrap();
-    }
-    c::ProviderOffer {
-        provider,
-        name: text(name),
-        key_bytes: 4096,
-        sign_in,
-        signed_in_plan: true,
-        key: true,
-        programs,
-        programs_cut: false,
-        none: false,
-        manage_usage: None,
-    }
-}
-fn text(value: &[u8]) -> c::DocumentText {
-    c::DocumentText::complete(c::Text::new(Box::from(value), 64).unwrap())
-}
-fn ways_root(offers: List<c::ProviderOffer>, demo: bool) -> d::Domain {
-    let limits = fixtures::limits();
-    let (mut root, watch, _) = fixtures::root_at(d::Address::Accounts, &limits);
-    let mut me = d::pages::accounts::current_me(root.client()).unwrap().clone();
-    me.providers = offers;
-    me.providers_cut = true;
-    me.deployment_role = Some(c::HeldRole::Owner);
-    if demo {
-        return fixtures::demo_frame_root(d::Address::Accounts, fixtures::PROJECT, true, None, Some(me));
-    }
-    fixtures::root_event(
-        &mut root,
-        d::Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Watched { watch, event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(me))) },
-            },
-        },
-    );
-    root
-}
-pub(super) fn offered_root() -> d::Domain {
-    let mut providers = List::with_capacity(1);
-    providers.push(offer(PROVIDER, b"openai", true, false)).unwrap();
-    ways_root(providers, false)
-}
-fn button_names(root: &d::Domain) -> Vec<Vec<u8>> {
-    let mut view = fixtures::view();
-    fixtures::build(&mut view, root)
-        .nodes()
-        .iter()
-        .filter(|node| node.role == Role::Button)
-        .filter_map(|node| node.name.as_ref().map(|name| name.to_vec()))
-        .collect()
-}
-#[test]
-fn the_accounts_page_names_the_plan_sign_in_and_key_ways() {
-    let names = button_names(&offered_root());
-    assert!(names.contains(&b"Continue with ChatGPT".to_vec()));
-    assert!(names.contains(&b"Use an API key".to_vec()));
-}
-#[test]
-fn two_key_providers_name_each_key_way_by_its_brand() {
-    let mut providers = List::with_capacity(2);
-    providers.push(offer(PROVIDER, b"openai", false, false)).unwrap();
-    providers.push(offer(PROVIDER + 1, b"Scripted", false, false)).unwrap();
-    let names = button_names(&ways_root(providers, false));
-    assert!(names.contains(&b"Use an OpenAI API key".to_vec()));
-    assert!(names.contains(&b"Use a Scripted API key".to_vec()));
-    assert!(!names.contains(&b"Use an API key".to_vec()));
-}
-#[test]
-fn a_provider_without_a_plan_names_its_sign_in_by_its_brand() {
-    let mut providers = List::with_capacity(1);
-    let mut provider = offer(PROVIDER, b"anthropic", true, false);
-    provider.signed_in_plan = false;
-    providers.push(provider).unwrap();
-    assert!(button_names(&ways_root(providers, false)).contains(&b"Sign in to Anthropic".to_vec()));
-}
-#[test]
-fn the_demos_provider_offers_no_way() {
-    let mut providers = List::with_capacity(2);
-    providers.push(offer(PROVIDER, b"demo", true, true)).unwrap();
-    providers.push(offer(PROVIDER + 1, b"openai", true, false)).unwrap();
-    let names = button_names(&ways_root(providers, true));
-    assert!(names.contains(&b"Continue with ChatGPT".to_vec()));
-    assert!(names.contains(&b"Use an API key".to_vec()));
-    assert!(!names.iter().any(|name| name.windows(b"demo".len()).any(|part| part == b"demo")));
-}
-#[test]
-fn the_deployment_holder_offers_keys_only() {
-    let mut providers = List::with_capacity(2);
-    providers.push(offer(PROVIDER, b"openai", true, false)).unwrap();
-    providers.push(offer(PROVIDER + 1, b"anthropic", false, true)).unwrap();
-    let mut root = ways_root(providers, false);
-    action(
-        &mut root,
-        A::Select { selection: Selection { holder: c::AccountHolder::Deployment, ..Default::default() } },
-    );
-    let names = button_names(&root);
-    assert!(names.contains(&b"Use an OpenAI API key".to_vec()));
-    assert!(names.contains(&b"Use an Anthropic API key".to_vec()));
-    assert!(!names.contains(&b"Continue with ChatGPT".to_vec()));
-    assert!(!names.contains(&b"Use your Claude subscription".to_vec()));
-}
-#[test]
-fn a_program_way_shows_the_default_name_and_the_command_on_each_host() {
-    let mut providers = List::with_capacity(1);
-    providers.push(offer(PROVIDER, b"anthropic", false, true)).unwrap();
-    let mut root = ways_root(providers, false);
-    let mut view = fixtures::view();
-    press(&mut view, &mut root, Role::Button, b"Use your Claude subscription", Act::Press);
-    let tree = fixtures::build(&mut view, &root);
-    let field = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Program name")).unwrap();
-    assert_eq!(field.value.as_ref().unwrap().text.as_ref(), b"claude-pat");
-    assert!(fixtures::find(tree, Role::Button, b"Declare").is_some());
-    assert!(
-        String::from_utf8(fixtures::text(tree).into_vec())
-            .unwrap()
-            .contains("On each host, run: temper program-login claude-pat")
-    );
-}
-fn card_document(provider: &[u8], display: &[u8], kind: c::OwnerAccountKind) -> c::OwnerAccounts {
+pub(super) fn card_document(provider: &[u8], display: &[u8], kind: c::OwnerAccountKind) -> c::OwnerAccounts {
     let mut doc = document(1);
     let row = doc.accounts.get_mut(0).unwrap();
     row.provider_name = Some(text(provider));
@@ -218,7 +96,7 @@ fn sources_name_their_kinds_in_the_providers_words() {
     }
 }
 #[test]
-fn add_an_account_follows_both_account_lists() {
+fn account_management_keeps_both_account_lists() {
     let (root, _) = owner_root();
     let mut view = fixtures::view();
     let tree = fixtures::build(&mut view, &root);
@@ -228,7 +106,7 @@ fn add_an_account_follows_both_account_lists() {
         .filter(|node| node.role == Role::Heading { level: 2 })
         .map(|node| node.name.as_ref().unwrap().to_vec())
         .collect();
-    assert_eq!(headings, [b"Your LLM accounts".to_vec(), b"Deployment accounts".to_vec(), b"Add an account".to_vec()]);
+    assert_eq!(headings, [b"Your accounts".to_vec(), b"Deployment accounts".to_vec()]);
 }
 #[test]
 fn a_cut_provider_name_keeps_the_numbered_card_fallback() {
@@ -256,7 +134,7 @@ fn source(number: u32) -> c::OwnerAccountSource {
         spent_until: None,
     }
 }
-fn document(count: u32) -> c::OwnerAccounts {
+pub(super) fn document(count: u32) -> c::OwnerAccounts {
     let mut accounts = List::with_capacity(count);
     let mut signing = List::with_capacity(count);
     for number in 1..=count {
@@ -301,7 +179,7 @@ fn document(count: u32) -> c::OwnerAccounts {
         cut: true,
     }
 }
-fn deliver(root: &mut d::Domain, watch: Token, doc: c::OwnerAccounts) {
+pub(super) fn deliver(root: &mut d::Domain, watch: Token, doc: c::OwnerAccounts) {
     fixtures::root_event(
         root,
         d::Event::Client {
@@ -317,10 +195,14 @@ fn deliver(root: &mut d::Domain, watch: Token, doc: c::OwnerAccounts) {
 fn action(root: &mut d::Domain, act: A) {
     fixtures::root_event(root, d::Event::Act { action: d::Action::Pages(d::pages::Act::Accounts(act)) });
 }
-fn press(view: &mut crate::View, root: &mut d::Domain, role: Role, name: &[u8], act: Act) {
+pub(super) fn press(view: &mut crate::View, root: &mut d::Domain, role: Role, name: &[u8], act: Act) {
     let node = fixtures::find(fixtures::build(view, root), role, name).expect("offered account control");
     let event = crate::event(view, node, act).expect("account control decodes");
-    fixtures::root_event(root, event);
+    if let d::Event::Act { action: d::Action::Pages(d::pages::Act::Go { address }) } = event {
+        fixtures::root_event(root, d::Event::Went { place: d::Place::Address(address) });
+    } else {
+        fixtures::root_event(root, event);
+    }
 }
 fn shown(doc: c::OwnerAccounts) -> String {
     shown_at(doc, fixtures::limits().accounts)
@@ -402,7 +284,7 @@ fn a_key_draft_never_enters_the_view() {
 #[test]
 fn a_held_key_has_an_empty_view_value() {
     let (root, view) = key_draft();
-    assert!(root.pages().accounts().unwrap().has_key());
+    assert!(root.pages().accounts().unwrap().request.has_key());
     assert!(key_field(&view).value.as_ref().unwrap().text.is_empty());
 }
 #[test]
@@ -415,10 +297,8 @@ fn sending_a_key_writes_an_empty_field() {
     assert!(value.text.is_empty());
     assert_ne!(value.written, before);
 }
-fn sign_in_address(address: &[u8]) -> d::Domain {
-    let (mut root, watch) = fixtures::account_root();
-    deliver(&mut root, watch, document(0));
-    action(&mut root, A::Select { selection: Selection { provider: Some(PROVIDER), ..Default::default() } });
+pub(super) fn sign_in_address(address: &[u8]) -> d::Domain {
+    let mut root = super::connect_model::offered_root();
     let limits = fixtures::limits();
     let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
     let mut out = skein_lib::Queue::with_capacity(d::max_out(&limits));
@@ -426,12 +306,20 @@ fn sign_in_address(address: &[u8]) -> d::Domain {
         &mut root,
         &env,
         d::Event::Act {
-            action: d::Action::Pages(d::pages::Act::Accounts(A::Submit {
+            action: d::Action::Pages(d::pages::Act::ConnectModel(d::pages::connect_model::Act::SignIn {
                 name: [97; 16],
-                operation: Operation::SignIn,
+                way: d::pages::accounts::Way::SignIn { provider: PROVIDER, plan: true },
             })),
         },
         &mut out,
+    );
+    fixtures::root_event(
+        &mut root,
+        d::Event::Went {
+            place: d::Place::Address(d::Address::ConnectModel {
+                way: Some(d::ModelWay { provider: PROVIDER, kind: d::WayKind::SignIn }),
+            }),
+        },
     );
     d::step(&mut root, &env, d::Event::Client { event: jig_client::Event::Stored }, &mut out);
     let attempt = out
@@ -773,7 +661,7 @@ mod memory_literal;
 // ConnectForge's and the welcome's forge words, and 128 more phrase segments (11,588 B).
 // The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6994600584;
+const ACCOUNT_BYTES: u64 = 6994622580;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -853,7 +741,7 @@ fn an_owner_sees_deployment_accounts_after_their_own() {
     let mut view = fixtures::view();
     let text = fixtures::text(fixtures::build(&mut view, &root));
     assert!(
-        skein_lib::bytes::find(&text, b"Your LLM accounts").unwrap()
+        skein_lib::bytes::find(&text, b"Your accounts").unwrap()
             < skein_lib::bytes::find(&text, b"Deployment accounts").unwrap()
     );
     assert!(skein_lib::bytes::find(&text, b"Account 41").is_some());
@@ -873,7 +761,7 @@ fn invalid_number_input_preserves_a_key() {
     if let Some(event) = invalid_number(&mut view, &root) {
         fixtures::root_event(&mut root, event);
     }
-    assert!(root.pages().accounts().unwrap().has_key());
+    assert!(root.pages().accounts().unwrap().request.has_key());
 }
 #[test]
 fn invalid_numbers_disable_submission() {
@@ -888,7 +776,7 @@ fn invalid_numbers_disable_submission() {
 fn cancel_refreshes_invalid_number_fields() {
     let (mut root, mut view) = key_draft();
     invalid_number(&mut view, &root);
-    let before = root.pages().accounts().unwrap().key_written();
+    let before = root.pages().accounts().unwrap().request.key_written();
     press(&mut view, &mut root, Role::Button, b"Cancel", Act::Press);
     let tree = fixtures::build(&mut view, &root);
     for field in tree.nodes().iter().filter(|n| n.role == Role::TextField) {

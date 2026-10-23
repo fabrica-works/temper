@@ -265,7 +265,8 @@ fn root_at_with_activity(
         | temper_client_domain::Address::Inbox { .. }
         | temper_client_domain::Address::Adopt { .. }
         | temper_client_domain::Address::Chat { .. }
-        | temper_client_domain::Address::Task { .. } => false,
+        | temper_client_domain::Address::Task { .. }
+        | temper_client_domain::Address::ConnectModel { .. } => false,
     };
     // Sign in before opening the page's one-shot activity read.
     temper_client_domain::step(
@@ -1094,7 +1095,16 @@ pub fn demo_frame_root(
     llm: Option<c::LlmChoice>,
     frame: Option<c::Me>,
 ) -> temper_client_domain::Domain {
-    let (mut root, me_watch, task_watch, _, _) =
+    demo_frame_with_watch(address, project, model, llm, frame).0
+}
+pub fn demo_frame_with_watch(
+    address: temper_client_domain::Address,
+    project: u32,
+    model: bool,
+    llm: Option<c::LlmChoice>,
+    frame: Option<c::Me>,
+) -> (temper_client_domain::Domain, Token) {
+    let (mut root, me_watch, task_watch, _, accounts_watch) =
         root_at_with_demo(address.clone(), &domain_limits(), b"Project", Some((project, model)));
     let template = chat::messaging_root();
     let mut me = match frame {
@@ -1182,7 +1192,7 @@ pub fn demo_frame_root(
             },
         );
     }
-    root
+    (root, accounts_watch.unwrap())
 }
 
 /// T1 keeps its demo account after another provider's key becomes usable.

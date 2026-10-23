@@ -8,6 +8,7 @@ pub enum Address {
     Accounts,
     Forges,
     ConnectForge { forge: Option<Choice> },
+    ConnectModel { way: Option<ModelWay> },
     Welcome { step: Step },
     Chat { task: u64 },
     Task { task: u64 },
@@ -18,7 +19,7 @@ pub enum Address {
 pub enum Step {
     Welcome,
     Forge { forge: Option<Choice> },
-    Model,
+    Model { way: Option<ModelWay> },
     Ready,
 }
 /// A configured forge, or the instructions for adding a Forgejo elsewhere.
@@ -26,6 +27,17 @@ pub enum Step {
 pub enum Choice {
     Forge(u16),
     Elsewhere,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ModelWay {
+    pub provider: u32,
+    pub kind: WayKind,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WayKind {
+    SignIn,
+    Program,
+    Key,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Filter {
@@ -59,12 +71,13 @@ pub fn print(address: &Address) -> Box<[u8]> {
             return match step {
                 Step::Welcome => b"/welcome".as_slice().into(),
                 Step::Forge { forge } => print_choice(b"/welcome?at=forge", *forge, b"&forge="),
-                Step::Model => b"/welcome?at=model".as_slice().into(),
+                Step::Model { way } => print_way(b"/welcome?at=model", *way, b"&"),
                 Step::Ready => b"/welcome?at=ready".as_slice().into(),
             };
         }
         Address::ConnectForge { forge } => return print_choice(b"/forges/connect", *forge, b"?forge="),
         Address::Forges => (b"forges".as_slice(), None, b"".as_slice()),
+        Address::ConnectModel { way } => return print_way(b"/accounts/connect", *way, b"?"),
         Address::Accounts => (b"accounts".as_slice(), None, b"".as_slice()),
         Address::Chats => (b"chats".as_slice(), None, b"".as_slice()),
         Address::Chat { task } => (b"chats".as_slice(), Some(*task), b"".as_slice()),
@@ -114,6 +127,7 @@ pub fn parse(path: &[u8]) -> Place {
         (b"forges", b"", b"") => Address::Forges,
         (b"forges", b"connect", b"") => Address::ConnectForge { forge: forge_choice(fields) },
         (b"accounts", b"", b"") => Address::Accounts,
+        (b"accounts", b"connect", b"") => Address::ConnectModel { way: parse_way(fields) },
         (b"welcome", b"", b"") => Address::Welcome { step: welcome_step(fields) },
         (b"chats", b"", b"") => Address::Chats,
         (b"chats", _, b"") => {
@@ -253,7 +267,7 @@ fn welcome_step(query: &[u8]) -> Step {
             seen = true;
             step = match value {
                 b"forge" => Step::Forge { forge: forge_choice(query) },
-                b"model" => Step::Model,
+                b"model" => Step::Model { way: parse_way(query) },
                 b"ready" => Step::Ready,
                 _ => Step::Welcome,
             };
@@ -314,4 +328,52 @@ fn forge_choice(query: &[u8]) -> Option<Choice> {
         }
     }
     choice
+}
+
+fn print_way(base: &[u8], way: Option<ModelWay>, separator: &[u8]) -> Box<[u8]> {
+    let Some(way) = way else { return skein_lib::bytes::copy_of(base) };
+    let provider = Decimal::of(u64::from(way.provider));
+    let kind = match way.kind {
+        WayKind::SignIn => b"sign-in".as_slice(),
+        WayKind::Program => b"program",
+        WayKind::Key => b"key",
+    };
+    let parts = [base, separator, b"provider=", provider.as_bytes(), b"&way=", kind];
+    let mut size = 0_usize;
+    for part in parts {
+        size = size.checked_add(part.len()).expect("way address fits");
+    }
+    let mut path = Writer::new(size);
+    for part in parts {
+        path.put(part).expect("measured way fits");
+    }
+    path.finish()
+}
+fn parse_way(query: &[u8]) -> Option<ModelWay> {
+    let mut provider = None;
+    let mut kind = None;
+    let mut rest = query;
+    for _ in 0..query.len() {
+        if rest.is_empty() {
+            break;
+        }
+        let end = skein_lib::bytes::find(rest, b"&").unwrap_or(rest.len());
+        let field = rest.get(..end).expect("separator in query");
+        rest = rest.get(end..).expect("separator in query").strip_prefix(b"&").unwrap_or(b"");
+        if let Some(value) = field.strip_prefix(b"provider=") {
+            if provider.is_none() {
+                provider = project_decimal(value);
+            }
+        } else if let Some(value) = field.strip_prefix(b"way=")
+            && kind.is_none()
+        {
+            kind = match value {
+                b"sign-in" => Some(WayKind::SignIn),
+                b"program" => Some(WayKind::Program),
+                b"key" => Some(WayKind::Key),
+                _ => None,
+            };
+        }
+    }
+    Some(ModelWay { provider: provider?, kind: kind? })
 }

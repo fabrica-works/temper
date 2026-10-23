@@ -118,7 +118,7 @@ fn the_setup_strip_replaces_the_demo_banner_and_says_whats_missing() {
     );
     for address in [
         Address::Accounts,
-        Address::Welcome { step: Step::Model },
+        Address::Welcome { step: Step::Model { way: None } },
         Address::Forges,
         Address::ConnectForge { forge: None },
     ] {

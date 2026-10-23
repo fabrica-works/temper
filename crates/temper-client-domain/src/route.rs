@@ -51,6 +51,7 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
 }
 pub(crate) fn pages(root: &mut Domain, env: &Env<Limits>, event: crate::pages::Event, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(crate::pages::max_out(&env.limits));
+    demo_facts(root);
     crate::pages::step(&mut root.pages, env, &root.client, event, &mut child);
     for _ in 0..child.len() {
         match child.pop().expect("counted pages output") {
@@ -188,6 +189,9 @@ fn forge_demo(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
     let consumed = forge::demo::told(&mut root.forge, told, env.limits.forge, &mut child);
     route_forge(root, env, &mut child, out);
+    // A demo answer can arrive after the page and account watch. Way resolution
+    // must exclude its provider on that same rebuild.
+    demo_facts(root);
     consumed
 }
 fn suggest(root: &mut Domain, env: &Env<Limits>, cue: u8, out: &mut Queue<Request>) {
@@ -226,8 +230,23 @@ fn forge_forges(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, o
         && last.answer == Some(forge::forges::SetUpAnswer::Outcome(forge::forges::SetUpOutcome::SettingUp))
         && let Address::Welcome { step: crate::Step::Forge { .. } } = root.pages.address()
     {
-        out.push(Request::Show { address: Address::Welcome { step: crate::Step::Model }, replace: false });
+        out.push(Request::Show {
+            address: Address::Welcome { step: crate::Step::Model { way: None } },
+            replace: false,
+        });
     }
     route_forge(root, env, &mut child, out);
     consumed
+}
+
+#[expect(clippy::manual_map, reason = "the programming model reads optional demo facts without closures")]
+fn demo_facts(root: &mut Domain) {
+    root.pages.demo_provider = match root.forge.demo() {
+        Some(demo) => Some(demo.provider),
+        None => None,
+    };
+    root.pages.demo_model = match root.demo() {
+        Some((_, halves)) => halves.model,
+        None => false,
+    };
 }

@@ -12,36 +12,41 @@ fn the_accounts_page_returns_after_a_key_send() {
     let input = |name: &[u8], value: &[u8]| {
         Step::Person(PersonStep::Type { find: Find::exactly_named(Role::TextField, name), words: Box::from(value) })
     };
-    let accounts = || Find::exactly_named(Role::Heading { level: 1 }, b"Accounts");
+    let accounts = || Find::exactly_named(Role::Heading { level: 1 }, b"Connect a model");
     let chats = || Find::exactly_named(Role::Heading { level: 1 }, b"Chats");
     let address = || Find::text(b"Open the sign-in page");
     let mut script = Script::new(Box::new([
         see(Find::exactly_named(Role::Link, b"Set up temper")),
-        Step::Person(PersonStep::Go { address: Box::from(b"/accounts".as_slice()) }),
+        Step::Person(PersonStep::Go { address: Box::from(b"/accounts/connect".as_slice()) }),
         see(accounts()),
-        Step::Address(Box::from(b"/accounts".as_slice())),
-        see(Find::exactly_named(Role::Button, b"Use an API key")),
-        press(b"Use an API key", Role::Button),
+        Step::Address(Box::from(b"/accounts/connect".as_slice())),
+        see(Find::exactly_named(Role::Link, b"Use an API key")),
+        press(b"Use an API key", Role::Link),
         input(b"Key (pasted once)", b"private-browser-key"),
         press(b"Add key", Role::Button),
-        see(Find::text(b"Key kept as source")),
+        see(Find::text(b"Added your Test provider API key")),
+        press(b"Chats", Role::Link),
+        see(chats()),
+        Step::Back,
+        see(accounts()),
         // The browser kit refuses typing into a nonempty field: this proves re-entry after clearing.
         input(b"Key (pasted once)", b"another-private-key"),
-        press(b"Cancel", Role::Button),
+        press("‹ All ways".as_bytes(), Role::Link),
         press(b"Sign in to Test provider", Role::Button),
         see(address()),
         press(b"Chats", Role::Link),
         see(chats()),
         Step::Back,
         see(accounts()),
-        see(address()),
-        Step::Address(Box::from(b"/accounts".as_slice())),
+        see(Find::exactly_named(Role::Button, b"Sign in to Test provider")),
+        Step::Address(Box::from(b"/accounts/connect?provider=17&way=sign-in".as_slice())),
         Step::Forward,
         see(chats()),
         Step::Address(Box::from(b"/chats".as_slice())),
         Step::Back,
         see(accounts()),
-        // Drain the live sign-in within this fixture's short public deadline before closing its server.
+        // Leaving the flow drops its sign-in state; the accounts watch retains the live source.
+        press(b"Accounts", Role::Link),
         see(Find::text(b"No sign-ins in progress.")),
     ]));
     assert_eq!(Harness::new(tier.setup()).run(&mut [&mut script]), Outcome::Done);

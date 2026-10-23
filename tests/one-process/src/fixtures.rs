@@ -398,12 +398,12 @@ pub(crate) fn account_steps() -> Box<[skein_fake_person::Step<temper_client_doma
     use skein_fake_person::{Find, Step};
     use skein_ui::Role;
     Box::new([
-        Step::Go { address: temper_client_domain::Address::Accounts },
+        Step::Go { address: temper_client_domain::Address::ConnectModel { way: None } },
         Step::See { find: Find::named(Role::Button, b"Use deployment accounts"), within: PERSON_WAIT },
         Step::Press { find: Find::named(Role::Button, b"Use deployment accounts") },
-        Step::Press { find: Find::named(Role::Button, b"Use an API key") },
+        Step::Press { find: Find::named(Role::Link, b"Use an API key") },
         Step::Type { find: Find::named(Role::TextField, b"Key (pasted once)"), words: channel::KEY.into() },
         Step::Press { find: Find::named(Role::Button, b"Add key") },
-        Step::See { find: Find::text(b"Key kept as source"), within: PERSON_WAIT },
+        Step::See { find: Find::text(b"Added your"), within: PERSON_WAIT },
     ])
 }

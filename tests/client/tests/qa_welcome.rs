@@ -41,7 +41,7 @@ fn every_welcome_step_has_its_canonical_address() {
     for (path, step) in [
         (b"/welcome".as_slice(), Step::Welcome),
         (b"/welcome?at=forge", Step::Forge { forge: None }),
-        (b"/welcome?at=model", Step::Model),
+        (b"/welcome?at=model", Step::Model { way: None }),
         (b"/welcome?at=ready", Step::Ready),
     ] {
         assert_eq!(address::parse(path), Place::Address(welcome(step)), "{path:?}");
@@ -57,7 +57,7 @@ fn unknown_and_unrelated_fields_drop_from_welcome() {
         ("/welcome?at=Welcome", Step::Welcome, "/welcome"),
         ("/welcome?at=FORGE", Step::Welcome, "/welcome"),
         ("/welcome?project=1&kind=question", Step::Welcome, "/welcome"),
-        ("/welcome?other=ready&at=model&goal=9", Step::Model, "/welcome?at=model"),
+        ("/welcome?other=ready&at=model&goal=9", Step::Model { way: None }, "/welcome?at=model"),
         ("/welcome?at&at=ready&&x=1", Step::Ready, "/welcome?at=ready"),
         ("/welcome?at=model=ready", Step::Welcome, "/welcome"),
     ] {
@@ -73,7 +73,7 @@ fn repeated_step_keeps_first_readable_value() {
     // browser.md, 2.3: as the inbox query, repeats after the first that read are dropped.
     for (path, step) in [
         ("/welcome?at=forge&at=model", Step::Forge { forge: None }),
-        ("/welcome?at=model&at=ready", Step::Model),
+        ("/welcome?at=model&at=ready", Step::Model { way: None }),
         ("/welcome?at=ready&at=done", Step::Ready),
         ("/welcome?at=done&at=forge", Step::Forge { forge: None }),
         ("/welcome?at=&at=ready", Step::Ready),
@@ -107,7 +107,7 @@ fn null_demo_owner_stays_and_offers_only_setup() {
 
 #[test]
 fn null_demo_later_steps_never_offer_the_playground() {
-    for step in [Step::Forge { forge: None }, Step::Model, Step::Ready] {
+    for step in [Step::Forge { forge: None }, Step::Model { way: None }, Step::Ready] {
         let mut world = f::accounts_world(f::SEED);
         let client = open_from_chats(&mut world, step);
         follow(&mut world, client, vec![see(Role::Link, b"Later")]);
@@ -140,7 +140,7 @@ fn non_deployment_owner_without_account_can_set_up() {
 fn later_welcome_steps_do_not_redirect_on_their_own() {
     for (step, heading) in [
         (Step::Forge { forge: None }, b"Connect a forge".as_slice()),
-        (Step::Model, b"Connect a model"),
+        (Step::Model { way: None }, b"Connect a model"),
         (Step::Ready, b"Almost ready"),
     ] {
         let mut world = f::world(f::SEED);

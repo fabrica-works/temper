@@ -1,6 +1,31 @@
 //! The accounts story restores the fixture person's deployment membership.
 use super::{Driver, Joint, Store, client, engine, engine_limits, fixtures, walking};
 impl Joint {
+    pub(crate) fn with_model_connections(seed: u64, limits: client::Limits) -> Self {
+        let mut bounds = engine_limits();
+        bounds.accounts.accounts = 3;
+        bounds.accounts.holder_accounts = 2;
+        bounds.accounts.credentials = 3;
+        bounds.authority.accounts = 4;
+        bounds.fleet.grants = 6;
+        bounds.journal.writes = bounds.journal.writes.checked_add(16).expect("four grant cohorts fit");
+        let configs = std::array::from_fn(|_| {
+            let mut config = walking::config(seed);
+            let rules = config.core.authority.rules().clone();
+            let policy = config.core.authority.policy(1).expect("fixture project").clone();
+            let mut authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("account bounds");
+            let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+            jig_domain_authority::step(
+                &mut authority,
+                jig_domain_authority::Event::Policy { project: 1, policy },
+                &mut out,
+            );
+            config.core.authority = authority;
+            config
+        });
+        Self::with_engine(seed, &limits, Store::new(), configs, &bounds, 1)
+    }
+
     pub(crate) fn with_accounts(seed: u64, limits: client::Limits) -> Self {
         let mut bounds = engine_limits();
         bounds.people.projects = 2; // Project membership and the deployment role row.

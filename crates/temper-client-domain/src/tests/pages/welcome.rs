@@ -222,7 +222,7 @@ fn the_welcome_decides_once_each_time_it_opens() {
 }
 #[test]
 fn a_later_step_never_moves_on() {
-    for step in [Step::Forge { forge: None }, Step::Model, Step::Ready] {
+    for step in [Step::Forge { forge: None }, Step::Model { way: None }, Step::Ready] {
         let (mut root, _, accounts, forges) = opened(true, step);
         answer(&mut root, true);
         account(&mut root, accounts, 18, true);
@@ -240,21 +240,12 @@ fn try_the_playground_opens_the_chats_in_the_demos_project() {
 }
 #[test]
 fn the_model_step_sends_the_accounts_acts() {
-    use pages::accounts::{Act as A, Operation, Way};
-    let (mut root, _, _, _) = opened(false, Step::Model);
-    event(
-        &mut root,
-        Event::Act {
-            action: Action::Pages(Act::Accounts(A::Choose { name: [1; 16], way: Way::Key { provider: 17 } })),
-        },
-    );
+    use pages::connect_model::Act as A;
+    let (mut root, _, _, _) = opened(false, Step::Model { way: None });
+    go(&mut root, Step::Model { way: Some(crate::ModelWay { provider: 17, kind: crate::WayKind::Key }) });
     event(&mut root, Event::AccountKey { value: Secret::new(b"private-test-key".as_slice().into()) });
-    let mut out = event(
-        &mut root,
-        Event::Act {
-            action: Action::Pages(Act::Accounts(A::Submit { name: [1; 16], operation: Operation::AddAccountKey })),
-        },
-    );
+    let mut out =
+        event(&mut root, Event::Act { action: Action::Pages(Act::ConnectModel(A::Submit { name: [1; 16] })) });
     let mut sent = false;
     while let Some(request) = out.pop() {
         if let Request::Client { request: jig_client::Request::Down { down: Down::Send { value: Some(value), .. } } } =
@@ -265,7 +256,7 @@ fn the_model_step_sends_the_accounts_acts() {
         }
     }
     assert!(sent);
-    assert!(!root.pages().accounts().unwrap().has_key());
+    assert!(!root.pages().connect_model().unwrap().request.has_key());
 }
 #[test]
 fn leaving_the_welcome_keeps_the_sessions_forges() {
@@ -356,7 +347,7 @@ fn strip_forges(root: &mut Domain, watch: Token, connection: Option<w::Connectio
 #[test]
 fn the_setup_strip_shows_while_there_is_no_demo_and_the_first_run_is_not_over() {
     use forge::listed;
-    let (mut root, _, accounts, forges) = opened(true, Step::Model);
+    let (mut root, _, accounts, forges) = opened(true, Step::Model { way: None });
     event(&mut root, Event::Went { place: Place::Address(Address::Chats) });
     assert!(listed::setup(&root).is_none());
     account(&mut root, accounts, 18, false);
@@ -371,7 +362,7 @@ fn the_setup_strip_shows_while_there_is_no_demo_and_the_first_run_is_not_over() 
 fn the_strip_names_what_is_missing_and_a_non_owner_misses_the_model_alone() {
     use forge::listed;
     for owner in [false, true] {
-        let (mut root, _, accounts, forges) = opened(owner, Step::Model);
+        let (mut root, _, accounts, forges) = opened(owner, Step::Model { way: None });
         answer(&mut root, false);
         account(&mut root, accounts, 18, false);
         strip_forges(&mut root, forges.unwrap(), None);
@@ -391,14 +382,14 @@ fn the_strip_names_what_is_missing_and_a_non_owner_misses_the_model_alone() {
 #[test]
 fn continue_setting_up_goes_to_the_first_step_not_done() {
     use forge::listed;
-    let (mut root, _, accounts, forges) = opened(true, Step::Model);
+    let (mut root, _, accounts, forges) = opened(true, Step::Model { way: None });
     let watch = forges.unwrap();
     answer(&mut root, false);
     account(&mut root, accounts, 18, false);
     strip_forges(&mut root, watch, None);
     assert_eq!(listed::setup(&root).unwrap().step, Step::Forge { forge: None });
     strip_forges(&mut root, watch, Some(w::Connection::Connecting));
-    assert_eq!(listed::setup(&root).unwrap().step, Step::Model);
+    assert_eq!(listed::setup(&root).unwrap().step, Step::Model { way: None });
     account(&mut root, accounts, 18, true);
     assert_eq!(listed::setup(&root).unwrap().step, Step::Ready);
     strip_forges(
@@ -413,12 +404,12 @@ fn continue_setting_up_goes_to_the_first_step_not_done() {
     let setup = listed::setup(&root).unwrap();
     assert!(!setup.forge);
     assert!(setup.model);
-    assert_eq!(setup.step, Step::Model);
+    assert_eq!(setup.step, Step::Model { way: None });
 }
 
 #[test]
 fn the_playground_forge_shows_while_the_forge_half_holds() {
-    let (mut root, _, accounts, forges) = opened(true, Step::Model);
+    let (mut root, _, accounts, forges) = opened(true, Step::Model { way: None });
     let watch = forges.unwrap();
     answer(&mut root, true);
     account(&mut root, accounts, 18, true);

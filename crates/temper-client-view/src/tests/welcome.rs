@@ -101,7 +101,7 @@ fn the_steps_mark_the_current_one() {
     for (step, name) in [
         (Step::Welcome, "Welcome"),
         (Step::Forge { forge: None }, "Forge"),
-        (Step::Model, "Model"),
+        (Step::Model { way: None }, "Model"),
         (Step::Ready, "Ready"),
     ] {
         let view = f::page_view(&f::welcome_root(step, true));
@@ -122,15 +122,22 @@ fn the_steps_mark_the_current_one() {
 }
 #[test]
 fn the_model_step_offers_the_accounts_ways() {
-    let mut root = super::accounts::offered_root();
-    f::root_event(&mut root, d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model }) });
+    let mut root = super::connect_model::offered_root();
+    f::root_event(
+        &mut root,
+        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model { way: None } }) },
+    );
     let view = f::page_view(&root);
     node(view.tree(), Role::Heading { level: 1 }, "Connect a model");
     node(view.tree(), Role::Paragraph, "temper’s agents run on it, and what they use is billed to its account.");
     node(view.tree(), Role::Button, "Continue with ChatGPT");
-    let action = press(&root, Role::Button, "Use an API key");
-    let d::Action::Pages(pages::Act::Accounts(_)) = &action else { panic!("shared account binding") };
-    f::root_event(&mut root, d::Event::Act { action });
+    let action = press(&root, Role::Link, "Use an API key");
+    let d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Model { way: Some(_) } } }) = &action
+    else {
+        panic!("shared account binding")
+    };
+    let d::Action::Pages(pages::Act::Go { address }) = action else { unreachable!() };
+    f::root_event(&mut root, d::Event::Went { place: d::Place::Address(address) });
     let view = f::page_view(&root);
     assert!(view.tree().nodes().iter().any(|node| node.role == Role::TextField));
 }
@@ -138,8 +145,8 @@ fn the_model_step_offers_the_accounts_ways() {
 fn each_later_step_offers_back_later_and_the_playground_while_the_demo_is_answered() {
     for (step, back) in [
         (Step::Forge { forge: None }, Step::Welcome),
-        (Step::Model, Step::Forge { forge: None }),
-        (Step::Ready, Step::Model),
+        (Step::Model { way: None }, Step::Forge { forge: None }),
+        (Step::Ready, Step::Model { way: None }),
     ] {
         for demo in [false, true] {
             let root = f::welcome_root(step, demo);

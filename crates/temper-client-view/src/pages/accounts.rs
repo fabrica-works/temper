@@ -11,7 +11,7 @@ use jig_client::contract as c;
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
 use temper_client_domain::{
     Domain,
-    pages::accounts::{self, Act, Broken, Operation, Way},
+    pages::accounts::{self, Act, Broken, Operation},
 };
 pub(super) fn run(b: &mut Builder, w: &Words, word: W) {
     b.run(Run::Plain, &words::say(w, word, &[]));
@@ -345,7 +345,7 @@ fn account(
     omitted(b, w, W::SourcesOmitted, sources.len(), counts.sources);
     b.close();
 }
-fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd, rows: &skein_lib::List<c::OwnerAccountLine>) {
+pub(super) fn end(b: &mut Builder, w: &Words, end: &c::OwnerAccountEnd, rows: &skein_lib::List<c::OwnerAccountLine>) {
     b.open(Role::Status);
     b.open(Role::Text);
     match end {
@@ -442,6 +442,7 @@ fn refused(b: &mut Builder, w: &Words, refusal: c::OwnerAccountRefusal) {
     };
     run(b, w, word);
 }
+#[expect(clippy::too_many_lines, reason = "the account lists and their creation link are drawn in page order")]
 pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, text_per_node: u32) {
     let counts = bindings.counts();
     b.open(Role::Main);
@@ -454,6 +455,9 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     text(b, w, Role::Heading { level: 1 }, W::Accounts);
     b.close();
     text(b, w, Role::Heading { level: 2 }, W::Own);
+    if let Some(to) = bindings.insert(Meaning::Go(temper_client_domain::Address::ConnectModel { way: None })) {
+        crate::flow::control(b, crate::flow::Control::Link { name: &words::say(w, W::ConnectAdd, &[]), to });
+    }
     if let Some(doc) = accounts::document(root.client()) {
         if doc.accounts.is_empty() {
             text(b, w, Role::Paragraph, W::Empty);
@@ -552,13 +556,27 @@ fn form_page(
     text_per_node: u32,
 ) {
     let counts = bindings.counts();
-    let busy = match &form.pending {
+    let busy = match &form.request.pending {
         Some(p) => p.outcome.is_none(),
         None => false,
     };
-    add_account(b, root, w, bindings, form, text_per_node);
+    outcome(b, root, w, &form.request, text_per_node);
     b.open(Role::Form);
     b.name(&words::say(w, W::Accounts, &[]));
+    for (holder, word) in [(c::AccountHolder::Own, W::OwnChoice), (c::AccountHolder::Deployment, W::DeploymentChoice)] {
+        if holder == c::AccountHolder::Deployment && !is_owner(root) {
+            continue;
+        }
+        control(
+            b,
+            w,
+            bindings,
+            word,
+            Meaning::Action(Act::Select { selection: accounts::Selection { holder, ..Default::default() } }),
+            busy,
+            form.selection.holder == holder,
+        );
+    }
     for (field, word, value) in [
         (Field::Provider, W::ProviderField, form.selection.provider),
         (Field::Account, W::AccountField, form.selection.account),
@@ -573,7 +591,7 @@ fn form_page(
             Some(n) => words::say(w, W::Number, &[Hole::Number(u64::from(n))]),
             None => Box::new([]),
         };
-        b.value(&text, form.key_written());
+        b.value(&text, form.request.key_written());
         b.bind(binding);
         if bindings.invalid_field(field) {
             b.state(State::Invalid);
@@ -584,9 +602,7 @@ fn form_page(
         b.close();
         b.close();
     }
-    if form.way.is_none() {
-        key_field(b, w, bindings, form, busy);
-    }
+    key_field(b, w, bindings, &form.request, busy);
     let busy = busy || bindings.invalid();
     if bindings.invalid() {
         text(b, w, Role::Alert, W::Selection);
@@ -629,7 +645,7 @@ fn form_page(
             }
         }
     }
-    if let Some((_, ask)) = &form.confirm {
+    if let Some((_, ask)) = &form.request.confirm {
         confirmation(b, root, w, form, ask);
         control(b, w, bindings, W::Confirm, Meaning::Action(Act::Confirm), busy, false);
     }
@@ -637,40 +653,13 @@ fn form_page(
     b.close();
     b.close();
 }
-pub(crate) fn add_account(
+pub(super) fn key_field(
     b: &mut Builder,
-    root: &Domain,
     w: &Words,
     bindings: &mut Bindings,
-    form: &accounts::Accounts,
-    text_per_node: u32,
+    form: &accounts::request::Request,
+    busy: bool,
 ) {
-    let busy = match &form.pending {
-        Some(p) => p.outcome.is_none(),
-        None => false,
-    };
-    text(b, w, Role::Heading { level: 2 }, W::AddAccount);
-    b.open(Role::Form);
-    b.name(&words::say(w, W::AddAccount, &[]));
-    for (holder, word) in [(c::AccountHolder::Own, W::OwnChoice), (c::AccountHolder::Deployment, W::DeploymentChoice)] {
-        if holder == c::AccountHolder::Deployment && !is_owner(root) {
-            continue;
-        }
-        control(
-            b,
-            w,
-            bindings,
-            word,
-            Meaning::Action(Act::Select { selection: accounts::Selection { holder, ..Default::default() } }),
-            busy,
-            form.selection.holder == holder,
-        );
-    }
-    offered_ways(b, root, w, bindings, form, busy);
-    outcome(b, root, w, form, text_per_node);
-    b.close();
-}
-fn key_field(b: &mut Builder, w: &Words, bindings: &mut Bindings, form: &accounts::Accounts, busy: bool) {
     let Some(binding) = bindings.insert(Meaning::Key) else { return };
     b.open(Role::TextField);
     b.name(&words::say(w, W::KeyField, &[]));
@@ -682,112 +671,13 @@ fn key_field(b: &mut Builder, w: &Words, bindings: &mut Bindings, form: &account
     }
     b.close();
 }
-fn offered_ways(
+pub(super) fn outcome(
     b: &mut Builder,
     root: &Domain,
     w: &Words,
-    bindings: &mut Bindings,
-    form: &accounts::Accounts,
-    busy: bool,
+    form: &accounts::request::Request,
+    text_per_node: u32,
 ) {
-    let Some(me) = accounts::current_me(root.client()) else { return };
-    let mut demo = None;
-    if let Some(answer) = root.forge().demo() {
-        demo = Some(answer.provider);
-    }
-    let ways = accounts::ways(&me.providers, demo, form.selection.holder);
-    let mut keys = 0_u32;
-    for way in &ways {
-        if let Way::Key { .. } = way {
-            keys = keys.checked_add(1).expect("shown providers fit");
-        }
-    }
-    let name = root.pages().account_name();
-    b.open(Role::Slot);
-    b.style(crate::look::CARD);
-    for way in &ways {
-        let mut provider_name_value = None;
-        for offer in &me.providers {
-            if offer.provider == way.provider() {
-                provider_name_value = provider_name(Some(&offer.name));
-                break;
-            }
-        }
-        let fallback = words::join(&[
-            &words::say(w, W::Provider, &[]),
-            &words::say(w, W::Number, &[Hole::Number(u64::from(way.provider()))]),
-        ]);
-        let (brand, plan) = words::provider_words(provider_name_value.unwrap_or(&fallback));
-        let label = match way {
-            Way::SignIn { plan: true, .. } => named(w, W::Continue, plan),
-            Way::SignIn { plan: false, .. } => named(w, W::SignInBrand, brand),
-            Way::Program { .. } => named(w, W::SubscriptionWay, plan),
-            Way::Key { .. } if keys == 1 => words::say(w, W::KeyWayOnly, &[]),
-            Way::Key { .. } => {
-                let word = match brand.first() {
-                    Some(b'a' | b'e' | b'i' | b'o' | b'u' | b'A' | b'E' | b'I' | b'O' | b'U') => W::KeyWayAn,
-                    Some(_) | None => W::KeyWay,
-                };
-                named(w, word, brand)
-            }
-        };
-        named_control(
-            b,
-            bindings,
-            &label,
-            Meaning::Action(Act::Choose { name, way: *way }),
-            busy,
-            form.way == Some(*way),
-        );
-    }
-    b.close();
-    // A changed catalogue cannot keep an old chosen way's fields offered.
-    if let Some(way) = form.way
-        && ways.as_slice().contains(&way)
-    {
-        match way {
-            Way::Key { .. } => {
-                key_field(b, w, bindings, form, busy);
-                control(
-                    b,
-                    w,
-                    bindings,
-                    W::AddKey,
-                    bindings::submit(name, Operation::AddAccountKey),
-                    busy || bindings.invalid(),
-                    false,
-                );
-            }
-            Way::Program { .. } => {
-                if let Some(binding) = bindings.insert(Meaning::Program) {
-                    b.open(Role::TextField);
-                    b.name(&words::say(w, W::ProgramField, &[]));
-                    b.value(&form.program, form.key_written());
-                    b.bind(binding);
-                    if !c::valid_program_name(&form.program) {
-                        b.state(State::Invalid);
-                    }
-                    if busy {
-                        b.state(State::Disabled);
-                    }
-                    b.close();
-                }
-                control(
-                    b,
-                    w,
-                    bindings,
-                    W::Declare,
-                    bindings::submit(name, Operation::DeclareProgram),
-                    busy || !c::valid_program_name(&form.program),
-                    false,
-                );
-                crate::cards::text(b, Role::Paragraph, &named(w, W::ProgramCommand, &form.program));
-            }
-            Way::SignIn { .. } => {}
-        }
-    }
-}
-fn outcome(b: &mut Builder, root: &Domain, w: &Words, form: &accounts::Accounts, text_per_node: u32) {
     if let Some(broken) = form.broken {
         text(
             b,

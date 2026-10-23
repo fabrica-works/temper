@@ -501,7 +501,8 @@ pub enum Word {
 // The Accounts navigation's two state words (5.3).
 // ConnectForge's and the welcome's forge words (client/forge.md, 5.4).
 // The Forges page, navigation dot and setup strip (18 phrases).
-const PHRASES: u32 = 939;
+// Thirty-one model-flow phrases (client/README.md, 5.5).
+const PHRASES: u32 = 970;
 const ALL: [Word; 458] = [
     Word::YourForgesTitle,
     Word::YourForges,
@@ -1567,9 +1568,9 @@ impl Words {
             languages: 1,
             phrases: PHRASES,
             holes: 3,
-            // 1,600 segments with ConnectForge's words; room for a few more.
-            segments: 1664,
-            text_bytes: 24576,
+            // Room for ConnectForge and ConnectModel words.
+            segments: 1728,
+            text_bytes: 32768,
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined.max(temper_client_domain::forge::DEMO_FIELD_BYTES),
         };

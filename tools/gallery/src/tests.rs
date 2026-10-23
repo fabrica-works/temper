@@ -282,10 +282,14 @@ const HOLDS: [Holds; samples::N] = [
     },
     Holds {
         name: "accounts-signin",
-        heading: "Accounts",
+        heading: "Connect a model",
         parts: &[Part::Named { role: Role::Link, name: "Open the sign-in page" }],
     },
-    Holds { name: "accounts-refused", heading: "Accounts", parts: &[Part::Named { role: Role::Alert, name: "" }] },
+    Holds {
+        name: "accounts-refused",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::Alert, name: "" }],
+    },
     Holds {
         name: "task-reference-T28",
         heading: "Build path: one cache per lane",

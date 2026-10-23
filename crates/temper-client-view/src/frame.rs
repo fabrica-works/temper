@@ -189,6 +189,7 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
     builder.close();
     builder.close();
 }
+#[expect(clippy::too_many_lines, reason = "one navigation tree keeps page states and account marks together")]
 pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
     if unavailable(root).is_some() {
         return;
@@ -202,6 +203,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
         | Address::Chats
         | Address::Chat { .. }
         | Address::Task { .. }
+        | Address::ConnectModel { .. }
         | Address::Accounts => (false, false),
     };
     let count = match root.pages().me(root.client()) {
@@ -249,6 +251,7 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
             | Address::Inbox { .. }
             | Address::Task { .. }
             | Address::Adopt { .. }
+            | Address::ConnectModel { .. }
             | Address::Accounts => false,
         },
         bindings,
@@ -267,7 +270,17 @@ pub(crate) fn navigation(builder: &mut Builder, root: &Domain, words: &crate::wo
     let name = crate::accounts::words::say(words, crate::accounts::words::Word::Accounts, &[]);
     crate::link(builder, &name, bindings.insert(Act::Go { address: Address::Accounts }));
     builder.text(Run::Plain, &name);
-    if *root.pages().address() == Address::Accounts {
+    if match root.pages().address() {
+        Address::Accounts | Address::ConnectModel { .. } => true,
+        Address::Inbox { .. }
+        | Address::Chats
+        | Address::Welcome { .. }
+        | Address::Forges
+        | Address::ConnectForge { .. }
+        | Address::Chat { .. }
+        | Address::Task { .. }
+        | Address::Adopt { .. } => false,
+    } {
         builder.state(skein_ui::State::Current);
     }
     if let Some(mark) = crate::accounts::words::mark(root) {
@@ -293,7 +306,11 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
         return;
     }
     match root.pages().address() {
-        Address::Accounts | Address::Welcome { .. } | Address::ConnectForge { .. } | Address::Forges => return,
+        Address::Accounts
+        | Address::ConnectModel { .. }
+        | Address::Welcome { .. }
+        | Address::ConnectForge { .. }
+        | Address::Forges => return,
         Address::Chats
         | Address::Chat { .. }
         | Address::Task { .. }
@@ -341,7 +358,7 @@ pub(crate) fn demo_banner(b: &mut Builder, root: &Domain, words: &crate::words::
             b,
             Role::Link,
             &words.say(crate::words::Word::ConnectModel, &[]),
-            Act::Go { address: Address::Accounts },
+            Act::Go { address: Address::ConnectModel { way: None } },
             false,
             bindings,
         );
@@ -384,6 +401,7 @@ fn forges_entry(builder: &mut Builder, root: &Domain, words: &crate::words::Word
     let current = match root.pages().address() {
         Address::Forges | Address::ConnectForge { .. } => true,
         Address::Accounts
+        | Address::ConnectModel { .. }
         | Address::Welcome { .. }
         | Address::Chats
         | Address::Chat { .. }

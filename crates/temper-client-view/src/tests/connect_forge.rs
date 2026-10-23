@@ -269,7 +269,7 @@ fn a_forge_under_way_is_no_choice_in_the_welcome() {
 fn the_model_step_shows_the_set_up_under_way() {
     let mut forges = rows(w::Connection::Connecting, w::Offer::Offered);
     *forges.get_mut(0).unwrap() = row(GITHUB, w::Kind::Github, w::Mode::Managed, connected(), w::Offer::NotOffered);
-    let root = f::forge_root(Address::Welcome { step: Step::Model }, forges);
+    let root = f::forge_root(Address::Welcome { step: Step::Model { way: None } }, forges);
     let view = f::page_view(&root);
     node(view.tree(), Role::Paragraph, "Forgejo on this machine · Connecting".as_bytes());
     node(view.tree(), Role::Disclosure, b"Each step");

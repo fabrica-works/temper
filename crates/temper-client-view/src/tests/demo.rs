@@ -29,7 +29,7 @@ fn the_demo_banner_follows_the_frame_on_work_pages() {
             let link = f::find(view.tree(), Role::Link, b"Connect a model").expect("model link");
             assert_eq!(
                 crate::act(&mut view, link, skein_ui::Act::Press),
-                Some(Action::Pages(Act::Go { address: Address::Accounts })),
+                Some(Action::Pages(Act::Go { address: Address::ConnectModel { way: None } })),
                 "{row}"
             );
             let mut roles = skein_lib::List::with_capacity(3);

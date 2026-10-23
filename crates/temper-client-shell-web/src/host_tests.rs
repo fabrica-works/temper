@@ -119,9 +119,11 @@ fn the_key_patch_declares_a_secret_entry() {
 #[test]
 fn sending_a_key_emits_the_empty_value_patch() {
     let mut host = fixture();
+    host.went(b"/accounts/connect");
     build(&mut host);
-    let way = node(&host, Role::Button, b"Use an API key");
+    let way = node(&host, Role::Link, b"Use an API key");
     host.act(way, Act::Press);
+    host.requests();
     build(&mut host);
     input(&mut host, b"Key (pasted once)", KEY);
     let key = node(&host, Role::TextField, b"Key (pasted once)");
@@ -136,9 +138,11 @@ fn sending_a_key_emits_the_empty_value_patch() {
 #[test]
 fn a_key_never_reaches_the_small_store_output() {
     let mut host = fixture();
+    host.went(b"/accounts/connect");
     build(&mut host);
-    let way = node(&host, Role::Button, b"Use an API key");
+    let way = node(&host, Role::Link, b"Use an API key");
     host.act(way, Act::Press);
+    host.requests();
     build(&mut host);
     input(&mut host, b"Key (pasted once)", KEY);
     send(&mut host, b"Add key");
@@ -151,6 +155,7 @@ fn a_key_never_reaches_the_small_store_output() {
 #[test]
 fn the_external_href_is_the_supplied_sign_in_address() {
     let mut host = fixture();
+    host.went(b"/accounts/connect");
     build(&mut host);
     let attempt = send(&mut host, b"Continue with ChatGPT");
     host.client(jig_client::Event::Up {
@@ -268,7 +273,7 @@ mod memory_literal;
 // The chat's saved run state adds 320 B inline and three 512 B call texts (1,856 B).
 // The Forges page, the setup strip and the dot's words (2,664 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388825967;
+const WEB_BYTES: u64 = 274389901251;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

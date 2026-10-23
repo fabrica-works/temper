@@ -225,7 +225,10 @@ fn an_accepted_set_up_moves_the_welcome_on_to_model() {
     );
     setup(&mut root);
     let mut out = answered(&mut root, w::Outcome::SettingUp);
-    assert_eq!(out.pop(), Some(Request::Show { address: Address::Welcome { step: Step::Model }, replace: false }));
+    assert_eq!(
+        out.pop(),
+        Some(Request::Show { address: Address::Welcome { step: Step::Model { way: None } }, replace: false })
+    );
     assert!(out.is_empty());
 }
 

@@ -607,6 +607,7 @@ impl Chat {
             Act::Stop => self.send(env, client, Sending::Stop, serial, out),
             Act::Choice(_)
             | Act::Accounts(_)
+            | Act::ConnectModel(_)
             | Act::Project { .. }
             | Act::SignOut
             | Act::ChatWords { .. }

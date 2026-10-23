@@ -36,9 +36,9 @@ fn an_account_act_is_answered_through_the_page() {
     let root = world.root(person).person();
     let form = root.pages().accounts().expect("accounts page");
     assert!(matches!(
-        form.pending.as_ref().expect("answered account operation").outcome,
+        form.request.pending.as_ref().expect("answered account operation").outcome,
         Some(jig_client::Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused { .. })))
     ));
-    assert!(!form.has_key());
+    assert!(!form.request.has_key());
     assert!(world.kept(person).is_empty(), "a one-shot value has no small-store record");
 }

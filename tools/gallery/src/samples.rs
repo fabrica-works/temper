@@ -106,8 +106,18 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "chat-rejecting", world: Solo, address: Address::Chat { task: 10 }, then: Rejecting },
         Sample { name: "task-held", world: Solo, address: Address::Task { task: 3 }, then: Held },
         Sample { name: "task-releasing", world: Solo, address: Address::Task { task: 3 }, then: Releasing },
-        Sample { name: "accounts-signin", world: Reference, address: Address::Accounts, then: SigningIn },
-        Sample { name: "accounts-refused", world: Reference, address: Address::Accounts, then: AccountRefused },
+        Sample {
+            name: "accounts-signin",
+            world: Reference,
+            address: Address::ConnectModel { way: None },
+            then: SigningIn,
+        },
+        Sample {
+            name: "accounts-refused",
+            world: Reference,
+            address: Address::ConnectModel { way: None },
+            then: AccountRefused,
+        },
         Sample { name: "task-reference-T28", world: Reference, address: Address::Task { task: 28 }, then: Shown },
         Sample { name: "task-reference-T24", world: Reference, address: Address::Task { task: 24 }, then: Shown },
         Sample { name: "task-reference-T12", world: Reference, address: Address::Task { task: 12 }, then: Shown },
@@ -129,7 +139,7 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         Address::Chats => ("chats", None),
         Address::Chat { task } => ("chat", Some(task)),
         Address::Inbox { .. } => ("inbox", None),
-        Address::Accounts => ("accounts", None),
+        Address::Accounts | Address::ConnectModel { .. } => ("accounts", None),
         Address::Welcome { .. } => ("welcome", None),
         Address::Task { task } => ("task", Some(task)),
         Address::ConnectForge { .. } => ("connect-forge", None),
@@ -147,6 +157,7 @@ pub fn mockup(sample: &Sample) -> Option<String> {
         Address::Inbox { .. }
         | Address::Chats
         | Address::Accounts
+        | Address::ConnectModel { .. }
         | Address::Forges
         | Address::ConnectForge { forge: None | Some(temper_client_domain::Choice::Elsewhere) }
         | Address::Welcome { .. }
@@ -257,17 +268,20 @@ fn adoption(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
     }
 }
 fn account(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
-    use temper_client_domain::pages::accounts::{Act as A, Operation, Way};
+    use temper_client_domain::pages::{accounts::Way, connect_model::Act as A};
+    let way = if refused { Way::Key { provider: 18 } } else { Way::SignIn { provider: 18, plan: true } };
     step(
         root,
-        Event::Act {
-            action: Action::Pages(Act::Accounts(A::Choose {
-                name: [97; 16],
-                way: if refused { Way::Key { provider: 18 } } else { Way::SignIn { provider: 18, plan: true } },
-            })),
+        Event::Went {
+            place: temper_client_domain::Place::Address(Address::ConnectModel {
+                way: Some(temper_client_domain::pages::connect_model::model_way(way)),
+            }),
         },
         out,
     );
+    if !refused {
+        step(root, Event::Act { action: Action::Pages(Act::ConnectModel(A::SignIn { name: [97; 16], way })) }, out);
+    }
     if refused {
         step(
             root,
@@ -276,13 +290,7 @@ fn account(root: &mut Domain, refused: bool, out: &mut Queue<Request>) {
         );
     }
     if refused {
-        step(
-            root,
-            Event::Act {
-                action: Action::Pages(Act::Accounts(A::Submit { name: [97; 16], operation: Operation::AddAccountKey })),
-            },
-            out,
-        );
+        step(root, Event::Act { action: Action::Pages(Act::ConnectModel(A::Submit { name: [97; 16] })) }, out);
     }
     step(root, Event::Client { event: jig_client::Event::Stored }, out);
     let attempt = sent_attempt(out);

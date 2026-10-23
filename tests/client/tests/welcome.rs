@@ -3,10 +3,7 @@ use skein_lib::{Env, Queue, Secret, Wall};
 use skein_ui::Role;
 use temper_client_domain::{
     self as d, Address, Place, Step,
-    pages::{
-        Act,
-        accounts::{Act as A, Operation, Way},
-    },
+    pages::{Act, connect_model::Act as A},
 };
 use temper_client_world::{app::Temper, fixtures, front::account_acts as accounts};
 
@@ -35,16 +32,15 @@ fn a_first_run_welcome_without_a_demo() {
     accounts::event(
         &mut front,
         &mut root,
-        d::Event::Went { place: Place::Address(Address::Welcome { step: Step::Model }) }.into(),
+        d::Event::Went { place: Place::Address(Address::Welcome { step: Step::Model { way: None } }) }.into(),
     );
     accounts::event(
         &mut front,
         &mut root,
-        d::Event::Act {
-            action: d::Action::Pages(Act::Accounts(A::Choose {
-                name: [41; 16],
-                way: Way::Key { provider: accounts::PROVIDER },
-            })),
+        d::Event::Went {
+            place: Place::Address(Address::Welcome {
+                step: Step::Model { way: Some(d::ModelWay { provider: accounts::PROVIDER, kind: d::WayKind::Key }) },
+            }),
         }
         .into(),
     );
@@ -56,10 +52,7 @@ fn a_first_run_welcome_without_a_demo() {
     accounts::event(
         &mut front,
         &mut root,
-        d::Event::Act {
-            action: d::Action::Pages(Act::Accounts(A::Submit { name: [41; 16], operation: Operation::AddAccountKey })),
-        }
-        .into(),
+        d::Event::Act { action: d::Action::Pages(Act::ConnectModel(A::Submit { name: [41; 16] })) }.into(),
     );
     accounts::kept(&mut front);
     front.engine.send(temper_engine_domain::Event::Forge(Box::new(temper_engine_domain_forge::Event::Connection {

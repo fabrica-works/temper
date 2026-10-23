@@ -41,9 +41,19 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 fn account_link(b: &mut Builder, bindings: &mut Bindings, name: &[u8]) {
     control(b, bindings, Role::Link, name, Act::Go { address: Address::Accounts }, false);
 }
+#[expect(clippy::manual_map, reason = "optional demo facts are read without closures in step code")]
 pub(crate) fn banner(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings) {
     if crate::frame::unavailable(root).is_some()
-        || *root.pages().address() == Address::Accounts
+        || match root.pages().address() {
+            Address::Accounts | Address::ConnectModel { .. } | Address::Welcome { .. } => true,
+            Address::Forges
+            | Address::ConnectForge { .. }
+            | Address::Inbox { .. }
+            | Address::Chats
+            | Address::Chat { .. }
+            | Address::Task { .. }
+            | Address::Adopt { .. } => false,
+        }
         || root.pages().availability(root.client()) != Some(false)
     {
         return;
@@ -51,8 +61,27 @@ pub(crate) fn banner(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut B
     b.open(Role::Slot);
     b.style(crate::look::ACCOUNTS);
     line(b, w, W::AccountBanner, &[]);
-    for word in [W::AccountSignIn, W::AccountProgram, W::AccountKey] {
-        account_link(b, bindings, &w.say(word, &[]));
+    if let Some(me) = temper_client_domain::pages::accounts::current_me(root.client()) {
+        let demo = match root.forge().demo() {
+            Some(demo) => Some(demo.provider),
+            None => None,
+        };
+        let ways = temper_client_domain::pages::accounts::ways(&me.providers, demo, c::AccountHolder::Own);
+        for way in &ways {
+            let name = crate::pages::connect_model::label(me, *way, &ways, w);
+            control(
+                b,
+                bindings,
+                Role::Link,
+                &name,
+                Act::Go {
+                    address: Address::ConnectModel {
+                        way: Some(temper_client_domain::pages::connect_model::model_way(*way)),
+                    },
+                },
+                false,
+            );
+        }
     }
     b.close();
 }
@@ -199,7 +228,11 @@ fn payer(me: &c::Me, task: Option<&c::Task>) -> Option<c::OwnerAccountUse> {
         },
     }
 }
-fn readiness(doc: &c::OwnerAccounts, provider: Option<u32>, payer: Option<c::OwnerAccountUse>) -> c::Readiness {
+pub(crate) fn readiness(
+    doc: &c::OwnerAccounts,
+    provider: Option<u32>,
+    payer: Option<c::OwnerAccountUse>,
+) -> c::Readiness {
     for row in &doc.readiness {
         if Some(row.provider) == provider && Some(row.payer) == payer {
             return row.readiness;

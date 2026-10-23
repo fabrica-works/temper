@@ -99,7 +99,7 @@ pub fn setup(root: &Domain) -> Option<Setup> {
     let step = if owner && !started {
         Step::Forge { forge: None }
     } else if model {
-        Step::Model
+        Step::Model { way: None }
     } else {
         Step::Ready
     };

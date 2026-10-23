@@ -19,7 +19,7 @@ fn pump(front: &mut Joint, root: &mut Root, now: &mut Time, event: d::Event) -> 
     for _ in 0..PUMP_STEPS {
         while let Some(request) = out.pop() {
             if let d::Request::Show { address, .. } = &request {
-                model |= *address == Address::Welcome { step: Step::Model };
+                model |= *address == Address::Welcome { step: Step::Model { way: None } };
                 Temper::step(
                     root,
                     &Env { now: *now, wall: Wall::EPOCH, limits },
@@ -114,7 +114,7 @@ fn setting_up_forgejo_here_from_the_welcome() {
         &mut front,
         &mut root,
         &mut now,
-        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model }) },
+        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model { way: None } }) },
     );
     let model = view(&root);
     node(&model, Role::Paragraph, "Forgejo on this machine · Setting up: preparing".as_bytes());
@@ -140,7 +140,7 @@ fn setting_up_forgejo_here_from_the_welcome() {
 
 #[test]
 fn a_connected_forge_and_usable_model_remove_the_setup_strip_and_dot() {
-    use d::pages::accounts::{Act as A, Operation, Way};
+    use d::pages::connect_model::Act as A;
     let (mut front, mut root) = accounts::forge_fixture(fixtures::SEED);
     let mut now = Time::ZERO.saturating_add(Duration::from_secs(1));
     connection(&mut front, Connection::Connecting);
@@ -148,21 +148,11 @@ fn a_connected_forge_and_usable_model_remove_the_setup_strip_and_dot() {
     let strip = view(&root);
     node(&strip, Role::Region, b"Setup");
     node(&strip, Role::Link, b"View");
+    let way = d::ModelWay { provider: accounts::PROVIDER, kind: d::WayKind::Key };
     for event in [
-        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model }) },
-        d::Event::Act {
-            action: d::Action::Pages(d::pages::Act::Accounts(A::Choose {
-                name: [41; 16],
-                way: Way::Key { provider: accounts::PROVIDER },
-            })),
-        },
+        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model { way: Some(way) } }) },
         d::Event::AccountKey { value: skein_lib::Secret::new(b"test-private-key".as_slice().into()) },
-        d::Event::Act {
-            action: d::Action::Pages(d::pages::Act::Accounts(A::Submit {
-                name: [41; 16],
-                operation: Operation::AddAccountKey,
-            })),
-        },
+        d::Event::Act { action: d::Action::Pages(d::pages::Act::ConnectModel(A::Submit { name: [41; 16] })) },
     ] {
         pump(&mut front, &mut root, &mut now, event);
     }

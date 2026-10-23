@@ -3,7 +3,7 @@ use crate::{
     Action, Address, Event, Request,
     pages::{
         self,
-        accounts::{self, Act, Operation, Selection, SignInState, Way},
+        accounts::{self, Act, Operation, Selection, Way},
     },
 };
 use jig_client::{Down, contract as c};
@@ -77,120 +77,17 @@ fn a_provider_with_no_offered_sources_offers_no_way() {
     providers.push(provider).unwrap();
     assert!(accounts::ways(&providers, None, c::AccountHolder::Own).is_empty());
 }
-#[test]
-fn a_sign_in_way_sends_one_own_sign_in_request() {
-    let (root, _, _) = opened(c::HeldRole::Member);
-    let mut page = accounts::Accounts::default();
-    let mut out = Queue::with_capacity(4);
-    let mut serial = 0;
-    let act = Act::Choose { name: NAME, way: Way::SignIn { provider: PROVIDER, plan: true } };
-    page.act(root.client(), act.clone(), &mut serial, &mut out);
-    assert_operation_send(&mut out, c::Ask::SignIn { holder: c::AccountHolder::Own, provider: PROVIDER });
-    page.act(root.client(), act, &mut serial, &mut out);
-    assert!(out.is_empty());
-}
-#[test]
-fn a_key_way_adds_a_new_account_with_the_value_privately_once() {
-    let (mut root, _, _) = opened(c::HeldRole::Owner);
-    select(&mut root, c::AccountHolder::Deployment);
-    act(&mut root, Act::Choose { name: NAME, way: Way::Key { provider: PROVIDER } });
-    key(&mut root, b"private-once");
-    let mut out = sends(submit(&mut root, Operation::AddAccountKey));
-    let (_, name, ask, value) = out.pop().expect("one carried key");
-    assert_eq!(name, NAME);
-    assert_eq!(
-        ask,
-        jig_client::Ask::Jig(Box::new(change(
-            c::AccountHolder::Deployment,
-            c::AccountChange::AddKey {
-                provider: PROVIDER,
-                join: None,
-                digest: skein_lib::sha256::digest(b"private-once")
-            }
-        )))
-    );
-    assert_eq!(value.unwrap().expose(), b"private-once");
-    assert!(out.is_empty());
-    assert!(sends(submit(&mut root, Operation::AddAccountKey)).is_empty());
-    assert!(!root.pages().accounts().unwrap().has_key());
-}
+
 #[test]
 fn adding_a_key_in_the_account_form_requires_an_account_number() {
     let mut root = own_accounts();
     act(&mut root, Act::Select { selection: Selection { provider: Some(PROVIDER), ..Default::default() } });
     key(&mut root, b"private-once");
     assert!(sends(submit(&mut root, Operation::AddKey)).is_empty());
-    assert_eq!(root.pages().accounts().unwrap().broken, Some(accounts::Broken::Selection));
+    assert_eq!(root.pages().accounts().unwrap().request.broken, Some(accounts::Broken::Selection));
 }
-#[test]
-fn a_program_way_declares_the_default_name_for_the_person() {
-    let (root, _, _) = opened(c::HeldRole::Member);
-    let mut page = accounts::Accounts::default();
-    let mut out = Queue::with_capacity(4);
-    let mut serial = 0;
-    page.act(
-        root.client(),
-        Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } },
-        &mut serial,
-        &mut out,
-    );
-    assert_eq!(page.program.as_ref(), b"claude-pat");
-    page.act(root.client(), Act::Submit { name: NAME, operation: Operation::DeclareProgram }, &mut serial, &mut out);
-    assert_operation_send(
-        &mut out,
-        change(
-            c::AccountHolder::Own,
-            c::AccountChange::DeclareProgram {
-                provider: PROVIDER,
-                join: None,
-                name: Box::from(b"claude-pat".as_slice()),
-            },
-        ),
-    );
-}
-#[test]
-fn an_invalid_or_overlong_program_name_is_never_declared() {
-    let (root, _, _) = opened(c::HeldRole::Member);
-    for value in [b"".as_slice(), b"Alice", b"bad name", &[b'a'; 33]] {
-        let mut page = accounts::Accounts::default();
-        let mut out = Queue::with_capacity(4);
-        page.act(root.client(), Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } }, &mut 0, &mut out);
-        page.act(root.client(), Act::ProgramName { value: Box::from(value) }, &mut 0, &mut out);
-        page.act(root.client(), Act::Submit { name: NAME, operation: Operation::DeclareProgram }, &mut 0, &mut out);
-        assert!(out.is_empty());
-    }
-}
-#[test]
-fn the_program_default_uses_the_lowercased_first_name_within_the_name_bound() {
-    for (person, expected) in [
-        (b"ALICE Example".as_slice(), b"claude-alice".as_slice()),
-        (b"abcdefghijklmnopqrstuvwxyz", b"claude-abcdefghijklmnopqrstuvwxy"),
-    ] {
-        let (mut root, watch, _) = opened(c::HeldRole::Member);
-        let c::WatchEvent::Delivered(c::Delivery::Me(mut me)) = frame(c::HeldRole::Member, fixtures::PARTY) else {
-            unreachable!()
-        };
-        me.party.name = c::DocumentText::complete(c::Text::new(Box::from(person), 32).unwrap());
-        deliver(&mut root, watch, c::WatchEvent::Delivered(c::Delivery::Me(me)));
-        act(&mut root, Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } });
-        assert_eq!(root.pages().accounts().unwrap().program.as_ref(), expected);
-    }
-}
-#[test]
-fn a_program_name_at_its_bound_is_declared() {
-    let (root, _, _) = opened(c::HeldRole::Member);
-    let mut page = accounts::Accounts::default();
-    let mut out = Queue::with_capacity(4);
-    let name = Box::new([b'a'; 32]);
-    page.act(root.client(), Act::Choose { name: NAME, way: Way::Program { provider: PROVIDER } }, &mut 0, &mut out);
-    page.act(root.client(), Act::ProgramName { value: name.clone() }, &mut 0, &mut out);
-    page.act(root.client(), Act::Submit { name: NAME, operation: Operation::DeclareProgram }, &mut 0, &mut out);
-    assert_operation_send(
-        &mut out,
-        change(c::AccountHolder::Own, c::AccountChange::DeclareProgram { provider: PROVIDER, join: None, name }),
-    );
-}
-fn event(root: &mut crate::Domain, event: Event) -> Queue<Request> {
+
+pub(super) fn event(root: &mut crate::Domain, event: Event) -> Queue<Request> {
     let limits = fixtures::limits();
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     crate::step(root, &fixtures::env(&limits), event, &mut out);
@@ -200,24 +97,24 @@ fn event(root: &mut crate::Domain, event: Event) -> Queue<Request> {
 fn act(root: &mut crate::Domain, act: Act) -> Queue<Request> {
     event(root, Event::Act { action: Action::Pages(pages::Act::Accounts(act)) })
 }
-fn frame(role: c::HeldRole, party: u64) -> c::WatchEvent {
+pub(super) fn frame(role: c::HeldRole, party: u64) -> c::WatchEvent {
     let c::WatchEvent::Delivered(c::Delivery::Me(mut me)) = fixtures::frame(party) else { unreachable!() };
     me.deployment_role = Some(role);
     me.providers = List::with_capacity(1);
     me.providers.push(offer(PROVIDER)).unwrap();
     c::WatchEvent::Delivered(c::Delivery::Me(me))
 }
-fn opened(role: c::HeldRole) -> (crate::Domain, Token, Token) {
+pub(super) fn opened(role: c::HeldRole) -> (crate::Domain, Token, Token) {
     let mut root = crate::unlinked(&fixtures::limits(), fixtures::SEED);
     let (me, accounts) = fixtures::start_accounts(&mut root, List::with_capacity(0));
     deliver(&mut root, me, frame(role, fixtures::PARTY));
     event(&mut root, Event::Went { place: crate::Place::Address(Address::Accounts) });
     (root, me, accounts)
 }
-fn deliver(root: &mut crate::Domain, watch: Token, event: c::WatchEvent) -> Queue<Request> {
+pub(super) fn deliver(root: &mut crate::Domain, watch: Token, event: c::WatchEvent) -> Queue<Request> {
     self::event(root, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event } } })
 }
-fn document(signing: bool) -> c::WatchEvent {
+pub(super) fn document(signing: bool) -> c::WatchEvent {
     let mut rows = List::with_capacity(1);
     if signing {
         rows.push(c::OwnerAccountSignIn {
@@ -247,14 +144,14 @@ fn select(root: &mut crate::Domain, holder: c::AccountHolder) {
         },
     );
 }
-fn key(root: &mut crate::Domain, bytes: &[u8]) {
+pub(super) fn key(root: &mut crate::Domain, bytes: &[u8]) {
     event(root, Event::AccountKey { value: Secret::new(Box::from(bytes)) });
 }
 fn submit(root: &mut crate::Domain, operation: Operation) -> Queue<Request> {
     act(root, Act::Submit { name: NAME, operation })
 }
 type Sent = (Token, [u8; 16], jig_client::Ask, Option<Secret>);
-fn sends(mut out: Queue<Request>) -> Queue<Sent> {
+pub(super) fn sends(mut out: Queue<Request>) -> Queue<Sent> {
     let mut sent = Queue::with_capacity(4);
     while let Some(request) = out.pop() {
         if let Request::Client { request: jig_client::Request::Save { .. } } = &request {
@@ -365,7 +262,7 @@ fn losing_the_owner_role_clears_the_deployment_key_draft() {
     deliver(&mut root, me, frame(c::HeldRole::Member, fixtures::PARTY));
     let page = root.pages().accounts().unwrap();
     assert!(page.deployment.is_none());
-    assert!(!page.has_key());
+    assert!(!page.request.has_key());
 }
 #[test]
 fn members_cannot_submit_a_key_for_the_deployment_holder() {
@@ -383,8 +280,8 @@ fn changing_the_party_clears_the_deployment_account_draft() {
     submit(&mut root, Operation::AddKey);
     deliver(&mut root, me, frame(c::HeldRole::Owner, fixtures::PARTY + 1));
     let page = root.pages().accounts().unwrap();
-    assert!(!page.has_key());
-    assert!(page.pending.is_none());
+    assert!(!page.request.has_key());
+    assert!(page.request.pending.is_none());
 }
 #[test]
 fn leaving_the_accounts_page_discards_its_private_key_draft() {
@@ -392,7 +289,7 @@ fn leaving_the_accounts_page_discards_its_private_key_draft() {
     event(&mut root, Event::Went { place: crate::Place::Missing });
     assert!(root.pages().accounts().is_none());
     event(&mut root, Event::Went { place: crate::Place::Address(Address::Accounts) });
-    assert!(!root.pages().accounts().unwrap().has_key());
+    assert!(!root.pages().accounts().unwrap().request.has_key());
 }
 #[test]
 fn signing_out_closes_the_accounts_page_with_its_draft() {
@@ -422,7 +319,7 @@ fn adding_a_joined_key_sends_its_value_once_privately() {
             },
         }))
     );
-    assert!(!root.pages().accounts().unwrap().has_key());
+    assert!(!root.pages().accounts().unwrap().request.has_key());
     assert!(!format!("{:?}", root.pages()).contains("private-once"));
 }
 #[test]
@@ -478,51 +375,17 @@ fn an_again_answer_leaves_the_key_retry_unsent() {
         },
     );
     assert!(sends(out).is_empty());
-    assert_eq!(root.pages().accounts().unwrap().pending.as_ref().unwrap().outcome, Some(jig_client::Outcome::Unsent));
-}
-#[test]
-fn a_restored_sign_in_address_is_live_only_while_the_watch_names_its_source() {
-    let (mut root, _, watch) = opened(c::HeldRole::Member);
-    let pending = jig_client::Key { asker: pages::me_handle().asker, number: 991 };
-    crate::route::told(
-        &mut root,
-        &fixtures::env(&fixtures::limits()),
-        jig_client::Told::Kept {
-            key: pending,
-            request: jig_client::Ask::Jig(Box::new(c::Ask::SignIn {
-                holder: c::AccountHolder::Own,
-                provider: PROVIDER,
-            })),
-        },
-        &mut Queue::with_capacity(crate::max_out(&fixtures::limits())),
+    assert_eq!(
+        root.pages().accounts().unwrap().request.pending.as_ref().unwrap().outcome,
+        Some(jig_client::Outcome::Unsent)
     );
-    started(&mut root, pending);
-    deliver(&mut root, watch, document(true));
-    let page = root.pages().accounts().unwrap();
-    assert_eq!(page.sign_in_state(root.client()), SignInState::Signing { source: SOURCE });
-    assert_eq!(page.sign_in_address(root.client()), Some(b"https://issuer/visit".as_slice()));
-    let c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(mut cut)) = document(false) else { unreachable!() };
-    cut.cut = true;
-    deliver(&mut root, watch, c::WatchEvent::Delivered(c::Delivery::OwnerAccounts(cut)));
-    assert_eq!(root.pages().accounts().unwrap().sign_in_state(root.client()), SignInState::Unknown);
-    deliver(&mut root, watch, document(false));
-    let page = root.pages().accounts().unwrap();
-    assert_eq!(page.sign_in_state(root.client()), SignInState::Ended { source: SOURCE });
-    assert_eq!(page.sign_in_address(root.client()), None);
-    select(&mut root, c::AccountHolder::Own);
-    submit(&mut root, Operation::SignIn);
-    let key = root.pages().accounts().unwrap().pending.as_ref().unwrap().key;
-    started(&mut root, key);
-    let page = root.pages().accounts().unwrap();
-    assert_eq!(page.sign_in_state(root.client()), SignInState::Started { source: SOURCE });
-    assert!(page.sign_in_address(root.client()).is_some(), "an older watch does not end a new sign-in");
 }
+
 #[test]
 fn account_operations_send_the_selected_holder_numbers_without_confirmation() {
     let (root, _, _) = opened(c::HeldRole::Owner);
     for holder in [c::AccountHolder::Own, c::AccountHolder::Deployment] {
         for (operation, ask) in [
-            (Operation::SignIn, c::Ask::SignIn { holder, provider: PROVIDER }),
             (Operation::Resume, change(holder, c::AccountChange::Resume { source: SOURCE })),
             (
                 Operation::MoveAccount { place: 1 },
@@ -552,7 +415,7 @@ fn destructive_account_operations_wait_for_confirmation_before_sending() {
             let (mut page, mut serial, mut out) = operation_page(root.client(), holder);
             page.act(root.client(), Act::Submit { name: NAME, operation }, &mut serial, &mut out);
             assert!(out.is_empty());
-            assert_eq!(page.confirm, Some((NAME, ask.clone())));
+            assert_eq!(page.request.confirm, Some((NAME, ask.clone())));
             page.act(root.client(), Act::Confirm, &mut serial, &mut out);
             assert_operation_send(&mut out, ask);
             assert_finished_operation(&mut page, root.client(), &mut serial, &mut out);
@@ -591,22 +454,9 @@ fn account_move_operations_refuse_a_zero_based_rank() {
         let mut page = accounts::Accounts::default();
         let mut out = Queue::with_capacity(4);
         page.act(root.client(), Act::Submit { name: NAME, operation }, &mut 0, &mut out);
-        assert_eq!(page.broken, Some(accounts::Broken::Rank));
+        assert_eq!(page.request.broken, Some(accounts::Broken::Rank));
         assert!(out.is_empty());
     }
-}
-#[test]
-fn a_key_at_capacity_can_create_a_standalone_account() {
-    let (root, _, _) = opened(c::HeldRole::Owner);
-    let mut page = accounts::Accounts::default();
-    let mut out = Queue::with_capacity(4);
-    page.act(root.client(), Act::Choose { name: NAME, way: Way::Key { provider: PROVIDER } }, &mut 0, &mut out);
-    page.key(Secret::new(Box::new([b'x'; 4096])));
-    page.act(root.client(), Act::Submit { name: NAME, operation: Operation::AddAccountKey }, &mut 0, &mut out);
-    let c::Ask::AccountChange { change: c::AccountChange::AddKey { join: None, .. }, .. } = page.pending.unwrap().ask
-    else {
-        panic!("key-only account");
-    };
 }
 
 fn change(holder: c::AccountHolder, change: c::AccountChange) -> c::Ask {
@@ -633,10 +483,10 @@ fn another_partys_restored_account_work_is_not_shown() {
     event(&mut root, Event::Went { place: crate::Place::Address(Address::Accounts) });
     assert!(root.pages().accounts().is_none());
     deliver(&mut root, me, frame(c::HeldRole::Member, fixtures::PARTY));
-    assert!(root.pages().accounts().unwrap().pending.is_none());
+    assert!(root.pages().accounts().unwrap().request.pending.is_none());
 }
 
-fn started(root: &mut crate::Domain, pending: jig_client::Key) {
+pub(super) fn started(root: &mut crate::Domain, pending: jig_client::Key) {
     crate::route::told(
         root,
         &fixtures::env(&fixtures::limits()),
@@ -707,7 +557,7 @@ fn operation_page(
         &mut serial,
         &mut out,
     );
-    page.key(Secret::new(Box::from(b"private-once".as_slice())));
+    page.request.key(Secret::new(Box::from(b"private-once".as_slice())));
     (page, serial, out)
 }
 fn assert_operation_send(out: &mut Queue<pages::Request>, ask: c::Ask) {
@@ -725,7 +575,7 @@ fn assert_finished_operation(
     out: &mut Queue<pages::Request>,
 ) {
     assert!(out.is_empty());
-    assert!(!page.has_key());
+    assert!(!page.request.has_key());
     page.act(client, Act::Confirm, serial, out);
     assert!(out.is_empty());
 }
@@ -746,7 +596,7 @@ fn cancel_abandons_a_named_lost_account_act() {
             },
         );
         act(&mut root, Act::Cancel);
-        assert!(root.pages().accounts().unwrap().pending.is_none());
+        assert!(root.pages().accounts().unwrap().request.pending.is_none());
         key(&mut root, b"another-key");
         assert_eq!(sends(act(&mut root, Act::Submit { name: [99; 16], operation: Operation::AddKey })).len(), 1);
     }
@@ -775,7 +625,7 @@ fn cancel_abandons_a_restored_lost_account_act() {
             jig_client::Told::Answered { key, outcome },
             &mut out,
         );
-        assert_eq!(root.pages().accounts().unwrap().pending.as_ref().unwrap().name, None);
+        assert_eq!(root.pages().accounts().unwrap().request.pending.as_ref().unwrap().name, None);
         act(&mut root, Act::Cancel);
         select(&mut root, c::AccountHolder::Own);
         assert_eq!(sends(submit(&mut root, Operation::Resume)).len(), 1);

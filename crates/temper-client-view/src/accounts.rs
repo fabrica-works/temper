@@ -18,6 +18,8 @@ pub(crate) enum Field {
 #[derive(Clone, Debug)]
 pub(crate) enum Meaning {
     Action(AccountAct),
+    Model(pages::connect_model::Act),
+    Go(temper_client_domain::Address),
     Field(Field, Selection),
     Key,
     Program,
@@ -62,9 +64,25 @@ impl Bindings {
             if *key != token {
                 continue;
             }
+            match (meaning, &act) {
+                (Meaning::Model(action), Act::Press) => {
+                    return Some(Event::Act { action: Action::Pages(pages::Act::ConnectModel(action.clone())) });
+                }
+                (Meaning::Go(address), Act::Press) => {
+                    return Some(Event::Act { action: Action::Pages(pages::Act::Go { address: address.clone() }) });
+                }
+                (Meaning::Program, Act::Input { value }) => {
+                    return Some(Event::Act {
+                        action: Action::Pages(pages::Act::ConnectModel(pages::connect_model::Act::ProgramName {
+                            value: value.clone(),
+                        })),
+                    });
+                }
+                (Meaning::Model(_) | Meaning::Go(_), _) => return None,
+                _ => {}
+            }
             let action = match (meaning, act) {
                 (Meaning::Key, Act::Input { value }) => return Some(Event::AccountKey { value: Secret::new(value) }),
-                (Meaning::Program, Act::Input { value }) => AccountAct::ProgramName { value },
                 (Meaning::Field(field, selection), Act::Input { value }) => {
                     self.revision = self.revision.checked_add(1).expect("field edit revisions fit");
                     let bit = field.bit();
@@ -92,8 +110,7 @@ impl Bindings {
                 }
                 (Meaning::Action(action), Act::Press) => {
                     match action {
-                        AccountAct::Select { .. } | AccountAct::Choose { .. } | AccountAct::Cancel => self.invalid = 0,
-                        AccountAct::ProgramName { .. } => {}
+                        AccountAct::Select { .. } | AccountAct::Cancel => self.invalid = 0,
                         AccountAct::Submit { .. } | AccountAct::Confirm => {
                             if self.invalid != 0 {
                                 return None;
@@ -103,8 +120,11 @@ impl Bindings {
                     action.clone()
                 }
                 (_, Act::Submit | Act::Toggle | Act::Drawing { .. })
-                | (Meaning::Action(_), Act::Input { .. })
-                | (Meaning::Key | Meaning::Program | Meaning::Field(..), Act::Press) => return None,
+                | (Meaning::Action(_) | Meaning::Model(_) | Meaning::Go(_) | Meaning::Program, Act::Input { .. })
+                | (
+                    Meaning::Key | Meaning::Program | Meaning::Field(..) | Meaning::Model(_) | Meaning::Go(_),
+                    Act::Press,
+                ) => return None,
             };
             return Some(Event::Act { action: Action::Pages(pages::Act::Accounts(action)) });
         }

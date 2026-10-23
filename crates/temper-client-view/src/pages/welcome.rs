@@ -41,7 +41,7 @@ fn steps(b: &mut Builder, root: &Domain, w: &Words, current: Step) {
     let current = match current {
         Step::Welcome => 0,
         Step::Forge { .. } => 1,
-        Step::Model => 2,
+        Step::Model { .. } => 2,
         Step::Ready => {
             let connected = match crate::forge::connect::personal(root) {
                 Some(row) => match row.connection {
@@ -137,7 +137,7 @@ pub(crate) fn main(
                 );
             }
         }
-        Step::Model => {
+        Step::Model { .. } => {
             if let Some(row) = temper_client_domain::forge::connect::underway_forge(root.forges(), root.forge().demo())
             {
                 crate::forge::connect::status(b, root, w, row, false);
@@ -145,9 +145,7 @@ pub(crate) fn main(
             }
             text(b, w, Role::Heading { level: 1 }, Word::WelcomeModelTitle);
             paragraph(b, w, Word::WelcomeModelLead, look::WELCOME_LEAD);
-            if let Some(form) = root.pages().accounts() {
-                super::accounts::add_account(b, root, w, accounts, form, text_per_node);
-            }
+            super::connect_model::body(b, root, w, accounts, text_per_node);
         }
         Step::Ready => {
             text(b, w, Role::Heading { level: 1 }, Word::WelcomeReadyTitle);
@@ -159,8 +157,8 @@ pub(crate) fn main(
         b.style(look::WELCOME_FOOT);
         let back = match step {
             Step::Welcome | Step::Forge { .. } => Step::Welcome,
-            Step::Model => Step::Forge { forge: None },
-            Step::Ready => Step::Model,
+            Step::Model { .. } => Step::Forge { forge: None },
+            Step::Ready => Step::Model { way: None },
         };
         go(b, w, bindings, Word::WelcomeBack, back);
         control(b, w, bindings, Word::WelcomeLater, Act::Go { address: Address::Chats });
@@ -204,7 +202,7 @@ fn ready(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings) {
         crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeModelAccount, &[Hole::Name(account)]));
     } else {
         text(b, w, Role::Paragraph, Word::WelcomeNoModel);
-        go(b, w, bindings, Word::WelcomeModelTitle, Step::Model);
+        go(b, w, bindings, Word::WelcomeModelTitle, Step::Model { way: None });
     }
     b.close();
     b.close();

@@ -391,6 +391,7 @@ impl Task {
             | Act::Choice(_)
             | Act::SignOut
             | Act::Accounts(_)
+            | Act::ConnectModel(_)
             | Act::ChatWords { .. }
             | Act::StartChat
             | Act::Playground
@@ -484,6 +485,7 @@ impl Task {
             | Act::Choice(_)
             | Act::SignOut
             | Act::Accounts(_)
+            | Act::ConnectModel(_)
             | Act::ChatWords { .. }
             | Act::StartChat
             | Act::Playground

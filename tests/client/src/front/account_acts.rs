@@ -15,34 +15,76 @@ pub const PROVIDER: u32 = 17;
 pub const SMALL_ROWS: u32 = 2;
 #[must_use]
 pub fn fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, false, WelcomeForge::None)
+    fixture_root(seed, false, 2, None, false, WelcomeForge::None, false)
 }
 #[must_use]
 pub fn plan_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, true, WelcomeForge::None)
+    fixture_root(seed, false, 2, None, true, WelcomeForge::None, false)
 }
 #[must_use]
 pub fn tools_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, true, 2, None, false, WelcomeForge::None)
+    fixture_root(seed, true, 2, None, false, WelcomeForge::None, false)
 }
 #[must_use]
 pub fn small_rows_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 3, Some(SMALL_ROWS), false, WelcomeForge::None)
+    fixture_root(seed, false, 3, Some(SMALL_ROWS), false, WelcomeForge::None, false)
 }
 #[must_use]
 pub fn welcome_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, false, WelcomeForge::Connected)
+    fixture_root(seed, false, 2, None, false, WelcomeForge::Connected, false)
 }
 /// The first-run forge is owned by the box; the test scripts its connection rows.
 #[must_use]
 pub fn forge_fixture(seed: u64) -> (Joint, Root) {
-    fixture_root(seed, false, 2, None, false, WelcomeForge::Owned)
+    fixture_root(seed, false, 2, None, false, WelcomeForge::Owned, false)
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum WelcomeForge {
     None,
     Connected,
     Owned,
+}
+#[must_use]
+pub fn program_fixture(seed: u64) -> (Joint, Root) {
+    fixture_root(seed, false, 2, None, false, WelcomeForge::None, true)
+}
+#[must_use]
+pub fn empty_fixture(seed: u64) -> (Joint, Root) {
+    use temper_client_domain::pages::{
+        Act as PageAct,
+        accounts::{Act, Operation, Selection},
+    };
+    let (mut front, mut root) = fixture(seed);
+    let domain = root.person();
+    let account = domain
+        .pages()
+        .accounts()
+        .expect("account fixture")
+        .deployment(domain.client())
+        .expect("owner deployment")
+        .accounts
+        .get(0)
+        .expect("seeded deployment account")
+        .number;
+    for act in [
+        Act::Select {
+            selection: Selection {
+                holder: jig_client::contract::AccountHolder::Deployment,
+                account: Some(account),
+                ..Default::default()
+            },
+        },
+        Act::Submit { name: [67; 16], operation: Operation::RemoveAccount },
+        Act::Confirm,
+    ] {
+        event(
+            &mut front,
+            &mut root,
+            temper_client_domain::Event::Act { action: temper_client_domain::Action::Pages(PageAct::Accounts(act)) }
+                .into(),
+        );
+    }
+    (front, root)
 }
 fn fixture_root(
     seed: u64,
@@ -51,6 +93,7 @@ fn fixture_root(
     rows: Option<u32>,
     plan: bool,
     forge: WelcomeForge,
+    program: bool,
 ) -> (Joint, Root) {
     let welcome = forge != WelcomeForge::None;
     let forge_setup = forge == WelcomeForge::Owned;
@@ -70,9 +113,11 @@ fn fixture_root(
                 offers: a::Offers { sign_in: true, key: true, programs: Box::new([]) },
             }]),
         };
-        if tools {
+        if tools || program {
             config.core.settings.llm_providers.providers.get_mut(0).expect("fixture provider").offers.programs =
                 Box::new([Box::from(b"claude_code".as_slice())]);
+        }
+        if tools {
             let mut model = walking::charter().policy.model;
             model.name = Box::from(b"effort-model".as_slice());
             model.efforts = Box::new([Box::from(b"high".as_slice())]);
@@ -159,8 +204,10 @@ fn flush(
 ) {
     Temper::take(root, env, out);
     while let Some(request) = out.pop() {
-        if let Duty::Wire(request) = Temper::duty(request) {
-            front.wire(CLIENT, env.now, env.wall, request);
+        match Temper::duty(request) {
+            Duty::Wire(request) => front.wire(CLIENT, env.now, env.wall, request),
+            Duty::Show { address, .. } => Temper::step(root, env, Temper::went(address), out),
+            Duty::Store(_) | Duty::SignIn { .. } | Duty::SignOut | Duty::Fact => {}
         }
     }
 }
