@@ -1640,7 +1640,9 @@ the cues the demo's, copied in:
   GitHub, or a Forgejo temper runs on this machine. Your model: your
   ChatGPT plan, or an OpenAI API key.", by the default document's
   forges and its providers' ways;
-  "About five minutes"), each with its button; then
+  "About five minutes"), each with its button, the set up card's a
+  link to the Forge step drawn as one (a move is a link: `browser.md`,
+  2.3); then
   "Started in the playground? Connect your own forge and model whenever
   you like; the playground then steps aside." Forge is `ConnectForge`'s
   Choose and Details; Model is `ConnectModel`'s Choose (5.5, The ways);

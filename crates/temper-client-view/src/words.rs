@@ -1281,7 +1281,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::WelcomePlaygroundDescription => (&[b"A built-in scripted model and forge. Ask one of three requests and follow its change from a branch to main."], &[]),
         Word::WelcomePlaygroundCost => (&[b"Nothing leaves this machine, and nothing costs. \xc2\xb7 Ready at once"], &[]),
         Word::WelcomeSetup => (&[b"Set up temper"], &[]),
-        Word::WelcomeSetupDescription => (&[b"Your forge: GitHub, or a Forgejo temper runs on this machine. Your model: an OpenAI API key."], &[]),
+        Word::WelcomeSetupDescription => (&[b"Your forge: GitHub, or a Forgejo temper runs on this machine. Your model: your ChatGPT plan, or an OpenAI API key."], &[]),
         Word::WelcomeSetupTime => (&[b"About five minutes"], &[]),
         Word::WelcomeAfter => (&[b"Started in the playground? Connect your own forge and model whenever you like; the playground then steps aside."], &[]),
         Word::WelcomeForgeTitle => (&[b"Connect a forge"], &[]),

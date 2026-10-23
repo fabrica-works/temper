@@ -57,7 +57,7 @@ fn the_welcome_step_says_its_words_and_offers_both_cards() {
         "Nothing leaves this machine, and nothing costs. · Ready at once",
         "Try the playground",
         "Set up temper",
-        "Your forge: GitHub, or a Forgejo temper runs on this machine. Your model: an OpenAI API key.",
+        "Your forge: GitHub, or a Forgejo temper runs on this machine. Your model: your ChatGPT plan, or an OpenAI API key.",
         "About five minutes",
         "Set up temper",
         "Started in the playground? Connect your own forge and model whenever you like; the playground then steps aside.",
