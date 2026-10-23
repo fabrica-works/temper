@@ -1760,8 +1760,10 @@ question waiting at the director. It is never stood up by running act 1
 again. Each step's story is a fresh deployment, as act 1's are, whose
 opening scripts delegate the part of that start its Musts read, and no
 more. Its fixture is the case's, with the director on its own charter
-(4.1's row), one worker with a slot for each run the step keeps waiting at
-once, and what the row names. Act 2's scripts, acts and oracle steps
+(4.1's row), and what the row names. It runs on the real loop's cluster,
+as 4.3's and 4.6's stories do, one slot per worker (../protocol/README.md,
+15.7), a worker for each run the step keeps at once: a standalone worker's
+slots are its agent host's, one. Act 2's scripts, acts and oracle steps
 (`oracle::step_5_1`, `step_5_2`, `step_5_3`) sit beside act 1's in the
 library's files, over the one `Observed`, which grows only by fields, and
 each oracle step has unit tests that a mutated observation fails. The
