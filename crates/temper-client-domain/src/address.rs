@@ -33,11 +33,11 @@ pub enum Place {
 }
 
 /// The page's path (client/browser.md, 2.3): `/`, `/chats`, `/chats/<task>`, `/tasks/<task>`,
-/// `/projects/<project>/adopt`, `/accounts`. The inbox prints `/` whatever its filter.
+/// `/projects/<project>/adopt`, `/accounts`. The inbox adds its set filter fields as a query.
 #[must_use]
 pub fn print(address: &Address) -> Box<[u8]> {
     let (name, number, tail) = match address {
-        Address::Inbox { .. } => return Box::from(b"/".as_slice()),
+        Address::Inbox { filter } => return print_filter(*filter),
         Address::Accounts => (b"accounts".as_slice(), None, b"".as_slice()),
         Address::Chats => (b"chats".as_slice(), None, b"".as_slice()),
         Address::Chat { task } => (b"chats".as_slice(), Some(*task), b"".as_slice()),
@@ -64,14 +64,16 @@ pub fn print(address: &Address) -> Box<[u8]> {
     path.finish()
 }
 
-/// The page a path names, ignoring its query and one trailing slash; any other path is `Place::Missing`.
+/// The page a path names, reading the inbox's filter query and ignoring other queries and one trailing slash.
+/// Unreadable query fields are dropped; any other path is `Place::Missing`.
 #[must_use]
 pub fn parse(path: &[u8]) -> Place {
     let query = skein_lib::bytes::find(path, b"?").unwrap_or(path.len());
+    let fields = path.get(query..).expect("query in path").strip_prefix(b"?").unwrap_or(b"");
     let path = path.get(..query).expect("query in path");
     let path = path.strip_suffix(b"/").unwrap_or(path);
     if path.is_empty() {
-        return Place::Address(Address::Inbox { filter: Filter::ALL });
+        return Place::Address(Address::Inbox { filter: parse_filter(fields) });
     }
     let Some(path) = path.strip_prefix(b"/") else {
         return Place::Missing;
@@ -105,6 +107,76 @@ pub fn parse(path: &[u8]) -> Place {
         _ => return Place::Missing,
     };
     Place::Address(address)
+}
+
+fn print_filter(filter: Filter) -> Box<[u8]> {
+    let project = Decimal::of(u64::from(filter.project.unwrap_or(0)));
+    let goal = Decimal::of(filter.goal.unwrap_or(0));
+    let kind = match filter.kind {
+        Some(Kind::Proposal) => b"proposal".as_slice(),
+        Some(Kind::Question) => b"question".as_slice(),
+        Some(Kind::Held) => b"held".as_slice(),
+        Some(Kind::PersonTask) => b"person-task".as_slice(),
+        None => b"".as_slice(),
+    };
+    let fields = [
+        (b"project=".as_slice(), project.as_bytes(), filter.project.is_some()),
+        (b"kind=".as_slice(), kind, filter.kind.is_some()),
+        (b"goal=".as_slice(), goal.as_bytes(), filter.goal.is_some()),
+    ];
+    let mut size = 1_usize;
+    for (name, value, set) in fields {
+        if set {
+            size = size.checked_add(1).expect("query fits usize");
+            size = size.checked_add(name.len()).expect("query fits usize");
+            size = size.checked_add(value.len()).expect("query fits usize");
+        }
+    }
+    let mut path = Writer::new(size);
+    path.put(b"/").expect("root fits");
+    let mut separator = b"?";
+    for (name, value, set) in fields {
+        if set {
+            path.put(separator).expect("separator fits");
+            path.put(name).expect("field name fits");
+            path.put(value).expect("field value fits");
+            separator = b"&";
+        }
+    }
+    path.finish()
+}
+
+fn parse_filter(query: &[u8]) -> Filter {
+    let mut filter = Filter::ALL;
+    let mut rest = query;
+    for _ in 0..query.len() {
+        if rest.is_empty() {
+            break;
+        }
+        let end = skein_lib::bytes::find(rest, b"&").unwrap_or(rest.len());
+        let field = rest.get(..end).expect("separator in query");
+        rest = rest.get(end..).expect("separator in query").strip_prefix(b"&").unwrap_or(b"");
+        let Some(split) = skein_lib::bytes::find(field, b"=") else {
+            continue;
+        };
+        let name = field.get(..split).expect("separator in field");
+        let value = field.get(split..).expect("separator in field").strip_prefix(b"=").expect("field separator");
+        match name {
+            b"project" if filter.project.is_none() => filter.project = project_decimal(value),
+            b"goal" if filter.goal.is_none() => filter.goal = decimal(value),
+            b"kind" if filter.kind.is_none() => {
+                filter.kind = match value {
+                    b"proposal" => Some(Kind::Proposal),
+                    b"question" => Some(Kind::Question),
+                    b"held" => Some(Kind::Held),
+                    b"person-task" => Some(Kind::PersonTask),
+                    _ => None,
+                };
+            }
+            _ => {}
+        }
+    }
+    filter
 }
 
 fn segment(path: &[u8]) -> (&[u8], &[u8]) {

@@ -60,6 +60,60 @@ fn the_inbox_watches_inbox_and_reads_each_entrys_object() {
     }
 }
 #[test]
+fn a_kind_chosen_shows_the_inbox_at_its_address() {
+    let (mut root, _) = fixtures::inbox_home(Filter::ALL);
+    let filter = Filter { kind: Some(Kind::Question), ..Filter::ALL };
+    let mut out = Queue::with_capacity(crate::max_out(&fixtures::limits()));
+    crate::step(
+        &mut root,
+        &fixtures::env(&fixtures::limits()),
+        crate::Event::Act { action: crate::Action::Pages(Act::Filter { filter }) },
+        &mut out,
+    );
+    assert_eq!(out.pop(), Some(Request::Show { address: crate::Address::Inbox { filter }, replace: false }));
+    assert_eq!(&*crate::address::print(&crate::Address::Inbox { filter }), b"/?kind=question");
+    assert!(out.is_empty());
+}
+#[test]
+fn the_inbox_at_a_filtered_path_reads_that_filter() {
+    let (mut root, _) = fixtures::inbox_home(Filter::ALL);
+    let mut out = Queue::with_capacity(crate::max_out(&fixtures::limits()));
+    crate::step(
+        &mut root,
+        &fixtures::env(&fixtures::limits()),
+        crate::Event::Went { place: crate::address::parse(b"/?project=3&kind=question&goal=9") },
+        &mut out,
+    );
+    let mut watch = None;
+    while let Some(request) = out.pop() {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down:
+                        jig_client::Down::Open {
+                            watch: token,
+                            subject: jig_client::Watchable::Jig(contract::Subject::Inbox { .. }),
+                        },
+                },
+        } = request
+        {
+            watch = Some(token);
+        }
+    }
+    let watch = watch.expect("filtered inbox watch");
+    let mut out = fixtures::inbox_entries(&mut root, watch, List::with_capacity(0));
+    assert_eq!(
+        reads(&mut out).as_ref(),
+        [Read::Inbox {
+            group: contract::InboxReadGroup::Needs,
+            project: Some(3),
+            kind: Some(InboxGroup::Questions),
+            goal: Some(9),
+            after: None,
+        }]
+    );
+}
+#[test]
 fn a_filter_by_project_shows_only_that_projects_entries() {
     let (mut root, watch) = fixtures::inbox_home(Filter { project: Some(OTHER_PROJECT), ..Filter::ALL });
     let mut entries = rows(ObjectKey::Result(TASK), InboxGroup::Results, PROJECT);

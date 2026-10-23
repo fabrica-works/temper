@@ -57,6 +57,12 @@ fn fixture() -> Host {
     host.requests();
     host
 }
+fn fixture_at(path: &[u8]) -> Host {
+    let mut host = fixture();
+    host.went(path);
+    host.requests();
+    host
+}
 fn build(host: &mut Host) -> Vec<Patch> {
     host.patches()
 }
@@ -180,6 +186,38 @@ fn the_accounts_href_navigates_inside_the_app() {
     host.act(link, Act::Press);
     host.requests();
     assert_eq!(host.show, Some((Box::from(b"/accounts".as_slice()), false)));
+}
+
+#[test]
+fn a_filter_chosen_pushes_the_inbox_at_its_query() {
+    let mut host = fixture_at(b"/");
+    build(&mut host);
+    let question = node(&host, Role::Button, b"Question");
+    host.act(question, Act::Press);
+    host.requests();
+    assert_eq!(host.show.take(), Some((Box::from(b"/?kind=question".as_slice()), false)));
+    build(&mut host);
+    let all = node(&host, Role::Button, b"All kinds");
+    host.act(all, Act::Press);
+    host.requests();
+    assert_eq!(host.show, Some((Box::from(b"/".as_slice()), false)));
+}
+#[test]
+fn a_load_at_a_filtered_address_opens_the_inbox_filtered() {
+    let mut host = fixture_at(b"/?kind=question");
+    build(&mut host);
+    assert_eq!(
+        host.address,
+        Address::Inbox { filter: Filter { kind: Some(root::address::Kind::Question), ..Filter::ALL } }
+    );
+    assert_eq!(host.show, None);
+    node(&host, Role::Disclosure, "Kind · Question".as_bytes());
+}
+#[test]
+fn a_stale_filter_link_opens_less_filtered_at_its_printed_address() {
+    let host = fixture_at(b"/?kind=reply&project=3");
+    assert_eq!(host.address, Address::Inbox { filter: Filter { project: Some(3), ..Filter::ALL } });
+    assert_eq!(host.show, Some((Box::from(b"/?project=3".as_slice()), true)));
 }
 
 #[path = "../../../testing/memory_literal.rs"]
