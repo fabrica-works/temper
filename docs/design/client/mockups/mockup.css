@@ -76,7 +76,7 @@ body.mock-sources .src:hover { background-color: color-mix(in srgb, var(--c) 10%
 .case-ref, .gap { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border-radius: 3px; font: 600 9.5px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0; vertical-align: 1px; white-space: nowrap; font-style: normal; }
 .case-ref { color: var(--note); background: var(--note-pale); }
 .gap { color: var(--note); border: 1px dashed var(--note-line); background: transparent; }
-body.mock-plain .case-ref, body.mock-plain .gap, body.mock-plain .gap-note, body.mock-plain .mock-note, body.mock-plain .mock-variants { display: none !important; }
+body.mock-plain .case-ref, body.mock-plain .gap, body.mock-plain .gap-note, body.mock-plain .mock-note, body.mock-plain .mock-variants, body.mock-plain .mock-url { display: none !important; }
 .gap-note { margin: 12px 0 0; padding-top: 9px; border-top: 1px dashed var(--note-line); color: var(--note); font-size: 10.5px; }
 .mock-note { color: var(--note); font-size: 10.5px; margin-left: 8px; }
 
@@ -85,6 +85,55 @@ body.mock-plain .case-ref, body.mock-plain .gap, body.mock-plain .gap-note, body
 .mock-variants > h2 { font-weight: 700; margin: 0 0 6px; }
 .mock-variants > h3 { font-weight: 700; margin: 18px 0 6px; }
 .mock-variants > p { margin: 0 0 12px; }
+
+/* Where the tab is, on a way that leaves temper: its address, and how it
+   got there. */
+.mock-url { margin: 0 0 18px; padding: 7px 10px; border: 1px dashed var(--note-line); background: var(--note-pale); color: var(--note); font: 10.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.mock-url b { color: #2c333c; font-weight: 600; }
+.gh-left { display: block; margin: 16px 0 0; }
+.gh-left a.text-link { color: var(--note); text-decoration: underline; }
+
+/* GitHub's pages, sketched: the other side of Connect GitHub, never
+   temper's, in a plain likeness of GitHub's own look. */
+.gh { min-height: calc(100dvh - var(--mock-bar)); background: #fff; color: #1f2328; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }
+.gh-header { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 24px; background: #f6f8fa; border-bottom: 1px solid #d1d9e0; }
+.gh-mark { width: 30px; height: 30px; border-radius: 50%; background: #1f2328; }
+.gh-search { margin-left: auto; width: min(280px, 40vw); height: 30px; padding: 0 10px; display: flex; align-items: center; border: 1px solid #d1d9e0; border-radius: 6px; background: #fff; color: #818b98; font-size: 13px; }
+.gh-main { width: min(720px, calc(100% - 32px)); margin: 28px auto 60px; }
+.gh h1, .gh h2 { font-family: inherit; letter-spacing: 0; }
+.gh-title { font-size: 24px; font-weight: 400; margin: 0 0 4px; }
+.gh-h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+.gh-sub { font-weight: 600; margin: 16px 0 8px; }
+.gh-sub:first-child { margin-top: 0; }
+.gh-muted { color: #59636e; font-size: 12px; margin: 0; }
+.gh-box { border: 1px solid #d1d9e0; border-radius: 6px; margin-top: 16px; }
+.gh-pad { padding: 16px; }
+.gh-rows .gh-row + .gh-row { border-top: 1px solid #d1d9e0; }
+.gh-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.gh-grow { flex: 1; min-width: 0; }
+.gh-app-head { display: flex; align-items: center; gap: 14px; }
+.gh-avatar { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #ddf4ff; color: #0969da; font-weight: 600; }
+.gh-avatar.gh-org { border-radius: 6px; background: #fff8c5; color: #9a6700; }
+.gh-avatar.gh-app { width: 48px; height: 48px; border-radius: 10px; background: #ba694e; color: #fff; font-size: 22px; }
+.gh-label { display: block; font-weight: 600; margin-bottom: 6px; }
+.gh-input { width: 100%; box-sizing: border-box; height: 32px; padding: 5px 12px; border: 1px solid #d1d9e0; border-radius: 6px; font: inherit; }
+.gh-input + .gh-muted { margin: 6px 0 16px; }
+.gh-btn { display: inline-flex; align-items: center; height: 32px; padding: 0 16px; border: 1px solid #d1d9e0; border-radius: 6px; background: #f6f8fa; color: #25292e; font-size: 14px; font-weight: 500; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.gh-btn:hover { background: #eff2f5; }
+.gh-btn-primary { background: #1f883d; border-color: #1a7f37; color: #fff; }
+.gh-btn-primary:hover { background: #1c8139; }
+.gh-btn[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+.gh-acts { display: flex; gap: 8px; margin-top: 18px; }
+.gh-radio { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; margin: 0 0 10px; cursor: pointer; }
+.gh-radio > span { display: grid; }
+.gh-radio input { margin: 4px 0 0; }
+.gh-select { margin: 4px 0 6px 24px; border: 1px solid #d1d9e0; border-radius: 6px; }
+.gh-select[hidden] { display: none; }
+.gh-repo { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+.gh-repo + .gh-repo { border-top: 1px solid #d1d9e0; }
+.gh-pill { margin-left: auto; padding: 0 7px; border: 1px solid #d1d9e0; border-radius: 2em; color: #59636e; font-size: 12px; }
+.gh-perms { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.gh-perms li::before { content: '✓'; color: #1a7f37; margin-right: 8px; }
 
 /* What the current step changed. */
 .fresh { position: relative; }

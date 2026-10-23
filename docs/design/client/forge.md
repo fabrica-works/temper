@@ -67,8 +67,9 @@ section 10.
   (linked to the installation's page on GitHub), stopped and why.
 - **The browser's steps of a connect are temper's routes** on the
   clients' listener (9.1): the manifest's page, GitHub's redirect and
-  its setup, each authenticated by a one-use state alone. The client
-  prints a connect's link and never opens it.
+  its setup, each authenticated by a one-use state alone. A browser's
+  tab goes to a connect's link and comes back to the page that sent
+  it; the terminal prints the link and never opens it.
 
 ## 2. A change's panel
 
@@ -435,13 +436,18 @@ and `connect-forge.html`.
   line. Once the demo has ended (`../draft/first-run.md`, 2.3), it
   shows nowhere.
 - **Connecting a forge,** `ConnectForge { forge }`, is four steps,
-  named along its top: Choose, Details, Setting up ("Connecting" for
-  GitHub and a Forgejo elsewhere) and Ready; `forge` is none at Choose,
+  named along its top: Choose, Details, Setting up ("Connecting" for a
+  Forgejo elsewhere) and Ready. GitHub's, through temper's App, is
+  three, Choose, Connecting and Ready, with no step of temper's
+  between Choose and GitHub; an App of the person's own adds Details
+  (with the user, 2026-10-23). `forge` is none at Choose,
   or the choice: a forge's number, or "a Forgejo elsewhere"
   (`browser.md`, 2.3). The step shown is the choice's: none, Choose;
   a forge whose row offers its connect or set up, or a Forgejo
-  elsewhere, Details; a forge setting up, set up failed or connecting,
-  Setting up; a forge connected, Ready. A number that names no row, or
+  elsewhere, Details (on GitHub, an App of the person's own); a forge
+  setting up, set up failed or connecting, Setting up, or Connecting;
+  a forge connected, Ready, but a GitHub forge with no accepted
+  installation, Connecting (below). A number that names no row, or
   the demo's forge, is Choose. The page's level-1 heading is "Connect a
   forge", above the steps, and each step's content is in one card,
   under its level-2 heading.
@@ -450,9 +456,14 @@ and `connect-forge.html`.
   order, each with its level-2 heading, its words, a muted line and
   its link, "Choose" (a Forgejo elsewhere's "Show how"):
   - *GitHub,* a GitHub forge not connected: "Your repositories on
-    GitHub. temper makes its App there, or takes an App of yours, and
-    you install it on the repositories you choose." · "In your browser,
-    on GitHub · about two minutes";
+    GitHub. temper makes its own App there; you choose the account and
+    the repositories it may use." · "In this tab, on GitHub · about two
+    minutes"; in its link's place the button "Connect GitHub", which
+    sends `Connect` (below) and takes the tab to GitHub, and beside it
+    "Use an App of your own ›", a link to its Details. Nothing asks for
+    an organization: the App is made under the person's own account,
+    and GitHub's install page offers every account they may install it
+    on;
   - *Forgejo on this machine,* an owned Forgejo not set up whose offer
     is offered or not under the box (`README.md`, 4.6): "A forge of
     your own, run by temper box. No account needed: temper makes your
@@ -463,19 +474,18 @@ and `connect-forge.html`.
     to temper’s configuration and a restart".
 - **Details** are the choice's, under its level-2 heading, after "‹ All
   forges", a link back to Choose:
-  - *GitHub:* "Connect GitHub", "Create an App and install it on your
-    account or organization. Choose selected repositories.", its field
-    "An organization, or none for your account" and its button; then
-    "Connect an App of your own", "Its id, and its private key as
-    GitHub gives it.", "On GitHub, set the App’s setup URL to
-    temper’s address followed by /forges/N/github/setup, and give it
-    the permissions and events temper’s guide lists." (the client
-    knows no address of its own to print), its fields "App id" and "Private
-    key" and its button; then "A pasted value is sent once and shown
-    nowhere, then or after." Until GitHub's connect (the FORGE
-    requests' `Connect`, `README.md`, section 8), both buttons are
-    disabled and the card ends "Connecting GitHub from temper is not
-    available yet.";
+  - *GitHub,* an App of the person's own, by "Use an App of your own
+    ›": "An App of your own", "Its id, and its private key as GitHub
+    gives it.", "On GitHub, set the App’s setup URL to temper’s address
+    followed by /forges/N/github/setup, and give it the permissions and
+    events temper’s guide lists." (the client knows no address of its
+    own to print), its fields "App id" and "Private key" and its
+    button, "Connect the App"; then "A pasted value is sent once and
+    shown nowhere, then or after." Its install is Connecting's, as for
+    temper's App. Until GitHub's connect (the FORGE requests'
+    `Connect`, `README.md`, section 8), "Connect GitHub" on Choose and
+    this button are disabled, and each card ends "Connecting GitHub
+    from temper is not available yet.";
   - *Forgejo on this machine,* under the box: "temper box downloads
     Forgejo and its runner, starts them, and makes your first
     repository, with a README and a CI workflow. No restart."; the set
@@ -533,11 +543,23 @@ and `connect-forge.html`.
   the same fields. While a `SetUp` is pending its button is disabled;
   refused, its refusal shows under it in the set up's words
   (`README.md`, 4.6).
+- **Connecting, on GitHub,** is the App made and installed nowhere:
+  a GitHub forge connected with no accepted installation, which the
+  row also says as connecting (below), since it reaches no repository
+  yet. The level-2 heading "Install temper’s App", then "SLUG is made
+  on GitHub, under your account, and installed nowhere yet. Install
+  it, and choose the repositories temper may use." and "Install on
+  GitHub", which sends `Install` and takes the tab to GitHub's install
+  page, as Connect GitHub does. The person meets it only by coming
+  back to temper before installing: GitHub's redirect takes the tab
+  from the App's form straight to that page. A connect whose App is
+  not made yet shows nowhere: its tab is GitHub's, no run holds the
+  forge, and Connect GitHub again draws a fresh state, the first
+  ending unused (9.1).
 - **Ready** ends on the work: "ORG/NAME is ready", the level-2 heading,
   then "In PROJECT, on FORGE.", FORGE its name, the steps all done,
   "Open PROJECT", a link to the chats page in that project, and "FORGE
-  is on the Forges page, with its details.", "Forges" a link to it; on
-  GitHub, the account of its first installation. Its repository is
+  is on the Forges page, with its details.", "Forges" a link to it. Its repository is
   adopted by the client that asked the set up: once the row says the
   first repository made, the forge's side, which keeps the `SetUp` it
   sent, sends `Adopt` of it into its project, once, on whatever page
@@ -552,6 +574,25 @@ and `connect-forge.html`.
   or one a restart has dropped): "FORGE is
   connected", "Connected as LOGIN.", "Adopt a repository", a link to
   `Adopt { project }`, and the Forges line.
+- **Ready, on GitHub,** starts with the repository to start in, while
+  none of the forge's is adopted: "Choose a repository to start in",
+  "SLUG is installed on ACCOUNT, with all its repositories, N." or
+  "…, with N repositories you chose.", then the repositories of its
+  accepted installations as one choice, each "OWNER/NAME", marked
+  "private" where it is, the first chosen (`Reachable`, each
+  installation's, as the picker reads them, 4.3); "Into a new project,
+  named", a field, the chosen repository's name until changed;
+  "Adopt OWNER/NAME", which sends `Adopt` of it into that new project,
+  as its home (`README.md`, 4.7), and refused "a new project" until
+  jig makes projects at runtime, as Set up's is; and "Not listed?
+  Choose its repositories on GitHub, and GitHub sends you back here.",
+  whose link sends `Install` and takes the tab to GitHub's install
+  page, where an account installed already offers Configure. Once one
+  is adopted: "OWNER/NAME is ready", "In the new project PROJECT, on
+  GitHub.", what its adoption found of its CI and its branch's rules
+  (`../domain/forge.md`, section 4), "Open PROJECT", "Open on GitHub
+  ↗", the repository's page in a tab of its own, and the Forges
+  line.
 - **Elsewhere:** while a forge sets up or connects, the banner says it,
   "FORGE · CONNECTION", its name and its connection's words, with
   "View", a link to the flow at it (`README.md`, 5.1); the navigation's
@@ -572,7 +613,7 @@ says:
   | not set up | an owned forge not prepared yet (`../protocol/setup.md`, 6.5): under the box, "Not set up", with "Set up a Forgejo here"; without it, "Not set up: run `temper forge fetch N`, `temper forge prepare N`, `temper forge run N forgejo` and `temper forge run N runner`, then restart `temper serve`", N its number, with no action |
   | setting up | the box runs its steps, asked: "Setting up: fetching", "Setting up: preparing" or "Setting up: starting", by the box's last word of the step it runs, else "Setting up" (`../protocol/setup.md`, 7.1); then "Connecting", as its handover is taken and reconciled (`../protocol/setup.md`, 5.1) |
   | set up failed | "Set up failed: STEP", naming the box's step, or, after the box's `started`, the engine's step that stopped (taking the handover, reconciling, removing the handover file; `../protocol/setup.md`, 6.5), with `temper box`'s output for the rest until its `failed` line carries a reason; with "Set up again"; the engine and every other forge run on |
-  | connecting | "Connecting": a run holds the forge, and what it waits for: a managed or owned Forgejo's reconcile, the forge's answers to a check, or the person's browser on GitHub until the link's state ends (`setup.state_life_ms`) |
+  | connecting | "Connecting": a run holds the forge, and what it waits for: a managed or owned Forgejo's reconcile, the forge's answers to a check, or GitHub's conversion of its App; on GitHub, also connected with no accepted installation, "Connecting: installed nowhere yet", with "Install on GitHub". The person's browser on GitHub is no run, and shows nowhere |
   | connected | "Connected as LOGIN", the user the records hold: the bot's on Forgejo, the App's on GitHub; its id on an Account line |
   | stopped | "Stopped: WHY", the component's reason in words (its key or token refused, a user other than its own, an access it finds invalid, a refusal that asking again would not mend), with Replace where offered; an owned forge says "Restart temper box: its preparation mends it"; the engine and every other forge run on |
 
@@ -652,11 +693,11 @@ admin", with its forge number and bot (`../protocol/setup.md`, section
 
 | Action | Offered | What it does |
 |---|---|---|
-| Connect | GitHub, not connected or stopped | "Connect GitHub", for the person's account or an organization they name: the answer is a link to the manifest's page on the clients' listener (9.1), shown as text for the person to open; on GitHub they create the App, then install it on an account, and come back to temper. Or "Connect an App of your own": its id, and its private key pasted as GitHub gives it; no webhook secret is asked, since temper points the App's hook at `https://SLUG.invalid/` and hears changes from its delivery log |
+| Connect | GitHub, not connected or stopped | "Connect GitHub", with `back`, the page's address to come back to: the answer is a link to the manifest's page on the clients' listener (9.1), and the browser goes to it in its own tab; the page posts temper's manifest to GitHub, the person creates the App under their own account and installs it on an account GitHub offers, and the setup route sends the tab back to `back`. Or "Connect an App of your own": its id, and its private key pasted as GitHub gives it; no webhook secret is asked, since temper points the App's hook at `https://SLUG.invalid/` and hears changes from its delivery log |
 | Connect | Forgejo not owned, not connected; a Forgejo of the connected mode, stopped | its bot's API token, its git token and, where the person made hooks to temper's listener, their secret, pasted together; both tokens must answer as one user |
 | Connect | Forgejo not owned, not connecting, with a managed setup entry | "Connect as its admin": a site admin's token pasted; temper makes its bot (or takes over the connected one, 5.5) and the forge becomes managed |
 | Replace | GitHub, connected or stopped; a Forgejo of the connected mode, connected or stopped | a new App key, or a new API token, git token or both, pasted, which must answer as the forge's user (on GitHub, the same App); the old is erased once the new is kept |
-| Install the App; Install on another account | GitHub, connected: "Install the App" before any accepted installation, "Install on another account" after one | a fresh link to install temper's App, shown as text; the person picks the account and its repositories, the page advising selected ones over all |
+| Install the App; Install on another account | GitHub, connected: "Install on GitHub" before any accepted installation (Connecting), "Install on another account" after one, and Ready's "Choose its repositories on GitHub" | a fresh link to temper's App's install page, with `back`, where the browser goes in its own tab; the person picks the account and its repositories on GitHub, keeping GitHub's default, all of them, or choosing some, and the setup route sends the tab back to `back` |
 | New repository | Forgejo owned or managed, connected | the set up's same fields: organization (default `work`), repository (default `hello`) and an existing project; the general form of the first repository (`../protocol/setup.md`, section 15) |
 | Forget the admin's token | managed | the admin's token erased; the forge is connected, its bot and tokens kept, and adopting a repository grants nothing more: the person makes the bot a collaborator |
 | Set up a Forgejo here | the row's offer offered, not set up (`README.md`, 4.6) | its organization (default `work`), its repository (default `hello`) and its project: a new one, named as the repository, or an existing one (`../protocol/setup.md`, section 15; a new project waits on jig's projects at runtime); then the box asked to run the forge's steps (`../protocol/setup.md`, 7.1): its binaries fetched, its preparation, Forgejo and its runner started, then its handover taken and reconciled, the repository made with the starter workflow (`../protocol/setup.md`, 6.7), and, once the row says it made, the client's `Adopt` into the project; the card names the path of `person_password`, never its password (`../protocol/setup.md`, 6.5) |
@@ -676,9 +717,12 @@ Replace of a Forgejo's tokens with both empty: "Paste a new API token,
 git token or both."); and the bundle of the action's values past 4 KiB,
 jig's bound on a carried value (`tools.md`, section 12), shows "The
 pasted values are past 4 KiB, the most a request carries." under the
-action's button. The link a connect or an
-install answers is shown as text, and the client never opens it
-(`README.md`, 6.5).
+action's button. The link a connect or an install answers is where
+the browser's tab goes, as a sign-in's address is (`README.md`, 3.5,
+`ConnectModel`, The tab's departure): the root asks its shell to leave
+for it once, from the answer, and the page shows it as an external
+link meanwhile. The terminal prints it and opens nothing (`README.md`,
+6.5).
 
 ### 5.5 How the forge's refusals show
 
@@ -839,38 +883,73 @@ nothing of temper's client calls them. Every other path, the client's
 
 | Route | What it does | Answers |
 |---|---|---|
-| `GET /forges/N/github/manifest?state=S` | the page the setup's host's `Manifest` run produced for that state, held with it: one form posting temper's manifest to `WEB/settings/apps/new?state=S`, or `WEB/organizations/ORG/settings/apps/new?state=S` for an organization, one button, no script; the manifest's redirect and setup addresses are whole URLs on the clients' listener, `http://LISTENER/forges/N/github/redirect` and `http://LISTENER/forges/N/github/setup`, and its `url`, the App's homepage, `http://LISTENER/` | `200`, the page |
-| `GET /forges/N/github/redirect?code=C&state=S` | `Convert`: the code exchanged for the App's id, slug and key, each kept before the browser is answered, and its user; the App's hook points at `https://SLUG.invalid/`, so no webhook secret is kept on GitHub; then `Install` for a fresh state, whose link answers the browser, and the forge connects | `302` to the install page, `Install`'s link for that state |
-| `GET /forges/N/github/setup?installation_id=I&setup_action=A&state=S` | `Accept`: the installation checked and accepted, then the forge's installations handed to its component again | `200`, a short page: "temper has the installation; you may close this tab." |
+| `GET /forges/N/github/manifest?state=S` | the page the setup's host's `Manifest` run produced for that state, held with it: one form posting temper's manifest to `WEB/settings/apps/new?state=S`, the person's own account's, which posts itself as the page loads; a browser that runs no script, or one come back to the page through its history, shows instead "temper’s App, on GitHub", its button "Continue to GitHub" and "Back to temper", a link to the connect's `back`; the manifest's redirect and setup addresses are whole URLs on the clients' listener, `http://LISTENER/forges/N/github/redirect` and `http://LISTENER/forges/N/github/setup`, and its `url`, the App's homepage, `http://LISTENER/` | `200`, the page |
+| `GET /forges/N/github/redirect?code=C&state=S` | `Convert`: the code exchanged for the App's id, slug and key, each kept before the browser is answered, and its user; the App's hook points at `https://SLUG.invalid/`, so no webhook secret is kept on GitHub; then `Install` for a fresh state, held with the connect's `back`, whose link answers the browser, and the forge connects | `302` to the install page, `Install`'s link for that state |
+| `GET /forges/N/github/setup?installation_id=I&setup_action=A&state=S` | `Accept`: the installation checked and accepted, then the forge's installations handed to its component again | `303` to the state's `back`; with none, `200`, a short page: "temper has the installation; you may close this tab." |
 
-N is the forge's `number`, WEB its configured `web` address, ORG the
-organization the connect named and LISTENER the clients' listener's
-address, as temper builds the manifest from it
-(`../protocol/forge.md`, the setup's host).
+N is the forge's `number`, WEB its configured `web` address and
+LISTENER the clients' listener's address, as temper builds the
+manifest from it (`../protocol/forge.md`, the setup's host).
 
+- **The tab goes and comes back** (with the user, 2026-10-23): the
+  page that sends `Connect` or `Install` names `back`, its own address,
+  which the setup's host holds with the state (a connect's passes to
+  the install `Convert` starts), and the browser goes to the link in
+  the page's own tab, as a sign-in's does (`README.md`, 3.5,
+  `ConnectModel`, The tab's departure). The setup route sends it back
+  there, so the page that started it shows how it ended, as a new
+  client: the welcome's Forge step, `ConnectForge` at the forge, or the
+  Forges page. A connect from the terminal names none, and its routes
+  answer their pages as before.
 - **The manifest's page's headers:** `Content-Security-Policy:
-  default-src 'none'; form-action WEB`, `Cache-Control: no-store` and
-  `Referrer-Policy: no-referrer`. It loads nothing, runs nothing, and
-  may post only to the configured forge.
+  default-src 'none'; form-action WEB; script-src 'sha256-H'`, H the
+  hash of its one inline script, which submits the form unless the
+  page was reached through the browser's history (its navigation's
+  type `back_forward`), so that back from GitHub's form stops on the
+  page rather than posting again; `Cache-Control: no-store` and
+  `Referrer-Policy: no-referrer`. It loads nothing, runs nothing but
+  that script, and may post only to the configured forge.
 - **The state is the only authenticator.** A route takes no cookie and
   no credential of jig's: the state, 128 bits or more drawn by the
   setup's host for one connect or one install, is good once, for its
   life (`setup.state_life_ms`), for that forge alone. The host keeps at
   most `setup.states` of them, in memory, so a restart forgets them
   (`../protocol/forge.md`, the setup's host).
-- **Refused:** a state used, unknown or past its life, or a code GitHub
-  refuses, is answered `410` and a short page, "This link has ended.
-  Start again from temper.", with `Cache-Control: no-store` and
-  `Referrer-Policy: no-referrer`, and nothing is kept. So is a run that
-  stops otherwise: `Convert`'s `Stop`, whatever its failure, an
-  `Install` that stops, and `Accept`'s `Stop`.
+- **Where GitHub's way can't go on,** the route answers a short page
+  of its own, temper's name above one card: its heading, why, and
+  "Back to temper", a link, in place of sending the tab back; each with
+  `Cache-Control: no-store` and `Referrer-Policy: no-referrer`, and
+  nothing is kept. The pages:
+  - *Ended:* a state used, unknown or past its life, or a code GitHub
+    refuses, is answered `410`: "This link has ended", "It was used
+    already, it expired, or temper restarted since. Start again from
+    temper.", its link to `/forges/connect?forge=N`, since the state's
+    `back` is gone with it. So is a run that stops otherwise:
+    `Convert`'s `Stop`, whatever its failure, an `Install` that stops,
+    and `Accept`'s `Stop`.
+  - *A request:* GitHub's visit with `setup_action=request` and no
+    installation, after a member of an organization who is not its
+    owner asked for the App there. The state is used, nothing is
+    accepted, and the route answers `200`: "GitHub sent a request, not
+    an installation", "Only an owner of an organization can install
+    temper’s App there, and temper can’t wait for an owner to approve
+    it yet: an installation approved later isn’t used. Install it on
+    your own account, or on an organization you own.", its link to the
+    state's `back`, else `/forges/connect?forge=N`. An owner's approval
+    later makes an installation with no state of temper's, a stray
+    (`../protocol/setup.md`, 17.4); waiting for it is for later
+    (`../draft/github.md`, section 18).
 - **A visit with no state** to the setup route is GitHub's, after a
   person changed the installation's repositories on GitHub: for an
-  installation accepted already it is a refresh, answered `200`, "temper
-  has the installation; you may close this tab.", the routing handing
-  the root `Repositories` for it so the picker lists them again, and
-  nothing reaches the forge's component or the store; for any other
-  installation it is refused, `410`.
+  installation accepted already it is a refresh, answered `303` to
+  `/forges`, the routing handing the root `Repositories` for it so the
+  picker lists them again, and nothing reaches the forge's component
+  or the store; for any other installation it is refused, `410`, as
+  ended. An update's visit with a live state is the same refresh, sent
+  on to the state's `back`: GitHub may keep an install link's state
+  through Configure to the update it saves, which Ready's "Choose its
+  repositories on GitHub" counts on, and which the probe App is to
+  show; where it doesn't, the tab lands on Forges.
 - **Bounds and others:** a query malformed or past `routes.query_bytes`
   is answered `400`, in the refused page's words and headers; a method
   other than `GET` is answered `405`; a forge not configured, or one
@@ -896,8 +975,8 @@ address, as temper builds the manifest from it
   The routes' tests are `temper-service`'s own, requests through
   `fixtures::http::Peer`; the bytes through the fake's GitHub layer are
   the real loop's (`../domain/testing.md`, 2.4), whose browser's tier
-  opens the manifest's page once to see its form post to the configured
-  `web`; no test calls github.com.
+  opens the manifest's page once to see it post its form, by itself, to
+  the configured `web`; no test calls github.com.
 
 ### 9.2 A change's panel, watched
 

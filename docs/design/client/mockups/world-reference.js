@@ -50,7 +50,7 @@
       // One forge, GitHub, through temper's App (client forge.md, 5.4).
       forges: [
         { n: 1, kind: 'GitHub', web: 'https://github.com', mode: 'connected', state: 'connected', login: 'temper-acme[bot]', id: 190244117,
-          app: { slug: 'temper-acme', installs: [{ account: 'acme', repos: 'selected repositories' }] },
+          app: { slug: 'temper-acme', installs: [{ account: 'acme', id: 55120934, all: false, names: ['kit', 'app'] }] },
           load: { used: 1840, rate: 5000, window: 'hour', reserve: 500, uses: [['fresh reads', 920], ['writes', 140], ['keeping up', 610], ['the slow pass', 170]], outbox: { waiting: 2, uncertain: 0 }, hooks: [['acme/kit', -1], ['acme/app', -6]] } },
       ],
 

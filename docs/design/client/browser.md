@@ -521,8 +521,9 @@ tests 4.1's stories take and 4.2's story, the tier reaches its 12.
   the configuration.
 - **The test:** GitHub's Connect asked through `temper ctl`, which
   prints the manifest page's link (`tools.md`); the browser opens
-  `/forges/N/github/manifest?state=S` and presses its one button. The
-  form posts to `WEB/settings/apps/new?state=S`, the fake's. The test
+  `/forges/N/github/manifest?state=S`, which posts its form as it
+  loads, with nothing pressed. The form posts to
+  `WEB/settings/apps/new?state=S`, the fake's. The test
   ends once the fake's GitHub layer has taken the post, its `manifest`
   field the page's and its state S, with no policy violation. The post
   is answered `200` with a page holding one link, `Create GitHub App`

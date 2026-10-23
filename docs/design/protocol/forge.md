@@ -431,7 +431,7 @@ Run's start, and the page shows it as busy, try again (skein's
 | `TakeOver { forge, admin_token }` | an owned or fake forge's start, or the box's `started`, whenever the handover file is present, even with a kept `AdminToken` (setup.md, 6.5) | keeps the handover's admin token; only after its `Done` and the record kept is the file removed, before reconcile |
 | `Adopt { forge, repository }` | a managed or owned forge's adoption, before its reads | gives the bot access to the repository (`../domain/forge.md`, 4.2) |
 | `Check { forge }` | a connected Forgejo's pasted tokens, and their replacement | both tokens answer as one user, and as the kept user on a replacement |
-| `Manifest { forge, target }` | GitHub's Connect, for `Personal` or `Org(login)` | a fresh state and the manifest's page; it ends `Done(Manifest { state, page })` |
+| `Manifest { forge, target }` | GitHub's Connect, always for `Personal`: the App is the person's, public, and installs on any account GitHub offers them (setup.md, 17.2) | a fresh state and the manifest's page; it ends `Done(Manifest { state, page })` |
 | `Convert { forge, code, state }` | GitHub's redirect back | the code exchanged for the App's id, slug and key, the conversion's webhook secret and OAuth pair never kept; the bot user found; it writes `AppId`, `AppSlug`, `AppKey` and `User` |
 | `Install { forge }` | Install the App, or Install on another account | a fresh state, and the install link (`Link`) |
 | `Accept { forge, installation, state }` | the setup URL's visit | the installation checked, and added to `Accepted` |
@@ -451,7 +451,9 @@ Run's start, and the page shows it as busy, try again (skein's
   state and the manifest page's bytes, at most `page_bytes`, which
   temper holds in memory with the state while it lives and serves on
   the clients' listener (client/README.md, the routes); `Link`, the
-  install link; or `Lacking`, each permission or event the App lacks,
+  install link; each state held with the request's `back`, a
+  connect's passing to the install its `Convert` starts, where the
+  setup route sends the browser (client/forge.md, 9.1); or `Lacking`, each permission or event the App lacks,
   shown on the deployment's page and never refused (client/forge.md,
   the deployment's page).
 - **The redirect and setup addresses** temper gives the plans are whole

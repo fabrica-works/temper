@@ -41,11 +41,14 @@ is open section 19.
   temper tells its own writes from others' by its user's id, so temper
   must be someone else (section 5).
 - **Connecting GitHub is two clicks** (section 6): "Connect GitHub" in
-  the client opens a page on temper's listener that posts the App's
-  manifest to GitHub; the person clicks "Create", GitHub sends the
-  browser back with a code, temper exchanges it for the App's key and
-  keeps it; the person picks an account and repositories on the install
-  page. No token is pasted. GitHub has no API that creates or installs an
+  the client takes the tab to a page on temper's listener that posts
+  the App's manifest to GitHub as it loads; the person clicks "Create",
+  GitHub sends the browser back with a code, temper exchanges it for
+  the App's key and keeps it; the person picks an account and
+  repositories on the install page, and GitHub's setup redirect brings
+  the tab back to the page that started it. No organization is asked:
+  the App is the person's, and GitHub's install page is the menu of
+  accounts. No token is pasted. GitHub has no API that creates or installs an
   App, so nothing does better. Probed (section 11).
 - **No public address.** The App's webhook points at a host that cannot
   resolve; GitHub still records each delivery, and temper reads that
@@ -299,13 +302,14 @@ is open section 19.
 
 1. **Connect.** The person chooses "Connect GitHub" in the client; the
    engine answers an address on the clients' listener, with a one-time
-   `state` tied to that request, which the client shows (the terminal
-   prints it and opens no browser, as for a sign-in;
-   `../client/README.md`, 6.5).
+   `state` tied to that request and the page's address to come back
+   to, and the browser's tab goes there, as for a sign-in (the terminal
+   prints it and opens no browser; `../client/README.md`, 6.5).
 2. **The manifest.** That address serves a page whose form posts the
-   manifest to `https://github.com/settings/apps/new?state=<state>`, or
-   to an org's `/organizations/<org>/settings/apps/new` when the person
-   names one. The person clicks "Create GitHub App" on GitHub.
+   manifest to `https://github.com/settings/apps/new?state=<state>` as
+   it loads: the App is always the person's own, and public, so it
+   installs on any account they may install it on (with the user,
+   2026-10-23). The person clicks "Create GitHub App" on GitHub.
 3. **The exchange.** GitHub sends the browser to the manifest's
    `redirect_url` on the clients' listener, with a `code` and the
    `state`. The engine checks the state, exchanges the code with `POST
@@ -318,8 +322,13 @@ is open section 19.
    The person picks an account and its repositories, all or selected,
    and clicks Install. GitHub sends the browser to the manifest's
    `setup_url`, on the clients' listener, with the installation's id and
-   the state; temper accepts the installation, and the client lists its
-   repositories.
+   the state; temper accepts the installation and sends the browser
+   back to the page that started the connect, which lists its
+   repositories to start in. A member of an organization who isn't its
+   owner gets a request, not an installation: GitHub comes back with
+   `setup_action=request` and none, and temper's page says why it
+   can't go on, and to install it on their own account or an
+   organization they own.
 
 ### 6.2 The manifest
 
@@ -342,7 +351,7 @@ is open section 19.
 
 - **"Install on another account"** in the client gives a fresh state
   and the install link, so the person adds their org, or another, at
-  any time; the same `setup_url` brings them back.
+  any time; the same `setup_url` brings the tab back.
 - **Repositories granted later** on GitHub's installation page reach
   temper as an `installation_repositories` delivery (section 7), and
   appear in the picker.
@@ -1012,6 +1021,15 @@ Each step lands working, and shows what it proved in the real loop
 - **Batched reads** in one GraphQL query.
 - **Disconnecting,** and connecting a forge as someone else: what
   becomes of the adopted repositories, their keys and their branches.
+- **An App an organization owns,** made through the organization's
+  manifest address, `/organizations/<org>/settings/apps/new` (skein's
+  `Target::Org`), for a team whose App should outlive its maker's
+  account. Until then the App is the person's own, and installs on
+  their organizations.
+- **An owner's approval:** a member who isn't an owner requests the
+  App, and an owner approves it later, with no state of temper's;
+  temper would wait for that installation and accept it, where it now
+  says why it can't go on and treats it as a stray.
 
 ## 19. Open questions
 
@@ -1036,7 +1054,8 @@ Each with the default the draft takes.
 - **The merge method:** the first allowed of merge, squash and rebase;
   or the adoption asks. Default: the first allowed, shown at adoption.
 - **The installation's scope:** all repositories, or selected. Default:
-  the install page's own choice, with the client advising selected.
+  the install page's own choice, all repositories, as GitHub offers it
+  (with the user, 2026-10-23).
 - **`log_catch_up`:** how far back the puller reads at start. GitHub's
   documents keep deliveries three days. Default: back to the newest
   `guid` temper kept, and within a day at most; the slow pass covers the

@@ -2,17 +2,18 @@
 
 temper works on GitHub through a GitHub App. temper makes the App from
 its manifest in your browser, or you make one yourself and paste its id
-and key; both end in the same records, and temper runs them alike. You
-open every GitHub page in your own browser: temper shows each link as
-text and never opens one. The design is
+and key; both end in the same records, and temper runs them alike. In
+temper's web page, **Connect GitHub** takes the tab to GitHub and
+GitHub brings it back; `temper ctl` and the terminal print each link
+and never open one. The design is
 `docs/design/protocol/setup.md`, connecting GitHub; the page you use is
 the client's **Forges** (`docs/design/client/forge.md`, the deployment's
 page).
 
 ## 1. What you need
 
-- **A GitHub account,** or an organization where you may make Apps, as
-  its owner or one of its App managers.
+- **A GitHub account.** temper's App is made under it; you may install
+  it on your account and on any organization you own.
 - **temper's clients' listener at a fixed address** your browser
   reaches, such as `127.0.0.1:7100`. GitHub sends your browser back to
   it, so open temper's links in a browser on the engine's machine, or
@@ -64,31 +65,40 @@ connected", with **Connect**.
 
 ## 3. Connect GitHub with temper's App
 
-On **Forges**, choose **Connect** on the forge's row, then **Connect
-GitHub**, for your own account or for an organization you name. temper
-shows a link as text:
+On **Forges**, choose **Add a forge**, then **Connect GitHub** on
+GitHub's card; the welcome's **Set up temper** offers the same card.
+The tab goes to GitHub, by a page of temper's on its clients' listener:
 
 ```text
 http://127.0.0.1:7100/forges/2/github/manifest?state=<state>
 ```
 
-Or, with `temper ctl` (add `--org <org>` for an organization):
+Or, with `temper ctl`, which prints that link for you to open:
 
 ```sh
 temper ctl me forge-connect 2 github --key github
 temper ctl me wait forges --until settled
 ```
 
-1. **Open the link** in your browser. temper's page is one button: it
-   sends temper's manifest to GitHub's form for a new App.
-2. **Create the App** on GitHub's form. You may rename it there; temper
-   takes the name GitHub keeps.
+1. **temper's page** sends temper's manifest to GitHub's form for a new
+   App as it opens; where it can't, it shows one button, **Continue to
+   GitHub**.
+2. **Create the App** on GitHub's form, under your account. You may
+   rename it there; temper takes the name GitHub keeps.
 3. **GitHub sends you back to temper,** which keeps the App's id, slug
    and key, then sends you on to the App's install page.
-4. **Install it** (section 5's choices): pick the account, and **Only
-   select repositories**, as temper advises, or **All repositories**.
-   GitHub brings you back to temper, whose page says "temper has the
-   installation; you may close this tab."
+4. **Install it:** GitHub lists your account and your organizations;
+   choose **Install** beside one, then **All repositories**, GitHub's
+   default, or **Only select repositories**. GitHub brings you back to
+   the page you started from, which lists the repositories to start
+   in; a link printed by `temper ctl` ends on temper's page instead,
+   "temper has the installation; you may close this tab."
+
+- **An organization you're only a member of** offers **Request**, not
+  **Install**: its owner must approve it. temper can't wait for that
+  yet, so its page says so, "GitHub sent a request, not an
+  installation": install it on your own account, or on an organization
+  you own.
 
 The row says "Connected as `<slug>[bot]` (`<id>`)", and lists the
 installation: its account, and "selected repositories" or "all
@@ -164,9 +174,9 @@ On the forge's row, choose **Install on another account**, or:
 temper ctl me forge-install 2
 ```
 
-temper shows GitHub's install link as text. Open it, pick the account
-or organization, and **Only select repositories**, as temper advises,
-or **All repositories**. GitHub brings you back to temper, and the row
+The tab goes to GitHub's install page (`temper ctl` prints its link).
+Pick the account or organization, and **All repositories** or **Only
+select repositories**. GitHub brings you back to temper, and the row
 lists the installation.
 
 - **Only installations made through temper's link are used.** temper's

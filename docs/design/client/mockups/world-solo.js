@@ -35,7 +35,7 @@
 
       forges: [
         { n: 1, kind: 'GitHub', web: 'https://github.com', mode: 'connected', state: 'connected', login: 'temper-robin[bot]', id: 190311402,
-          app: { slug: 'temper-robin', installs: [{ account: 'robin', repos: 'selected repositories' }] },
+          app: { slug: 'temper-robin', installs: [{ account: 'robin', id: 55311706, all: false, names: ['tally'] }] },
           load: { used: 210, rate: 5000, window: 'hour', reserve: 500, uses: [['fresh reads', 96], ['writes', 12], ['keeping up', 88], ['the slow pass', 14]], outbox: { waiting: 0, uncertain: 0 }, hooks: [['robin/tally', -3]] } },
       ],
 

@@ -34,6 +34,9 @@
     world.now = s.hour * 60;
     s.apply(world, s.id);
   }
+  // A world may take choices the person made on its way from the address,
+  // such as the repositories given to GitHub's installation.
+  if (W.choices) W.choices(world, params);
 
   // Annotations show unless hidden; sources show when asked. `?bare`
   // draws the product alone, for a capture: no bar, no marks.
@@ -81,7 +84,7 @@
     const p = new URLSearchParams(query || '');
     if (!p.has('world')) p.set('world', worldKey);
     if (!p.has('step')) p.set('step', at);
-    if (params.has('project') && !p.has('project')) p.set('project', params.get('project'));
+    for (const kept of ['project', 'granted', 'pick']) if (params.has(kept) && !p.has(kept)) p.set(kept, params.get(kept));
     if (bare) p.set('bare', '');
     return `${file}?${p}${hash ? `#${hash}` : ''}`;
   }
@@ -710,7 +713,7 @@
       <p>${esc(step.summary)}</p>
       <ol>${look}</ol>
       <h2>Pages</h2>
-      <p>${pagesList}; a chat, a task and a change open from them. <a href="first-run.html">first-run.html</a> opens the first run at its first step: the link <code>temper box</code> prints.</p>
+      <p>${pagesList}; a chat, a task and a change open from them. <a href="first-run.html">first-run.html</a> opens the first run at its first step: the link <code>temper box</code> prints. <a href="${u(`github.html?world=${GH_WORLD}`, '2')}">github.html</a> draws GitHub’s own pages, in the world First run, on GitHub.</p>
       <h2>Marks</h2>
       <p>Slate marks are annotations, not the product: the reference case's names (<i class="case-ref">B</i>, <i class="case-ref">f1</i>) and the gaps temper lacks for what a page draws (<i class="gap">gap 6.5</i>). <b>Sources</b>, in View, underlines each value by where it comes from: <span class="legend-engine">an engine fact</span>, <span class="legend-config">a name from the configuration</span>, <span class="legend-written">words as a person or an agent wrote them</span>, or <span class="legend-ops">an ops application</span>. Unmarked text is the UI's own words, and names no workflow.</p>
     </div>`;
@@ -1283,16 +1286,56 @@
     return cap(f.state);
   }
   const PASTED = '<p class="muted tiny" style="margin:0">A pasted value is sent once and shown nowhere, then or after.</p>';
-  function githubWays(f, wizard = false) {
-    return `<div class="forge-acts">
-        <div class="forge-act"><h3>Connect GitHub</h3><p>Create an App and install it on your account or organization. Choose selected repositories.</p>
-          <label class="forge-field"><span>An organization, or none for your account</span><input type="text"></label>
-          <button class="button primary" data-later="${wizard ? 'Mockup: the wizard continues at Model once the App is installed.' : 'Mockup: the answer is a link to make temper’s App on GitHub, shown as text; this page then waits for you on GitHub.'}">Connect GitHub</button></div>
-        <div class="forge-act"><h3>Connect an App of your own</h3><p>Its id, and its private key as GitHub gives it.</p><p>On GitHub, set the App’s setup URL to ${conf('the forge’s GitHub setup URL', esc(`http://127.0.0.1:8367/forges/${f.n}/github/setup`))}, and give it the permissions and events temper’s guide lists.</p>
+  // GitHub's ways (client forge.md, 5.4). Connect GitHub leaves for GitHub
+  // in this tab at once, with no page of temper's before it, and GitHub
+  // sends the tab back to the page it left; an App of your own is the one
+  // GitHub way with Details. GitHub's side is drawn in its own world, at
+  // the step it is at; `from` is the page the tab comes back to.
+  const GH_WORLD = 'first-run-github';
+  const toGithub = (at, from, step) => u(`github.html?${worldKey === GH_WORLD ? '' : `world=${GH_WORLD}&`}at=${at}&from=${from}`, step);
+  const githubBack = from => ({ welcome: 'welcome.html?at=forge&forge=2', forges: 'forges.html' }[from] || 'connect-forge.html?forge=2');
+  const githubAdopted = f => Object.values(world.repos).find(r => r.forge === f.n && !r.retired);
+  function githubAppForm(f) {
+    return `<div class="forge-setup"><h3>An App of your own</h3><p>Its id, and its private key as GitHub gives it.</p><p>On GitHub, set the App’s setup URL to ${conf('the forge’s GitHub setup URL', esc(`http://127.0.0.1:8367/forges/${f.n}/github/setup`))}, and give it the permissions and events temper’s guide lists.</p>
           <label class="forge-field"><span>App id</span><input type="text"></label>
           <label class="forge-field"><span>Private key</span><textarea rows="2"></textarea></label>
-          <button class="button" data-later="${wizard ? 'Mockup: the wizard continues at Model once the App is installed.' : ''}">Connect an App of your own</button></div>
-      </div>${PASTED}`;
+          <button class="button primary" data-later="Mockup: temper checks the App with its key; then Install on GitHub, as for temper’s own App.">Connect the App</button>${PASTED}</div>`;
+  }
+  // Connecting: the App is made, and installed nowhere. A connect before
+  // the App is made shows nowhere: Connect GitHub again starts afresh.
+  function githubConnecting(f, from = 'connect-forge') {
+    return `<div class="forge-setup"><h3>Install temper’s App</h3><p>${fact('temper: the App made on GitHub, installed nowhere', esc(`${f.app.slug} is made on GitHub, under your account, and installed nowhere yet.`))} Install it, and choose the repositories temper may use.</p><a class="button primary" href="${esc(toGithub('install', from, '3'))}">Install on GitHub</a></div>`;
+  }
+  // Ready: installed. Choose the repository to start in, adopted into a new
+  // project of its name; once one is adopted, it is ready.
+  function githubReady(f, from = 'connect-forge') {
+    const install = f.app.installs[0];
+    const adopted = githubAdopted(f);
+    if (adopted) return `<div class="forge-setup"><h3>${fact('temper: the repository adopted at Ready', esc(`${adopted.name} is ready`))}</h3><p>In the new project ${fact('jig: the new project', esc(adopted.project))}, on GitHub. ${fact('temper: what the adoption found (domain forge.md, section 4)', 'GitHub Actions runs its CI, and main has no rules: temper merges once CI passes.')}</p>
+        <div class="button-row"><a class="button primary" href="${esc(u(`chats.html?project=${encodeURIComponent(adopted.project)}`))}">Open ${esc(adopted.project)}</a><a class="text-link" href="#" data-later="${esc(`Mockup: github.com/${adopted.name}, in a new tab.`)}">Open on GitHub ↗</a></div><p class="muted tiny">GitHub is on the <a class="text-link" href="${esc(u('forges.html'))}">Forges</a> page, with its details.</p></div>`;
+    const repos = install.names.map(n => [n, (world.github?.repos[install.account] || []).find(([r]) => r === n)?.[1]]);
+    const target = from === 'welcome' ? 'welcome.html?at=model' : 'connect-forge.html?forge=2';
+    const first = repos[0][0];
+    return `<div class="forge-setup"><h3>Choose a repository to start in</h3><p>${fact('temper: the App’s installation, its account and its repositories', esc(`${f.app.slug} is installed on ${install.account}, with ${install.all ? `all its repositories, ${install.names.length}` : `${plural(install.names.length, 'repository', 'repositories')} you chose`}.`))}</p>
+        <div class="pick-list" data-pick="${esc(u(target, '5'))}" data-owner="${esc(install.account)}">${repos.map(([n, priv], i) => `<label class="pick-row"><input type="radio" name="pick" value="${esc(n)}"${i ? '' : ' checked'}><span>${fact('temper: a repository the installation reaches', esc(`${install.account}/${n}`))}</span>${priv ? '<span class="tag">private</span>' : ''}</label>`).join('')}</div>
+        <label class="forge-field"><span>Into a new project, named ${ahead('jig', 'a project made after the first start: jig makes projects only at a deployment’s first start yet')}</span><input type="text" value="${esc(first)}" data-pick-project></label>
+        <div class="button-row"><a class="button primary" data-pick-go href="${esc(u(`${target}&pick=${encodeURIComponent(first)}`, '5'))}">Adopt ${esc(`${install.account}/${first}`)}</a></div>
+        <p class="muted tiny">Not listed? <a class="text-link" href="${esc(toGithub('install', from, '4'))}">Choose its repositories on GitHub</a>, and GitHub sends you back here.</p></div>`;
+  }
+  // GitHub's steps: Connect GitHub has no Details; an App of your own does.
+  function githubSteps(f) {
+    const labels = f.mode === 'managed' ? ['Choose', 'Connecting', 'Ready'] : ['Choose', 'Details', 'Connecting', 'Ready'];
+    const n = labels.length;
+    return flowSteps(f.state === 'connected' ? (githubAdopted(f) ? n : n - 1) : f.state === 'connecting' ? n - 2 : 1, '', labels);
+  }
+  // What the clients' listener answers itself, where GitHub's way can't go
+  // on: its own short page, with the way back (client forge.md, 9.1).
+  function githubRefusal(why, from = 'connect-forge') {
+    const [head, words, back, step] = {
+      request: ['GitHub sent a request, not an installation', 'Only an owner of an organization can install temper’s App there, and temper can’t wait for an owner to approve it yet: an installation approved later isn’t used. Install it on your own account, or on an organization you own.', githubBack(from), '3'],
+      ended: ['This link has ended', 'It was used already, it expired, or temper restarted since. Start again from temper.', 'connect-forge.html', '1'],
+    }[why];
+    return `<div class="forge-setup"><h3>${esc(head)}</h3><p>${fact('temper: the setup route’s refusal, in its words', esc(words))}</p><a class="button primary" href="${esc(u(back, step))}">Back to temper</a></div>`;
   }
   function ownedCommands(f) { return `<div class="forge-setup"><h3>Set it up from a terminal</h3><p>temper was not started by temper box, so it does not start a Forgejo itself. Run these, keep the last two running (a service manager is best), then restart temper:</p><pre><code>${conf('the owned forge’s number in the configuration', esc(`temper forge fetch ${f.n}\ntemper forge prepare ${f.n}\ntemper forge run ${f.n} forgejo\ntemper forge run ${f.n} runner`))}</code></pre><p>Once it is connected, make your first repository here.</p></div>`; }
   function ownedForm(f, target = `connect-forge.html?forge=${f.n}`, at = '6') {
@@ -1319,8 +1362,8 @@
   function forgeActs(f) {
     if (f.state === 'setting up') return `${ownedProgress(f)}<a class="text-link" href="${esc(u(`connect-forge.html?forge=${f.n}`))}">Open its set-up ›</a>`;
     if (f.state === 'set up failed') return `${ownedProgress(f, { failedAt: 'preparing' })}<a class="button" href="${esc(u(`connect-forge.html?forge=${f.n}`))}">Set up again</a>`;
-    if (f.kind === 'GitHub' && f.state === 'connecting') return `${githubConnecting(f)}<a class="text-link" href="${esc(u(`connect-forge.html?forge=${f.n}`))}">Open its set-up ›</a>`;
-    if (f.kind === 'GitHub') return `<div class="rule"></div><div class="button-row"><button class="button" data-later="Mockup: a new App key, pasted; the old is erased once the new is kept.">Replace</button><button class="button" data-later="Mockup: a fresh link to install temper’s App, shown as text.">Install on another account</button></div>`;
+    if (f.kind === 'GitHub' && f.state === 'connecting') return `<div class="rule"></div>${githubConnecting(f, 'forges')}`;
+    if (f.kind === 'GitHub') return `<div class="rule"></div><div class="button-row"><button class="button" data-later="Mockup: GitHub’s install page, in this tab, as at step 3; GitHub sends the tab back to Forges, and the row lists the new installation.">Install on another account</button><button class="button" data-later="Mockup: a new App key, pasted; the old is erased once the new is kept.">Replace</button></div>`;
     if (f.mode === 'owned' && f.state === 'stopped') return '';
     if (f.mode === 'owned' && f.state === 'connected') return `<div class="rule"></div><div class="button-row">
         <a class="button primary" href="#" data-later="${esc(`Mockup: Forgejo opens in a new tab, signed in as ${f.person} through temper.`)}">Open Forgejo ↗</a>${ahead('sign-in', 'signing in to an owned Forgejo through temper, as its OpenID provider: no mission yet')}
@@ -1350,7 +1393,7 @@
     const ok = f.state === 'connected';
     const access = f.kind === 'Forgejo' ? { fake: 'temper’s own admin token · the playground’s forge', owned: 'Site admin, with temper’s own token', managed: 'Site admin, with a token you gave', connected: 'Its bot’s tokens, which you gave' }[f.mode] : { managed: 'temper’s App, made on GitHub from temper’s manifest', connected: 'An App of your own, with the key you gave' }[f.mode];
     const repos = Object.values(world.repos).filter(r => !r.retired && r.forge === f.n);
-    const app = f.app ? `<div class="kv"><span>temper’s App</span><strong>${fact('temper: the App, and its installations', `${esc(f.app.slug)} · ${f.app.installs.map(i => `<a class="text-link" href="#" data-later="Mockup: the installation’s page, on GitHub.">${esc(i.account)}, ${esc(i.repos)} ↗</a>`).join(', ')}`)}</strong></div>` : '';
+    const app = f.app ? `<div class="kv"><span>temper’s App</span><strong>${fact('temper: the App, and its installations', `${esc(f.app.slug)} · ${f.app.installs.length ? f.app.installs.map(i => `<a class="text-link" ${worldKey === GH_WORLD ? `href="${esc(toGithub('installation', 'forges', stepId))}"` : 'href="#" data-later="Mockup: the installation’s page, on GitHub."'} title="Choose its repositories on GitHub">${esc(i.account)}, ${esc(i.all ? 'all repositories' : plural(i.names.length, 'selected repository', 'selected repositories'))}</a>`).join(', ') : 'installed nowhere yet'}`)}</strong></div>` : '';
     return `<div class="repo-lines">${ok ? `<div class="kv"><span>Account</span><strong>${fact('temper: the user the forge’s records hold, by login and id', esc(`${f.login} · ${f.kind === 'GitHub' ? 'App user' : 'user'} ${f.id}`))}</strong></div>` : ''}
         ${ok || f.state === 'stopped' ? `<div class="kv"><span>Access</span><strong>${fact('temper: how temper holds the forge: its own admin token, one a person gave, or the bot’s tokens alone (setup.md, the modes)', esc(access))}</strong></div>` : ''}
         ${f.mode === 'owned' && f.state !== 'not set up' ? `<div class="kv"><span>Runs</span><strong>${fact('temper: the owned forge’s setup, from the configuration and the pins', esc(`On this machine, with temper box · Forgejo ${f.versions.forgejo} and its runner ${f.versions.runner} · jobs labelled ${f.label} run here, as you`))}</strong></div>` : ''}
@@ -1400,11 +1443,8 @@
   function flowSteps(current, label3 = 'Setting up', labels = ['Choose', 'Details', label3, 'Ready']) {
     return `<div class="steps flow-steps" style="grid-template-columns:repeat(${labels.length}, minmax(0, 1fr))">${labels.map((label, i) => `<div class="step${i < current ? ' done' : i === current ? ' current' : ''}">${esc(label)}</div>`).join('')}</div>`;
   }
-  function githubConnecting(f) {
-    return `<h3>GitHub</h3><p>Open this link to make temper’s App on GitHub, then install it on the repositories you choose. temper never opens it for you.</p><pre><code>${fact('temper: the one-use GitHub manifest link', esc(`http://127.0.0.1:8367/forges/${f.n}/github/manifest?state=k3Jx…`))}</code></pre><p class="muted tiny">Waiting for you on GitHub. The link works once, and ends if temper restarts.</p><button class="button" data-later="Mockup: a fresh link; the old one ends.">Start again</button><p class="muted tiny">Once installed: choose the repositories to adopt, each into a new project or into Default; then Open the project.</p>`;
-  }
-  function flowCard(f) {
-    if (f.kind === 'GitHub') return f.state === 'connecting' ? githubConnecting(f) : `<h3>GitHub</h3>${githubWays(f)}`;
+  function flowCard(f, from = 'connect-forge') {
+    if (f.kind === 'GitHub') return f.state === 'connected' ? githubReady(f, from) : f.state === 'connecting' ? githubConnecting(f, from) : githubAppForm(f);
     if (f.state === 'connected') return `<h3>${fact('temper: the repository made at set-up', esc(`${f.setup.org}/${f.setup.repo} is ready`))}</h3><p>In the new project ${fact('jig: the new project', esc(f.setup.project))}, on ${conf('the forge’s name', esc(forgeName(f)))}. Its first CI run passed, on this machine.</p>${ownedProgress(f, { allDone: true })}<div class="button-row"><a class="button primary" href="${esc(u(`chats.html?project=${encodeURIComponent(f.setup.project)}`))}">Open ${esc(f.setup.project)}</a><a class="text-link" href="#" data-later="${esc(`Mockup: Forgejo opens in a new tab, signed in as ${f.person} through temper.`)}">Open Forgejo ↗</a>${ahead('sign-in', 'signing in to an owned Forgejo through temper, as its OpenID provider: no mission yet')}</div><p class="muted tiny">${conf('the forge’s name', esc(forgeName(f)))} is on the <a class="text-link" href="${esc(u('forges.html'))}">Forges</a> page, with its details.</p>`;
     if (['setting up', 'set up failed'].includes(f.state)) return `<h3>Setting up Forgejo on this machine</h3>${chosenValues(f)}${ownedProgress(f, { failedAt: f.state === 'set up failed' ? 'preparing' : null })}${f.state === 'set up failed' ? `${ownedFailure()}<button class="button" data-later="Mockup: the box runs the steps again; a fetched binary is kept.">Set up again</button>` : '<p class="muted tiny">You may leave this page: the steps go on, and the banner says where they are.</p>'}`;
     return f.box ? ownedForm(f) : ownedCommands(f);
@@ -1414,23 +1454,27 @@
   function forgeChoices(target = 'connect-forge.html?forge=') {
     const github = world.forges.find(f => f.kind === 'GitHub' && f.state === 'not connected');
     const offer = world.forges.find(f => f.mode === 'owned' && f.state === 'not set up');
-    return `<div class="forge-choices">${github ? `<section class="card card-pad"><h3>GitHub</h3><p>Your repositories on GitHub. temper makes its App there, or takes an App of yours, and you install it on the repositories you choose.</p><p class="muted tiny">In your browser, on GitHub · about two minutes</p><a class="button primary" href="${esc(u(`${target}${github.n}`))}">Choose</a></section>` : ''}${offer ? `<section class="card card-pad"><h3>Forgejo on this machine</h3><p>A forge of your own, run by temper box. No account needed: temper makes your first repository, and you start in it.</p><p class="muted tiny">${offer.box ? 'Here · about a minute' : 'Needs four commands and a restart'}</p><a class="button" href="${esc(u(`${target}${offer.n}`))}">Choose</a></section>` : ''}<section class="card card-pad"><h3>A Forgejo elsewhere</h3><p>Your own Forgejo server. temper connects as its admin, or with its bot’s tokens.</p><p class="muted tiny">Needs a change to temper’s configuration and a restart</p><a class="button" href="${esc(u(`${target}elsewhere`))}">Show how</a></section></div>`;
+    return `<div class="forge-choices">${github ? `<section class="card card-pad"><h3>GitHub</h3><p>Your repositories on GitHub. temper makes its own App there; you choose the account and the repositories it may use.</p><p class="muted tiny">In this tab, on GitHub · about two minutes</p><div class="button-row"><a class="button primary" href="${esc(toGithub('create', target.startsWith('welcome') ? 'welcome' : 'connect-forge', '2'))}">Connect GitHub</a><a class="text-link" href="${esc(u(`${target}${github.n}`))}">Use an App of your own ›</a></div></section>` : ''}${offer ? `<section class="card card-pad"><h3>Forgejo on this machine</h3><p>A forge of your own, run by temper box. No account needed: temper makes your first repository, and you start in it.</p><p class="muted tiny">${offer.box ? 'Here · about a minute' : 'Needs four commands and a restart'}</p><a class="button" href="${esc(u(`${target}${offer.n}`))}">Choose</a></section>` : ''}<section class="card card-pad"><h3>A Forgejo elsewhere</h3><p>Your own Forgejo server. temper connects as its admin, or with its bot’s tokens.</p><p class="muted tiny">Needs a change to temper’s configuration and a restart</p><a class="button" href="${esc(u(`${target}elsewhere`))}">Show how</a></section></div>`;
   }
 
   // The first link offers a choice; real setup keeps its place while the
   // box works in the background. The demo starts only across its link.
   pages.welcome = () => {
     document.body.classList.add('terminal-pages');
-    const f = world.forges.find(f => f.mode === 'owned');
-    const startedForge = world.forges.some(f => f.mode !== 'fake' && !['not connected', 'not set up', 'retired'].includes(f.state));
-    const at = params.get('at') || (demoRunning() ? 'demo' : !startedForge ? 'welcome' : !usableModel() ? 'model' : 'ready');
+    // The person's forge in play: the one acted on, else the owned offer.
+    const f = world.forges.find(f => f.mode !== 'fake' && !['not connected', 'not set up', 'retired'].includes(f.state)) || world.forges.find(f => f.mode === 'owned');
+    const startedForge = f && !['not connected', 'not set up'].includes(f.state);
+    // GitHub's way stays at Forge until a repository is adopted from it.
+    const githubOpen = startedForge && f.kind === 'GitHub' && !githubAdopted(f);
+    const asked = params.get('at') || (demoRunning() ? 'demo' : !startedForge ? 'welcome' : githubOpen ? 'forge' : !usableModel() ? 'model' : 'ready');
+    const at = asked === 'ready' && githubOpen ? 'forge' : asked;
     const views = ['welcome', 'forge', 'model', 'ready'];
     const current = views.includes(at) ? at : 'welcome';
     const way = params.get('way');
     const back = (current === 'forge' && params.has('forge')) || (current === 'model' && way) ? current : views[Math.max(0, views.indexOf(current) - 1)];
     const foot = `<div class="welcome-foot"><a class="text-link" href="${esc(u(`welcome.html?at=${back}`))}">‹ Back</a><a class="text-link" href="${esc(u('chats.html'))}">Later</a>${!ownForge() ? tryDemo('Try the playground instead') : ''}</div>`;
     const heading = (text, tag = 'h2') => `<${tag}>${text} ${welcomeMark()}</${tag}>`;
-    const eachStep = () => `<details class="welcome-progress"><summary>Each step</summary>${ownedProgress(f)}</details>`;
+    const eachStep = () => f.mode === 'owned' ? `<details class="welcome-progress"><summary>Each step</summary>${ownedProgress(f)}</details>` : '';
     let content;
     if (at === 'demo') {
       content = `<p class="mock-note">Once the playground runs, the link opens Chats; the welcome is gone. <a class="text-link" href="${esc(u('chats.html'))}">Open Chats</a></p>`;
@@ -1442,25 +1486,29 @@
         <section class="card card-pad"><h2>Set up temper</h2><p>Your forge: GitHub, or a Forgejo temper runs on this machine.<br>Your model: ${conf('the configuration’s ways to connect a model, and its providers', ways)}.</p><p class="muted">About five minutes</p><a class="button primary" href="${esc(u('welcome.html?at=forge'))}">Set up temper</a></section></div>
         <p class="muted welcome-after">Started in the playground? Connect your own forge and model whenever you like; the playground then steps aside.</p>`;
     } else if (current === 'forge') {
-      const which = params.get('forge');
+      const which = params.get('forge') || (githubOpen ? String(f.n) : null);
       const chosen = world.forges.find(f => String(f.n) === which && f.mode !== 'fake');
       const next = Math.max(...world.forges.map(f => f.n)) + 1;
-      const details = which === 'elsewhere' ? `${elsewhereHow(next)}<p class="muted">After the restart, the link opens this wizard where you left it.</p>` : chosen?.kind === 'GitHub' ? githubWays(chosen, true) : chosen ? ownedForm(chosen, 'welcome.html?at=model&world=first-run-real&step=2') : '';
+      const details = which === 'elsewhere' ? `${elsewhereHow(next)}<p class="muted">After the restart, the link opens this wizard where you left it.</p>` : chosen?.kind === 'GitHub' ? flowCard(chosen, 'welcome') : chosen ? ownedForm(chosen, 'welcome.html?at=model&world=first-run-real&step=2') : '';
       content = `${heading('Connect a forge')}<p class="muted welcome-lead">Where your repositories live: temper’s agents push branches and open pull requests there.</p>${which ? flowWrap(details) : forgeChoices('welcome.html?at=forge&forge=')}${foot}`;
     } else if (current === 'model') {
       const status = f?.state === 'setting up' ? `<div class="welcome-status">${fact('temper: the forge’s name and set-up state', esc(`${forgeName(f)} · ${f.state}`))}${eachStep()}</div>` : '';
       // Connect a model's Choose, or a key's Details, within the wizard;
       // ChatGPT's sign-in returns to the wizard's Almost ready.
-      const body = way === 'key' ? flowWrap(keyForm()) : modelChoices('welcome.html?at=ready&world=first-run-real&step=3', 'welcome.html?at=model&way=key');
+      const signedIn = worldKey === GH_WORLD ? 'welcome.html?at=ready&step=6' : 'welcome.html?at=ready&world=first-run-real&step=3';
+      const body = way === 'key' ? flowWrap(keyForm()) : modelChoices(signedIn, 'welcome.html?at=model&way=key');
       const variants = worldKey === 'first-run-real' ? `<section class="mock-variants" id="other-states"><h2>Other ways, where the configuration offers them</h2>${flowWrap(claudeSketch())}<p style="margin-top:14px">ChatGPT’s other endings, and the account’s other states, are drawn in the first run: <a class="text-link" href="${esc(u('connect-model.html?world=first-run&step=5#other-states'))}">Connect a model</a> and <a class="text-link" href="${esc(u('accounts.html?world=first-run&step=5#other-states'))}">Accounts</a>.</p></section>` : '';
       content = `${status}${heading('Connect a model')}<p class="muted welcome-lead">temper’s agents run on it: on a plan you sign in to, or on a key.</p>${body}${foot}${variants}`;
     } else {
       const ready = f?.state === 'connected';
+      const owned = f.mode === 'owned';
+      const repo = `${f.setup.org}/${f.setup.repo}`, proj = f.setup.project;
       const next = world.config.next;
       const model = next ? `${accountName(account(next.account))} · ${next.model}` : 'No model yet';
       const modelLine = `<li class="done">${fact('jig: the usable model and its account', esc(`Model: ${model}`))}</li>`;
-      const forgeLine = `<li class="${ready ? 'done' : 'current'}">${fact('temper: the forge’s connection state and login', ready ? 'Forge: Forgejo on this machine, connected as temper' : esc(`Forge: ${forgeName(f)} · ${f.state}`))}${!ready ? eachStep() : ''}</li>`;
-      content = `${heading(ready ? 'work/hello is ready' : 'Almost ready')}<ul class="forge-progress welcome-checklist">${ready ? forgeLine + modelLine : modelLine + forgeLine}<li class="${ready ? 'done' : ''}">${fact('temper and jig: the first repository, its project and CI', `Project hello, with work/hello${ready ? ' · its first CI run passed' : ''}`)}</li></ul>${ready ? `<div class="button-row"><a class="button primary" href="${esc(u('chats.html?project=hello'))}">Open hello</a><a class="text-link" href="#" data-later="Mockup: Forgejo opens in a new tab, signed in as sam through temper.">Open Forgejo ↗</a>${ahead('sign-in', 'signing in to an owned Forgejo through temper, as its OpenID provider: no mission yet')}</div>` : '<button class="button primary" disabled>Open hello</button><p class="muted tiny welcome-after">It opens once work/hello is made.</p>'}`;
+      const forgeLine = `<li class="${ready ? 'done' : 'current'}">${fact('temper: the forge’s connection state and login', esc(ready ? `Forge: ${forgeName(f)}, connected as ${f.login}` : `Forge: ${forgeName(f)} · ${f.state}`))}${!ready ? eachStep() : ''}</li>`;
+      const open = owned ? `<a class="text-link" href="#" data-later="Mockup: Forgejo opens in a new tab, signed in as sam through temper.">Open Forgejo ↗</a>${ahead('sign-in', 'signing in to an owned Forgejo through temper, as its OpenID provider: no mission yet')}` : `<a class="text-link" href="#" data-later="${esc(`Mockup: github.com/${repo}, in a new tab.`)}">Open on GitHub ↗</a>`;
+      content = `${heading(ready ? esc(`${repo} is ready`) : 'Almost ready')}<ul class="forge-progress welcome-checklist">${ready ? forgeLine + modelLine : modelLine + forgeLine}<li class="${ready ? 'done' : ''}">${fact('temper and jig: the first repository, its project and CI', esc(`Project ${proj}, with ${repo}${ready && owned ? ' · its first CI run passed' : ''}`))}</li></ul>${ready ? `<div class="button-row"><a class="button primary" href="${esc(u(`chats.html?project=${encodeURIComponent(proj)}`))}">Open ${esc(proj)}</a>${open}</div>` : `<button class="button primary" disabled>Open ${esc(proj)}</button><p class="muted tiny welcome-after">It opens once ${esc(repo)} is made.</p>`}`;
     }
     // Ready is done, not current, once the forge is connected too.
     const step = current === 'ready' && f?.state === 'connected' ? views.length : views.indexOf(current);
@@ -1473,14 +1521,126 @@
     const next = Math.max(...world.forges.map(f => f.n)) + 1;
     const owned = world.forges.find(f => f.n === 3);
     const choose = forgeChoices();
-    const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the flow’s other paths.</p>${[
-      ['GitHub, waiting for you on GitHub', { n: 2, kind: 'GitHub', state: 'connecting' }],
+    const github = world.forges.find(f => f.kind === 'GitHub');
+    const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the flow’s other paths. GitHub’s, with GitHub’s own pages, are drawn in their own world: <a class="text-link" href="${esc(u(`connect-forge.html?world=${GH_WORLD}#other-states`, '1'))}">First run, on GitHub</a>.</p>${[
       ['Forgejo on this machine, set up failed', { ...owned, state: 'set up failed' }],
       ['Forgejo on this machine, without the box', { ...owned, state: 'not set up', box: false }],
       ['A Forgejo elsewhere', null],
-    ].map(([heading, f]) => `<h3>${esc(heading)}</h3>${flowSteps(flowCurrent(f), f?.kind === 'GitHub' ? 'Connecting' : 'Setting up')}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}`).join('')}</section>` : '';
-    return listPage('forges', [['Forges', 'forges.html'], ['Connect a forge']], `<div class="section-heading" style="margin-top:0"><h2>Connect a forge</h2></div>${flowSteps(which ? flowCurrent(f) : 0, f?.kind === 'GitHub' ? 'Connecting' : 'Setting up')}${which ? `${flowCurrent(f) === 1 ? `<p><a class="text-link" href="${esc(u('connect-forge.html'))}">‹ All forges</a></p>` : ''}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}` : choose}${variants}`);
+    ].map(([heading, f]) => `<h3>${esc(heading)}</h3>${flowSteps(flowCurrent(f))}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}`).join('')}</section>`
+      : worldKey === GH_WORLD ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: where GitHub’s way can’t go on, temper’s listener answers its own short page, in place of sending the tab back here; and the App of your own’s Details.</p>${[
+      ['Back from GitHub with a request, not an installation: the setup route’s page', githubRefusal('request')],
+      ['A link that has ended: the manifest’s, the redirect’s or the setup route’s page', githubRefusal('ended')],
+      ['An App of your own: its details', githubAppForm(github)],
+    ].map(([heading, card]) => `<h3>${esc(heading)}</h3>${flowWrap(card)}`).join('')}</section>` : '';
+    const steps = f?.kind === 'GitHub' ? githubSteps(f) : flowSteps(which ? flowCurrent(f) : 0);
+    const atDetails = f?.kind === 'GitHub' ? f.state === 'not connected' : flowCurrent(f) === 1;
+    return listPage('forges', [['Forges', 'forges.html'], ['Connect a forge']], `<div class="section-heading" style="margin-top:0"><h2>Connect a forge</h2></div>${steps}${which ? `${atDetails ? `<p><a class="text-link" href="${esc(u('connect-forge.html'))}">‹ All forges</a></p>` : ''}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}` : choose}${variants}`);
   };
+  // ---- GitHub's side --------------------------------------------------
+
+  // GitHub's pages on Connect GitHub's way, sketched: not temper's, drawn
+  // so that the way can be followed click by click, in the world
+  // first-run-github. Each says, in slate, the address the tab is at and
+  // how it got there; `from` is the page of temper's the tab returns to.
+  pages.github = () => {
+    const gh = world.github;
+    if (!gh) return `<div class="mock-index"><p>GitHub’s side is drawn in the world <a href="${esc(u(`github.html?world=${GH_WORLD}`, '2'))}">First run, on GitHub</a>.</p></div>`;
+    const from = params.get('from') || 'connect-forge';
+    const f = world.forges.find(f => f.kind === 'GitHub');
+    const install = f.app?.installs[0];
+    const asked = params.get('at') || ({ 1: 'create', 2: 'create', 3: 'install' }[stepId] || 'installation');
+    const at = asked === 'installation' && !install ? 'install' : asked;
+    const where = (address, how) => `<p class="mock-url"><b>${esc(address)}</b>${how ? `<br>${how}` : ''}</p>`;
+    const left = (words, target, step) => `<p class="mock-note gh-left">${words} <a class="text-link" href="${esc(u(target, step))}">temper, as it is then</a></p>`;
+    if (at === 'refused') {
+      document.body.classList.add('terminal-pages');
+      const why = params.get('why') === 'ended' ? 'ended' : 'request';
+      const how = why === 'request' ? 'GitHub sent the tab here after Request, with no installation: an owner of the organization is to approve it.' : 'The state in the address is used, expired or from before a restart.';
+      return `<main class="welcome-page">${where(`http://127.0.0.1:8367/forges/${f.n}/github/setup?setup_action=request&state=Qm9v…`, how)}<p class="route-brand">temper</p>${flowWrap(githubRefusal(why, from))}</main>`;
+    }
+    const accountOf = login => gh.accounts.find(a => a.login === login) || gh.accounts[0];
+    const avatar = a => `<span class="gh-avatar${a.kind === 'org' ? ' gh-org' : ''}" aria-hidden="true">${esc(a.login[0].toUpperCase())}</span>`;
+    const appHead = (title, sub) => `<div class="gh-app-head"><span class="gh-avatar gh-app" aria-hidden="true">t</span><div><h1 class="gh-title">${title}</h1><p class="gh-muted">${sub}</p></div></div>`;
+    const perms = `<p class="gh-sub">with these permissions:</p><ul class="gh-perms"><li><b>Read</b> access to actions, administration, checks, commit statuses and metadata</li><li><b>Read</b> and <b>write</b> access to code, issues, merge queues and pull requests</li></ul>`;
+    // GitHub's choice of repositories: all, its default, or those selected.
+    const access = (a, chosen) => `<div class="gh-access" data-gh-account="${esc(a.login)}">
+        <label class="gh-radio"><input type="radio" name="gh-scope" value="all"${chosen.all ? ' checked' : ''}><span><b>All repositories</b><span class="gh-muted">This applies to all current and future repositories owned by the resource owner.</span></span></label>
+        <label class="gh-radio"><input type="radio" name="gh-scope" value="select"${chosen.all ? '' : ' checked'}><span><b>Only select repositories</b><span class="gh-muted">Select at least one repository.</span></span></label>
+        <div class="gh-select"${chosen.all ? ' hidden' : ''}>${gh.repos[a.login].map(([n, priv]) => `<label class="gh-repo"><input type="checkbox" value="${esc(n)}"${!chosen.all && chosen.names?.includes(n) ? ' checked' : ''}><span>${esc(`${a.login}/${n}`)}</span>${priv ? '<span class="gh-pill">Private</span>' : ''}</label>`).join('')}</div>
+      </div>`;
+    const choose = from === 'welcome' ? 'welcome.html?at=forge' : from === 'forges' ? 'forges.html' : 'connect-forge.html';
+    let body;
+    if (at === 'create') {
+      body = `${where('https://github.com/settings/apps/new?state=k3Jx…', `From temper’s manifest page, ${conf('the manifest page’s address, on the clients’ listener', esc(`http://127.0.0.1:8367/forges/${f.n}/github/manifest?state=k3Jx…`))}, which posted temper’s manifest here as it loaded. Connect GitHub sent the tab there.`)}
+        <h1 class="gh-title">Create GitHub App</h1>
+        <div class="gh-box gh-pad"><label class="gh-label" for="gh-name">GitHub App name</label><input id="gh-name" class="gh-input" value="${esc(gh.app)}"><p class="gh-muted">The name of your GitHub App.</p>
+        <a class="gh-btn gh-btn-primary" href="${esc(u(`github.html?at=install&from=${from}`, '3'))}">Create GitHub App for ${esc(gh.login)}</a></div>
+        ${left('Back by the browser’s back instead: no App is made, temper shows no connect under way, and Connect GitHub starts afresh.', choose, '1')}`;
+    } else if (at === 'install') {
+      const rows = gh.accounts.map(a => {
+        const on = f.app?.installs.some(i => i.account === a.login);
+        const [label, target] = on ? ['Configure', `github.html?at=installation&from=${from}`] : [a.role === 'owner' ? 'Install' : 'Request', `github.html?at=account&account=${a.login}&from=${from}`];
+        const note = a.kind === 'user' ? 'your personal account' : a.role === 'owner' ? 'an organization you own' : 'an organization you’re a member of';
+        return `<div class="gh-row">${avatar(a)}<span class="gh-grow"><b>${esc(a.login)}</b> <span class="gh-muted">· ${note}</span></span><a class="gh-btn" href="${esc(u(target))}">${label}</a></div>`;
+      }).join('');
+      body = `${where(`https://github.com/apps/${gh.app}/installations/new?state=Qm9v…`, install ? 'From temper’s “Choose its repositories on GitHub”: a fresh install link, whose state GitHub keeps through Configure.' : `From temper’s redirect, http://127.0.0.1:8367/forges/${f.n}/github/redirect?code=…&state=k3Jx…, which exchanged GitHub’s code for the App’s key, kept it, and sent the tab here.`)}
+        ${appHead(`Install ${esc(gh.app)}`, `Where do you want to install ${esc(gh.app)}?`)}
+        <div class="gh-box gh-rows">${rows}</div>
+        ${install ? '' : left('Back to temper from here instead: the App is made and installed nowhere, and temper offers Install on GitHub.', githubBack(from), '3')}`;
+    } else if (at === 'account') {
+      const a = accountOf(params.get('account'));
+      const owner = a.role === 'owner';
+      const go = owner
+        ? `<a class="gh-btn gh-btn-primary" data-gh-go="${esc(u(githubBack(from), '4'))}" data-gh-grant href="#">Install</a>`
+        : `<a class="gh-btn gh-btn-primary" href="${esc(u(`github.html?at=refused&why=request&from=${from}`, '3'))}">Request</a>`;
+      body = `${where(`https://github.com/apps/${gh.app}/installations/new/permissions?target_id=…&state=Qm9v…`, '')}
+        ${appHead(`${owner ? 'Install' : 'Request'} ${esc(gh.app)}`, a.kind === 'user' ? `Install on your personal account ${esc(a.login)}` : owner ? `Install on your organization ${esc(a.login)}` : `Request on the organization ${esc(a.login)}. An owner of ${esc(a.login)} must approve the request.`)}
+        <div class="gh-box gh-pad"><p class="gh-sub">for these repositories:</p>${access(a, { all: true })}${perms}<div class="gh-acts">${go}<a class="gh-btn" href="${esc(u(`github.html?at=install&from=${from}`))}">Cancel</a></div></div>
+        ${owner ? '<p class="mock-note gh-left">Install sends the tab to temper’s setup route, which takes the installation and sends the tab back where Connect GitHub started.</p>' : '<p class="mock-note gh-left">Request sends the tab to temper’s setup route with no installation: temper answers its own page.</p>'}`;
+    } else {
+      const a = accountOf(install.account);
+      const direct = from === 'forges';
+      body = `${where(`https://github.com/settings/installations/${install.id}`, direct ? 'From the installation’s link on temper’s Forges page.' : 'From Configure, on the install page.')}
+        ${appHead(esc(gh.app), `Installed on ${esc(a.login)} · developed by ${esc(gh.login)}`)}
+        <div class="gh-box gh-pad"><h2 class="gh-h2">Repository access</h2>${access(a, install)}${perms}<div class="gh-acts"><a class="gh-btn gh-btn-primary" data-gh-go="${esc(u(githubBack(from), stepId))}" data-gh-grant href="#">Save</a></div></div>
+        <p class="mock-note gh-left">temper’s App asks GitHub to send the tab to its setup route on an update too: Save sends it there, and temper reads the installation’s repositories again. ${direct ? 'This visit carries no state of temper’s, so the route sends the tab to Forges.' : 'The state GitHub kept from the install link sends the tab back where it started; were GitHub to drop it, the route would send the tab to Forges.'}</p>`;
+    }
+    return `<div class="gh"><header class="gh-header"><span class="gh-mark" aria-hidden="true"></span><b>GitHub</b><span class="gh-search">Type / to search</span>${avatar(accountOf(gh.login))}</header><main class="gh-main">${body}</main></div>`;
+  };
+  // GitHub's choice of repositories, carried in the address of the act
+  // that ends it, as `granted`.
+  function bindGithub() {
+    const box = document.querySelector('.gh-access');
+    const go = document.querySelector('[data-gh-go]');
+    if (!box || !go) return;
+    const update = () => {
+      const all = box.querySelector('input[value="all"]').checked;
+      box.querySelector('.gh-select').hidden = all;
+      const names = [...box.querySelectorAll('.gh-select input:checked')].map(i => i.value);
+      const url = new URL(go.dataset.ghGo, location.href);
+      url.searchParams.set('granted', `${box.dataset.ghAccount}:${all ? 'all' : names.join(',')}`);
+      go.href = url.href;
+      go.setAttribute('aria-disabled', String(!all && !names.length));
+    };
+    box.addEventListener('change', update);
+    update();
+  }
+  // Ready's choice of a repository, carried as `pick`.
+  function bindPick() {
+    const list = document.querySelector('[data-pick]');
+    if (!list) return;
+    const go = document.querySelector('[data-pick-go]');
+    const name = document.querySelector('[data-pick-project]');
+    list.addEventListener('change', () => {
+      const pick = list.querySelector('input:checked').value;
+      name.value = pick;
+      const url = new URL(list.dataset.pick, location.href);
+      url.searchParams.set('pick', pick);
+      go.href = url.href;
+      go.textContent = `Adopt ${list.dataset.owner}/${pick}`;
+    });
+  }
+
   pages.forges = () => {
     const owned = world.forges.find(f => f.n === 3);
     const forges = world.forges.filter(f => f.mode !== 'fake' && ['connecting', 'setting up', 'set up failed', 'connected', 'stopped'].includes(f.state));
@@ -1503,6 +1663,8 @@
   bindSources();
   bindTrees();
   bindLaterActs();
+  bindGithub();
+  bindPick();
 
   const notes = document.getElementById('notes');
   if (notes) {

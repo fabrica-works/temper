@@ -2652,19 +2652,25 @@ listener's (`../client/forge.md`, the browser's steps).
 ### 17.2 Managed: the manifest flow
 
 1. **Connect,** "Connect GitHub" on the deployment's page or its tool
-   of `temper ctl`, for the person's account or an org they name
-   (`Connect` with `GitHubManifest { org? }`). The setup host runs
-   `Manifest { forge, target }` (skein's `forge-setup.md`, 5.1) for a
-   fresh state, ending `Done(Manifest { state, page })`; the page is
-   held with the state. The client shows the
-   link, `http://<listener>/forges/<n>/github/manifest?state=<s>`, as
-   text, and never opens it.
-2. **The manifest's page,** opened by the person: one form posting the
-   manifest to `<web>/settings/apps/new?state=<s>`, or
-   `<web>/organizations/<org>/settings/apps/new?state=<s>`, one button,
-   no script; its headers allow a form to `<web>` alone, keep no copy
+   of `temper ctl` (`Connect` with `GitHubManifest { back? }`). The
+   setup host runs `Manifest { forge, target }` (skein's
+   `forge-setup.md`, 5.1), `target` always `Personal`, for a fresh
+   state, ending `Done(Manifest { state, page })`; the page and `back`
+   are held with the state. The link is
+   `http://<listener>/forges/<n>/github/manifest?state=<s>`: a
+   browser's tab goes to it, as a sign-in's does, and comes back to
+   `back` at the end; the terminal prints it and never opens it.
+2. **The manifest's page** posts the manifest to
+   `<web>/settings/apps/new?state=<s>` as it loads, by one inline
+   script its policy allows by hash, and shows its button where the
+   script doesn't run or the page was reached through the browser's
+   history; its headers allow a form to `<web>` alone, keep no copy
    and send no referrer.
-3. **GitHub's form:** the person creates the App.
+3. **GitHub's form:** the person creates the App, under their own
+   account. Nothing asks for an organization: the App is public, so
+   GitHub's install page offers every account the person may install
+   it on (with the user, 2026-10-23; an App an organization owns is
+   for later, `../draft/github.md`, section 18).
 4. **The redirect back,** `http://<listener>/forges/<n>/github/redirect`:
    `Convert { forge, code, state }` (5.2) exchanges the code for the
    App's id, slug and key, finds its bot user, and writes the records;
@@ -2672,12 +2678,17 @@ listener's (`../client/forge.md`, the browser's steps).
    Once they are kept, `Install` (5.4) answers the App's install link,
    the browser goes on to it, and the forge connects (forge.md, the
    setup's host).
-5. **Installing:** the person picks an account, and all or selected
-   repositories; temper's client advises selected. GitHub sends the
-   browser to `http://<listener>/forges/<n>/github/setup`, where
-   `Accept` (5.4) checks the installation and adds it to `Accepted`;
-   the page says "temper has the installation; you may close this
-   tab."
+5. **Installing:** the person picks an account, and all repositories,
+   GitHub's default, or those they select. GitHub sends the browser to
+   `http://<listener>/forges/<n>/github/setup`, where `Accept` (5.4)
+   checks the installation and adds it to `Accepted`, and the route
+   sends the browser back to `back`, or, with none, says "temper has
+   the installation; you may close this tab." A member of an
+   organization who isn't its owner can only request the App there:
+   GitHub comes back with `setup_action=request` and no installation,
+   and the route says why temper can't go on, and to install it on
+   their own account or an organization they own (client/forge.md,
+   9.1).
 
 - **States** are one use, drawn by the setup host, at most
   `setup.states`, each living `setup.state_life_ms`, at most the
@@ -2714,14 +2725,16 @@ listener's (`../client/forge.md`, the browser's steps).
 
 ### 17.4 Another account, and repositories later
 
-- **"Install on another account"** (`Install { forge }`, skein's
-  `forge-setup.md`, 5.4): a fresh state and GitHub's install link
-  (`Link`), shown as text; the person installs on another account or
-  org, and the setup route accepts it.
+- **"Install on another account"** (`Install { forge, back? }`,
+  skein's `forge-setup.md`, 5.4): a fresh state and GitHub's install
+  link (`Link`), where the browser goes as at 17.2; the person installs
+  on another account or org, and the setup route accepts it and sends
+  the browser back.
 - **Repositories added later** to an installation of selected
   repositories are the person's, on the installation's page on GitHub;
   GitHub's visit to the setup route with no state refreshes an accepted
-  installation's repositories, and is refused otherwise. The forge
+  installation's repositories and sends the browser to Forges, and is
+  refused otherwise. The forge
   component reads an installation's repositories again on its events.
 - **An installation temper did not accept,** a stray made with no
   state of temper's, is shown, and uninstalled by the next reconcile

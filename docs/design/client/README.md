@@ -663,8 +663,12 @@ keeps (`../protocol/configuration.md`, section 2).
   request the root refuses for the role says "Your role does not hold
   the deployment's forges." Its acts are the FORGE
   requests (section 8), each sent as 3.6
-  says; a pasted key or token is a secret field (3.6), and a connect's
-  or an install's link is shown as an external link (6.5). How a
+  says; a pasted key or token is a secret field (3.6). A connect's or
+  an install's link is where the page's own tab goes, as a sign-in's
+  address is (`ConnectModel`, The tab's departure), the request naming
+  the page's address as its `back` (section 8); GitHub's last step
+  sends the tab back there (`forge.md`, 9.1), and the page shows the
+  link as an external link meanwhile (6.5). How a
   connect ends is read on the page, never assumed from its answer.
 - **The welcome** (`welcome.html`) is one page, `Welcome { step }`, its
   step Welcome, Forge, Model or Ready, at `/welcome` and
@@ -704,7 +708,12 @@ keeps (`../protocol/configuration.md`, section 2).
     its choice in the welcome's address (`browser.md`, 2.3), "‹ All
     forges" back to its Choose. A forge already setting up, connecting
     or connected is no choice: the step says it, "FORGE · CONNECTION",
-    with "View", to `ConnectForge` at it. Once "Set up a Forgejo here"
+    with "View", to `ConnectForge` at it; but a GitHub forge with no
+    accepted installation, or with none of its repositories adopted,
+    shows `ConnectForge`'s Connecting or Ready in the step, its `back`
+    the welcome's Forge step, `/welcome?at=forge&forge=N`, so that the
+    tab GitHub sends back finds its choice there. Once a repository is
+    adopted, the welcome moves on to Model. Once "Set up a Forgejo here"
     is accepted, the welcome moves on to Model, the set up running on.
     *Model* is `ConnectModel`'s Choose and Details, its state and acts
     (above), its way in the welcome's address (`browser.md`, 2.3), "‹
@@ -2757,7 +2766,8 @@ command.
   end when the `accounts` watch tells it. A browser goes to the address
   in its own tab instead (3.5, `ConnectModel`).
 - **A forge's connect or install link** is printed the same way, as
-  `TEXT <URL>` with no number, and never opened. A connect link's
+  `TEXT <URL>` with no number, and never opened; the terminal names no
+  `back`, so the setup route ends on its own page. A connect link's
   address is on the clients' listener (`forge.md`, 9.1), for example
   `http://127.0.0.1:PORT/forges/1/github/manifest?state=STATE`; an
   install link's is GitHub's,
@@ -3008,11 +3018,11 @@ does for the client:
 
   | Request | The value it carries | What the engine does | Its outcome |
   |---|---|---|---|
-  | `Connect { forge, how: GitHubManifest { org? } }` | none | the setup's host's `Manifest` run, for the person's account or the organization `org` names, ending `Done(Manifest { state, page })` | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
+  | `Connect { forge, how: GitHubManifest { back? } }` | none | the setup's host's `Manifest` run, for the person's own account, always (`forge.md`, 9.1), ending `Done(Manifest { state, page })`; `back` held with the state | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
   | `Connect { forge, how: GitHubApp { id, key } }` | `key`, the App's private key, PEM as GitHub gives it; `id` rides in the request | `Paste`: the key decoded and matched to the App `id` names, the App's user found, its hook pointed at `https://SLUG.invalid/` (no webhook secret on GitHub: changes are heard from the App's delivery log), its permissions and events checked | connecting |
   | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | one bundle: the API token, the git token and, where the person made hooks to temper's listener, their secret | `Check`: both tokens answer as one user | connecting |
   | `Connect { forge, how: ForgejoAdmin { admin_token } }` | the site admin's token | `Reconcile`; the forge becomes managed | connecting |
-  | `Install { forge }` | none | `Install`, GitHub alone | a link, the install page for a fresh state |
+  | `Install { forge, back? }` | none | `Install`, GitHub alone; `back` held with the state | a link, the install page for a fresh state |
   | `Replace { forge, value }` | a new App key, or a new API token, git token or both | `Paste` with the kept App id, or `Check` against the kept user: it must answer as the forge's user; the old is erased once the new is kept | connecting |
   | `Forget { forge }` | none | the admin's token erased; a managed forge becomes connected (`../protocol/credentials.md`) | forgotten |
   | `SetUp { forge }` | none | an owned forge not set up, or whose set up failed, whose setup says `"start": "asked"`: the routing asks the box for the forge's group, `start FORGE` on its pipe (`../protocol/setup.md`, 7.1), refused "not under the box" without a pipe and "busy" while a group starts; at the box's `started`, its handover taken, then reconciled and connected (`../protocol/forge.md`, 2.2) | setting up |
@@ -3043,6 +3053,10 @@ does for the client:
   core leaves unused, its request refused, replayed, joined to another
   or cut by a stop, is named in one output of the core's, which temper's
   root forwards to jig's clients' component to erase.
+- **`back`,** on a GitHub connect and an install, is the page's address
+  the setup route sends the browser back to once GitHub is done
+  (`forge.md`, 9.1), checked at decode as `Return`'s `path` is (below);
+  none, from the terminal, leaves the route's own page.
 - **`Return { source, path }`,** a sign-in's return (3.5,
   `ConnectModel`, The tab's departure), is no forge's: the family
   carries it as temper's one request of the client's own. `source` is
