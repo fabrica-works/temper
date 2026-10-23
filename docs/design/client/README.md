@@ -365,14 +365,21 @@ keeps (`../protocol/configuration.md`, section 2).
     start, its first line with no older page; a chat whose spec is
     empty has no such turn, and opens on its first words line;
   - *the agent's words,* each assistant message's text under "Temper",
-    whole within the receiving bounds (5.4);
+    whole within the receiving bounds (5.4), read as Markdown by
+    `skein-ui`'s reader (skein's `ui.md`, section 10): paragraphs, lists,
+    quotes, code, and tables at the top level. A browser draws a table
+    as the mockups' (`md-table`), and leaves out a header row whose
+    cells are all empty, as they do;
   - *its calls,* after its message's text: each delegation as its
     task's card (5.7), then the message's other calls in one
-    disclosure (skein's `ui.md`, its disclosure), named by its fold
-    line: "1 tool call" or "N tool calls", then their tools' names in
-    order, a name called again given once with "×N", each part after
-    " · " ("2 tool calls · read ×2", "2 tool calls · read · edit"). A
-    browser shows it folded to its name until the person opens it,
+    disclosure (skein's `ui.md`, its disclosure), named by its count,
+    "1 tool call" or "N tool calls", and described by their tools'
+    names in order, a name called again given once with "×N", joined by
+    " · " ("read ×2", "read · edit"). A browser shows it folded to its
+    summary, the name and then its description in a lighter tone, as
+    the mockups' two tones, until the person opens it; the terminal
+    prints the description on its own line under the name (skein's
+    `ui-text.md`),
     while the terminal and the fake person find its content whole: each
     of those calls in order, as a work line, its tool's name and its
     outcome where the call has one, as an agent's task's page draws a
@@ -1792,7 +1799,7 @@ the change's chip in a chat (`forge.md`, 2.4 and 2.5).
 - **The first run:** the chat is task 1 and the change it delegates
   task 2, so the person reads "T2 · CHANGE", Running, then Landed
   (`../draft/first-run.md`, 2.1), and after the card the chat's next
-  call, folded, "1 tool call · wait" (3.5).
+  call, folded, "1 tool call", described "wait" (3.5).
 
 ### 5.8 A goal's page
 
@@ -2053,7 +2060,7 @@ acts on it as its document offers (5.11).
   `thread`), read as the chat's page reads it, is drawn as work, not as
   a chat's (3.5): its latest window; committed turns, the agent's
   "Temper"; a message's calls folded as a chat's (3.5), in one
-  disclosure after its text, named by the chat's fold line and
+  disclosure after its text, named and described as the chat's and
   listing each call as a work line, a `delegate` call's too, since a
   delegation's card is the chat's (5.7); each result as a work line,
   where its message has it; "Run N began" and
@@ -2076,8 +2083,8 @@ acts on it as its document offers (5.11).
     mockup names the charter (3.5);
   - the demo's banner stays where the frame draws it, before the page,
     where the mockup draws it under the taskbar (5.1);
-  - a message's calls folded as the mockup folds them ("7 tool calls
-    · read ×6 · recall") and as a chat does (3.5), its results still
+  - a message's calls folded as the mockup folds them ("7 tool calls",
+    then "read ×6 · recall") and as a chat does (3.5), its results still
     work lines (section 11);
   - not drawn, since no document supplies them: the charter's, model's,
     account's, worker's and pool's names ("Implementer · Sonnet ·
@@ -3409,7 +3416,8 @@ own tests:
     on the dependencies, as a plan row's, is the candidate (a jig
     change);
   - a message's calls: folded as a chat's, in the disclosure named
-    "N tool calls · NAMES" (3.5), each call a work line inside it;
+    "N tool calls" and described by their names (3.5), each call a work
+    line inside it;
     its results stay work lines where their message has them, which
     the mockup doesn't draw;
   - its plan: drawn while its tree holds a delegate or a held card,
