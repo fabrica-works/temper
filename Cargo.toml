@@ -212,6 +212,11 @@ overflow-checks = true
 [profile.dev.package.skein-codegen]
 opt-level = 3
 
+# skein-lib holds SHA-256: the process tier hashes the whole cached Forgejo and
+# runner binaries (setup.md 6.6, 13.4), 8x faster optimized. Every hash still runs.
+[profile.dev.package.skein-lib]
+opt-level = 3
+
 # The lints for the step crates (every domain, protocol and io layer: lib is skein's).
 # Disallowed types, macros and methods are listed in clippy.toml. Ordinary Rust
 # (simulators, test harnesses) declares its own [lints] table.
