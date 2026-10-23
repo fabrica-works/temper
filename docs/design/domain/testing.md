@@ -2121,6 +2121,38 @@ world of temper's on a scripted engine (../client/README.md, section 10).
   from the engine's root to the chat's page. The same story over real
   agents runs in the real loop (2.4).
 
+### 6.4 Settings in the store
+
+Designed, not built: mission 2 of the configuring plan
+(`../protocol/configuration.md`, section 13; jig's `domain/engine.md`,
+section 17, and its `domain/testing.md`, sections 4 and 9, for jig's
+own). By the pyramid, each behaviour in the lowest world that owns it,
+and one smoke above:
+
+| Where | What | Priced |
+|---|---|---|
+| step tests, in their crates | a landing rule's record: its golden bytes, the largest at its bounds within the kind's bound, one past refused; the forge's judge of each item, each refusal and an accepted rule, by a table; the two standing verdicts over a table of rules, deployment's and project's, enforcing or not, met, wait and refuse, a branch no rule covers; the stock defaults passing jig's one check for `temper init`'s document, for one with a single model and for one with the demo; each of the six members refused, naming its path; `temper init`'s document without them, and no `charters/` | milliseconds, outside the worlds' guides |
+| the client's step and view tests (`../client/README.md`, section 10) | How work runs' rows from the `settings` document and each setting, in each tag; the card for an owner and for a member; the review's split of a proposal's items into enforced and followed, and its effect; stale and accepted; each act as the operations it sends; the gallery's worlds and the terminal's goldens gaining the two pages | milliseconds each, in their suites |
+| the forge's world (`tests/engine/forge`) | forge.md 18's settings stories: a rule changed between two merges; a gate a rule adds asked for on a queued change, which leaves the queue; one a rule drops no longer waited on; a project's rule adding an approval; a rule refused; a change kept on its charter, and one held when it is no longer offered; a restart handing the values back before the records | about 0.3 s, seven stories at the world's usual cost |
+| the engine's domain world (`tests/engine/domain`) | through the root and the core on jig's store: a change naming a landing rule and a charter committed in one decision, and refused whole when the forge refuses its rule; a project's rule changed by its owner, refused as not theirs for another; a new forge's charter reaching the next change's delegates while a live change keeps its own; a project made after the first start covered by the deployment's rule; the two requirements removed from the rules, landing left to the procedure's waits; the resume fixture restarting with changed values | about 0.6 s |
+| fuzzy, in an existing sweep | one operation in the forge world's `fuzzy_simulation`: random changes of landing rules among the changes stepping and merging; its referee holds that no merge lands without each requirement of the rules held at its decision | within the fuzzy suite's 120 s, measured with it; no new binary |
+| the client and the engine, joined (6.3) | "Tell temper how you work" starting the configuring chat, whose run proposes; "How work runs" read at its defaults and after a change, with its revisions in use; a proposal's review page split into temper enforces and your agents follow, with its effect; one accepted, making a revision; one withdrawn as stale; a member's, waiting for an owner | about 0.4 s against the 8 s guide |
+| the one-process world (2.5) | its fixture's document without the six members; its restart story with one change of settings before it | no new story |
+| the real loop (2.4) | one smoke: a gate added to a project's landing rule from the client, the next change asking for its review and landing after it | at most 2 s, its guide; about 11.5 s of the 13 s ceiling, from 9.5 s at its last measure (case 2’s M4) |
+| the process tier | none: no Must of settings depends on processes | |
+
+- **The tests that move:** every test document and typed builder that
+  writes the six members (25 files of documents, 20 of builders, a
+  JSON fixture and the lab's documents) takes the stock defaults or a
+  settings change in its setup instead; a story that edited a charter in
+  its document makes the change it needs. Their times do not change.
+- **Its QA:** mission 2 changes the facts of the forge's world and the
+  engine's domain world (how a merge is judged), so their `qa_*`
+  profiles run before it lands (skein's `owners.md`).
+- **Measured** at mission 2's base and end, by 6.1's rule. Should the
+  smoke miss its 2 s, or the real loop pass its 13 s, the plan goes to
+  the user with its numbers; no story is cut or moved to fit.
+
 ## 7. Layout
 
 ```

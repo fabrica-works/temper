@@ -1,6 +1,6 @@
 # The forge connector
 
-Provisional, 2026-10-04, revised 2026-10-22. How temper drives a forge,
+Provisional, 2026-10-04, revised 2026-10-23. How temper drives a forge,
 Forgejo or GitHub: the forge as a connector on jig's contract (jig's
 `domain/connectors.md`), with its resources, effects, topics, procedures,
 requirements and reads; a forge connected or not; adopting repositories,
@@ -897,7 +897,11 @@ starts from current code. It never updates only because its base moved.
   adds a memory-safety review to one change); the landing rules add
   theirs to every change into a branch they cover (8.7). A gate added
   while a change is queued takes it out of the queue until it has its
-  verdict.
+  verdict. Designed, not built (8.9): the rules' gates are not copied
+  into a change when it is made, but taken at each step from the rules
+  the forge holds then, every rule covering the branch adding its own,
+  enforced or not; a gate a changed rule drops is no longer waited on,
+  and a review already running for it reports as an advisory one.
 - **Valid at a head, and carried over clean updates.** A verdict is given
   at a head. Each gate says which later heads it still counts at
   (`freshness`): *exact*, the head itself; *clean*, every head reached
@@ -1034,7 +1038,8 @@ merge, kind 4, on a pattern of landing branches (jig's
 - **Landing rules** come from the configuration, the deployment's and
   each project's (`../protocol/configuration.md`, section 3, `landing`),
   each covering a pattern of landing branches with CI, up to date, its
-  gates and its approvals. A merge meets every rule that covers its
+  gates and its approvals. Designed, not built: they are settings, the
+  forge's own kinds (8.9). A merge meets every rule that covers its
   branch: a project's rules add to the deployment's, and never replace
   them; gates a plan asks for on one change are the change's own (8.3),
   and add to the rules', never replace them.
@@ -1056,6 +1061,22 @@ merge, kind 4, on a pattern of landing branches (jig's
   branch backwards: a run's push is a fast-forward
   (`../protocol/git.md`, 4.8), an update merges the base in
   (section 10), and a branch found moved backwards is drift (8.5).
+
+- **Designed, not built: two standing requirements** replace the four
+  above as landing rules' attachments (`../protocol/configuration.md`,
+  13.3). temper's stock rules attach both to the merge on every landing
+  branch, and the forge judges each over every enforcing rule covering
+  the merge's branch, as it holds the rules then:
+
+  | Requirement | Its parameters | Met | Wait | Refuse | Guarded or observed |
+  |---|---|---|---|---|---|
+  | 5, the landing rules | none | each such rule's CI, gates and approvals are met, as 1, 3 and 4 above; or no rule enforces there | one waits, and none refuses | one refuses | guarded |
+  | 6, up to date by the landing rules | none | each such rule asking for it is met, as 2 above; or none asks | the comparison unread or failed | the head lacks the base's tip | observed, freshness 0 |
+
+  The change keeps the rule and the criterion of its last wait or
+  refusal, by the rule's scope and number and the criterion's kind
+  (a gate's number, an approval's role); its panel shows it (8.8), and
+  its hold says it, in the forge's words.
 
 ### 8.8 Its panel
 
@@ -1088,6 +1109,39 @@ What the connector makes of a change for the client's panel
   unknown.
 - **Kept as long as its record:** the record outlives the task's end, so
   a landed or cancelled change still has its panel.
+- **Designed, not built:** what the landing rules wait on at its head,
+  the rule and criterion its last verdict named (8.7), and the forge's
+  charter it was made with (8.9).
+
+### 8.9 The landing rules as settings
+
+Designed, not built (`../protocol/configuration.md`, section 13). The
+forge owns three of temper's kinds of settings: the deployment's
+landing rules (kind 1), each project's (kind 2), and the forge's charter
+(kind 3), whose values are bytes jig keeps and never reads (jig's
+`domain/connectors.md`, section 17).
+
+- **It judges them in the change's decision,** from its own state: a
+  rule decodes, its pattern is a landing branch's within jig's pattern
+  bounds, its gates and approvals within their bounds, and the forge's
+  charter a charter's number (`../protocol/configuration.md`, 13.2). A
+  refusal names the item and what fails, and the whole change is
+  refused with it.
+- **It holds them** decoded, the deployment's rules and each project's,
+  within `landing_rules` per scope and `judge_projects` projects, and
+  replaces a scope's whole when told its new values, in the decision
+  that committed them. Then each live change into a repository a
+  changed scope covers is stepped: a gate a rule added is asked for, a
+  gate it dropped is no longer waited on, and a change queued for a
+  gate it now needs leaves its queue until it has its verdict (8.3).
+- **It reads the newest:** every merge is judged by the rules held at
+  its decision, whatever revision its change was made in.
+- **A change keeps its charter.** The forge's charter is read when the
+  change is made, and the change's producing, repairs, resolutions and
+  agents' and checks' gates run under it: its procedure's authority
+  grants that charter's delegation alone, and is never rewritten. A
+  change whose charter the newest settings no longer offer is held when
+  it next needs a delegate, saying so; it is cancelled, or made again.
 
 ## 9. Landing queues
 
@@ -1438,7 +1492,10 @@ is connected as the routing tells the root (`../protocol/forge.md`, 2.1
 and 8.1); the adopted repositories of each managed or owned Forgejo are
 named to the routing for its reconcile (4.2). Until a forge connects, its
 reads and entries answer `NotConnected`, which narrows nothing (4.1), so
-the steps below run on each forge as it connects. temper's steps:
+the steps below run on each forge as it connects. Designed, not built:
+before its records, the connector hears its kinds' current values
+(8.9), so a restored change is judged by the rules as they are. temper's
+steps:
 
 1. it reads afresh each repository's landing branches' tips and each
    live pull request (head, state, mergeability, CI, its place in a
@@ -1475,7 +1532,13 @@ overlaps a goal's change, and one that does not; a goal's issue
 written, revised and closed; a merge whose answer is lost, found merged
 after a restart; a mergeability unsettled within the window, then
 settled; a forge preloaded with ten times the history, idle at the same
-cost.
+cost. Designed, not built (8.9): a landing rule changed between two
+merges, the second judged by the new rule; a gate a rule adds asked for
+on a queued change, which leaves the queue, and a gate a rule drops no
+longer waited on; a project's rule adding an approval; a rule refused
+in its change's decision; a change kept on the charter it was made
+with, and one held when that charter is no longer offered; a restart
+that hands the values back before the records.
 
 Its stories of access and of GitHub's ways, the root and routing
 scripted: a forge connected while temper runs, an adoption refused as

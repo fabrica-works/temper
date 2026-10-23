@@ -29,7 +29,8 @@ not contract. What is still open is listed in section 11.
 - **Its pages,** on jig's (jig's `client/domain/pages.md`): the inbox
   (home), the chats, a chat, a project's board, a task's page, the
   changes, the forge's adoption form, the forges, and the LLM accounts
-  (3.5). The
+  (3.5); designed, not built, "How work runs" and a proposal of
+  settings' review (5.13). The
   mockups give their look and the order of their parts. What no page
   shows is open (section 11).
 - **Its cards are its own.** A proposal, a question, a held task, a
@@ -315,6 +316,8 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `ConnectModel`'s acts |
 | `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's, each row folded until opened: its LLM provider and display name, its holder, its deciding source's state and its line (5.5, An account's line); opened, that state's words and acts, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), what it pays for, the runs using it and the tasks waiting for it (facts jig gives the deployment's accounts alone for now, so a person's own leave them out: 5.5) and its acts; the checks under way, and how the last ended; then the playground's account, folded, while the demo's model half holds; "+ Connect a model", to `ConnectModel` | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in again or add a key from a state's acts, as `ConnectModel`'s ways; sign a source out; add a key to an account; replace a key; remove a source or an account; check a program's login again; move an account, or a source, up or down; resume a limited source |
 | `ConnectModel { way }` | `connect-model.html` | connecting one more LLM account, `way` the way it is at, or none at Choose: Choose, a card for each way its providers offer (5.5, The ways); Signing in, at the provider, for a sign-in, or Details, a way's field, for a key or a program's login; and Ready, the account made, or how the sign-in ended (5.5, A sign-in) | `accounts`; `me`'s LLM providers | sign in with an LLM provider; add a key as an account of its own; declare a program's login |
+| `HowWorkRuns` (designed, not built) | none yet: drawn ahead, on the user's word (5.13) | the settings in the person's words: the newest revision and who decided it; "Tell temper how you work"; pending proposals of settings; roles, ways to start work, rules, running work and history, each row tagged Default, Changed or Added (5.13) | `settings`; each setting shown, `setting` (jig's `client/domain/contract.md`, 5.1 and 6) | start the configuring chat; move a revision's tasks to the newest; propose a reset, a removal or a restore |
+| `Proposal { proposal }` (designed, not built) | none yet (5.13) | a proposal of settings: temper enforces and your agents follow, its effect on running work, the settings folded; withdrawn when stale; accepted (5.13) | the `proposal`; `settings`; each item's setting before | accept, choosing whether running work moves; reject with a reason; change something, in the chat |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
   `client/domain/client.md`, section 19), in jig's words, with temper's
@@ -1721,7 +1724,9 @@ you", a text node of its own after the entry's name, read from the
 person's own accounts, the demo's provider's left out: red for a
 deciding source refused, needing a sign-in, misconfigured or
 unloaded, before amber for one limited; current on `Accounts` and
-`ConnectModel`; both whatever the project. With no project chosen, the
+`ConnectModel`; both whatever the project; and, designed, not built,
+"How work runs", to `HowWorkRuns`, current there and on `Proposal`
+(5.13), whatever the project. With no project chosen, the
 project's entries are not offered. The mockups' "Tasks", a list of a
 project's tasks, and "Workers", the deployment's hosts, are not in the
 navigation (the user's pick, 10-23): the Board covers what a task list
@@ -2813,6 +2818,145 @@ Its rules:
   the gallery's worlds its own (`browser.md`, 7.2). A test of a form
   steps that time to either side of the bound it reads (section 10).
 
+### 5.13 How work runs, and a proposal of settings
+
+Designed, not built: mission 2 of the configuring plan
+(`../protocol/configuration.md`, section 13; jig's `domain/engine.md`,
+section 17, for the settings, their revisions and their proposals; the
+draft `../draft/configuring.md`, section 5). The user answers the option
+pages (where the page sits, its layout, the card, the review, a stale
+proposal); until then this section takes the options recommended, and
+the mockups join `mockups/` on the user's word, drawn ahead.
+
+- **Two pages and a card.** `HowWorkRuns`, "How work runs", lists the
+  settings in the person's words; `Proposal { proposal }`, under it,
+  reviews one proposal of settings; and a proposal of settings in a
+  chat is a card of its own (below). They read jig's `settings`
+  document, and each setting they show whole (`setting`, jig's
+  `client/domain/contract.md`, 5.1 and 6), again as the document says
+  it changed. The settings are bounded by jig's limits and temper's
+  (`../protocol/configuration.md`, 13.2), so the page reads them all
+  as it opens. A party sees the deployment's settings with a role in
+  the deployment, and a project's with a role in that project, as the
+  document gives them; the client hides nothing of its own.
+- **In the navigation** after "Accounts", whatever the project
+  (5.3); current on both pages.
+- **How work runs:** the level-1 heading "How work runs"; the line "The
+  roles temper's agents take, the ways work starts, and the rules temper
+  holds it to."; the newest revision, "Revision 8, accepted by Pat today
+  at 14:03" (who decided it and when, 5.12; "temper's defaults" for the
+  first start's and "temper 0.4's defaults" for a release's); the
+  offer "Tell temper how you work", which starts the configuring chat
+  (template 3, `../protocol/configuration.md`, 13.4) and opens it; each
+  pending proposal of settings as a line, "Proposal 13 waits for an
+  owner. Lee asked for a Reviewer role, from "Reviews"", with "Review".
+  Then five sections, each a level-2 heading with its count and a line
+  of what it holds, its rows folded until opened, as the accounts' are
+  (5.5):
+  - *Roles,* the charters: each its name, "a role · temper's stock" or
+    "added in revision 6", a tag, and its line, a sentence of its
+    instructions' first paragraph; opened, its instructions (temper's
+    for a stock one, its own otherwise), its models, where it runs, how
+    it waits and its budget, and how many tasks run it, by revision;
+    the forge's charter says "Made by temper when a change needs a fix,
+    a rebase or a gate".
+  - *Ways to start work,* the templates: each its name and line;
+    opened, its role, its budget and deadline, and how it closes.
+  - *Rules,* what temper holds work to: the deployment's landing rules
+    and, for the project chosen, its own, each its branches and what
+    it needs ("Needs CI passed · up to date · the gate heavy --gate · 1
+    approval by an owner") and who decides it ("Decided by acme/app's
+    owners: Pat, Kim"); the policy new projects start with; and jig's
+    rules, "Everywhere, always". A project's people and its own policy
+    are its own page's, not this one's.
+  - *Running work,* the revisions held: the newest, "Newest · 14 tasks
+    · new work takes it", and each older one, its tasks' count, and
+    "Move them" (jig's `MoveToNewest`), confirmed (3.6) as "Move 9
+    tasks to revision 8 at their next run? A task whose role revision 8
+    removed, or whose model it no longer allows, finishes on revision
+    7."; the answer's count of those that could not move is said after
+    it.
+  - *History,* the revision records the store keeps, newest first:
+    each its number, what it did in a line (a proposal's title, or "a
+    release's", "the first start's"), who decided it and when, "Show",
+    and "Restore…", which proposes its items again against the newest
+    (jig's `domain/engine.md`, 17.7) and opens that proposal's review.
+- **Its tags:** "Default", a setting no change is over; "Changed", one
+  a change is over, with "changed in revision N"; "Added", one no
+  default has.
+- **Proposals only, at first** (`../draft/configuring.md`, section 10;
+  jig keeps the owner's direct change in its API, and the pages never
+  send `ChangeSettings`). A row's act is "Change it in a chat", which
+  starts the configuring chat with the row named in its first message.
+  "Reset to default…" on a changed default, "Remove…" on an added
+  setting and "Restore…" in the history are the person's own proposals
+  (jig's `Propose`), each confirmed (3.6) and opening its review page.
+- **The card in a chat:** a proposal of settings the chat's subtree made
+  is a card at the call that made it, as every proposal is (3.5): the
+  tag "Proposal 12" and "against revision 7", its title, one line per
+  change in the person's words, before and after ("Testers GPT-5 high
+  → GPT-5 medium", "Sub-owners new: temper stops one 4 h after its
+  start"), at most five and "and N more", then "Review", to its review
+  page, and "Nothing changes until an owner accepts it." Nothing is
+  accepted from the card. A person who may not accept it sees "Waiting
+  for an owner" in its tag's place and "Pat or Kim decides: it is in
+  their inbox.", the parties it waits for as jig's proposal names them.
+  In the inbox, its card is the chat's (3.5), with "Review".
+- **The review page:** the level-1 heading "Proposal 12 · from "How we
+  work" · against revision 7"; "Made by T21 How we work, for Pat, today
+  at 13:56"; then two blocks:
+  - *temper enforces,* "temper holds work to these, whatever an agent
+    does.": the changes of every setting but a charter's instructions,
+    grouped as How work runs groups them (roles, ways to start work,
+    rules), each before and after in words, with "new" and "removed";
+  - *your agents follow,* "Agents read these at each run and are
+    trusted to follow them; temper does not check.": the changes of a
+    charter's instructions, each as the role and what it now reads.
+  Then *Effect*: "New work follows this from the moment it is accepted.
+  Nothing restarts."; "9 running tasks are on revision 7:" with two
+  choices, "Let them finish on revision 7", chosen, and "Move them at
+  their next run"; and "A task whose role this removes, or whose model
+  it no longer allows, finishes on revision 7." Then "Show the
+  settings", folded, the items as the settings name them (charter 4,
+  its models, before and after), and the acts: "Reject…", a reason,
+  sent as jig's `Decide`, which the agent hears and revises from;
+  "Change something", which returns to the chat with the person's
+  words; and "Accept", jig's `Decide` with the
+  choice of running work, naming the proposal by its proposer and
+  number (jig's `client/domain/contract.md`, 3.2 and 5.2); the revision
+  it was made against is its own, and one made against an older is
+  withdrawn, never accepted (jig's `domain/engine.md`, 17.6).
+- **What the review page says plainly:** a landing rule naming a role
+  nobody holds, "Nobody holds this role yet: changes wait for an
+  approval nobody can give."; a change of jig's rules that removes the
+  landing's requirements (`../protocol/configuration.md`, 13.3),
+  "temper no longer holds landing to its rules: the change procedure
+  still waits for them."; a role removed while tasks run it, "2 tasks
+  hold it on revision 7".
+- **Stale:** a proposal made against an older revision is withdrawn by
+  the decision that made the newer (jig's `domain/engine.md`, 17.6). Its
+  review page keeps its items, dimmed, under the banner "Withdrawn:
+  made against revision 7; now 8.", what revision 8 changed in a line
+  and who made it, and "T21 How we work is redoing it against revision
+  8; its new proposal comes to your inbox."; it offers no Accept, only
+  "Open the chat". In the chat the card says "Withdrawn: made against
+  revision 7; now 8", and the agent, told so, proposes again against
+  the newest, a new card after it.
+- **Accepted:** the review page says "Accepted by Pat at 14:03:
+  revision 8. New work takes it now.", with what became of running
+  work ("9 tasks finish on revision 7", or "moved"), and "How work
+  runs"; in the chat, the card's line "Accepted at 14:03: new work
+  takes it now." A refusal of Accept (out of shape, judged, full) is
+  said under the acts in jig's words, the forge's for a landing rule
+  it refused (`../protocol/configuration.md`, 13.2), and the proposal
+  stays pending; full names the oldest revision held and offers "Move
+  them" there.
+- **Drawn ahead of jig:** the names of a revision's tasks, "Show them"
+  and how many of them could not move are not in jig's facts (section
+  11); the page draws counts alone until they are. A charter's
+  documents, "Owners also read acme/handbook process.md", wait on jig
+  (`../protocol/configuration.md`, section 11).
+
 ## 6. The terminal shell
 
 ### 6.1 `temper open DIRECTORY LINK_OR_ADDRESS`
@@ -3399,6 +3543,10 @@ The tiers, the fakes and the budgets are `../domain/testing.md`'s (sections 2,
 4 and 6.1); the client's joint world is its 2.1 and 6.3. The client's
 own tests:
 
+- **How work runs and a proposal of settings** (5.13), designed, not
+  built: step tests of their rows, card and review from jig's
+  documents, and the gallery's and goldens' pages
+  (`../domain/testing.md`, 6.4).
 - **Credential-boundary consumption** is checked in the existing
   domain and composed-client fixtures, including the terminal shell's
   startup `Held` sign-in after its children have asked reads (3.4).
@@ -3966,3 +4114,18 @@ own tests:
   source does not. Candidate: the page shows the person's sign-in under
   way for that provider, with its end. Default: the way's button
   again.
+- **Which tasks hold a revision, and which could move** (5.13). jig's
+  `settings` document counts the live tasks holding each revision, but
+  a task query has no revision among its keys (jig's
+  `client/domain/contract.md`, 6.1), and nothing says before a move or
+  an acceptance how many tasks could not move. Default, asked of jig in
+  the configuring plan's M4 (revisions):
+  a task query keyed by revision, its live group only (a scan, which
+  costs live tasks no more than any key), and a proposal's or a move's
+  count of tasks that could not move. Until then "Running work" and the
+  review page draw counts alone and say in words which tasks stay.
+- **How work runs' place and look** (5.13). The option pages put to the
+  user where the page sits in the navigation, its layout, the
+  proposal's card, the review page and a stale proposal. Default: the
+  options recommended, as 5.13 has them; the mockups join `mockups/`
+  on the user's word.

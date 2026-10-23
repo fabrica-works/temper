@@ -1433,7 +1433,7 @@ directory is empty (7.1).
   | `worker.digest` | data | 0o600 | the SHA-256 of the secret's digits without its newline, as 64 lowercase hexadecimal digits and a newline, as `docs/guide/box.md` makes it |
   | `demo/llm.key` | data | 0o600 | the demo model's key (8.4): 32 bytes from the kernel's random source, as 64 lowercase hexadecimal digits and a newline |
   | `demo/bin/git` | data | a link | the demo's git, `temper fake git` (8.4): a symbolic link to the binary |
-  | `charters/chat.txt`, `charters/coding.txt` | configuration | 0o644 | the charters' instructions, the owned example's |
+  | `charters/chat.txt`, `charters/coding.txt` | configuration | 0o644 | the charters' instructions, the owned example's; designed, not built: no longer written, the binary holding them (configuration.md, 13.4) |
   | `agent.json` | configuration | 0o644 | smith's agent configuration (configuration.md, section 5): the owned example's endpoints, models and profile (8.1), and the demo's endpoint and model (8.3); Claude Code's program at the `claude` found on `PATH`, and its programs directory, `programs` in the data directory; with no `claude` on `PATH`, no program, and Anthropic's models by key alone |
   | `temper.json` | configuration | 0o644 | the default document (8.3) |
 
@@ -1585,7 +1585,10 @@ defaults for a person's real work are open (section 16).
   with no person in between, in every project, seeded or made
   (configuration.md, section 8). Until jig makes projects at runtime,
   the document seeds project 1 with that policy, and both adopt into it
-  (section 15).
+  (section 15). Designed, not built: the policy and the landing rule are
+  the binary's stock settings, policy 1 and the deployment's rule 1, and
+  the document names neither (configuration.md, 13.4); `temper init`
+  writes no `engine.policies`, `engine.rules` or `application.landing`.
 - **Its acts:** `engine.acts` (jig's `protocol/configuration.md`,
   section 3) grants the forge connector, 1, exactly the acts the demo
   makes (8.4), `{"connector": 1, "may": ["close", "add_key",
@@ -1612,7 +1615,12 @@ defaults for a person's real work are open (section 16).
   which, before the start, from jig's `resolved_default` preview in
   `me`, never by guessing from catalogue order (`../client/README.md`,
   5.5). The request keeps its omitted choice; the preview does not turn
-  it into an explicit one.
+  it into an explicit one. Designed, not built: the charters, the
+  templates and the forge's charter are the binary's stock settings,
+  their models every model `engine.llm` configures in the document's
+  order, the demo's last as `temper init` writes it; the document names
+  none of them (configuration.md, 13.4), and a person changes them from
+  "How work runs" (`../client/README.md`, 5.13).
 - **One worker,** in the process, its `root` `workspaces` in the data
   directory, its `git` the machine's, or null (8.2); the deployment's directory
   `deployment` in the data directory; the clients' listener
@@ -1673,7 +1681,7 @@ them as it does any Forgejo.
   | `llm.cued` | a list of `{"cue", "turns"}`, optional, none when absent | as `asked`'s; the scripts the fake plays and the client never suggests, an agent's, cued by its brief |
   | `llm.otherwise` | a list of turns | 1 to 8 |
   | `forge` | u16 | the `forge` of one fake `setup` entry (section 8) |
-  | `project` | `{"name", "policy"}` | the project the demo's start makes (below): `name` a project's name in jig's shape (jig's `domain/core.md`, 6.1), `Playground` as `temper init` writes it; `policy` the number of one of `engine.policies` (jig's `protocol/configuration.md`, section 3) |
+  | `project` | `{"name", "policy"}` | the project the demo's start makes (below): `name` a project's name in jig's shape (jig's `domain/core.md`, 6.1), `Playground` as `temper init` writes it; `policy` the number of one of `engine.policies` (jig's `protocol/configuration.md`, section 3); designed, not built: of the policies offered at its start, the stock policy 1 unless changed (configuration.md, 13.4) |
 
   The scripts, `asked`, `cued` and `otherwise` together, fit skein's fake LLM's
   `script_bytes` (skein's `fake-llm.md`), which `temper-fake` sets.

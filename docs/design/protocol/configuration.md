@@ -83,6 +83,12 @@ document says what temper adds. What is open is listed in section 11.
   dialling it. A document of none of the three is refused (section 2).
 - **The agent's configuration is smith's** (section 5), and `temper open`
   takes no file at all (section 9).
+- **Settings leave the document** (section 13; designed, not built):
+  jig's charters, templates, policies and rules, and temper's landing
+  rules and forge's charter, become settings in the store, changed by a
+  decision an owner accepts, with the binary's stock values as their
+  defaults. The document keeps what a start needs before it reads its
+  store, and what belongs to the machine.
 
 ## 2. The document
 
@@ -275,7 +281,9 @@ or a GitHub forge's list at `forges.installations` entries, each at its
 largest (section 7).
 
 **`landing`:** the deployment's and the projects' landing rules, the
-root's `LandingPolicy`:
+root's `LandingPolicy`. Leaving the document: section 13 makes them
+settings in the store, temper's kinds 1 and 2; until mission 2 builds
+it, they are configured here.
 
 ```
 "landing": {
@@ -314,7 +322,8 @@ A rule is a `LandingRule`, member for member:
 
 **`charter`:** u32, the charter the forge's procedures start agent work
 under; it must be the `number` of one of `engine.charters`. Feeds
-`Config.forge_charter`.
+`Config.forge_charter`. Leaving the document: temper's kind 3 (section
+13).
 
 **`clients`:** the clients' listener, which `temper-service` owns
 (`../client/README.md`, section 8), and the browser's bundle it serves
@@ -1110,16 +1119,44 @@ one owned forge, with its own values (setup.md, 8.1).
   section 5; jig's `examples.md`, section 4), would renew it.
 - **A made project's own landing rules.** `landing.projects` names
   seeded projects, so a project made after the first start has the
-  deployment's rules alone. Default: the deployment's; rules per
-  configured policy, joined to a project made from it, once a document
-  needs them.
+  deployment's rules alone. Default: the deployment's. Designed in
+  section 13, not built: a project's rules are a setting its owners
+  change, kind 2, for any project, made or seeded.
 - **A forge removed while the store holds its repositories.** Default:
   the start is refused at the forge's restart step, naming the forge
   number (jig's `protocol/configuration.md`, section 9, removed parts).
 - **A project's landing rules changed after its first start.** They
   reach the forge's judges at the next start, but the project's policy
   keeps the requirements seeded at its first start. Default: a change
-  reaches the policy only through a policy change by a person.
+  reaches the policy only through a policy change by a person. Designed
+  in section 13, not built: the rules leave the policies for two
+  standing requirements the forge judges over the rules it holds, so a
+  change reaches the next merge.
+- **A charter an application's setting names** (13.2). The forge's
+  charter is a number in bytes jig never reads, so jig's check of
+  references cannot hold it, and a change that removes that charter is
+  accepted. Default, asked of jig, in the configuring plan's M3 (jig's
+  hook for an application's kinds): an application's kind may declare
+  that its values name a charter, beside the bytes, and jig's one check
+  holds the reference as it holds a template's. Until then, the forge's
+  next change is held, saying its charter is not offered.
+- **Requirements an application fixes** (13.3). The landing rules'
+  two requirements are in jig's rules, which the deployment's owners may
+  change, so landing can be left unenforced by a change of rules.
+  Default: changeable, and said plainly on the review page; jig could
+  let an application mark requirements no change removes.
+- **A charter's documents** (`../draft/configuring.md`, section 2: rules
+  reach the runs). A charter of jig's is its instructions as text, with
+  no documents (jig's `domain/engine.md`, 17.1), so a chat, which has
+  no workspace, cannot read the rules a repository holds. Default,
+  asked of jig in the configuring plan's mission 3, with the configuring
+  agent: a charter may name documents, each a repository, a path
+  and a branch, carried as references jig never reads and pinned with
+  the charter; the forge reads each at its branch's head into the
+  run's brief, as a section of its own (`../domain/agent.md`, 4.1).
+  Until then the configuring agent puts a rule in the charter's own
+  instructions, as the draft does for a rule typed in the chat, and
+  says that a change to the repository's text will not reach it.
 - **A repository renamed or moved after adoption.** Default: its
   resource path, which landing patterns match, and its remote keep the
   owner and name of its adoption; Forgejo redirects the old path, and
@@ -1171,7 +1208,7 @@ variable, else its default.
 
 | Directory | Flag, variable | Default | Holds | Kept |
 |---|---|---|---|---|
-| configuration | `--config DIR`, `TEMPER_CONFIG` | `$XDG_CONFIG_HOME/temper` | the document, `temper.json`; smith's agent configuration, `agent.json`; the charters' instructions; trusted roots' files | as a person's own files are: copied, synced or published, so it holds no secret |
+| configuration | `--config DIR`, `TEMPER_CONFIG` | `$XDG_CONFIG_HOME/temper` | the document, `temper.json`; smith's agent configuration, `agent.json`; the charters' instructions, until section 13 moves them into the binary; trusted roots' files | as a person's own files are: copied, synced or published, so it holds no secret |
 | data | `--data DIR`, `TEMPER_DATA` | `$XDG_DATA_HOME/temper` | the deployment's directory, with the store, transcripts and jig's secrets' store; the worker's secret and its digest; the worker's root; each set-up forge's directory (setup.md, section 3); the demo's key and its git's link, in `demo/` (setup.md, 8.4); the box's records of the forges it has started, in `box/started/` (setup.md, 7.1); the box's logs of its last two runs, in `box/logs/` and `box/logs.previous/` (setup.md, 7.2); the programs directory | the deployment: backed up whole |
 | cache | `--cache DIR`, `TEMPER_CACHE` | `$XDG_CACHE_HOME/temper` | binaries fetched again at will: an owned forge's Forgejo and runner, `temper forge fetch`'s in `forgejo/VERSION/` and `forgejo-runner/RUNNER_VERSION/` (setup.md, 6.6) | never backed up |
 
@@ -1221,3 +1258,203 @@ variable, else its default.
   processes share a data or cache directory.
 - **Tests give all three,** each a directory of the test's own: no test
   resolves a default under `$HOME` (`../domain/testing.md`).
+
+## 13. Settings in the store
+
+Designed, not built: mission 2 of the configuring plan builds it
+(`../STATUS.md`). How work is run leaves the document for the store,
+by the rule of `../draft/configuring.md`, 3.1: the document keeps
+what a start needs before it can read its store, and what belongs to
+the machine. The mechanism is jig's (jig's `domain/engine.md`, section
+17; `domain/connectors.md`, section 17): a setting is a kind, a scope
+and a number; the current settings are the binary's defaults with the
+stored changes over them; a change is one decision, checked whole and
+refused whole; charters are pinned per revision, everything else is
+read at its newest. This section says what temper adds: its own kinds,
+how the forge judges them, its stock defaults, and the members that go.
+The pages a person meets it on are `../client/README.md`, 5.13.
+
+### 13.1 What leaves the document
+
+| Member today | Becomes | Its default (13.4) |
+|---|---|---|
+| jig's `engine.charters` | jig's charters | temper's stock charters: a chat's (1), a coding agent's (2) and the configuring agent's (3) |
+| jig's `engine.templates` | jig's templates | jig's chat (1) and goal (2), and temper's configuring chat (3) |
+| jig's `engine.policies` | jig's policies projects are made from | the stock policy (1) |
+| jig's `engine.rules` | jig's rules | temper's stock rules, the landing's two requirements among them (13.3) |
+| `application.landing` | temper's kinds 1 and 2: the deployment's landing rules, and each project's (13.2) | one deployment rule: CI passed and up to date, everywhere |
+| `application.charter` | temper's kind 3: the forge's charter (13.2) | charter 2 |
+
+- **What stays** is section 3's other members and jig's other parts:
+  the directories, the listeners, the workers and their secrets' files,
+  the limits, the first owners and the sign-in providers, the forges,
+  the identities, `clients`, `sign_in`, `webhooks`, `setup` and `demo`,
+  and, for now, the LLM providers (`engine.llm`), each its own design
+  later (`../draft/configuring.md`, section 10). jig's `engine.projects`,
+  the projects a first start seeds, stays jig's member.
+- **A project's own policy** is not a setting: it is in the store
+  already, and its owners change it (jig's `domain/people.md`, 5.2).
+  What a project adds to how its changes land is its landing rules, a
+  setting of kind 2, decided by its owners.
+
+### 13.2 temper's kinds
+
+temper declares three kinds of its own beside jig's, each owned by the
+forge's connector, which judges them (jig's `domain/engine.md`, 17.5):
+
+| Kind | Scope | Numbers | Value | Decided by |
+|---|---|---|---|---|
+| 1, the deployment's landing rules | the deployment | a rule's, from 1; at most `forge.landing_rules` | a landing rule (below) | the deployment's owners |
+| 2, a project's landing rules | each project | a rule's, from 1; at most `forge.landing_rules` per project | a landing rule | that project's owners |
+| 3, the forge's charter | the deployment | 1 alone | a charter's number, a u32 | the deployment's owners |
+
+- **A landing rule's value** is a `LandingRule` record in temper's
+  codec, section 3's rule member for member but `connector` and `kind`,
+  which are always the forge's and its merge: `pattern`, `enforce`,
+  `ci`, `up_to_date`, `gates` and `approvals`, each as section 3 says.
+  Its largest bytes, the kind's bound, are its encoding with a pattern
+  at jig's pattern bounds, `forge.change_policy.gates` gates and
+  `authority.roles` approvals; `forge.landing_rules`, a limit of the
+  forge's (section 7), is 4 in `small`, as jig's requirements per scope
+  bound the rules today.
+- **Judged by the forge, in the change's decision.** The root hands the
+  forge each item of its kinds with the value it would leave (jig's
+  `domain/connectors.md`, section 17); the forge reads only its own
+  state, and refuses an item, naming it by kind, scope and number and
+  saying what fails:
+  - *a rule* that does not decode; whose pattern's first segment is not
+    `forge`, or passes jig's pattern bounds; with more gates than
+    `forge.change_policy.gates`, or a gate's number twice; with an
+    approval of no people, or a role twice, or one past
+    `authority.roles`;
+  - *the forge's charter* outside 1 to jig's `tasks.charters`.
+  Whether a project's policy has an approval's role is not the forge's
+  to know: a rule naming a role nobody holds is accepted, and the
+  review page says so (`../client/README.md`, 5.13); a change it covers
+  waits, as one whose approvers have not yet approved. Whether the
+  forge's charter names a charter the change leaves offered is jig's
+  check of references, once jig's kinds may name a charter (section
+  11); until then a change of charters that would leave it unoffered is
+  accepted, and the forge's next change is held, saying so.
+- **Told in the same decision.** Once a change is committed, the forge
+  hears its kinds' new values and replaces its rules, the deployment's
+  or the project's, whole; each live change into a repository it serves
+  is stepped after the commit, so a gate a rule added is asked for and
+  one it dropped no longer waited on (`../domain/forge.md`, 8.3). At a
+  start the forge hears the current values before its records
+  (`../domain/forge.md`, section 16).
+- **Never pinned.** Every merge is judged by the rules as they are
+  then, whatever revision its change was made in: what work may do is
+  always current (`../draft/configuring.md`, section 4).
+- **The forge's charter is read when a change is made.** The root reads
+  it through the core, by kind, scope and number, as it reads a charter
+  (jig's `domain/engine.md`, 17.5), and grants the change's procedure
+  delegation to that charter. The change keeps it: its producing, its
+  repairs, its resolutions and its agents' and checks' gates run under
+  the charter it was made with, and a newer forge's charter reaches the
+  changes made after it (`../domain/root.md`, section 6).
+
+### 13.3 How the landing rules are enforced
+
+- **Two standing requirements** in temper's stock rules, on the forge's
+  merge (kind 4) over `{"segments": ["forge"], "last": "open", "value":
+  ""}`, every landing branch of every forge: the forge's requirement 5,
+  *the landing rules*, guarded and marked as one that must be guarded;
+  and its requirement 6, *up to date by the landing rules*, observed
+  with a freshness of 0. Their parameters are 0. They replace the
+  requirements 1 to 4 that each rule's criteria became, one per
+  criterion, in the rules and in each seeded project's policy
+  (`../domain/forge.md`, 8.7).
+- **Judged over the rules the forge holds then.** At a merge, the forge
+  takes every rule covering its branch that enforces, the deployment's
+  and the project's: requirement 5 meets when each one's CI, gates and
+  approvals are met, waits when one waits and none refuses, and refuses
+  when one refuses; requirement 6 likewise for each one's up to date. A
+  branch no enforcing rule covers meets both. The forge keeps on the
+  change the rule and the criterion it last waited on or refused, which
+  the change's panel shows and its hold says (`../domain/forge.md`,
+  8.7): the words are the forge's, kept with its change, whatever a
+  verdict carries through jig.
+- **So a change of landing rules touches nothing of jig's:** no rule,
+  no project's policy. A project made after the first start is covered
+  by the deployment's rules at once, and by its own once its owners
+  set them; a project's rules changed reach its next merge.
+- **jig's rules are the deployment owners' to change,** the two
+  requirements among them. A change that removes one leaves landing to
+  the change procedure's waits alone; the review page says so under
+  "temper enforces" (`../client/README.md`, 5.13).
+
+### 13.4 temper's stock defaults
+
+The binary holds them, and gives them to jig's builder as `Config`'s
+defaults at each start (jig's `domain/engine.md`, 17.1): the values
+`temper init` writes into the document today (`setup.md`, 8.3), moved
+into the binary.
+
+| Setting | Its value |
+|---|---|
+| charter 1, a chat's | the instructions of today's `charters/chat.txt`; models: every model `engine.llm` configures, in the document's order, the first its default; hosts `workers`; waiting 10 s; resume; a run of 8 turns and 120 s, a reserve of 1 turn and 60 s; a default spend of 20; the inspect, modify and agents tool families, no shell; a call's timeout 10 s |
+| charter 2, a coding agent's | as charter 1, with today's `charters/coding.txt` |
+| template 1, a chat | jig's chat, run by charter 1, as `temper init` writes it today |
+| charter 3, the configuring agent's | as charter 1, with new instructions held in the binary (`../draft/configuring.md`, sections 2 and 5.2: split what temper enforces from what agents follow, offer a rule as structure where temper has it, ask until it can propose); the inspect family and jig's `settings` family (jig's `domain/engine.md`, 7.3), no modify, no agents, no shell |
+| template 2, a goal | jig's goal, its executor chosen |
+| template 3, the configuring chat | a chat, flagged conversation and labelled as jig's chat is, run by charter 3 |
+| policy 1 | today's seeded project's policy, with no requirements: role 0 requests and decides everything, a period's spend of 100 for the project and for role 0, an authority's spend of 40, with the rules' grants and delegation |
+| the rules | today's: tools, the forge's grants under `forge`, delegation to charters 1, 2 and 3 and the change procedure, 8 tasks 4 deep, a spend of 100, a run's spend from 1 to 10; and 13.3's two requirements |
+| kind 1, rule 1 | everywhere (`forge`, open), enforced: CI passed, up to date; no gates, no approvals |
+| kind 3 | charter 2 |
+
+- **The configuring agent is a setting** like any other (`../draft/configuring.md`, 5.1): "Tell temper how you work" starts template 3,
+  which an owner may change or remove as any template. Its runs read
+  and propose settings; they never change one, since jig's `settings`
+  family proposes and an owner accepts (jig's `domain/engine.md`, 17.6).
+- **Built at each start** by `temper-service`'s `stock` module, as
+  typed values, the instructions held in the binary; `Service` passes
+  them, with the three kinds' declarations (number, scope, the forge's
+  connector, the bounds above), to jig's builder in place of the
+  document's members, and makes the engine as today.
+- **The stock charters' models are the document's:** a charter names
+  configured models, and the binary knows none, so it gives every model
+  `engine.llm` configures, the demo's among them where the demo is
+  configured. A document whose models change between starts gives new
+  defaults, which make a revision recorded as the release's (jig's
+  `domain/engine.md`, 17.7).
+- **A release that changes a default** reaches every deployment that
+  kept it, at its next start, by a revision recorded as the release's,
+  and its release notes say so (`../draft/configuring.md`, 3.2).
+
+### 13.5 The members gone
+
+- **Refused.** temper passes its defaults, so `jig-protocol-config`
+  reads no `engine.charters`, `templates`, `policies` or `rules` (jig's
+  bridge, `domain/engine.md`, 17.7, serves an application that passes
+  none), and temper reads no `application.landing` or `charter`. A
+  document naming one is refused as any unknown member is (section 1),
+  naming its path and saying where it went: "settings live in the
+  store: How work runs". Section 3's `landing` and `charter`, and
+  `Config`'s `landing` and `forge_charter` fields, go with them.
+- **Before the baseline** (`../draft/upgrades.md`, 4.1), when mission 2
+  is planned to land: the settings change the store's families, so a
+  deployment is made again, and nothing is imported. A document `temper
+  init` wrote carried the stock values, now the binary's; one an
+  operator edited is told again, after the start, as a proposal ("Tell
+  temper how you work").
+- **From the baseline,** were the members to go after it
+  (`../draft/upgrades.md`, section 10): the release that removes them
+  accepts each for one release with a warning naming its setting, and
+  at that start takes its values as stored changes where the store has
+  none, in a revision recorded as the release's and as from the
+  document, so nothing configured is lost; the next release refuses it.
+- **Across jig and temper:** jig reads the four members while temper
+  passes no defaults (the bridge); temper's repin onto the jig that
+  takes defaults and application kinds lands with temper's side whole
+  (the `stock` module, the kinds, the members refused, `temper init`'s
+  document shortened), and jig's bridge goes after.
+- **Who writes them today, and loses them:** `temper init`'s document
+  and its `charters/` files (`setup.md`, 8.2 and 8.3); the box, which
+  has no document of its own but `temper init`'s (`setup.md`, section
+  7); `docs/examples/owned.json` and its instructions; the lab's engine
+  documents; the tests' documents and builders (`../domain/testing.md`,
+  6.4). A generated document elsewhere, fabrig's, drops the six members;
+  what it set differently from the stock values becomes a proposal after
+  the deployment's first start.

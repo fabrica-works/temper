@@ -1,6 +1,6 @@
 # temper's root
 
-Provisional, 2026-10-04, revised 2026-10-22. What temper's engine root
+Provisional, 2026-10-04, revised 2026-10-23. What temper's engine root
 is and does: `temper-engine-domain`, the top-level domain of temper's
 engine, which composes jig's core with the forge connector in the shape
 jig's `domain/root.md` gives every application's root. It says what the
@@ -281,6 +281,7 @@ forge's number:
 | The core asks | The root |
 |---|---|
 | describe, keep or drop an effect; judge a requirement | gives it to the forge (5.5) |
+| judge items of temper's kinds of settings; tell their new values | gives them to the forge (5.6) |
 | the holdings of a task, of a delegate batch, of a procedure's batch | has the forge name the branches each task will hold, before the core admits the batch |
 | take or hand down a hold; end a topic | gives it to the forge |
 | a claim | claims the forge's writer slots for the attempt's branches in the claim's decision, and starts the run through the fleet, with its grants, once the claim commits (7.1) |
@@ -323,13 +324,34 @@ What temper adds to the core's usual routes (jig's `domain/engine.md`,
   same way before the step's decision is complete; one the core refuses
   leaves the change's state as it was.
 - **The forge is every requirement's judge:** temper's landing rules are
-  the forge's criteria (section 6; forge.md, 8.7).
+  the forge's criteria (section 6; forge.md, 8.7). Designed, not built:
+  the forge judges two standing requirements over the landing rules it
+  holds (`../protocol/configuration.md`, 13.3), and the root gives it,
+  with each ask, the merge's resources by the forge's names, the path
+  read back as section 6 makes it.
 - **Made after the commit:** the core's held output to make an entry is
   released once its commit is durable, fed back to the forge, which makes
   its API call (`Request::Forge`) behind every commit before it.
 - **Priced at nothing.** Only LLMs are counted: the root gives no forge
   effect a price, and a forge request is load, within the forge's
   request budget (forge.md, 5.4), never spend.
+
+### 5.6 Settings
+
+Designed, not built (`../protocol/configuration.md`, section 13).
+
+- **temper's kinds are the forge's.** A change of settings naming items
+  of temper's kinds reaches the root within the change's decision, as a
+  requirement's verdict is asked (jig's `domain/engine.md`, 17.5); the
+  root gives each item to the forge, which accepts or refuses it with
+  its reason, and carries the answer back. Once the change commits, the
+  root gives the forge the kinds' new values; then each live change the
+  rules cover is stepped.
+- **The root routes, never judges** (section 11): what a landing rule
+  means and whether it is well formed is the forge's.
+- **The forge's charter is read through the core** when a change is
+  made, by kind, scope and number (jig's `domain/engine.md`, 17.5), and
+  kept on the change (section 6).
 
 ## 6. Translation
 
@@ -341,7 +363,10 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   whole; `forge` to the forge, its namespace the deployment's id;
   `identities`, each forge's git identity, to the forge; `landing`
   translated (below); `forge_charter` kept, the charter of every agent
-  task the forge's procedures make. The root holds its configuration to
+  task the forge's procedures make. Designed, not built: `landing` and
+  `forge_charter` leave `Config` for settings, and `core` carries
+  temper's stock defaults and its kinds' declarations
+  (`../protocol/configuration.md`, 13.4). The root holds its configuration to
   its limits as it is made, and a start that breaks one is refused,
   naming it (`../protocol/configuration.md`, section 2): one connector;
   the configured workers within the fleet's configured count and name bytes
@@ -362,7 +387,12 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   authority no requirement. As the root is made, the deployment's
   requirements join the configured rules and each project's its policy;
   a rule's gates become the forge's gate templates, which every change
-  into a covered branch asks for (forge.md, 8.3).
+  into a covered branch asks for (forge.md, 8.3). Designed, not built:
+  nothing is compiled. The rules are values of temper's kinds, which the
+  forge holds as it is told them (5.6); the stock rules carry two
+  standing requirements on the forge's merge, and no rule or policy of
+  jig's changes with a landing rule (`../protocol/configuration.md`,
+  13.3).
 - **Names.** The root makes two names from the forge's own (the forge,
   the repository's id, what in it): a path for authority (`forge`, the
   forge's host, the owner, the name, then `branch` and its segments, or
@@ -398,7 +428,9 @@ exhaustively with no `_` arm (jig's `domain/root.md`, section 6).
   the id's digits is not refused, and the result never passes it.
 - **A change's delegates,** in the core's terms: an agent task under the
   forge's charter for producing, repairs, resolutions, and agents' and
-  checks' gates; a person task for the project's maintainers for a
+  checks' gates (designed, not built: the charter the change was made
+  with, kept on it, which its procedure's delegation grants;
+  `../protocol/configuration.md`, 13.2); a person task for the project's maintainers for a
   person's gate. Its parameters name the repository, its base and the
   change's branch, and a resolution's base commit or a gate's number and
   head, each commit as text: its id in lowercase hexadecimal, 40 digits
@@ -546,7 +578,8 @@ each step the core asks for:
    step.
 2. **The inbox:** the census of ended owners.
 3. **The forge's records,** `Range::Forge`, a page at a time; then the
-   forge reconciles them.
+   forge reconciles them. Designed, not built: before them, the forge
+   hears its kinds' current values (5.6).
 4. **Runs adopted:** the claims to the fleet, those on in-process
    workers settled at once (section 2).
 5. **The forge reads afresh,** then **settles its outbox** (forge.md,
@@ -608,7 +641,9 @@ adds:
   numbers, 268,435,456 and 65,536 bytes, held as the root's constants
   (section 13).
 - **The worst case:** the core's, the forge's, the journal's, the loads',
-  the landing policy's and the permission mappings', and every value in
+  the landing policy's (designed, not built: the forge's rules, priced
+  by the forge, and the settings' values, by jig) and the permission
+  mappings', and every value in
   flight (section 2), summed in checked arithmetic (programming-model.md,
   6.3). The service computes it at start; limits whose sum overflows, or
   that break a check above, refuse the start.
@@ -617,7 +652,8 @@ adds:
 
 - decide anything of the core's or the forge's: what to commit, what
   waits, whether an effect may be made, what a change does next, the
-  order of a restart;
+  order of a restart, whether a setting of temper's kinds is well
+  formed;
 - send an output any way but through the journal;
 - keep anything between steps but its children, the journal and the
   values in flight of section 2;

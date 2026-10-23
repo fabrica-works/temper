@@ -1,6 +1,6 @@
 # The agent
 
-Provisional, 2026-10-05, revised 2026-10-22. temper's agent is smith's:
+Provisional, 2026-10-05, revised 2026-10-23. temper's agent is smith's:
 the standard agent built from smith, the kit for LLM agents, on skein
 like temper. smith's design is its own (smith's `domain/run.md`,
 `domain/session.md`, `domain/tools.md`, `domain/host.md`), and how a
@@ -95,7 +95,11 @@ engine's routing encodes it (`../protocol/llm.md`, section 5).
   an amendment gives a task its own (jig's `domain/tasks.md`, section
   7), whole, where an empty text leaves it none, not its charter's.
   The task's next run carries them; a run already live hears them as
-  the amendment's words.
+  the amendment's words. Designed, not built: a charter is a setting in
+  the store, read from the revision the task runs under (jig's
+  `domain/engine.md`, 17.3), temper's stock chat's and coding agent's
+  held in the binary as their defaults
+  (`../protocol/configuration.md`, 13.4).
 - **The brief:** the sections jig's core gathers (jig's
   `domain/engine.md`, section 9) and the forge's (forge.md, section 2),
   each rendered as one of smith's titled sections, titled by its kind:
@@ -250,7 +254,7 @@ Checks at `.temper/pre-pr`, guides at `AGENTS.md` (smith's
 
 - **Budget:** the run's turns, spend and time, with its reserve of turns
   and time for finishing (smith's `domain/run.md`, 9.1), from its charter
-  in configuration; its spend is what its task has left, capped per run,
+  in configuration (designed, not built: at the task's revision); its spend is what its task has left, capped per run,
   reserved at its claim, in the deployment's unit (jig's
   `domain/hosts.md`, section 8).
 - **Models:** the main session's and those its sub-agents may use, each
@@ -331,6 +335,11 @@ run starts fresh, its brief carrying the tail.
 | a review (forge.md, 8.3), a triage | none | reads; `finish` with a verdict | its verdict meets its contract |
 | a chat | its person's words; its delegates' results | most; `deliver` mid-run; `wait` | its person closes it |
 | a coordinator | questions, results, overlapping landings; proposals and escalations to decide | `delegate`, `amend`, `cancel`, `release`, `decide`, `decide_escalation`, `propose`, `subscribe_forge`, `note`; `wait` | its goal's report is written |
+
+The change's agents run under the forge's charter; designed, not built,
+the one the change was made with, kept on it whatever later changes of
+settings make the forge's charter (`../protocol/configuration.md`,
+13.2).
 
 ## 9. The world
 
