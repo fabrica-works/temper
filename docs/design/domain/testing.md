@@ -1054,11 +1054,14 @@ skein's (skein's `fake-llm.md`):
   and `{"tool_output": {"id", "output", "is_error"}}`. Every byte string
   is standard base64, since a provider's text is bytes, so the record
   is lossless. Its decoder is `temper-fake`'s, giving skein's messages
-  back, so a reader holds no copy of the format. The peer keeps at most
-  `limits`' bound of records between two drains; past it the stream
-  ends with a record-full checkpoint and the fake exits non-zero, as
-  the GitHub layer's git records do (4.2). Without the flag the peer
-  records nothing.
+  back, so a reader holds no copy of the format. skein's peer keeps its
+  records for its life, with no drain, so the process holds them under
+  the caps the real loop's hosted peer runs the whole case under,
+  smith's, 256 records and 4 MiB: at the count's cap the stream ends
+  with a record-full checkpoint and the fake exits non-zero before a
+  record is lost, as the GitHub layer's git records do (4.2), and a
+  record past the bytes' cap stops it non-zero. Without the flag the
+  peer records nothing.
 - **Its issuer,** skein's fake issuer (`skein-fake-oauth`; skein's
   `oauth.md`, section 5), for sign-ins with an LLM provider; the test
   drives the redirect to the engine's loopback listener as a browser
