@@ -1350,18 +1350,24 @@ fn setup_names_are_validated_at_admission_on_both_sides_of_the_name_bound() {
         for org in [true, false] {
             let kit_bound = if org { 40 } else { 100 };
             let bound = domain_bound.min(kit_bound);
-            let mut cases: Vec<Vec<u8>> = [0, 1, bound, bound + 1, kit_bound, kit_bound + 1]
-                .into_iter()
-                .map(|length| vec![b'x'; usize::try_from(length).unwrap()])
-                .collect();
-            cases.extend([b".".to_vec(), b"..".to_vec(), b"a/b".to_vec(), b"-a".to_vec(), b"a._-9".to_vec()]);
-            for name in cases {
+            let mut cases = skein_lib::List::with_capacity(11);
+            for length in [0, 1, bound, bound + 1, kit_bound, kit_bound + 1] {
+                let mut bytes = skein_lib::Writer::new(usize::try_from(length).unwrap());
+                for _ in 0..length {
+                    bytes.put(b"x").unwrap();
+                }
+                cases.push(bytes.finish()).unwrap();
+            }
+            for name in [b".".as_slice(), b"..", b"a/b", b"-a", b"a._-9"] {
+                cases.push(Box::from(name)).unwrap();
+            }
+            for name in cases.as_slice() {
                 let mut d = setup_domain(&CONFIGURED, true);
                 outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
                 let request = Token::new(91);
                 let token = Token::new(92);
-                let org_name: Box<[u8]> = if org { name.clone().into() } else { b"o".as_slice().into() };
-                let repository: Box<[u8]> = if org { b"r".as_slice().into() } else { name.into() };
+                let org_name: Box<[u8]> = if org { name.clone() } else { b"o".as_slice().into() };
+                let repository: Box<[u8]> = if org { b"r".as_slice().into() } else { name.clone() };
                 let plan = host::Plan::Create {
                     forge: 1,
                     org: org_name.clone(),

@@ -718,7 +718,8 @@ fn assert_forgejo_setup(
         let adoption = String::from_utf8_lossy(&calls[3].stdout);
         assert!(adoption.contains("work/hello"), "ctl printed the first adoption: {adoption}");
         let made = support::ctl::json(&calls[5]);
-        let row = made["forges"].as_array().unwrap().iter().find(|row| row["number"] == 3).unwrap();
+        let row =
+            made["forges"].as_array().expect("forges rows").iter().find(|row| row["number"] == 3).expect("forge 3");
         assert_eq!(row["first"]["state"], "made");
         assert_eq!(row["first"]["project"]["existing"], 1);
         assert_eq!(row["first"]["org"], "work");

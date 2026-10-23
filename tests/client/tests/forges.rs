@@ -240,7 +240,7 @@ impl World {
             let immediate = std::mem::take(&mut self.engine.immediate);
             moved |= !immediate.is_empty();
             for request in immediate {
-                if let engine::Request::SetUp { forge, request } = request {
+                if let engine::Request::SetUp { forge, request, .. } = request {
                     self.box_calls += 1;
                     self.box_requests.push_back((forge, request));
                 } else {

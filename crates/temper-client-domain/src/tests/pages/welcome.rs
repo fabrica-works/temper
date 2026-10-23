@@ -327,6 +327,7 @@ fn strip_forges(root: &mut Domain, watch: Token, connection: Option<w::Connectio
                         mode: w::Mode::Owned,
                         connection,
                         offer: w::Offer::Offered,
+                        first: None,
                     },
                 )
                 .unwrap(),

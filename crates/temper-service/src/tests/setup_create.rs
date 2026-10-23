@@ -18,7 +18,7 @@ struct Forge {
     pipe: Pipe,
     events: Queue<fake::Event>,
     down: Queue<Down>,
-    requests: Vec<Vec<u8>>,
+    requests: List<Box<[u8]>>,
 }
 impl Forge {
     fn new(refuse_file: bool) -> Self {
@@ -72,7 +72,7 @@ impl Forge {
             pipe: Pipe::new(7, Cut::Never),
             events: Queue::with_capacity(8),
             down: Queue::with_capacity(32),
-            requests: Vec::new(),
+            requests: List::with_capacity(4096),
         }
     }
     fn permit_file(&mut self) {
@@ -85,13 +85,26 @@ impl Forge {
         engine.env.now = self.env.now;
         advance(engine);
         engine.forge.iterate(self.env.now, Wall::EPOCH);
+        self.turn_io(engine);
+        self.turn_server(engine);
+        for _ in 0_u32..4 {
+            root_turn(engine);
+        }
+        self.service.reclaim();
+    }
+    fn record_requests(&mut self) {
+        for line in self.pipe.request_lines() {
+            self.requests.push(Box::from(line.as_slice())).unwrap();
+        }
+    }
+    fn turn_io(&mut self, engine: &mut crate::engine::Engine) {
         for setup in [true, false] {
             let io = if setup { &mut engine.setup.io } else { &mut engine.forge.io };
-            let mut pending = Vec::new();
+            let mut pending = List::with_capacity(32);
             while let Some(request) = io.pop() {
-                pending.push(request);
+                pending.push(request).unwrap();
             }
-            for request in pending {
+            for request in pending.into_boxed() {
                 match request {
                     skein_io::Request::Connect { owner, .. } => {
                         assert!(self.socket.is_none());
@@ -114,7 +127,7 @@ impl Forge {
                     skein_io::Request::Stream { down, .. } => self.pipe.client_down(down),
                     skein_io::Request::Close { .. } | skein_io::Request::Abort { .. } => {
                         let (owner, _) = self.socket.unwrap();
-                        self.requests.extend(self.pipe.request_lines().iter().cloned());
+                        self.record_requests();
                         self.socket = None;
                         self.server = None;
                         if setup {
@@ -123,10 +136,19 @@ impl Forge {
                             engine.forge.up(skein_io::Event::Closed { owner });
                         }
                     }
-                    _ => panic!("unexpected forge io request"),
+                    skein_io::Request::Listen { .. }
+                    | skein_io::Request::Bind { .. }
+                    | skein_io::Request::Reject { .. }
+                    | skein_io::Request::Output { .. }
+                    | skein_io::Request::Spawn { .. }
+                    | skein_io::Request::Signal { .. }
+                    | skein_io::Request::Usage { .. }
+                    | skein_io::Request::Window { .. } => panic!("unexpected forge io request"),
                 }
             }
         }
+    }
+    fn turn_server(&mut self, engine: &mut crate::engine::Engine) {
         if let Some(server) = &mut self.server {
             fake::resume_with_domain(
                 server,
@@ -183,31 +205,22 @@ impl Forge {
                         self.git.reclaim();
                     }
                     fake::Event::Close => {
-                        fake::closed(server, &mut self.service, &self.env, &mut self.events, &mut self.down)
+                        fake::closed(server, &mut self.service, &self.env, &mut self.events, &mut self.down);
                     }
                     fake::Event::Closed => {}
                 }
             }
         }
-        for _ in 0..4 {
-            root_turn(engine);
-        }
-        self.service.reclaim();
     }
     fn settle(&mut self, service: &mut crate::Service) {
-        for _ in 0..20_000 {
+        for _ in 0_u32..20_000 {
             self.turn(service);
             let engine = service.engine.as_ref().unwrap();
-            if engine.setup.runs.is_empty()
-                && matches!(engine.domain.forge_connection(1), domain::Connection::Connected { .. })
-            {
-                self.requests.extend(self.pipe.request_lines().iter().cloned());
+            if engine.setup.runs.is_empty() && connected(engine) {
+                self.record_requests();
                 return;
             }
-            if matches!(engine.domain.forge_connection(1), domain::Connection::SetUpFailed { .. })
-                && engine.setup.runs.is_empty()
-                && self.socket.is_none()
-            {
+            if failed(engine) && engine.setup.runs.is_empty() && self.socket.is_none() {
                 return;
             }
         }
@@ -266,7 +279,7 @@ fn ask(service: &mut crate::Service, number: u64) {
         },
     })));
     // Drive the root's journal seam, including its child continuations.
-    for _ in 0..256 {
+    for _ in 0_u32..256 {
         root_turn(engine);
         if engine.box_link.write.is_some() {
             break;
@@ -290,18 +303,22 @@ fn reconcile_then_create_then_connect_makes_the_first_repository_and_bot_workflo
     ask(&mut service, 91);
     forge.settle(&mut service);
     let engine = service.engine.as_ref().unwrap();
-    assert!(
-        !matches!(engine.domain.forge_connection(1), domain::Connection::SetUpFailed { .. }),
-        "{:?}: {:?}",
-        engine.domain.forge_connection(1),
-        forge.requests
-    );
+    assert!(!failed(engine), "{:?}: {:?}", engine.domain.forge_connection(1), forge.requests);
     assert_eq!(engine.domain.forges().rows[0].first.as_ref().unwrap().state, domain::FirstState::Made { id: 1 });
-    assert!(matches!(engine.domain.forge_connection(1), domain::Connection::Connected { .. }));
+    assert!(connected(engine));
     let reads = &forge.requests;
-    let admin_reads: Vec<_> =
-        reads.iter().enumerate().filter(|(_, line)| line.starts_with(b"GET /api/v1/user ")).map(|(at, _)| at).collect();
-    let creation = reads.iter().position(|line| line.starts_with(b"GET /api/v1/orgs/work ")).unwrap();
+    let mut admin_reads = List::with_capacity(64);
+    let mut creation = None;
+    for (at, line) in reads.as_slice().iter().enumerate() {
+        if line.starts_with(b"GET /api/v1/user ") {
+            admin_reads.push(at).unwrap();
+        }
+        if creation.is_none() && line.starts_with(b"GET /api/v1/orgs/work ") {
+            creation = Some(at);
+        }
+    }
+    let creation = creation.unwrap();
+    let admin_reads = admin_reads.as_slice();
     assert!(admin_reads[0] < admin_reads[1] && admin_reads[1] < creation && creation < *admin_reads.last().unwrap());
     assert_eq!(forge.service.setup().organization(b"work").unwrap().owner.as_ref(), b"owner");
     assert!(forge.service.setup().is_private(1));
@@ -325,12 +342,9 @@ fn no_first_intent_reconciles_and_connects_without_create() {
     read_handover(&mut service);
     forge.settle(&mut service);
     assert!(service.engine.as_ref().unwrap().domain.forges().rows[0].first.is_none());
-    assert!(
-        !forge
-            .requests
-            .iter()
-            .any(|line| line.starts_with(b"GET /api/v1/orgs/") || line.starts_with(b"POST /api/v1/orgs/"))
-    );
+    for line in forge.requests.as_slice() {
+        assert!(!line.starts_with(b"GET /api/v1/orgs/") && !line.starts_with(b"POST /api/v1/orgs/"));
+    }
     assert!(forge.service.setup().organization(b"work").is_none());
 }
 #[test]
@@ -360,10 +374,7 @@ fn a_file_stop_names_the_step_and_a_second_ask_finishes_once() {
         "{:?}",
         service.engine.as_ref().unwrap().domain.forge_connection(1)
     );
-    assert!(matches!(
-        service.engine.as_ref().unwrap().domain.forge_connection(1),
-        domain::Connection::Connected { .. }
-    ));
+    assert!(connected(service.engine.as_ref().unwrap()));
     let head = forge.git.branch(b"work/hello", b"main").unwrap();
     assert_eq!(forge.git.object(head).unwrap().parent, Some(readme));
     assert_eq!(
@@ -377,13 +388,38 @@ fn root_turn(engine: &mut crate::engine::Engine) {
     // acknowledgement is exercised separately in the root setup tests.
     let mut events = Queue::with_capacity(engine.events.len());
     while let Some(event) = engine.events.pop() {
-        if !matches!(&event, root::Event::Forge(event) if matches!(event.as_ref(), domain::Event::SetUpAnswered { .. }))
+        if let root::Event::Forge(forge) = &event
+            && let domain::Event::SetUpAnswered { .. } = forge.as_ref()
         {
-            events.push(event);
+            continue;
         }
+        events.push(event);
     }
     while let Some(event) = events.pop() {
         engine.events.push(event);
     }
     crate::engine::iterate(engine, engine.env.now, Wall::EPOCH);
+}
+
+fn connected(engine: &crate::engine::Engine) -> bool {
+    match engine.domain.forge_connection(1) {
+        domain::Connection::Connected { .. } => true,
+        domain::Connection::NotConnected
+        | domain::Connection::NotSetUp
+        | domain::Connection::SettingUp { .. }
+        | domain::Connection::SetUpFailed { .. }
+        | domain::Connection::Connecting
+        | domain::Connection::Stopped { .. } => false,
+    }
+}
+fn failed(engine: &crate::engine::Engine) -> bool {
+    match engine.domain.forge_connection(1) {
+        domain::Connection::SetUpFailed { .. } => true,
+        domain::Connection::NotConnected
+        | domain::Connection::NotSetUp
+        | domain::Connection::SettingUp { .. }
+        | domain::Connection::Connected { .. }
+        | domain::Connection::Connecting
+        | domain::Connection::Stopped { .. } => false,
+    }
 }
