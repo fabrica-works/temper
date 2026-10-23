@@ -13,7 +13,6 @@ pub(crate) enum Control<'a> {
 pub(crate) enum Mark {
     Done,
     UnderWay,
-    #[cfg_attr(not(test), expect(dead_code, reason = "a shared progress part also supports failed steps"))]
     Failed,
     ToCome,
 }

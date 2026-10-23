@@ -14,7 +14,7 @@ use temper_client_domain::{
     forge::{
         self,
         connect::{self, Name, Shown},
-        forges::{Connection, Kind, Mode, Offer, Row, SetUpAnswer, SetUpOutcome, SetUpProject, SetupField},
+        forges::{Connection, FirstState, Kind, Mode, Offer, Row, SetUpAnswer, SetUpOutcome, SetUpProject, SetupField},
     },
     pages::Act,
 };
@@ -406,9 +406,15 @@ pub(crate) fn progress(b: &mut Builder, w: &Words, row: &Row) {
     let fetch = w.say(Word::ForgeFetch, &[]);
     let prepare = w.say(Word::ForgePrepare, &[]);
     let run = w.say(Word::ForgeRun, &[]);
-    let connecting = match &row.first {
-        Some(first) => w.say(Word::SetupMaking, &[Hole::Name(forge::words::full_name(&first.org, &first.repository))]),
-        None => w.say(Word::ForgeConnecting, &[]),
+    let (connecting, connecting_mark) = match &row.first {
+        Some(first) => match first.state {
+            FirstState::Failed { .. } => (forge::words::first_repository(first), Mark::Failed),
+            FirstState::Making | FirstState::Made { .. } => (
+                w.say(Word::SetupMaking, &[Hole::Name(forge::words::full_name(&first.org, &first.repository))]),
+                mark(current, 3),
+            ),
+        },
+        None => (w.say(Word::ForgeConnecting, &[]), mark(current, 3)),
     };
     flow::progress(
         b,
@@ -418,7 +424,7 @@ pub(crate) fn progress(b: &mut Builder, w: &Words, row: &Row) {
             (&fetch, mark(current, 0)),
             (&prepare, mark(current, 1)),
             (&run, mark(current, 2)),
-            (&connecting, mark(current, 3)),
+            (&connecting, connecting_mark),
         ],
     );
 }
@@ -522,6 +528,67 @@ pub(crate) fn status(b: &mut Builder, root: &Domain, w: &Words, row: &Row, ready
         Role::Paragraph,
         &w.say(word, &[Hole::Name(name(w, row, root)), Hole::Name(forge::words::forge_connection(row))]),
     );
+}
+/// The welcome's Model step says what Forge did (client/README.md, 3.5).
+pub(crate) fn welcome_line(b: &mut Builder, root: &Domain, w: &Words, row: &Row) {
+    let connected = match row.connection {
+        Connection::Connected { .. } => true,
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::SetUpFailed { .. }
+        | Connection::Connecting
+        | Connection::Stopped { .. } => false,
+    };
+    let done = match &row.first {
+        Some(first) => match first.state {
+            FirstState::Made { .. } => connected,
+            FirstState::Making | FirstState::Failed { .. } => false,
+        },
+        None => false,
+    };
+    let target = match &row.first {
+        Some(first) => Some((&first.org, &first.repository, &first.project)),
+        None => match root.forge().set_up() {
+            Some(last) if last.forge == row.number => Some((&last.org, &last.repository, &last.project)),
+            Some(_) | None => None,
+        },
+    };
+    let forge = name(w, row, root);
+    let line = if connected && !underway(row) && row.first.is_none() {
+        w.say(Word::WelcomeForgeNoRepository, &[Hole::Name(forge)])
+    } else if let Some((org, repository, project)) = target {
+        let project = match project {
+            SetUpProject::New(name) => w.say(Word::WelcomeNewProject, &[Hole::Name(copy_of(name))]),
+            SetUpProject::Existing(_) => project_name(root, w, project),
+        };
+        let repository = forge::words::full_name(org, repository);
+        if done {
+            w.say(Word::WelcomeForgeDone, &[Hole::Name(forge), Hole::Name(repository), Hole::Name(project)])
+        } else {
+            w.say(
+                Word::WelcomeForgeLine,
+                &[
+                    Hole::Name(forge),
+                    Hole::Name(forge::words::forge_connection(row)),
+                    Hole::Name(repository),
+                    Hole::Name(project),
+                ],
+            )
+        }
+    } else {
+        w.say(Word::ForgeStatus, &[Hole::Name(forge), Hole::Name(forge::words::forge_connection(row))])
+    };
+    b.open(Role::Paragraph);
+    if done {
+        b.style(look::FLOW_DONE);
+    }
+    b.name(&line);
+    b.text(Run::Plain, &line);
+    b.close();
+    if !done {
+        each_step(b, w, row);
+    }
 }
 pub(crate) fn each_step(b: &mut Builder, w: &Words, row: &Row) {
     b.open(Role::Disclosure);

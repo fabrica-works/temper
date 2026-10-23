@@ -49,6 +49,10 @@ pub enum Word {
     ForgeStatus,
     WelcomeForgeConnected,
     WelcomeForgeStatus,
+    WelcomeForgeLine,
+    WelcomeForgeDone,
+    WelcomeForgeNoRepository,
+    WelcomeNewProject,
     WelcomeModelAccount,
     WelcomeModelSigningIn,
     ForgeConfigCode,
@@ -537,8 +541,9 @@ pub enum Word {
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
-const PHRASES: u32 = 1022;
-const ALL: [Word; 489] = [
+// The Model step adds four forge phrases and twenty-two segments.
+const PHRASES: u32 = 1026;
+const ALL: [Word; 493] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -577,6 +582,10 @@ const ALL: [Word; 489] = [
     Word::ForgeStatus,
     Word::WelcomeForgeConnected,
     Word::WelcomeForgeStatus,
+    Word::WelcomeForgeLine,
+    Word::WelcomeForgeDone,
+    Word::WelcomeForgeNoRepository,
+    Word::WelcomeNewProject,
     Word::WelcomeModelAccount,
     Word::WelcomeModelSigningIn,
     Word::ForgeConfigCode,
@@ -1071,6 +1080,10 @@ impl Word {
             Self::ForgeStatus => 1707,
             Self::WelcomeForgeConnected => 1708,
             Self::WelcomeForgeStatus => 1709,
+            Self::WelcomeForgeLine => 1835,
+            Self::WelcomeForgeDone => 1836,
+            Self::WelcomeForgeNoRepository => 1837,
+            Self::WelcomeNewProject => 1838,
             Self::WelcomeModelAccount => 1710,
             Self::WelcomeModelSigningIn => 1832,
             Self::ForgeConfigCode => 1711,
@@ -1601,8 +1614,8 @@ impl Words {
         let mut phrases = List::with_capacity(PHRASES);
         for word in ALL {
             let (literals, kinds) = english(word, shell);
-            let mut holes = List::with_capacity(3);
-            let mut segments = List::with_capacity(7);
+            let mut holes = List::with_capacity(4);
+            let mut segments = List::with_capacity(9);
             for (index, literal) in literals.iter().enumerate() {
                 segments.push(Segment::Text(copy_of(literal))).expect("closed English segments fit");
                 if let Some(kind) = kinds.get(index) {
@@ -1611,10 +1624,10 @@ impl Words {
                             kind: *kind,
                             bytes: hole_bytes(word, *kind, index.checked_add(1) == Some(kinds.len()), joined)?,
                         })
-                        .expect("three holes fit");
+                        .expect("four holes fit");
                     segments
                         .push(Segment::Hole {
-                            index: u16::try_from(index).expect("three hole indices fit"),
+                            index: u16::try_from(index).expect("four hole indices fit"),
                             kind: *kind,
                         })
                         .expect("closed segments fit");
@@ -1673,9 +1686,9 @@ impl Words {
         let limits = PhraseLimits {
             languages: 1,
             phrases: PHRASES,
-            holes: 3,
+            holes: 4,
             // Setup fields and first repository need 28 more segments; the demo's start 15.
-            segments: 1780,
+            segments: 1802,
             text_bytes: 32768,
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined
@@ -1776,6 +1789,10 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ForgeOnForgesTail => (&[b" page, with its details."], &[]),
         Word::ForgeStatus => (&[b"", b" \xc2\xb7 ", b""], &[Name, Name]),
         Word::WelcomeForgeConnected => (&[b"Forge: ", b", connected as ", b""], &[Name, Name]),
+        Word::WelcomeForgeLine => (&[b"", b" \xc2\xb7 ", b" \xc2\xb7 ", b", into ", b""], &[Name, Name, Name, Name]),
+        Word::WelcomeForgeDone => (&[b"", b" \xc2\xb7 ", b", in ", b""], &[Name, Name, Name]),
+        Word::WelcomeForgeNoRepository => (&[b"", b" \xc2\xb7 no repository chosen yet"], &[Name]),
+        Word::WelcomeNewProject => (&[b"the new project ", b""], &[Name]),
         Word::WelcomeForgeStatus => (&[b"Forge: ", b" \xc2\xb7 ", b""], &[Name, Name]),
         Word::WelcomeModelAccount => (&[b"Model: ", b""], &[Name]),
         Word::WelcomeModelSigningIn => (&[b"Model: ", b" \xc2\xb7 signing in"], &[Name]),
