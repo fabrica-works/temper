@@ -596,6 +596,21 @@ pub fn live_deployment(paths: &[PathBuf; 3]) {
     super::write_private(&path, &serde_json::to_vec(&value).expect("live configuration"));
 }
 
+/// Reserve a new kept deployment without reading or replacing an existing store.
+pub fn reserve_live_store(path: &std::path::Path) -> Result<(), String> {
+    use std::os::unix::fs::DirBuilderExt;
+    fs::DirBuilder::new().mode(0o700).create(path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::AlreadyExists {
+            format!(
+                "kept store {} exists: reruns on a kept sign-in are not built yet; move it aside to sign in afresh",
+                path.display()
+            )
+        } else {
+            format!("create kept store {}: {error}", path.display())
+        }
+    })
+}
+
 /// The forge's durable identity, read from this run's private owned repository.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ForgeIdentity {
@@ -607,6 +622,7 @@ pub struct ForgeIdentity {
 }
 
 pub struct LiveEvidence {
+    pub task: String,
     pub reads: super::first_repository::Evidence,
     pub forge: ForgeIdentity,
     pub replies: std::collections::BTreeMap<u64, serde_json::Value>,
@@ -734,12 +750,33 @@ fn oracle_token(paths: &[PathBuf; 3], first: bool) -> String {
     token.to_owned()
 }
 
-/// Keep the person-facing acts and reads shared, with longer live watch bounds.
-#[must_use]
-pub fn live_steps(first: bool, words: &str) -> (Vec<super::ctl::Step>, usize, usize) {
-    let mut steps = forgejo_setup_steps(if first { "first" } else { "second" });
-    let (account, found) = change_steps(&mut steps, first, if first { 7 } else { 4 }, words, "1800s", true);
-    (steps, account, found)
+/// Commands are admitted one at a time so a failure cannot start the next act.
+fn live_commands(first: bool, words: &str) -> (Vec<Vec<String>>, usize) {
+    let mut commands = vec![vec!["sign-in", "-"]];
+    if first {
+        commands.extend([vec!["forges"], vec!["forges", "--json"], vec!["forge-setup", "3"]]);
+    }
+    commands.extend([
+        vec!["wait", "forges", "--until", "settled", "--timeout", "180s"],
+        vec!["forges", "--json"],
+        vec!["forges"],
+        vec!["me", "--json"],
+    ]);
+    if first {
+        commands.extend([
+            vec!["connect", "1", "--key", "connect-plan"],
+            vec!["wait", "accounts", "--until", "settled", "--timeout", "600s", "--json"],
+        ]);
+    }
+    let account = commands.len();
+    commands.push(vec!["accounts", "--json"]);
+    if first {
+        commands.extend([
+            vec!["chat", "--project", "1", "--model", "gpt-6-luna", "--key", "change-on-plan", words, "--json"],
+            vec!["wait", "task", "1", "--until", "replied", "--timeout", "1800s", "--json"],
+        ]);
+    }
+    (commands.into_iter().map(|args| args.into_iter().map(str::to_owned).collect()).collect(), account)
 }
 
 pub struct LivePlan<'a> {
@@ -751,54 +788,65 @@ pub struct LivePlan<'a> {
 }
 
 /// Only committed assistant text at or after the child's end counts as its reply.
-#[must_use]
 pub fn replies_after(
     activity: &serde_json::Value,
     ended_at: u64,
-) -> std::collections::BTreeMap<u64, serde_json::Value> {
+) -> Result<std::collections::BTreeMap<u64, serde_json::Value>, String> {
     let mut replies = std::collections::BTreeMap::new();
-    for row in activity["rows"].as_array().expect("chat activity") {
-        if row["at"].as_u64().expect("activity timestamp") < ended_at {
+    for row in activity["rows"].as_array().ok_or("chat activity missing")? {
+        if row["at"].as_u64().ok_or("activity timestamp missing")? < ended_at {
             continue;
         }
         let Some(turn) = row.pointer("/event/owner/decoded/turn/decoded") else { continue };
-        assert_eq!(turn["cut"], false, "whole reply turn");
-        for message in turn["messages"].as_array().expect("turn messages") {
+        require(turn["cut"] == false, "whole reply turn")?;
+        for message in turn["messages"].as_array().ok_or("turn messages missing")? {
             if message["speaker"] == "assistant"
-                && message["blocks"].as_array().expect("blocks").iter().any(|block| {
+                && message["blocks"].as_array().ok_or("message blocks missing")?.iter().any(|block| {
                     block
                         .pointer("/text/text")
                         .and_then(serde_json::Value::as_str)
                         .is_some_and(|text| !text.trim().is_empty())
                 })
             {
-                replies.insert(row["position"].as_u64().expect("reply position"), turn.clone());
+                replies.insert(row["position"].as_u64().ok_or("reply position missing")?, turn.clone());
             }
         }
     }
-    replies
+    Ok(replies)
 }
 
 /// Names from actual committed call blocks, never from the model's prose.
 #[must_use]
 pub fn successful_tools(activity: &serde_json::Value) -> std::collections::BTreeSet<String> {
-    activity["rows"]
-        .as_array()
-        .expect("activity rows")
-        .iter()
+    let Some(rows) = activity["rows"].as_array() else { return std::collections::BTreeSet::new() };
+    committed_tools(rows)
+        .filter(|call| call["failed"] == false && !call["outcome"].is_null())
+        .filter_map(|call| call["tool"].as_str().map(str::to_owned))
+        .collect()
+}
+
+fn committed_tools(rows: &[serde_json::Value]) -> impl Iterator<Item = &serde_json::Value> {
+    rows.iter()
         .filter_map(|row| {
             row.pointer("/event/owner/decoded/turn/decoded/messages").and_then(serde_json::Value::as_array)
         })
         .flatten()
         .filter(|message| message["speaker"] == "assistant")
-        .flat_map(|message| message["blocks"].as_array().expect("message blocks"))
+        .flat_map(|message| message["blocks"].as_array().into_iter().flatten())
         .filter_map(|block| block.get("call"))
-        .filter(|call| call["failed"] == false && !call["outcome"].is_null())
-        .map(|call| call["tool"].as_str().expect("call tool").to_owned())
-        .collect()
+}
+
+fn require(condition: bool, message: &str) -> Result<(), String> {
+    if condition { Ok(()) } else { Err(message.to_owned()) }
+}
+fn live_json(call: &super::Ended) -> Result<serde_json::Value, String> {
+    serde_json::from_slice(&call.stdout).map_err(|error| format!("live ctl JSON: {error}"))
 }
 
 enum LivePhase {
+    Setup,
+    Waiting,
+    Progress,
     Snapshot,
     Pages,
     Closing,
@@ -811,9 +859,17 @@ struct LiveJudge<'a> {
     account_at: usize,
     found_at: usize,
     checked: usize,
+    pending: std::collections::VecDeque<Vec<String>>,
+    arguments: Vec<Vec<String>>,
+    active_until: Option<skein_lib::Time>,
+    wait_started: Option<skein_lib::Time>,
+    wait_until: Option<skein_lib::Time>,
+    wait_call: Option<usize>,
+    failure: &'a std::cell::Cell<Option<String>>,
     signing_until: Option<skein_lib::Time>,
     account_checked: bool,
     linked: bool,
+    cleanup: bool,
     phase: LivePhase,
     snapshot: Option<String>,
     replies: std::collections::BTreeMap<u64, serde_json::Value>,
@@ -826,63 +882,74 @@ struct LiveJudge<'a> {
     poll: skein_lib::Time,
 }
 impl LiveJudge<'_> {
-    fn advance(&mut self, calls: &mut super::ctl::Calls) {
-        use super::ctl::{Call, Step, json};
-        if !calls.foreground_idle() || calls.ends().len() <= self.found_at + 3 {
-            return;
+    fn advance(&mut self, now: skein_lib::Time, calls: &mut super::ctl::Calls) -> Result<(), String> {
+        if !calls.foreground_idle() || !self.pending.is_empty() {
+            return Ok(());
         }
-        let last = json(calls.ends().last().expect("live read"));
+        let last = live_json(calls.ends().last().ok_or("live read missing")?)?;
         match self.phase {
+            LivePhase::Setup => {
+                self.wait_started = Some(now);
+                self.wait_until = Some(now.saturating_add(Duration::from_secs(1800)));
+                self.wait_round(now)?;
+            }
+            LivePhase::Waiting => {
+                self.wait_call = Some(calls.ends().len() - 1);
+                if last["met"] == false {
+                    self.queue(&["task", "2", "--json"]);
+                    self.queue(&["tasks", "--project", "1", "--parent", "2", "--json"]);
+                    self.phase = LivePhase::Progress;
+                } else {
+                    self.found_at = calls.ends().len() - 1;
+                    self.queue(&["task", "2"]);
+                    self.queue(&["task", "3", "--json"]);
+                    self.queue(&["task", "1", "--json"]);
+                    self.phase = LivePhase::Snapshot;
+                }
+            }
+            LivePhase::Progress => self.progress(now, calls, &last)?,
             LivePhase::Snapshot => {
-                let ended = json(&calls.ends()[self.found_at]);
-                assert_eq!(ended["met"], true, "change ended within its watch");
+                let ended = live_json(&calls.ends()[self.found_at])?;
+                require(ended["met"] == true, "change ended within its watch")?;
                 self.ended_at = Some(
                     ended["task"]["chip"]["details"]["owner"]["details"]["ended_at"]
                         .as_u64()
-                        .expect("change ended timestamp"),
+                        .ok_or("change ended timestamp missing")?,
                 );
-                self.snapshot = Some(last["digest"].as_str().expect("chat digest").to_owned());
+                self.snapshot = Some(last["digest"].as_str().ok_or("chat digest missing")?.to_owned());
 
                 self.pages = 0;
-                calls.push(Step::Run(Call::new(&["chat", "1", "--json"])));
+                self.queue(&["chat", "1", "--json"]);
                 self.phase = LivePhase::Pages;
             }
             LivePhase::Pages => {
                 self.pages += 1;
-                assert!(self.pages <= 32, "bounded conversation pages");
+                require(self.pages <= 32, "bounded conversation pages")?;
                 let activity = &last["activity"];
-                assert_eq!(activity["cut"], false, "whole activity page");
+                require(activity["cut"] == false, "whole activity page")?;
                 self.tools.extend(successful_tools(activity));
-                self.replies.extend(replies_after(activity, self.ended_at.expect("ended change")));
+                self.replies.extend(replies_after(activity, self.ended_at.ok_or("change end missing")?)?);
                 if let Some(before) = activity["before"]["value"].as_str() {
-                    calls.push(Step::Run(Call::new(&["chat", "1", "--before", before, "--json"])));
+                    self.queue(&["chat", "1", "--before", before, "--json"]);
                 } else if self.replies.is_empty() {
-                    calls.push(Step::Run(Call::new(&[
+                    self.queue(&[
                         "wait",
                         "task",
                         "1",
                         "--until",
                         "replied",
                         "--since",
-                        self.snapshot.as_deref().expect("snapshot before conversation"),
+                        &self.snapshot.clone().ok_or("snapshot before conversation missing")?,
                         "--timeout",
                         "1800s",
                         "--json",
-                    ])));
-                    calls.push(Step::Run(Call::new(&["task", "1", "--json"])));
+                    ]);
+                    self.queue(&["task", "1", "--json"]);
                     self.phase = LivePhase::Snapshot;
                 } else {
                     self.tasks_at = calls.ends().len();
                     for parent in ["1", "2"] {
-                        calls.push(Step::Run(Call::new(&[
-                            "tasks",
-                            "--project",
-                            "1",
-                            "--parent",
-                            parent,
-                            "--ended",
-                            "--json",
-                        ])));
+                        self.queue(&["tasks", "--project", "1", "--parent", parent, "--ended", "--json"]);
                     }
                     if !self.plan.first {
                         for args in [
@@ -890,113 +957,328 @@ impl LiveJudge<'_> {
                             &["wait", "tree", "1", "--until", "ended", "--timeout", "300s", "--json"],
                             &["tasks", "--project", "1", "--json"],
                         ] {
-                            calls.push(Step::Run(Call::new(args)));
+                            self.queue(args);
                         }
                     }
                     self.phase = LivePhase::Closing;
                 }
             }
             LivePhase::Closing => {
-                self.check_landing(calls);
+                self.check_landing(calls)?;
                 calls.release();
                 self.phase = LivePhase::Done;
             }
             LivePhase::Done | LivePhase::Stopping | LivePhase::Settled => {}
         }
+        Ok(())
+    }
+    fn progress(
+        &mut self,
+        now: skein_lib::Time,
+        calls: &super::ctl::Calls,
+        last: &serde_json::Value,
+    ) -> Result<(), String> {
+        let task = live_json(&calls.ends()[calls.ends().len() - 2])?;
+        let children = last["tasks"]["rows"]
+            .as_array()
+            .ok_or("children rows missing")?
+            .iter()
+            .map(|row| format!("{}:{}", row["chip"]["task"], row["chip"]["phase"].as_str().unwrap_or("?")))
+            .collect::<Vec<_>>()
+            .join(",");
+        super::live::notice(&format!(
+            "PROGRESS {} task2={} children={} completions={} waits_on={} details={}",
+            now.saturating_since(self.wait_started.ok_or("watch start missing")?).as_nanos() / 1_000_000_000,
+            task["chip"]["phase"].as_str().unwrap_or("?"),
+            children,
+            super::live::deployment_completions(self.plan.paths),
+            task["waits_on"],
+            task["chip"]["details"]
+        ));
+        if now >= self.wait_until.ok_or("watch deadline missing")? {
+            self.fail("change watch exceeded 1800s", calls, self.wait_call);
+        } else {
+            self.wait_round(now)?;
+        }
+        Ok(())
     }
     fn stopping(&self) -> bool {
         matches!(self.phase, LivePhase::Stopping | LivePhase::Settled)
     }
 
-    fn check_landing(&mut self, calls: &super::ctl::Calls) {
-        use super::ctl::json;
-        let last = json(calls.ends().last().expect("closing reads"));
+    fn check_landing(&mut self, calls: &super::ctl::Calls) -> Result<(), String> {
+        let last = live_json(calls.ends().last().ok_or("closing reads missing")?)?;
         if !self.plan.first {
-            assert_eq!(json(&calls.ends()[calls.ends().len() - 2])["met"], true, "chat tree closed");
-            assert_no_live_roots(&last);
+            require(live_json(&calls.ends()[calls.ends().len() - 2])?["met"] == true, "chat tree closed")?;
+            require(
+                last["tasks"]["rows"] == serde_json::json!([]) && last["tasks"]["more"] == false,
+                "no live root tasks",
+            )?;
         }
         let reads = super::first_repository::live(&self.plan.paths[0], &self.plan.paths[1], self.plan.client);
-        assert!(self.tools.contains("change"), "the chat's committed change call succeeded");
-        let delegates = [0, 1].map(|offset| {
-            let value = json(&calls.ends()[self.tasks_at + offset]);
-            assert_no_live_tasks(&value);
+        require(self.tools.contains("change"), "the chat's committed change call succeeded")?;
+        let mut delegates = [Vec::new(), Vec::new()];
+        for (offset, tasks) in delegates.iter_mut().enumerate() {
+            let value = live_json(&calls.ends()[self.tasks_at + offset])?;
+            require(value["live"] == serde_json::json!([]) && value["live_after"].is_null(), "no live delegates")?;
             let ended = &value["ended"]["rows"];
-            assert_eq!(ended["cut"], false, "whole delegate set");
-            assert!(ended["after"].is_null(), "whole delegate set");
-            let mut tasks: Vec<_> = ended["rows"]
+            require(ended["cut"] == false, "whole delegate set")?;
+            require(ended["after"].is_null(), "whole delegate set")?;
+            *tasks = ended["rows"]
                 .as_array()
-                .expect("ended delegates")
+                .ok_or("ended delegates missing")?
                 .iter()
-                .map(|row| row["chip"]["task"].as_u64().expect("delegate task"))
-                .collect();
+                .map(|row| row["chip"]["task"].as_u64().ok_or("delegate task missing"))
+                .collect::<Result<_, _>>()?;
             tasks.sort_unstable();
-            tasks
-        });
-        assert!(delegates[0].contains(&2), "change task belongs to the chat that called change");
-        assert!(!self.tools.contains("delegate"), "no raw delegate started the task");
+        }
+        require(delegates[0].contains(&2), "change task belongs to the chat that called change")?;
+        require(!self.tools.contains("delegate"), "no raw delegate started the task")?;
         let forge = live_forge(self.plan.paths, self.plan.first, reads.address, self.plan.line);
-        self.evidence.set(Some(LiveEvidence { reads, forge, replies: std::mem::take(&mut self.replies), delegates }));
+        self.evidence.set(Some(LiveEvidence {
+            task: String::from_utf8_lossy(&calls.ends()[self.found_at + 1].stdout).into_owned(),
+            reads,
+            forge,
+            replies: std::mem::take(&mut self.replies),
+            delegates,
+        }));
+        Ok(())
+    }
+}
+impl LiveJudge<'_> {
+    fn queue(&mut self, args: &[&str]) {
+        self.pending.push_back(args.iter().map(|arg| (*arg).to_owned()).collect());
+    }
+    fn wait_round(&mut self, now: skein_lib::Time) -> Result<(), String> {
+        let left = self.wait_until.ok_or("watch deadline missing")?.saturating_since(now).as_nanos() / 1_000_000_000;
+        self.queue(&[
+            "wait",
+            "task",
+            "2",
+            "--until",
+            "ended",
+            "--timeout",
+            &format!("{}s", left.clamp(1, 60)),
+            "--json",
+        ]);
+        self.phase = LivePhase::Waiting;
+        Ok(())
+    }
+    fn dump(&self, index: usize, call: &super::Ended) {
+        super::live::notice(&format!(
+            "EVIDENCE cwd={} argv=temper ctl client {:?} exit={:?}\nstdout: {}\nstderr: {}",
+            self.plan.client.display(),
+            self.arguments.get(index),
+            call.exit,
+            String::from_utf8_lossy(&call.stdout),
+            String::from_utf8_lossy(&call.stderr)
+        ));
+    }
+    fn fail(&mut self, message: &str, calls: &super::ctl::Calls, failing: Option<usize>) {
+        let previous = self.failure.take();
+        if previous.is_some() {
+            self.failure.set(previous);
+            return;
+        }
+        let message = if let Some(index) = failing {
+            format!("{message}: argv={:?} exit={:?}", self.arguments.get(index), calls.ends()[index].exit)
+        } else {
+            message.to_owned()
+        };
+        self.failure.set(Some(super::live::redact(&message)));
+        super::live::notice(&format!("FAILURE {message}"));
+        if let Some(index) = failing {
+            self.dump(index, &calls.ends()[index]);
+        } else if let Some(call) = calls.pending() {
+            self.dump(calls.ends().len(), call);
+        }
+        // Each independent read uses ctl's existing 60s bound. Even an unknown
+        // task or a broken read is evidence, never a reason to omit later reads.
+        let mut task2 = false;
+        for args in [
+            &["task", "1", "--json"][..],
+            &["task", "2", "--json"],
+            &["task", "3", "--json"],
+            &["tasks", "--project", "1", "--json"],
+        ] {
+            if let Some(read) = self.diagnostic(args) {
+                task2 |= args == ["task", "2", "--json"] && read.exit == Some(Exit::Code(0));
+            }
+        }
+        let mut before = None::<String>;
+        for _ in 0..32 {
+            let mut args = vec!["chat", "1", "--json"];
+            if let Some(cursor) = &before {
+                args.extend(["--before", cursor]);
+            }
+            let Some(read) = self.diagnostic(&args) else { break };
+            let Ok(page) = serde_json::from_slice::<serde_json::Value>(&read.stdout) else { break };
+            if let Some(rows) = page["activity"]["rows"].as_array() {
+                for call in committed_tools(rows) {
+                    super::live::notice(&format!(
+                        "TOOL name={} failed={} outcome={}",
+                        call["tool"], call["failed"], call["outcome"]
+                    ));
+                }
+            }
+            before = page["activity"]["before"]["value"].as_str().map(str::to_owned);
+            if before.is_none() {
+                break;
+            }
+        }
+        if task2 {
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                super::first_repository::change_page(&self.plan.paths[0], self.plan.client)
+            })) {
+                Ok(page) => super::live::notice(&format!("CHANGE PAGE\n{page}")),
+                Err(_) => super::live::notice("CHANGE PAGE unavailable"),
+            }
+        }
+        self.pending.clear();
+        self.phase = LivePhase::Done;
+    }
+    fn diagnostic(&self, args: &[&str]) -> Option<super::Ended> {
+        if let Ok(read) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            super::ctl::alone(self.plan.client, super::ctl::Call::new(args))
+        })) {
+            // Do not copy conversation prose or tool arguments into notices.
+            let stdout = if args.first() == Some(&"chat") {
+                "(committed tools below)".into()
+            } else {
+                String::from_utf8_lossy(&read.stdout)
+            };
+            super::live::notice(&format!(
+                "EVIDENCE cwd={} argv=temper ctl client {args:?} exit={:?}\nstdout: {stdout}\nstderr: {}",
+                self.plan.client.display(),
+                read.exit,
+                String::from_utf8_lossy(&read.stderr)
+            ));
+            Some(read)
+        } else {
+            super::live::notice(&format!("EVIDENCE {args:?}: bounded read unavailable"));
+            None
+        }
+    }
+    fn drive(
+        &mut self,
+        now: skein_lib::Time,
+        binary: &mut skein_world::end_to_end::Binary,
+        calls: &mut super::ctl::Calls,
+    ) {
+        use skein_shell::Host;
+        calls.observe_box_stderr(binary.stderr(), now);
+        if !self.linked && super::printed_link(calls.stdout()).is_some() {
+            super::live::client_notice(&String::from_utf8_lossy(calls.link()));
+            self.linked = true;
+        }
+        for index in self.checked..calls.ends().len() {
+            let call = &calls.ends()[index];
+            let not_yet = matches!(self.phase, LivePhase::Waiting) && call.exit == Some(Exit::Code(3));
+            if call.exit != Some(Exit::Code(0)) && !not_yet {
+                self.fail("live ctl failed", calls, Some(index));
+                break;
+            }
+            if self.plan.first && index == self.account_at - 2 {
+                super::live::notice(&String::from_utf8_lossy(&call.stdout));
+                self.signing_until = Some(now.saturating_add(Duration::from_secs(600)));
+            }
+        }
+        if calls.ends().len() > self.checked {
+            self.active_until = None;
+        }
+        self.checked = calls.ends().len();
+        if !matches!(self.phase, LivePhase::Done | LivePhase::Stopping | LivePhase::Settled)
+            && !self.account_checked
+            && calls.ends().len() > self.account_at
+        {
+            match live_json(&calls.ends()[self.account_at]).and_then(|value| super::live::ready_account(&value)) {
+                Ok(()) => self.account_checked = true,
+                Err(message) => self.fail(&message, calls, Some(self.account_at)),
+            }
+        }
+        if !self.stopping() && !matches!(self.phase, LivePhase::Done) {
+            if self.signing_until.is_some_and(|until| !self.account_checked && now >= until) {
+                self.fail("ChatGPT sign-in exceeded 10 minutes", calls, None);
+            } else if now >= self.deadline {
+                self.fail("live story exceeded its budget", calls, None);
+            } else if binary.exit_status().is_some() {
+                self.fail("live box stopped before its reads", calls, None);
+            } else if self.active_until.is_some_and(|until| now >= until) {
+                self.fail("live ctl exceeded its per-call bound", calls, None);
+            } else if now >= self.poll {
+                if super::live::deployment_completions(self.plan.paths) > 25 {
+                    self.fail("live completion budget exceeded", calls, None);
+                }
+                self.poll = now.saturating_add(Duration::from_secs(1));
+            }
+        }
+        if !self.stopping() && !matches!(self.phase, LivePhase::Done) {
+            if let Err(message) = self.advance(now, calls) {
+                self.fail(&message, calls, calls.ends().len().checked_sub(1));
+            }
+            if calls.foreground_idle()
+                && let Some(args) = self.pending.pop_front()
+            {
+                let seconds = args
+                    .windows(2)
+                    .find(|pair| pair[0] == "--timeout")
+                    .and_then(|pair| pair[1].strip_suffix('s'))
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
+                self.active_until = Some(now.saturating_add(Duration::from_secs(seconds + 60)));
+                let words = args.iter().map(String::as_str).collect::<Vec<_>>();
+                calls.push(super::ctl::Step::Run(if words == ["sign-in", "-"] {
+                    super::ctl::Call::sign_in()
+                } else {
+                    super::ctl::Call::new(&words)
+                }));
+                self.arguments.push(args);
+            }
+        }
+        if !self.stopping() && matches!(self.phase, LivePhase::Done) {
+            calls.release();
+            calls.cancel();
+            binary.signal(skein_io::kernel::Signal::Terminate);
+            self.phase = LivePhase::Stopping;
+        }
+        if !self.cleanup && now >= self.deadline && !binary.is_empty() {
+            binary.signal_tree(skein_io::kernel::Signal::Kill);
+            self.cleanup = true;
+        }
     }
 }
 impl Referee<Process> for LiveJudge<'_> {
     fn act(&mut self, now: skein_lib::Time, procs: &mut [Process]) {
-        use skein_io::kernel::Signal;
-        use skein_shell::Host;
-        let [Process::Binary(binary), Process::Calls(calls)] = procs else { panic!("live box and ctl only") };
-        calls.observe_box_stderr(binary.stderr(), now);
-        if !self.linked && super::printed_link(calls.stdout()).is_some() {
-            eprintln!("CLIENT {}", String::from_utf8_lossy(calls.link()));
-            self.linked = true;
-        }
-        for (index, call) in calls.ends().iter().enumerate().skip(self.checked) {
-            assert_eq!(call.exit, Some(Exit::Code(0)), "live ctl: {}", String::from_utf8_lossy(&call.stderr));
-            if self.plan.first && index == self.account_at - 2 {
-                // Only connect's authorization address, never a callback or token.
-                eprintln!("{}", String::from_utf8_lossy(&call.stdout));
-                self.signing_until = Some(now.saturating_add(Duration::from_secs(600)));
-            }
-        }
-        self.checked = calls.ends().len();
-        if !self.account_checked && calls.ends().len() > self.account_at {
-            super::live::account_ready(&super::ctl::json(&calls.ends()[self.account_at]));
-            self.account_checked = true;
-        }
-        assert!(
-            self.account_checked || self.signing_until.is_none_or(|until| now < until),
-            "ChatGPT sign-in exceeded 10 minutes"
-        );
-        if now >= self.poll && !self.stopping() {
-            assert!(super::live::deployment_completions(self.plan.paths) <= 25, "live completion budget exceeded");
-            self.poll = now.saturating_add(Duration::from_secs(1));
-        }
-        if !self.stopping() {
-            self.advance(calls);
-        }
-        if !self.stopping() && (calls.idle() || now >= self.deadline || binary.exit_status().is_some()) {
+        let [Process::Binary(binary), Process::Calls(calls), ..] = procs else { return };
+        // Legacy oracle assertions must never unwind through the world's Tree.
+        // Their recorded failure is raised by the caller after run_live returns.
+        if let Err(failed) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.drive(now, binary, calls))) {
+            let message = failed
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| failed.downcast_ref::<&str>().copied())
+                .unwrap_or("live referee validation failed");
+            self.fail(message, calls, calls.ends().len().checked_sub(1));
             calls.release();
             calls.cancel();
-            binary.signal(Signal::Terminate);
+            binary.signal(skein_io::kernel::Signal::Terminate);
             self.phase = LivePhase::Stopping;
         }
-        if now >= self.deadline && !binary.is_empty() {
-            binary.signal_tree(Signal::Kill);
-        }
     }
-    fn observe(&mut self, now: skein_lib::Time, procs: &[Process]) {
+    fn observe(&mut self, _now: skein_lib::Time, procs: &[Process]) {
         use skein_shell::Host;
         if self.stopping() && procs.iter().all(Host::is_empty) {
             self.phase = LivePhase::Settled;
         }
-        let Process::Binary(binary) = &procs[0] else { panic!("box") };
-        assert!(self.stopping() || binary.exit_status().is_none(), "live box stopped before its reads");
-        assert!(now < self.deadline || self.stopping(), "live story exceeded its budget");
     }
     fn next_deadline(&self) -> Option<skein_lib::Time> {
-        (!self.stopping()).then_some(self.poll.min(self.deadline).min(if self.account_checked {
-            self.deadline
+        if matches!(self.phase, LivePhase::Settled) || self.cleanup {
+            None
+        } else if self.stopping() {
+            Some(self.deadline)
         } else {
-            self.signing_until.unwrap_or(self.deadline)
-        }))
+            Some(self.poll.min(self.deadline))
+        }
     }
     fn overdue(&self, _now: skein_lib::Time) -> Option<String> {
         None
@@ -1007,8 +1289,11 @@ impl Referee<Process> for LiveJudge<'_> {
 }
 
 /// The live face has only the supervised box and ctl, no issuer, visitor or peer.
-#[must_use]
-pub fn run_live(plan: LivePlan<'_>, budget: Duration, face: &Face) -> super::boxed::CtlOutcome<LiveEvidence> {
+pub fn run_live(
+    plan: LivePlan<'_>,
+    budget: Duration,
+    face: &Face,
+) -> Result<super::boxed::CtlOutcome<LiveEvidence>, String> {
     use skein_shell::{Clock, Host};
     use skein_world::end_to_end::{Binary, Command, Expectation, Mode};
     assert!(matches!(face, Face::Live), "live driver takes the live face");
@@ -1032,17 +1317,26 @@ pub fn run_live(plan: LivePlan<'_>, budget: Duration, face: &Face) -> super::box
     let mut fds = streams.descriptors();
     let root = skein_shell::open_root(plan.client).expect("fresh client root");
     fds.push(root);
-    let (steps, account_at, found_at) = live_steps(plan.first, plan.words);
+    let (commands, account_at) = live_commands(plan.first, plan.words);
+    let failure = std::cell::Cell::new(None);
     let evidence = std::cell::Cell::new(None);
     let mut world = real::World::new(LiveJudge {
         plan,
         account_at,
-        found_at,
+        found_at: 0,
         checked: 0,
+        pending: commands.into(),
+        arguments: Vec::new(),
+        active_until: None,
+        wait_started: None,
+        wait_until: None,
+        wait_call: None,
+        failure: &failure,
         signing_until: None,
         account_checked: false,
         linked: false,
-        phase: LivePhase::Snapshot,
+        cleanup: false,
+        phase: LivePhase::Setup,
         snapshot: None,
         replies: std::collections::BTreeMap::new(),
         tasks_at: 0,
@@ -1058,14 +1352,22 @@ pub fn run_live(plan: LivePlan<'_>, budget: Duration, face: &Face) -> super::box
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || {
-        let mut calls = super::ctl::Calls::new(root, steps, Some(&streams), None).with_box_stderr();
+        let mut calls = super::ctl::Calls::new(root, vec![], Some(&streams), None).with_box_stderr();
         calls.hold();
         Process::Calls(Box::new(calls))
     });
-    let ended = world.run(&clock, budget);
-    assert!(ended.procs.iter().all(Host::is_empty), "live box, descendants and ctl drain");
+    // Failure diagnostics: at most 36 ctl reads (60s each), a 20s native
+    // change-page read, and ten seconds to cancel, drain and reap afterwards.
+    let drain_budget = Duration::from_secs(36 * 60 + 30);
+    let ended = world.run(&clock, Duration::from_nanos(budget.as_nanos().saturating_add(drain_budget.as_nanos())));
+    if !ended.procs.iter().all(Host::is_empty) {
+        return Err("live box, descendants and ctl did not drain".into());
+    }
     let [Process::Binary(binary), Process::Calls(calls)] = ended.procs.as_slice() else { panic!("live box and ctl") };
-    super::boxed::CtlOutcome {
+    if let Some(message) = failure.take() {
+        return Err(message);
+    }
+    Ok(super::boxed::CtlOutcome {
         exit: binary.exit_status(),
         stdout: calls.stdout().to_vec(),
         stderr: binary.stderr().to_vec(),
@@ -1076,5 +1378,5 @@ pub fn run_live(plan: LivePlan<'_>, budget: Duration, face: &Face) -> super::box
             .map(|call| super::Ended { exit: call.exit, stdout: call.stdout.clone(), stderr: call.stderr.clone() })
             .collect(),
         checked: evidence.take(),
-    }
+    })
 }

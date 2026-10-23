@@ -133,26 +133,31 @@ fn pushed(directory: &Path, forge: &Throwaway, baseline: &[u8]) -> Option<Push> 
     None
 }
 pub fn account_ready(value: &Value) {
+    ready_account(value).unwrap_or_else(|message| panic!("{message}"));
+}
+pub fn ready_account(value: &Value) -> Result<(), String> {
     let account = value["accounts"]["party"]
         .as_array()
-        .expect("person's accounts")
+        .ok_or("person's accounts missing")?
         .iter()
         .find(|account| account["provider"] == 1)
-        .expect("ChatGPT sign-in produced the person's account");
-    assert_eq!(account["plan"], true, "ChatGPT is a plan");
+        .ok_or("ChatGPT account missing")?;
+    if account["plan"] != true {
+        return Err("ChatGPT is not a plan".into());
+    }
     let source = account["sources"]
         .as_array()
-        .expect("sources")
+        .ok_or("account sources missing")?
         .iter()
         .find(|source| source["kind"] == "sign_in")
-        .expect("a signed-in source");
-    assert!(
-        source["usable"] == true && source["state"]["kind"] == "granted",
-        "live account {} cannot run: state={}, reset={}",
-        account["number"],
-        source["state"],
-        source["spent_until"]
-    );
+        .ok_or("signed-in source missing")?;
+    if source["usable"] != true || source["state"]["kind"] != "granted" {
+        return Err(format!(
+            "live account {} cannot run: state={}, reset={}",
+            account["number"], source["state"], source["spent_until"]
+        ));
+    }
+    Ok(())
 }
 fn tasks_ready(value: &Value) {
     match value {
@@ -196,7 +201,8 @@ impl Judge<'_> {
                 String::from_utf8_lossy(&connected.stderr)
             );
             // This is the authorization address, never the browser's final callback or a token.
-            eprintln!("{}", String::from_utf8_lossy(&connected.stdout));
+            notice(&String::from_utf8_lossy(&connected.stdout));
+            client_notice(&String::from_utf8_lossy(calls.link()));
             self.phase = Phase::Signing;
         }
         if !self.running() && calls.ends().len() >= SETUP_CALLS {
@@ -419,4 +425,76 @@ fn count_completions(config: &Path, directories: &temper::directories::Directori
         }
     }
     count
+}
+
+/// Redact link secrets and structured credential values before diagnostic output.
+#[must_use]
+pub fn redact(text: &str) -> String {
+    let mut output = text.to_owned();
+    for key in ["secret=", "access_token=", "refresh_token=", "id_token=", "token=", "Bearer "] {
+        let mut at = 0;
+        while let Some(found) = output[at..].find(key) {
+            let start = at + found + key.len();
+            let end = output[start..]
+                .find(|c: char| c.is_whitespace() || matches!(c, '&' | '"' | '\'' | '<' | '>'))
+                .map_or(output.len(), |n| start + n);
+            output.replace_range(start..end, "…");
+            at = start + "…".len();
+        }
+    }
+    for key in [
+        "secret",
+        "token",
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "credential",
+        "authorization",
+        "api_key",
+        "password",
+    ] {
+        let marker = format!("\"{key}\"");
+        let mut at = 0;
+        while let Some(found) = output[at..].find(&marker) {
+            let start = at + found + marker.len();
+            at = start;
+            let rest = output[start..].trim_start();
+            let Some(rest) = rest.strip_prefix(':') else { continue };
+            let value = output.len() - rest.trim_start().len();
+            let mut stream = serde_json::Deserializer::from_str(&output[value..]).into_iter::<Value>();
+            if stream.next().is_some_and(|value| value.is_ok()) {
+                let end = value + stream.byte_offset();
+                output.replace_range(value..end, "\"…\"");
+                at = value + "\"…\"".len();
+            }
+        }
+    }
+    output
+}
+
+fn append_notice(text: &str) {
+    use std::{io::Write, os::unix::fs::OpenOptionsExt};
+    let Some(path) = std::env::var_os("TEMPER_LIVE_NOTICE") else { return };
+    // The launcher creates this private file before starting heavy.
+    match fs::OpenOptions::new().append(true).mode(0o600).open(path) {
+        Ok(mut file) => {
+            if let Err(error) = writeln!(file, "{text}") {
+                eprintln!("live notice write: {error}");
+            }
+        }
+        Err(error) => eprintln!("live notice open: {error}"),
+    }
+}
+
+/// The same safe diagnostics reach stderr and, optionally, the person's terminal.
+pub fn notice(text: &str) {
+    let safe = redact(text);
+    eprintln!("{safe}");
+    append_notice(&safe);
+}
+
+/// Only the transient private notice contains the full sign-in link.
+pub fn client_notice(link: &str) {
+    eprintln!("CLIENT {}", link.split('?').next().unwrap_or(link));
+    append_notice(&format!("CLIENT {link}"));
 }
