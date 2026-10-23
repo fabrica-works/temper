@@ -20,6 +20,7 @@ pub struct Chat {
     pub document: Handle,
     pub activity: Handle,
     pub run: Option<Handle>,
+    current_run: Option<c::RunState>,
     pub next: u64,
     pub thread: Thread,
     rows: u32,
@@ -51,6 +52,7 @@ impl Chat {
             document,
             activity,
             run: None,
+            current_run: None,
             next: first.checked_add(2).expect("chat handles fit"),
             thread,
             rows: limits.client.domain.rows,
@@ -114,9 +116,7 @@ impl Chat {
                 }
             }
             Told::Changed { handle } | Told::Text { handle } if Some(handle) == self.run => {
-                if let Some(Latest::Jig(c::Delivery::RunState(run))) = latest(client, handle) {
-                    self.thread.run(run, client.text(handle).or(run.writing.as_ref()));
-                }
+                self.run_changed(client, handle);
             }
             Told::Page { handle, page } if handle == self.activity => {
                 if let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = page {
@@ -180,6 +180,31 @@ impl Chat {
         }
         self.delegations(client, out);
         true
+    }
+    fn run_changed(&mut self, client: &Client, handle: Handle) {
+        match latest(client, handle) {
+            Some(Latest::Jig(c::Delivery::RunState(run))) => {
+                self.thread.run(run, client.text(handle).or(run.writing.as_ref()));
+                self.current_run = Some(c::RunState {
+                    task: run.task,
+                    attempt: run.attempt,
+                    committed_turn: run.committed_turn,
+                    writing: None,
+                    call: run.call.clone(),
+                });
+            }
+            Some(Latest::Jig(c::Delivery::Run(text))) => {
+                let fallback = c::RunState {
+                    task: self.task,
+                    attempt: Some(text.attempt),
+                    committed_turn: 0,
+                    writing: None,
+                    call: None,
+                };
+                self.thread.run(self.current_run.as_ref().unwrap_or(&fallback), client.text(handle));
+            }
+            _ => {}
+        }
     }
     fn answered(&mut self, key: Key, outcome: jig_client::Outcome) {
         if self.pending.as_slice().contains(&(key, Sending::Seen)) {
@@ -541,6 +566,7 @@ impl Chat {
         } = task.chip.details.as_ref()
         {
             if self.run.is_none() {
+                self.current_run = None;
                 let handle = handle(self.next);
                 self.next = self.next.checked_add(1).expect("chat handles fit");
                 self.run = Some(handle);
@@ -550,6 +576,7 @@ impl Chat {
                 }));
             }
         } else if let Some(handle) = self.run.take() {
+            self.current_run = None;
             unwatch(handle, out);
         }
     }
@@ -674,6 +701,9 @@ pub fn thread_limits(limits: &Limits) -> jig_client::thread::Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     jig_client::thread::worst_case(&thread_limits(limits))?
+        // The latest run state keeps no writing; its inline call owns three bounded texts.
+        .checked_add(u64::try_from(size_of::<Option<c::RunState>>()).ok()?)?
+        .checked_add(u64::from(limits.client.domain.text).checked_mul(3)?)?
         .checked_add(List::<(Key, Sending)>::worst_case(4)?)?
         .checked_add(u64::from(limits.client.domain.text))?
         .checked_add(limits.client.domain.document_bytes)?

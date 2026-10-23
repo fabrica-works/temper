@@ -265,8 +265,9 @@ mod memory_literal;
 // The flow's three state words (444 B).
 // The Accounts navigation's two state words (296 B).
 // ConnectForge's and the welcome's forge words and nodes, and 128 more phrase segments (77,364 B).
+// The chat's saved run state adds 320 B inline and three 512 B call texts (1,856 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 274388821447;
+const WEB_BYTES: u64 = 274388823303;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
