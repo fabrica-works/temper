@@ -66,6 +66,14 @@ pub fn text(owned: &Owned, place: &Place, secrets: &Secrets, allowed_host: Optio
         Some(a) => joined(&[b"[webhook]\nALLOWED_HOST_LIST = ", &ip(a), b"\n"]),
         None => Box::new([]),
     };
+    let public = match &owned.public {
+        Some(origin) => {
+            let port = Decimal::of(u64::from(origin.port));
+            let suffix = if origin.port == 443 { Box::new([]) } else { joined(&[b":", port.as_bytes()]) };
+            joined(&[b"\nDOMAIN = ", &origin.host, b"\nROOT_URL = https://", &origin.host, &suffix, b"/"])
+        }
+        None => joined(&[b"\nROOT_URL = http://", &socket, b"/"]),
+    };
     Secret::new(joined(&[
         b"RUN_USER = ",
         &place.user,
@@ -75,9 +83,8 @@ pub fn text(owned: &Owned, place: &Place, secrets: &Secrets, allowed_host: Optio
         &address,
         b"\nHTTP_PORT = ",
         port.as_bytes(),
-        b"\nROOT_URL = http://",
-        &socket,
-        b"/\nAPP_DATA_PATH = ",
+        &public,
+        b"\nAPP_DATA_PATH = ",
         &work,
         b"/data\nDISABLE_SSH = true\nOFFLINE_MODE = true\n[database]\nDB_TYPE = sqlite3\nPATH = ",
         &work,

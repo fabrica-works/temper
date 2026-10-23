@@ -34,11 +34,12 @@ fn read_owned(owned: &str) -> Result<Owned, Box<[u8]>> {
         Mode::Managed { .. } | Mode::Fake(_) => panic!("owned"),
     }
 }
-fn owned_json(forgejo: &str, runner: Option<&str>, mirror: Option<&str>) -> String {
+fn owned_json(forgejo: &str, runner: Option<&str>, mirror: Option<&str>, public: Option<&str>) -> String {
     let runner = runner.map_or("null".into(), |binary| format!(r#"{{"binary":"{binary}","labels":["temper-host:host"],"capacity":1,"path":"/usr/local/bin:/usr/bin:/bin"}}"#));
     let mirror = mirror.map_or(String::new(), |mirror| format!(",\"mirror\":{mirror}"));
+    let public = public.map_or(String::new(), |public| format!(",\"public\":{public}"));
     format!(
-        r#"{{"forgejo":"{forgejo}","runner":{runner},"listen":{{"socket":"127.0.0.1:3000"}},"person":{{"login":"ada","email":"ada@example.invalid"}}{mirror}}}"#
+        r#"{{"forgejo":"{forgejo}","runner":{runner},"listen":{{"socket":"127.0.0.1:3000"}},"person":{{"login":"ada","email":"ada@example.invalid"}}{mirror}{public}}}"#
     )
 }
 #[test]
@@ -75,7 +76,7 @@ fn owned_binaries_and_mirror() {
             };
             value
         });
-        assert_eq!(read_owned(&owned_json(forgejo, runner, mirrors)), Ok(expected));
+        assert_eq!(read_owned(&owned_json(forgejo, runner, mirrors, None)), Ok(expected));
     }
     for bad in [
         "http://mirror.test",
@@ -90,7 +91,7 @@ fn owned_binaries_and_mirror() {
     ] {
         let mirror = format!(r#"{{"forgejo":"{bad}","runner":"https://mirror.test"}}"#);
         assert_eq!(
-            read_owned(&owned_json("fetched", None, Some(&mirror))),
+            read_owned(&owned_json("fetched", None, Some(&mirror), None)),
             Err(b"application.setup[1].mode.owned.mirror.forgejo: invalid form\n".as_slice().into()),
             "{bad}"
         );
@@ -102,7 +103,41 @@ fn owned_binaries_and_mirror() {
             "application.setup[1].mode.owned.mirror.third: unknown member\n",
         ),
     ] {
-        assert_eq!(read_owned(&owned_json("fetched", None, Some(mirror))), Err(expected.as_bytes().into()));
+        assert_eq!(read_owned(&owned_json("fetched", None, Some(mirror), None)), Err(expected.as_bytes().into()));
+    }
+}
+#[test]
+fn owned_public_address() {
+    for (public, expected) in [
+        (None, None),
+        (Some(r#""https://git.example.com""#), Some(origin(b"git.example.com", 443))),
+        (Some(r#""https://git.example.com:8443""#), Some(origin(b"git.example.com", 8443))),
+    ] {
+        let mut owned = fixtures::owned();
+        owned.public = expected;
+        assert_eq!(
+            read_owned(&owned_json("/opt/forgejo/forgejo", Some("/opt/forgejo/forgejo-runner"), None, public)),
+            Ok(owned)
+        );
+    }
+}
+#[test]
+fn owned_public_address_refuses_invalid_forms() {
+    for bad in [
+        r#""http://git.example.com""#,
+        r#""https://git.example.com/""#,
+        r#""https://git.example.com/x""#,
+        r#""https://git.example.com:0""#,
+        r#""git.example.com""#,
+        r#""https://git.example.com?q""#,
+        r#""https://git.example.com#fragment""#,
+        "42",
+    ] {
+        assert_eq!(
+            read_owned(&owned_json("fetched", None, None, Some(bad))),
+            Err(b"application.setup[1].mode.owned.public: invalid form\n".as_slice().into()),
+            "{bad}"
+        );
     }
 }
 #[test]

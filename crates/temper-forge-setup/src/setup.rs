@@ -26,6 +26,7 @@ pub struct Runner {
 /// What temper runs for one forge.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Owned {
+    pub public: Option<Origin>,
     pub fetch: Fetch,
     pub forgejo: Box<[u8]>,
     pub runner: Option<Runner>,
@@ -277,6 +278,7 @@ fn owned(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<O
     let listen_at = o.required(d, b"listen", p, ps);
     let person_at = o.required(d, b"person", p, ps);
     let mirror_at = o.member(d, b"mirror");
+    let public_at = o.member(d, b"public");
     o.finish(d, p, ps);
     let runner_at = runner_at?;
     let mut runner = if d.token(runner_at)?.kind == Kind::Null {
@@ -306,10 +308,21 @@ fn owned(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<O
         Some(at) => Some(mirror(d, at, &p.member(b"mirror"), ps)?),
         None => None,
     };
+    let public = match public_at {
+        Some(at) => {
+            let path = p.member(b"public");
+            let Ok(value) = read::text(d, at, 4096) else {
+                ps.push(path, config::What::Form);
+                return None;
+            };
+            Some(origin(&value, &path, ps)?)
+        }
+        None => None,
+    };
     let fetch = Fetch { forgejo: fetched_forgejo, runner: fetched_runner, mirror };
     let p = p.member(b"person");
     let person = account(d, person_at?, &p, ps)?;
-    Some(Owned { fetch, forgejo, runner, listen, person })
+    Some(Owned { public, fetch, forgejo, runner, listen, person })
 }
 fn mirror(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mirror> {
     let mut o = object(d, at, p, ps)?;

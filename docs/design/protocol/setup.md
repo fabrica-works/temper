@@ -496,7 +496,8 @@ private, never edited by hand:
 
 - `RUN_USER` the process's user, `WORK_PATH` the work path;
 - `[server]`: `HTTP_ADDR` and `HTTP_PORT` from the address, `ROOT_URL`
-  `http://<address>/`, `DISABLE_SSH`, `OFFLINE_MODE`;
+  `https://<public>/` with `DOMAIN` its host when `public` is given, and
+  `http://<address>/` otherwise, `DISABLE_SSH`, `OFFLINE_MODE`;
 - `[database]`: SQLite in the work path;
 - `[repository]`: its root in the work path, `DEFAULT_BRANCH` `main`;
 - `[security]`: `INSTALL_LOCK`, `SECRET_KEY` and `INTERNAL_TOKEN`;
@@ -1160,6 +1161,7 @@ running its commands, and the client names them (6.5).
   | `start` | absent, or `"asked"` | when owned, and only then: absent, the box runs the forge's steps at every start; `"asked"`, they wait, dormant, until the client asks for them or the box's record says they ran (7.1) |
   | `owned.forgejo`, `owned.runner.binary` | cache paths (configuration.md, section 12), or `"fetched"` | checked against the pins of 6.1; `"fetched"` names temper's pinned build in the cache, which `temper forge fetch` writes (6.6) |
   | `owned.mirror` | absent, or `{"forgejo", "runner"}`, each an origin | each `https://HOST` or `https://HOST:PORT`, no path: where `temper forge fetch` asks for the pinned paths (6.6) |
+  | `owned.public` | absent, or an origin | `https://HOST` or `https://HOST:PORT`, no path: the address people reach this Forgejo at, behind a proxy; written as `ROOT_URL` and `DOMAIN` (6.2) |
   | `owned.runner` | the runner's members, or null for none | `capacity` at least 1; `labels` at least one, at most 8 |
   | `owned.listen` | an address, jig's format | a socket address on loopback; unique among the deployment's listeners and owned and fake forges |
   | `owned.person` | `{"login", "email"}` | a Forgejo login other than the bot's and `temper-admin` |

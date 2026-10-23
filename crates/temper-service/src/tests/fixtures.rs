@@ -947,6 +947,7 @@ pub fn owned_setup(forge: u16) -> settings::Setup {
             orgs: Box::new([]),
             asked: true,
             mode: Mode::Owned(Owned {
+                public: None,
                 fetch: Fetch { forgejo: false, runner: false, mirror: None },
                 forgejo: b"/bin/forgejo".as_slice().into(),
                 runner: None,
