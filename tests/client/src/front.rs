@@ -4,7 +4,10 @@ use crate::app::Event;
 use crate::{app::Temper, fixtures, translate};
 use jig_client_world::{
     harness::{ClientId, Front, FrontFault, Observed},
-    joint::{packets, transport::Transport},
+    joint::{
+        packets,
+        transport::{Transport, Watched},
+    },
 };
 use skein_lib::{Duration, RequestEnvelope, Time, Token, Wall};
 use smith_domain_session::llm::Block;
@@ -1029,12 +1032,32 @@ impl Front<Temper> for Joint {
         if let Event::Root(RootEvent::Client {
             event:
                 jig_client::Event::Up {
-                    up: jig_client::Up::Watched { watch, event: jig_client::contract::WatchEvent::Delivered(_) },
+                    up: jig_client::Up::Watched { watch, event: jig_client::contract::WatchEvent::Delivered(delivery) },
                 },
         }) = event
-            && let Some(event) = self.transport.taken(who, *watch)
         {
-            self.send(translate::party(event));
+            let acknowledgement = if let jig_client::contract::Delivery::Run(text) = delivery {
+                let route = self.transport.watch_token(who, *watch).and_then(|watcher| self.transport.watch(watcher));
+                if let Some(Watched::Jig(jig_client::contract::Subject::Run { task, .. })) =
+                    route.map(|route| &route.subject)
+                {
+                    let task = *task;
+                    self.transport
+                        .continued(
+                            who,
+                            *watch,
+                            jig_client::contract::Subject::Run { task, turn: Some(text.turn), offset: text.through },
+                        )
+                        .expect("delivered stream belongs to its run watch")
+                } else {
+                    None
+                }
+            } else {
+                self.transport.taken(who, *watch)
+            };
+            if let Some(event) = acknowledgement {
+                self.send(translate::party(event));
+            }
         }
         if let Event::Root(RootEvent::Client {
             event: jig_client::Event::Up { up: jig_client::Up::FamilyDelivered { watch, .. } },
