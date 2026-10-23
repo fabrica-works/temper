@@ -151,3 +151,20 @@ fn binding_keys_use_family_eighteen_and_canonical_addresses() {
         assert_eq!(keys::encode(&Key::Binding(address.into()), u32::MAX), None);
     }
 }
+
+#[test]
+fn demo_act_keys_follow_demo_and_require_sixteen_bytes() {
+    use temper_engine_domain_forge::Key;
+    let previous = keys::encode(&Key::Demo(u16::MAX), u32::MAX).unwrap();
+    for key in [[0; 16], [255; 16], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]] {
+        let bytes = keys::encode(&Key::DemoAct(key), u32::MAX).unwrap();
+        assert_eq!(bytes[0], 19);
+        assert!(bytes > previous);
+        assert_eq!(keys::decode(&bytes, &fixtures::LIMITS), Some(Key::DemoAct(key)));
+    }
+    for length in [0, 15, 17] {
+        let mut writer = skein_kv::KeyWriter::new(u32::MAX);
+        writer.tag(19).bytes(&[0; 17][..length]);
+        assert_eq!(keys::decode(&writer.finish().unwrap(), &fixtures::LIMITS), None);
+    }
+}

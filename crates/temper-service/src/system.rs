@@ -164,7 +164,7 @@ impl Service {
         )
         .expect("checked forge limits");
         forget_handover(&mut settings);
-        let notes = Queue::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
+        let notes = Queue::with_capacity(note_bound(&settings, &limits).expect("validated diagnostic room"));
         let configured = crate::startup::application::configured(&settings);
         // Workers take the forge settings; derive the demo's adoption host first.
         let demo_config = match &settings.demo {
@@ -912,6 +912,7 @@ fn handover_diagnostics(settings: &settings::Engine, queue: u32, events: u32) ->
         .checked_mul(file_copies)?
         .checked_add(file_diagnostic.checked_mul(u64::try_from(settings.forges.len()).ok()?.checked_add(1)?)?)
 }
+#[expect(clippy::too_many_lines, reason = "one checked sum of the service and its participating state")]
 fn memory(
     settings: &settings::Engine,
     root: &temper_engine_domain::Limits,
@@ -949,7 +950,8 @@ fn memory(
         .checked_add(Queue::<Submit>::worst_case(queue)?.checked_mul(2)?)?
         .checked_add(Queue::<io::Event>::worst_case(queue)?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
-        .checked_add(Queue::<crate::Note>::worst_case(u32::try_from(settings.forges.len()).ok()?)?)?
+        .checked_add(Queue::<crate::Note>::worst_case(note_bound(settings, root)?)?)?
+        .checked_add(u64::from(temper_engine_domain_forge::demo_act_bound(&root.forge)?).checked_mul(256)?)?
         .checked_add(Queue::<crate::Note>::worst_case(3)?)?
         .checked_add(Queue::<box_link::Out>::worst_case(3)?)?
         .checked_add(u64::try_from(settings.forges.len()).ok()?.checked_mul(crate::setup::diagnostics::worst_case()?)?)?
@@ -1175,4 +1177,9 @@ fn box_io(service: &mut Service) {
 
 fn box_bytes(line_bytes: u32) -> Option<u64> {
     u64::from(line_bytes).checked_add(1)?.checked_mul(2)
+}
+
+// One forge cohort and the end's bounded act answers can be named together.
+fn note_bound(settings: &settings::Engine, root: &temper_engine_domain::Limits) -> Option<u32> {
+    u32::try_from(settings.forges.len()).ok()?.checked_add(temper_engine_domain_forge::demo_act_bound(&root.forge)?)
 }

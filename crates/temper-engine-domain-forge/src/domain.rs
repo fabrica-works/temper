@@ -105,6 +105,7 @@ pub struct Domain {
     pub(crate) demo: Option<crate::DemoConfig>,
     bindings: Map<Box<[u8]>, Box<[u8]>>,
     pub(crate) demo_state: Option<crate::DemoState>,
+    pub(crate) demo_acts: Map<[u8; 16], crate::DemoActKind>,
     pub(crate) demo_pending: Map<Token, Token>,
     pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
     pub(crate) connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
@@ -487,6 +488,7 @@ impl Domain {
             demo: None,
             demo_state: None,
             bindings: Map::with_capacity(l.bindings),
+            demo_acts: Map::with_capacity(crate::demo_act_bound(l).expect("validated act bound")),
             demo_pending: Map::with_capacity(l.applications),
             demo_answers: Map::with_capacity(l.applications),
             connections: Map::with_capacity(l.client.repositories),
@@ -937,7 +939,10 @@ pub const fn max_out(l: &Limits) -> u32 {
     // At most one panel mark accompanies each previously bounded output:
     // a saved change, or a read completion whose CI verdict changed.
     // A demo start can also finish every bounded waiting application together.
-    l.output.saturating_mul(2).saturating_add(l.applications)
+    l.output
+        .saturating_mul(2)
+        .saturating_add(l.applications)
+        .saturating_add(l.tasks.saturating_add(1).saturating_mul(2))
 }
 
 /// Decide one parent event and collect its durable records and outputs.
@@ -960,6 +965,9 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             };
             out.push(Request::Bound { request, answer });
         }
+        Event::DemoActs { acts } => crate::demo::acts(d, acts, out),
+        Event::DemoActAnswered { key, keep } => crate::demo::act_answered(d, key, keep, out),
+        Event::SendDemoActs => crate::demo::send_acts(d, out),
         Event::DemoAnswered { answer } => crate::demo::answered(d, answer, out),
         Event::BoxClosed => {
             d.under_box = false;
@@ -4066,6 +4074,9 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
         Stored::Binding { address, subject } => {
             assert!(crate::binding_address(&address) && subject.len() <= 255, "restored binding fields");
             d.bindings.insert(address, subject).expect("restored binding within limits");
+        }
+        Stored::DemoAct(row) => {
+            d.demo_acts.insert(row.key, row.act).expect("restored demo acts within limits");
         }
         Stored::Demo(row) => {
             if let Some(demo) = &d.demo

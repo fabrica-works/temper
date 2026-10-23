@@ -38,7 +38,9 @@ pub use brief::{HOME_SECTION_BYTES, hex, home_access_reason};
 pub use domain::{Domain, fire, max_out, resume, step, tag, untag, writer};
 pub use gates::{GateCandidate, GateLast, GatePattern, GatePolicy, GateTemplate};
 pub use judge::{Criterion, Freshness as JudgeFreshness, Judges, Reviewer, Verdict as JudgeVerdict};
-pub use limits::{BOT_LOGIN_SUFFIX, CONNECT_WHY_BYTES, Limits, STOPPED_TEXT_BYTES, connection_worst_case, worst_case};
+pub use limits::{
+    BOT_LOGIN_SUFFIX, CONNECT_WHY_BYTES, Limits, STOPPED_TEXT_BYTES, connection_worst_case, demo_act_bound, worst_case,
+};
 pub use panel::{MARKED, PANEL_AHEAD, PANEL_GATES, PANEL_NAME_BYTES, Panel, PanelGate, PanelStep, PanelUsed};
 /// Connector-owned access to one exact effect on an adopted resource.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -223,6 +225,7 @@ pub fn stored_key(row: &Stored) -> Key {
         Stored::Writer(row) => Key::Writer(row.forge),
         Stored::Demo(row) => Key::Demo(row.forge),
         Stored::Binding { address, .. } => Key::Binding(address.clone()),
+        Stored::DemoAct(row) => Key::DemoAct(row.key),
     }
 }
 /// Checked payload bytes of one connector record for its parent's store page.
@@ -372,7 +375,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         Stored::Binding { address, subject } => bytes(address)?.checked_add(bytes(subject)?),
         Stored::BranchHead(row) => name(&row.name),
         Stored::PullState(row) => name(&row.name),
-        Stored::Ci(_) | Stored::Landed { .. } | Stored::Writer(_) | Stored::Demo(_) => Some(0),
+        Stored::Ci(_) | Stored::Landed { .. } | Stored::Writer(_) | Stored::Demo(_) | Stored::DemoAct(_) => Some(0),
         Stored::ProposedEffect(row) => {
             let resource = match &row.resource {
                 What::Branch(branch) => {

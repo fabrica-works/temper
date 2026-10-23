@@ -775,6 +775,7 @@ impl World {
         assert_eq!(assignment.run.sources.as_ref(), &[Some(assignment.grants[0].account)]);
     }
 
+    #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher for the world's delivery boundary")]
     fn delivery(&mut self, delivery: Delivery) {
         match delivery {
             Delivery::SourceSignedOut { .. } => panic!("this story issues no source sign-out"),
@@ -850,7 +851,9 @@ impl World {
                 .referee
                 .result(&self.store.rows, person, task, &words)
                 .expect("committed result reaches person once"),
-            Delivery::Host(_)
+            Delivery::DemoActed { .. }
+            | Delivery::DemoNote { .. }
+            | Delivery::Host(_)
             | Delivery::Link { .. }
             | Delivery::ForgeCall { .. }
             | Delivery::Bound { .. }

@@ -1,5 +1,5 @@
 use super::fixtures;
-use crate::{records, v8};
+use crate::{records, v9};
 use temper_engine_domain_forge as forge;
 
 #[test]
@@ -54,7 +54,7 @@ fn bounds_take_each_limit_from_its_source() {
 #[test]
 fn bounds_refuse_sources_past_schema_ceilings() {
     let mut larger = fixtures::LIMITS;
-    larger.name_bytes = v8::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
+    larger.name_bytes = v9::CEILINGS.adopted_host.checked_add(1).expect("one past ceiling");
     assert_eq!(crate::bounds(&larger), None);
 }
 
@@ -659,21 +659,21 @@ fn every_application_outcome_preserves_its_complete_record() {
     assert!(
         jig_protocol_store::people_v11::Refusal::worst_case_bytes(&jig_protocol_store::people_v11::CEILINGS)
             .expect("bounded facts")
-            <= u64::from(v8::CEILINGS.core_refused_refusal)
+            <= u64::from(v9::CEILINGS.core_refused_refusal)
     );
 }
 #[test]
 fn application_decoding_refuses_malformed_refusal_facts() {
     let bounds = crate::bounds(&fixtures::LIMITS).expect("fixture bounds");
     for refusal in [Box::from([255]), Box::from([2]), Box::from([9, 0])] {
-        let value = v8::CoreRefused::new(&v8::CEILINGS, v8::CoreRefusedParts { refusal }).expect("small piece");
-        let application = v8::Application::new(
-            &v8::CEILINGS,
-            v8::ApplicationParts { token: 9, until: 10, outcome: v8::ApplicationOutcome::CoreRefused(value) },
+        let value = v9::CoreRefused::new(&v9::CEILINGS, v9::CoreRefusedParts { refusal }).expect("small piece");
+        let application = v9::Application::new(
+            &v9::CEILINGS,
+            v9::ApplicationParts { token: 9, until: 10, outcome: v9::ApplicationOutcome::CoreRefused(value) },
         )
         .expect("application");
         let row =
-            v8::Row::new(&v8::CEILINGS, v8::RowParts { value: v8::Value::Application(application) }).expect("row");
+            v9::Row::new(&v9::CEILINGS, v9::RowParts { value: v9::Value::Application(application) }).expect("row");
         assert_eq!(records::decode(&fixtures::encoded_row(&row), &bounds), Err(crate::Undecodable));
     }
 }
@@ -719,7 +719,7 @@ fn forge_writers_round_trip_with_the_v6_golden_bytes() {
         let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).expect("writer key");
         let bytes = records::encode(&row);
         assert_eq!(bytes.len(), 13); // Row version, family, forge, author.
-        assert_eq!(&bytes[..3], &[0, 8, 16]);
+        assert_eq!(&bytes[..3], &[0, 9, 16]);
         assert_eq!(records::row(&key, &bytes, &bounds), Ok(row));
         if forge == u16::MAX {
             let mut golden = [255; 11];
@@ -740,7 +740,7 @@ fn demo_states_round_trip_and_refuse_a_mismatched_key() {
             let key = crate::keys::encode(&forge::Key::Demo(forge), u32::MAX).expect("demo key");
             let bytes = records::encode(&row);
             assert_eq!(bytes.len(), 6);
-            assert_eq!(&bytes[..3], &[0, 8, 17]);
+            assert_eq!(&bytes[..3], &[0, 9, 17]);
             assert_eq!(records::row(&key, &bytes, &bounds), Ok(row));
             let other = crate::keys::encode(&forge::Key::Demo(forge ^ 1), u32::MAX).expect("other key");
             assert_eq!(records::row(&other, &bytes, &bounds), Err(crate::Undecodable));
@@ -764,7 +764,7 @@ fn binding_rows_round_trip_at_the_field_bounds() {
     ] {
         let row = forge::Stored::Binding { address, subject };
         let bytes = records::encode(&row);
-        assert_eq!(&bytes[..3], &[0, 8, 18]);
+        assert_eq!(&bytes[..3], &[0, 9, 18]);
         let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).unwrap();
         assert_eq!(records::row(&key, &bytes, &bounds), Ok(row));
         let other =
@@ -774,7 +774,7 @@ fn binding_rows_round_trip_at_the_field_bounds() {
 }
 #[test]
 fn binding_decoder_refuses_noncanonical_addresses() {
-    use crate::v8 as w;
+    use crate::v9 as w;
     let bounds = crate::bounds(&fixtures::LIMITS).unwrap();
     for address in [b"Sam@example.com".as_slice(), b"no-at", b"@b", b"a@@b", b"a@ b"] {
         let binding = w::Binding::new(
@@ -788,11 +788,26 @@ fn binding_decoder_refuses_noncanonical_addresses() {
 }
 #[test]
 fn binding_schema_refuses_fields_one_past_their_bounds() {
-    use crate::v8 as w;
+    use crate::v9 as w;
     for (address, subject) in [
         (Box::from([b'a'; 255]), b"subject".as_slice().into()),
         (b"sam@example.com".as_slice().into(), Box::from([b's'; 256])),
     ] {
         w::Binding::new(&w::CEILINGS, w::BindingParts { address, subject }).unwrap_err();
+    }
+}
+
+#[test]
+fn demo_end_acts_round_trip_with_their_keys() {
+    let bounds = crate::bounds(&fixtures::LIMITS).unwrap();
+    for act in [
+        forge::DemoActKind::Close { project: u32::MAX, task: u64::MAX },
+        forge::DemoActKind::RemoveAccount { account: u32::MAX },
+    ] {
+        let row = forge::Stored::DemoAct(forge::DemoAct { key: [255; 16], act });
+        let key = crate::keys::encode(&forge::stored_key(&row), u32::MAX).unwrap();
+        assert_eq!(key[0], 19);
+        assert_eq!(crate::keys::decode(&key, &fixtures::LIMITS), Some(forge::stored_key(&row)));
+        assert_eq!(records::row(&key, &records::encode(&row), &bounds), Ok(row));
     }
 }

@@ -15,7 +15,8 @@ fn a_stopped_forge_is_named_and_only_its_calls_are_not_connected() {
         service.engine.as_ref().expect("engine").drain.is_none(),
         "a stopped forge never starts the engine's drain"
     );
-    assert_eq!(service.notes().capacity(), 2);
+    let acts = temper_engine_domain_forge::demo_act_bound(&service.engine.as_ref().unwrap().env.limits.forge).unwrap();
+    assert_eq!(service.notes().capacity(), 2 + acts);
     assert_eq!(
         service.notes().pop(),
         Some(crate::Note::ForgeStopped { number: 1, why: Stopped::Refused { read: StartRead::User, status: 401 } })
@@ -473,6 +474,10 @@ fn the_longest_head_of_the_shipped_forge_fits_its_room_to_the_byte() {
 #[test]
 fn a_full_notes_queue_keeps_its_first_diagnostic_and_the_engine_running() {
     let mut service = fixtures::ready();
+    let occupied = service.notes().room() - 1;
+    for _ in 0..occupied {
+        service.notes().push(crate::Note::ForgeUnconfigured { number: 1 });
+    }
     for user in [7, 8] {
         service
             .engine
@@ -485,6 +490,9 @@ fn a_full_notes_queue_keeps_its_first_diagnostic_and_the_engine_running() {
     crate::engine::forge_pass(service.engine.as_mut().expect("engine"));
     assert_eq!(service.end(), None);
     assert!(service.engine.as_ref().expect("engine").drain.is_none());
+    for _ in 0..occupied {
+        service.notes().pop().unwrap();
+    }
     assert_eq!(
         service.notes().pop(),
         Some(crate::Note::ForgeStopped { number: 1, why: Stopped::OtherUser { user: 7 } })

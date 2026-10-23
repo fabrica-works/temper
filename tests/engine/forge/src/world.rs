@@ -530,6 +530,7 @@ impl World {
         true
     }
 
+    #[expect(clippy::too_many_lines, reason = "one exhaustive connector output dispatcher")]
     fn take_top(&mut self) {
         let mut calls = List::with_capacity(self.top_out.len());
         let mut restart = None;
@@ -589,6 +590,8 @@ impl World {
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
                 other @ (top::Request::Bound { .. }
+                | top::Request::ListDemoActs
+                | top::Request::SendDemoAct(_)
                 | top::Request::DemoStart { .. }
                 | top::Request::StopGroup { .. }
                 | top::Request::SetUpGroup { .. }
@@ -704,6 +707,7 @@ fn key(row: &top::Stored) -> top::Key {
         top::Stored::Issue(row) => top::Key::Issue(row.goal),
         top::Stored::Demo(row) => top::Key::Demo(row.forge),
         top::Stored::Binding { address, .. } => top::Key::Binding(address.clone()),
+        top::Stored::DemoAct(row) => top::Key::DemoAct(row.key),
         top::Stored::Release(row) => top::Key::Release(row.task),
         top::Stored::Application { token, .. } => top::Key::Application(*token),
         top::Stored::Writer(row) => top::Key::Writer(row.forge),

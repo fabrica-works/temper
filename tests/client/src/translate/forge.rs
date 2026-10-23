@@ -396,7 +396,9 @@ pub fn incoming(
                 },
             )));
         }
-        delivery @ (Delivery::SourceSignedOut { .. }
+        delivery @ (Delivery::DemoActed { .. }
+        | Delivery::DemoNote { .. }
+        | Delivery::SourceSignedOut { .. }
         | Delivery::Result { .. }
         | Delivery::Host(_)
         | Delivery::Link { .. }
