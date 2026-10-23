@@ -278,6 +278,7 @@ pub fn config_with_project_room(seed: u64, projects: u32) -> engine::Config {
                 deployment_provider: 1,
                 charters: Box::new([charter()]),
                 resume_bytes: 256,
+                tail_bytes: 2048,
                 tools: jig_domain_core::ToolFamilies::JIG,
                 models: models(),
                 llm_providers: accounts::Providers {
