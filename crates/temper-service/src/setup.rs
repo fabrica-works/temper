@@ -79,12 +79,14 @@ pub(crate) fn worst_case(
     let writes = l.runs.checked_add(l.forges)?;
     let name = u64::from(config.limits.forge.name_bytes);
     let page = u64::from(l.body_bytes).checked_add(STATE_TEXT_BYTES)?;
+    // The kit's Manifest outcome: its form target and manifest, each at most body_bytes (5.1).
+    let form = u64::from(l.body_bytes).checked_mul(2)?.checked_add(STATE_TEXT_BYTES)?;
     let wanted = skein_forge::github::setup::PERMISSIONS.len().checked_add(skein_forge::github::setup::EVENTS.len())?;
     let lacking = skein_lib::List::<skein_forge_setup::github::Lacking>::worst_case(u32::try_from(wanted).ok()?)?
         .checked_add(diagnostics::worst_case()?)?;
     // Handed-up items, pages/links with state, failure subjects, or missing access.
     let payload =
-        u64::from(l.body_bytes_in).max(page).max(u64::from(config.limits.records.value_bytes)).max(name).max(lacking);
+        u64::from(l.body_bytes_in).max(form).max(u64::from(config.limits.records.value_bytes)).max(name).max(lacking);
     let mut local_bytes = 0_u64;
     for identity in &config.identities {
         if !config.records_only.contains(&identity.forge) {

@@ -338,7 +338,18 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
         installations(engine, forge);
     }
     let outcome = match outcome {
-        reconcile::Outcome::Manifest { state, page } => {
+        reconcile::Outcome::Manifest { state, target, manifest } => {
+            // The kit answers the form's parts; the page is temper's (forge-setup.md 5.1).
+            let Some(page) = super::routes::form(&target, &manifest, engine.setup.env.limits.body_bytes) else {
+                let failure = reconcile::Failure {
+                    forge,
+                    step: reconcile::Stage::App,
+                    subject: Box::from(b"manifest".as_slice()),
+                    why: reconcile::Why::Unexpected,
+                };
+                stopped(engine, token, failure);
+                return;
+            };
             engine.setup.hold(forge, state.clone(), page);
             root::SetupOutcome::Manifest { state }
         }

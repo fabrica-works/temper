@@ -1796,3 +1796,15 @@ fn ended_forge_calls_are_answered_locally_at_zero_cost_and_hints_are_dropped() {
     assert!(engine.forge.starts.is_empty());
     assert!(engine.forge.io.is_empty());
 }
+#[test]
+fn the_manifest_form_escapes_its_attributes_and_refuses_a_page_past_its_bound() {
+    let target = b"http://forge.test/settings/apps/new?state=s&x=\"<>";
+    let manifest = br#"{"name":"temper-abc"}"#;
+    let page = routes::form(target, manifest, 4096).expect("form fits");
+    assert!(contains(&page, b"action=\"http://forge.test/settings/apps/new?state=s&amp;x=&quot;&lt;&gt;\""));
+    assert!(contains(&page, b"value=\"{&quot;name&quot;:&quot;temper-abc&quot;}\""));
+    assert!(contains(&page, b"<script>document.forms[0].submit()</script>"));
+    let fits = u32::try_from(page.len()).unwrap();
+    assert!(routes::form(target, manifest, fits).is_some());
+    assert!(routes::form(target, manifest, fits - 1).is_none());
+}

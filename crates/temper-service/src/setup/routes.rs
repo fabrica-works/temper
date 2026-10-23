@@ -128,6 +128,33 @@ fn escaped(byte: &u8) -> &[u8] {
         _ => core::slice::from_ref(byte),
     }
 }
+/// The form posting GitHub's manifest to `target`, submitted by its one script and
+/// with no external resources; both attributes escape. Refuses a page past `max`.
+pub(super) fn form(target: &[u8], manifest: &[u8], max: u32) -> Option<Box<[u8]>> {
+    let parts = [
+        b"<!doctype html><meta charset=\"utf-8\"><title>GitHub App</title><form method=\"post\" action=\"".as_slice(),
+        b"\"><input type=\"hidden\" name=\"manifest\" value=\"",
+        b"\"></form><script>document.forms[0].submit()</script>",
+    ];
+    let mut length = 0_usize;
+    for part in parts {
+        length = length.checked_add(part.len())?;
+    }
+    for byte in target.iter().chain(manifest) {
+        length = length.checked_add(escaped(byte).len())?;
+    }
+    if length > usize::try_from(max).ok()? {
+        return None;
+    }
+    let mut writer = Writer::new(length);
+    for (part, value) in parts.iter().zip([target, manifest, b"".as_slice()]) {
+        writer.put(part).ok()?;
+        for byte in value {
+            writer.put(escaped(byte)).ok()?;
+        }
+    }
+    Some(writer.finish())
+}
 fn page(engine: &mut Engine, call: Token, status: u16, heading: &[u8], why: &[u8], back: &[u8]) {
     let parts = [
         b"<!doctype html><title>temper</title><h1>temper</h1><main><h2>".as_slice(),
