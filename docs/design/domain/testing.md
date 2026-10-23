@@ -538,7 +538,9 @@ in the lower world that owns it, never here.
        replying. A whole chat: at most 3 s (1.5 s before the user's
        doubling of 10-22, provisional);
     2. GitHub connected through the manifest flow from `temper ctl`,
-       the browser's steps as the requests above;
+       the browser's steps as the requests above: story 6's start, so
+       that one chat shows both, while story 1 connects its App by the
+       paste;
     3. a repository added to a project later, from the picker;
     4. a landing through GitHub's merge queue, with an ejection
        repaired;
@@ -548,8 +550,9 @@ in the lower world that owns it, never here.
        chat's clone and push on a GitHub repository, each authenticated
        by its installation's token (`x-access-token`), which the layer's
        git route checks (skein's `fake-forge.md`, section 10). Two
-       accounts on the layer, `acme` with the App installed on all its
-       repositories and `umbra` with none, one repository each. The
+       accounts on the layer, one repository each, and the App made
+       through the manifest (story 2), installed on all of `acme`'s
+       repositories and on none of `umbra`'s. The
        person adopts `acme/app`; a chat delegates a change whose coder
        reads, edits and finishes it, as `fuzzy_landing`'s scripts begin
        (no review, no landing), and the story ends on the push. The

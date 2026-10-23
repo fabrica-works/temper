@@ -529,11 +529,7 @@ and `connect-forge.html`.
     "temper is busy with forge N: try again when it ends."; `no key`,
     "The key did not reach temper: paste it again."; unknown past the
     retention, "It is not known whether the App was connected: see
-    Forges.". Its install is Connecting's, as for temper's App. Until
-    the manifest's way (the FORGE requests' `Connect` with
-    `GitHubManifest`, `README.md`, section 8), "Connect GitHub" on
-    Choose is disabled, and its card ends "Connecting GitHub through
-    temper’s own App is not available yet: use an App of your own."
+    Forges.". Its install is Connecting's, as for temper's App.
     The terminal shell has no secret field of several lines: its
     Details for an App of your own say, in place of the fields and the
     button, "Paste the key on this page in a browser, or run temper
@@ -607,12 +603,12 @@ and `connect-forge.html`.
   installation shows Ready. The person meets it only by coming
   back to temper before installing: GitHub's redirect takes the tab
   from the App's form straight to that page. An App of the person's
-  own meets it always, since its connect has no redirect: its words
-  are "SLUG is connected to temper, and installed nowhere yet. Install
-  it, and choose the repositories temper may use.", since the client
-  cannot tell an App made from temper's manifest from one pasted (the
-  two end in the same records, `../protocol/credentials.md`, 2.1), and
-  the manifest's words wait for the manifest's way. SLUG is the
+  own meets it always, since its connect has no redirect. The row's
+  `app` says which (`README.md`, 4.6): `Manifest`, the words above;
+  otherwise, an App pasted or one connected before a restart, since
+  the two end in the same records (`../protocol/credentials.md`, 2.1),
+  "SLUG is connected to temper, and installed nowhere yet. Install it,
+  and choose the repositories temper may use.". SLUG is the
   connected login without its `[bot]` (the App's bot user's login is
   its slug and `[bot]`). The link `Install` answers is where the tab
   goes, as 5.4's last paragraph says; refused, its refusal shows under
@@ -964,7 +960,7 @@ nothing of temper's client calls them. Every other path, the client's
 
 | Route | What it does | Answers |
 |---|---|---|
-| `GET /forges/N/github/manifest?state=S` | the page the setup's host's `Manifest` run produced for that state, held with it: one form posting temper's manifest to `WEB/settings/apps/new?state=S`, the person's own account's, which posts itself as the page loads; a browser that runs no script, or one come back to the page through its history, shows instead "temper’s App, on GitHub", its button "Continue to GitHub" and "Back to temper", a link to the connect's `back`; the manifest's redirect and setup addresses are whole URLs on the clients' listener, `http://LISTENER/forges/N/github/redirect` and `http://LISTENER/forges/N/github/setup`, and its `url`, the App's homepage, `http://LISTENER/` | `200`, the page |
+| `GET /forges/N/github/manifest?state=S` | temper's page for that state, rendered from what the setup's host's `Manifest` run answered, the form's target and the manifest, and held with it, at most `page_bytes`: one form, the manifest its hidden `manifest` field, escaped as an attribute's value, posting temper's manifest to `WEB/settings/apps/new?state=S`, the person's own account's, which posts itself as the page loads; a browser that runs no script, or one come back to the page through its history, shows instead "temper’s App, on GitHub", its button "Continue to GitHub" and "Back to temper", a link to the connect's `back`, else `/forges/connect?forge=N`; the manifest's redirect and setup addresses are whole URLs on the clients' listener, `http://LISTENER/forges/N/github/redirect` and `http://LISTENER/forges/N/github/setup`, and its `url`, the App's homepage, `http://LISTENER/` | `200`, the page |
 | `GET /forges/N/github/redirect?code=C&state=S` | `Convert`: the code exchanged for the App's id, slug and key, each kept before the browser is answered, and its user; the App's hook points at `https://SLUG.invalid/`, so no webhook secret is kept on GitHub; then `Install` for a fresh state, held with the connect's `back`, whose link answers the browser, and the forge connects | `302` to the install page, `Install`'s link for that state |
 | `GET /forges/N/github/setup?installation_id=I&setup_action=A&state=S` | `Accept`: the installation checked and accepted, then the forge's installations handed to its component again | `303` to the state's `back`; with none, `200`, a short page: "temper has the installation; you may close this tab." |
 

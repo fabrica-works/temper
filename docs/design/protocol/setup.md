@@ -2750,8 +2750,9 @@ listener's (`../client/forge.md`, the browser's steps).
    of `temper ctl` (`Connect` with `GitHubManifest { back? }`). The
    setup host runs `Manifest { forge, target }` (skein's
    `forge-setup.md`, 5.1), `target` always `Personal`, for a fresh
-   state, ending `Done(Manifest { state, page })`; the page and `back`
-   are held with the state. The link is
+   state, ending `Done(Manifest { state, target, manifest })`; temper
+   renders the page from them (client/forge.md, 9.1) and holds it and
+   `back` with the state. The link is
    `http://<listener>/forges/<n>/github/manifest?state=<s>`: a
    browser's tab goes to it, as a sign-in's does, and comes back to
    `back` at the end; the terminal prints it and never opens it.

@@ -1180,7 +1180,8 @@ for its kind, its user's login and its installations. Its nodes:
   read's `state` and `StartDemo`), 8 since a sign-in's return
   (`Return`, section 8), 9 since connecting a GitHub App (`Connect`,
   `Install`, `ForgeRefusal`), 10 since the forges row's installations
-  and last connect's end, moved as
+  and last connect's end, 11 since GitHub's manifest (`Connect`'s
+  `GitHubManifest` and the row's `app`), moved as
   `../protocol/README.md`, section 9 says: at most once in a plan, at
   its first landing that changes one of these records, and shared by
   plans that run at once. A request, an outcome, a read, a subject or a
@@ -1348,7 +1349,11 @@ for its kind, its user's login and its installations. Its nodes:
   accepted through temper's link (booleans); its last connect's end,
   `ended`: none, or `ConnectStopped`, why the run of a `Connect` or an
   `Install` stopped, text of at most 256 bytes, in the setup host's
-  words (`forge.md`, 5.4); and its
+  words (`forge.md`, 5.4); on GitHub, its App's way, `app`: none,
+  `Manifest` or `Pasted`, how the App its records hold was connected
+  since the engine started, the forge domain's memory alone, so none
+  after a restart and while no App is connected (`forge.md`, 5.4,
+  Connecting); and its
   offer, the forge domain's (`../domain/forge.md`, 4.1): offered, not
   under the box, or not offered, which is what "Set up a Forgejo here", "Set up again"
   and the commands to run by hand follow (`forge.md`, 5.4). The read of the forges, the
@@ -3179,7 +3184,7 @@ does for the client:
 
   | Request | The value it carries | What the engine does | Its outcome |
   |---|---|---|---|
-  | `Connect { forge, how: GitHubManifest { back? } }` | none | the setup's host's `Manifest` run, for the person's own account, always (`forge.md`, 9.1), ending `Done(Manifest { state, page })`; `back` held with the state | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
+  | `Connect { forge, how: GitHubManifest { back? } }` | none | the setup's host's `Manifest` run, for the person's own account, always (`forge.md`, 9.1), ending `Done(Manifest { state, target, manifest })`, from which temper renders the manifest's page (`forge.md`, 9.1); the page and `back` held with the state | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
   | `Connect { forge, how: GitHubApp { id, key } }` | `key`, the App's private key, PEM as GitHub gives it; `id` rides in the request | `Paste`: the key decoded and matched to the App `id` names, the App's user found, its hook pointed at `https://SLUG.invalid/` (no webhook secret on GitHub: changes are heard from the App's delivery log), its permissions and events checked | connecting |
   | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | one bundle: the API token, the git token and, where the person made hooks to temper's listener, their secret | `Check`: both tokens answer as one user | connecting |
   | `Connect { forge, how: ForgejoAdmin { admin_token } }` | the site admin's token | `Reconcile`; the forge becomes managed | connecting |
