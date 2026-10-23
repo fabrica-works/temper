@@ -19,6 +19,7 @@ pub struct Model {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Document {
     listen: SocketAddr,
+    control: Option<SocketAddr>,
     key: Box<[u8]>,
     root: Option<Box<[u8]>>,
     models: Box<[Model]>,
@@ -31,6 +32,7 @@ impl Document {
         let p = Path::root();
         let mut o = read::object(&d, 0, &p)?;
         let listen_at = read::required(&mut o, &d, b"listen", &p)?;
+        let control_at = o.member(&d, b"control");
         let key = read::field(&mut o, &d, b"key", crate::limits::PATH_BYTES, &p)?;
         let tls_at = read::required(&mut o, &d, b"tls", &p)?;
         let models_at = read::required(&mut o, &d, b"models", &p)?;
@@ -39,6 +41,10 @@ impl Document {
         let otherwise_at = read::required(&mut o, &d, b"otherwise", &p)?;
         read::finish(o, &d, &p)?;
         let listen = read::listen(&d, listen_at, &p.member(b"listen"))?;
+        let control = match control_at {
+            Some(at) => Some(read::listen(&d, at, &p.member(b"control"))?),
+            None => None,
+        };
         read::absolute(&key, &p.member(b"key"))?;
         let root = if read::is_null(&d, tls_at) {
             None
@@ -53,10 +59,17 @@ impl Document {
         let models = models(&d, models_at, &p.member(b"models"))?;
         let (cued, cued_rules) = scripts_with_inputs(&d, cued_at, &p.member(b"cued"), true)?;
         let (asked, asked_rules) = scripts_with_inputs(&d, asked_at, &p.member(b"asked"), true)?;
-        let scripts = api::Scripts { cued, asked, otherwise: turns(&d, otherwise_at, &p.member(b"otherwise"))? };
+        let scripts = api::Scripts {
+            cued,
+            asked,
+            otherwise: turns_allowing_pieces(&d, otherwise_at, &p.member(b"otherwise"), true)?,
+        };
+        if control.is_none() && holds(&scripts) {
+            return Err(read::why(&p.member(b"control"), b"required when a piece has a hold"));
+        }
         let rules = api::Rules { cued: cued_rules, asked: asked_rules };
         check_inputs(&scripts, &rules, &p.member(b"otherwise"))?;
-        Ok(Self { listen, key, root, models, scripts, rules })
+        Ok(Self { listen, control, key, root, models, scripts, rules })
     }
     pub(crate) fn checked(
         listen: SocketAddr,
@@ -68,11 +81,15 @@ impl Document {
     ) -> Result<Self, Refusal> {
         check_scripts(&scripts, &p.member(b"otherwise"))?;
         let rules = api::Rules { cued: counted_rules(&scripts.cued), asked: counted_rules(&scripts.asked) };
-        Ok(Self { listen, key, root, models, scripts, rules })
+        Ok(Self { listen, control: None, key, root, models, scripts, rules })
     }
     #[must_use]
     pub fn listen(&self) -> SocketAddr {
         self.listen
+    }
+    #[must_use]
+    pub fn control(&self) -> Option<SocketAddr> {
+        self.control
     }
     #[must_use]
     pub fn key(&self) -> &[u8] {
@@ -100,6 +117,7 @@ impl Document {
 #[derive(Debug)]
 pub struct Configuration {
     pub listen: SocketAddr,
+    pub control: Option<SocketAddr>,
     pub tls: bool,
     pub key: skein_lib::Secret,
     pub models: Box<[Model]>,
@@ -112,6 +130,7 @@ pub const ROUTE: &[u8] = b"/v1/responses";
 pub fn configuration(document: &Document, key: &[u8], seed: u64) -> Configuration {
     Configuration {
         listen: document.listen,
+        control: document.control,
         tls: document.root.is_some(),
         key: skein_lib::Secret::new(skein_lib::bytes::copy_of(key)),
         models: document.models.clone(),
@@ -202,11 +221,12 @@ pub(crate) fn scripts(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Script]>,
     Ok(scripts_with_inputs(d, at, p, false)?.0)
 }
 type InputRules = Box<[Box<[api::Rule]>]>;
+/// A standalone document's scripts may carry `inputs` and held pieces; the deployment's carry neither.
 fn scripts_with_inputs(
     d: &Json,
     at: u32,
     p: &Path,
-    by_input: bool,
+    standalone: bool,
 ) -> Result<(Box<[api::Script]>, InputRules), Refusal> {
     let items = read::list(d, at, 0, p)?;
     let mut out = List::<api::Script>::with_capacity(items.len());
@@ -216,7 +236,7 @@ fn scripts_with_inputs(
         let mut o = read::object(d, *at, &p)?;
         let cue = read::field(&mut o, d, b"cue", crate::limits::CUE_BYTES, &p)?;
         let turns_at = read::required(&mut o, d, b"turns", &p)?;
-        let inputs_at = if by_input { o.member(d, b"inputs") } else { None };
+        let inputs_at = if standalone { o.member(d, b"inputs") } else { None };
         read::finish(o, d, &p)?;
         read::nonempty(&cue, &p.member(b"cue"))?;
         for prev in &out {
@@ -224,7 +244,7 @@ fn scripts_with_inputs(
                 return Err(read::why(&p.member(b"cue"), b"must be unique"));
             }
         }
-        let turns = turns(d, turns_at, &p.member(b"turns"))?;
+        let turns = turns_allowing_pieces(d, turns_at, &p.member(b"turns"), standalone)?;
         let inputs = match inputs_at {
             Some(at) => inputs(d, at, turns.len(), &p.member(b"inputs"))?,
             None => Box::new([]),
@@ -264,13 +284,38 @@ fn inputs(d: &Json, at: u32, turns: usize, p: &Path) -> Result<Box<[api::Rule]>,
     Ok(rules.into_boxed())
 }
 pub(crate) fn turns(d: &Json, at: u32, p: &Path) -> Result<Box<[api::Turn]>, Refusal> {
+    turns_allowing_pieces(d, at, p, false)
+}
+fn turns_allowing_pieces(d: &Json, at: u32, p: &Path, allow_pieces: bool) -> Result<Box<[api::Turn]>, Refusal> {
     let items = read::list(d, at, 1, p)?;
     let mut out = List::with_capacity(items.len());
     for (i, at) in items.iter().enumerate() {
-        let turn = turn::Turn::read(d, *at, &read::index(p, i))?;
+        let turn = turn::Turn::read_pieces(d, *at, &read::index(p, i), allow_pieces)?;
         out.push(turn::into_skein(turn)).expect("eight turns");
     }
     Ok(out.into_boxed())
+}
+fn holds(scripts: &api::Scripts) -> bool {
+    for script in scripts.cued.iter().chain(scripts.asked.iter()) {
+        if turns_hold(&script.turns) {
+            return true;
+        }
+    }
+    turns_hold(&scripts.otherwise)
+}
+fn turns_hold(turns: &[api::Turn]) -> bool {
+    for turn in turns {
+        for line in &turn.lines {
+            if let api::Line::Pieces { pieces } = line {
+                for piece in pieces {
+                    if piece.hold.is_some() {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 /// Live-domain limits: joint script bytes include all 17 scripts' wrappers.
 pub const LIMITS: domain::Config = domain::Config {
@@ -306,4 +351,174 @@ pub fn peer(configuration: Configuration) -> Result<skein_fake_peers::llm::Peer,
 /// Constructs a peer retaining the real loop's bounded outside query records.
 pub fn recording_peer(configuration: Configuration) -> Result<skein_fake_peers::llm::Peer, skein_fake_peers::Error> {
     crate::wire::llm(configuration, true)
+}
+
+/// One bounded, bodyless HTTP/1.1 control exchange on skein's server machine.
+/// The host queues the requested release before acknowledging it (protocol/setup.md, 8.4).
+pub mod control {
+    use alloc::boxed::Box;
+    use skein_http::{Method, Version, server as http};
+    use skein_lib::{
+        Env, Queue, Time, Wall, bytes,
+        stream::{Down, Up},
+    };
+
+    const LIMITS: http::Limits =
+        http::Limits { head: 1024, headers: 1024 / 3, body: 0, read: 1, response: 256, send: 1 };
+    const QUEUE: u32 = 8;
+
+    #[derive(Debug)]
+    pub struct Exchange {
+        server: http::Server,
+        events: Queue<http::Event>,
+        requests: Queue<http::Request>,
+        below: Queue<Down>,
+        release: Option<Box<[u8]>>,
+        done: bool,
+    }
+    impl Default for Exchange {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+    impl Exchange {
+        #[must_use]
+        pub fn new() -> Self {
+            let mut requests = Queue::with_capacity(QUEUE);
+            requests.push(http::Request::Next);
+            Self {
+                server: http::Server::new(&LIMITS),
+                events: Queue::with_capacity(QUEUE),
+                requests,
+                below: Queue::with_capacity(QUEUE),
+                release: None,
+                done: false,
+            }
+        }
+        pub fn up(&mut self, now: Time, wall: Wall, up: Up) {
+            http::up(&mut self.server, &Env { now, wall, limits: LIMITS }, up, &mut self.events, &mut self.below);
+            self.events();
+        }
+        pub fn advance(&mut self, now: Time, wall: Wall) {
+            for _ in 0..QUEUE {
+                if self.events.room() < 3 || self.below.room() < 2 {
+                    break;
+                }
+                let Some(request) = self.requests.pop() else { break };
+                http::down(
+                    &mut self.server,
+                    &Env { now, wall, limits: LIMITS },
+                    request,
+                    &mut self.events,
+                    &mut self.below,
+                );
+                self.events();
+            }
+        }
+        pub fn shutdown(&mut self) {
+            for _ in 0..self.requests.len() {
+                self.requests.pop().expect("one pass over requests");
+            }
+            self.release = None;
+            self.requests.push(http::Request::Close);
+        }
+        pub fn release(&mut self) -> Option<Box<[u8]>> {
+            self.release.take()
+        }
+        pub fn released(&mut self, queued: bool) {
+            self.respond(if queued { 204 } else { 400 });
+        }
+        pub fn pop(&mut self) -> Option<Down> {
+            self.below.pop()
+        }
+        #[must_use]
+        pub fn done(&self) -> bool {
+            self.done && self.below.is_empty() && self.requests.is_empty()
+        }
+        #[must_use]
+        pub fn work_pending(&self) -> bool {
+            self.done || self.release.is_some() || !self.requests.is_empty() || !self.below.is_empty()
+        }
+        #[must_use]
+        pub fn worst_case() -> u64 {
+            let mut bytes = http::worst_case(&LIMITS).expect("fixed HTTP limits");
+            for owned in [
+                Queue::<http::Event>::worst_case(QUEUE),
+                Queue::<http::Request>::worst_case(QUEUE),
+                Queue::<Down>::worst_case(QUEUE),
+                u64::from(QUEUE).checked_mul(u64::from(LIMITS.response)),
+                Some(64),
+            ] {
+                bytes = bytes.checked_add(owned.expect("bounded control storage")).expect("fixed control footprint");
+            }
+            bytes
+        }
+        fn respond(&mut self, status: u16) {
+            // Respond before discarding: a forbidden body gets no read or 100
+            // Continue. The discard then settles even an empty body's stream.
+            self.requests.push(http::Request::Respond(http::Response {
+                status,
+                headers: Box::new([]),
+                body: http::Body::None,
+                close: true,
+            }));
+            self.requests.push(http::Request::Discard);
+        }
+        fn events(&mut self) {
+            while let Some(event) = self.events.pop() {
+                match event {
+                    http::Event::Call(call) => {
+                        let bodyless = match call.body {
+                            http::Body::None | http::Body::Length(0) => true,
+                            http::Body::Length(_) | http::Body::Chunked => false,
+                        };
+                        if call.version != Version::Http11 || !bodyless {
+                            self.respond(400);
+                        } else if call.method != Method::Post || !call.target.starts_with(b"/release/") {
+                            self.respond(404);
+                        } else {
+                            let name = call.target.strip_prefix(b"/release/").expect("checked release prefix");
+                            if name.is_empty() || name.len() > 64 {
+                                self.respond(400);
+                            } else {
+                                self.release = Some(bytes::copy_of(name));
+                            }
+                        }
+                    }
+                    http::Event::Failed(http::Error::Rejected(rejection)) => {
+                        // The control has one refusal status, even for a head past its
+                        // bound. Preserve the server's reserved Send and stream demands.
+                        let answer: &[u8] = if rejection == http::Rejection::Method {
+                            b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        } else {
+                            b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        };
+                        for _ in 0..self.below.len() {
+                            let down = self.below.pop().expect("one pass over outputs");
+                            self.below.push(match down {
+                                Down::Send(_) => Down::Send(bytes::copy_of(answer)),
+                                other @ (Down::Demand { .. } | Down::Finish) => other,
+                            });
+                        }
+                        self.requests.push(http::Request::Close);
+                    }
+                    http::Event::Failed(http::Error::Truncated) => {
+                        // A partial head still owns the response room reserved before
+                        // its first line. End crossed its outstanding read.
+                        self.below.push(Down::Demand { read: skein_lib::stream::Read::Nothing, room: 0 });
+                        self.below.push(Down::Send(bytes::copy_of(
+                            b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                        )));
+                        self.requests.push(http::Request::Close);
+                    }
+                    http::Event::Done(_) | http::Event::Ended | http::Event::Failed(_) => {
+                        self.requests.push(http::Request::Close);
+                    }
+                    http::Event::Closed => self.done = true,
+                    http::Event::Body(_) => {}
+                    http::Event::Reply(_) | http::Event::Refused(_) => unreachable!("bodyless control exchange"),
+                }
+            }
+        }
+    }
 }

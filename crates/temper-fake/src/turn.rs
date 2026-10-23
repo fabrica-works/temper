@@ -3,7 +3,7 @@ use crate::{Refusal, read};
 use alloc::boxed::Box;
 use core::mem::size_of;
 use jig_protocol_config::{Path, read as config};
-use skein_fake_llm_domain::api::{self, Finish, Line};
+use skein_fake_llm_domain::api::{self, Finish, Line, Piece};
 use skein_json::{
     Document,
     document::Kind,
@@ -19,6 +19,10 @@ pub struct Turn {
 impl Turn {
     /// Reads and checks either spelling at its document path.
     pub fn read(d: &Document, at: u32, p: &Path) -> Result<Self, Refusal> {
+        Self::read_pieces(d, at, p, false)
+    }
+    /// The standalone document also permits text deltas, including named holds.
+    pub(crate) fn read_pieces(d: &Document, at: u32, p: &Path, allow_pieces: bool) -> Result<Self, Refusal> {
         let token = d.token(at).ok_or(read::why(p, b"missing"))?;
         if token.kind == Kind::String {
             let text = read::text(d, at, crate::ANSWER_BYTES, p)?;
@@ -46,7 +50,7 @@ impl Turn {
         let items = read::list(d, lines_at, 1, &p.member(b"lines"))?;
         let mut lines = List::with_capacity(items.len());
         for (i, at) in items.iter().enumerate() {
-            let line = line(d, *at, &read::index(&p.member(b"lines"), i))?;
+            let line = line(d, *at, &read::index(&p.member(b"lines"), i), allow_pieces)?;
             lines.push(line).expect("bounded lines");
         }
         let value = api::Turn { lines: lines.into_boxed(), finish, tokens };
@@ -60,12 +64,19 @@ pub fn into_skein(turn: Turn) -> api::Turn {
     turn.value
 }
 
-fn line(d: &Document, at: u32, p: &Path) -> Result<Line, Refusal> {
+fn line(d: &Document, at: u32, p: &Path, allow_pieces: bool) -> Result<Line, Refusal> {
     let mut o = read::object(d, at, p)?;
     let text_at = o.member(d, b"text");
     let call_at = o.member(d, b"call");
     let args_at = o.member(d, b"arguments");
+    let pieces_at = if allow_pieces { o.member(d, b"pieces") } else { None };
     read::finish(o, d, p)?;
+    if let Some(at) = pieces_at {
+        if text_at.is_some() || call_at.is_some() || args_at.is_some() {
+            return Err(read::why(p, b"expected pieces alone"));
+        }
+        return pieces(d, at, &p.member(b"pieces"));
+    }
     if let Some(at) = text_at {
         if call_at.is_some() || args_at.is_some() {
             return Err(read::why(p, b"expected text alone, or call and arguments"));
@@ -88,6 +99,27 @@ fn line(d: &Document, at: u32, p: &Path) -> Result<Line, Refusal> {
     }
     let arguments = compact(d, at, &p.member(b"arguments"))?;
     Ok(Line::Call { name, arguments })
+}
+fn pieces(d: &Document, at: u32, p: &Path) -> Result<Line, Refusal> {
+    let items = read::list(d, at, 1, p)?;
+    let mut pieces = List::with_capacity(items.len());
+    for (i, at) in items.iter().enumerate() {
+        let p = read::index(p, i);
+        let mut o = read::object(d, *at, &p)?;
+        let text = read::field(&mut o, d, b"text", crate::ANSWER_BYTES, &p)?;
+        let hold_at = read::required(&mut o, d, b"hold", &p)?;
+        read::finish(o, d, &p)?;
+        read::nonempty(&text, &p.member(b"text"))?;
+        let hold = if read::is_null(d, hold_at) {
+            None
+        } else {
+            let hold = read::text(d, hold_at, 64, &p.member(b"hold"))?;
+            read::nonempty(&hold, &p.member(b"hold"))?;
+            Some(hold)
+        };
+        pieces.push(Piece { text, hold }).expect("eight pieces");
+    }
+    Ok(Line::Pieces { pieces: pieces.into_boxed() })
 }
 fn compact(d: &Document, at: u32, p: &Path) -> Result<Box<[u8]>, Refusal> {
     let Ok(end) = config::after(d, at) else {
@@ -131,7 +163,14 @@ fn check_answer(turn: &api::Turn, p: &Path) -> Result<(), Refusal> {
             Line::Call { name, arguments } => {
                 name.len().checked_add(arguments.len()).expect("bounded call").checked_add(21).expect("call id")
             }
-            Line::Fail { .. } | Line::Pieces { .. } | Line::Opaque { .. } => {
+            Line::Pieces { pieces } => {
+                let mut bytes = 0_usize;
+                for piece in pieces {
+                    bytes = bytes.checked_add(piece.text.len()).expect("eight bounded pieces");
+                }
+                bytes
+            }
+            Line::Fail { .. } | Line::Opaque { .. } => {
                 unreachable!("only the two checked line spellings")
             }
         };
