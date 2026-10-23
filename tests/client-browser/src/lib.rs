@@ -80,7 +80,7 @@ pub fn start_chat(words: &[u8]) -> Vec<Step> {
         see(live()),
         see(composer()),
         Step::Person(PersonStep::Type { find: composer(), words: Box::from(words) }),
-        Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Start") }),
+        Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Start chat") }),
         see(first_chat(words)),
     ]
 }

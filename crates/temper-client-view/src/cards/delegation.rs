@@ -7,6 +7,7 @@ use crate::{
 };
 use jig_client::contract as c;
 use skein_ui::{Builder, Role, Run, phrases::Hole};
+use temper_client_domain::PlanFilter;
 use temper_client_domain::{
     Address,
     pages::{
@@ -59,7 +60,11 @@ pub(crate) fn card(b: &mut Builder, task: &c::Task, words: &Words, bindings: &mu
         b.close();
     }
     let name = words.say(Word::Task, &[Hole::Number(facts.task)]);
-    crate::link(b, &name, bindings.insert(Act::Go { address: Address::Task { task: facts.task } }));
+    crate::link(
+        b,
+        &name,
+        bindings.insert(Act::Go { address: Address::Task { task: facts.task, filter: PlanFilter::All } }),
+    );
     b.open(Role::Text);
     b.run(Run::Plain, &name);
     b.run(Run::Plain, " ↗".as_bytes());

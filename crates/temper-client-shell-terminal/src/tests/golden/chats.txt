@@ -8,7 +8,7 @@ Menu:
   * Pat
   [5] Sign out
 [6] Start a chat: (empty)
-[7] Start
+[7] Start chat
 ## Your chats
 [8] All (pressed)
 [9] Live
@@ -22,6 +22,6 @@ Your chats:
     just now
   - [12] T8
     Earlier
-    * Ended
+    * Closed
     4 spent · of 50 · delegates spent 0
     just now

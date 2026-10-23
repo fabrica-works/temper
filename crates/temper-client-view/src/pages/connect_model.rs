@@ -10,6 +10,7 @@ use crate::{
 use alloc::boxed::Box;
 use jig_client::contract as c;
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{
     Address, Domain, WayKind,
     pages::{
@@ -380,7 +381,7 @@ fn ready_body(
     if model::model_way(way).kind != WayKind::Program {
         facts(b, root, w, way);
     }
-    go(b, bindings, &say(w, W::StartChat), Address::Chats);
+    go(b, bindings, &say(w, W::StartChat), Address::Chats { filter: ChatsFilter::All, start: false });
     if model::model_way(way).kind == WayKind::SignIn {
         button(b, bindings, &label(me, way, ways, w), Act::SignIn { name: root.pages().account_name(), way }, false);
     }

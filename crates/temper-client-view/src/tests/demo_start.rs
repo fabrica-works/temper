@@ -3,10 +3,11 @@ use super::fixtures as f;
 use jig_client::contract as c;
 use skein_ui::Role;
 use temper_client_domain::Address;
+use temper_client_domain::ChatsFilter;
 
 #[test]
 fn the_start_draws_the_frame_banner_before_its_chatbar_context_and_invitation() {
-    let root = f::demo_root(Address::Chats, f::PROJECT, true);
+    let root = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true);
     let view = f::page_view(&root);
     let nodes = view.tree().nodes();
     let mut main = None;
@@ -87,7 +88,11 @@ fn other_chats_keep_their_heading_and_no_start() {
         ("forge alone", f::PROJECT, false, true),
         ("no answer", f::PROJECT, true, false),
     ] {
-        let root = if demo { f::demo_root(Address::Chats, project, model) } else { f::chats_root() };
+        let root = if demo {
+            f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, project, model)
+        } else {
+            f::chats_root()
+        };
         let view = f::page_view(&root);
         assert!(f::find(view.tree(), Role::Heading { level: 1 }, b"Chats").is_some(), "{row}");
         assert!(f::find(view.tree(), Role::Paragraph, b"New chat").is_none(), "{row}");
@@ -100,7 +105,7 @@ fn other_chats_keep_their_heading_and_no_start() {
 
 #[test]
 fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person() {
-    let template = f::demo_root(Address::Chats, f::PROJECT, true);
+    let template = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true);
     for (row, deployment, role, named, expected, project) in [
         (
             "deployment owner",
@@ -143,7 +148,13 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
                 jig_client::contract::Text::new(b"Project 1".as_slice().into(), 64).expect("project name"),
             );
         }
-        let root = f::demo_frame_root(Address::Chats, f::PROJECT, true, None, Some(me));
+        let root = f::demo_frame_root(
+            Address::Chats { filter: ChatsFilter::All, start: false },
+            f::PROJECT,
+            true,
+            None,
+            Some(me),
+        );
         let view = f::page_view(&root);
         assert!(f::find(view.tree(), Role::Paragraph, expected).is_some(), "{row}");
         let mut found = false;
@@ -192,7 +203,7 @@ fn a_chats_context_follows_the_chatbar_only_in_the_demo_project_even_without_its
 fn the_context_repository_has_its_own_node_and_style() {
     // Each page has exactly one demo repository in its context.
     const REPOSITORIES: u32 = 1;
-    for address in [Address::Chats, Address::Chat { task: f::chat::TASK }] {
+    for address in [Address::Chats { filter: ChatsFilter::All, start: false }, Address::Chat { task: f::chat::TASK }] {
         let root = f::demo_root(address, f::PROJECT, true);
         let view = f::page_view(&root);
         let mut repositories = skein_lib::List::with_capacity(REPOSITORIES);
@@ -209,7 +220,7 @@ fn the_context_repository_has_its_own_node_and_style() {
 
 #[test]
 fn the_invitation_is_a_named_region_with_its_parts_in_order() {
-    let root = f::demo_root(Address::Chats, f::PROJECT, true);
+    let root = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true);
     let view = f::page_view(&root);
     let tree = view.tree();
     let region = f::find(tree, Role::Region, b"What shall we change?").expect("named invitation region");
@@ -253,7 +264,8 @@ fn starting_waits_and_each_failure_explains_why_with_try_again() {
         (w::StartFailure::Adoption, "The playground did not start: acme/shop was not adopted."),
         (w::StartFailure::NotConnected, "The playground did not start: Playground forge did not connect."),
     ] {
-        let mut root = f::demo_state_root(Address::Chats, w::DemoState::NotStarted);
+        let mut root =
+            f::demo_state_root(Address::Chats { filter: ChatsFilter::All, start: false }, w::DemoState::NotStarted);
         assert_eq!(root.forge().demo().unwrap().state, DemoState::NotStarted);
         let attempt = f::demo_start_attempt(&mut root);
         let view = f::page_view(&root);
@@ -287,7 +299,7 @@ fn starting_waits_and_each_failure_explains_why_with_try_again() {
 #[test]
 fn a_not_started_demo_has_the_setup_strip_and_no_context_or_demo_banner() {
     use temper_client_protocol_wire::v1 as w;
-    for address in [Address::Chats, Address::Chat { task: 41 }] {
+    for address in [Address::Chats { filter: ChatsFilter::All, start: false }, Address::Chat { task: 41 }] {
         let root = f::demo_state_root(address, w::DemoState::NotStarted);
         let view = f::page_view(&root);
         assert!(f::find(view.tree(), Role::Region, b"Playground").is_none());
@@ -299,7 +311,8 @@ fn a_not_started_demo_has_the_setup_strip_and_no_context_or_demo_banner() {
 #[test]
 fn a_full_group_failure_keeps_each_utf8_replacement_as_the_forge_failure_does() {
     use temper_client_protocol_wire::v1 as w;
-    let mut root = f::demo_state_root(Address::Chats, w::DemoState::NotStarted);
+    let mut root =
+        f::demo_state_root(Address::Chats { filter: ChatsFilter::All, start: false }, w::DemoState::NotStarted);
     let attempt = f::demo_start_attempt(&mut root);
     let why = w::StartFailure::Group(
         w::GroupFailed::new(&w::CEILINGS, w::GroupFailedParts { why: Box::from([255_u8; 256]) }).unwrap(),

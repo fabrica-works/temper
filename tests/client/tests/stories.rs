@@ -37,7 +37,7 @@ fn a_double_press_of_start_makes_one_chat() {
         .tree(person)
         .nodes()
         .iter()
-        .find(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Start"))
+        .find(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Start chat"))
         .expect("Start")
         .id;
     world.act(person, node, skein_ui::Act::Press);
@@ -78,7 +78,7 @@ fn a_chat_started_on_the_chats_page_is_answered_by_the_run() {
         vec![
             Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: fixtures::WITHIN },
             Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: Box::from(*b"Hello") },
-            Step::Press { find: Find::named(Role::Button, b"Start") },
+            Step::Press { find: Find::named(Role::Button, b"Start chat") },
             Step::See { find: Find::text(b"Answered by the run"), within: fixtures::WITHIN },
         ],
     );
@@ -100,7 +100,7 @@ fn signed_out_mid_request_is_made_once_after_signing_in() {
         vec![
             Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: fixtures::WITHIN },
             Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: Box::from(*b"Hello") },
-            Step::Press { find: Find::named(Role::Button, b"Start") },
+            Step::Press { find: Find::named(Role::Button, b"Start chat") },
             Step::See { find: Find::text(b"Signed out"), within: fixtures::WITHIN },
         ],
     );

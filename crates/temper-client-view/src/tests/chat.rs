@@ -1230,7 +1230,7 @@ fn every_chat_end_line_carries_ended_and_omits_the_whole_composer() {
         at: Wall::EPOCH,
     };
     for (result, expected) in [
-        (c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Done(report.clone()))), "Ended · its report, “A report”"),
+        (c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Done(report.clone()))), "Closed · its report, “A report”"),
         (
             c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Failed(c::DocumentText::complete(text(
                 b"Checks failed",
@@ -1240,7 +1240,7 @@ fn every_chat_end_line_carries_ended_and_omits_the_whole_composer() {
         (c::TaskResult::Ending(Box::new(cancelled.clone())), "Cancelled · No longer needed"),
         (
             result_document(c::Ending::Task(Box::new(c::OwnerChipEnding::Done(report)))),
-            "Ended · its report, “A report”",
+            "Closed · its report, “A report”",
         ),
         (result_document(c::Ending::Task(Box::new(cancelled))), "Cancelled · No longer needed"),
         (result_document(c::Ending::Failed { reason: Some(text(b"Checks failed")) }), "Failed · Checks failed"),
@@ -1254,9 +1254,9 @@ fn every_chat_end_line_carries_ended_and_omits_the_whole_composer() {
             "Cancelled · No longer needed",
         ),
         (result_document(c::Ending::Withdrawn { reason: text(b"Withdrawn") }), "Cancelled · Withdrawn"),
-        (result_document(c::Ending::Done), "Ended"),
-        (result_document(c::Ending::Deleted), "Ended"),
-        (result_document(c::Ending::Decided { by: PARTY, party: None, how: None, at: Wall::EPOCH }), "Ended"),
+        (result_document(c::Ending::Done), "Closed"),
+        (result_document(c::Ending::Deleted), "Closed"),
+        (result_document(c::Ending::Decided { by: PARTY, party: None, how: None, at: Wall::EPOCH }), "Closed"),
     ] {
         let view = result_view(result);
         let end = fixtures::find(view.tree(), Role::Paragraph, expected.as_bytes()).expect("end line");
@@ -1321,7 +1321,7 @@ fn a_chats_end_line_says_who_ended_it() {
             c::OwnerChipEnding::Done(report),
             reported,
             Some(fixtures::NOW),
-            "Ended 00:00 · its report, “A report”",
+            "Closed 00:00 · its report, “A report”",
         ),
         (
             "failure",
@@ -1363,7 +1363,7 @@ fn a_chats_end_and_its_phase_keep_the_supplied_clock() {
     for (ending, expected) in [
         (
             c::OwnerChipEnding::Done(c::ResultValue::Report(c::DocumentText::complete(text(b"A report")))),
-            "Ended 00:00 · its report, “A report”",
+            "Closed 00:00 · its report, “A report”",
         ),
         (c::OwnerChipEnding::Failed(c::DocumentText::complete(text(b"Checks failed"))), "Failed 00:00 · Checks failed"),
         (
@@ -1666,7 +1666,7 @@ fn the_chatbar_and_chats_line_share_every_status_phrase() {
         b"Waiting for another party",
         b"Parked",
         b"Closing",
-        b"Ended",
+        b"Closed",
         b"waiting on 1 delegate",
         b"waiting on 2 delegates",
         b"waiting on your words",
@@ -1821,4 +1821,14 @@ fn named_count(tree: &skein_ui::Tree, role: Role, name: &[u8]) -> u32 {
         }
     }
     count
+}
+
+#[test]
+fn the_demo_chats_bar_has_no_model_word() {
+    let root = fixtures::demo_root(temper_client_domain::Address::Chat { task: TASK }, fixtures::PROJECT, true);
+    let view = fixtures::page_view(&root);
+    let bar = styled(view.tree(), crate::look::CHATBAR);
+    for node in subtree(view.tree(), bar) {
+        assert_ne!(node.name.as_deref(), Some(b"Scripted model".as_slice()));
+    }
 }

@@ -6,6 +6,7 @@
 use super::connect_forge as forge;
 use super::fixtures as f;
 use skein_ui::{Act, Role, State};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{self as d, Address, Step, pages};
 use temper_client_protocol_wire::v1 as w;
 
@@ -221,7 +222,7 @@ fn a_document_with_no_demo_has_neither_the_playground_card_nor_the_closing_line(
 }
 #[test]
 fn the_welcome_shows_its_heading_alone_until_it_decides() {
-    let (mut root, _, _) = f::root_at(Address::Chats, &f::limits());
+    let (mut root, _, _) = f::root_at(Address::Chats { filter: ChatsFilter::All, start: false }, &f::limits());
     f::root_event(&mut root, d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Welcome }) });
     assert!(!root.pages().welcome().unwrap().decided);
     let view = f::page_view(&root);
@@ -293,7 +294,10 @@ fn each_later_step_offers_back_later_and_the_playground_while_the_demo_is_answer
                 press(&root, Role::Link, "‹ Back"),
                 d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: back } })
             );
-            assert_eq!(press(&root, Role::Link, "Later"), d::Action::Pages(pages::Act::Go { address: Address::Chats }));
+            assert_eq!(
+                press(&root, Role::Link, "Later"),
+                d::Action::Pages(pages::Act::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } })
+            );
             let view = f::page_view(&root);
             assert_eq!(f::find(view.tree(), Role::Button, b"Try the playground instead").is_some(), demo);
             if demo {
@@ -399,7 +403,7 @@ fn ready_names_the_configured_model_without_an_account_row() {
 }
 #[test]
 fn the_setup_strip_continues_to_ready_with_a_configured_model() {
-    let root = configured_model_fixture(Address::Chats);
+    let root = configured_model_fixture(Address::Chats { filter: ChatsFilter::All, start: false });
     assert_eq!(
         press(&root, Role::Link, "Continue setting up"),
         d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Ready } })

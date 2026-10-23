@@ -1,17 +1,17 @@
-//! temper's addresses and the inbox's filters (client/README.md, 3.5), and their paths (client/browser.md, 2.3).
+//! temper's addresses and the pages' filters (client/README.md, 3.5), and their paths (client/browser.md, 2.3).
 use alloc::boxed::Box;
 use skein_lib::{Decimal, Writer};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
     Inbox { filter: Filter },
-    Chats,
+    Chats { filter: ChatsFilter, start: bool },
     Accounts,
     Forges,
     ConnectForge { forge: Option<Choice> },
     ConnectModel { way: Option<ModelWay> },
     Welcome { step: Step },
     Chat { task: u64 },
-    Task { task: u64 },
+    Task { task: u64, filter: PlanFilter },
     Adopt { project: u32 },
 }
 /// The welcome's query names its step (client/browser.md, 2.3).
@@ -41,6 +41,17 @@ pub enum WayKind {
     Key,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatsFilter {
+    All,
+    Live,
+    Closed,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlanFilter {
+    All,
+    Live,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Filter {
     pub project: Option<u32>,
     pub kind: Option<Kind>,
@@ -63,7 +74,7 @@ pub enum Place {
 }
 
 /// The page's path (client/browser.md, 2.3): `/`, `/chats`, `/chats/<task>`, `/tasks/<task>`,
-/// `/projects/<project>/adopt`, `/accounts`. The inbox adds its set filter fields as a query.
+/// `/projects/<project>/adopt`, `/accounts`. The pages add their set filter fields as a query.
 #[must_use]
 pub fn print(address: &Address) -> Box<[u8]> {
     let (name, number, tail) = match address {
@@ -80,9 +91,18 @@ pub fn print(address: &Address) -> Box<[u8]> {
         Address::Forges => (b"forges".as_slice(), None, b"".as_slice()),
         Address::ConnectModel { way } => return print_way(b"/accounts/connect", *way, b"?"),
         Address::Accounts => (b"accounts".as_slice(), None, b"".as_slice()),
-        Address::Chats => (b"chats".as_slice(), None, b"".as_slice()),
+        Address::Chats { filter, start } => {
+            return match (filter, start) {
+                (ChatsFilter::All, false) => b"/chats".as_slice().into(),
+                (ChatsFilter::Live, false) => b"/chats?state=live".as_slice().into(),
+                (ChatsFilter::Closed, false) => b"/chats?state=closed".as_slice().into(),
+                (ChatsFilter::All, true) => b"/chats?at=start".as_slice().into(),
+                (ChatsFilter::Live, true) => b"/chats?state=live&at=start".as_slice().into(),
+                (ChatsFilter::Closed, true) => b"/chats?state=closed&at=start".as_slice().into(),
+            };
+        }
         Address::Chat { task } => (b"chats".as_slice(), Some(*task), b"".as_slice()),
-        Address::Task { task } => (b"tasks".as_slice(), Some(*task), b"".as_slice()),
+        Address::Task { task, .. } => (b"tasks".as_slice(), Some(*task), b"".as_slice()),
         Address::Adopt { project } => (b"projects".as_slice(), Some(u64::from(*project)), b"adopt".as_slice()),
     };
     let digits = Decimal::of(number.unwrap_or(0));
@@ -95,6 +115,12 @@ pub fn print(address: &Address) -> Box<[u8]> {
             size = size.checked_add(1).expect("path fits usize");
         }
     }
+    let query = if let Address::Task { filter: PlanFilter::Live, .. } = address {
+        b"?state=live".as_slice()
+    } else {
+        b"".as_slice()
+    };
+    size = size.checked_add(query.len()).expect("query fits usize");
     let mut path = Writer::new(size);
     for part in parts {
         if !part.is_empty() {
@@ -102,10 +128,11 @@ pub fn print(address: &Address) -> Box<[u8]> {
             path.put(part).expect("part fits");
         }
     }
+    path.put(query).expect("query fits");
     path.finish()
 }
 
-/// The page a path names, reading the inbox's filter query and ignoring other queries and one trailing slash.
+/// The page a path names, reading the page's query and ignoring other queries and one trailing slash.
 /// Unreadable query fields are dropped; any other path is `Place::Missing`.
 #[must_use]
 pub fn parse(path: &[u8]) -> Place {
@@ -130,7 +157,10 @@ pub fn parse(path: &[u8]) -> Place {
         (b"accounts", b"", b"") => Address::Accounts,
         (b"accounts", b"connect", b"") => Address::ConnectModel { way: parse_way(fields) },
         (b"welcome", b"", b"") => Address::Welcome { step: welcome_step(fields) },
-        (b"chats", b"", b"") => Address::Chats,
+        (b"chats", b"", b"") => {
+            let (filter, start) = parse_chats(fields);
+            Address::Chats { filter, start }
+        }
         (b"chats", _, b"") => {
             let Some(task) = decimal(number) else {
                 return Place::Missing;
@@ -141,7 +171,7 @@ pub fn parse(path: &[u8]) -> Place {
             let Some(task) = decimal(number) else {
                 return Place::Missing;
             };
-            Address::Task { task }
+            Address::Task { task, filter: parse_plan(fields) }
         }
         (b"projects", _, b"adopt") => {
             let Some(project) = project_decimal(number) else {
@@ -152,6 +182,45 @@ pub fn parse(path: &[u8]) -> Place {
         _ => return Place::Missing,
     };
     Place::Address(address)
+}
+
+fn parse_chats(query: &[u8]) -> (ChatsFilter, bool) {
+    let mut filter = ChatsFilter::All;
+    let mut start = false;
+    let mut rest = query;
+    for _ in 0..query.len() {
+        if rest.is_empty() {
+            break;
+        }
+        let end = skein_lib::bytes::find(rest, b"&").unwrap_or(rest.len());
+        let field = rest.get(..end).expect("separator in query");
+        rest = rest.get(end..).expect("separator in query").strip_prefix(b"&").unwrap_or(b"");
+        if filter == ChatsFilter::All {
+            filter = match field {
+                b"state=live" => ChatsFilter::Live,
+                b"state=closed" => ChatsFilter::Closed,
+                _ => ChatsFilter::All,
+            };
+        }
+        start |= field == b"at=start";
+    }
+    (filter, start)
+}
+
+fn parse_plan(query: &[u8]) -> PlanFilter {
+    let mut rest = query;
+    for _ in 0..query.len() {
+        if rest.is_empty() {
+            break;
+        }
+        let end = skein_lib::bytes::find(rest, b"&").unwrap_or(rest.len());
+        let field = rest.get(..end).expect("separator in query");
+        rest = rest.get(end..).expect("separator in query").strip_prefix(b"&").unwrap_or(b"");
+        if field == b"state=live" {
+            return PlanFilter::Live;
+        }
+    }
+    PlanFilter::All
 }
 
 fn print_filter(filter: Filter) -> Box<[u8]> {

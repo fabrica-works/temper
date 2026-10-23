@@ -30,7 +30,7 @@ pub const fn open(address: &Address) -> bool {
         Address::Forges
         | Address::ConnectForge { .. }
         | Address::Inbox { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Accounts
         | Address::Welcome { .. }
         | Address::Chat { .. }
@@ -57,7 +57,7 @@ pub fn address(current: &Address, way: Option<ModelWay>) -> Address {
         Address::Forges
         | Address::ConnectForge { .. }
         | Address::Inbox { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Accounts
         | Address::ConnectModel { .. }
         | Address::Chat { .. }
@@ -72,7 +72,7 @@ pub fn way(pages: &Pages, client: &Client) -> Option<Way> {
         Address::Forges
         | Address::ConnectForge { .. }
         | Address::Inbox { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Accounts
         | Address::Welcome { .. }
         | Address::Chat { .. }

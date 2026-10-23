@@ -1,3 +1,4 @@
+use crate::ChatsFilter;
 mod accounts;
 mod chat;
 mod chats;
@@ -75,7 +76,7 @@ fn a_client_started_again_opens_at_the_inbox() {
         &mut pages,
         &fixtures::env(&fixtures::limits()),
         root.client(),
-        Event::Went { address: Address::Chats },
+        Event::Went { address: Address::Chats { filter: ChatsFilter::All, start: false } },
         &mut out,
     );
     pages::step(&mut pages, &fixtures::env(&fixtures::limits()), root.client(), Event::Started, &mut out);
@@ -141,4 +142,32 @@ fn leaving_a_page_unwatches_its_handles_and_drops_their_tells() {
     let before = pages::shown(root.pages());
     crate::route::told(&mut root, &fixtures::env(&limits), Told::Changed { handle: LEFT }, &mut out);
     assert_eq!(pages::shown(root.pages()), before);
+}
+
+#[test]
+fn arriving_at_chats_or_a_task_sets_its_address_filter() {
+    use crate::PlanFilter;
+    let limits = fixtures::limits();
+    let root = crate::unlinked(&limits, fixtures::SEED);
+    for address in [
+        Address::Chats { filter: ChatsFilter::Live, start: true },
+        Address::Chats { filter: ChatsFilter::Closed, start: false },
+        Address::Task { task: 7, filter: PlanFilter::Live },
+    ] {
+        let mut pages = Pages::new();
+        pages::step(
+            &mut pages,
+            &fixtures::env(&limits),
+            root.client(),
+            Event::Went { address: address.clone() },
+            &mut Queue::with_capacity(crate::max_out(&limits)),
+        );
+        assert_eq!(pages.address(), &address);
+        if let Address::Chats { filter, .. } = address {
+            assert_eq!(pages.chats().unwrap().filter, filter);
+        }
+        if let Address::Task { filter, .. } = address {
+            assert_eq!(pages.task().unwrap().filter, filter);
+        }
+    }
 }

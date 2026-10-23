@@ -324,19 +324,33 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     b.style(crate::look::PAGEBAR);
     text(b, w, Role::Heading { level: 1 }, W::Accounts);
     b.close();
+    // The heading's row, as the inbox's: the heading, its count, and the link to connect one.
+    b.open(Role::Slot);
+    b.style(crate::look::HEADING);
     text(b, w, Role::Heading { level: 2 }, W::Own);
+    let mut count = 0_u64;
     if let Some(doc) = accounts::document(root.client()) {
-        let mut count = 0_u64;
         for row in &doc.accounts {
             if !rows::demo(root, row.provider) {
                 count = count.checked_add(1).expect("received accounts fit");
             }
         }
-        crate::cards::text(b, Role::Paragraph, &words::say(w, W::Number, &[Hole::Number(count)]));
+        b.open(Role::Paragraph);
+        b.style(crate::look::SUBTLE_COUNT);
+        let said = words::say(w, W::Number, &[Hole::Number(count)]);
+        b.name(&said);
+        b.text(Run::Plain, &said);
+        b.close();
         connect(b, w, bindings, W::ConnectAdd);
+    }
+    b.close();
+    if let Some(doc) = accounts::document(root.client()) {
         if count == 0 {
+            // A block of their own, so that the link keeps to the page's column.
+            b.open(Role::Slot);
             text(b, w, Role::Paragraph, W::NoOwn);
             connect(b, w, bindings, W::Connect);
+            b.close();
         }
         let mut shown = 0;
         for row in &doc.accounts {

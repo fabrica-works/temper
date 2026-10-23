@@ -2,6 +2,7 @@
 use super::{connect_forge as cf, fixtures as f};
 use skein_lib::List;
 use skein_ui::{Act, Role, State};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{self as d, Address, Choice, Step};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 const HERE: u16 = 3;
@@ -107,7 +108,7 @@ fn the_navigation_has_forges_with_its_dot_and_words() {
 }
 #[test]
 fn the_setup_strip_replaces_the_demo_banner_and_says_whats_missing() {
-    let root = root(Address::Chats, w::Connection::NotSetUp);
+    let root = root(Address::Chats { filter: ChatsFilter::All, start: false }, w::Connection::NotSetUp);
     let view = f::page_view(&root);
     assert!(f::find(view.tree(), Role::Region, b"Setup").is_some());
     assert!(f::find(view.tree(), Role::Region, b"Playground").is_none());
@@ -125,7 +126,10 @@ fn the_setup_strip_replaces_the_demo_banner_and_says_whats_missing() {
         let view = f::page_view(&self::root(address, w::Connection::NotSetUp));
         assert!(f::find(view.tree(), Role::Region, b"Setup").is_none());
     }
-    let (mut root, accounts) = f::forge_root_accounts(Address::Chats, cf::rows(cf::connected(), w::Offer::Offered));
+    let (mut root, accounts) = f::forge_root_accounts(
+        Address::Chats { filter: ChatsFilter::All, start: false },
+        cf::rows(cf::connected(), w::Offer::Offered),
+    );
     let view = f::page_view(&root);
     assert!(f::find(view.tree(), Role::Paragraph, b"temper has no model yet.").is_some());
     f::welcome_account(&mut root, accounts);
@@ -133,7 +137,8 @@ fn the_setup_strip_replaces_the_demo_banner_and_says_whats_missing() {
 }
 #[test]
 fn the_demo_banners_connect_a_forge_is_a_link() {
-    let root = f::demo_frame_root(Address::Chats, f::PROJECT, true, None, None);
+    let root =
+        f::demo_frame_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true, None, None);
     assert_eq!(action(&root, Role::Link, b"Connect a forge"), go(Address::ConnectForge { forge: None }));
     assert!(f::find(f::page_view(&root).tree(), Role::Button, b"Connect a forge").is_none());
 }
@@ -141,7 +146,11 @@ fn the_demo_banners_connect_a_forge_is_a_link() {
 fn a_set_up_under_way_shows_in_either_banner_with_view() {
     for demo in [false, true] {
         let rows = cf::rows(w::Connection::Connecting, w::Offer::Offered);
-        let root = if demo { f::demo_forges_root(Address::Chats, rows) } else { f::forge_root(Address::Chats, rows) };
+        let root = if demo {
+            f::demo_forges_root(Address::Chats { filter: ChatsFilter::All, start: false }, rows)
+        } else {
+            f::forge_root(Address::Chats { filter: ChatsFilter::All, start: false }, rows)
+        };
         let view = f::page_view(&root);
         assert!(f::find(view.tree(), Role::Paragraph, "Forgejo on this machine · Connecting".as_bytes()).is_some());
         assert_eq!(action(&root, Role::Link, b"View"), go(Address::ConnectForge { forge: Some(Choice::Forge(HERE)) }));
@@ -163,7 +172,10 @@ fn the_playground_forge_shows_while_the_forge_half_holds() {
     )
     .unwrap();
     assert!(!view.tree().nodes().iter().find(|n| n.id == row).unwrap().states.as_slice().contains(&State::Expanded));
-    f::root_event(&mut root, d::Event::Went { place: d::Place::Address(Address::Chats) });
+    f::root_event(
+        &mut root,
+        d::Event::Went { place: d::Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) },
+    );
     assert!(d::forge::listed::playground(&root).is_some());
     let root = f::demo_forges_root(Address::Forges, cf::rows(cf::connected(), w::Offer::Offered));
     assert!(d::forge::listed::playground(&root).is_none());

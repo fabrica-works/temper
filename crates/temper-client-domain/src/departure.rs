@@ -42,7 +42,7 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: &Told, out: &mut 
             Address::ConnectModel { way: Some(ModelWay { provider, kind: WayKind::SignIn, source: Some(*source) }) }
         }
         Address::Inbox { .. }
-        | Address::Chats
+        | Address::Chats { .. }
         | Address::Accounts
         | Address::Forges
         | Address::ConnectForge { .. }

@@ -2,6 +2,7 @@
 use super::fixtures as f;
 use skein_lib::List;
 use skein_ui::{Act, Role, State};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{self as d, Address, Choice, Step, pages};
 use temper_client_protocol_wire::v1 as w;
 const HERE: u16 = 3;
@@ -618,7 +619,13 @@ fn ready_says_the_repository_is_ready_and_opens_its_project() {
         assert_eq!(action, d::Action::Pages(pages::Act::OpenProject { project: f::PROJECT }));
         let mut out = drive(&mut root, d::Event::Act { action });
         assert_eq!(root.pages().project(), Some(f::PROJECT));
-        assert_eq!(out.pop(), Some(d::Request::Show { address: Address::Chats, replace: false }));
+        assert_eq!(
+            out.pop(),
+            Some(d::Request::Show {
+                address: Address::Chats { filter: ChatsFilter::All, start: false },
+                replace: false
+            })
+        );
     }
 }
 fn pending_adoption() -> (d::Domain, skein_lib::Token) {

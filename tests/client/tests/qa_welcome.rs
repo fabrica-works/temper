@@ -4,6 +4,7 @@ use jig_client_world::harness::{ClientId, Until, World};
 use skein_fake_person::{Find, Step as PersonStep};
 use skein_ui::Role;
 use skein_world::domain::Verdict;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Address, Place, Step, address};
 use temper_client_world::{app::Temper, fixtures as f, front::Joint};
 
@@ -30,7 +31,7 @@ fn follow(world: &mut Pages, client: ClientId, steps: Vec<PersonStep<Address>>) 
 // Welcome deliberately has no link-state node (client/README.md, 3.5).
 // Establish the world's visible Online expectation at Chats before navigating.
 fn open_from_chats(world: &mut Pages, step: Step) -> ClientId {
-    let client = world.client(f::PARTY, Address::Chats);
+    let client = world.client(f::PARTY, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(world, client, vec![see(Role::Heading { level: 1 }, b"Chats")]);
     follow(world, client, vec![PersonStep::Go { address: welcome(step) }]);
     client

@@ -1,4 +1,5 @@
 use super::{demo, fixtures as f};
+use crate::ChatsFilter;
 use crate::{
     Address, Choice, Event, Place, Request, Step,
     forge::{
@@ -597,7 +598,7 @@ fn the_client_that_set_up_adopts_the_made_repository_once_on_another_page() {
     let (mut root, _, watch) = opened(true);
     let (attempt, _, _) = sent(setup(&mut root));
     reply(&mut root, attempt, w::Outcome::SettingUp);
-    event(&mut root, Event::Went { place: Place::Address(Address::Chats) });
+    event(&mut root, Event::Went { place: Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }) });
     assert!(deliver_first(&mut root, watch, connected(), w::FirstState::Making).is_empty());
     assert!(deliver_first(&mut root, watch, w::Connection::Connecting, made()).is_empty());
     let (_, key, w::Request::Adopt(adoption)) = sent(deliver_first(&mut root, watch, connected(), made())) else {

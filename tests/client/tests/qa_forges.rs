@@ -5,6 +5,7 @@ use skein_fake_person::{Find, Step as PersonStep};
 use skein_lib::Duration;
 use skein_ui::{Act, Role, State};
 use skein_world::domain::Verdict;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Address, Choice, Place, Step, address};
 use temper_client_view::look;
 use temper_client_world::{app::Temper, fixtures as f, front::Joint};
@@ -134,7 +135,7 @@ fn connected() -> forge::Connection {
 }
 // Welcome hides Live. Establish the world's Online observation before entering it.
 fn open(world: &mut Pages, address: Address) -> ClientId {
-    let client = world.client(f::PARTY, Address::Chats);
+    let client = world.client(f::PARTY, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(world, client, vec![see(Role::Heading { level: 1 }, b"Chats")]);
     follow(world, client, vec![PersonStep::Go { address }]);
     client
@@ -350,7 +351,12 @@ fn unoffered_forge_has_no_owned_choose_card() {
 #[test]
 fn github_details_offer_only_the_app_of_ones_own_with_a_masked_key() {
     let mut world = world();
-    let client = world.client_with(f::PARTY, Address::Chats, f::domain_limits(), browser_client);
+    let client = world.client_with(
+        f::PARTY,
+        Address::Chats { filter: ChatsFilter::All, start: false },
+        f::domain_limits(),
+        browser_client,
+    );
     follow(
         &mut world,
         client,
@@ -534,7 +540,7 @@ fn navigation_dot_names_and_colours_follow_real_rows_only() {
     ] {
         let mut world = world_for(number);
         connection(&mut world, number, state);
-        let client = open(&mut world, Address::Chats);
+        let client = open(&mut world, Address::Chats { filter: ChatsFilter::All, start: false });
         let dot = node(&world, client, Role::Text, label);
         assert!(dot.styles.as_slice().contains(&style), "wrong colour: {dot:?}");
     }
@@ -545,7 +551,7 @@ fn failure_dot_wins_over_progress_then_clears_on_connect() {
     let mut world = world();
     connection(&mut world, OWNED, forge::Connection::SetUpFailed { why: FAILURE.into() });
     connection(&mut world, GITHUB, forge::Connection::Connecting);
-    let client = open(&mut world, Address::Chats);
+    let client = open(&mut world, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(&mut world, client, vec![see(Role::Text, b"a forge needs you"), gone(Role::Text, b"a forge is setting up")]);
     connection(&mut world, OWNED, connected());
     connection(&mut world, GITHUB, connected());
@@ -569,7 +575,7 @@ fn failure_dot_wins_over_progress_then_clears_on_connect() {
 fn fake_failure_never_sets_navigation_dot() {
     let mut world = world_for(FAKE);
     connection(&mut world, FAKE, forge::Connection::SetUpFailed { why: FAILURE.into() });
-    let client = open(&mut world, Address::Chats);
+    let client = open(&mut world, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(
         &mut world,
         client,
@@ -668,7 +674,7 @@ fn running_setup_opened_in_second_tab_is_not_resent() {
 #[test]
 fn setup_strip_tracks_progress_and_changes_its_continue_step() {
     let mut world = world();
-    let client = open(&mut world, Address::Chats);
+    let client = open(&mut world, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(&mut world, client, vec![see(Role::Region, b"Setup")]);
     follow(
         &mut world,
@@ -676,7 +682,7 @@ fn setup_strip_tracks_progress_and_changes_its_continue_step() {
         vec![
             PersonStep::Press { find: Find::exactly_named(Role::Link, b"Continue setting up") },
             see(Role::Heading { level: 1 }, b"Connect a forge"),
-            PersonStep::Go { address: Address::Chats },
+            PersonStep::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } },
         ],
     );
     connection(&mut world, OWNED, forge::Connection::SettingUp { step: Some(forge::SetUpStep::Fetch) });
@@ -726,7 +732,7 @@ fn non_owner_forges_page_explains_the_watch_refusal() {
 #[ignore = "needs: a non-owner identity; `configured(false, ..)` still signs in the deployment's owner"]
 fn non_owner_setup_strip_only_names_the_missing_model() {
     let mut world = configured(false, true, forge::Mode::Owned);
-    let client = open(&mut world, Address::Chats);
+    let client = open(&mut world, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(&mut world, client, vec![see(Role::Region, b"Setup")]);
     let words = text(&world, client);
     assert!(words.contains("temper has no model yet."), "{words}");
@@ -738,7 +744,14 @@ fn non_owner_setup_strip_only_names_the_missing_model() {
 fn session_watch_survives_pages_and_stays_terminal_without_retry() {
     let mut world = world();
     let client = open(&mut world, Address::Forges);
-    follow(&mut world, client, vec![PersonStep::Go { address: at(OWNED) }, PersonStep::Go { address: Address::Chats }]);
+    follow(
+        &mut world,
+        client,
+        vec![
+            PersonStep::Go { address: at(OWNED) },
+            PersonStep::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } },
+        ],
+    );
     // Hold first delivery: Forges must draw headings only. Refuse/end instead:
     // no rows or stale dot/banner; navigating must not open another watch.
 }
@@ -758,7 +771,7 @@ fn playground_forge_disappears_when_real_forge_connects() {
 #[ignore = "needs: non-null Demo read fixture to exercise both halves, banner order, Connect a forge href, replacement by progress, exclusions and demo-to-setup/accounts seam"]
 fn playground_banner_replaces_connect_link_with_running_setup() {
     let mut world = world();
-    let client = open(&mut world, Address::Chats);
+    let client = open(&mut world, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(&mut world, client, vec![see(Role::Region, b"Playground"), see(Role::Link, b"Connect a forge")]);
     connection(&mut world, OWNED, forge::Connection::SettingUp { step: None });
     follow(&mut world, client, vec![see(Role::Link, b"View"), gone(Role::Link, b"Connect a forge")]);
@@ -791,7 +804,7 @@ fn browser_reload_preserves_running_setup_without_resending() {
 #[test]
 fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
     for (page, has_strip) in [
-        (Address::Chats, true),
+        (Address::Chats { filter: ChatsFilter::All, start: false }, true),
         (f::inbox(), true),
         (Address::Adopt { project: 1 }, true),
         (Address::Forges, false),

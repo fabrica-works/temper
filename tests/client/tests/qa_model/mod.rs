@@ -3,6 +3,7 @@ use jig_client_world::harness::{ClientId, Until, World};
 use skein_fake_person::{Find, Step};
 use skein_ui::Role;
 use skein_world::domain::Verdict;
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Address, Place, address};
 use temper_client_world::{app::Temper, fixtures as f, front::Joint};
 
@@ -27,7 +28,7 @@ pub fn follow(world: &mut Pages, client: ClientId, steps: Vec<Step<Address>>) {
     assert_eq!(result.verdict, Verdict::Passed, "{result:?}");
 }
 pub fn open(world: &mut Pages, path: &[u8]) -> ClientId {
-    let client = world.client(f::PARTY, Address::Chats);
+    let client = world.client(f::PARTY, Address::Chats { filter: ChatsFilter::All, start: false });
     follow(world, client, vec![see(Role::Status, b"Live"), Step::Go { address: at(path) }]);
     client
 }

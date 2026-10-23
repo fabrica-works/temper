@@ -334,6 +334,7 @@ pub enum Word {
     SignedProjectOwner,
     SignedName,
     NewChat,
+    NewChatLink,
     Ready,
     Demo,
     DemoModel,
@@ -543,8 +544,8 @@ pub enum Word {
 // Seven demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
 // The browser sign-in heading and Google link add two phrases.
-const PHRASES: u32 = 1026;
-const ALL: [Word; 493] = [
+const PHRASES: u32 = 1027;
+const ALL: [Word; 494] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -862,6 +863,7 @@ const ALL: [Word; 493] = [
     Word::SignedProjectOwner,
     Word::SignedName,
     Word::NewChat,
+    Word::NewChatLink,
     Word::Ready,
     Word::Demo,
     Word::DemoModel,
@@ -1374,6 +1376,7 @@ impl Word {
             Self::SignedProjectOwner => 284,
             Self::SignedName => 285,
             Self::NewChat => 286,
+            Self::NewChatLink => 1258,
             Self::Ready => 287,
             Self::Demo => 187,
             Self::DemoModel => 188,
@@ -2021,8 +2024,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::TimeYesterday => (&[b"Yesterday \xc2\xb7 ", b""], &[Name]),
         Word::TimeWaiting => (&[b"Waiting ", b""], &[Name]),
         Word::TimeWaitingChat => (&[b"waiting ", b""], &[Name]),
-        Word::TimeEnded => (&[b"Ended ", b""], &[Name]),
-        Word::TimeEndedReport => (&[b"Ended ", b" \xc2\xb7 its report, \xe2\x80\x9c", b"\xe2\x80\x9d"], &[Name, Name]),
+        Word::TimeEnded => (&[b"Closed ", b""], &[Name]),
+        Word::TimeEndedReport => (&[b"Closed ", b" \xc2\xb7 its report, \xe2\x80\x9c", b"\xe2\x80\x9d"], &[Name, Name]),
         Word::TimeFailed => (&[b"Failed ", b" \xc2\xb7 ", b""], &[Name, Name]),
         Word::TimeCancelled => (&[b"Cancelled ", b" \xc2\xb7 ", b""], &[Name, Name]),
         Word::TimeSundayShort => (&[b"Sun"], &[]),
@@ -2051,8 +2054,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::TimeOctober => (&[b"October"], &[]),
         Word::TimeNovember => (&[b"November"], &[]),
         Word::TimeDecember => (&[b"December"], &[]),
-        Word::ChatEnded => (&[b"Ended"], &[]),
-        Word::ChatEndedReport => (&[b"Ended \xc2\xb7 its report, \xe2\x80\x9c", b"\xe2\x80\x9d"], &[Name]),
+        Word::ChatEnded => (&[b"Closed"], &[]),
+        Word::ChatEndedReport => (&[b"Closed \xc2\xb7 its report, \xe2\x80\x9c", b"\xe2\x80\x9d"], &[Name]),
         Word::ChatFailed => (&[b"Failed \xc2\xb7 ", b""], &[Name]),
         Word::ChatCancelled => (&[b"Cancelled \xc2\xb7 ", b""], &[Name]),
         Word::RunBegan => (&[b"Run ", b" began"], &[Number]),
@@ -2072,7 +2075,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::Stop => (&[b"Stop"], &[]),
         Word::Older => (&[b"Older"], &[]),
         Word::StartChat => (&[b"Start a chat"], &[]),
-        Word::Start => (&[b"Start"], &[]),
+        Word::Start => (&[b"Start chat"], &[]),
         Word::YourChats => (&[b"Your chats"], &[]),
         Word::NoChats => (&[b"No chats yet."], &[]),
         Word::NoLiveChats => (&[b"No live chats."], &[]),
@@ -2105,6 +2108,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::SignedProjectOwner => (&[b"Signed in as the project\xe2\x80\x99s owner"], &[]),
         Word::SignedName => (&[b"Signed in as ", b""], &[Name]),
         Word::NewChat => (&[b"New chat"], &[]),
+        Word::NewChatLink => (&[b"+ New chat"], &[]),
         Word::Ready => (&[b"Ready"], &[]),
         Word::Demo => (&[b"Playground"], &[]),
         Word::DemoModel => (&[b"This is the playground: a scripted model."], &[]),

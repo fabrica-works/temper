@@ -1,17 +1,24 @@
 use super::fixtures as f;
 use skein_ui::{Role, State};
 use temper_client_domain::{Action, Address, Event, pages::Act};
+use temper_client_domain::{ChatsFilter, PlanFilter};
 #[test]
 fn the_demo_banner_follows_the_frame_on_work_pages() {
     for (row, address, project, demo, shown) in [
-        ("other project chats", Address::Chats, f::SECOND_PROJECT, true, true),
-        ("demo start", Address::Chats, f::PROJECT, true, true),
+        (
+            "other project chats",
+            Address::Chats { filter: ChatsFilter::All, start: false },
+            f::SECOND_PROJECT,
+            true,
+            true,
+        ),
+        ("demo start", Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true, true),
         ("chat", Address::Chat { task: 1 }, f::PROJECT, true, true),
         ("inbox", Address::Inbox { filter: temper_client_domain::address::Filter::ALL }, f::SECOND_PROJECT, true, true),
-        ("task", Address::Task { task: 9 }, f::SECOND_PROJECT, true, true),
+        ("task", Address::Task { task: 9, filter: PlanFilter::All }, f::SECOND_PROJECT, true, true),
         ("accounts", Address::Accounts, f::PROJECT, true, false),
         ("welcome", Address::Welcome { step: temper_client_domain::Step::Welcome }, f::PROJECT, true, false),
-        ("no demo", Address::Chats, f::PROJECT, false, false),
+        ("no demo", Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, false, false),
     ] {
         let root = if demo { f::demo_root(address, project, true) } else { f::chats_root() };
         let mut view = f::page_view(&root);
@@ -56,7 +63,11 @@ fn suggestions_show_only_in_the_demo_project_with_the_model_half() {
         ("no model half", f::PROJECT, false, true, false),
         ("no demo", f::PROJECT, true, false, false),
     ] {
-        let root = if demo { f::demo_root(Address::Chats, project, model) } else { f::chats_root() };
+        let root = if demo {
+            f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, project, model)
+        } else {
+            f::chats_root()
+        };
         let view = f::page_view(&root);
         assert_eq!(
             f::find(view.tree(), Role::Heading { level: 1 }, b"What shall we change?").is_some(),
@@ -101,7 +112,7 @@ fn suggestions_show_only_in_the_demo_project_with_the_model_half() {
 #[test]
 fn suggestion_buttons_wait_for_a_start_and_press_their_own_cue() {
     for (row, pending) in [("ready", false), ("start pending", true)] {
-        let mut root = f::demo_root(Address::Chats, f::PROJECT, true);
+        let mut root = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true);
         if pending {
             for act in [Act::ChatWords { words: b"My draft".as_slice().into() }, Act::StartChat] {
                 f::root_event(&mut root, Event::Act { action: Action::Pages(act) });
@@ -127,7 +138,7 @@ fn suggestion_buttons_wait_for_a_start_and_press_their_own_cue() {
         }
         let mut start = None;
         for candidate in view.tree().nodes() {
-            if candidate.role == Role::Button && candidate.name.as_deref() == Some(b"Start") {
+            if candidate.role == Role::Button && candidate.name.as_deref() == Some(b"Start chat") {
                 start = Some(candidate);
             }
         }
@@ -142,7 +153,7 @@ fn the_demo_banner_is_absent_when_the_link_is_unavailable() {
         ("signed out", jig_client::Up::SignedOut),
         ("out of date", jig_client::Up::Served { served: false, versions: None }),
     ] {
-        let mut root = f::demo_root(Address::Chats, f::PROJECT, true);
+        let mut root = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true);
         f::root_event(&mut root, Event::Client { event: jig_client::Event::Up { up } });
         let view = f::page_view(&root);
         assert!(f::find(view.tree(), Role::Region, b"Playground").is_none(), "{row}");
@@ -152,7 +163,7 @@ fn the_demo_banner_is_absent_when_the_link_is_unavailable() {
 
 #[test]
 fn a_forge_only_banner_links_to_connect_without_a_model_link() {
-    let root = f::demo_root(Address::Chats, f::PROJECT, false);
+    let root = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, false);
     let mut view = f::page_view(&root);
     assert!(f::find(view.tree(), Role::Paragraph, b"This is the playground: a playground forge.").is_some());
     assert!(f::find(view.tree(), Role::Link, b"Connect a model").is_none());
@@ -165,10 +176,10 @@ fn a_forge_only_banner_links_to_connect_without_a_model_link() {
 
 #[test]
 fn a_chats_banner_precedes_main_and_its_chatbar_in_every_project() {
-    for (row, project, model, label) in [
-        ("demo project", f::PROJECT, true, true),
-        ("another project", f::SECOND_PROJECT, true, false),
-        ("forge alone", f::PROJECT, false, false),
+    for (row, project, model) in [
+        ("demo project", f::PROJECT, true),
+        ("another project", f::SECOND_PROJECT, true),
+        ("forge alone", f::PROJECT, false),
     ] {
         let root = f::demo_root(Address::Chat { task: 1 }, project, model);
         let view = f::page_view(&root);
@@ -200,7 +211,7 @@ fn a_chats_banner_precedes_main_and_its_chatbar_in_every_project() {
         assert_eq!(main.unwrap(), demo.unwrap() + usize::try_from(nodes[demo.unwrap()].size).unwrap(), "{row}");
         assert!(main.unwrap() < chatbar.unwrap() && chatbar.unwrap() < thread.unwrap(), "{row}");
         assert!(f::find(view.tree(), Role::Heading { level: 1 }, "T1 · Ship the update".as_bytes()).is_some(), "{row}");
-        assert_eq!(f::find(view.tree(), Role::Paragraph, b"Scripted model").is_some(), label, "{row}");
+        assert!(f::find(view.tree(), Role::Paragraph, b"Scripted model").is_none(), "{row}");
     }
 }
 #[test]
@@ -225,7 +236,7 @@ fn the_demo_account_always_names_default_whatever_the_model_or_project() {
         let view = f::page_view(&root);
         assert!(f::find(view.tree(), Role::Paragraph, expected.as_bytes()).is_some(), "{row}");
     }
-    let root = f::demo_root(Address::Chats, f::PROJECT, true);
+    let root = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true);
     assert!(
         f::find(f::page_view(&root).tree(), Role::Paragraph, "Using Scripted model · Default".as_bytes()).is_some()
     );
@@ -319,7 +330,7 @@ fn the_hidden_deployment_demo_account_needs_only_its_public_provider() {
 
 #[test]
 fn the_playground_chooser_names_the_provider_and_model_but_keeps_the_configured_choice() {
-    let mut root = f::demo_root(Address::Chats, f::PROJECT, true);
+    let mut root = f::demo_root(Address::Chats { filter: ChatsFilter::All, start: false }, f::PROJECT, true);
     let mut view = f::page_view(&root);
     assert!(f::find(view.tree(), Role::Paragraph, b"Playground").is_some());
     assert!(f::find(view.tree(), Role::Button, b"demo").is_none());
@@ -360,7 +371,7 @@ fn the_playground_account_is_in_its_own_folded_section() {
 
 #[test]
 fn the_accounts_banner_precedes_the_playground_when_both_show() {
-    for address in [Address::Chats, Address::Chat { task: 1 }] {
+    for address in [Address::Chats { filter: ChatsFilter::All, start: false }, Address::Chat { task: 1 }] {
         let (mut root, _, _, _, watch) =
             f::root_at_with_demo(address, &f::domain_limits(), b"Shop", Some((f::PROJECT, true)));
         let mut doc = temper_client_domain::pages::accounts::document(root.client()).unwrap().clone();

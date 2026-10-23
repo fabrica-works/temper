@@ -290,7 +290,11 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 - **A filter chosen is a move** (below), with its history entry: a
   link's, at the page's top with the focus on its heading, and back
   returns to the filter before. Like any move it folds the open
-  disclosures (2.5), so the Kind menu closes on its choice.
+  disclosures (2.5), so the Kind menu closes on its choice. A move
+  that stays on the chats list, or on one goal's page, changing its
+  filter or its start alone, keeps the page: its composers' words, the
+  closed chats and ended delegates it read, which it reads not again;
+  the inbox's filter, a query the engine answers, reads its page anew.
 - **A path that is no page** opens the inbox, and the address is
   replaced with `/`. The codec never prints a path under `/jig`,
   `/bundle/`, `/test/` or `/forges/N/github/`, temper's routes for

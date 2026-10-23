@@ -289,7 +289,7 @@ fn root_at_with_forges(
         temper_client_domain::Address::Welcome { .. } => true,
         temper_client_domain::Address::Forges
         | temper_client_domain::Address::ConnectForge { .. }
-        | temper_client_domain::Address::Chats
+        | temper_client_domain::Address::Chats { .. }
         | temper_client_domain::Address::Accounts
         | temper_client_domain::Address::Inbox { .. }
         | temper_client_domain::Address::Adopt { .. }
@@ -525,13 +525,19 @@ pub fn signed_in_with_project() -> crate::View {
     build(&mut view, &root_in_project(Some(PROJECT)));
     view
 }
-pub fn link_names(view: &crate::View) -> Box<[Box<[u8]>]> {
+pub fn navigation_link_names(view: &crate::View) -> Box<[Box<[u8]>]> {
     let mut names = List::with_capacity(view.limits().tree.nodes);
-    for node in view.tree().nodes() {
-        if node.role == skein_ui::Role::Link
-            && let Some(name) = &node.name
-        {
-            names.push(skein_lib::bytes::copy_of(name)).expect("tree bounds link names");
+    for (index, node) in view.tree().nodes().iter().enumerate() {
+        if node.role == skein_ui::Role::Navigation {
+            let end =
+                index.checked_add(usize::try_from(node.size).expect("navigation fits")).expect("navigation end fits");
+            for child in &view.tree().nodes()[index..end] {
+                if child.role == skein_ui::Role::Link
+                    && let Some(name) = &child.name
+                {
+                    names.push(skein_lib::bytes::copy_of(name)).expect("tree bounds link names");
+                }
+            }
         }
     }
     names.into_boxed()
@@ -1026,7 +1032,11 @@ pub mod chat {
 }
 
 pub fn chats_root() -> temper_client_domain::Domain {
-    root_at(temper_client_domain::Address::Chats, &domain_limits()).0
+    root_at(
+        temper_client_domain::Address::Chats { filter: temper_client_domain::ChatsFilter::All, start: false },
+        &domain_limits(),
+    )
+    .0
 }
 /// Act `Input` on the named text area, as a person typing, and return the area's value after the root took it.
 pub fn type_into(root: &mut temper_client_domain::Domain, name: &[u8], words: &[u8]) -> Box<[u8]> {

@@ -196,7 +196,8 @@ pub fn change_page(config: &Path, client: &Path) -> String {
         fn act(&mut self, now: skein_lib::Time, clients: &mut [NativeClient]) {
             let client = &mut clients[0];
             if client.started() && !self.opened {
-                client.go(temper_client_domain::Address::Task { task: 2 });
+                client
+                    .go(temper_client_domain::Address::Task { task: 2, filter: temper_client_domain::PlanFilter::All });
                 self.opened = true;
             }
             if self.closing {

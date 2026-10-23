@@ -2,6 +2,7 @@ use super::fixtures;
 use jig_client::contract::*;
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 use skein_ui::{Builder, Role};
+use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Domain, Request};
 const TASK: u64 = 9;
 const TEXT: u32 = 32;
@@ -160,7 +161,10 @@ fn the_chat_composer_waits_for_the_person_and_project() {
     fixtures::root_event(
         &mut root,
         temper_client_domain::Event::Went {
-            place: temper_client_domain::Place::Address(temper_client_domain::Address::Chats),
+            place: temper_client_domain::Place::Address(temper_client_domain::Address::Chats {
+                filter: ChatsFilter::All,
+                start: false,
+            }),
         },
     );
     let mut view = fixtures::view();
@@ -267,7 +271,7 @@ fn the_entry_contains_the_composer_hint_and_start_in_order() {
         if node.styles.as_slice().contains(&crate::look::HINT) {
             hint = Some(index);
         }
-        if node.role == Role::Button && node.name.as_deref() == Some(b"Start") {
+        if node.role == Role::Button && node.name.as_deref() == Some(b"Start chat") {
             start = Some(index);
         }
     }
@@ -292,7 +296,9 @@ fn open_chats(root: &mut Domain, env: &Env<temper_client_domain::Limits>, out: &
     temper_client_domain::step(
         root,
         env,
-        Event::Went { place: temper_client_domain::Place::Address(Address::Chats) },
+        Event::Went {
+            place: temper_client_domain::Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }),
+        },
         out,
     );
     let mut watch = None;
@@ -444,7 +450,11 @@ fn chats_have_one_list_or_the_empty_sentence() {
 
 #[test]
 fn an_empty_demo_start_has_its_invitation_and_your_chats() {
-    let root = fixtures::demo_root(temper_client_domain::Address::Chats, fixtures::PROJECT, true);
+    let root = fixtures::demo_root(
+        temper_client_domain::Address::Chats { filter: ChatsFilter::All, start: false },
+        fixtures::PROJECT,
+        true,
+    );
     let view = fixtures::page_view(&root);
     assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Live chats").is_none());
     assert!(fixtures::find(view.tree(), Role::Heading { level: 2 }, b"Closed chats").is_none());
@@ -519,8 +529,8 @@ fn an_open_chat_at_rest_says_waiting_on_your_words_on_its_line() {
 fn a_closed_chat_says_closed_on_its_line() {
     for (by, expected) in [
         (Some(OwnerRequester::Person(73)), b"Closed".as_slice()),
-        (Some(OwnerRequester::Person(74)), b"Ended"),
-        (None, b"Ended"),
+        (Some(OwnerRequester::Person(74)), b"Closed"),
+        (None, b"Closed"),
     ] {
         let mut line = line();
         let ChipPhase::Owner { phase, details } = line.chip.details.as_mut() else { panic!("owner") };
@@ -543,14 +553,15 @@ fn a_closed_chat_says_closed_on_its_line() {
     }
 }
 
-fn filter(root: &mut Domain, filter: temper_client_domain::pages::chats::Filter) {
+fn filter(root: &mut Domain, filter: ChatsFilter) {
     fixtures::root_event(
         root,
-        temper_client_domain::Event::Act {
-            action: temper_client_domain::Action::Pages(temper_client_domain::pages::Act::ChatFilter { filter }),
+        temper_client_domain::Event::Went {
+            place: temper_client_domain::Place::Address(temper_client_domain::Address::Chats { filter, start: false }),
         },
     );
 }
+
 fn numbers(tree: &skein_ui::Tree) -> Box<[u64]> {
     let mut numbers = List::with_capacity(u32::try_from(tree.nodes().len()).expect("tree nodes fit"));
     for node in tree.nodes() {
@@ -582,10 +593,7 @@ fn one_list_merges_activity_and_end_times_with_lower_numbers_first_on_a_tie() {
 }
 #[test]
 fn each_filter_selects_its_lines_and_presses_its_bound_button() {
-    use temper_client_domain::{
-        Action,
-        pages::{Act, chats::Filter},
-    };
+    use temper_client_domain::{Action, address::ChatsFilter as Filter, pages::Act};
     for (selected, name, expected) in [
         (Filter::All, b"All".as_slice(), [8, 9].as_slice()),
         (Filter::Live, b"Live", [9].as_slice()),
@@ -624,7 +632,7 @@ fn each_filter_selects_its_lines_and_presses_its_bound_button() {
 }
 #[test]
 fn empty_filters_say_which_chats_are_missing() {
-    use temper_client_domain::pages::chats::Filter;
+    use temper_client_domain::address::ChatsFilter as Filter;
     for (selected, words) in [
         (Filter::All, b"No chats yet.".as_slice()),
         (Filter::Live, b"No live chats."),
@@ -648,10 +656,7 @@ fn empty_filters_say_which_chats_are_missing() {
 }
 #[test]
 fn more_closed_chats_is_bound_only_under_all_or_closed_with_an_older_page() {
-    use temper_client_domain::{
-        Action,
-        pages::{Act, chats::Filter},
-    };
+    use temper_client_domain::{Action, address::ChatsFilter as Filter, pages::Act};
     for more in [false, true] {
         for selected in [Filter::All, Filter::Live, Filter::Closed] {
             let mut root = listed(&[line()], &[timed(8, 0, Some(0))], more);
@@ -690,7 +695,11 @@ fn delegate_counts_are_plural_and_absent_at_zero() {
 fn start_a_chat_heads_the_composer_except_at_the_demos_start() {
     for demo in [false, true] {
         let root = if demo {
-            fixtures::demo_root(temper_client_domain::Address::Chats, fixtures::PROJECT, true)
+            fixtures::demo_root(
+                temper_client_domain::Address::Chats { filter: ChatsFilter::All, start: false },
+                fixtures::PROJECT,
+                true,
+            )
         } else {
             // A template makes the ordinary chats composer available.
             super::choice::ordinary_chats()
@@ -724,7 +733,8 @@ fn start_a_chat_heads_the_composer_except_at_the_demos_start() {
 #[test]
 fn an_accepted_start_draws_no_applied_status() {
     use temper_client_domain::{self as d, Action, Event, pages::Act};
-    let mut root = fixtures::demo_root(d::Address::Chats, fixtures::PROJECT, true);
+    let mut root =
+        fixtures::demo_root(d::Address::Chats { filter: ChatsFilter::All, start: false }, fixtures::PROJECT, true);
     let limits = fixtures::domain_limits();
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut out = Queue::with_capacity(d::max_out(&limits));
@@ -801,7 +811,11 @@ fn the_chats_page_opens_with_its_bar_and_draws_its_list_as_the_mockup() {
     let after = bar + usize::try_from(nodes[bar].size).unwrap();
     assert_eq!(nodes[after].role, Role::Heading { level: 2 });
     assert_eq!(nodes[after].name.as_deref(), Some(b"Start a chat".as_slice()));
-    let demo = fixtures::page_view(&fixtures::demo_root(temper_client_domain::Address::Chats, fixtures::PROJECT, true));
+    let demo = fixtures::page_view(&fixtures::demo_root(
+        temper_client_domain::Address::Chats { filter: ChatsFilter::All, start: false },
+        fixtures::PROJECT,
+        true,
+    ));
     let demo_nodes = demo.tree().nodes();
     assert!(!demo_nodes[main_of(demo_nodes)].styles.as_slice().contains(&crate::look::PAGE));
     for node in demo_nodes {
@@ -821,5 +835,59 @@ fn the_chats_page_opens_with_its_bar_and_draws_its_list_as_the_mockup() {
         let empty = index_of(nodes, fixtures::find(view.tree(), Role::Paragraph, b"No chats yet.").unwrap());
         assert_eq!(empty, end, "{page}: the empty words follow the heading row");
         assert_eq!(nodes[empty].styles.as_slice(), [crate::look::EMPTY], "{page}");
+    }
+}
+
+#[test]
+fn done_and_failed_chats_say_closed_in_the_list_and_bar() {
+    for ending in [
+        OwnerChipEnding::Done(ResultValue::Report(DocumentText::complete(fixtures::first_run::text(b"Done")))),
+        OwnerChipEnding::Failed(DocumentText::complete(fixtures::first_run::text(b"Failed"))),
+    ] {
+        let mut line = line();
+        let ChipPhase::Owner { phase, details } = line.chip.details.as_mut() else { panic!("owner") };
+        *phase = OwnerChipPhase::Ended;
+        details.live_delegates = 0;
+        details.ended_at = Some(Wall::EPOCH);
+        details.ending = Some(ending);
+        let (tree, _) = tree(&line);
+        assert!(fixtures::find(&tree, Role::Status, b"Closed").is_some());
+        let root = fixtures::root_in_project(None);
+        let me = root.pages().me(root.client()).unwrap();
+        let mut bar = Builder::new(&fixtures::tree_limits());
+        crate::pages::chats::status(
+            &mut bar,
+            &line.chip,
+            (&line.waits_on, Some(0), None),
+            (line.project, line.requester),
+            None,
+            me,
+            &fixtures::words(),
+        );
+        assert!(fixtures::find(&bar.finish(), Role::Status, b"Closed").is_some());
+    }
+}
+
+#[test]
+fn only_the_starts_address_focuses_its_composer_including_the_demo() {
+    for demo in [false, true] {
+        for start in [false, true] {
+            let address = temper_client_domain::Address::Chats { filter: ChatsFilter::All, start };
+            let root = if demo {
+                fixtures::demo_root(address, fixtures::PROJECT, true)
+            } else {
+                fixtures::root_at(address, &fixtures::domain_limits()).0
+            };
+            let view = fixtures::page_view(&root);
+            let mut focused = 0_usize;
+            for node in view.tree().nodes() {
+                if node.focus.is_some() {
+                    assert_eq!(node.role, Role::TextArea);
+                    assert_eq!(node.name.as_deref(), Some(b"Start a chat".as_slice()));
+                    focused = focused.checked_add(1).expect("focus requests fit");
+                }
+            }
+            assert_eq!(focused, usize::from(start), "demo={demo}, start={start}");
+        }
     }
 }

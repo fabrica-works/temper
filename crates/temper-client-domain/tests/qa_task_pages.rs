@@ -166,7 +166,11 @@ mod tests {
         let mut root = domain::unlinked(&domain_limits(), 11);
         let mut requests = root_event(
             &mut root,
-            Event::Start { address: domain::Address::Task { task: TASK }, kept: List::with_capacity(0), with: None },
+            Event::Start {
+                address: domain::Address::Task { task: TASK, filter: domain::PlanFilter::All },
+                kept: List::with_capacity(0),
+                with: None,
+            },
         );
         // Successful sign-in ends the pre-sign-in read; its owner asks anew
         // before the first me (client/README.md, 3.4). Keep that output too.
@@ -355,17 +359,19 @@ mod tests {
         assert!(root.pages().task().expect("agent").ended.is_none());
     }
 
-    // client/README.md 5.8: "All is chosen when the page opens"; the filter reads
-    // nothing and "the read goes on under either".
+    // A filter moves within the goal's page; reopening the unfiltered address shows All.
     #[test]
-    fn goal_filter_is_local_and_resets_after_leaving_and_reopening() {
+    fn goal_filter_moves_without_wire_work_and_the_plain_address_reopens_all() {
         let (mut root, watch, tree_watch, _) = opened(goal());
-        let local = act(&mut root, domain::pages::Act::PlanFilter { filter: domain::pages::task::Filter::Live });
-        assert!(local.is_empty(), "local filter emitted no wire work");
-        drop(went(&mut root, domain::Address::Chats));
-        let requests = went(&mut root, domain::Address::Task { task: TASK });
+        let local = act(&mut root, domain::pages::Act::PlanFilter { filter: domain::address::PlanFilter::Live });
+        assert!(local.is_empty(), "filter move emitted no wire work");
+        let moved = went(&mut root, domain::Address::Task { task: TASK, filter: domain::PlanFilter::Live });
+        assert!(moved.is_empty(), "same task keeps its reads");
+        assert_eq!(root.pages().task().expect("goal").filter, domain::PlanFilter::Live);
+        drop(went(&mut root, domain::Address::Chats { filter: domain::ChatsFilter::All, start: false }));
+        let requests = went(&mut root, domain::Address::Task { task: TASK, filter: domain::PlanFilter::All });
         let page = root.pages().task().expect("reopened task");
-        assert_eq!(page.filter, domain::pages::task::Filter::All);
+        assert_eq!(page.filter, domain::address::PlanFilter::All);
         let new_watch = requests
             .iter()
             .find_map(|request| match request {
@@ -400,7 +406,7 @@ mod tests {
             })
             .expect("live run watch");
         drop(up(&mut root, jig_client::Up::Watched { watch: run, event: c::WatchEvent::Opened }));
-        let left = went(&mut root, domain::Address::Chats);
+        let left = went(&mut root, domain::Address::Chats { filter: domain::ChatsFilter::All, start: false });
         assert!(left.contains(&jig_client::Down::Close { watch: run }), "navigation closes run: {left:?}");
         drop(answer(&mut root, activity, empty_activity()));
         assert!(root.pages().task().is_none(), "late activity cannot resurrect page");

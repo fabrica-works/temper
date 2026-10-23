@@ -1,5 +1,6 @@
 //! Live chats are borrowed from the client; closed rows are one bounded read page.
 use super::Request;
+use crate::address::ChatsFilter;
 use crate::{Address, Limits, owner::Owner};
 use alloc::boxed::Box;
 use jig_client::contract::{
@@ -7,16 +8,11 @@ use jig_client::contract::{
 };
 use jig_client::{Client, Handle, Key, Latest, Readable, Readout, Told, Watchable};
 use skein_lib::{Env, Queue};
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Filter {
-    All,
-    Live,
-    Closed,
-}
+
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the configured query is private watch bookkeeping")]
 pub struct Chats {
-    pub filter: Filter,
+    pub filter: ChatsFilter,
     pub live: Handle,
     pub closed: Handle,
     pub words: Box<[u8]>,
@@ -30,7 +26,7 @@ pub struct Chats {
 impl Chats {
     pub(crate) fn new(first: u64) -> Self {
         Self {
-            filter: Filter::All,
+            filter: ChatsFilter::All,
             live: handle(first),
             closed: handle(first.checked_add(1).expect("page handles fit")),
             words: Box::default(),

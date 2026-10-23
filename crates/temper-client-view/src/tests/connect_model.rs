@@ -243,7 +243,9 @@ fn a_key_has_details_then_ready_with_its_account_and_chat_link() {
     let node = fixtures::find(tree, Role::Link, b"Start a chat").unwrap();
     assert_eq!(
         crate::act(&mut view, node, Act::Press),
-        Some(d::Action::Pages(d::pages::Act::Go { address: d::Address::Chats }))
+        Some(d::Action::Pages(d::pages::Act::Go {
+            address: d::Address::Chats { filter: d::ChatsFilter::All, start: false }
+        }))
     );
 }
 #[test]
@@ -358,7 +360,10 @@ fn the_accounts_banner_links_each_way_to_its_address_and_is_hidden_in_the_flow()
     let mut doc = super::accounts::document(0);
     doc.usable = false;
     super::accounts::deliver(&mut root, watch, doc);
-    fixtures::root_event(&mut root, d::Event::Went { place: d::Place::Address(d::Address::Chats) });
+    fixtures::root_event(
+        &mut root,
+        d::Event::Went { place: d::Place::Address(d::Address::Chats { filter: d::ChatsFilter::All, start: false }) },
+    );
     let mut view = fixtures::page_view(&root);
     for (name, kind) in [
         (b"Continue with ChatGPT".as_slice(), d::WayKind::SignIn),
@@ -381,7 +386,8 @@ fn the_accounts_banner_links_each_way_to_its_address_and_is_hidden_in_the_flow()
 }
 #[test]
 fn the_demo_banner_links_to_choose() {
-    let root = fixtures::demo_root(d::Address::Chats, fixtures::PROJECT, true);
+    let root =
+        fixtures::demo_root(d::Address::Chats { filter: d::ChatsFilter::All, start: false }, fixtures::PROJECT, true);
     let mut view = fixtures::page_view(&root);
     let id = fixtures::find(view.tree(), Role::Link, b"Connect a model").unwrap();
     assert_eq!(

@@ -207,7 +207,12 @@ fn opened(cue: &[u8]) -> (crate::Domain, skein_lib::Token) {
         );
     }
     deliver_demo_read(&mut root, Readout::Family { family: wire::FORGE, record: Some(answer(cue)) });
-    event(&mut root, crate::Event::Went { place: crate::Place::Address(crate::Address::Chats) });
+    event(
+        &mut root,
+        crate::Event::Went {
+            place: crate::Place::Address(crate::Address::Chats { filter: crate::ChatsFilter::All, start: false }),
+        },
+    );
     act(&mut root, Act::ChatWords { words: DRAFT.into() });
     (root, account)
 }
@@ -781,7 +786,15 @@ fn cleanup_needs_a_running_answer_and_positive_evidence_of_an_end() {
         assert_eq!(watch.is_some(), watches, "{case}");
         let mut out = match accounts {
             Some(document) => deliver_accounts(&mut root, account, document),
-            None => event(&mut root, crate::Event::Went { place: crate::Place::Address(crate::Address::Chats) }),
+            None => event(
+                &mut root,
+                crate::Event::Went {
+                    place: crate::Place::Address(crate::Address::Chats {
+                        filter: crate::ChatsFilter::All,
+                        start: false,
+                    }),
+                },
+            ),
         };
         assert!(deployment_watch(&mut out).is_none(), "{case}");
         assert!(removed(&mut out).is_empty(), "{case}");

@@ -6,10 +6,7 @@ use crate::{
 use alloc::boxed::Box;
 use jig_client::contract::{EndedGroup, TaskLine};
 use skein_ui::{Builder, Role, Run, State, phrases::Hole};
-use temper_client_domain::{
-    Address, Domain,
-    pages::{Act, chats::Filter},
-};
+use temper_client_domain::{Address, ChatsFilter, Domain, pages::Act};
 fn text(b: &mut Builder, role: Role, value: &[u8]) {
     b.open(role);
     b.name(value);
@@ -57,6 +54,9 @@ pub(crate) fn main(
             b.style(crate::look::ENTRY);
             b.open(Role::TextArea);
             b.name(&words.say(Word::StartChat, &[]));
+            if let Address::Chats { start: true, .. } = root.pages().address() {
+                b.focus(0);
+            }
             b.state(State::SubmitsOnEnter);
             b.style(crate::look::COMPOSER);
             b.value(&chats.words, temper_client_domain::pages::shown(root.pages()));
@@ -98,9 +98,11 @@ fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, 
     text(b, Role::Heading { level: 2 }, &words.say(Word::YourChats, &[]));
     b.open(Role::Slot);
     b.style(crate::look::FILTERS);
-    for (filter, word) in
-        [(Filter::All, Word::AllChats), (Filter::Live, Word::LiveChats), (Filter::Closed, Word::ClosedChats)]
-    {
+    for (filter, word) in [
+        (ChatsFilter::All, Word::AllChats),
+        (ChatsFilter::Live, Word::LiveChats),
+        (ChatsFilter::Closed, Word::ClosedChats),
+    ] {
         b.open(Role::Button);
         b.name(&words.say(word, &[]));
         if chats.filter == filter {
@@ -112,11 +114,11 @@ fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, 
     b.close();
     b.close();
     let live = match chats.live(root.client()) {
-        Some(live) if chats.filter != Filter::Closed => live.rows.as_slice(),
+        Some(live) if chats.filter != ChatsFilter::Closed => live.rows.as_slice(),
         _ => &[],
     };
     let (closed, more) = match &chats.page {
-        Some(page) if chats.filter != Filter::Live => match &page.ended {
+        Some(page) if chats.filter != ChatsFilter::Live => match &page.ended {
             EndedGroup::Rows { rows, after, .. } => (rows.as_slice(), after.is_some()),
             EndedGroup::None => (&[][..], false),
         },
@@ -124,9 +126,9 @@ fn list(b: &mut Builder, root: &Domain, words: &Words, bindings: &mut Bindings, 
     };
     if live.is_empty() && closed.is_empty() {
         let word = match chats.filter {
-            Filter::All => Word::NoChats,
-            Filter::Live => Word::NoLiveChats,
-            Filter::Closed => Word::NoClosedChats,
+            ChatsFilter::All => Word::NoChats,
+            ChatsFilter::Live => Word::NoLiveChats,
+            ChatsFilter::Closed => Word::NoClosedChats,
         };
         let empty = words.say(word, &[]);
         b.open(Role::Paragraph);
@@ -372,7 +374,7 @@ pub(crate) fn status(
     let name = match status {
         ChatStatus::Held(ref reason @ HoldCategory::Exceeded(_)) => crate::cards::hold_phrase(reason, words),
         ChatStatus::WaitingForYou { .. } => words.say(Word::WaitingForYou, &[]),
-        ChatStatus::Ended { .. } if closed(chip, requester) => words.say(Word::ChatClosed, &[]),
+        ChatStatus::Ended { .. } => words.say(Word::ChatClosed, &[]),
         ChatStatus::Starting
         | ChatStatus::Writing
         | ChatStatus::Tool { .. }
@@ -382,8 +384,7 @@ pub(crate) fn status(
         | ChatStatus::Retrying { .. }
         | ChatStatus::HostRefused(_)
         | ChatStatus::Held(_)
-        | ChatStatus::Closing
-        | ChatStatus::Ended { .. } => words.say_word(jig_client::words::Word::status(&status), holes.as_slice()),
+        | ChatStatus::Closing => words.say_word(jig_client::words::Word::status(&status), holes.as_slice()),
     };
     b.name(&name);
     b.text(Run::Plain, &name);
@@ -392,9 +393,7 @@ pub(crate) fn status(
 
 /// The demo whose start the Chats page shows, when it shows one.
 pub(crate) fn demo_start(root: &Domain) -> Option<&temper_client_domain::forge::Demo> {
-    if *root.pages().address() != Address::Chats {
-        return None;
-    }
+    let Address::Chats { .. } = root.pages().address() else { return None };
     match root.demo() {
         Some((demo, halves)) if halves.model && root.pages().project() == Some(demo.project) => Some(demo),
         _ => None,
@@ -453,26 +452,4 @@ fn suggestions(
     b.close();
     text(b, Role::Paragraph, &words.say(Word::DemoScript, &[]));
     b.close();
-}
-
-fn closed(chip: &jig_client::contract::Chip, requester: jig_client::contract::OwnerRequester) -> bool {
-    use jig_client::contract::{ChipPhase, OwnerChipEnding};
-    match chip.details.as_ref() {
-        ChipPhase::Owner { details, .. } => match &details.ending {
-            Some(OwnerChipEnding::Cancelled { by, .. }) => super::chat::closed_by_requester(requester, *by),
-            Some(OwnerChipEnding::Done(_) | OwnerChipEnding::Failed(_)) | None => false,
-        },
-        ChipPhase::Active(_)
-        | ChipPhase::Waiting { .. }
-        | ChipPhase::Idle { .. }
-        | ChipPhase::Starting
-        | ChipPhase::Running { .. }
-        | ChipPhase::WaitingForWords { .. }
-        | ChipPhase::BackingOff { .. }
-        | ChipPhase::Procedure { .. }
-        | ChipPhase::Person { .. }
-        | ChipPhase::Closing(_)
-        | ChipPhase::Held { .. }
-        | ChipPhase::Ended { .. } => false,
-    }
 }

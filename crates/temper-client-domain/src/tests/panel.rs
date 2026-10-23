@@ -6,6 +6,7 @@ use crate::{
         panel::{State, Subject},
     },
 };
+use crate::{ChatsFilter, PlanFilter};
 use jig_client::{Down, Handle, Told, Up, Watchable, Why, contract as c};
 use skein_lib::{List, Queue, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
@@ -28,7 +29,7 @@ fn went(root: &mut Domain, place: Place) -> Queue<Request> {
     event(root, Event::Went { place })
 }
 fn task_page(root: &mut Domain, task: u64) -> Token {
-    let mut out = went(root, Place::Address(Address::Task { task }));
+    let mut out = went(root, Place::Address(Address::Task { task, filter: PlanFilter::All }));
     let mut found = None;
     while let Some(request) = out.pop() {
         if let Request::Client { request: jig_client::Request::Down { down: Down::Open { watch, subject } } } = request
@@ -137,7 +138,10 @@ fn only_a_forge_procedure_document_opens_its_projects_panel() {
 }
 #[test]
 fn leaving_closes_the_panel_and_reopening_uses_a_fresh_handle() {
-    for place in [Place::Address(Address::Chats), Place::Address(Address::Adopt { project: PROJECT })] {
+    for place in [
+        Place::Address(Address::Chats { filter: ChatsFilter::All, start: false }),
+        Place::Address(Address::Adopt { project: PROJECT }),
+    ] {
         let (mut root, watch, first) = opened();
         let closed = closes(&mut went(&mut root, place.clone()));
         assert!(closed.as_slice().contains(&watch), "{place:?}");
@@ -155,7 +159,7 @@ fn leaving_closes_the_panel_and_reopening_uses_a_fresh_handle() {
 fn another_tasks_page_closes_the_old_panel_and_watches_its_own_subject() {
     let (mut root, watch, first) = opened();
     // task_page acknowledges the task and tree openings; the old panel closes on navigation.
-    let mut out = went(&mut root, Place::Address(Address::Task { task: NEXT }));
+    let mut out = went(&mut root, Place::Address(Address::Task { task: NEXT, filter: PlanFilter::All }));
     let mut task = None;
     let mut closed = List::with_capacity(out.len());
     while let Some(request) = out.pop() {
@@ -232,9 +236,16 @@ fn invalid_records_end_unknown_and_unwatch_once() {
         assert_eq!(root.forge().panel().unwrap().handle, None);
         assert!(deliver(&mut root, watch, &panel).is_empty(), "late delivery");
         assert_eq!(root.forge().panel().unwrap().state, State::Unknown);
-        assert!(family_open(&mut went(&mut root, Place::Address(Address::Task { task: TASK })), TASK).is_none());
+        assert!(
+            family_open(
+                &mut went(&mut root, Place::Address(Address::Task { task: TASK, filter: PlanFilter::All })),
+                TASK
+            )
+            .is_none()
+        );
         up(&mut root, Up::WatchEnded { watch, end: c::WatchEnd::Closed });
-        let closed = closes(&mut went(&mut root, Place::Address(Address::Chats)));
+        let closed =
+            closes(&mut went(&mut root, Place::Address(Address::Chats { filter: ChatsFilter::All, start: false })));
         assert!(!closed.as_slice().contains(&watch), "already unwatched");
         for &watch in &closed {
             up(&mut root, Up::WatchEnded { watch, end: c::WatchEnd::Closed });
@@ -260,8 +271,15 @@ fn jig_endings_keep_unknown_and_other_reasons_apart_from_loading() {
         assert_eq!(root.forge().panel().unwrap().state, expected);
         assert_ne!(forge::shown(root.forge()), shown);
         assert!(root.forge().panel().unwrap().handle.is_none());
-        assert!(family_open(&mut went(&mut root, Place::Address(Address::Task { task: TASK })), TASK).is_none());
-        let closed = closes(&mut went(&mut root, Place::Address(Address::Chats)));
+        assert!(
+            family_open(
+                &mut went(&mut root, Place::Address(Address::Task { task: TASK, filter: PlanFilter::All })),
+                TASK
+            )
+            .is_none()
+        );
+        let closed =
+            closes(&mut went(&mut root, Place::Address(Address::Chats { filter: ChatsFilter::All, start: false })));
         assert!(!closed.as_slice().contains(&watch), "jig already ended it");
         for &watch in &closed {
             up(&mut root, Up::WatchEnded { watch, end: c::WatchEnd::Closed });

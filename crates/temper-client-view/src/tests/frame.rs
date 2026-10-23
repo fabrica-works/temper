@@ -1,6 +1,7 @@
 use super::fixtures;
 use skein_ui::{Act, Role};
 use temper_client_domain::{Action, pages};
+use temper_client_domain::{ChatsFilter, PlanFilter};
 
 #[test]
 fn the_navigation_is_named_main_navigation() {
@@ -12,7 +13,7 @@ fn the_navigation_is_named_main_navigation() {
 fn the_navigation_ends_with_accounts() {
     let view = fixtures::signed_in_with_project();
     assert_eq!(
-        fixtures::link_names(&view).as_ref(),
+        fixtures::navigation_link_names(&view).as_ref(),
         [
             Box::from(*b"Inbox"),
             Box::from(*b"Chats"),
@@ -282,7 +283,7 @@ fn each_link_shows_its_name_as_its_text() {
             links += 1;
         }
     }
-    assert_eq!(links, 5);
+    assert_eq!(links, 6);
 }
 
 #[test]
@@ -320,11 +321,11 @@ fn the_navigation_marks_only_the_current_page() {
     for (address, current) in [
         (Address::Inbox { filter: Filter::ALL }, Some(b"Inbox".as_slice())),
         (Address::Inbox { filter: Filter { goal: Some(9), ..Filter::ALL } }, Some(b"Inbox".as_slice())),
-        (Address::Chats, Some(b"Chats".as_slice())),
+        (Address::Chats { filter: ChatsFilter::All, start: false }, Some(b"Chats".as_slice())),
         (Address::Adopt { project: fixtures::PROJECT }, Some(b"Adopt a repository".as_slice())),
         (Address::Accounts, Some(b"Accounts".as_slice())),
         (Address::Chat { task: 9 }, Some(b"Chats".as_slice())),
-        (Address::Task { task: 9 }, None),
+        (Address::Task { task: 9, filter: PlanFilter::All }, None),
     ] {
         let root = fixtures::root_at(address, &fixtures::domain_limits()).0;
         let view = fixtures::page_view(&root);
@@ -546,7 +547,7 @@ fn the_qa_controls_keep_their_accessible_names_with_the_menu_closed() {
                 (Role::Button, b"Sign out".as_slice()),
                 (Role::Link, b"Chats"),
                 (Role::TextArea, b"Start a chat"),
-                (Role::Button, b"Start"),
+                (Role::Button, b"Start chat"),
             ][..],
         ),
         (
@@ -834,7 +835,10 @@ fn browser_google_sign_in_has_the_mark_heading_and_return_link() {
     use temper_client_domain::{Address, Event};
     for (address, expected) in [
         // Signed out, the page stays at its address; its query is percent-encoded into `then`.
-        (Address::Chats, b"https://temper.example.com/sign-in/google?then=/%3Fproject%3D1".as_slice()),
+        (
+            Address::Chats { filter: ChatsFilter::All, start: false },
+            b"https://temper.example.com/sign-in/google?then=/%3Fproject%3D1".as_slice(),
+        ),
     ] {
         let mut root = fixtures::signed_out();
         fixtures::root_event(&mut root, Event::Act { action: Action::Pages(pages::Act::Go { address }) });
