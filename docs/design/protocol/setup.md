@@ -2501,9 +2501,10 @@ it checks of this document:
   in the project, on the fake LLM, changes `hello`: its worker clones
   it, its pull's run of the starter workflow passes, and it lands; the
   test reads it all through temper's own reads, with no credential:
-  the project's read names `work/hello` adopted, the change's checks
-  at its pull's head are the starter workflow's run, passed, and the
-  task ends landed. The
+  the set up's answer names `work/hello` adopted, owned, on forge 3;
+  the task, given in project 1, runs on and lands into `work/hello`;
+  the change's checks at its pull's head are the starter workflow's
+  run, passed; and the task ends landed. The
   handover file is gone, and
   forge 3's directory has no `api_token`, `git_token`, `user` or
   `webhook_secret` file. The service's step world shows the git value
@@ -2511,7 +2512,8 @@ it checks of this document:
   box on the same directories starts the group by its record, before
   `temper serve`. Preparation makes a new handover; serve takes it over
   and connects forge 3 from its records (6.5), and the task is found
-  landed.
+  landed, its CI at its head unknown until a next step reads it
+  (`../domain/forge.md`, 8.8).
 
 ## 15. Later
 
