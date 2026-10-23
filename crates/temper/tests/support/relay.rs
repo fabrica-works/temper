@@ -38,7 +38,7 @@ impl Guard {
     pub fn allows(&self, listener: &str, method: &str, target: &str, body: Option<&[u8]>, id: Option<u64>) -> bool {
         let path = target.split('?').next().unwrap_or("");
         if !path.starts_with('/')
-            || path.contains("..")
+            || path.split('/').any(|segment| segment == "." || segment == "..")
             || path.to_ascii_lowercase().contains("%2e")
             || path.contains("//")
             || path.contains(['\\', '#'])

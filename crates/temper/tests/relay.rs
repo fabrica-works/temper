@@ -33,6 +33,8 @@ fn check(rows: Vec<Row<'_>>) {
 fn guard_bounds_every_route_to_the_probe() {
     let none: &[u8] = b"";
     let status = format!("/repos/owner/probe/statuses/{}", "a".repeat(40));
+    // GitHub's compare names its sides with three dots, one path segment (skein Request::Compare).
+    let compare = format!("/repos/owner/probe/compare/{}...{}", "a".repeat(40), "b".repeat(40));
     check(vec![
         ("api", "GET", "/app", Some(none), true),
         ("api", "GET", "/app/hook/config", Some(none), true),
@@ -79,6 +81,10 @@ fn guard_bounds_every_route_to_the_probe() {
         ("api", "GET", "/repos/other/probe", Some(none), false),
         ("api", "POST", "/repos/owner/other/pulls", Some(none), false),
         ("api", "GET", "/repos/owner/probe/../other", Some(none), false),
+        ("api", "GET", "/repos/owner/probe/..", Some(none), false),
+        ("api", "GET", "/repos/owner/probe/./pulls", Some(none), false),
+        ("api", "GET", &compare, Some(none), true),
+        ("api", "GET", "/repos/owner/other/compare/a...b", Some(none), false),
         ("api", "GET", "/repos/owner/probe/%2E%2e/other", Some(none), false),
         ("api", "GET", "/repos/owner/probe//pulls", Some(none), false),
         ("api", "GET", "/repos/Owner/probe", Some(none), false),
