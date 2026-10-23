@@ -2069,6 +2069,7 @@ fn the_opener_and_the_two_hour_check_run_on_three_workers_as_processes_without_p
 // Leaves out the director as asker, plan pacing, B's model, repeated questions,
 // and amending only A's model (domain/testing.md, 5.3's 4.4 row).
 // On ws alone, no s2: a worker's own sources and sign-in are undesigned.
+// Past 6.1's 2 s guide, as its real-loop twin is, by its seven activations.
 #[test]
 fn the_pace_question_reaches_the_person_and_its_answer_is_kept_as_processes_on_one_worker_without_plan_pacing() {
     use temper_real_loop_world::case::{self, acts, oracle};
@@ -2109,6 +2110,8 @@ fn step_4_5_refused_rules() -> Box<[Box<[skein_fake_llm_domain::api::Rule]>]> {
 // Leaves out s2's sign-in, credentials never copied between machines, B's work,
 // five hours and a session that never ends (domain/testing.md, 5.3's 4.5 row).
 // On ws alone, no s2: a worker's own sources and sign-in are undesigned.
+// Past 6.1's 2 s guide, as its real-loop twin is, by its reset: one second,
+// the shortest a provider's wire carries.
 #[test]
 fn a_limited_account_holds_its_work_until_its_reset_as_processes_on_one_worker() {
     use temper_real_loop_world::case::{self, acts, oracle};
