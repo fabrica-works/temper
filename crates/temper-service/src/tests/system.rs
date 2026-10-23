@@ -395,3 +395,72 @@ fn box_setup(
     assert!(reader.is_empty());
     answer.into_parts().outcome
 }
+
+#[test]
+fn a_new_client_after_idle_gets_its_whole_stall_period() {
+    use skein_lib::Duration;
+    const STALL: Duration = Duration::from_secs(30);
+    const BEGAN: Time = Time::from_nanos(1_000_000_000);
+    for idle in [29, 30, 60, 100] {
+        let mut service = fixtures::started();
+        fixtures::listening(&mut service);
+        crate::iterate(&mut service, BEGAN, Wall::EPOCH);
+        let accepted = BEGAN.saturating_add(Duration::from_secs(idle));
+        service.told.push(skein_io::Event::Accepted {
+            owner: Token::new(crate::tokens::SERVER),
+            socket: fixtures::http::SOCKET,
+            peer: fixtures::http::address(),
+        });
+        crate::iterate(&mut service, accepted, Wall::EPOCH);
+        assert_eq!(
+            service.engine.as_ref().unwrap().clients.next_deadline(),
+            Some(accepted.saturating_add(STALL)),
+            "new connection after {idle} seconds idle gets its deadline at accept"
+        );
+    }
+}
+
+#[test]
+fn a_new_webhook_after_idle_gets_its_whole_delivery_period() {
+    use skein_lib::Duration;
+    const BEGAN: Time = Time::from_nanos(1_000_000_000);
+    const IDLE: Duration = Duration::from_secs(60);
+    const LISTENER: Token = Token::new(1_u64 << 59);
+    let mut service = fixtures::ready();
+    let config = fixtures::engine();
+    let mut found = jig_protocol_config::Problems::empty();
+    let mut settings = crate::forge::settings(
+        &config.forges,
+        fixtures::forge_runtime(),
+        Some(skein_forge_connection::hooks::Webhooks { listener: fixtures::http::address() }),
+        &mut found,
+    )
+    .unwrap();
+    for at in 0..settings.forges.len() {
+        settings.forges.get_mut(at).unwrap().access = None;
+    }
+    let layer = &mut service.engine.as_mut().unwrap().forge;
+    layer.component = skein_forge_connection::Component::new(
+        settings,
+        &layer.env.limits,
+        &crate::forge::shared(&config.limits, &config.jig.limits.io),
+    )
+    .unwrap();
+    layer.component.begin(&layer.env, &mut layer.above, &mut layer.io);
+    layer.up(skein_io::Event::Listening { owner: LISTENER, listener: Token::new(88), addr: fixtures::http::address() });
+    while layer.io.pop().is_some() {}
+    let delivery = layer.env.limits.hook_deadline;
+    crate::iterate(&mut service, BEGAN, Wall::EPOCH);
+    let accepted = BEGAN.saturating_add(IDLE);
+    service.told.push(skein_io::Event::Accepted {
+        owner: Token::new(crate::tokens::FORGE | LISTENER.raw()),
+        socket: Token::new(89),
+        peer: fixtures::http::address(),
+    });
+    crate::iterate(&mut service, accepted, Wall::EPOCH);
+    assert_eq!(
+        service.engine.as_ref().unwrap().forge.component.next_deadline(),
+        Some(accepted.saturating_add(delivery)),
+        "the webhook starts its delivery period at accept"
+    );
+}

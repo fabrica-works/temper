@@ -204,10 +204,23 @@ impl Engine {
     }
 }
 
-pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
+/// Every child sees this iteration's time before an input can arm a deadline.
+pub(crate) fn clock(engine: &mut Engine, now: Time, wall: Wall) {
     engine.env.now = now;
     engine.env.wall = wall;
     engine.store.clock(now, wall);
+    if let Some(accounts) = &mut engine.accounts {
+        accounts.clock(now, wall);
+    }
+    engine.clients.clock(now, wall);
+    engine.forge.env.now = now;
+    engine.forge.env.wall = wall;
+    engine.setup.env.now = now;
+    engine.setup.env.wall = wall;
+}
+
+pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
+    clock(engine, now, wall);
     engine.store.iterate();
     answer(engine);
     if !engine.store.opened && engine.end.is_none() {
@@ -216,8 +229,6 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if let Some(accounts) = &mut engine.accounts {
         accounts.iterate(now, wall, &mut engine.values, &mut engine.events, &mut engine.store);
     }
-    engine.forge.env.now = now;
-    engine.forge.env.wall = wall;
     crate::forge::records::advance(engine);
     if !engine.forge_records.loading() || engine.end.is_some() || engine.drain.is_some() {
         engine.forge.iterate(now, wall);

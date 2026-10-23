@@ -637,10 +637,8 @@ fn read_charters(settings: &mut settings::Engine) -> Result<(), Problems> {
 pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
     service.io_env.now = now;
     service.io_env.wall = wall;
-    if let Some(engine) = &mut service.engine
-        && let Some(accounts) = &mut engine.accounts
-    {
-        accounts.clock(now, wall);
+    if let Some(engine) = &mut service.engine {
+        engine::clock(engine, now, wall);
     }
     for _ in 0..service.io_env.limits.sockets.checked_add(service.io_env.limits.refusals).expect("io entries") {
         if !service.io.is_ready() || !service.room(io::MAX_OUT_RESUME) {

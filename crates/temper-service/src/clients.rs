@@ -496,6 +496,13 @@ impl Clients {
             }
         }
     }
+    pub fn clock(&mut self, now: Time, wall: Wall) {
+        self.env.now = now;
+        self.env.wall = wall;
+        self.mount_env.now = now;
+        self.mount_env.wall = wall;
+        self.server.clock(now, wall);
+    }
     pub fn iterate(
         &mut self,
         now: Time,
@@ -504,17 +511,13 @@ impl Clients {
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
     ) {
-        self.env.now = now;
-        self.env.wall = wall;
+        self.clock(now, wall);
         if let Some(settings) = self.initial.take() {
             // Link lifetimes start on the supplied clock, which need not start at zero.
             self.out = Queue::with_capacity(self.out.capacity());
             self.component =
                 kit::Component::new(settings, &self.env, &mut self.out).expect("validated client settings");
         }
-        self.mount_env.now = now;
-        self.mount_env.wall = wall;
-        self.server.clock(now, wall);
         if self.closed || !self.room(1) || self.early.room() < kit::MAX_OUT_DOWN || events.room() < kit::MAX_OUT_DOWN {
             return;
         }
