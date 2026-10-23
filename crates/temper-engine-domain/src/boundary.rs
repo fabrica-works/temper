@@ -395,6 +395,8 @@ pub enum PartyInput {
         decision: ProcedureStep,
     },
     SignedIn {
+        /// Authenticated sign-in offered beside the printed link.
+        held: Option<u64>,
         /// Web-issued right to this one sign-in reply, moved through people to a durable terminal.
         reply_to: ReplyTo,
         /// Protocol-authenticated forge/user key and display bytes, bounded by people

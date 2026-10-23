@@ -44,15 +44,16 @@ impl OneShot {
             return;
         }
         if signing.with.is_some()
-            && let Some((_, records)) = signing.shell.as_mut().and_then(Shell::loaded)
+            && let Some((held, records)) = signing.shell.as_mut().and_then(Shell::loaded)
         {
             let with = signing.with.take().expect("link secret");
+            signing.held.clone_from(&held);
             let mut kept = skein_lib::List::with_capacity(u32::try_from(records.len()).expect("bounded records"));
             for record in records {
                 kept.push(record).expect("record room");
             }
             self.root_event(jig_client::Event::Start { kept });
-            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link(with) });
+            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link { secret: with, held } });
         }
     }
     pub(super) fn signing_retry(&mut self) {
@@ -60,7 +61,8 @@ impl OneShot {
         if signing.retry.is_some_and(|at| self.env.now >= at) && self.until.is_some_and(|until| self.env.now < until) {
             signing.retry = None;
             let with = signing.link.as_ref().expect("link sign-in").clone();
-            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link(with) });
+            let held = signing.held.clone();
+            self.root_event(jig_client::Event::SignIn { with: jig_client::With::Link { secret: with, held } });
         }
     }
     pub(super) fn signing_keep(&mut self) {
@@ -74,8 +76,12 @@ impl OneShot {
         {
             signing.link = None;
             signing.retry = None;
-            shell.keep(Some(credential.clone()));
-            signing.credential = Credential::Writing;
+            if Some(credential) == signing.held.as_ref() {
+                signing.credential = Credential::Kept;
+            } else {
+                shell.keep(Some(credential.clone()));
+                signing.credential = Credential::Writing;
+            }
             self.directory.store_address(self.env.now, signing.address.take().expect("parsed address"));
         }
         if let Some(kept) = shell.kept() {

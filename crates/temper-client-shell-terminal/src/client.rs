@@ -102,7 +102,7 @@ impl NativeClient {
             io: bounds.io,
         });
         let with = match start {
-            Start::Link(printed) => Some(jig_client::With::Link(shell.sign_in(&printed)?)),
+            Start::Link(printed) => Some(jig_client::With::Link { secret: shell.sign_in(&printed)?, held: None }),
             Start::Token => None,
         };
         shell.adopt(directory, user, seed);
@@ -158,11 +158,13 @@ impl NativeClient {
         let secret = self.shell.sign_in(printed)?;
         if self.loaded {
             self.event(domain::Event::Client {
-                event: jig_client::Event::SignIn { with: jig_client::With::Link(secret) },
+                event: jig_client::Event::SignIn {
+                    with: jig_client::With::Link { secret, held: self.credential.clone() },
+                },
             });
             self.outputs();
         } else {
-            self.with = Some(jig_client::With::Link(secret));
+            self.with = Some(jig_client::With::Link { secret, held: self.credential.clone() });
         }
         Ok(())
     }
@@ -210,7 +212,10 @@ impl NativeClient {
             }
             kept.push(record).expect("counted store");
         }
-        let with = self.with.take().or_else(|| credential.map(jig_client::With::Held));
+        let with = match self.with.take() {
+            Some(jig_client::With::Link { secret, .. }) => Some(jig_client::With::Link { secret, held: credential }),
+            with => with.or_else(|| credential.map(jig_client::With::Held)),
+        };
         self.event(domain::Event::Start { address: self.address.clone(), kept, with });
     }
     fn event(&mut self, event: domain::Event) {
@@ -300,7 +305,7 @@ impl NativeClient {
             self.notices.push(Shown::Notice(route::Notice::Credential { party, credential }));
         }
         let credential = self.root.client().link().credential.cloned();
-        if credential != self.credential {
+        if credential != self.credential && (credential.is_some() || matches!(signing, Some(Signing::SignedOut))) {
             self.shell.keep(credential.clone());
             self.credential = credential;
             self.saving_signing = signing;

@@ -55,7 +55,7 @@ impl Host {
         }
         self.address = self.opened(path);
         let with = match secret {
-            Some(bytes) => jig_client::With::Link(Secret::new(bytes)),
+            Some(bytes) => jig_client::With::Link { secret: Secret::new(bytes), held: None },
             None => jig_client::With::Transport,
         };
         self.event(Event::Start { address: self.address.clone(), kept, with: Some(with) });

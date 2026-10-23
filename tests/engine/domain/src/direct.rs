@@ -271,6 +271,7 @@ impl Driver {
     pub fn sign_in(&mut self) {
         self.serial += 1;
         self.send(engine::Event::Party(engine::PartyInput::SignedIn {
+            held: None,
             reply_to: ReplyTo::new(Token::new(self.serial)),
             identity: people::Identity {
                 key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

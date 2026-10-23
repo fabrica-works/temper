@@ -275,6 +275,9 @@ impl skein_world::Referee<Proc> for Referee {
             self.forge.borrow_mut().adopted();
         }
         let complete = match self.phase {
+            crate::world::Phase::SignIn => {
+                other.iter().any(|proc| matches!(proc, Proc::Client(person) if person.signed_in > 0))
+            }
             crate::world::Phase::Drain => {
                 snapshot(&self.store.borrow()).receipts.contains(&rules::Receipt::Turn(1, 1, 1))
             }
@@ -296,7 +299,7 @@ impl skein_world::Referee<Proc> for Referee {
             },
         };
         if self.done.is_none()
-            && (done || matches!(self.phase, crate::world::Phase::Drain | crate::world::Phase::Restart))
+            && (done || !matches!(self.phase, crate::world::Phase::Story | crate::world::Phase::Fault { .. }))
             && complete
         {
             for proc in other.iter_mut() {

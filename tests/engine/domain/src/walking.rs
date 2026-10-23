@@ -637,6 +637,7 @@ impl World {
             self.person_sent = true;
             self.queue(
                 engine::Event::Party(engine::PartyInput::SignedIn {
+                    held: None,
                     reply_to: ReplyTo::new(Token::new(101)),
                     identity: people::Identity {
                         key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

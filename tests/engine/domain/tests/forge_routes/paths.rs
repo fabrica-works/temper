@@ -41,6 +41,7 @@ pub(super) fn add_reader(policy: &mut authority::Policy) {
 fn sign_in_reader(world: &mut World) {
     let owner = world.signed_in.take().expect("owner session");
     world.send(engine::Event::Party(engine::PartyInput::SignedIn {
+        held: None,
         reply_to: ReplyTo::new(SIGN_IN_READER),
         identity: people::Identity {
             key: people::IdentityKey { provider: 0, subject: READER_SUBJECT.to_be_bytes().into() },

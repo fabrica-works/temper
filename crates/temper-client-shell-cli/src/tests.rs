@@ -202,6 +202,28 @@ fn sign_in_keeps_its_record_before_success() {
     assert_eq!(f.exit(), Some(Exit::Code(0)));
 }
 #[test]
+fn a_kept_sign_in_stores_the_fresh_address_without_writing_the_token() {
+    let mut f = fixtures::Disk::sign_in(fixtures::LINK);
+    f.address = b"http://127.0.0.1:3999\n";
+    f.keep_link = Some(());
+    f.token = fixtures::TOKEN_BYTES;
+    f.answer_sign_in_then_me();
+    assert_eq!(f.exit(), None, "address must be durable before success");
+    f.store_token_with_address();
+    assert_eq!(f.stored(b"address"), Some(b"http://127.0.0.1:4000\n".as_slice()));
+    assert_eq!(f.stored(b"token"), None, "the loaded token is never written");
+    assert_eq!(f.host.root.client().link().credential.map(skein_lib::Secret::expose), Some(fixtures::TOKEN_BYTES));
+    assert_eq!(f.exit(), Some(Exit::Code(0)));
+    let mut ordinary = fixtures::Disk::sign_in(fixtures::LINK);
+    ordinary.answer_sign_in_then_me();
+    ordinary.store_token_with_address();
+    assert_eq!(f.stdout(), ordinary.stdout(), "usual success output");
+    assert_eq!(f.stderr(), ordinary.stderr());
+    assert_eq!(f.link_bearers.len(), 1, "the link offers a held bearer");
+    assert_eq!(f.link_bearers[0].as_deref(), Some(fixtures::TOKEN_BYTES));
+}
+
+#[test]
 fn a_non_loopback_link_exits_1_before_sending() {
     let mut f = fixtures::Disk::sign_in(
         b"http://192.0.2.1:4000/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -215,10 +237,12 @@ fn a_non_loopback_link_exits_1_before_sending() {
 fn a_refused_link_never_prints_its_secret() {
     let mut f = fixtures::Disk::sign_in(fixtures::LINK);
     f.refuse_link = Some(());
+    f.token = fixtures::TOKEN_BYTES;
     f.answer_sign_in_then_me();
     assert_eq!(f.stdout(), b"");
     assert_eq!(f.stderr(), b"temper ctl: the sign-in link was refused\n");
     assert_eq!(f.stored(b"token"), None);
+    assert_eq!(f.stored(b"address"), None);
     assert_eq!(f.exit(), Some(Exit::Code(1)));
 }
 #[test]
@@ -422,6 +446,7 @@ fn sign_out_waits_for_the_empty_token_stored() {
 #[test]
 fn sign_in_dash_reads_stdin() {
     let mut f = fixtures::Disk::act(&[b"sign-in", b"-"]);
+    f.token = b"";
     f.input = fixtures::LINK;
     f.answer_sign_in_then_me();
     assert_eq!(f.stored(b"token"), Some(fixtures::TOKEN_BYTES));
@@ -634,12 +659,15 @@ fn a_link_answered_again_is_sent_after_backoff() {
     let mut f = fixtures::Disk::act(&[b"sign-in", b"-"]);
     f.input = fixtures::LINK;
     f.again_links = 1;
+    f.token = b"9876543210987654321098765432109876543210";
     f.answer_sign_in_then_me();
     assert_eq!(f.next_deadline(), Some(skein_lib::Time::ZERO.saturating_add(SIGN_IN_FIRST)));
     assert_eq!(f.link_posts.len(), 1);
     f.advance_past(SIGN_IN_FIRST);
     assert_eq!(f.link_posts.len(), 2);
     assert_eq!(f.link_posts[0], f.link_posts[1]);
+    assert_eq!(f.link_bearers[0].as_deref(), Some(f.token), "the first exchange offers the stored token");
+    assert_eq!(f.link_bearers[0], f.link_bearers[1], "retry offers the same token");
     assert_eq!(f.stored(b"token"), Some(fixtures::TOKEN_BYTES));
     assert_eq!(f.stderr(), b"");
     assert_eq!(f.exit(), Some(Exit::Code(0)));
