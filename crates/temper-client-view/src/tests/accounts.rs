@@ -767,8 +767,9 @@ mod memory_literal;
 // The page reserves its patch queue once, at four patches a node.
 // A chat's composer placeholder adds one phrase (148 B).
 // Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
+// The flow's three state words (444 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const ACCOUNT_BYTES: u64 = 6978202125;
+const ACCOUNT_BYTES: u64 = 6978202569;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
