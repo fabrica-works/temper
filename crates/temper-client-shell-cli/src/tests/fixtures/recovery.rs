@@ -90,7 +90,7 @@ pub fn chat_me() -> w::Me {
         &lim,
         w::MeProjectParts {
             project: PROJECT,
-            name: Some(text(b"shop")),
+            name: text(b"shop"),
             role: w::HeldRole::Owner,
             pool: None,
             templates: piece(&encode!(template)),

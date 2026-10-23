@@ -549,7 +549,15 @@ fn the_first_meta_omits_absent_priority_and_uses_the_project_fallback_and_proced
     let root = f::held_root();
     let mut me = root.pages().me(root.client()).expect("me").clone();
     for index in 0..me.projects.len() {
-        me.projects.get_mut(index).expect("project").name = None;
+        let row = me.projects.get_mut(index).expect("project");
+        row.name = jig_client::contract::DocumentText::complete(
+            jig_client::contract::Text::new(
+                fixtures::words()
+                    .say(crate::words::Word::Project, &[skein_ui::phrases::Hole::Number(u64::from(row.project))]),
+                64,
+            )
+            .expect("project name"),
+        );
     }
     let tree = header(&task, Some(&me));
     assert!(named(

@@ -55,7 +55,9 @@ fn assert_golden(name: &str, printed: crate::jig::Printed) {
 fn delegate_answer(result: c::ReadResult) -> crate::jig::Printed {
     let (mut root, call) = f::read_call(&["task", "2"]);
     let mut me = f::me(f::PARTY);
-    me.projects.get_mut(0).expect("project").name = None;
+    me.projects.get_mut(0).expect("project").name = jig_client::contract::DocumentText::complete(
+        jig_client::contract::Text::new(b"project 1".as_slice().into(), 64).expect("project name"),
+    );
     root.deliver(c::Delivery::Me(Box::new(me)));
     root.serve(call, result);
     root.answer(call).expect("delegate answered")

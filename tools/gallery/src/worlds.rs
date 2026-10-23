@@ -1985,7 +1985,7 @@ fn base_frame(person: &str, project: &str) -> c::Me {
     projects
         .push(c::MeProject {
             project: PROJECT,
-            name: Some(doc(project)),
+            name: doc(project),
             role: c::HeldRole::Owner,
             pool: None,
             templates,

@@ -286,10 +286,8 @@ pub(crate) fn header(
     let mut named = false;
     if let Some(me) = me {
         for project in &me.projects {
-            if project.project == task.project
-                && let Some(name) = &project.name
-            {
-                text(b, Role::Paragraph, name.bytes());
+            if project.project == task.project {
+                text(b, Role::Paragraph, project.name.bytes());
                 named = true;
             }
         }

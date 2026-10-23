@@ -57,7 +57,7 @@ pub fn me() -> Me {
     me.projects
         .push(MeProject {
             project: PROJECT,
-            name: None,
+            name: DocumentText::complete(Text::new(b"Project 1".as_slice().into(), 64).expect("project name")),
             role: HeldRole::Owner,
             pool: None,
             templates,

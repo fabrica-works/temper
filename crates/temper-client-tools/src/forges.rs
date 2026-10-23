@@ -913,9 +913,7 @@ fn intent(forge: u16, call: &jig::call::Call, client: &Client) -> Intent {
             let mut found = None;
             if let Some(me) = crate::forge::me(client) {
                 for project in &me.projects {
-                    if let Some(text) = &project.name
-                        && text.bytes() == name.as_ref()
-                    {
+                    if project.name.bytes() == name.as_ref() {
                         found = Some(project.project);
                         break;
                     }

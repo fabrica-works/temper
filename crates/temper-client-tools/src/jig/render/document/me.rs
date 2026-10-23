@@ -85,12 +85,7 @@ pub(super) fn encode_me_project(value: &jig_client::contract::MeProject, out: &m
     out.key(b"project");
     out.unsigned(u64::from(value.project));
     out.key(b"name");
-    match &value.name {
-        Some(item_1) => {
-            super::encode_document_text(item_1, out, budget);
-        }
-        None => out.null(),
-    }
+    super::encode_document_text(&value.name, out, budget);
     out.key(b"role");
     super::encode_held_role(value.role, out, budget);
     out.key(b"pool");

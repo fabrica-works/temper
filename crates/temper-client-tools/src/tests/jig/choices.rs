@@ -103,7 +103,7 @@ fn chat_model_lookup_is_scoped_to_the_project() {
     let mut me = f::choice_me(f::CHAT_BUDGET);
     let mut other = me.projects.get(0).expect("project").clone();
     other.project = f::PROJECT + 1;
-    other.name = Some(f::document_text(b"other"));
+    other.name = f::document_text(b"other");
     other.models.clear();
     let mut projects = List::with_capacity(2);
     projects.push(me.projects.get(0).expect("project").clone()).expect("first");

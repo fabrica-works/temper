@@ -148,13 +148,7 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
         for selected in [true, false] {
             for row in &me.projects {
                 if (Some(row.project) == pages.project()) == selected {
-                    // Until jig gives projects names, a project `me` leaves unnamed is "Project N" (5.1).
-                    let fallback = words
-                        .say(crate::words::Word::Project, &[skein_ui::phrases::Hole::Number(u64::from(row.project))]);
-                    let name = match &row.name {
-                        Some(name) => name.bytes(),
-                        None => &fallback,
-                    };
+                    let name = row.name.bytes();
                     builder.open(Role::Button);
                     builder.name(name);
                     if selected {

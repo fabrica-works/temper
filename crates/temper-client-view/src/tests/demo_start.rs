@@ -139,7 +139,9 @@ fn the_context_names_the_deployment_owner_then_the_project_owner_then_the_person
         me.deployment_role = deployment;
         me.projects.get_mut(0).unwrap().role = role;
         if !named {
-            me.projects.get_mut(0).unwrap().name = None;
+            me.projects.get_mut(0).unwrap().name = jig_client::contract::DocumentText::complete(
+                jig_client::contract::Text::new(b"Project 1".as_slice().into(), 64).expect("project name"),
+            );
         }
         let root = f::demo_frame_root(Address::Chats, f::PROJECT, true, None, Some(me));
         let view = f::page_view(&root);

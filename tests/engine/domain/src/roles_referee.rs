@@ -103,6 +103,7 @@ impl Referee {
                             | people::Stored::ReadConversation { .. }
                             | people::Stored::EndedRead { .. }
                             | people::Stored::SignIn { .. }
+                            | people::Stored::Acted { .. }
                             | people::Stored::Policy { .. }
                             | people::Stored::Answer { .. },
                         )
@@ -149,6 +150,7 @@ impl Referee {
                             | people::Stored::EndedRead { .. }
                             | people::Stored::SignIn { .. }
                             | people::Stored::Roles { .. }
+                            | people::Stored::Acted { .. }
                             | people::Stored::Policy { .. },
                         )
                         | jig_domain_core::Record::Tasks(_)

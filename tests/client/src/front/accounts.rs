@@ -12,15 +12,7 @@ impl Joint {
         let configs = std::array::from_fn(|_| {
             let mut config = walking::config(seed);
             let rules = config.core.authority.rules().clone();
-            let policy = config.core.authority.policy(1).expect("fixture project").clone();
-            let mut authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("account bounds");
-            let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
-            jig_domain_authority::step(
-                &mut authority,
-                jig_domain_authority::Event::Policy { project: 1, policy },
-                &mut out,
-            );
-            config.core.authority = authority;
+            config.core.authority = jig_domain_authority::Domain::new(rules, bounds.authority).expect("account bounds");
             config
         });
         Self::with_engine(seed, &limits, Store::new(), configs, &bounds, 1)

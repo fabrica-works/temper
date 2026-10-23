@@ -79,7 +79,7 @@ fn configured() -> Driver {
         rules.ceiling.delegation.depth = 2;
         rules.ceiling.delegation.tasks = 4;
         let mut domain = authority::Domain::new(rules, limits.authority).expect("larger authority");
-        let mut policy = config.core.authority.policy(1).expect("configured project").clone();
+        let mut policy = config.core.seed_projects[0].policy.policy.clone();
         policy.ceiling.tools = authority::Tools(3);
         policy.ceiling.delegation.depth = 2;
         policy.ceiling.delegation.tasks = 4;
@@ -98,7 +98,9 @@ fn configured() -> Driver {
         let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
         authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
         assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-        config.core.authority = domain;
+        config.core.seed_projects[0].policy.policy = domain.policy(1).expect("configured seed policy").clone();
+        config.core.authority =
+            jig_domain_authority::Domain::new(domain.rules().clone(), *domain.limits()).expect("configured authority");
         config
     });
     Driver::configured(Store::new(), config, &limits)

@@ -155,7 +155,7 @@ fn watched_root() -> (Domain, Env<Limits>) {
     use jig_domain_people as people;
     let (mut domain, env) = root();
     let mut out = Queue::with_capacity(people::max_out(&env.limits.people));
-    domain.core.people = people::Domain::new(&env.limits.people, Box::new([]), 1);
+    domain.core.people = people::Domain::new(&env.limits.people, Box::new([]), 1, Box::new([]));
     for record in [
         people::Stored::Person {
             number: 1,
