@@ -343,7 +343,11 @@ impl Judge {
         let secret = b"s2-case-fixture-secret";
         let mut hash = skein_lib::sha256::Sha256::new();
         hash.update(secret);
-        let digest = hash.finish().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        let digest = hash.finish().iter().fold(String::new(), |mut hex, byte| {
+            use std::fmt::Write as _;
+            write!(hex, "{byte:02x}").expect("hex");
+            hex
+        });
         super::write_private(&engine_dir.join("data/secrets/s2.digest"), digest.as_bytes());
         for name in ["ws", "s1", "s2"] {
             let dir = if name == "ws" { ws_dir.clone() } else { self.members.prepare(name) };
@@ -704,7 +708,7 @@ impl Referee<cluster::Root> for Judge {
             }
             Stage::Stopping if self.members.ended("ws") && Self::calls(root).foreground_idle() => {
                 self.stopped_links = Some(self.members.linked("ws"));
-                self.stage = Stage::Acts
+                self.stage = Stage::Acts;
             }
             Stage::Starting { target } if self.members.linked("ws") == target => self.stage = Stage::Acts,
             Stage::Acts => self.advance(now, root),
