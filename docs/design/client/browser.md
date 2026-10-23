@@ -195,6 +195,7 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   | `Chat { task }` | `/chats/<task>` |
   | `Task { task }` | `/tasks/<task>` |
   | `Adopt { project }` | `/projects/<project>/adopt` |
+  | `Welcome { step }` | `/welcome`, and its step's query |
 
   `<task>` and `<project>` are the task's and the project's numbers in
   decimal. A later page's path comes with it, in this shape
@@ -213,10 +214,17 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   or edited link opens the inbox less filtered, never refused, and its
   address is replaced with the printed one. It reads numbers, not the
   person's projects: a project the person isn't in shows an empty
-  inbox, which "All projects" undoes. The inbox's filter alone is in
-  an address: the chats list's and a goal's plan's are the page's,
-  "All" at each open (section 5), and another page's query is dropped,
+  inbox, which "All projects" undoes. The inbox's filter and the
+  welcome's step (below) alone are in an address: the chats list's
+  and a goal's plan's are the page's, "All" at each open (section 5),
+  and another page's query is dropped,
   `/chats/7?x=1` replaced with `/chats/7`.
+- **The welcome's step is its query:** none for its first step,
+  Welcome, so that `/welcome` is the welcome; `?at=forge`, `?at=model`
+  and `?at=ready` for the others (`README.md`, 3.5, The welcome). As
+  the inbox's filter, an `at` that doesn't read as a step, or a field
+  of another name, is dropped, and the address replaced with the
+  printed one: `/welcome?at=done` opens the welcome at `/welcome`.
 - **A filter chosen is a move** (below), with its history entry: a
   link's, at the page's top with the focus on its heading, and back
   returns to the filter before. Like any move it folds the open
@@ -238,12 +246,12 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   `http://HOST:PORT/jig/v1/sign-in/link?secret=SECRET`, opened in a
   browser on the engine's machine (`README.md`, section 7): temper's
   server answers its `GET` with the page (2.2); jig's sign-in part takes
-  the secret and replaces the address with `/chats`, temper's home for
-  a sign-in, before anything is sent; the client signs in with it
+  the secret and replaces the address with `/welcome`, temper's home
+  for a sign-in, before anything is sent; the client signs in with it
   (`SignIn { with: Link(secret) }`), and the mapping's answer sets its
   cookie, which the client never sees (jig's `protocol/browser.md`,
-  section 11). The chats page follows, where a first run's demo
-  suggests its requests (`README.md`, 4.8).
+  section 11). The welcome follows, which moves on to the chats page
+  once the first run is over (`README.md`, 3.5, The welcome).
 - **A reload, or another tab,** signs in with `Transport`, by the cookie
   (jig's `client/domain/client.md`, section 12).
 - **Signed out,** by the banner's "Sign out" (jig's sign-out clears the
@@ -358,8 +366,9 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
 
 ### 4.1 The first milestone's stories
 
-1. **Signing in by the printed link:** the chats show, and the
-   address reads `/chats` once they do (2.4); a reload on a chat's
+1. **Signing in by the printed link:** the welcome shows, at
+   `/welcome`, or, where the first run is over, the chats, the
+   address reading `/chats` once they do (2.4); a reload on a chat's
    address shows that chat, signed in by the cookie; a link spent shows
    the browser's signed-out paragraph (2.4). That the secret leaves the
    address before the first request is held by the shell's start order
@@ -581,6 +590,7 @@ view draws, never changing a view to suit a sample.
 | `task-solo-T3` | the solo world's goal T3, its plan and budget |
 | `accounts-solo` | the solo world's accounts |
 | `chats-first-run-1` | the first run's first screen: the demo's start |
+| `welcome-first-run-0` | the first run's welcome: its two cards |
 | `adoption` | the adoption form, empty |
 | `adoption-filled` | the adoption form, filled in |
 | `adoption-refused` | the adoption form after a refusal, its alert |

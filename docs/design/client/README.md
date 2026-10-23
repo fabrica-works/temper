@@ -285,9 +285,10 @@ credential.
   any page opens at the inbox, and a composer's words not sent, or a
   form's values, are not kept across a restart (section 11). A browser
   opens at its address (`browser.md`, 2.3), and after the printed
-  link's sign-in at the chats page, where a first run starts
-  (`browser.md`, 2.4); with the welcome (`../draft/first-run.md`, 2.3),
-  at `Welcome` until the person has chosen, then at the chats page.
+  link's sign-in at `Welcome` (`browser.md`, 2.4;
+  `../draft/first-run.md`, 2.3), which shows its first step while the
+  first run is not over, and otherwise moves on to the chats page
+  (3.5, The welcome).
 
 ### 3.5 Its pages
 
@@ -309,7 +310,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Adopt { project }` | none: 4.4 | the adoption form, with the picker of the repositories temper can reach on the chosen forge | `me`; the chosen forge's deployment part, for its kind, mode, user and installations (`forge.md`, 5.4); the picker's page, a `Reachable` request (section 8) | adopt a repository (4.4) |
 | `Forges` | `forges.html` | the person's forges, each row folded until opened: its connection, its mode and access, on GitHub temper's App and its installations, a connect under way and how the last ended, its load; then the playground's forge, folded, while the demo's forge half holds; "+ Add a forge", to `ConnectForge` (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect a stopped forge; replace a key or tokens; install on another account; new repository; forget the admin's token; set up again (section 8) |
 | `ConnectForge` | `connect-forge.html` | connecting one more forge: Choose, Details, Setting up and Ready, which ends on the work it adopted (`forge.md`, 5.4) | the forge's, through the forge's side (4.2) | connect; connect as its admin; set up a Forgejo here (section 8) |
-| `Welcome` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); the forge's, as `ConnectForge` reads it; `accounts` | start the playground; `ConnectForge`'s and `Accounts`' acts |
+| `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `Accounts`' acts |
 | `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's: each with its LLM provider and display name, its holder, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), the runs using it and the tasks waiting for it; the sign-ins and checks under way, and how the last ended; "Add an account", with the ways its providers offer (5.5, The ways) | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in with an LLM provider; sign a source out; add a key, to an account or as one of its own; replace a key; remove a source or an account; declare a program's login; check it again; move an account, or a source, up or down; resume a limited source |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
@@ -535,6 +536,42 @@ keeps (`../protocol/configuration.md`, section 2).
   says; a pasted key or token is a secret field (3.6), and a connect's
   or an install's link is shown as an external link (6.5). How a
   connect ends is read on the page, never assumed from its answer.
+- **The welcome** (`welcome.html`) is one page, `Welcome { step }`, its
+  step Welcome, Forge, Model or Ready, at `/welcome` and
+  `/welcome?at=forge`, `model` or `ready` (`browser.md`, 2.3); its
+  words are 5.6's.
+  - *Its frame* is temper's name, the person's name and "Sign out"
+    alone: no project, navigation or link state, and neither the
+    accounts' banner nor the demo's nor the setup strip (5.1). Each
+    step's heading is the page's level-1 heading.
+  - *Whether it shows:* at its Welcome step, the page decides once each
+    time it opens, when its facts are in. The first run is over
+    when an account of the `accounts` document is usable whose LLM
+    provider is not the demo's (4.8), and a forge other than the
+    demo's (`application.demo.forge`) is connected in the `forges`
+    watch's rows; for a person whose role does not hold the
+    deployment's forges (above), the forges are not theirs to set up,
+    and the account alone decides. Its facts are in once the demo's
+    read has answered, a demo or none, the `accounts` document is
+    delivered and not cut, and, where the person's role holds the
+    forges, the `forges` watch has delivered its rows or been refused.
+    Over, the page moves on to the chats page, its address replacing
+    the welcome's, so that back does not return to it; once the demo
+    has a state of the engine's (`../draft/first-run.md`, 2.3), a
+    running demo is the person's choice made, and the page moves on the
+    same way. Otherwise it shows its step, and until its facts are in,
+    its heading alone. Its other steps never move on of their own.
+  - *"Try the playground"* opens the chats page in the demo's project,
+    as choosing that project does; once the demo has a state of the
+    engine's, after asking the engine to start the playground while it
+    has not started.
+    *"Set up temper"* opens its Forge step.
+  - *Forge* is `ConnectForge`'s Choose and Details (`forge.md`, 5.4).
+    *Model* is the accounts page's "Add an account": its ways, a chosen
+    way's field, its act pending and how it ended, the accounts page's
+    own state and acts (above), so that an account added there is the
+    accounts page's too. *Ready* names the forge and the model as set
+    up or under way.
 - **A suggested request** (`chats.html`) starts a chat with the
   cue's words as its first message, as the composer's send does: one
   act, one request (3.6), the suggestions and the send disabled while
@@ -1116,11 +1153,12 @@ of each (`../draft/first-run.md`, 3.6).
     page's watch reopens; the person's name and "Sign out"; all but
     temper's name in one disclosure, "Menu", which a browser folds
     behind its ☰ at phone width alone (`browser.md`, 2.5) and the
-    terminal and the fake person find whole;
+    terminal and the fake person find whole; on `Welcome`, temper's
+    name, the person's name and "Sign out" alone (3.5, The welcome);
   - *the accounts' banner,* while no account the person's work may use
     is usable (the `accounts` watch; jig's
     `client/domain/contract.md`, 7.1): its words and three buttons
-    (5.5), on every page but the accounts page;
+    (5.5), on every page but the accounts page and `Welcome`;
   - *the demo's banner,* while either of the demo's halves holds
     (4.8): a region named "Playground", its words and its links (5.6), on
     every page but `Welcome`, the accounts and the forges pages and
@@ -1469,7 +1507,7 @@ the cues the demo's, copied in:
   wizard's steps, Welcome, Forge, Model and Ready, along its top, under
   a frame of temper's name, the person's and "Sign out" alone. Welcome:
   the level-1 heading "Welcome to temper"; "Ask for a change in a chat.
-  temper's agents make it on a branch, open a pull request, and land it
+  temper’s agents make it on a branch, open a pull request, and land it
   once CI passes."; two cards, "Try the playground" ("A built-in
   scripted model and forge. Ask one of three requests and follow its
   change from a branch to main."; "Nothing leaves this machine, and
@@ -1481,9 +1519,16 @@ the cues the demo's, copied in:
   you like; the playground then steps aside." Forge is `ConnectForge`'s
   Choose and Details; Model is the accounts page's ways (5.5); Ready
   names each as set up or under way, then "Open PROJECT" once the
-  forge's work is adopted. Each step after Welcome offers "Back",
-  "Later", to the chats page, and "Try the playground instead" while no
-  forge of the person's is connected.
+  forge's work is adopted. Forge's heading is "Connect a forge", then
+  "Where your repositories live: temper’s agents push branches and
+  open pull requests there."; Model's "Connect a model", then "temper’s
+  agents run on it, and what they use is billed to its account.". Each
+  step after Welcome offers "‹ Back", to the step before, "Later", to
+  the chats page, and "Try the playground instead" while the demo is
+  answered (4.8), which it no longer is once a forge of the person's
+  connects. A document with no demo (`application.demo` null, the
+  demo's read answering none) has neither the playground's card nor
+  the closing line, and no step offers the playground.
 - **The setup strip:** "temper has no forge and no model yet.", or the
   one missing alone; a set up under way (5.1); then "Continue setting
   up", to `Welcome` at its step, and "Try the playground" while no forge
