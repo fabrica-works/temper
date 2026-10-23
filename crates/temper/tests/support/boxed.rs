@@ -219,11 +219,13 @@ pub struct StoryOutcome<T> {
     pub stderr: Vec<u8>,
     pub left: Option<Vec<u32>>,
     pub finished: bool,
+    pub dormant_checked: bool,
     pub checked: T,
 }
 struct StoryJudge<'a, F, T> {
     check: Option<F>,
     checked: &'a Cell<Option<T>>,
+    dormant_checked: &'a Cell<bool>,
     stopping: bool,
     cleanup: bool,
     settled: bool,
@@ -250,6 +252,15 @@ impl<F: FnOnce() -> T, T> Referee<Process> for StoryJudge<'_, F, T> {
         let Process::Binary(binary) = &procs[0] else { panic!("binary") };
         let Process::Person(person) = &procs[1] else { panic!("native person") };
         let stderr = String::from_utf8_lossy(binary.stderr());
+        if person.choosing_playground() {
+            assert!(
+                !stderr.lines().any(|line| line.starts_with("fake llm: ")
+                    || line.starts_with("fake forge ")
+                    || line.starts_with("prepare 1: ")),
+                "the demo's fakes stay dormant at the welcome: {stderr}"
+            );
+            self.dormant_checked.set(true);
+        }
         if person.failed.is_some() {
             for node in person.client.as_ref().expect("native client").tree().nodes() {
                 eprintln!(
@@ -309,9 +320,11 @@ pub fn run_story<T>(
     let root = skein_shell::open_root(client).expect("client's parent root");
     fds.push(root);
     let checked = Cell::new(None);
+    let dormant_checked = Cell::new(false);
     let mut world = real::World::new(StoryJudge {
         check: Some(check),
         checked: &checked,
+        dormant_checked: &dormant_checked,
         stopping: false,
         cleanup: false,
         settled: false,
@@ -331,6 +344,7 @@ pub fn run_story<T>(
         stderr: binary.stderr().to_vec(),
         left: binary.tree_status().live_at_leader_exit.clone(),
         finished: person.finished,
+        dormant_checked: dormant_checked.get(),
         checked: checked.take().expect("the finished person's forge check ran"),
     }
 }

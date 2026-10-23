@@ -56,6 +56,7 @@ enum Begin {
     LinkWithOpenAiKey,
     Token,
     Link,
+    Playground,
 }
 /// The script is separate from the client's production composition.
 pub struct Script {
@@ -116,26 +117,25 @@ pub fn signed_in_account(signing: &[u8], name: &[u8]) -> Script {
         ]),
     }
 }
-/// Signs in by the printed link, no key added: the demo's seed added it.
-/// Asks `cue` in a new chat, task `task`, then sees the text and the task's report.
+/// Signs in by the printed link; the demo's running start keeps the deployment key.
+/// Asks `cue` in a new chat, task `task`, then sees its committed reply.
+/// Chats are ended by their requester; the scripted finish keeps no report.
 #[must_use]
-pub fn demo_chat(task: u64, cue: &[u8], text: &[u8], report: &[u8]) -> Script {
+pub fn demo_chat(task: u64, cue: &[u8], text: &[u8]) -> Script {
     use skein_ui::Role;
     // The view names each inbox entry by its kind and its source task.
-    let entry: Box<[u8]> = format!("Updates from T{task}").into_bytes().into_boxed_slice();
+    let entry: Box<[u8]> = format!("Reply from T{task}").into_bytes().into_boxed_slice();
     let result = || Box::new([Target::Role { role: Role::Item, name: entry.clone() }]);
     Script {
         begin: Begin::Link,
         steps: Box::new([
             Step::Go { address: Address::Chats },
             Step::See { find: Find::named(Role::TextArea, b"Start a chat"), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Status, b"Ready"), within: START_WITHIN },
+            Step::Gone { find: Find::exactly_named(Role::Status, b"Starting"), within: START_WITHIN },
             Step::Press { find: Find::exactly_named(Role::Button, b"Scripted model") },
             Step::Type { find: Find::named(Role::TextArea, b"Start a chat"), words: cue.into() },
             Step::Press { find: Find::named(Role::Button, b"Start") },
-            Step::See {
-                find: Find::text(format!("Ended · its report, “{}”", String::from_utf8_lossy(report)).as_bytes()),
-                within: START_WITHIN,
-            },
             Step::See {
                 find: Find::exactly_named(Role::Paragraph, b"You")
                     .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
@@ -151,11 +151,23 @@ pub fn demo_chat(task: u64, cue: &[u8], text: &[u8], report: &[u8]) -> Script {
                     .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
                 within: START_WITHIN,
             },
-            // A Failed's reason could contain the report too. The inbox's result
-            // card must say Done, and hold this cue's report, without any log.
+            Step::See { find: Find::named(Role::TextArea, b"Message"), within: START_WITHIN },
             Step::Go { address: Address::Inbox { filter: temper_client_domain::address::Filter::ALL } },
-            Step::See { find: Find::exactly_named(Role::Status, b"Done").within(result()), within: START_WITHIN },
-            Step::See { find: Find::text(report).within(result()), within: START_WITHIN },
+            Step::See {
+                find: Find::named(Role::Heading { level: 3 }, b"replied").within(result()),
+                within: START_WITHIN,
+            },
+            Step::Go { address: Address::Chat { task } },
+            Step::See {
+                find: Find::text(text)
+                    .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
+                within: START_WITHIN,
+            },
+            Step::Gone {
+                find: Find::text(b"Invalid call: unknown tool")
+                    .within(Box::new([Target::Role { role: Role::Log, name: b"Conversation".as_slice().into() }])),
+                within: START_WITHIN,
+            },
         ]),
     }
 }
@@ -174,9 +186,13 @@ pub fn demo_change() -> Script {
         ])
     };
     Script {
-        begin: Begin::Link,
+        begin: Begin::Playground,
         steps: Box::new([
-            Step::Go { address: Address::Chats },
+            Step::Go { address: Address::Welcome { step: temper_client_domain::Step::Welcome } },
+            Step::See { find: Find::exactly_named(Role::Button, b"Try the playground"), within: START_WITHIN },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Try the playground") },
+            Step::See { find: Find::exactly_named(Role::Status, b"Starting"), within: START_WITHIN },
+            Step::See { find: Find::exactly_named(Role::Status, b"Ready"), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Paragraph, "Using Scripted model · Default".as_bytes()), within: START_WITHIN },
             Step::See { find: Find::exactly_named(Role::Disclosure, b"Change model"), within: START_WITHIN },
             // client/README.md, 4.8: a suggested request starts and opens its chat.
@@ -287,6 +303,11 @@ impl Person {
         self.bytes.extend_from_slice(link);
         self.bytes.push(b'\n');
     }
+    /// The welcome has answered and the playground button has not yet been pressed.
+    #[must_use]
+    pub fn choosing_playground(&self) -> bool {
+        self.begin == Begin::Playground && self.actor.at() == 2
+    }
     fn build(root: Fd, input: Option<Fd>, output: Option<Fd>, script: Script) -> Self {
         let steps = if matches!(script.begin, Begin::LinkWithKey | Begin::LinkWithOpenAiKey) {
             use skein_ui::Role;
@@ -327,13 +348,17 @@ impl Person {
             signing_retry: None,
             signing_backoff: SIGN_IN_FIRST,
             finished: false,
-            project: ProjectSelection::Pending,
+            project: if script.begin == Begin::Playground {
+                ProjectSelection::Selected
+            } else {
+                ProjectSelection::Pending
+            },
             failed: None,
             begin: script.begin,
             directory: b"private".as_slice().into(),
             // Fresh demo clients must not reuse the same request names when
             // signing the same owner in again on the same deployment.
-            seed: if script.begin == Begin::Link {
+            seed: if matches!(script.begin, Begin::Link | Begin::Playground) {
                 let seed = skein_shell::crypto_seed().expect("demo client's fresh seed");
                 u64::from_le_bytes(seed.expose()[..8].try_into().expect("eight seed bytes"))
             } else {
@@ -479,6 +504,15 @@ impl Person {
                 Next::Failed { step, why } => {
                     self.failed = Some(format!("native person step {step}: {why:?}"));
                 }
+            }
+            if self.begin == Begin::Playground && before == 3 && self.actor.at() == 4 {
+                let mut face = TreeFace::new(client.tree());
+                let Found::Node(cue) =
+                    face.find(&Find::exactly_named(skein_ui::Role::Button, b"Add CSV export to widget"))
+                else {
+                    panic!("starting playground has its suggested request");
+                };
+                assert!(!face.allows(cue, &skein_ui::Act::Press), "suggestions wait for the start's answer");
             }
             if self.actor.at() != before {
                 self.wake = Some(now);

@@ -166,6 +166,11 @@ impl Service {
         forget_handover(&mut settings);
         let notes = Queue::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
         let configured = crate::startup::application::configured(&settings);
+        // Workers take the forge settings; derive the demo's adoption host first.
+        let demo_config = match &settings.demo {
+            Some(demo) => Some(demo.domain(&settings.forges, settings.limits.setup.deadline)),
+            None => None,
+        };
         let workers = workers::Workers::configured(&mut settings, seeds.deployment, max)?;
         let config = temper_engine_domain::Config {
             core: jig_protocol_config::core(&settings.jig, seeds.deployment, seeds.seed),
@@ -175,10 +180,7 @@ impl Service {
             forge_charter: settings.charter,
             forges: configured,
             under_box,
-            demo: match &settings.demo {
-                Some(demo) => Some(demo.domain(&settings.forges, settings.limits.setup.deadline)),
-                None => None,
-            },
+            demo: demo_config,
         };
         let store = store::Store::new(&limits, &store_limits, &config.core.settings.models, seeds.installation);
         let demo = settings.demo;

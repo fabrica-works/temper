@@ -782,13 +782,12 @@ fn cached_binary_fingerprint(path: &std::path::Path) -> (u64, [u8; 32]) {
 }
 
 #[test]
-#[ignore = "jig seeds no deployment owner in init's configuration; ctl omits the kept deployment account"]
-fn a_first_run_answers_on_the_demo_and_a_second_finds_it_seeded() {
+#[ignore = "the shipped dark-theme script's finish is rejected as an unknown tool by the pinned jig/smith Open chat"]
+fn a_first_run_answers_on_the_demo_and_a_second_finds_it_running() {
     first_run(true);
 }
-fn first_run(restart: bool) {
+fn first_run_directories(scratch: &support::Scratch) -> ([std::path::PathBuf; 3], Vec<String>) {
     use std::{fs, os::unix::fs::PermissionsExt};
-    let scratch = support::Scratch::new("first-run");
     let paths = ["config", "data", "cache"].map(|name| scratch.path().join(name));
     for path in &paths {
         fs::create_dir(path).expect("empty first-run directory");
@@ -799,12 +798,49 @@ fn first_run(restart: bool) {
         .zip(&paths)
         .flat_map(|(flag, path)| [flag.into(), path.display().to_string()])
         .collect();
+    (paths, flags)
+}
+
+#[test]
+fn a_first_run_ctl_demo_start_answers_running_twice() {
+    use support::ctl::{Call, Step};
+    let scratch = support::Scratch::new("first-run-ctl");
+    let (_, flags) = first_run_directories(&scratch);
+    let seen = support::boxed::run_ctl(
+        scratch.path(),
+        flags,
+        scratch.path(),
+        vec![
+            Step::Run(Call::sign_in()),
+            Step::Run(Call::new(&["demo-start", "--key", "first"])),
+            Step::Run(Call::new(&["demo-start", "--key", "second"])),
+        ],
+        BOX_DEADLINE,
+        || (),
+    );
+    assert_eq!(seen.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&seen.stderr));
+    assert_eq!(seen.left, Some(Vec::new()), "no process outlived the box");
+    assert_eq!(seen.checked, Some(()), "all calls finished before stopping");
+    let [signed, first, second] = seen.calls.as_slice() else { panic!("sign-in and two demo starts") };
+    assert_eq!(signed.exit, Some(Exit::Code(0)));
+    for call in [first, second] {
+        assert_eq!(call.exit, Some(Exit::Code(0)), "{}", String::from_utf8_lossy(&call.stderr));
+        assert_eq!(call.stdout, b"running\n");
+        assert!(call.stderr.is_empty(), "{}", String::from_utf8_lossy(&call.stderr));
+    }
+    assert_demo_streams(&seen.stdout, &seen.stderr);
+    scratch.remove();
+}
+
+fn first_run(restart: bool) {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    let scratch = support::Scratch::new("first-run");
+    let (paths, flags) = first_run_directories(&scratch);
     let mut bot = None;
-    for (run, person, key) in [
+    for (run, person) in [
         (
             "first",
             support::person::demo_change(),
-            temper_fake::seed::KEY_ADDED_LINE,
         ),
         (
             "second",
@@ -813,9 +849,7 @@ fn first_run(restart: bool) {
                 3,
                 b"Add a dark theme to widget",
                 b"I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.",
-                b"The playground changes nothing.",
             ),
-            temper_fake::seed::KEY_FOUND_LINE,
         ),
     ].into_iter().take(if restart { 2 } else { 1 }) {
         let client = scratch.path().join(run);
@@ -838,7 +872,8 @@ fn first_run(restart: bool) {
         assert_eq!(ended.left, Some(Vec::new()), "{run}: no process outlived the box: {stderr}");
         let wrote = format!("box: wrote the configuration, {}\n", paths[0].join("temper.json").display());
         assert_eq!(stderr.contains(&wrote), run == "first", "{run}: {stderr}");
-        assert_demo_streams(&ended.stdout, &ended.stderr, key);
+        assert_demo_streams(&ended.stdout, &ended.stderr);
+        assert_eq!(ended.dormant_checked, run == "first", "the welcome precedes any fake start");
         if let Some(previous) = bot {
             assert_eq!(ended.checked, previous, "the restarted fake connects as the same bot");
         }
@@ -849,29 +884,13 @@ fn first_run(restart: bool) {
     }
     scratch.remove();
 }
-fn assert_demo_streams(stdout: &[u8], stderr: &[u8], key: &[u8]) {
+fn assert_demo_streams(stdout: &[u8], stderr: &[u8]) {
     let link = support::printed_link(stdout).expect("the person's sign-in link");
     assert!(skein_lib::bytes::find(link, b"/jig/v1/sign-in/link?secret=").is_some());
     assert_eq!(stdout, [link, b"\n"].concat(), "exactly one stdout line");
     let stderr = std::str::from_utf8(stderr).expect("demo diagnostics");
-    let adopt = std::str::from_utf8(temper_fake::seed::ADOPT_LINE).expect("act 4");
-    let lines = [
-        "temper fake seed: act 1: signed in\n".to_string(),
-        std::str::from_utf8(key).expect("act 2").into(),
-        "temper fake seed: act 3: accounts are usable\n".into(),
-        adopt.into(),
-        "temper fake seed: act 5: signed out\n".into(),
-        "temper fake seed: act 6: the spent link was refused\n".into(),
-    ];
-    let mut remaining = stderr;
-    for line in lines {
-        let expected = format!("seed: {line}");
-        let (_, after) =
-            remaining.split_once(&expected).unwrap_or_else(|| panic!("missing ordered {expected}: {stderr}"));
-        remaining = after;
-        assert_eq!(stderr.matches(&expected).count(), 1, "one act: {expected}");
-    }
-    let steps = ["fake llm: ", "prepare 1: ", "fake forge 1: ", "serve: ", "seed: ", "box: "];
+    assert!(!stderr.contains("temper fake seed"), "the engine owns the demo's start: {stderr}");
+    let steps = ["fake llm: ", "prepare 1: ", "fake forge 1: ", "serve: ", "box: "];
     let bundle = std::path::Path::new(env!("CARGO_BIN_EXE_temper"))
         .parent()
         .expect("binary parent")
