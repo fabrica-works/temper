@@ -790,3 +790,157 @@ pub fn step_5_6_rules() -> Box<[Box<[Rule]>]> {
     .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
     Box::new([Box::new(director), Box::new([])])
 }
+
+// Act 2, step 5.4 (domain/testing.md, 5.3)
+fn direction_owner(forge: SocketAddr, spec: &str, spend: u64, notes: u32, tasks: u32) -> Value {
+    json!({
+        "executor":{"kind":"agent","charter":1},"tracked":{"priority":1},
+        "spec":{"words":spec,"parameters":[]},"contract":{"kind":"report","words":128},
+        "authority":{"tools":391,"notes":notes,"grants":grants(forge,&[2,3,4,10,11,12]),
+            "delegation":{"kinds":[{"kind":"agent","number":1},{"kind":"procedure","number":2}],"tasks":tasks,"depth":3},
+            "budget":{"spend":spend}}
+    })
+}
+fn direction_change(forge: SocketAddr, spec: &str, path: &str, tasks: u32) -> Value {
+    json!({
+        "executor":{"kind":"procedure","connector":1,"code":2},
+        "spec":{"words":spec,"parameters":[
+            {"name":1,"kind":"resource","connector":1,"resource":temper_engine_domain_forge::tag(1, crate::forge::ID)},
+            {"name":2,"kind":"bytes","value":"main"},
+            {"name":6,"kind":"bytes","value":path}]},
+        "contract":{"kind":"change","connector":1,"change_kind":1,"words":128},
+        "authority":{"tools":1,"notes":0,"grants":grants(forge,&[2,3,4,10,11,12]),
+            "delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":tasks,"depth":2},"budget":{"spend":10}}
+    })
+}
+fn direction_held(name: &[u8], mut turn: Turn) -> Turn {
+    use skein_fake_llm_domain::api::Piece;
+    let mut lines = vec![Line::Pieces {
+        pieces: Box::new([Piece { text: super::DIRECTION_HELD_WORDS.as_bytes().into(), hold: Some(name.into()) }]),
+    }];
+    lines.extend(turn.lines);
+    turn.lines = lines.into();
+    turn
+}
+
+#[must_use]
+pub fn step_5_4(forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        B_DELEGATE_HOLD, B_FILE, B_WORDS, DEFERRED_NOTE, DEFERRED_NOTE_NUMBER, DEFERRED_WORDS, DIRECTION_BRIEF,
+        DIRECTION_REASON, DIRECTION_REPORT, DIRECTION_REVISION, OVERLAP_OWNER_REPORT, OVERLAP_OWNER_SPEC, PLANNED,
+        PLANNED_CANCEL_REASON, PLANNED_CODING_HOLD, PLANNED_SPEC, PROJECT, STORY_CHANGE, STORY_GREEN, STORY_OWNER,
+        STORY_OWNER_REPORT, STORY_OWNER_SPEC, STORY_RECALL_HOLD, STORY_SPEC, STORY_WORDS, X3, X3_CANCEL_REASON,
+        X3_FILE, X3_REVIEW_HOLD, X3_SPEC, X3_WORDS,
+    };
+    let verdict = || call(b"finish", &json!({"form":"verdict","label":"1","text":REVIEWED,"fields":{},"items":[]}));
+    Box::new([
+        Script {
+            cue: Agent::Direction.cue().into(),
+            turns: Box::new([
+                then_wait(
+                    call(
+                        b"delegate",
+                        &json!({"batch":[direction_owner(forge, STORY_OWNER_SPEC,30,2,6),direction_owner(forge, OVERLAP_OWNER_SPEC,20,0,2)]}),
+                    ),
+                    "A and B own kit's work.",
+                ),
+                then_wait(
+                    call(
+                        b"amend",
+                        &json!({"target":STORY_OWNER,"revision":DIRECTION_REVISION-1,"amendment":{"instructions":DIRECTION_BRIEF,"reason":DIRECTION_REASON}}),
+                    ),
+                    "A has the new direction.",
+                ),
+                report(DIRECTION_REPORT),
+                wait("The director is waiting for direction or the owners' reports."),
+            ]),
+        },
+        Script {
+            cue: Agent::StoryOwner.cue().into(),
+            turns: Box::new([
+                call(b"delegate", &json!({"batch":[direction_change(forge, X3_SPEC,X3_FILE,2)]})),
+                wait("x3's review waits."),
+                call(b"cancel", &json!({"target":X3,"reason":X3_CANCEL_REASON})),
+                call(
+                    b"note",
+                    &json!({"scope":{"kind":"project","project":PROJECT},"description":DEFERRED_NOTE,"body":DEFERRED_WORDS,"tags":["deferred"]}),
+                ),
+                wait("x3's cancellation is settling before a1 starts."),
+                call(b"delegate", &json!({"batch":[direction_change(forge, STORY_SPEC,B_FILE,2)]})),
+                wait("a1 is delegated."),
+                direction_held(STORY_RECALL_HOLD, call(b"recall", &json!({"kind":"name","name":DEFERRED_NOTE_NUMBER}))),
+                report(STORY_OWNER_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::OverlapOwner.cue().into(),
+            turns: Box::new([
+                direction_held(
+                    B_DELEGATE_HOLD,
+                    then_wait(
+                        call(b"delegate", &json!({"batch":[direction_change(forge, PLANNED_SPEC,B_FILE,1)]})),
+                        "h1's planned path waits.",
+                    ),
+                ),
+                then_wait(
+                    call(b"cancel", &json!({"target":PLANNED,"reason":PLANNED_CANCEL_REASON})),
+                    "h1's cancellation is settling.",
+                ),
+                report(OVERLAP_OWNER_REPORT),
+            ]),
+        },
+        Script {
+            cue: Agent::X3Writer.cue().into(),
+            turns: Box::new([
+                call(b"write", &json!({"path":X3_FILE,"content":X3_WORDS})),
+                call(b"finish", &json!({"form":"change","fields":{"title":"x3","body":"The deferred plan."}})),
+            ]),
+        },
+        Script {
+            cue: Agent::PlannedWriter.cue().into(),
+            turns: Box::new([direction_held(PLANNED_CODING_HOLD, report("h1 did not produce a change."))]),
+        },
+        Script {
+            cue: Agent::StoryWriter.cue().into(),
+            turns: Box::new([
+                call(b"edit", &json!({"path":B_FILE,"edits":[{"old":B_WORDS,"new":STORY_WORDS}]})),
+                call(b"finish", &json!({"form":"change","fields":{"title":"a1","body":STORY_GREEN}})),
+            ]),
+        },
+        // Each review starts with a fresh transcript. Select x3's by its
+        // requester in the system brief; a1's review needs no hold.
+        Script {
+            cue: format!("[Requested by task {X3}]").into_bytes().into(),
+            turns: Box::new([direction_held(X3_REVIEW_HOLD, verdict())]),
+        },
+        Script { cue: format!("[Requested by task {STORY_CHANGE}]").into_bytes().into(), turns: Box::new([verdict()]) },
+    ])
+}
+
+/// B's hold can wake the director before the person sends the new direction.
+/// Follow the delivered input, so that notice cannot consume the amendment or report.
+#[must_use]
+pub fn step_5_4_rules() -> Box<[Box<[Rule]>]> {
+    use super::{DIRECTION_MESSAGE, DIRECTION_REVISION, OVERLAP_OWNER, STORY_OWNER, STORY_OWNER_REPORT};
+    let director = [
+        (STORY_OWNER_REPORT, 2),
+        (CROSSED, 2),
+        (&format!("Done: task {STORY_OWNER} is at spec revision {DIRECTION_REVISION}"), 3),
+        (DIRECTION_MESSAGE, 1),
+        ("Held task needs a decision", 3),
+        (&format!("{DELEGATED}{STORY_OWNER}, {OVERLAP_OWNER}"), 3),
+        (BEGIN, 0),
+        ("", 3),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    Box::new([
+        Box::new(director),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+    ])
+}

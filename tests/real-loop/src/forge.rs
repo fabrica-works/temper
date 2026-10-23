@@ -179,6 +179,8 @@ impl State {
         // The case's design pull body and title-plus-body commit message exceed
         // the git-only fixture's 32-byte body and 50-byte message limits.
         config.limits.body_bytes = 2048;
+        // A closed pull keeps its item: the case's 5.4 keeps x3's closed pull while a1 opens another.
+        config.limits.items = 2;
         // Forgejo timestamps are wall times; this peer runs on the real monotonic clock.
         let now = skein_shell::Clock::new().now();
         config.skew = domain::Skew::Ahead(Duration::from_nanos(
