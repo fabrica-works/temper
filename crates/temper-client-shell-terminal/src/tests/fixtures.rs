@@ -163,6 +163,9 @@ pub fn copy_tree(source: &skein_ui::Tree) -> skein_ui::Tree {
         if let Some(name) = &node.name {
             builder.name(name);
         }
+        if let Some(description) = &node.description {
+            builder.description(description);
+        }
         for state in &node.states {
             builder.state(*state);
         }

@@ -1136,7 +1136,7 @@ fn folded_calls(
     let count = words.say(Word::ToolCalls, &[Hole::Number(count)]);
     let separator = words.say(Word::ToolSeparator, &[]);
     let mut names = List::with_capacity(u32::try_from(blocks.len()).expect("bounded blocks"));
-    let mut length = count.len();
+    let mut length = 0_usize;
     for (at, block) in blocks.iter().enumerate() {
         let c::Block::Call(call) = block else { continue };
         if !other_call(block, tasks, delegations) {
@@ -1163,19 +1163,23 @@ fn folded_calls(
         } else {
             skein_lib::bytes::copy_of(call.tool.bytes())
         };
-        length = length.checked_add(separator.len()).expect("bounded separator");
+        if !names.is_empty() {
+            length = length.checked_add(separator.len()).expect("bounded separator");
+        }
         length = length.checked_add(name.len()).expect("bounded fold line");
         names.push(name).expect("one name per block at most");
     }
-    let mut name = skein_lib::Writer::new(length);
-    name.put(&count).expect("count fits fold line");
-    for part in &names {
-        name.put(&separator).expect("separator fits fold line");
-        name.put(part).expect("tool fits fold line");
+    let mut description = skein_lib::Writer::new(length);
+    for (at, part) in names.iter().enumerate() {
+        if at != 0 {
+            description.put(&separator).expect("separator fits fold line");
+        }
+        description.put(part).expect("tool fits fold line");
     }
     b.open(Role::Disclosure);
     b.style(look::WORK);
-    b.name(&name.finish());
+    b.name(&count);
+    b.description(&description.finish());
     for block in blocks {
         if other_call(block, tasks, delegations)
             && let c::Block::Call(call) = block

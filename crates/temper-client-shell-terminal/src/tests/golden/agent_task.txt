@@ -27,6 +27,7 @@ Started 10-22 03:48Z
 Conversation:
   Temper
   Checking the credentials.
-  1 tool call · read_file:
+  1 tool call:
+    read_file
     read_file
     Read token.rs

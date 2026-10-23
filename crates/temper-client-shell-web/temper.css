@@ -263,6 +263,7 @@ section.temper-accounts button:hover { text-decoration: underline; }
 .temper-chat details.temper-work { display: block; }
 .temper-chat details.temper-work::before { content: none; }
 .temper-chat details.temper-work > summary { display: inline-flex; align-items: baseline; gap: 12px; list-style: none; cursor: pointer; }
+.temper-chat details.temper-work > summary > [id^="skein-ui-description-"] { color: #aaa297; }
 .temper-chat details.temper-work > summary::-webkit-details-marker { display: none; }
 .temper-chat details.temper-work > summary::before { content: '└' / ''; color: #b5a99b; font-size: 15px; }
 .temper-chat details.temper-work > summary:focus-visible { outline: 2px solid var(--temper-accent); outline-offset: 2px; }

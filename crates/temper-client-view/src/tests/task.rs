@@ -1836,11 +1836,11 @@ fn an_agents_conversation_is_drawn_as_a_chats() {
     assert!(skein_lib::bytes::find(&fixtures::node_text(tree, log), b"Checking the credentials.").is_some());
     assert!(has_style(nodes, look::WORK));
     assert!(named(nodes, Role::Paragraph, b"delegate"));
-    super::chat::assert_call_fold(tree, "1 tool call · delegate".as_bytes(), &[b"delegateDelegated tasks: 17"]);
+    super::chat::assert_call_fold(tree, b"1 tool call", b"delegate", &[b"delegateDelegated tasks: 17"]);
     let content = children(tree, styled(tree, look::SAYS));
     let first = *content.as_slice().first().expect("message text");
     assert_eq!(fixtures::node_text(tree, first).as_ref(), b"Checking the credentials.");
-    assert!(first < index_of(tree, Role::Disclosure, "1 tool call · delegate".as_bytes()));
+    assert!(first < index_of(tree, Role::Disclosure, b"1 tool call"));
     assert!(!has_style(nodes, look::CARD));
     let mut thread = jig_client::thread::Thread::new(
         TASK,
@@ -1872,8 +1872,13 @@ fn an_agents_message_folds_each_call_and_keeps_results_in_their_message() {
     task.activity = 1;
     let view = fixtures::page_view(&f::agent_root_with_page(task, Some(f::tree()), page));
     let tree = view.tree();
-    super::chat::assert_call_fold(tree, "2 tool calls · read ×2".as_bytes(), &[b"readFirst file", b"readSecond file"]);
-    let fold = index_of(tree, Role::Disclosure, "2 tool calls · read ×2".as_bytes());
+    super::chat::assert_call_fold(
+        tree,
+        b"2 tool calls",
+        "read ×2".as_bytes(),
+        &[b"readFirst file", b"readSecond file"],
+    );
+    let fold = index_of(tree, Role::Disclosure, b"2 tool calls");
     let result_message = styled(tree, look::BY_TOOL);
     assert!(fold < result_message);
     let mut says = None;

@@ -630,7 +630,7 @@ fn person_words_keep_their_shell_and_only_assistant_calls_keep_work() {
     for hidden in [look::BY_TOOL, look::BY_SYSTEM, look::BY_AGENT] {
         assert!(style_position(tree.nodes(), hidden).is_none(), "inputs and call-only assistant have no shell");
     }
-    assert!(fixtures::find(&tree, Role::Disclosure, "1 tool call · Read".as_bytes()).is_some());
+    assert_call_fold(&tree, b"1 tool call", b"Read", &[b"Read"]);
 }
 #[test]
 fn only_omission_markers_keep_the_turn_region() {
@@ -929,7 +929,8 @@ fn repeated_calls_fold_in_first_name_order_with_each_outcome_inside() {
     ]);
     assert_call_fold(
         &tree,
-        "3 tool calls · read ×2 · wait".as_bytes(),
+        b"3 tool calls",
+        "read ×2 · wait".as_bytes(),
         &[b"readRead the first file", b"wait", b"readRead the second file"],
     );
     assert!(skein_lib::bytes::find(&fixtures::text(&tree), b"Temper").is_none());
@@ -937,15 +938,13 @@ fn repeated_calls_fold_in_first_name_order_with_each_outcome_inside() {
 #[test]
 fn a_fold_names_two_repeated_calls_and_two_distinct_calls() {
     use fixtures::first_run as run;
-    for (tool, name) in
-        [(b"read".as_slice(), "2 tool calls · read ×2"), (b"edit".as_slice(), "2 tool calls · read · edit")]
-    {
+    for (tool, description) in [(b"read".as_slice(), "read ×2"), (b"edit".as_slice(), "read · edit")] {
         let tree = assistant_blocks(&[run::call(1, b"read", b"{}", None), run::call(2, tool, b"{}", None)]);
-        assert_call_fold(&tree, name.as_bytes(), &[b"read", tool]);
+        assert_call_fold(&tree, b"2 tool calls", description.as_bytes(), &[b"read", tool]);
     }
 }
 #[test]
-fn a_tool_name_using_the_whole_turn_budget_fits_with_its_fold_prefix() {
+fn a_tool_name_using_the_whole_turn_budget_fits_its_fold_description() {
     use fixtures::first_run as run;
     const TURN_BYTES: u32 = 4096;
     let mut receiving = fixtures::domain_limits();
@@ -973,17 +972,14 @@ fn a_tool_name_using_the_whole_turn_budget_fits_with_its_fold_prefix() {
         &mut crate::frame::Bindings::new(bounds.tree.bindings),
     );
     let tree = b.finish();
-    let prefix = "1 tool call · ".as_bytes();
-    let mut name = skein_lib::Writer::new(prefix.len().checked_add(tool.len()).unwrap());
-    name.put(prefix).unwrap();
-    name.put(&tool).unwrap();
-    assert_call_fold(&tree, &name.finish(), &[&tool]);
+    assert_call_fold(&tree, b"1 tool call", &tool, &[&tool]);
 }
 // The fake person sees the fold and all its content, without an Expanded state.
-pub(super) fn assert_call_fold(tree: &skein_ui::Tree, name: &[u8], lines: &[&[u8]]) {
+pub(super) fn assert_call_fold(tree: &skein_ui::Tree, name: &[u8], description: &[u8], lines: &[&[u8]]) {
     assert!(fixtures::person_find(tree, Role::Disclosure, name).is_some());
     let at = named_position(tree.nodes(), Role::Disclosure, Some(name)).expect("disclosure node");
     let fold = &tree.nodes()[at];
+    assert_eq!(fold.description.as_deref(), Some(description));
     assert!(!fold.states.as_slice().contains(&skein_ui::State::Expanded));
     let mut child = at.checked_add(1).unwrap();
     for line in lines {
@@ -1744,7 +1740,7 @@ fn a_proposals_fold_precedes_its_card_after_the_message() {
     assert!(fold >= message + usize::try_from(children[message].size).unwrap());
     assert!(fold + usize::try_from(children[fold].size).unwrap() <= card, "fold before proposal card");
     assert_eq!(named_count(&tree, Role::Button, b"Accept"), 1);
-    assert_call_fold(&tree, "2 tool calls · read ×2".as_bytes(), &[b"read", b"read"]);
+    assert_call_fold(&tree, b"2 tool calls", "read ×2".as_bytes(), &[b"read", b"read"]);
     let said = fixtures::text(&tree);
     assert!(skein_lib::bytes::find(&said, b"propose").is_none());
 }

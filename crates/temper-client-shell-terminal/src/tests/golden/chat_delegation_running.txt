@@ -30,7 +30,8 @@ Conversation:
       - CI passed
       - Landed
     [7] Task 2 ↗
-  1 tool call · wait:
+  1 tool call:
+    wait
     wait
 Using the default model
 [8] Message: (empty) (enter sends)

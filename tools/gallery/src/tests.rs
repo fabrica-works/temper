@@ -46,6 +46,7 @@ struct Holds {
 }
 enum Part {
     Named { role: Role, name: &'static str },
+    Described { role: Role, name: &'static str, description: &'static str },
     Absent { role: Role, name: &'static str },
     Value { role: Role, name: &'static str, value: &'static str },
     Chats { live: u32, closed: u32 },
@@ -78,7 +79,7 @@ const HOLDS: [Holds; samples::N] = [
         parts: &[
             Part::Named { role: Role::Button, name: "Accept" },
             Part::Named { role: Role::Heading { level: 2 }, name: "JSON output for tally report" },
-            Part::Named { role: Role::Disclosure, name: "2 tool calls · read ×2" },
+            Part::Described { role: Role::Disclosure, name: "2 tool calls", description: "read ×2" },
         ],
     },
     Holds {
@@ -164,7 +165,7 @@ const HOLDS: [Holds; samples::N] = [
         heading: "T1 · Add CSV export to widget",
         parts: &[
             Part::Named { role: Role::Link, name: "Task 2" },
-            Part::Named { role: Role::Disclosure, name: "1 tool call · wait" },
+            Part::Described { role: Role::Disclosure, name: "1 tool call", description: "wait" },
         ],
     },
     Holds {
@@ -299,8 +300,8 @@ const HOLDS: [Holds; samples::N] = [
         heading: "T9 · Produce T8's branch",
         parts: &[
             Part::Named { role: Role::Log, name: "Conversation" },
-            Part::Named { role: Role::Disclosure, name: "3 tool calls · read ×3" },
-            Part::Named { role: Role::Disclosure, name: "3 tool calls · edit ×3" },
+            Part::Described { role: Role::Disclosure, name: "3 tool calls", description: "read ×3" },
+            Part::Described { role: Role::Disclosure, name: "3 tool calls", description: "edit ×3" },
             Part::Named { role: Role::Paragraph, name: "Errors carry their line now" },
         ],
     },
@@ -360,6 +361,8 @@ fn each_state_holds_what_its_name_says() {
         } else {
             assert!(matches!(main.find(&h1), Found::Node(_)), "{}: heading {}", sample.name, row.heading);
         }
+        // Count-only names may repeat; described parts follow conversation order.
+        let mut described = tree.nodes().iter();
         for part in row.parts {
             match part {
                 Part::Named { role, name } => {
@@ -382,6 +385,12 @@ fn each_state_holds_what_its_name_says() {
                         "{}",
                         sample.name
                     );
+                }
+                Part::Described { role, name, description } => {
+                    let node = described
+                        .find(|node| node.role == *role && node.name.as_deref() == Some(name.as_bytes()))
+                        .unwrap_or_else(|| panic!("{}: missing {role:?} {name:?}", sample.name));
+                    assert_eq!(node.description.as_deref(), Some(description.as_bytes()), "{}", sample.name);
                 }
                 Part::Chats { live, closed } => {
                     let available = (*live).min(driver::limits().client.domain.rows)
