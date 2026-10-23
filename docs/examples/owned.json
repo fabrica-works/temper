@@ -212,7 +212,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 645651289035499,
+    "memory_bytes": 645651289035247,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -950,10 +950,7 @@
             },
             "person": {
               "login": "ada",
-              "email": "ada@example.invalid",
-              "orgs": [
-                "acme"
-              ]
+              "email": "ada@example.invalid"
             }
           }
         }

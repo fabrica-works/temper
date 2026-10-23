@@ -13,7 +13,9 @@ fn done(settings: temper_forge_setup_shell::reconcile::Settings, peer: Peer) {
     std::thread::scope(|scope| {
         let server = scope.spawn(|| peer.serve_after(0, &[(200, ADMIN), (200, BOT), (200, BOT), (200, BOT)]));
         reconcile(settings, &Clock::new()).expect("Done");
-        assert_eq!(server.join().expect("peer thread").requests.len(), 4);
+        let heard = server.join().expect("peer thread");
+        assert_eq!(heard.requests.len(), 4);
+        assert!(heard.requests.iter().all(|request| !request.line.contains("/orgs")));
     });
 }
 
@@ -22,7 +24,6 @@ fn done_with_a_listener_draws_a_private_hex_secret() {
     use std::os::unix::fs::PermissionsExt;
     let peer = Peer::reserve();
     let mut settings = support::settings(peer.address());
-    settings.given.orgs = Box::new([]);
     settings.given.listener = Some(peer.address());
     let path = settings.directory.join("webhook_secret");
     done(settings, peer);
@@ -37,7 +38,6 @@ fn done_keeps_the_secret_byte_for_byte_without_rewriting() {
     use std::os::unix::fs::MetadataExt;
     let peer = Peer::reserve();
     let mut settings = support::settings(peer.address());
-    settings.given.orgs = Box::new([]);
     settings.given.listener = Some(peer.address());
     let path = settings.directory.join("webhook_secret");
     let kept = [b'a'; 64];
@@ -49,10 +49,9 @@ fn done_keeps_the_secret_byte_for_byte_without_rewriting() {
 }
 
 #[test]
-fn done_without_a_listener_makes_no_secret() {
+fn owned_reconcile_makes_no_org_or_secret_without_a_listener() {
     let peer = Peer::reserve();
-    let mut settings = support::settings(peer.address());
-    settings.given.orgs = Box::new([]);
+    let settings = support::settings(peer.address());
     let path = settings.directory.join("webhook_secret");
     done(settings, peer);
     assert!(!path.exists());

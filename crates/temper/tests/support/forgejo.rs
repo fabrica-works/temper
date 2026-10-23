@@ -267,6 +267,7 @@ fn person_token(instance: &Instance) -> Token {
 }
 fn repository(instance: &Instance, person: &Token, sleep_seconds: u64) -> u64 {
     let began = skein_shell::Clock::new().now().now;
+    request(instance, person, "POST", "/api/v1/orgs", &json!({"username":"acme","visibility":"private"}), 201);
     let value = request(
         instance,
         person,

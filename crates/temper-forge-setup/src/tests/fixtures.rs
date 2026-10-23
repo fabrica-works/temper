@@ -11,7 +11,7 @@ use skein_json::Document;
 use skein_lib::{Writer, bytes};
 pub const TWO: &[u8] = br#"[
 {"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.invalid"},"orgs":["acme"],"mode":{"managed":{"admin_token":"secrets/forgejo-admin"}}},
-{"forge":2,"directory":"forge-2","bot":{"login":"temper","email":"temper@example.invalid"},"orgs":["work"],"mode":{"owned":{"forgejo":"/opt/forgejo/forgejo","runner":{"binary":"/opt/forgejo/forgejo-runner","labels":["temper-host:host"],"capacity":1,"path":"/usr/local/bin:/usr/bin:/bin"},"listen":{"socket":"127.0.0.1:3000"},"person":{"login":"ada","email":"ada@example.invalid"}}}}
+{"forge":2,"directory":"forge-2","bot":{"login":"temper","email":"temper@example.invalid"},"mode":{"owned":{"forgejo":"/opt/forgejo/forgejo","runner":{"binary":"/opt/forgejo/forgejo-runner","labels":["temper-host:host"],"capacity":1,"path":"/usr/local/bin:/usr/bin:/bin"},"listen":{"socket":"127.0.0.1:3000"},"person":{"login":"ada","email":"ada@example.invalid"}}}}
 ]"#;
 /// TWO followed by the demo's fake entry (protocol/setup.md, 8).
 pub fn three() -> Box<[u8]> {
@@ -31,10 +31,6 @@ pub fn document(bytes: &[u8]) -> Document {
 }
 pub fn setup() -> Setup {
     read_setup(TWO)
-}
-pub fn nested() -> Box<[u8]> {
-    let bytes = changed(br#""orgs":["work"],"#, b"");
-    changed_in(&bytes, br#""login":"ada""#, br#""login":"ada","orgs":["nested"]"#)
 }
 fn read_setup(bytes: &[u8]) -> Setup {
     Setup::read(

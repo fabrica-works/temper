@@ -64,13 +64,12 @@ pub fn settings(address: std::net::SocketAddr) -> temper_forge_setup_shell::reco
         forge: 1,
         directory: Box::new([]),
         bot: Account { login: b"temper-bot".as_slice().into(), email: b"bot@example.invalid".as_slice().into() },
-        orgs: Box::new([b"acme".as_slice().into()]),
+        orgs: Box::new([]),
         mode: Mode::Owned(Owned {
             fetch: temper_forge_setup::setup::Fetch { forgejo: false, runner: false, mirror: None },
             forgejo: Box::new([]),
             runner: None,
             listen: address,
-            orgs: Box::new([]),
             person: Account { login: b"ada".as_slice().into(), email: b"ada@example.invalid".as_slice().into() },
         }),
     };

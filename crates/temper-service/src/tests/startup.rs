@@ -1413,7 +1413,7 @@ fn a_worker_alones_complete_envelope_must_fit_its_own_memory() {
 }
 
 fn owned_start_document(asked: bool) -> Box<[u8]> {
-    let setup = br#"[{"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.test"},"orgs":[],
+    let setup = br#"[{"forge":1,"directory":"forge-1","bot":{"login":"temper","email":"temper@example.test"},
         "start":"asked","mode":{"owned":{"forgejo":"/opt/forgejo","runner":null,
         "listen":{"socket":"127.0.0.1:9"},"person":{"login":"ada","email":"ada@example.test"}}}}]"#;
     let input = fixtures::with(&fixtures::document(), b"application.setup", setup);

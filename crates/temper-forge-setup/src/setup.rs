@@ -31,8 +31,6 @@ pub struct Owned {
     pub runner: Option<Runner>,
     pub listen: SocketAddr,
     pub person: Account,
-    /// The person's named orgs; empty when the entry uses the old org list.
-    pub orgs: Box<[Box<[u8]>]>,
 }
 /// Which pinned binaries the fetch supplies (protocol/setup.md, 6.6).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -272,7 +270,7 @@ fn runner(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<
         path: path_value,
     })
 }
-fn owned(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Problems) -> Option<Owned> {
+fn owned(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Owned> {
     let mut o = object(d, at, p, ps)?;
     let forgejo = text(d, &mut o, b"forgejo", p, ps);
     let runner_at = o.required(d, b"runner", p, ps);
@@ -310,20 +308,8 @@ fn owned(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
     };
     let fetch = Fetch { forgejo: fetched_forgejo, runner: fetched_runner, mirror };
     let p = p.member(b"person");
-    let mut person = object(d, person_at?, &p, ps)?;
-    let orgs_at = person.member(d, b"orgs");
-    let person = account_members(d, person, &p, ps)?;
-    let orgs = match orgs_at {
-        Some(at) => {
-            let orgs = strings(d, at, limits.orgs, true, &p.member(b"orgs"), ps)?;
-            if orgs.is_empty() {
-                return None; // strings already refused the named empty list.
-            }
-            orgs
-        }
-        None => Box::new([]),
-    };
-    Some(Owned { fetch, forgejo, runner, listen, person, orgs })
+    let person = account(d, person_at?, &p, ps)?;
+    Some(Owned { fetch, forgejo, runner, listen, person })
 }
 fn mirror(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mirror> {
     let mut o = object(d, at, p, ps)?;
@@ -412,7 +398,7 @@ fn fake(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Fa
     }
     Some(Fake { listen, git, owner, repositories: repositories.into_boxed() })
 }
-fn mode(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Problems) -> Option<Mode> {
+fn mode(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mode> {
     let mut o = object(d, at, p, ps)?;
     let managed = o.member(d, b"managed");
     let owned_at = o.member(d, b"owned");
@@ -434,7 +420,7 @@ fn mode(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Probl
         valid(path(&admin_token), p.member(b"admin_token"), ps);
         Some(Mode::Managed { admin_token })
     } else if let Some(at) = owned_at {
-        Some(Mode::Owned(owned(d, at, limits, &p.member(b"owned"), ps)?))
+        Some(Mode::Owned(owned(d, at, &p.member(b"owned"), ps)?))
     } else {
         Some(Mode::Fake(fake(d, fake_at?, &p.member(b"fake"), ps)?))
     }
@@ -447,7 +433,7 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
     let mode_at = o.required(d, b"mode", p, ps);
     let start_at = o.member(d, b"start");
     let mode = match mode_at {
-        Some(at) => mode(d, at, limits, &p.member(b"mode"), ps),
+        Some(at) => mode(d, at, &p.member(b"mode"), ps),
         None => None,
     };
     let orgs: Option<Box<[Box<[u8]>]>> = match &mode {
@@ -455,16 +441,9 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
             valid(o.member(d, b"orgs").is_none(), p.member(b"orgs"), ps);
             Some(Box::new([]))
         }
-        Some(Mode::Owned(owned)) if !owned.orgs.is_empty() => {
-            let old = o.member(d, b"orgs");
-            if old.is_some() {
-                valid(false, p.member(b"orgs"), ps);
-                valid(false, p.member(b"mode").member(b"owned").member(b"person").member(b"orgs"), ps);
-            }
-            Some(Box::new([]))
-        }
-        // temper-15 removes the old entry-level orgs form, including Managed's list.
-        Some(Mode::Managed { .. } | Mode::Owned(_)) => {
+        Some(Mode::Owned(_)) => Some(Box::new([])),
+        // Only a managed entry names orgs (protocol/setup.md, 8).
+        Some(Mode::Managed { .. }) => {
             let at = o.required(d, b"orgs", p, ps);
             match at {
                 Some(at) => strings(d, at, limits.orgs, true, &p.member(b"orgs"), ps),
@@ -548,15 +527,9 @@ impl Entry {
     #[must_use]
     pub fn heap_bytes(&self) -> Option<u64> {
         let mut bytes = self.directory.len().checked_add(self.bot.login.len())?.checked_add(self.bot.email.len())?;
-        let nested = match &self.mode {
-            Mode::Owned(o) => o.orgs.as_ref(),
-            Mode::Managed { .. } | Mode::Fake(_) => &[],
-        };
-        for orgs in [self.orgs.as_ref(), nested] {
-            bytes = bytes.checked_add(orgs.len().checked_mul(size_of::<Box<[u8]>>())?)?;
-            for org in orgs {
-                bytes = bytes.checked_add(org.len())?;
-            }
+        bytes = bytes.checked_add(self.orgs.len().checked_mul(size_of::<Box<[u8]>>())?)?;
+        for org in &self.orgs {
+            bytes = bytes.checked_add(org.len())?;
         }
         match &self.mode {
             Mode::Managed { admin_token } => bytes = bytes.checked_add(admin_token.len())?,

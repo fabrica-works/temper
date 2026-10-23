@@ -97,7 +97,7 @@ fn init_uses_the_effective_uids_login_or_names_its_fallback() {
         );
     }
     assert_eq!(person["email"], format!("{login}@localhost"));
-    assert_eq!(person["orgs"], serde_json::json!(["work"]));
+    assert!(person.get("orgs").is_none());
     scratch.remove();
 }
 

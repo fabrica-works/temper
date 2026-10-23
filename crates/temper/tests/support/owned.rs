@@ -15,7 +15,6 @@ pub struct Names<'a> {
     pub port: u16,
     pub bot: &'a str,
     pub person: &'a str,
-    pub orgs: &'a [&'a str],
 }
 pub fn document(value: &mut serde_json::Value, names: &Names<'_>) {
     let mut owned = Owned::example();
@@ -27,8 +26,7 @@ pub fn document(value: &mut serde_json::Value, names: &Names<'_>) {
     let setup = &mut members["setup"][0];
     setup["bot"] = serde_json::json!({"login":names.bot,"email":format!("{}@example.invalid", names.bot)});
     let mode = &mut setup["mode"]["owned"];
-    mode["person"] =
-        serde_json::json!({"login":names.person,"email":format!("{}@example.invalid", names.person),"orgs":names.orgs});
+    mode["person"] = serde_json::json!({"login":names.person,"email":format!("{}@example.invalid", names.person)});
     if let Some(binary) = names.runner {
         mode["runner"]["binary"] = serde_json::json!(binary);
     } else {
@@ -49,9 +47,6 @@ pub fn old_form(application: &mut serde_json::Value) {
     forge["webhook_secret"] = if webhooks { "forge-1/webhook_secret".into() } else { serde_json::Value::Null };
     application["identities"][0].as_object_mut().expect("identity").remove("forge");
     application["identities"][0]["token"] = "forge-1/git_token".into();
-    let entry = &mut application["setup"][0];
-    let orgs = entry["mode"]["owned"]["person"].as_object_mut().expect("owned person").remove("orgs");
-    entry["orgs"] = orgs.expect("owned orgs");
 }
 
 pub fn configuration(directory: &Path, names: &Names<'_>) {
@@ -145,7 +140,6 @@ esac
             port: 3000,
             bot: "temper",
             person: "ada",
-            orgs: &["acme"],
         },
     );
     Programs { directory: directory.into() }
@@ -318,14 +312,7 @@ pub fn prepared_processes(directory: &Path) -> u16 {
     let port = address.port();
     configuration(
         directory,
-        &Names {
-            forgejo: Path::new(&forgejo),
-            runner: Some(Path::new(&runner)),
-            port,
-            bot: "temper",
-            person: "ada",
-            orgs: &["acme"],
-        },
+        &Names { forgejo: Path::new(&forgejo), runner: Some(Path::new(&runner)), port, bot: "temper", person: "ada" },
     );
     let prepared = prepare(directory, 1);
     assert_eq!(prepared.status.code(), Some(0), "{}", String::from_utf8_lossy(&prepared.stderr));
@@ -431,7 +418,7 @@ pub fn attach(directory: &Path, port: u16, running: Running) -> skein_throwaway_
     Instance::attach(running.into_child(), port, directory, Token::new(token.trim().into()), &Settings::small())
         .expect("owned forge answers")
 }
-/// Reads the converged bot, its id, and its private organization.
+/// Reads the converged bot, its id, and the absence of an organization.
 pub fn assert_converged(directory: &Path, instance: &skein_throwaway_forgejo::Instance) {
     use skein_throwaway_forgejo::{Outgoing, Token};
     let api = fs::read_to_string(directory.join("forge-1/api_token")).expect("API token");
@@ -448,24 +435,17 @@ pub fn assert_converged(directory: &Path, instance: &skein_throwaway_forgejo::In
     assert_eq!(account["is_admin"], false);
     assert!(account["full_name"].as_str().expect("full name").contains("temper:bot"));
     let org = instance.exchange(&Outgoing::get("/api/v1/orgs/acme", Some(admin))).expect("org answers");
-    let org: serde_json::Value = serde_json::from_slice(&org.body).expect("org JSON");
-    assert_eq!(org["visibility"], "private");
+    assert_eq!(org.status, 404);
 }
 /// A managed forge whose directory reconcile must make itself.
 pub fn managed(directory: &Path) {
     configuration(
         directory,
-        &Names {
-            forgejo: Path::new("/usr/bin/false"),
-            runner: None,
-            port: 9,
-            bot: "temper",
-            person: "ada",
-            orgs: &["acme"],
-        },
+        &Names { forgejo: Path::new("/usr/bin/false"), runner: None, port: 9, bot: "temper", person: "ada" },
     );
     let path = directory.join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
+    value["application"]["setup"][0]["orgs"] = serde_json::json!(["acme"]);
     value["application"]["setup"][0]["mode"] = serde_json::json!({"managed":{"admin_token":"admin_token"}});
     value["application"]["limits"]["overrides"]["setup.deadline_ms"] = 300.into();
     value["application"]["limits"]["overrides"]["setup.backoff_ms"] = 20.into();
@@ -486,10 +466,7 @@ pub fn reconcile_configuration(directory: &Path) -> u16 {
     let binary = std::env::var_os("TEMPER_FORGEJO").expect("TEMPER_FORGEJO");
     let [address] = super::free_addresses(&[]);
     let port = address.port();
-    configuration(
-        directory,
-        &Names { forgejo: Path::new(&binary), runner: None, port, bot: "temper", person: "ada", orgs: &["acme"] },
-    );
+    configuration(directory, &Names { forgejo: Path::new(&binary), runner: None, port, bot: "temper", person: "ada" });
     port
 }
 
@@ -772,7 +749,7 @@ pub fn bounded(directory: &Path) -> Bounded {
     )
 }
 
-/// The shipped owned form has file-free access and nested orgs.
+/// The shipped owned form has file-free access and no orgs.
 #[must_use]
 pub fn bounded_records(directory: &Path) -> Bounded {
     let owned =

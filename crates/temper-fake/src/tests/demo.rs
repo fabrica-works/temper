@@ -21,7 +21,6 @@ pub(super) fn fixture() -> Value {
     d["engine"]["llm"]["providers"].as_array_mut().unwrap().push(json!({
         "name":"demo", "number":3, "models":["demo"], "sources":{"keys":true}
     }));
-    d["application"]["setup"][0].as_object_mut().unwrap().remove("orgs");
     d["application"]["setup"][0]["mode"] = json!({"fake":{
         "listen":{"socket":"127.0.0.1:3000"},"git":"demo/bin/git", "owner":"playground",
         "repositories":[{"name":"widget","landing":"main"}]
