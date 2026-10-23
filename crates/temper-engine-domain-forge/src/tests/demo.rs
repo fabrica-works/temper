@@ -3,6 +3,10 @@ use super::*;
 fn configured(under_box: bool) -> Domain {
     let mut d = domain();
     d.under_box = under_box;
+    for number in [1, 2] {
+        d.configured.insert(number, Configured { number, kind: Kind::Forgejo, mode: Mode::Fake, asked: true }).unwrap();
+    }
+    d.connection_limits(3, 1);
     d.configure_demo(Some(DemoConfig {
         provider: 1,
         adoption: fixtures::adoption(),
@@ -137,4 +141,156 @@ fn makes_act(sent: &[Request]) -> bool {
         }
     }
     false
+}
+
+fn connected(d: &mut Domain, forge: u16) -> Box<[Request]> {
+    outputs(d, Event::Connection { forge, state: Connection::Connected { id: 7, login: b"temper".as_slice().into() } })
+}
+
+#[test]
+fn first_other_connection_ends_once_from_none_or_running_and_answers_held_starts() {
+    for under_box in [false, true] {
+        for running in [false, true] {
+            let mut d = configured(under_box);
+            if running {
+                start(&mut d, 1);
+            }
+            let sent = connected(&mut d, 2);
+            assert!(sent.contains(&Request::Save {
+                read_afresh: None,
+                release: None,
+                record: Stored::Demo(Demo { forge: 1, state: DemoState::Ended })
+            }));
+            assert_eq!(sent.contains(&Request::StopGroup { forge: 1 }), under_box && running);
+            assert_eq!(d.demo_state(), Some(DemoState::Ended));
+            assert!(d.forge_ended(1));
+            assert!(!d.forge_ended(2));
+            assert_eq!(d.forges().rows.iter().map(|row| row.number).collect::<Vec<_>>(), [2]);
+            assert_eq!(d.offer(1), Offer::NotOffered);
+            if running {
+                assert!(sent.contains(&Request::ApplicationDone { request: Token::new(1), token: Token::new(101) }));
+                assert_eq!(d.application_answer(Token::new(101)), Some(Answered::StartDemo(StartAnswer::NotOffered)));
+            }
+            start(&mut d, 2);
+            assert_eq!(d.application_answer(Token::new(102)), Some(Answered::StartDemo(StartAnswer::NotOffered)));
+            let sent = connected(&mut d, 2);
+            assert!(!saved(&sent));
+            assert!(!sent.contains(&Request::StopGroup { forge: 1 }));
+            assert!(connected(&mut d, 1).is_empty());
+            assert_eq!(d.connection(1), Connection::NotConnected);
+        }
+    }
+}
+
+#[test]
+fn own_unconfigured_and_no_demo_connections_do_not_end_the_demo() {
+    let mut d = configured(true);
+    assert!(!saved(&connected(&mut d, 1)));
+    connected(&mut d, 3);
+    assert_eq!(d.demo_state(), None);
+    let mut d = configured(true);
+    d.configure_demo(None);
+    connected(&mut d, 2);
+    assert_eq!(d.demo_state(), None);
+}
+
+#[test]
+fn restored_ended_demo_hides_repositories_but_keeps_lookups_and_refuses_setup() {
+    let mut d = configured(true);
+    let home = adopted();
+    let mut context = home.clone();
+    context.provider.repository = 3;
+    context.home = false;
+    context.role = Role::Context;
+    context.name = b"context".as_slice().into();
+    for row in [home.clone(), context] {
+        outputs(&mut d, Event::Restore { record: Stored::Repository(row) });
+    }
+    outputs(&mut d, Event::Restore { record: Stored::Demo(Demo { forge: 1, state: DemoState::Ended }) });
+    let sent = outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    assert_eq!(group_asks(&sent), 0);
+    assert!(d.forge_ended(1));
+    assert_eq!(d.home(5), None);
+    assert!(d.context_repositories(5, 2).unwrap().is_empty());
+    assert!(d.adopted_ids(1).is_empty());
+    assert_eq!(d.repository(REPO), Some(&home));
+    assert_eq!(d.repository_tag(5, tag(REPO.forge, REPO.repository)), Some(&home));
+    assert!(connected(&mut d, 1).is_empty());
+    outputs(
+        &mut d,
+        Event::Application {
+            request: Token::new(4),
+            token: Token::new(104),
+            retention: Duration::from_secs(60),
+            ask: Ask::SetUp {
+                forge: 1,
+                org: b"org".as_slice().into(),
+                repository: b"repo".as_slice().into(),
+                project: SetUpProject::Existing(5),
+            },
+        },
+    );
+    assert_eq!(
+        d.application_answer(Token::new(104)),
+        Some(Answered::SetUp(SetUpAnswer::Refused(SetUpRefusal::NotOffered)))
+    );
+}
+
+#[test]
+fn an_ended_home_does_not_prevent_a_new_home_adoption() {
+    let mut d = configured(false);
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    outputs(&mut d, Event::Restore { record: Stored::Demo(Demo { forge: 1, state: DemoState::Ended }) });
+    connected(&mut d, 2);
+    let mut request = fixtures::adoption();
+    request.forge = 2;
+    outputs(
+        &mut d,
+        Event::Application {
+            request: Token::new(4),
+            token: Token::new(104),
+            retention: Duration::from_secs(60),
+            ask: Ask::Adopt(request),
+        },
+    );
+    let sent = ready(&mut d);
+    let [Request::Call { call, .. }] = sent.as_ref() else { panic!("locate on the other forge") };
+    outputs(
+        &mut d,
+        Event::Client(skein_forge_client::Event::Answered {
+            call: *call,
+            cost: 1,
+            free: 0,
+            rate: None,
+            result: Ok(skein_forge::api::Answer::Located { repository: 9 }),
+        }),
+    );
+    let sent = outputs(&mut d, Event::Adopt { request: Token::new(4) });
+    assert!(sent.is_empty());
+    assert!(ready(&mut d).iter().any(|r| matches!(
+        r,
+        Request::Call { op: skein_forge::api::Op::Read(skein_forge::api::Read::Permission { .. }), .. }
+    )));
+    assert_eq!(d.application_outcome(Token::new(104)), None);
+}
+
+#[test]
+fn closing_the_box_before_the_end_suppresses_stop_and_ended_connections_stay_inert() {
+    let mut d = configured(true);
+    start(&mut d, 1);
+    outputs(&mut d, Event::BoxClosed);
+    assert!(!connected(&mut d, 2).contains(&Request::StopGroup { forge: 1 }));
+    for state in [
+        Connection::NotConnected,
+        Connection::NotSetUp,
+        Connection::Connecting,
+        Connection::SettingUp { step: Some(SetUpStep::Run) },
+        Connection::SetUpFailed { why: b"failed".as_slice().into() },
+        Connection::Stopped { reason: b"stopped".as_slice().into() },
+        Connection::Connected { id: 99, login: b"different".as_slice().into() },
+    ] {
+        assert!(outputs(&mut d, Event::Connection { forge: 1, state }).is_empty());
+        assert_eq!(d.connection(1), Connection::NotConnected);
+        assert_eq!(d.demo_state(), Some(DemoState::Ended));
+    }
 }

@@ -342,7 +342,9 @@ fn forge(plan: &host::Plan) -> u16 {
 pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
     let plan = engine.setup.staged.remove(&run).expect("root names a staged setup plan");
     let number = forge(&plan);
-    if engine.drain.is_some() || engine.setup.closing || engine.setup.component.is_none() {
+    if crate::forge::ended(engine, number) {
+        ended(engine, run, root::SetupEnd::Stopped { forge: number, reason: Box::from(b"forge ended".as_slice()) });
+    } else if engine.drain.is_some() || engine.setup.closing || engine.setup.component.is_none() {
         ended(
             engine,
             run,
@@ -598,7 +600,9 @@ mod tests;
 /// Every setup path, including internal follow-ups, crosses the same unresolved-host gate.
 fn run_plan(engine: &mut crate::engine::Engine, run: Token, plan: host::Plan) {
     let number = forge(&plan);
-    if let Some(host) = engine.forge.unreachable(number) {
+    if crate::forge::ended(engine, number) {
+        lifecycle::refused(engine, run, number, Box::from(b"forge ended".as_slice()));
+    } else if let Some(host) = engine.forge.unreachable(number) {
         lifecycle::refused(engine, run, number, crate::forge::unreachable_text(&host));
     } else {
         engine.setup.down(host::Request::Run { run, plan });

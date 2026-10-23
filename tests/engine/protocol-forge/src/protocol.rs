@@ -457,6 +457,7 @@ impl Protocol {
                     self.seen.push(top::Request::RestartDone { stage }).expect("world output capacity");
                 }
                 other @ (top::Request::DemoStart { .. }
+                | top::Request::StopGroup { .. }
                 | top::Request::SetUpGroup { .. }
                 | top::Request::Connect { .. }
                 | top::Request::Install { .. }

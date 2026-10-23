@@ -91,6 +91,10 @@ fn begin(domain: &mut Domain, env: &Env<Limits>, decision: &mut Decision) {
 }
 
 pub(crate) fn progress(domain: &mut Domain, env: &Env<Limits>, _decision: &mut Decision) {
+    if domain.forge.demo_state() == Some(forge::DemoState::Ended) {
+        domain.demo_start = None;
+        return;
+    }
     let Some(start) = &domain.demo_start else { return };
     let demo = domain.forge.demo().expect("offered demo");
     let connection = domain.forge.connection(demo.adoption.forge);

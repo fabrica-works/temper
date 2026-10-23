@@ -481,7 +481,11 @@ pub enum PartyInput {
 /// and 4). Every output crosses the journal door in its peer's vocabulary.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
-    /// Start the demo's box group without creating a first repository.
+    /// Stop the ended demo's box group; no request waits for its answer.
+    StopGroup {
+        forge: u16,
+    },
+    /// Start the demo's box group.
     SetUpGroup {
         forge: u16,
         request: Token,

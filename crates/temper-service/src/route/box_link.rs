@@ -34,13 +34,20 @@ pub(crate) enum Out {
     Closed,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ask {
+    Start(u16),
+    Stop(u16),
+}
+
 pub(crate) struct Link {
     pub(crate) write: Option<Box<[u8]>>,
     ended: bool,
-    asked: Option<u16>,
+    asked: Option<Ask>,
     // which the box link holds while another group starts and sends once that
     // one answers (protocol/setup.md, 8.4).
     held: Option<u16>,
+    stop: Option<u16>,
     line_bytes: u32,
     partial: List<u8>,
     skipping: bool,
@@ -53,6 +60,7 @@ impl Link {
             ended: false,
             asked: None,
             held: None,
+            stop: None,
             line_bytes,
             partial: List::with_capacity(line_bytes),
             skipping: false,
@@ -61,7 +69,7 @@ impl Link {
     /// The caller reserves three output slots before asking.
     pub(crate) fn ask(&mut self, forge: u16, request: Token, out: &mut Queue<Out>) {
         if self.held.is_some()
-            || self.asked == Some(forge)
+            || self.asked == Some(Ask::Start(forge))
             || self.ended
             || self.asked.is_none() && self.write.is_some()
         {
@@ -72,11 +80,26 @@ impl Link {
         if self.asked.is_some() {
             self.held = Some(forge);
         } else {
-            self.asked = Some(forge);
+            self.asked = Some(Ask::Start(forge));
             out.push(Out::Write(start(forge)));
         }
         out.push(Out::SettingUp { forge, step: None });
         out.push(Out::Answered { forge, request, answer: Ok(()) });
+    }
+    /// No request waits on the demo's stop. Keep it even when a start is held.
+    pub(crate) fn stop(&mut self, forge: u16, out: &mut Queue<Out>) {
+        if self.ended {
+            return;
+        }
+        if self.held == Some(forge) {
+            self.held = None;
+        }
+        if self.asked.is_some() {
+            self.stop = Some(forge);
+        } else {
+            self.asked = Some(Ask::Stop(forge));
+            out.push(Out::Write(stop(forge)));
+        }
     }
     /// Any chunking is accepted. The caller reserves one output slot per LF in
     /// this chunk (including an LF completing a previous partial line), plus
@@ -105,11 +128,14 @@ impl Link {
             if *byte == b'\n' {
                 line(&mut self.asked, self.partial.as_slice(), out);
                 self.partial.clear();
-                if self.asked.is_none()
-                    && let Some(forge) = self.held.take()
-                {
-                    self.asked = Some(forge);
-                    out.push(Out::Write(start(forge)));
+                if self.asked.is_none() {
+                    if let Some(forge) = self.stop.take() {
+                        self.asked = Some(Ask::Stop(forge));
+                        out.push(Out::Write(stop(forge)));
+                    } else if let Some(forge) = self.held.take() {
+                        self.asked = Some(Ask::Start(forge));
+                        out.push(Out::Write(start(forge)));
+                    }
                 }
             } else if self.partial.room() == 0 {
                 self.partial.clear();
@@ -129,42 +155,94 @@ impl Link {
         out.push(Out::Named(Box::from(b"box link: the box closed the pipe".as_slice())));
         self.asked = None;
         self.held = None;
+        self.stop = None;
         out.push(Out::Closed);
     }
+}
+
+fn stop(forge: u16) -> Box<[u8]> {
+    joined(&[b"stop ", Decimal::of(u64::from(forge)).as_bytes(), b"\n"])
 }
 
 fn start(forge: u16) -> Box<[u8]> {
     joined(&[b"start ", Decimal::of(u64::from(forge)).as_bytes(), b"\n"])
 }
 
-fn line(asked: &mut Option<u16>, line: &[u8], out: &mut Queue<Out>) {
-    match decoded(line) {
-        Some((forge, word, event)) => {
-            if *asked != Some(forge) {
-                out.push(Out::Named(joined(&[
-                    b"box link: dropped ",
-                    word,
-                    b" for forge ",
-                    Decimal::of(u64::from(forge)).as_bytes(),
-                    b", not asked",
-                ])));
-                return;
-            }
-            match &event {
-                Out::Started { .. } | Out::Failed { .. } => *asked = None,
-                Out::SettingUp { .. } => {}
-                Out::Write(_) | Out::Answered { .. } | Out::Named(_) | Out::Closed => unreachable!("decoded box line"),
-            }
-            out.push(event);
+enum Reply {
+    Step(u16, Step),
+    Started(u16),
+    Stopped(u16),
+    Failed(u16, Box<[u8]>),
+}
+impl Reply {
+    fn forge(&self) -> u16 {
+        match self {
+            Self::Step(forge, _) | Self::Started(forge) | Self::Stopped(forge) | Self::Failed(forge, _) => *forge,
         }
-        None => out.push(Out::Named(Box::from(b"box link: dropped an unknown line".as_slice()))),
+    }
+    fn word(&self) -> &'static [u8] {
+        match self {
+            Self::Step(..) => b"step",
+            Self::Started(_) => b"started",
+            Self::Stopped(_) => b"stopped",
+            Self::Failed(..) => b"failed",
+        }
     }
 }
-fn decoded(line: &[u8]) -> Option<(u16, &'static [u8], Out)> {
+fn line(asked: &mut Option<Ask>, line: &[u8], out: &mut Queue<Out>) {
+    let Some(reply) = decoded(line) else {
+        out.push(Out::Named(Box::from(b"box link: dropped an unknown line".as_slice())));
+        return;
+    };
+    let forge = reply.forge();
+    let matches = match (*asked, &reply) {
+        (Some(Ask::Start(active)), Reply::Step(..) | Reply::Started(_) | Reply::Failed(..))
+        | (Some(Ask::Stop(active)), Reply::Stopped(_) | Reply::Failed(..)) => active == forge,
+        _ => false,
+    };
+    if !matches {
+        out.push(Out::Named(joined(&[
+            b"box link: dropped ",
+            reply.word(),
+            b" for forge ",
+            Decimal::of(u64::from(forge)).as_bytes(),
+            b", not asked",
+        ])));
+        return;
+    }
+    match reply {
+        Reply::Step(_, step) => out.push(Out::SettingUp { forge, step: Some(step) }),
+        Reply::Started(_) => {
+            *asked = None;
+            out.push(Out::Started { forge });
+        }
+        Reply::Stopped(_) => *asked = None,
+        Reply::Failed(_, why) => {
+            let stopping = match *asked {
+                Some(Ask::Stop(_)) => true,
+                Some(Ask::Start(_)) | None => false,
+            };
+            *asked = None;
+            if stopping {
+                out.push(Out::Named(joined(&[
+                    b"box link: stop failed for forge ",
+                    Decimal::of(u64::from(forge)).as_bytes(),
+                    b": ",
+                    &why,
+                ])));
+            } else {
+                out.push(Out::Failed { forge, why });
+            }
+        }
+    }
+}
+fn decoded(line: &[u8]) -> Option<Reply> {
     let line = line.strip_suffix(b"\n")?;
     if let Some(digits) = line.strip_prefix(b"started ") {
-        let forge = number(digits)?;
-        return Some((forge, b"started", Out::Started { forge }));
+        return Some(Reply::Started(number(digits)?));
+    }
+    if let Some(digits) = line.strip_prefix(b"stopped ") {
+        return Some(Reply::Stopped(number(digits)?));
     }
     let (word, rest) = if let Some(rest) = line.strip_prefix(b"step ") {
         (b"step".as_slice(), rest)
@@ -188,11 +266,11 @@ fn decoded(line: &[u8]) -> Option<(u16, &'static [u8], Out)> {
             b"run" => Step::Run,
             _ => return None,
         };
-        Some((forge, b"step", Out::SettingUp { forge, step: Some(step) }))
+        Some(Reply::Step(forge, step))
     } else if tail.is_empty() {
         None
     } else {
-        Some((forge, b"failed", Out::Failed { forge, why: bytes::copy_of(tail) }))
+        Some(Reply::Failed(forge, bytes::copy_of(tail)))
     }
 }
 fn number(digits: &[u8]) -> Option<u16> {

@@ -495,7 +495,10 @@ pub(crate) fn forge_pass(engine: &mut Engine) {
                 engine.drain_facts();
             }
             skein_forge_connection::Event::Hint(hinted) => {
-                if engine.drain.is_some() || engine.end.is_some() {
+                if engine.drain.is_some()
+                    || engine.end.is_some()
+                    || crate::forge::ended(engine, hinted.hint.repository.forge)
+                {
                     continue;
                 }
                 let connection = hinted.connection;

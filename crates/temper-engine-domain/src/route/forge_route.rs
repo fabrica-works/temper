@@ -1996,6 +1996,9 @@ pub(crate) fn outputs(
                 assert!(super::now(domain, Request::Install { forge, request, back }), "install door");
             }
             forge::Request::DemoStart { request } => super::demo::start(domain, env, decision, request),
+            forge::Request::StopGroup { forge } => {
+                assert!(super::now(domain, Request::StopGroup { forge }), "demo stop door reserved");
+            }
             forge::Request::SetUpGroup { forge, request } => {
                 assert!(super::now(domain, Request::SetUpGroup { forge, request }), "demo box group door reserved");
             }
