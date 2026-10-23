@@ -328,7 +328,21 @@ fn box_setup(
     let request = w::Requesting::new(
         &w::CEILINGS,
         w::RequestingParts {
-            request: w::Request::SetUp(w::SetUp::new(&w::CEILINGS, w::SetUpParts { forge }).unwrap()),
+            request: w::Request::SetUp(
+                w::SetUp::new(
+                    &w::CEILINGS,
+                    w::SetUpParts {
+                        forge,
+                        org: b"work".as_slice().into(),
+                        repository: b"hello".as_slice().into(),
+                        project: w::SetUpProject::Existing(
+                            w::ExistingProject::new(&w::CEILINGS, w::ExistingProjectParts { project: 1 })
+                                .expect("project"),
+                        ),
+                    },
+                )
+                .unwrap(),
+            ),
         },
     )
     .unwrap();

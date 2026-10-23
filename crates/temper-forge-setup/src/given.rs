@@ -12,6 +12,14 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
     let limits = root.member(b"application").member(b"limits").member(b"overrides");
     let mut what = What::Reason(b"invalid form");
     let path = match why.place {
+        Place::FilesLimit
+        | Place::FileBytesLimit
+        | Place::CreateOrg
+        | Place::CreateRepository
+        | Place::Files
+        | Place::FilePath(_)
+        | Place::FileContent(_)
+        | Place::Plan => unreachable!("Create fields and file limits are temper constants or admitted SetUp names"),
         Place::BotLogin => entry.member(b"bot").member(b"login"),
         Place::BotEmail => entry.member(b"bot").member(b"email"),
         Place::Orgs => {
@@ -66,6 +74,14 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
                 unreachable!("no picker until temper-10; reachable is fixed nonzero")
             }
             Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => b"forge.client.repositories",
+            Place::FilesLimit
+            | Place::FileBytesLimit
+            | Place::CreateOrg
+            | Place::CreateRepository
+            | Place::Files
+            | Place::FilePath(_)
+            | Place::FileContent(_)
+            | Place::Plan => unreachable!("Create has no paired limits"),
             Place::Word
             | Place::BotLogin
             | Place::BotEmail

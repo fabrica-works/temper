@@ -240,6 +240,7 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer) -> R
         let identity = joined.expect("checked identity");
         let login = &setup.entry.bot.login;
         let local = super::lifecycle::Local {
+            first: None,
             repositories: match &setup.entry.mode {
                 Mode::Fake(fake) => u64::try_from(fake.repositories.len()).expect("checked repositories"),
                 Mode::Owned(_) | Mode::Managed { .. } => 0,
@@ -308,6 +309,14 @@ fn check(own: &temper_forge_setup::limits::Host) -> Result<(), Problems> {
                 Place::Backoff => b"setup.backoff_ms".as_slice(),
                 Place::BackoffMax => b"setup.backoff_max_ms",
                 Place::Deadline => b"setup.deadline_ms",
+                Place::FilesLimit
+                | Place::FileBytesLimit
+                | Place::CreateOrg
+                | Place::CreateRepository
+                | Place::Files
+                | Place::FilePath(_)
+                | Place::FileContent(_)
+                | Place::Plan => unreachable!("Create inputs are admitted by the domain and fixed starter profile"),
                 Place::Word
                 | Place::BotLogin
                 | Place::BotEmail

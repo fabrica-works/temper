@@ -308,7 +308,21 @@ fn a_saved_setup_request_is_not_restored_as_an_adoption() {
     let request = w::Requesting::new(
         &w::CEILINGS,
         w::RequestingParts {
-            request: w::Request::SetUp(w::SetUp::new(&w::CEILINGS, w::SetUpParts { forge: 3 }).expect("forge")),
+            request: w::Request::SetUp(
+                w::SetUp::new(
+                    &w::CEILINGS,
+                    w::SetUpParts {
+                        forge: 3,
+                        org: b"work".as_slice().into(),
+                        repository: b"hello".as_slice().into(),
+                        project: w::SetUpProject::Existing(
+                            w::ExistingProject::new(&w::CEILINGS, w::ExistingProjectParts { project: 1 })
+                                .expect("project"),
+                        ),
+                    },
+                )
+                .expect("forge"),
+            ),
         },
     )
     .expect("setup request");

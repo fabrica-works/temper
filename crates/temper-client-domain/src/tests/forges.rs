@@ -19,7 +19,16 @@ fn answer(outcome: w::Outcome) -> Family {
 }
 #[test]
 fn set_up_is_a_deployment_request_and_forges_a_deployment_watch() {
-    let Ask::Family { scope, record } = ask(3, &fixtures::limits().forge).unwrap() else { panic!("family") };
+    let Ask::Family { scope, record } = ask(
+        3,
+        b"work".as_slice().into(),
+        b"hello".as_slice().into(),
+        forge::forges::SetUpProject::Existing(1),
+        &fixtures::limits().forge,
+    )
+    .unwrap() else {
+        panic!("family")
+    };
     assert_eq!(scope, c::Scope::Deployment);
     assert_eq!((record.family, record.version), (wire::FORGE, wire::CLIENT_VERSION));
     let w::Request::SetUp(request) = wire::decode_requesting(&record.bytes, &limits()).unwrap().into_parts().request
@@ -167,9 +176,12 @@ fn every_connection_decodes_into_the_forges_words() {
         };
         let number = u16::try_from(index + 1).unwrap();
         records
-            .push(w::ForgeRow::new(&limits(), w::ForgeRowParts { number, kind, mode, connection, offer }).unwrap())
+            .push(
+                w::ForgeRow::new(&limits(), w::ForgeRowParts { first: None, number, kind, mode, connection, offer })
+                    .unwrap(),
+            )
             .unwrap();
-        let row = Row { number, kind: k, mode: m, offer: o, connection: state };
+        let row = Row { first: None, number, kind: k, mode: m, offer: o, connection: state };
         assert_eq!(words::forge_connection(&row).as_ref(), words);
         expected.push(row).unwrap();
     }
@@ -188,6 +200,7 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
+        first: None,
         number: 3,
         kind: Kind::Forgejo,
         mode: Mode::Owned,
@@ -234,6 +247,7 @@ fn an_out_of_order_document_is_refused() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        first: None,
                         number,
                         kind: w::Kind::Forgejo,
                         mode: w::Mode::Owned,
@@ -251,4 +265,110 @@ fn an_out_of_order_document_is_refused() {
         bytes: wire::forges(&w::Forges::new(&limits(), w::ForgesParts { forges }).unwrap()),
     };
     assert!(rows(&record, &fixtures::limits().forge).is_none());
+}
+
+#[test]
+fn setup_carries_each_field_and_new_project_names_without_semantic_form_checks() {
+    use forge::forges::SetUpProject;
+    for project in
+        [SetUpProject::Existing(7), SetUpProject::New(b"Next".as_slice().into()), SetUpProject::New(Box::default())]
+    {
+        let Ask::Family { record, .. } =
+            ask(3, Box::default(), b"widget".as_slice().into(), project.clone(), &fixtures::limits().forge).unwrap()
+        else {
+            panic!("family")
+        };
+        let w::Request::SetUp(request) =
+            wire::decode_requesting(&record.bytes, &limits()).unwrap().into_parts().request
+        else {
+            panic!("setup")
+        };
+        assert_eq!(request.forge(), 3);
+        assert_eq!(request.org(), b"");
+        assert_eq!(request.repository(), b"widget");
+        match (project, request.project()) {
+            (SetUpProject::Existing(number), w::SetUpProject::Existing(value)) => assert_eq!(number, value.project()),
+            (SetUpProject::New(name), w::SetUpProject::New(value)) => assert_eq!(name.as_ref(), value.name()),
+            _ => panic!("project changed"),
+        }
+    }
+}
+#[test]
+fn first_repository_decodes_each_state_project_and_creation_step() {
+    use forge::forges::{CreateStep, First, FirstState, SetUpProject};
+    let mut states = List::with_capacity(6);
+    states.push((w::FirstState::Making, FirstState::Making)).unwrap();
+    states
+        .push((
+            w::FirstState::Made(w::Made::new(&limits(), w::MadeParts { id: 42 }).unwrap()),
+            FirstState::Made { id: 42 },
+        ))
+        .unwrap();
+    for (wire, domain) in [
+        (w::CreateStep::Admin, CreateStep::Admin),
+        (w::CreateStep::Org, CreateStep::Org),
+        (w::CreateStep::Repository, CreateStep::Repository),
+        (w::CreateStep::File, CreateStep::File),
+    ] {
+        states
+            .push((
+                w::FirstState::Failed(w::CreateFailed::new(&limits(), w::CreateFailedParts { step: wire }).unwrap()),
+                FirstState::Failed { step: domain },
+            ))
+            .unwrap();
+    }
+    for (wire_state, state) in states.into_boxed() {
+        for new in [false, true] {
+            let project = if new {
+                w::SetUpProject::New(
+                    w::NewProject::new(&limits(), w::NewProjectParts { name: b"Next".as_slice().into() }).unwrap(),
+                )
+            } else {
+                w::SetUpProject::Existing(
+                    w::ExistingProject::new(&limits(), w::ExistingProjectParts { project: 7 }).unwrap(),
+                )
+            };
+            let first = w::FirstRepository::new(
+                &limits(),
+                w::FirstRepositoryParts {
+                    org: b"team".as_slice().into(),
+                    repository: b"widget".as_slice().into(),
+                    project,
+                    state: wire_state.clone(),
+                },
+            )
+            .unwrap();
+            let mut forges = List::with_capacity(1);
+            forges
+                .push(
+                    w::ForgeRow::new(
+                        &limits(),
+                        w::ForgeRowParts {
+                            number: 3,
+                            kind: w::Kind::Forgejo,
+                            mode: w::Mode::Owned,
+                            connection: w::Connection::Connecting,
+                            offer: w::Offer::NotOffered,
+                            first: Some(first),
+                        },
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            let record = Family {
+                family: wire::FORGE,
+                version: wire::CLIENT_VERSION,
+                bytes: wire::forges(&w::Forges::new(&limits(), w::ForgesParts { forges }).unwrap()),
+            };
+            assert_eq!(
+                rows(&record, &fixtures::limits().forge).unwrap()[0].first,
+                Some(First {
+                    org: b"team".as_slice().into(),
+                    repository: b"widget".as_slice().into(),
+                    project: if new { SetUpProject::New(b"Next".as_slice().into()) } else { SetUpProject::Existing(7) },
+                    state
+                })
+            );
+        }
+    }
 }

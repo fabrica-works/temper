@@ -14,5 +14,8 @@ jig-domain-people.workspace = true
 temper-engine-domain-forge-change = { path = "../temper-engine-domain-forge-change" }
 temper-engine-domain-forge-issues = { path = "../temper-engine-domain-forge-issues" }
 
+[dev-dependencies]
+skein-forge-setup.workspace = true
+
 [lints]
 workspace = true

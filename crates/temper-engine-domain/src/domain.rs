@@ -85,6 +85,11 @@ impl Domain {
     pub fn forge_connection(&self, forge: u16) -> forge::Connection {
         self.forge.connection(forge)
     }
+    /// The current deployment document, including volatile setup progress.
+    #[must_use]
+    pub fn forges(&self) -> forge::Forges {
+        self.forge.forges()
+    }
     /// Restored provider ids for the setup host's start-time reconcile.
     #[must_use]
     pub fn adopted_ids(&self, forge: u16) -> Box<[u64]> {

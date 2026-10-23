@@ -42,7 +42,7 @@ impl Adopter {
         self.json = json;
     }
 }
-fn me(client: &Client) -> Option<&c::Me> {
+pub(crate) fn me(client: &Client) -> Option<&c::Me> {
     let doc = client.document(jig_client::Handle { asker: crate::root::RUNNER.asker(), number: 0 })?;
     if doc.state != State::Live {
         return None;
@@ -242,7 +242,13 @@ fn restored(ask: &jig_client::Ask, limits: forge::Limits) -> Option<forge::Adopt
         checks: a.checks.into_boxed(),
     })
 }
-fn print(adoption: &forge::Adoption, outcome: &Outcome, json: bool, kept: bool, limits: &Limits) -> jig::Printed {
+pub(crate) fn print(
+    adoption: &forge::Adoption,
+    outcome: &Outcome,
+    json: bool,
+    kept: bool,
+    limits: &Limits,
+) -> jig::Printed {
     let answer = match outcome {
         Outcome::Unknown => Some(forge::Answer::Unknown),
         Outcome::Answered(answer) => forge::answer(&limits.domain, answer),

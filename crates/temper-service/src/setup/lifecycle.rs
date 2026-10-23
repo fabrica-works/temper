@@ -21,12 +21,14 @@ pub(super) enum Kind {
     LocalTakeOver,
     LocalRemoval,
     LocalReconcile,
+    LocalCreate,
     LocalConnect,
     Adopt,
     Follow,
 }
 #[derive(Debug)]
 pub(super) struct Run {
+    pub(super) first: Option<Intent>,
     pub(super) previous: domain::Connection,
     pub(super) forge: u16,
     pub(super) kind: Kind,
@@ -44,7 +46,13 @@ pub(super) struct AdoptionFiles {
     pub(super) access: connection::Access,
 }
 #[derive(Debug)]
+pub(crate) struct Intent {
+    pub(crate) org: Box<[u8]>,
+    pub(crate) repository: Box<[u8]>,
+}
+#[derive(Debug)]
 pub(super) struct Local {
+    pub(crate) first: Option<Intent>,
     pub(super) repositories: u64,
     pub(super) pending: bool,
     pub(super) restored: bool,
@@ -86,6 +94,7 @@ impl FileStep {
     }
 }
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "local state lives inline in the bounded forge map")]
 pub(super) enum Reconcile {
     GitHub,
     Local(Local),
@@ -195,6 +204,7 @@ pub(super) fn kind(plan: &host::Plan) -> Kind {
         host::Plan::Accept { .. } => Kind::Accept,
         host::Plan::Reconcile { .. } => Kind::Reconcile,
         host::Plan::Adopt { .. } => Kind::Adopt,
+        host::Plan::Create { .. } => Kind::LocalCreate,
         host::Plan::Paste { .. } => unreachable!("temper-13 stages Paste"),
         host::Plan::TakeOver { .. } => Kind::LocalTakeOver,
         host::Plan::Check { .. } => unreachable!("Check is not staged"),
@@ -266,6 +276,13 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
         keep(engine, forge, Item::Origin, &origin, Purpose::LocalOrigin(token));
         return;
     }
+    if kind == Kind::LocalCreate {
+        let reconcile::Outcome::Created { id } = outcome else { unreachable!("Create returns its repository") };
+        engine.setup.runs.remove(&token).expect("created run");
+        engine.events.push(root::Event::Forge(Box::new(domain::Event::FirstMade { forge, id: id.get() })));
+        adopt_local(engine, forge);
+        return;
+    }
     if kind == Kind::Adopt {
         let adoption = engine.setup.lifecycle.adoptions.get_mut(&forge).expect("live start-time adoption");
         if adoption.next.get() < adoption.repositories {
@@ -303,7 +320,9 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
             root::SetupOutcome::Done
         }
         reconcile::Outcome::Nothing => root::SetupOutcome::Done,
-        reconcile::Outcome::Identity { .. } | reconcile::Outcome::Reachable { .. } => {
+        reconcile::Outcome::Identity { .. }
+        | reconcile::Outcome::Reachable { .. }
+        | reconcile::Outcome::Created { .. } => {
             unreachable!("later plans are not staged")
         }
     };
@@ -311,6 +330,10 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
 }
 pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure: reconcile::Failure) {
     let run = engine.setup.runs.get(&token).expect("stopped setup run");
+    if run.kind == Kind::LocalCreate {
+        create_stopped(engine, token, failure);
+        return;
+    }
     if run.kind == Kind::Adopt {
         engine.setup.lifecycle.adoptions.remove(&run.forge);
     }
@@ -366,7 +389,9 @@ pub(super) fn kept(engine: &mut crate::engine::Engine, purpose: Purpose) {
     match purpose {
         Purpose::LocalOrigin(run) => {
             let active = engine.setup.runs.remove(&run).expect("reconcile waits for Origin Kept");
-            adopt_local(engine, active.forge);
+            if !create_local(engine, active.forge) {
+                adopt_local(engine, active.forge);
+            }
         }
         Purpose::Host(run) => engine.setup.down(host::Request::Answer { run, answer: host::Answer::Written }),
         Purpose::Origin(run) => {
@@ -526,6 +551,7 @@ fn next_run(lifecycle: &mut Lifecycle) -> Token {
     lifecycle.next_run = lifecycle.next_run.checked_add(1).expect("setup run names");
     run
 }
+#[expect(clippy::too_many_lines, reason = "one ordered pass over setup continuations")]
 pub(super) fn advance(engine: &mut crate::engine::Engine) {
     if engine.setup.closing || engine.drain.is_some() || engine.end.is_some() || engine.setup.component.is_none() {
         return;
@@ -566,6 +592,7 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
                 .insert(
                     run,
                     Run {
+                        first: None,
                         forge: *forge,
                         kind: Kind::Adopt,
                         internal: true,
@@ -616,6 +643,7 @@ pub(super) fn advance(engine: &mut crate::engine::Engine) {
                 .insert(
                     run,
                     Run {
+                        first: None,
                         forge: *forge,
                         kind: Kind::Reconcile,
                         internal: true,
@@ -692,7 +720,13 @@ fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
             .runs
             .insert(
                 run,
-                Run { forge, kind: Kind::LocalTakeOver, internal: true, previous: domain::Connection::NotConnected },
+                Run {
+                    first: None,
+                    forge,
+                    kind: Kind::LocalTakeOver,
+                    internal: true,
+                    previous: domain::Connection::NotConnected,
+                },
             )
             .expect("admitted local takeover");
         state(engine, forge, domain::Connection::Connecting);
@@ -753,7 +787,13 @@ fn reconcile_local(engine: &mut crate::engine::Engine, forge: u16) {
         .runs
         .insert(
             run,
-            Run { forge, kind: Kind::LocalReconcile, internal: true, previous: domain::Connection::NotConnected },
+            Run {
+                first: None,
+                forge,
+                kind: Kind::LocalReconcile,
+                internal: true,
+                previous: domain::Connection::NotConnected,
+            },
         )
         .expect("admitted local reconcile");
     state(engine, forge, domain::Connection::Connecting);
@@ -791,6 +831,79 @@ fn adoption_repository(engine: &mut crate::engine::Engine, forge: u16) -> Option
     engine.setup.lifecycle.adoptions.remove(&forge);
     connect_local(engine, forge);
     None
+}
+/// Reconcile's Origin is durable before the first repository can be made.
+fn create_local(engine: &mut crate::engine::Engine, forge: u16) -> bool {
+    let local = engine.setup.lifecycle.local_mut(forge).expect("reconciled local");
+    let Some(first) = local.first.take() else { return false };
+    let plan = host::Plan::Create {
+        forge,
+        org: first.org.clone(),
+        repository: first.repository.clone(),
+        files: Box::new([host::File {
+            path: temper_forge_setup::STARTER_PATH.into(),
+            content: temper_forge_setup::STARTER_WORKFLOW.into(),
+        }]),
+    };
+    assert!(
+        skein_forge_setup::given::check_create(&local.limits, engine.setup.env.limits.string_bytes, &plan).is_ok(),
+        "SetUp admission and the starter profile prove Create's inputs"
+    );
+    let run = next_run(&mut engine.setup.lifecycle);
+    engine
+        .setup
+        .runs
+        .insert(
+            run,
+            Run {
+                first: Some(first),
+                forge,
+                kind: Kind::LocalCreate,
+                internal: true,
+                previous: domain::Connection::NotConnected,
+            },
+        )
+        .expect("reconcile released its run slot");
+    super::run_plan(engine, run, plan);
+    true
+}
+#[expect(clippy::disallowed_macros, reason = "closed credential-free Create diagnostic")]
+fn create_stopped(engine: &mut crate::engine::Engine, token: Token, failure: reconcile::Failure) {
+    let run = engine.setup.runs.remove(&token).expect("stopped Create");
+    let first = run.first.expect("Create retains the admitted names");
+    let step = match failure.step {
+        reconcile::Stage::Admin => domain::CreateStep::Admin,
+        reconcile::Stage::Org => domain::CreateStep::Org,
+        reconcile::Stage::Repository => domain::CreateStep::Repository,
+        reconcile::Stage::File => domain::CreateStep::File,
+        reconcile::Stage::Bot
+        | reconcile::Stage::Token
+        | reconcile::Stage::App
+        | reconcile::Stage::Installation
+        | reconcile::Stage::State => unreachable!("host Create stopped outside its stages"),
+    };
+    let suffix = alloc::format!(": {:?} ({:?})", failure.step, failure.why);
+    let length = first
+        .org
+        .len()
+        .checked_add(first.repository.len())
+        .and_then(|bytes| bytes.checked_add(8))
+        .and_then(|bytes| bytes.checked_add(suffix.len()))
+        .expect("bounded Create diagnostic");
+    let mut why = skein_lib::Writer::new(length);
+    for part in [b"making ".as_slice(), &first.org, b"/", &first.repository, suffix.as_bytes()] {
+        why.put(part).expect("measured Create diagnostic");
+    }
+    let why = bounded_reason(why.finish());
+    engine.notes.push(crate::Note::ForgeSetupStopped {
+        number: run.forge,
+        why: crate::SetupStopped::Stopped {
+            plan: crate::SetupPlan::Create,
+            step: crate::SetupStep { stage: failure.step, why: failure.why },
+        },
+    });
+    engine.events.push(root::Event::Forge(Box::new(domain::Event::FirstFailed { forge: run.forge, step })));
+    state(engine, run.forge, domain::Connection::SetUpFailed { why });
 }
 fn adopt_local(engine: &mut crate::engine::Engine, forge: u16) {
     let repositories = engine.setup.lifecycle.local(forge).expect("reconciled local").repositories;
@@ -855,6 +968,7 @@ fn local_failure(forge: u16, why: &crate::SetupStopped) -> Box<[u8]> {
                 crate::SetupPlan::TakeOver => "taking the handover",
                 crate::SetupPlan::Reconcile => "reconciling",
                 crate::SetupPlan::Adopt => "adopting",
+                crate::SetupPlan::Create => "making",
             };
             alloc::format!("{action}: {:?}: {:?}", step.stage, step.why).into_bytes().into_boxed_slice()
         }
@@ -1010,4 +1124,10 @@ fn file_answer(engine: &mut crate::engine::Engine, forge: u16) -> bool {
         FileStep::Idle | FileStep::Reading { .. } | FileStep::Removing { .. } => unreachable!("completed file IO"),
     }
     true
+}
+
+pub(crate) fn first(engine: &mut crate::engine::Engine, forge: u16, org: Box<[u8]>, repository: Box<[u8]>) {
+    if let Some(local) = engine.setup.lifecycle.local_mut(forge) {
+        local.first = Some(Intent { org, repository });
+    }
 }

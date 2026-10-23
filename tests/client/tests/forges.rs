@@ -46,6 +46,7 @@ struct World {
     transport: Transport,
     out: Queue<root::Request>,
     printed: BTreeMap<u32, tools::jig::Printed>,
+    progress: Vec<Box<[u8]>>,
     box_requests: VecDeque<(u16, Token)>,
     box_calls: u32,
     calls: u32,
@@ -97,6 +98,7 @@ impl World {
             transport,
             out: Queue::with_capacity(OUTPUTS),
             printed: BTreeMap::new(),
+            progress: Vec::new(),
             box_requests: VecDeque::new(),
             box_calls: 0,
             calls: 0,
@@ -222,6 +224,7 @@ impl World {
                         assert!(self.printed.insert(number, printed).is_none(), "one answer");
                     }
                     root::Request::Ready => {}
+                    root::Request::Progress { line } => self.progress.push(line),
                     root::Request::Client { request } => panic!("unlinked transport: {request:?}"),
                     root::Request::Kept { .. } | root::Request::Fact { .. } => {
                         panic!("no restored calls or unknown owners")
@@ -257,11 +260,8 @@ impl World {
         let call = self.setup();
         assert!(!self.printed.contains_key(&call));
         self.box_started();
-        let printed = self.answer(call);
-        assert_eq!(
-            (printed.status, printed.stdout.as_ref()),
-            (0, b"setting up\nnext: wait forges --until settled\n".as_slice())
-        );
+        assert!(!self.printed.contains_key(&call), "setup waits for its first repository");
+        assert_eq!(self.progress.last().expect("setup progress").as_ref(), b"setting up\n");
     }
     fn read(&mut self) -> tools::jig::Printed {
         self.invoke(&[b"forges", b"--json"])
@@ -383,4 +383,47 @@ fn a_failed_setup_settles_with_its_why_and_can_be_asked_again() {
     assert_eq!(world.box_calls, 2);
     assert!(world.saved.is_empty());
     world.connection(FORGE, forge::Connection::NotConnected);
+}
+
+#[test]
+fn setup_fields_reach_the_engine_and_the_row_while_unknown_projects_are_refused() {
+    use temper_client_domain::forge::forges as d;
+    let mut world = World::new(true);
+    let call = world.call(&[b"forge-setup", b"3", b"--org", b"team", b"--repository", b"widget", b"--project", b"1"]);
+    assert!(!world.printed.contains_key(&call));
+    world.box_started();
+    assert_eq!(world.progress.last().expect("setup progress").as_ref(), b"setting up\n");
+    assert!(!world.printed.contains_key(&call), "admitted setup waits for made");
+    world.read();
+    assert_eq!(
+        row(&world, FORGE).first,
+        Some(d::First {
+            org: b"team".as_slice().into(),
+            repository: b"widget".as_slice().into(),
+            project: d::SetUpProject::Existing(1),
+            state: d::FirstState::Making
+        })
+    );
+    world.engine.send(engine::Event::Forge(Box::new(forge::Event::BoxClosed)));
+    world.settle();
+    let failed = world.answer(call);
+    assert_eq!(failed.status, 1);
+    assert!(contains(&failed.stderr, b"Set up failed: the box closed the pipe"));
+    let printed = world.invoke(&[b"forge-setup", b"3", b"--project", b"Next"]);
+    assert_eq!(printed.status, 2);
+    assert!(contains(&printed.stderr, b"a new project"));
+    assert_eq!(world.box_calls, 1, "new project reaches no box effect");
+}
+#[test]
+fn invalid_setup_names_are_refused_without_a_box_effect() {
+    let mut world = World::new(true);
+    for flag in [b"--org".as_slice(), b"--repository"] {
+        let printed = world.invoke(&[b"forge-setup", b"3", flag, b""]);
+        assert_eq!(printed.status, 2);
+        assert!(contains(
+            &printed.stderr,
+            b"invalid: the organization, repository or project name is empty or too long"
+        ));
+    }
+    assert_eq!(world.box_calls, 0);
 }
