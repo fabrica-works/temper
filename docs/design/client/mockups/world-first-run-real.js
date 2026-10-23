@@ -17,10 +17,9 @@
     },
     {
       id: '2', label: '2', hour: 1 / 60, act: 1, title: 'Setting up a Forgejo',
-      summary: 'temper box fetches Forgejo and its runner. The wizard moves on to the model while it does: Sam chooses ChatGPT.',
+      summary: 'temper box fetches Forgejo and its runner. The wizard moves on to the model while it does: ChatGPT, or an OpenAI API key.',
       look: [
         ['welcome.html?at=model', 'Connect a model, while Forgejo sets up: ChatGPT, or an API key'],
-        ['welcome.html?at=model&way=chatgpt', 'ChatGPT: where to sign in'],
         ['welcome.html?at=model#other-states', 'Other ways, where the configuration offers them'],
         ['forges.html', 'Forges: forge 3, setting up; no playground'],
         ['chats.html', 'Chats: the setup strip’s status'],
@@ -33,7 +32,7 @@
     },
     {
       id: '3', label: '3', hour: 2 / 60, act: 1, title: 'Signing in to ChatGPT',
-      summary: 'Sam continues with ChatGPT. The engine listens on 127.0.0.1:1455 and gives the sign-in’s address, which Sam opens in a browser on this machine. temper waits for ChatGPT to send the browser back; Forgejo is preparing meanwhile.',
+      summary: 'Sam chooses Continue with ChatGPT, which starts the sign-in at once. The engine listens on 127.0.0.1:1455 and gives the sign-in’s address, which Sam opens in a browser on this machine. temper waits for ChatGPT to send the browser back; Forgejo is preparing meanwhile.',
       look: [
         ['welcome.html?at=model', 'Signing in: the address, and waiting for you in your browser'],
         ['accounts.html', 'Accounts: the sign-in under way; the nav’s mark, amber'],

@@ -1211,27 +1211,19 @@
       ${playground}${variants}`);
   };
 
-  // Connecting a model (client README, 5.5): Choose, Details, Signing in
-  // and Ready. ChatGPT's sign-in is drawn whole; a key's form and Claude's
-  // subscription are sketched, for the context.
+  // Connecting a model (client README, 5.5): Choose, then Signing in for
+  // ChatGPT or Details for a key, then Ready. Continue with ChatGPT starts
+  // the sign-in at once. ChatGPT's sign-in is drawn whole; a key's form and
+  // Claude's subscription are sketched, for the context.
   const SIGN_IN = 'https://auth.openai.com/api/accounts/authorize?response_type=code&client_id=…&redirect_uri=http%3A%2F%2F127.0.0.1%3A1455%2Fauth%2Fcallback&scope=openid+profile+email+offline_access+…&code_challenge=…&state=Qm7v…';
   const wayLabel = w => conf('a way the configuration offers to connect a model', esc(w));
-  function modelChoices(target = 'connect-model.html?way=') {
+  function modelChoices(signIn, keyForm = 'connect-model.html?way=key') {
     const ways = world.config.ways || [];
     const chatgpt = ways.find(w => w.startsWith('Continue with'));
     const key = ways.find(w => w.startsWith('Use an') && w.endsWith('API key'));
-    return `<div class="forge-choices model-choices">${chatgpt ? `<section class="card card-pad"><h3>ChatGPT</h3><p>Your ChatGPT plan. Sign in with your ChatGPT account, and temper’s agents use your plan’s included usage.</p><p class="muted tiny">In a browser on the engine’s machine · about a minute</p><a class="button primary" href="${esc(u(`${target}chatgpt`))}">${wayLabel(chatgpt)}</a></section>` : ''}${key ? `<section class="card card-pad"><h3>An OpenAI API key</h3><p>A key from OpenAI’s platform. What temper’s agents use is billed to the key’s organization.</p><p class="muted tiny">Pasted here · at once</p><a class="button" href="${esc(u(`${target}key`))}">${wayLabel(key)}</a></section>` : ''}</div>`;
+    return `<div class="forge-choices model-choices">${chatgpt ? `<section class="card card-pad"><h3>ChatGPT</h3><p>Your ChatGPT plan. Sign in with your ChatGPT account, and temper’s agents use your plan’s included usage.</p><p class="muted tiny">In a browser on the engine’s machine · about a minute</p><a class="button primary" href="${esc(u(signIn))}">${wayLabel(chatgpt)}</a></section>` : ''}${key ? `<section class="card card-pad"><h3>An OpenAI API key</h3><p>A key from OpenAI’s platform. What temper’s agents use is billed to the key’s organization.</p><p class="muted tiny">Pasted here · at once</p><a class="button" href="${esc(u(keyForm))}">${wayLabel(key)}</a></section>` : ''}</div>`;
   }
   const portFold = () => `<details class="forge-elsewhere model-elsewhere"><summary>Your browser is on another machine?</summary><p>ChatGPT sends your browser back to ${conf('the sign-in’s fixed redirect, in the configuration', '127.0.0.1:1455')} on its own machine. Forward that port to the engine’s machine first, and keep the tunnel open while you sign in:</p><pre><code>${conf('the sign-in’s fixed port, in the configuration', 'ssh -L 1455:127.0.0.1:1455 HOST')}</code></pre><p class="muted tiny">HOST is the engine’s machine. Codex’s own sign-in uses the same port: finish or cancel one before you start the other.</p></details>`;
-  function chatgptDetails(next) {
-    return `<div class="forge-setup">
-        <h3>ChatGPT</h3>
-        <p>Sign in with your ChatGPT account. temper’s agents then run on your plan.</p>
-        <p>Sign in from a browser on the engine’s machine: ChatGPT sends you back to it, where temper listens while you sign in.</p>
-        ${portFold()}
-        <a class="button primary" href="${esc(next)}">${wayLabel('Continue with ChatGPT')}</a>
-      </div>`;
-  }
   function signingIn(until = world.signIn?.until ?? world.now + 10) {
     return `<h3>Signing in to ChatGPT</h3>
       <p>Open this address in a browser on the engine’s machine:</p>
@@ -1274,37 +1266,38 @@
   function callbackTab(ok) {
     return `<div class="browser-tab"><div class="browser-bar">${esc(`127.0.0.1:1455/auth/callback?code=…&state=Qm7v…`)}</div><div class="browser-page"><p class="browser-brand">✳ temper</p>${ok ? '<h3>Signed in to ChatGPT</h3><p>You can close this tab and go back to temper.</p>' : '<h3>temper couldn’t finish signing in</h3><p>Go back to temper: Connect a model says why.</p>'}</div></div>`;
   }
+  const modelSteps = (current, way) => flowSteps(current, '', ['Choose', way === 'key' ? 'Details' : 'Signing in', 'Ready']);
   const endingCard = (words, acts, mark = '', failed = true) => `<h3>Signing in to ChatGPT ${mark}</h3><p${failed ? ' class="forge-failure"' : ''}>${words}</p>${acts ? `<div class="button-row">${acts}</div>` : ''}`;
 
   pages['connect-model'] = () => {
-    const way = params.get('way');
+    const waiting = world.signIn?.state === 'waiting';
+    const way = params.get('way') || (waiting ? 'chatgpt' : null);
     const a = ownAccounts().find(a => a.provider === 'OpenAI' && isPlan(a));
     const wasPlayground = demoRunning();
-    const next = worldKey === 'first-run-real' ? 'connect-model.html?way=chatgpt&step=3' : 'connect-model.html?way=chatgpt&step=5';
+    // Continue with ChatGPT leads to the step that draws what it starts.
+    const signIn = worldKey === 'first-run-real' ? 'connect-model.html?way=chatgpt&step=3' : 'connect-model.html?way=chatgpt&step=5';
     let current = 0;
-    let body = modelChoices();
-    if (way === 'chatgpt') {
-      if (world.signIn?.state === 'waiting') { current = 2; body = flowWrap(signingIn()); }
-      else if (a) { current = 3; body = flowWrap(chatgptReady(a, wasPlayground)); }
-      else { current = 1; body = flowWrap(chatgptDetails(u(next))); }
-    } else if (way === 'key') { current = 1; body = flowWrap(keyForm()); }
-    const back = current === 1 ? `<p><a class="text-link" href="${esc(u('connect-model.html'))}">‹ All ways</a></p>` : '';
+    let body = modelChoices(signIn);
+    if (way === 'chatgpt' && waiting) { current = 1; body = flowWrap(signingIn()); }
+    else if (way === 'chatgpt' && a) { current = 2; body = flowWrap(chatgptReady(a, wasPlayground)); }
+    else if (way === 'key') { current = 1; body = flowWrap(keyForm()); }
+    const back = way === 'key' ? `<p><a class="text-link" href="${esc(u('connect-model.html'))}">‹ All ways</a></p>` : '';
     const again = '<button class="button primary" data-later="Mockup: a fresh sign-in, with a new address.">Continue with ChatGPT</button>';
     const key = '<button class="button" data-later="Mockup: the key’s form.">Use an API key</button>';
     const variants = worldKey === 'first-run' ? `<section class="mock-variants" id="other-states"><h2>Other states, for reference</h2><p>Not steps of this world: the sign-in while it waits, the tab ChatGPT sends the browser back to, each other ending, and the other ways.</p>${[
-      ['Signing in: waiting for you in your browser', 2, signingIn(world.now + 10)],
-      ['The browser’s tab, once ChatGPT sends it back', 2, `<h3>In the browser ${ahead('callback page', 'what the engine’s loopback listener answers the browser: skein’s oauth.md draws no page')}</h3><div class="browser-tabs">${callbackTab(true)}${callbackTab(false)}</div>`],
-      ['The same account again', 2, endingCard(fact('jig: a sign-in to a subject the person already holds', esc(`That’s ${a ? a.sources[0].name : 'sam@example.com'} again. To add another account, sign out of ChatGPT in your browser first, then Continue with ChatGPT.`)), again, '', false)],
-      ['Signed in without plan usage', 2, endingCard(fact('jig: the sign-in refused, plan usage declined', 'You signed in without plan usage.'), again + key)],
-      ['Not eligible', 2, endingCard(fact('jig: the sign-in refused, not eligible', 'This ChatGPT account can’t be used for plan usage in temper. Plan usage needs an eligible ChatGPT plan.'), `${key}<button class="button" data-later="Mockup: sign out of ChatGPT in your browser first; then a fresh sign-in.">Sign in to another account</button>`)],
-      ['Another person holds that account', 2, endingCard(fact('jig: the sign-in refused, a subject another holder holds', 'Another person here holds that ChatGPT account. To use one of yours, sign out of ChatGPT in your browser first, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in refused for a subject another holder holds (jig’s accounts.md, 3.3): client README 5.5 has no words yet'))],
-      ['Cancelled, or past its deadline', 2, endingCard(fact('skein: the sign-in ended, cancelled or expired', esc(`The sign-in ended at ${hm(world.now + 10)}: no answer came from ChatGPT in time.`)), again, ahead('words', 'a sign-in cancelled or expired: client README 5.5 has no words yet'))],
-      ['The port is taken', 2, endingCard(fact('temper: the loopback listener couldn’t bind the fixed port', 'temper can’t listen on 127.0.0.1:1455: another program has it, such as Codex’s own sign-in. Finish or close that sign-in, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in whose fixed port is taken: client README 5.5 has no words yet'))],
-      ['Misconfigured', 2, endingCard(fact('jig: the sign-in refused by the provider, misconfigured', 'OpenAI refused temper’s sign-in. Check the configuration’s registration.'), '')],
-      ['An OpenAI API key: its details', 1, keyForm()],
-      ['Your Claude subscription, where the configuration offers it', 1, claudeSketch()],
-    ].map(([heading, at, content]) => `<h3>${esc(heading)}</h3>${flowSteps(at, 'Signing in')}${flowWrap(content)}`).join('')}</section>` : '';
-    return listPage('accounts', [['Accounts', 'accounts.html'], ['Connect a model']], `<div class="section-heading" style="margin-top:0"><h2>Connect a model</h2></div>${flowSteps(current, 'Signing in')}${back}${body}${variants}`);
+      ['Signing in: waiting for you in your browser', 1, signingIn(world.now + 10)],
+      ['The browser’s tab, once ChatGPT sends it back', 1, `<h3>In the browser ${ahead('callback page', 'what the engine’s loopback listener answers the browser: skein’s oauth.md draws no page')}</h3><div class="browser-tabs">${callbackTab(true)}${callbackTab(false)}</div>`],
+      ['The same account again', 1, endingCard(fact('jig: a sign-in to a subject the person already holds', esc(`That’s ${a ? a.sources[0].name : 'sam@example.com'} again. To add another account, sign out of ChatGPT in your browser first, then Continue with ChatGPT.`)), again, '', false)],
+      ['Signed in without plan usage', 1, endingCard(fact('jig: the sign-in refused, plan usage declined', 'You signed in without plan usage.'), again + key)],
+      ['Not eligible', 1, endingCard(fact('jig: the sign-in refused, not eligible', 'This ChatGPT account can’t be used for plan usage in temper. Plan usage needs an eligible ChatGPT plan.'), `${key}<button class="button" data-later="Mockup: sign out of ChatGPT in your browser first; then a fresh sign-in.">Sign in to another account</button>`)],
+      ['Another person holds that account', 1, endingCard(fact('jig: the sign-in refused, a subject another holder holds', 'Another person here holds that ChatGPT account. To use one of yours, sign out of ChatGPT in your browser first, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in refused for a subject another holder holds (jig’s accounts.md, 3.3): client README 5.5 has no words yet'))],
+      ['Cancelled, or past its deadline', 1, endingCard(fact('skein: the sign-in ended, cancelled or expired', esc(`The sign-in ended at ${hm(world.now + 10)}: no answer came from ChatGPT in time.`)), again, ahead('words', 'a sign-in cancelled or expired: client README 5.5 has no words yet'))],
+      ['The port is taken', 1, endingCard(fact('temper: the loopback listener couldn’t bind the fixed port', 'temper can’t listen on 127.0.0.1:1455: another program has it, such as Codex’s own sign-in. Finish or close that sign-in, then Continue with ChatGPT.'), again, ahead('words', 'a sign-in whose fixed port is taken: client README 5.5 has no words yet'))],
+      ['Misconfigured', 1, endingCard(fact('jig: the sign-in refused by the provider, misconfigured', 'OpenAI refused temper’s sign-in. Check the configuration’s registration.'), '')],
+      ['An OpenAI API key: its details', 1, keyForm(), 'key'],
+      ['Your Claude subscription, where the configuration offers it', 1, claudeSketch(), 'key'],
+    ].map(([heading, at, content, w]) => `<h3>${esc(heading)}</h3>${modelSteps(at, w)}${flowWrap(content)}`).join('')}</section>` : '';
+    return listPage('accounts', [['Accounts', 'accounts.html'], ['Connect a model']], `<div class="section-heading" style="margin-top:0"><h2>Connect a model</h2></div>${modelSteps(current, way)}${back}${body}${variants}`);
   };
 
   // The forges' part of the deployment's connectors, in temper's words
@@ -1432,7 +1425,7 @@
     return `<details class="card forge-row"${open ? ' open' : ''}><summary><div class="forge-name">${conf('the forge’s name, number, kind and web address', `${esc(forgeName(f))}<small>forge ${esc(f.n)} · ${esc(f.kind)} · ${esc(f.web)}</small>`)}</div><span class="tag ${f.state === 'connected' ? 'green' : ['set up failed', 'stopped'].includes(f.state) ? 'red' : 'amber'}">${fact('temper: the forge’s connection', esc(forgeConnection(f)))}</span><div class="forge-summary-line">${line}</div></summary><div class="card-pad">${forgeBody(f)}</div></details>`;
   }
   function flowSteps(current, label3 = 'Setting up', labels = ['Choose', 'Details', label3, 'Ready']) {
-    return `<div class="steps flow-steps">${labels.map((label, i) => `<div class="step${i < current ? ' done' : i === current ? ' current' : ''}">${esc(label)}</div>`).join('')}</div>`;
+    return `<div class="steps flow-steps" style="grid-template-columns:repeat(${labels.length}, minmax(0, 1fr))">${labels.map((label, i) => `<div class="step${i < current ? ' done' : i === current ? ' current' : ''}">${esc(label)}</div>`).join('')}</div>`;
   }
   function githubConnecting(f) {
     return `<h3>GitHub</h3><p>Open this link to make temper’s App on GitHub, then install it on the repositories you choose. temper never opens it for you.</p><pre><code>${fact('temper: the one-use GitHub manifest link', esc(`http://127.0.0.1:8367/forges/${f.n}/github/manifest?state=k3Jx…`))}</code></pre><p class="muted tiny">Waiting for you on GitHub. The link works once, and ends if temper restarts.</p><button class="button" data-later="Mockup: a fresh link; the old one ends.">Start again</button><p class="muted tiny">Once installed: choose the repositories to adopt, each into a new project or into Default; then Open the project.</p>`;
@@ -1483,9 +1476,9 @@
       content = `${heading('Connect a forge')}<p class="muted welcome-lead">Where your repositories live: temper’s agents push branches and open pull requests there.</p>${which ? flowWrap(details) : forgeChoices('welcome.html?at=forge&forge=')}${foot}`;
     } else if (current === 'model') {
       const status = f?.state === 'setting up' ? `<div class="welcome-status">${fact('temper: the forge’s name and set-up state', esc(`${forgeName(f)} · ${f.state}`))}${eachStep()}</div>` : '';
-      // Connect a model's Choose, Details and Signing in, within the
-      // wizard; its Ready is the wizard's.
-      const body = way === 'chatgpt' ? flowWrap(world.signIn?.state === 'waiting' ? signingIn() : chatgptDetails(u('welcome.html?at=model&world=first-run-real&step=3'))) : way === 'key' ? flowWrap(keyForm()) : modelChoices('welcome.html?at=model&way=');
+      // Connect a model's Choose and Signing in, or a key's Details, within
+      // the wizard; its Ready is the wizard's.
+      const body = way === 'chatgpt' && world.signIn?.state === 'waiting' ? flowWrap(signingIn()) : way === 'key' ? flowWrap(keyForm()) : modelChoices('welcome.html?at=model&world=first-run-real&step=3', 'welcome.html?at=model&way=key');
       const variants = worldKey === 'first-run-real' ? `<section class="mock-variants" id="other-states"><h2>Other ways, where the configuration offers them</h2>${flowWrap(claudeSketch())}<p style="margin-top:14px">ChatGPT’s other endings, and the account’s other states, are drawn in the first run: <a class="text-link" href="${esc(u('connect-model.html?world=first-run&step=5#other-states'))}">Connect a model</a> and <a class="text-link" href="${esc(u('accounts.html?world=first-run&step=5#other-states'))}">Accounts</a>.</p></section>` : '';
       content = `${status}${heading('Connect a model')}<p class="muted welcome-lead">temper’s agents run on it: on a plan you sign in to, or on a key.</p>${body}${foot}${variants}`;
     } else {
