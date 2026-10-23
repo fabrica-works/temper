@@ -34,7 +34,7 @@
           "core.call_answer_bytes": 2048,
           "hub.accounts": 4,
           "hub.event_bytes": 4094,
-          "hub.turns": 1,
+          "hub.turns": 8,
           "hub.held": 1,
           "hub.program_sources": 0,
           "link.ping_ms": 100,
@@ -47,8 +47,8 @@
   "application": {{
     "workers": [
       {{
-        "root": "worker-root",
-        "git": "/usr/bin/git"
+        "root": "workspaces",
+        "git": "{artifact.git}"
       }}
     ],
     "limits": {{

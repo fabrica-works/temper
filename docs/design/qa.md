@@ -140,11 +140,15 @@ forge    temper fake forge; ready "listening " → address
   `listening webhooks` on stderr. Reconcile registers the actual bound
   webhook endpoint; no fixed endpoint, socket probe or experiment poll
   substitutes for that handoff. Workers print their linked lines.
-- **A private bootstrap:** the engine's sign-in link on stdout goes
+- **A private bootstrap for S:** the engine's sign-in link on stdout goes
   directly to the seed client's stdin. It is never a file, readiness
   capture, command argument, event or transcript. Only the public client
   origin is kept and passed to the ctl wrapper. A spent link remains a
   credential for this rule.
+  The canonical native process harness retains an in-memory stdout link
+  capture for its chat clients. S explicitly removes that declaration and
+  uses its attended pipe; the page copies retain their current bootstrap
+  contract pending their owners' private-bootstrap work.
 - **S has an attended host** beside `lab/chat-change-smoke/`, while
   skein's runner lacks private bootstrap and stopped collection. It
   keeps the lab's subject, key, run, evidence and verdict records and

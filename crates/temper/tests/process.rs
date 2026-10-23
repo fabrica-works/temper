@@ -1024,7 +1024,11 @@ fn a_mixed_document_exits_1_naming_its_path() {
     let scratch = support::Scratch::new("cluster_mixed_document");
     let cluster = support::cluster::Cluster::documents(
         scratch.path(),
-        &[("llm", "address", "127.0.0.1:1"), ("engine", "workers", "127.0.0.1:2")],
+        &[
+            ("forge", "address", "127.0.0.1:3"),
+            ("llm", "address", "127.0.0.1:1"),
+            ("engine", "workers", "127.0.0.1:2"),
+        ],
     );
     let path = cluster.dir("engine").join("config/temper.json");
     let mut engine: serde_json::Value =
@@ -1247,11 +1251,17 @@ impl ClusterChatJudge {
         let engine: serde_json::Value =
             serde_json::from_slice(&std::fs::read(&self.engine).expect("rendered engine document"))
                 .expect("engine JSON");
+        let template = engine["engine"]["templates"]
+            .as_array()
+            .expect("templates")
+            .iter()
+            .find(|template| template["name"] == "chat")
+            .expect("chat template");
         let charter = engine["engine"]["charters"]
             .as_array()
             .expect("charters")
             .iter()
-            .find(|charter| charter["number"] == engine["application"]["charter"])
+            .find(|charter| charter["number"] == template["executor"]["charter"])
             .expect("chat charter");
         assert!(
             Duration::from_millis(charter["waiting_ms"].as_u64().expect("chat waiting_ms")) >= CHAT_HOLDS_ITS_SLOT,

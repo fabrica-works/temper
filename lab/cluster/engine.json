@@ -852,7 +852,11 @@
   }},
   "workers": [],
   "application": {{
-    "webhooks": null,
+    "webhooks": {{
+      "listener": {{
+        "socket": "127.0.0.1:0"
+      }}
+    }},
     "clients": {{
       "listener": {{
         "socket": "127.0.0.1:0"
@@ -864,22 +868,16 @@
         "number": 1,
         "kind": "forgejo",
         "api": {{
-          "socket": "127.0.0.1:9"
+          "socket": "{proc.forge.ready.address}"
         }},
         "transport": "plaintext",
-        "git": "http://127.0.0.1:9",
-        "webhook_secret": null,
-        "api_token": "secrets/forge-1.api-token",
-        "user": {{
-          "file": "secrets/forge-1.user"
-        }},
-        "identity": 1
+        "git": "http://{proc.forge.ready.address}"
       }}
     ],
     "identities": [
       {{
         "number": 1,
-        "token": "secrets/forge-1.git-token",
+        "forge": 1,
         "login": "temper",
         "author": {{
           "name": "Temper",
@@ -887,7 +885,31 @@
         }}
       }}
     ],
-    "setup": [],
+    "setup": [
+      {{
+        "forge": 1,
+        "directory": "{proc.forge.dir}/setup",
+        "bot": {{
+          "login": "temper",
+          "email": "temper@example.test"
+        }},
+        "mode": {{
+          "fake": {{
+            "listen": {{
+              "socket": "{proc.forge.ready.address}"
+            }},
+            "git": "{artifact.git}",
+            "owner": "fake",
+            "repositories": [
+              {{
+                "name": "widget",
+                "landing": "main"
+              }}
+            ]
+          }}
+        }}
+      }}
+    ],
     "demo": null,
     "landing": {{
       "deployment": [],

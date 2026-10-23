@@ -17,21 +17,47 @@ def read(path):
 
 
 class AssemblyTests(unittest.TestCase):
-    def test_s_inherits_qa_templates_with_only_declared_case_two_joins(self):
-        for name in ('agent.json', 'llm.json', 'chat.txt', 'coding.txt',
+    def test_s_inherits_canonical_templates_without_setup_or_worker_exceptions(self):
+        for name in ('agent.json', 'llm.json', 'chat.txt', 'coding.txt', 'forge.json',
+                     'engine.json', 'w1.json', 'w2.json',
                      'w1.secret', 'w1.digest', 'w2.secret', 'w2.digest'):
             with self.subTest(name=name):
                 self.assertEqual((SMOKE / name).read_bytes(), (CLUSTER / name).read_bytes())
-        canonical, smoke = read(CLUSTER / 'engine.json'), read(SMOKE / 'engine.json')
-        # Only the anticipated case-2 setup differs; QA policy stays canonical.
-        for field in ('forges', 'identities', 'setup', 'webhooks'):
-            smoke['application'][field] = canonical['application'][field]
-        self.assertEqual(smoke, canonical)
-        for name in ('w1.json', 'w2.json'):
-            canonical, smoke = read(CLUSTER / name), read(SMOKE / name)
-            self.assertEqual(smoke['application']['workers'][0]['git'], '{artifact.git}')
-            smoke['application']['workers'] = canonical['application']['workers']
-            self.assertEqual(smoke, canonical)
+
+    def test_all_remote_workers_admit_their_configured_agent_turns(self):
+        # Startup requires equality; the first frozen S failed before sign-in
+        # because the agent admitted eight turns while its worker allowed one.
+        for root in (CLUSTER, SMOKE, LAB / 'cluster-web', LAB / 'look-live'):
+            agent = read(root / 'agent.json')
+            turns = agent['profile']['policy']['max_turns']
+            self.assertEqual(turns, 8)
+            for name in ('w1', 'w2'):
+                with self.subTest(root=root.name, worker=name):
+                    worker, = read(root / (name + '.json'))['workers']
+                    self.assertEqual(worker['limits']['overrides']['hub.turns'], turns)
+                    self.assertEqual(worker['slots'], 1)
+                    app = read(root / (name + '.json'))['application']['workers'][0]
+                    self.assertEqual(app, dict(root='workspaces', git='{artifact.git}'))
+
+    def test_canonical_records_only_setup_uses_the_actual_forge(self):
+        app = read(CLUSTER / 'engine.json')['application']
+        forge, = app['forges']
+        self.assertEqual(forge, dict(number=1, kind='forgejo', api=dict(socket=FORGE),
+                                    transport='plaintext', git='http://' + FORGE))
+        self.assertNotIn('token', app['identities'][0])
+        self.assertEqual(app['identities'][0]['forge'], 1)
+        setup, = app['setup']
+        self.assertEqual(setup['directory'], '{proc.forge.dir}/setup')
+        self.assertEqual(setup['mode']['fake']['listen'], dict(socket=FORGE))
+        self.assertEqual(setup['mode']['fake']['git'], '{artifact.git}')
+        self.assertEqual(app['webhooks'], dict(listener=dict(socket='127.0.0.1:0')))
+        for root in (CLUSTER, SMOKE, LAB / 'cluster-web', LAB / 'look-live'):
+            exp = read(root / 'experiment.json')
+            self.assertFalse(any('reconcile' in action['argv'] for action in exp['actions']))
+            for process in exp['processes']:
+                self.assertFalse(any(entry.get('from', '').startswith('forge-1.')
+                                     for entry in process.get('files', [])))
+            self.assertFalse(list(root.glob('forge-1.*')))
 
     def test_tls_root_and_model_agree_for_engine_and_both_agents(self):
         for root in (CLUSTER, SMOKE):
@@ -159,14 +185,31 @@ class AssemblyTests(unittest.TestCase):
             self.assertEqual(worker['limits']['overrides']['hub.slots'], 1)
             self.assertGreaterEqual(worker['limits']['overrides']['hub.event_bytes'], limits['tasks.message_bytes'])
 
-    def test_canonical_has_only_qa_manifest_changes_and_no_seed(self):
+    def test_canonical_keeps_case_two_forge_and_process_harness_link(self):
         exp = read(CLUSTER / 'experiment.json')
-        self.assertEqual([p['name'] for p in exp['processes']], ['llm', 'engine', 'w1', 'w2'])
+        self.assertEqual([p['name'] for p in exp['processes']], ['forge', 'llm', 'engine', 'w1', 'w2'])
         for field in ('actions', 'checks', 'collect', 'dirs', 'faults'):
             self.assertEqual(exp[field], [])
         engine = next(p for p in exp['processes'] if p['name'] == 'engine')
         self.assertIn(dict(path='config/charters/coding.txt', **{'from': 'coding.txt'}), engine['files'])
-        self.assertFalse(any(r['capture'] == 'link' for r in engine['ready']))
+        self.assertIn(dict(stream='stdout', prefix='http://', capture='link'), engine['ready'])
+        self.assertIn(dict(stream='stderr', prefix='listening webhooks ', capture='webhooks'), engine['ready'])
+        forge, llm = exp['processes'][:2]
+        self.assertEqual(forge['argv'][forge['argv'].index('--seed') + 1], '17')
+        self.assertEqual(llm['after'], ['forge'])
+        self.assertNotIn('--seed', llm['argv'])
+
+    def test_s_process_contract_adapts_only_fake_seeds_and_private_bootstrap(self):
+        canonical = read(CLUSTER / 'experiment.json')['processes']
+        smoke = read(SMOKE / 'experiment.json')['processes']
+        for process in canonical:
+            if process['name'] == 'forge':
+                process['argv'][process['argv'].index('--seed') + 1] = '{seed.forge}'
+            elif process['name'] == 'llm':
+                process['argv'] += ['--seed', '{seed.llm}']
+            elif process['name'] == 'engine':
+                process['ready'].remove(dict(stream='stdout', prefix='http://', capture='link'))
+        self.assertEqual(smoke, canonical)
 
     def test_s_process_templates_have_ready_predecessors_and_regular_inputs(self):
         exp = read(SMOKE / 'experiment.json')

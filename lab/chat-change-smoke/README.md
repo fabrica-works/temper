@@ -1,8 +1,8 @@
 # S assembly and integration review
 
 This is the no-driver NOTICE smoke from `docs/design/qa.md`, sections 4–8.
-It is an assembly draft, awaiting case-2's canonical forge/reader contracts
-and the attended host join. No successful product run is claimed. Use the
+It uses case-2's landed forge/reader contracts and the attended host's
+private bootstrap. No successful product run is claimed. Use the
 standard `lab-experiment/1` fields; `about` describes the host dependency,
 never adds a credential capture or a new runtime protocol.
 
@@ -48,37 +48,30 @@ causal proof, C/P/tree/NOTICE stderr, object request/response bytes, result
 and exit status. The promises command derives independent decisions from
 temper records; there is no alternate credential or decision input schema.
 
-Before a run, join and review these contracts:
+Canonical integration contracts:
 
-- **Case-2 cluster and reader:** QA changed canonical `agent.json`,
-  `llm.json`, `chat.txt`, added `coding.txt`, changed `engine` limits/LLM/
-  charters/rules/project policy and `application` landing/charter/limits,
-  and only the worker limits in `w1.json`/`w2.json`. Canonical
-  `experiment.json` only adds the coding file and removes link readiness.
-  Its existing processes, forge fixture files and engine
-  `application.forges`, `identities`, `setup`, `webhooks`, plus worker
-  `application.workers`, remain at the base. QA's forge-address references
-  cannot render there until case-2 supplies its forge predecessor/capture.
-- **S's anticipated case-2 portion:** `forge.json`, the forge member/seed/
-  observations contract, LLM's forge predecessor and seed, engine webhook
-  readiness, the four setup fields above and worker `{artifact.git}` are
-  inherited draft contracts only. The forge seeds widget first and CI on
-  NOTICE; engine setup omits old file credential members and uses the fake's
-  admin-token handover. Records-only local start already exists at
-  `c921947b5`; bound webhook registration is a producer join. Compare with
-  case-2's landed canonical files before running. Do not reconcile externally
-  or reinstate old credential fixtures to work around this dependency.
-- **Shared process reader, case-2 owned:**
-  `crates/temper/tests/support/cluster.rs` needs the subject materialized as
-  `git`, the corresponding artifact binding, fake seed bindings, forge
-  readiness before rendering QA engine/LLM templates, and document-only
-  captures sufficient for those references. S's client directory/actions
-  remain the attended host's; canonical cluster still has none. Existing
-  read/document callers must supply the added captures. In particular,
-  `crates/temper/tests/configuration.rs::cluster_documents` and
-  `process.rs::a_mixed_document_exits_1_naming_its_path` currently supply only
-  LLM/worker captures; configuration's memory match also only knows the old
-  four members. No reader or caller was edited or tested by QA.
+- **Shared documents:** S's forge, engine, agents, workers, charters, TLS
+  and secret/digest templates equal `../cluster/` byte for byte. The engine
+  connects to the fake's actual API/git addresses, takes over its handover
+  through records-only setup, and registers the bound loopback webhook
+  listener. No external reconcile or file-backed forge credentials remain.
+  Workers use the subject's basename `git` artifact and root `workspaces`.
+- **Process adaptation:** canonical forge seed is literal `17`, with the
+  forge ready before the LLM. S draws `{seed.forge}` and `{seed.llm}`.
+  Canonical engine stdout retains its in-memory `http://` link capture for
+  the native process harness. S alone removes that capture and keeps its
+  attended private pipe; no captured link enters its manifest or evidence.
+  S adds the trusted client seed, story and stopped checks.
+- **Roles and capacity:** application charter 2 is coding/review's default;
+  chat stories follow the actual chat template's executor, charter 1, whose
+  120-second wait/ordinary run assertions remain. Each remote worker's
+  `hub.turns` equals the configured agent's eight turns, preserving one
+  slot. This corrects the first frozen S admission failure before sign-in;
+  that run, its key and frozen experiment remain immutable. A corrected
+  experiment requires a new capture and parent review.
+- **Document-only checks:** configuration and mixed-document callers provide
+  an explicit synthetic forge address. The shared cluster reader, case
+  fixture and real-loop world remain case-2's landed code.
 - **Host interface, joined:** `host.py::contract` accepts this manifest's
   absent stdin and public readiness only; it refuses link captures and
   placeholders. `Run.line`/`mark_ready` count the three declared engine
@@ -95,31 +88,21 @@ Before a run, join and review these contracts:
   fake writer's flush-before-reply contract. A checkpoint or story exit
   alone is insufficient; missing proof must stay unknown. Parent review of
   that argument and the case-2 contracts remains required before a run.
-- **Page copies, joined:** canonical byte-copy assertions in
-  `lab/tests/unit/test_cluster_web.py::FilesTests` cover
-  `lab/cluster-web/{agent.json,llm.json,chat.txt,engine.json,w1.json,w2.json,experiment.json}`
-  and its coding-file addition. The cluster-web → look-live copy chain in
-  `lab/tests/unit/test_look_live.py::FilesTests` follows, including its
-  inherited process contracts and coding template. The web bundle/browser
-  actions and look-live cue/charter-time overrides remain. These copies
-  inherit canonical QA at the current branch; case-2's forge, records-only
-  setup and fake-git process contracts still need propagation after that
-  canonical join. The removed startup link readiness also leaves the page
-  seed's old sign-in placeholder awaiting its owner's private-bootstrap join.
+- **Page copies, joined:** cluster-web inherits all five canonical service
+  members and templates, including forge, coding, records-only setup, fake
+  git and webhook readiness. It adds its bundle and browser. Look-live
+  inherits that contract while preserving its live cue and chat-time
+  overrides. Browser actions and collections retain their existing contract;
+  the page owners' private-bootstrap replacement remains separate work.
 
-Assembly verification at `32c1a95b4` on 2026-10-23, through `heavy`: 45 tests passed in
-0.357 s (10 assembly, 16 end-state, 5 ctl-output, 14 shell/canary). A separate
-six-test downstream file check took 0.007 s: the four look-live checks passed;
-`test_cluster_web.FilesTests.test_copies_and_engine_line` failed for
-`llm.json`, `chat.txt`, `agent.json`, `w1.json`, `w2.json` and the engine
-comparison, and `test_experiment` failed for the engine process contract
-(coding file and removed link readiness), seven failures retained. Actual
-skein lab validation with symbolic host facts accepted S's manifest, and its
-real template renderer rendered every process JSON. This does not prove host
-facts, startup, configuration admission or the product story.
+`lab/tests/unit/test_smoke_assembly.py` checks document equality, explicit
+seed/bootstrap adaptations, records-only setup and worker/agent admission
+capacity. Page consistency tests compare the intended copies without
+excluding the forge. Native configuration checks exercise the canonical
+reader's synthetic capture path. These checks do not establish a successful
+product story or prove the host's causal boundary on a real run.
 
-Neither owner lands before reciprocal cluster/reader diff review. After
-those joins, the parent rechecks and lands through `land`, then runs the
-three attended S seeds. Assembly verification above performed targeted
-Python checks only. The host join separately prepares a release binary for
-review, without a gate, real run, landing, paid driver or campaign.
+The parent reviews the complete diff and runs the `land` gate before main
+moves. A corrected S experiment and the three attended seeds follow that
+review separately. This integration performs no gate, landing, real lab
+run, paid driver or campaign.

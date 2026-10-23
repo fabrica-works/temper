@@ -26,8 +26,7 @@ def entry(**changes):
 class FilesTests(unittest.TestCase):
     def test_copies_and_engine_line(self):
         names = ['llm.json', 'chat.txt', 'coding.txt', 'agent.json', 'w1.json', 'w1.digest', 'w1.secret',
-                 'w2.json', 'w2.digest', 'w2.secret', 'forge-1.api-token',
-                 'forge-1.user', 'forge-1.git-token']
+                 'w2.json', 'w2.digest', 'w2.secret', 'forge.json']
         for name in names:
             with self.subTest(name=name):
                 self.assertEqual((WEB / name).read_bytes(), (CLUSTER / name).read_bytes())
@@ -46,12 +45,10 @@ class FilesTests(unittest.TestCase):
             self.assertEqual(exp[field], base[field])
         self.assertEqual(exp['name'], 'cluster-web')
         self.assertEqual(exp['dirs'], ['client', 'hand', 'spent'])
-        # cluster/'s forge member is the process tier's case stories' alone.
-        processes = [process for process in base['processes'] if process['name'] != 'forge']
-        del processes[0]['after']
-        processes[1]['files'].append(dict(path='bundle', tree='bundle'))
-        self.assertEqual(exp['processes'][:4], processes)
-        self.assertEqual(exp['processes'][4:], [dict(
+        processes = base['processes']
+        next(p for p in processes if p['name'] == 'engine')['files'].append(dict(path='bundle', tree='bundle'))
+        self.assertEqual(exp['processes'][:5], processes)
+        self.assertEqual(exp['processes'][5:], [dict(
             name='browser', after=['engine'], env={}, memory_bytes=None,
             argv=['{browser.program}', 'hand', '--chromium', '{browser.chromium}',
                   '--fonts', '{browser.fonts}', '--scratch', '{proc.browser.dir}',
