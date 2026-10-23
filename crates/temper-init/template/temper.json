@@ -1159,18 +1159,10 @@
                 "lines": [
                   {
                     "text": "I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
-                  },
-                  {
-                    "call": "finish",
-                    "arguments": {
-                      "form": "report",
-                      "text": "The playground changes nothing.",
-                      "fields": {}
-                    }
                   }
                 ],
-                "finish": "tool_calls",
-                "tokens": 87
+                "finish": "stop",
+                "tokens": 68
               }
             ]
           },
@@ -1181,18 +1173,10 @@
                 "lines": [
                   {
                     "text": "I would have widget say when a search finds nothing, name the words searched for and offer to clear them, in place of an empty table that looks broken. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done."
-                  },
-                  {
-                    "call": "finish",
-                    "arguments": {
-                      "form": "report",
-                      "text": "The playground changes nothing.",
-                      "fields": {}
-                    }
                   }
                 ],
-                "finish": "tool_calls",
-                "tokens": 89
+                "finish": "stop",
+                "tokens": 70
               }
             ]
           }
@@ -1255,18 +1239,10 @@
             "lines": [
               {
                 "text": "I am the scripted model, the playground’s: I answer only the suggested requests, from a script. To ask for other work, connect a model from Accounts: a ChatGPT plan, a Claude subscription or an API key."
-              },
-              {
-                "call": "finish",
-                "arguments": {
-                  "form": "report",
-                  "text": "The playground changes nothing.",
-                  "fields": {}
-                }
               }
             ],
-            "finish": "tool_calls",
-            "tokens": 70
+            "finish": "stop",
+            "tokens": 51
           }
         ]
       },

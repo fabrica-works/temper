@@ -1569,13 +1569,13 @@ fn facts(w: World, number: u64) -> TaskFacts {
             brief: "Add a dark theme to widget",
             charter: 1,
             parent: None,
-            phase: c::Phase::Done,
-            wait: 0,
+            phase: c::Phase::Idle,
+            wait: 2,
             spent_tenths: 0,
             budget: 20,
             priority: None,
             change: false,
-            result: Some("The playground changes nothing."),
+            result: None,
             merge: false,
             model: "Scripted model",
             effort: None,
@@ -1635,7 +1635,6 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
         }
         (FirstRun { step: 4 }, 4) => {
             events.push(agent_line("I would give widget a dark theme that follows the system's preference, with its colours as variables in one place so both themes stay in step. I am the scripted model and play this from a script, so nothing is changed: connect a model from Accounts to have the work done.", 2, Some(1))).expect("world activity");
-            events.push(tools_line(&[("finish", 1)], &[], false, 3)).expect("world activity");
         }
         _ => {}
     }
@@ -1646,7 +1645,7 @@ fn activity(w: World, task: u64) -> c::ActivityPage {
         (Solo, 9) => &[-21, -15, -14],
         (FirstRun { step: 2 }, 1) => &[1, 1, 1],
         (FirstRun { step: 3 | 4 }, 1) => &[1, 1, 1, 4, 4],
-        (FirstRun { step: 4 }, 4) => &[5, 5],
+        (FirstRun { step: 4 }, 4) => &[5],
         _ => &[],
     };
     let mut rows = List::with_capacity(events.len());

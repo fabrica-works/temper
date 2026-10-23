@@ -1642,17 +1642,13 @@ them as it does any Forgejo.
     left, and the procedure opens, checks and lands the change
     (`../domain/forge.md`); the coding charter's agent writes no git.
   - *The dark theme, the empty search, and `otherwise`,* one turn each:
-    its text line, answering what it would change and why, then
-    `{"call": "finish", "arguments": {"form": "report", "text": "The
-    playground changes nothing.", "fields": {}}}`, finishing `tool_calls`. The
-    chat is ended by its requester (`../domain/agent.md`, 4.6), so the
-    `finish` ends only the run's turn: its report is discarded, no try
-    is spent, and the chat waits for the person's next words, its
-    composer with it, as the CSV's does with `wait`; the answer is the
-    text, committed with the turn. `finish`'s arguments are the
-    contract's, as smith's schema for the tool has them (its
-    `smith-protocol-llm`'s `contract.rs`): a `form`, the report's `text`
-    and its `fields`, none for a chat.
+    its text line, answering what it would change and why, finishing
+    `stop`. The chat is ended by its requester (`../domain/agent.md`,
+    4.6), so its run is smith's Open mode, which offers no `finish`: a
+    turn that ends with text is its reply (smith's `domain/run.md`,
+    section 6), committed with the turn, and the chat waits for the
+    person's next words, its composer with it, as the CSV's does with
+    `wait`.
 
   What the scripts cannot know, they do not say: the task's number,
   which the client's card for the change shows; and how the change
@@ -1679,10 +1675,9 @@ them as it does any Forgejo.
   turns count every assistant message of the conversation, a tool's
   call among them, so a chat's first answer is its script's first turn
   and each result or message that wakes it plays the next. A one-turn
-  script finishes the run, and the chat is then ended, with no
-  composer; the CSV's waits, and is open (above). A message past a
-  script's turns is answered "done". It reads the
-  key file before it binds, and refuses to start without it, naming
+  script replies and waits, as the CSV's does: the chat stays open
+  (above). A message past a script's turns is answered "done". It reads
+  the key file before it binds, and refuses to start without it, naming
   the file; it accepts that one credential, and refuses every other
   request as the provider would. It serves `llm.provider`'s models, at
   their windows and outputs; no failure and no latency is configured,

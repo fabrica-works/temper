@@ -659,26 +659,19 @@ fn first_run_view(dark: bool, landed_change: bool) -> crate::View {
     chat.requester = c::OwnerRequester::Person(fixtures::chat::PARTY);
     chat.chip.title = c::DocumentText::complete(run::text(if dark { run::DARK } else { run::CSV }));
     chat.spec.specification.words = chat.chip.title.clone();
-    chat.activity = if dark || !landed_change { 5 } else { 9 };
-    if dark {
-        let report = c::ResultValue::Report(c::DocumentText::complete(run::text(run::REPORT)));
-        let ending = c::Ending::Task(Box::new(c::OwnerChipEnding::Done(report.clone())));
-        chat.chip.phase = c::Phase::Ended;
-        let c::ChipPhase::Owner { phase, details, .. } = chat.chip.details.as_mut() else { panic!("chat owner") };
-        *phase = c::OwnerChipPhase::Ended;
-        details.ending = Some(c::OwnerChipEnding::Done(report.clone()));
-        details.ended_at = Some(Wall::EPOCH);
-        chat.result_contract = c::TaskContractDocument::Report { words: 512 };
-        chat.acts = List::with_capacity(0);
-        chat.result = Some(c::TaskResult::Document(Box::new(c::Result {
-            task: chat.chip.clone(),
-            ending,
-            value: Some(report),
-            at: Some(Wall::EPOCH),
-            details: None,
-            acts: List::with_capacity(0),
-        })));
+    chat.chip.phase = c::Phase::Idle;
+    chat.flags.ended_by = c::EndedBy::Requester;
+    chat.acts = List::with_capacity(3);
+    for act in [c::ActKind::Message, c::ActKind::Stop, c::ActKind::Cancel] {
+        chat.acts.push(c::Offered { act, admission: c::Admission::Allowed, effect: None }).expect("chat act");
     }
+    chat.activity = if dark {
+        4
+    } else if landed_change {
+        9
+    } else {
+        5
+    };
     let document = if landed_change { landed() } else { change() };
     let root = root_chat_limits(
         Some(&chat),
@@ -874,18 +867,29 @@ fn the_csv_chat_stops_waiting_when_its_card_lands_before_the_chat_document() {
     }
 }
 #[test]
-fn the_dark_theme_chat_has_its_whole_answer_and_one_end_line() {
+fn the_dark_theme_chat_has_its_whole_answer_and_waits_with_its_composer() {
     use fixtures::first_run as run;
     let view = first_run_view(true, false);
     let said = fixtures::text(view.tree());
-    let ending = "Ended 00:00 · its report, “The playground changes nothing.”".as_bytes();
-    in_order(&said, &[b"You", run::DARK, b"Temper", run::DARK_ANSWER, b"finish", ending]);
-    let at = skein_lib::bytes::find(&said, ending).expect("end line");
-    assert!(skein_lib::bytes::find(&said[at + ending.len()..], ending).is_none());
-    for hidden in [b"Done".as_slice(), b"Milestone", b"Earlier text omitted", b"Tool completed", b"Instructions"] {
+    in_order(&said, &[b"You", run::DARK, b"Temper", run::DARK_ANSWER]);
+    for hidden in [
+        b"Done".as_slice(),
+        b"Ended",
+        b"finish",
+        b"Milestone",
+        b"Earlier text omitted",
+        b"Tool completed",
+        b"Instructions",
+    ] {
         assert!(skein_lib::bytes::find(&said, hidden).is_none(), "{hidden:?}");
     }
+    let mut composer = false;
+    for node in view.tree().nodes() {
+        composer |= node.styles.as_slice().contains(&look::COMPOSER_AREA);
+    }
+    assert!(composer);
 }
+
 #[test]
 fn a_failed_chat_has_one_end_line_with_its_reason() {
     let mut chat = change();
@@ -897,7 +901,10 @@ fn a_failed_chat_has_one_end_line_with_its_reason() {
 
 #[test]
 fn an_ended_chat_has_no_composer_line_or_chooser() {
-    let view = first_run_view(true, true);
+    let mut chat = change();
+    chat.chip.task = CHAT;
+    chat.result = Some(c::TaskResult::Ending(Box::new(c::OwnerChipEnding::Failed(document(b"No capacity")))));
+    let view = view_root(&root_chat(Some(&chat), &[], after_call(), &[]));
     for node in view.tree().nodes() {
         for token in [look::COMPOSER_AREA, look::CHOICE, look::ACCOUNT_LINE] {
             assert!(!node.styles.as_slice().contains(&token));

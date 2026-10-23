@@ -379,8 +379,7 @@ fn key_file() {
 #[test]
 fn demo_answers_the_brief() {
     let mut value = fixture();
-    // Keep the finish call in these short answers: a text-only stop does not
-    // finish a chat's run.
+    // These fixtures are the fake's own and need not be the template's.
     value["application"]["demo"]["llm"]["asked"] = json!([
         {"cue":"Add CSV export to widget","turns":[{
             "lines":[{"text":"Export CSV"},{"call":"finish","arguments":{
@@ -561,9 +560,13 @@ fn the_csv_cues_select_only_their_own_agents_briefs() {
             query.model = b"demo".as_slice().into();
             query.max_tokens = 8192;
             let answer = super::answer(demo.llm(), 23, query);
-            let arguments = call(&answer, if selected { tool } else { b"finish" });
-            if !selected {
-                assert_eq!(arguments["form"], "report");
+            if selected {
+                call(&answer, tool);
+            } else {
+                // The fallback replies in text, as an Open chat's run does.
+                let [Part::Text { text }] = answer.parts.as_ref() else { panic!("the fallback's text alone") };
+                assert!(text.starts_with("I am the scripted model".as_bytes()));
+                assert_eq!(answer.finish, Finish::Stop);
             }
         }
     }
