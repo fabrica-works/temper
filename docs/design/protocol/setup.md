@@ -177,10 +177,8 @@ connected  the forge component       ◄── its access, built from the record
   as a worker's root is (configuration.md, section 4). `temper forge
   prepare` makes it so when it is absent; a directory that is not so
   refuses the command, naming it. A managed or connected forge has none.
-  A fake forge's holds `admin_token`, read before binding, and, until
-  temper-15, the files its box reconcile step writes (8.4):
-  `api_token`, `git_token`, `user` and `webhook_secret`. An owned
-  forge's files:
+  A fake forge's holds `admin_token` until the engine takes it; `temper
+  fake forge` reads it before binding (8.4). An owned forge's files:
 
   | File | Made by | Read by | Holds |
   |---|---|---|---|
@@ -190,16 +188,6 @@ connected  the forge component       ◄── its access, built from the record
   | `state` | prepare | prepare, `run` | owned's record: the versions prepared, whether the first preparation ended, Forgejo's own secrets |
   | `admin_token` | prepare, when missing | the engine's setup host, once, at start or the box's `started` (6.5) | the handover: temper's admin's token, kept as the forge's `AdminToken` record by `TakeOver`, after whose `Done` the file is removed (6.5) |
   | `person_password` | prepare | the person | the person's first password on the owned Forgejo |
-
-- **The fake's files, until temper-15** (8.4):
-
-  | File | Made by | Read by | Holds |
-  |---|---|---|---|
-  | `admin_token` | prepare, or the fake from its seed | the fake before binding; box reconcile; serve's start-time adoption | the admin's token, left in place |
-  | `api_token` | box reconcile | serve | the bot's API token |
-  | `git_token` | box reconcile | serve | the bot's git token |
-  | `user` | box reconcile | serve | the bot's user id |
-  | `webhook_secret` | box reconcile, when a listener is named | serve's access and start-time adoption | the hooks' secret |
 
 - **What the preparation leaves for the engine** is `admin_token`
   alone: the token's text, nothing else, private and written whole;
@@ -212,28 +200,25 @@ connected  the forge component       ◄── its access, built from the record
   every owned forge whose binaries are `"fetched"`, written by `temper
   forge fetch` alone and fetched again at will (6.6; configuration.md,
   section 12).
-- **No other credential file is written or read for owned.** Its
-  `api_token`, `git_token`, `user` and `webhook_secret` files,
+- **No other credential file is written or read for owned or fake.**
+  Their `api_token`, `git_token`, `user` and `webhook_secret` files,
   including any left by an earlier temper, stay unread. Each record is
   written by a plan, `User` as its 8 bytes within a version-1 record
-  (credentials.md, the records). The managed and connected old forms
-  and the fake keep their credential files until temper-15 (6.5, 8.4).
+  (credentials.md, the records). The managed and connected old forms are
+  transitional until temper-15 (6.5).
 - **Written whole.** Each file is written beside its name and renamed
   over it, private, so a reader never sees half a token.
 - **The handover is read** as configuration.md, section 6 reads a
   secret's file, within `records.value_bytes`: it is the one credential
-  file of an owned forge that `temper serve` reads (6.5); the fake
-  keeps its file-backed access until temper-15 (8.4).
+  file of an owned or fake forge that `temper serve` reads (6.5).
 - **The records, by mode** (credentials.md, the records):
 
   | Forge | Records |
   |---|---|
   | Forgejo, connected | `ApiToken`, `GitToken`, `User`, `Origin`; `WebhookSecret` when the person gave one |
-  | Forgejo, managed or owned | those, and `AdminToken`; `WebhookSecret` drawn by reconcile when the webhooks' listener is configured |
+  | Forgejo, managed, owned or fake | those, and `AdminToken`; `WebhookSecret` drawn by reconcile when the webhooks' listener is configured |
   | GitHub, managed or connected | `AppId`, `AppSlug`, `AppKey`, `User` (the App's bot user), `Accepted`, `Origin`; no `WebhookSecret` |
 
-- **The fake keeps files until temper-15,** rather than these records
-  for its credentials and access (8.4).
 - **Written by the setup host's plans alone,** each write kept before
   the plan goes on (5.1). A value a person pastes is kept by jig until
   its run ends (credentials.md, pasted values), and is no record.
@@ -280,11 +265,10 @@ connected  the forge component       ◄── its access, built from the record
 ## 5. Managed: reconcile
 
 Reconcile is skein's plan, run by the engine's setup host at each start
-of a managed or owned Forgejo, at a managed connect and at an
+of a managed, owned or fake Forgejo, at a managed connect and at an
 owned forge's set up from the client (5.1). The managed and connected
-old forms and the fake keep their transitional command until temper-15
-(6.5, 8.4); otherwise nothing but the setup host runs it or writes what
-it makes.
+old forms alone keep their transitional command until temper-15 (6.5);
+otherwise nothing but the setup host runs it or writes what it makes.
 
 ### 5.1 The setup host in the engine
 
@@ -307,7 +291,7 @@ it makes.
   most `setup.states`, each living `setup.state_life_ms`, an hour at
   most; a restart forgets them (17.2).
 - **At each start,** once the records are loaded and the root restored:
-  an owned forge's handover by `TakeOver` whenever its file is
+  an owned or fake forge's handover by `TakeOver` whenever its file is
   present, even with a kept `AdminToken`, its file removed, then
   `Reconcile` with the restored repositories and connect (6.5); each
   managed Forgejo's reconcile; the fake's start-time adoption (8.4); and
@@ -343,10 +327,10 @@ it makes.
 
 | Plan | Forge | When | skein's `forge-setup.md` |
 |---|---|---|---|
-| `Reconcile { forge, adopted }` | Forgejo, managed, owned or fake | each managed or owned start; a managed connect; the owned box's `started` (5.1); the fake's box step before serve, until temper-15 (8.4) | section 4 |
+| `Reconcile { forge, adopted }` | Forgejo, managed, owned or fake | each managed, owned or fake start; a managed connect; the box's `started` (5.1) | section 4 |
 | `Adopt { forge, repository }` | Forgejo, managed, owned or fake | an adoption, before its reads; the fake's start (8.4) | 4.5 |
 | `Check { forge }` | Forgejo, connected | a connect; a replacement | 4.6 |
-| `TakeOver { forge, admin_token }` | Forgejo, owned | a start or the box's `started` with a handover, even with a kept `AdminToken` (6.5) | 4.7 |
+| `TakeOver { forge, admin_token }` | Forgejo, owned or fake | a start or the box's `started` with a handover, even with a kept `AdminToken` (6.5) | 4.7 |
 | `Reachable { forge, installation?, page }` | every kind | the picker | 4.8 |
 | `Manifest { forge, target }` | GitHub | Connect, managed | 5.1 |
 | `Convert { forge, code, state }` | GitHub | the redirect back | 5.2 |
@@ -414,13 +398,13 @@ it makes.
   | the API and git tokens, the bot's id | the `ApiToken`, `GitToken` and `User` records, or none when absent |
   | the webhooks' secret | the `WebhookSecret` record, or none, and reconcile then draws one |
 
-  For the engine's reconcile, each answer is a record or a pasted
-  value, never a file: a forge's `api_token`, `git_token`, `user` or
-  `webhook_secret` file, from a temper before the records, is not read, and reconcile makes what is
+  Each answer is a record or a pasted value, never a file: a forge's
+  `api_token`, `git_token`, `user` or `webhook_secret` file, from a
+  temper before the records, is not read, and reconcile makes what is
   missing afresh (section 3). Each item reconcile writes is kept as the
   forge's record; a kept `WebhookSecret` is never drawn again. The
-  fake's box reconcile and start-time adoption keep their file-backed
-  answers until temper-15 (8.4).
+  fake's start-time adoption (8.4) reads the same records, after its
+  handover and reconcile.
 
 ### 5.4 Access at adoption
 
@@ -434,7 +418,7 @@ it makes.
   is shown as that scope missing, named with its step.
 - **At each start,** reconcile's step 6 checks each adopted
   repository's access, and repairs what changed.
-- **A fake forge,** until temper-15: its repositories are
+- **A fake forge,** until this section is built: its repositories are
   its entry's, so the setup host runs `Adopt` for each of them at the
   engine's start, before the forge connects, in place of each
   adoption's (8.4, the fake's start-time adoption).
@@ -652,7 +636,7 @@ files: at a first preparation, and for a runner older than its pin
 
 ### 6.5 Then the engine's start, and the person
 
-- **The handover is the engine's,** for an owned forge, at
+- **The handover is the engine's,** for an owned or fake forge, at
   `temper serve`'s start after the records' load and the root's restore,
   or at the box's `started FORGE` (7.1). Whenever the handover file is
   present, even with a kept `AdminToken`, the setup host reads
@@ -663,33 +647,35 @@ files: at a first preparation, and for a runner older than its pin
   the forge's `AdminToken` record, and temper's admin's other tokens
   deleted. Only after `TakeOver`'s `Done` and the record kept does the
   host remove the file. It then runs `Reconcile { forge, adopted }` with
-  the root's restored repositories (section 5), then `Request::Connect`
-  with access built from the records (forge.md, 2.1, 2.2). The forge is
+  the root's restored repositories (section 5). A fake then runs its
+  start-time adoption (8.4), before `Request::Connect` with access built
+  from the records (forge.md, 2.1, 2.2). The forge is
   connecting from the start or `started` until its `Connected`; its git
   value comes from its `GitToken` record (forge.md, 2.5).
 - **A present handover is always taken over.** With an `AdminToken`
   record and no handover file, the host reconciles from the record. With
   the file present, `TakeOver` replaces the kept token and deletes the
-  older tokens; taking the same token again is harmless. No owned
-  forge's `api_token`, `git_token`, `user` or `webhook_secret` file
+  older tokens; taking the same token again is harmless. No owned or
+  fake forge's `api_token`, `git_token`, `user` or `webhook_secret` file
   is written or read.
-- **A step that stops blocks that forge's connect.** A `TakeOver` or
-  `Reconcile` stop, a handover read that fails, or a removal that fails
-  leaves the forge not connected, named by the plan's step or file
+- **A step that stops blocks that forge's connect.** A `TakeOver`,
+  `Reconcile` or `Adopt` stop, a handover read that fails, or a removal
+  that fails leaves the forge not connected, named by the plan's step or file
   operation, never a secret; at `started`, it is set up failed. A
   `TakeOver` stop leaves the file; a failed removal blocks reconcile.
   The row names the file as "forge N's admin_token" with the step and
   a short reason, within the wire's 256 bytes for `SetUpFailed`'s
   `why`; the operator's note names the file's full path, never its
-  bytes. The next start or ask takes that handover over again. The engine and every other forge run on. "Set up again"
+  bytes. The next start or ask takes that handover over again. The
+  engine and every other forge run on. "Set up again"
   asks the box, which answers a started group `started` at once (7.1),
   and the engine runs the same sequence again.
 - **Until temper-15, managed and connected Forgejo's old members**
   (`api_token`, `user`, `webhook_secret`, and the old managed form)
   still read their files as before (configuration.md, section 6).
-  `temper forge reconcile` remains a command for those forges and
-  the fake (8.4). A records-only owned entry is refused: "forge N
-  starts from its records: `temper serve` takes its handover".
+  `temper forge reconcile` remains a command for those forges alone.
+  A records-only owned or fake entry is refused: "forge N starts from
+  its records: `temper serve` takes its handover".
 - **Then reconcile runs as managed's** (section 5), and makes each of
   the person's orgs that is missing, owned by the person (`POST
   /api/v1/admin/users/{person}/orgs`).
@@ -803,14 +789,13 @@ temper box
 ├── temper fake llm DIRS              long, with the demo (8.4)
 ├── temper forge prepare DIRS 1       once, per fake forge: its handover
 ├── temper fake forge DIRS 1          long, per fake forge (8.4)
-├── temper forge reconcile DIRS 1     once, per fake forge, until temper-15 (8.4)
 ├── temper forge fetch DIRS 3         once, per owned forge whose binaries are fetched (6.6)
 ├── temper forge prepare DIRS 3       once, per owned forge
 ├── forgejo web                       long: temper forge run DIRS 3 forgejo
 ├── forgejo-runner daemon             long: temper forge run DIRS 3 runner
 │                                     these, the forge's group: here, or asked (below)
 ├── temper serve DIRS --box           long: its own tree (README.md, section 4); its setup
-│                                     host takes each owned handover and reconciles (section 5);
+│                                     host takes each handover and reconciles (section 5);
 │                                     fds 3 and 4 its pipe to the box (below)
 └── temper fake seed DIRS             link, with the demo: serve's first line on its stdin (8.4)
 ```
@@ -821,9 +806,6 @@ temper box
   configuration, <path>`, and goes on to its steps. Otherwise the box
   never writes the document: a configuration directory with entries but
   no document is refused as every command refuses it.
-- **A fake forge's group,** until temper-15, runs its preparation,
-  fake process and `temper forge reconcile DIRS N` once step, before
-  `temper serve` (8.4). An owned group has no reconcile step.
 - **An owned forge's group,** its fetch, its preparation, its Forgejo
   and its runner, runs in its place in order at every start of the box
   when its setup has no `start`. With `"start": "asked"` (section 8) the
@@ -870,7 +852,7 @@ temper box
   is dormant again, to be asked again; the box runs on. Once started,
   its long steps are restarted, and given up on, as 7.2 says.
 - **The default document's steps** are the demo's: the fake LLM, the
-  fake forge's preparation, process and reconcile, `temper serve` and the
+  fake forge's preparation and the fake forge, `temper serve` and the
   seed; and forge 3's group, dormant until the client asks for it
   (8.3).
 
@@ -1057,15 +1039,13 @@ running its commands, and the client names them (6.5).
   another kind or address leave a forge not connected, named, with
   nothing erased (section 3).
 - **`webhooks`,** `application.webhooks`, `{"listener": address}`, on
-  loopback; each Forgejo forge's secret is its `WebhookSecret` record,
-  except the fake's `webhook_secret` file until temper-15 (8.4;
-  configuration.md, section 3; skein's `forge.md`, section 7).
+  loopback; each Forgejo forge's secret is its `WebhookSecret` record
+  (configuration.md, section 3; skein's `forge.md`, section 7).
 - **The clients' listener at a fixed address** when a GitHub forge is
   configured: GitHub's redirect and setup URLs name it, so its port is
   never 0, checked at start (17.1).
-- **`temper serve` checks `setup`,** and reads an owned forge's
-  handover (section 3); until temper-15 it reads the fake's credential
-  files too (8.4). Under the box, with `--box`, it
+- **`temper serve` checks `setup`,** and reads one file of it, an owned
+  or fake forge's handover (section 3). Under the box, with `--box`, it
   adopts the box's pipe, over which it asks for an owned forge's steps
   whose `start` is `"asked"` (7.1).
 - **`application.demo`,** the demo's fake LLM and seed, or null for none
@@ -1377,11 +1357,10 @@ defaults for a person's real work are open (section 16).
     (8.2).
 
 - **The webhooks' listener,** `application.webhooks.listener`,
-  `127.0.0.1:<its port>` (8.2). The owned Forgejo's `WebhookSecret` is
-  a record, drawn by the engine's reconcile. Until temper-15, fake 1
-  names `demo/forge/webhook_secret`, drawn by its box reconcile step.
-  Adoption makes the repository's hook; the fake's start-time adoption
-  hooks its seeded repositories (8.4). GitHub's hints come from its App's delivery log.
+  `127.0.0.1:<its port>` (8.2). Each Forgejo's `WebhookSecret` is a
+  record, drawn by the engine's reconcile. Adoption makes the
+  repository's hook; the fake's start-time adoption hooks its seeded
+  repositories (8.4). GitHub's hints come from its App's delivery log.
 - **Its LLM providers:** the owned example's `engine.llm`, whole (8.1),
   with no account; and 3, Demo, the demo model's (8.4): one endpoint,
   `demo`, at `127.0.0.1:<the fake LLM's port>`, plaintext, OpenAI's
@@ -1428,9 +1407,8 @@ defaults for a person's real work are open (section 16).
   among them; two literals of `temper-init`'s checked by its tests the
   same way.
 - **`application.demo`,** the demo's (8.4).
-- **Its box's steps:** the fake LLM, forge 1's preparation, fake and,
-  until temper-15, reconcile once step; `temper serve` and the seed
-  (7.1); and forge 3's group, dormant until
+- **Its box's steps:** the fake LLM, forge 1's preparation and its fake,
+  `temper serve` and the seed (7.1); and forge 3's group, dormant until
   the client asks for it: its fetch, its preparation, Forgejo's web and
   the runner's daemon; the engine takes the handover and reconciles
   (6.5).
@@ -1602,8 +1580,7 @@ them as it does any Forgejo.
 - **`temper fake forge DIRS N`,** a long step: skein's fake forge peer,
   `without_records`, at `fake.listen`. It reads `admin_token` before it
   binds, refusing to start without it, naming the file, and leaves the
-  file for the box reconcile and `temper serve` until temper-15. Its
-  seed:
+  file for `temper serve`. Its seed:
   - *temper's admin,* `temper-admin`, a site admin of the setup's
     routes, its one token the handover's, with every scope (skein's
     `fake-forge.md`, section 4);
@@ -1632,32 +1609,21 @@ them as it does any Forgejo.
   engine's setup host grants it, by `Adopt` (below). It serves its
   git route among its routes (skein's `fake-forge.md`, section 4), and
   no git smart HTTP; it keeps no state across its starts.
-- **The fake's start-time adoption,** transitional until temper-15,
-  runs in `temper serve`'s setup host after the records' load and the
-  root's restore: one `Adopt { forge, repository }` for each of
-  `fake.repositories`, numbered from 1 in the list's order as the fake
-  numbers them. The plans run one after another (5.1), with the same
-  given values as owned (5.3). The admin's token is the handover's
-  `admin_token`, read once as 40 lowercase hexadecimal digits and
-  refused otherwise, naming the file. The host holds it as a pasted
-  value until the adoptions end, then drops it and leaves the file.
-  The webhooks' secret is answered from the `webhook_secret` file.
-  Any other read is answered from records, none on a fake, and writes
-  are kept as records (5.1). The listener is given only when the forge
-  names that secret; the configuration refuses either without the
-  other. Each adoption makes the bot a collaborator with write and,
-  with the listener, the repository's hook. The forge starts without
-  access and connects with the access built from its files once all
-  adoptions end done. A stop leaves it not connected, named by its
-  step; the engine and every other forge run on. The seed's adoption
-  retries until the forge is connected.
-- **The fake's box reconcile,** until temper-15, runs once after its
-  fake process and before `temper serve`: `temper forge reconcile
-  DIRS N` reads `admin_token`, makes the bot and writes `api_token`,
-  `git_token`, `user` and `webhook_secret`, each private, with no
-  adopted repository. `temper serve` builds access from those files
-  and runs no `TakeOver` and no `Reconcile` on a fake. `temper forge
-  fetch` and `run` refuse a fake, "it is fake, not owned".
+- **The fake's start-time adoption,** in `temper serve`'s setup host:
+  after the records' load, the root's restore, the handover and
+  reconcile (6.5), one `Adopt { forge, repository }` for each of
+  `fake.repositories` not already adopted, numbered from 1 in the list's
+  order as the fake numbers them. A repository restored by the root is
+  already adopted: reconcile checks its access, and start-time adoption
+  skips it. The plans run one after another (5.1), with the same given
+  values as owned (5.3), the admin's token and webhooks' secret
+  from records, and the deployment's listener when configured. Each
+  makes the bot a collaborator with write and the repository's hook; the
+  forge connects from records once they all end done. A stop leaves the
+  forge not connected, named by its step; the engine and every other
+  forge run on. The seed's adoption retries until the forge is
+  connected. `temper forge fetch` and `run` refuse a fake, "it is fake,
+  not owned".
 - **Its deliveries follow the setup's hooks** (skein's `fake-forge.md`,
   section 4): each event goes to each hook a repository's setup holds
   that takes it, signed by that hook's secret. A repository's hook is
@@ -1759,16 +1725,14 @@ them as it does any Forgejo.
   `127.0.0.1` (skein's `fake-llm.md`, section 3); an endpoint reaching
   it names `skein.test` as its server and trusts that file alone
   (configuration.md, section 12), as the QA loop's serve and agent do.
-  The fake removes none of them at its stop; until temper-15 the
-  handover stays for reconcile and start-time adoption, and the run
-  directories go with the run.
+  The fake removes none of them at its stop; the engine takes and
+  removes the handover (6.5), and the run's directories go with the run.
 - **A runner** starts the fakes first, learns their addresses from their
   ready lines, then writes temper's document naming them and the
-  handover the fake wrote. Until temper-15 it runs `temper forge
-  reconcile DIRS N` once, then starts `temper serve`.
-- **`temper serve`** builds the fake's access from its files until
-  temper-15, runs its start-time adoption with the handover and
-  `webhook_secret` file, then connects with that access (8.4).
+  handover the fake wrote, and starts `temper serve`.
+- **`temper serve`** takes the fake's handover and reconciles from
+  records (6.5), runs its start-time adoption from those records, then
+  connects (8.4).
 - **`temper fake seed DIRS`,** a link step: `temper ctl` calls
   (`../client/tools.md`, section 10), each a child of the binary's own
   run, its DIRECTORY the demo's `client`. A call is the person's own
@@ -1803,11 +1767,11 @@ them as it does any Forgejo.
   It exits 0. A seed that fails, at any act, makes the box give up,
   naming it (7.2).
 - **A restart** of the box starts the fakes afresh: the preparation
-  draws a new handover; until temper-15 the box reconcile makes the
-  bot and its tokens in files, and the engine's start-time adoption
-  grants each seeded repository's access again (8.4). The seed finds
-  its acts done but the sign-in and the link. The fake seeds its
-  repositories the same at every start, so a worker's clone of one still matches it; a branch an agent
+  draws a new handover, the engine's start takes it and reconciles,
+  which makes the bot, its tokens and each adopted repository's access
+  again (5.3, step 6), and the seed finds its acts done but the sign-in
+  and the link. The fake seeds its repositories the same at every
+  start, so a worker's clone of one still matches it; a branch an agent
   pushed is lost with the fake's state, and the engine's records of it
   outlive it, until the fake keeps its state across starts (below).
 - **`temper fake forge check DIRS N OBSERVATIONS STORE`,** no step: the
@@ -1943,20 +1907,19 @@ them as it does any Forgejo.
 
 | Credential | Mode | Made by | Kept | Used by |
 |---|---|---|---|---|
-| a site admin's token | Forgejo, managed; owned; fake | the person, pasted; the preparation, by Forgejo's command line, or drawn for a fake, or the fake from its seed in a document's form (8.4) | the `AdminToken` record for managed or owned; an owned handover until the engine takes it; until temper-15, the fake's `admin_token` file, read before binding, by box reconcile and start-time adoption | the setup host alone, while a plan runs: reconcile, `TakeOver`, access at adoption (`Adopt`), and the picker's read (`Reachable`, skein's `forge-setup.md`, 4.8) |
-| the bot's API and git tokens | Forgejo, every mode | the person, pasted; reconcile | the `ApiToken` and `GitToken` records; until temper-15, the fake's `api_token` and `git_token` files | the forge component; the identities' table |
+| a site admin's token | Forgejo, managed; owned; fake | the person, pasted; the preparation, by Forgejo's command line, or drawn for a fake, or the fake from its seed in a document's form (8.4) | the `AdminToken` record; an owned or fake forge's handover, until the engine takes it, which a fake forge reads at its start | the setup host alone, while a plan runs: reconcile, `TakeOver`, access at adoption (`Adopt`), and the picker's read (`Reachable`, skein's `forge-setup.md`, 4.8) |
+| the bot's API and git tokens | Forgejo, every mode | the person, pasted; reconcile | the `ApiToken` and `GitToken` records | the forge component; the identities' table |
 | the bot's password | Forgejo, managed, owned, fake | reconcile, random, when it makes the bot | nowhere | nothing |
 | temper's admin's password | owned | Forgejo, random | nowhere | nothing |
 | the person's first password | owned | Forgejo, random, at the first preparation | `person_password` | the person |
 | the runner's secret | owned | the preparation | `runner/secret` | Forgejo's command line; the runner's connection, through the token's file it names |
 | Forgejo's own secrets | owned | the preparation | `state`, and `app.ini` | Forgejo |
-| the webhooks' secret | Forgejo, every mode | the person, pasted; reconcile, drawn | the `WebhookSecret` record; until temper-15, the fake's `webhook_secret` file | the webhooks' listener; Forgejo's hooks |
+| the webhooks' secret | Forgejo, every mode | the person, pasted; reconcile, drawn | the `WebhookSecret` record | the webhooks' listener; Forgejo's hooks |
 | a GitHub App's key | GitHub | GitHub, at the manifest's conversion; the person, pasted as PEM | the `AppKey` record, DER; a PEM never | the forge component, for its tokens; the setup host, while a plan runs |
 | an installation's token; a GitHub git token | GitHub | the forge component, from the App's key | memory alone | the forge component; git |
 | the demo model's key | the demo | `temper init`, random (8.2), or the fake LLM from its seed in a document's form (8.4) | `demo/llm.key`, or the document's `key` | the fake LLM, its one credential; the seed, which adds it as the deployment's account (8.4) |
 
-- **The fake keeps file-backed credentials until temper-15** (8.4).
-- **Every other credential the engine holds is a record** in jig's secrets'
+- **Every credential the engine holds is a record** in jig's secrets'
   store (credentials.md, the records), written by the setup host's
   plans; a pasted value is kept by jig until its run ends
   (credentials.md, pasted values).
@@ -2202,11 +2165,11 @@ relies on.
   Events and counts establish the order, with no sleeps, new harness,
   unbounded queue or timeout change.
 - **The fake's start-time adoption** (8.4), in temper-service's step
-  tests: until temper-15, one `Adopt` for each seeded
-  repository in order, with the deployment's listener when configured;
-  the admin token answered from the handover, the webhooks' secret
-  from its file, and the connect's access built from files; no
-  `TakeOver` or `Reconcile`; a stop named by its step.
+  tests: after handover and reconcile, one `Adopt` for each seeded
+  repository not already restored, in order, with the deployment's
+  listener when configured;
+  the admin token and webhooks' secret answered from records, and the
+  connect's access built from records; a stop named by its step.
   `temper-init`'s step tests check the document's listener, and the
   binary's crate tests the five ports distinct.
 

@@ -43,10 +43,10 @@ document says what temper adds. What is open is listed in section 11.
   default to github.com's, and are given only to point at a fake.
 - **`setup`, for the forge's setup** (setup.md): how each set-up forge is
   run and set up, which the `temper forge` commands and `temper box` act
-  on. For managed and owned, the engine's setup host reconciles at
-  each start, and at the box's `started` for an owned forge set up
-  from the client (setup.md, 7.1). `temper serve` reads an owned forge's handover; until
-  temper-15 it reads the fake's credential files too (sections 3 and 6).
+  on, and the engine's setup host reconciles at each start, and at the
+  box's `started` for an owned forge set up from the client (setup.md,
+  7.1). `temper serve` reads one file of it, an owned or fake forge's
+  handover (sections 3 and 6).
 - **`demo`, a first run's demo** (setup.md, 8.4): the fake LLM the box
   runs, its scripts and its key, and what the seed adopts; null for
   none. `temper serve` reads none of its files.
@@ -56,14 +56,12 @@ document says what temper adds. What is open is listed in section 11.
   which skein's forge client keeps in the main store (credentials.md,
   2.1); a forge's credentials, which come from the client or the engine's
   setup host (credentials.md, section 2).
-- **No secret in the document.** Forge credentials are records in jig's
-  secrets' store under temper's tag (credentials.md, 2.1), except the
-  managed and connected old forms and the fake's credential files
-  until temper-15 (setup.md, 6.5 and 8.4). The private files the
+- **No secret in the document,** and no forge credential in a file the
+  document names. Each forge's credentials are records in jig's secrets'
+  store under temper's tag (credentials.md, 2.1). The private files the
   document names are jig's, a worker's secret and its digest, an owned
-  or fake forge's handover and the fake's transitional credential files
-  (setup.md, 8.4), each read at start, and the demo model's key, which
-  `temper serve` never reads (section 6).
+  or fake forge's handover, each read at start, and the demo model's
+  key, which `temper serve` never reads (section 6).
 - **LLM providers, never accounts.** jig's `engine.llm` names the LLM
   providers, written out whole: their endpoints, models and prices, and
   the sources each offers. Accounts are made at runtime from the client,
@@ -474,7 +472,7 @@ have one, an engine alone none. Each:
 
 | File | Named by | Holds | Read by |
 |---|---|---|---|
-| an owned or fake forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | for owned, the engine's setup host, once, at start or the box's `started` (setup.md, 6.5); for fake, before binding and, until temper-15, box reconcile and serve's start-time adoption (setup.md, 8.4) |
+| an owned or fake forge's handover: its admin's token | `admin_token` in the forge's setup directory, `application.setup[].directory` (setup.md, section 3) | the token's bytes | the engine's setup host, once, at start or the box's `started` (setup.md, 6.5); a fake forge, before binding (setup.md, 8.4) |
 | a worker's secret, its digest | jig's parts, data paths: `worker.secret` and `worker.digest` in the data directory as `temper init` writes them (setup.md, 8.2) | jig's formats (jig's `protocol/configuration.md`, sections 7 and 10) | jig's components |
 | the demo model's key | `application.demo.llm.key`, a data path: `demo/llm.key` as `temper init` writes it (setup.md, 8.2) | the key's bytes | the fake LLM, at its start, and the seed (setup.md, 8.4); never `temper serve` |
 
@@ -487,8 +485,8 @@ have one, an engine alone none. Each:
   naming it. For the handover, the forge stays not connected, or set up
   failed at the box's `started`; the engine and other forges run on
   (setup.md, 6.5). Its bound is `records.value_bytes` (section 7).
-- **An owned forge's present handover is always taken over.** At start
-  or the box's `started`, the setup host reads it once, even with a kept
+- **A present handover is always taken over.** At start or the box's
+  `started`, the setup host reads it once, even with a kept
   `AdminToken`, runs `TakeOver`, and removes the file only after its
   `Done` and the record kept in jig's secrets' store (setup.md, 6.5).
   Removal must succeed before reconcile; its failure leaves the file
@@ -497,18 +495,14 @@ have one, an engine alone none. Each:
   up.
 - **A set-up forge's directory** (`application.setup[].directory`) and
   its other files are setup.md, section 3's, made by the setup's
-  commands; for owned, `temper serve` reads only the handover. Until
-  temper-15 the fake's box reconcile writes `api_token`, `git_token`,
-  `user` and `webhook_secret`; serve reads these to build access,
-  adopts with the handover and secret file, then connects (setup.md,
-  8.4). It runs no `TakeOver` or `Reconcile` on a fake.
-- **Never written by `temper serve`,** but for an owned handover it
-  removes once taken. An operator replaces a worker's secret and restarts; a
+  commands; `temper serve` reads none of them but the handover.
+- **Never written by `temper serve`,** but for the handover it removes
+  once taken. An operator replaces a worker's secret and restarts; a
   forge's credentials are replaced from the client, with no restart
   (credentials.md, section 5).
-- **Forge credentials in jig's secrets' store,** except the fake's
-  transitional files until temper-15 (setup.md, 8.4), under temper's
-  tag, and in no other file but an owned forge's handover until taken:
+- **Every forge credential in jig's secrets' store,** under temper's
+  tag, and in no file but an owned or fake forge's handover until it is
+  taken:
   a forge's tokens, its App's key, its webhooks' secret, its user, from
   the client or from the engine's setup host (credentials.md, sections
   2 and 2.1).
