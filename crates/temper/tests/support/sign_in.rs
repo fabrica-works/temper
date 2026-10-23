@@ -275,7 +275,14 @@ enum Observation {
     Signing,
     Visited,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PlanChat {
+    Answered,
+    Exceeded,
+    Released,
+}
 struct AnswerJudge {
+    plan: PlanChat,
     observation: Observation,
     stopped: bool,
     settled: bool,
@@ -333,8 +340,20 @@ impl Referee<Process> for AnswerJudge {
                 String::from_utf8_lossy(&ended.stdout)
             );
         }
+        if self.plan == PlanChat::Exceeded && calls.ends().len() == ANSWER_CALLS {
+            let revision = exceeded_hold(&calls.ends()[8]);
+            assert_eq!(model_requests(procs), 1, "one model request before release");
+            let Process::Calls(calls) = &mut procs[1] else { panic!("ctl calls") };
+            calls.push(ctl::Step::Run(ctl::Call::new(&["release", "1", "--hold", &revision.to_string(), "--json"])));
+            calls.push(ctl::Step::Run(ctl::Call::new(&["wait", "task", "1", "--until", "held", "--json"])));
+            calls.push(ctl::Step::Run(ctl::Call::new(&["task", "1", "--json"])));
+            calls.release();
+            self.plan = PlanChat::Released;
+        }
+        let Process::Calls(calls) = &procs[1] else { panic!("ctl calls") };
         let Process::Person(person) = &procs[5] else { panic!("native observer") };
-        if !self.stopped && calls.ends().len() == ANSWER_CALLS && person.finished {
+        let expected = if self.plan == PlanChat::Answered { ANSWER_CALLS } else { ANSWER_CALLS + 3 };
+        if !self.stopped && calls.ends().len() == expected && person.finished {
             let Process::Binary(binary) = &mut procs[0] else { panic!("temper") };
             binary.signal(Signal::Terminate);
             for proc in procs {
@@ -378,23 +397,31 @@ impl Referee<Process> for AnswerJudge {
 }
 const ANSWER_CALLS: usize = 9;
 
-fn answer_peer() -> skein_fake_peers::llm::Peer {
+fn answer_peer(exceeded: bool) -> skein_fake_peers::llm::Peer {
     use skein_fake_llm_domain::api::{Finish, Line, Turn};
     // The chat is ended by its requester (domain/agent.md, 4.6): its answer is the
     // turn's text, and the finish only ends the turn.
+    // Pass the shipped per-item reasoning allowance, retaining valid native replay JSON.
+    let lines = if exceeded {
+        let bytes = serde_json::to_vec(&serde_json::json!({
+            "type": "reasoning", "id": "reasoning-1", "summary": [],
+            "encrypted_content": "a".repeat(2049)
+        }))
+        .expect("native reasoning item");
+        vec![Line::Opaque { bytes: bytes.into() }].into_boxed_slice()
+    } else {
+        vec![
+            Line::Text { text: super::ANSWER.into() },
+            Line::Call {
+                name: b"finish".as_slice().into(),
+                arguments: br#"{"form":"report","text":"Done.","fields":{}}"#.as_slice().into(),
+            },
+        ]
+        .into_boxed_slice()
+    };
     let mut recipe = temper_real_loop_world::llm::scripted(Box::new([skein_fake_llm_domain::api::Script {
         cue: Box::default(),
-        turns: Box::new([Turn {
-            lines: Box::new([
-                Line::Text { text: super::ANSWER.into() },
-                Line::Call {
-                    name: b"finish".as_slice().into(),
-                    arguments: br#"{"form":"report","text":"Done.","fields":{}}"#.as_slice().into(),
-                },
-            ]),
-            finish: Finish::ToolCalls,
-            tokens: 1,
-        }]),
+        turns: Box::new([Turn { lines, finish: if exceeded { Finish::Stop } else { Finish::ToolCalls }, tokens: 1 }]),
     }]));
     recipe.credential = skein_llm::Credential::bearer(ACCESS.into());
     skein_fake_peers::llm::Peer::new(
@@ -411,7 +438,27 @@ fn answer_peer() -> skein_fake_peers::llm::Peer {
 }
 
 pub fn answered(directory: &Path, issuer: oauth::Peer) {
-    let peer = answer_peer();
+    plan_chat(directory, issuer, false);
+}
+
+pub fn exceeded(directory: &Path, issuer: oauth::Peer) {
+    plan_chat(directory, issuer, true);
+}
+
+fn model_requests(procs: &[Process]) -> usize {
+    let Process::Peer(peer) = &procs[4] else { panic!("LLM peer") };
+    peer.observations().iter().filter(|event| matches!(event, skein_fake_peers::llm::Observation::Query { .. })).count()
+}
+
+fn exceeded_hold(ended: &super::Ended) -> u64 {
+    let task = ctl::json(ended);
+    let held = &task["chip"]["details"]["owner"]["phase"]["held"];
+    assert_eq!(held["reason"], serde_json::json!({"exceeded":{"bound":"reasoning","value":2048}}), "{task}");
+    held["revision"].as_u64().expect("hold revision")
+}
+
+fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
+    let peer = answer_peer(exceeded);
     let clock = Clock::new();
     let mut binary = start(directory);
     let streams = binary.take_streams().expect("serve pipes");
@@ -419,6 +466,7 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
     let root = skein_shell::open_root(directory).expect("scratch root");
     fds.push(root);
     let mut world = real::World::new(AnswerJudge {
+        plan: if exceeded { PlanChat::Exceeded } else { PlanChat::Answered },
         observation: Observation::Waiting,
         stopped: false,
         settled: false,
@@ -426,7 +474,7 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
     });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || {
-        Process::Calls(Box::new(ctl::Calls::new(
+        let mut calls = ctl::Calls::new(
             root,
             vec![
                 ctl::Step::Run(ctl::Call::sign_in()),
@@ -446,13 +494,24 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
                     "Hello",
                     "--json",
                 ])),
-                ctl::Step::Run(ctl::Call::new(&["wait", "task", "1", "--until", "replied", "--json"])),
+                ctl::Step::Run(ctl::Call::new(&[
+                    "wait",
+                    "task",
+                    "1",
+                    "--until",
+                    if exceeded { "held" } else { "replied" },
+                    "--json",
+                ])),
                 // The wait returns the task's status; read its committed conversation separately.
-                ctl::Step::Run(ctl::Call::new(&["chat", "1", "--json"])),
+                ctl::Step::Run(ctl::Call::new(&[if exceeded { "task" } else { "chat" }, "1", "--json"])),
             ],
             Some(&streams),
             None,
-        )))
+        );
+        if exceeded {
+            calls.hold();
+        }
+        Process::Calls(Box::new(calls))
     });
     world.spawn(|| Process::Issuer(Box::new(issuer)));
     world.spawn(|| Process::Visitor(Box::default()));
@@ -463,7 +522,35 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
     });
     let outcome = world.run(&clock, super::WITHIN);
     let Process::Calls(calls) = &outcome.procs[1] else { panic!("ctl calls") };
-    let [_, me, _, _, _, ready, _, _, conversation] = calls.ends() else { panic!("signed-in chat calls") };
+    let [_, me, _, _, _, ready, _, _, conversation, ..] = calls.ends() else { panic!("signed-in chat calls") };
+    assert_plan_account(me, ready);
+    if exceeded {
+        let first = exceeded_hold(conversation);
+        let second = exceeded_hold(&calls.ends()[11]);
+        assert!(second > first, "a fresh hold after the authorized release");
+        assert_eq!(model_requests(&outcome.procs), 2, "one additional model request after release");
+    } else {
+        assert_eq!(
+            String::from_utf8_lossy(&conversation.stdout).matches("Process answer").count(),
+            1,
+            "chat answered once: {}",
+            String::from_utf8_lossy(&conversation.stdout)
+        );
+    }
+    let Process::Peer(peer) = &outcome.procs[4] else { panic!("LLM peer") };
+    assert!(
+        peer.observations().iter().any(|event| matches!(
+            event,
+            skein_fake_peers::llm::Observation::Credential { scheme: Some(skein_llm::Scheme::Bearer), .. }
+        )),
+        "the peer observed a bearer scheme"
+    );
+    let Process::Binary(binary) = &outcome.procs[0] else { panic!("temper") };
+    assert_eq!(binary.exit_status(), Some(Exit::Code(0)));
+    assert!(outcome.procs.iter().all(Host::is_empty), "all signed-in chat io settled");
+}
+
+fn assert_plan_account(me: &super::Ended, ready: &super::Ended) {
     let person = ctl::json(me)["party"]["number"].as_u64().expect("person number");
     let ready = ctl::json(ready);
     let account = ready["accounts"]["party"]
@@ -480,21 +567,4 @@ pub fn answered(directory: &Path, issuer: oauth::Peer) {
         }),
         "usable signed-in source"
     );
-    assert_eq!(
-        String::from_utf8_lossy(&conversation.stdout).matches("Process answer").count(),
-        1,
-        "chat answered once: {}",
-        String::from_utf8_lossy(&conversation.stdout)
-    );
-    let Process::Peer(peer) = &outcome.procs[4] else { panic!("LLM peer") };
-    assert!(
-        peer.observations().iter().any(|event| matches!(
-            event,
-            skein_fake_peers::llm::Observation::Credential { scheme: Some(skein_llm::Scheme::Bearer), .. }
-        )),
-        "the peer observed a bearer scheme"
-    );
-    let Process::Binary(binary) = &outcome.procs[0] else { panic!("temper") };
-    assert_eq!(binary.exit_status(), Some(Exit::Code(0)));
-    assert!(outcome.procs.iter().all(Host::is_empty), "all signed-in chat io settled");
 }
