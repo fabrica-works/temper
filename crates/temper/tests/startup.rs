@@ -1202,9 +1202,13 @@ fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
             // 256-B reasons in retained connections and handoffs, and its path in Notes.
             - 388
             + 387_647
-            // Live text (jig b29665e8 and temper's repair), measured at that pin,
-            // releases 101,901,872 B at these same bounded strings.
-            - 101_901_872
+            // Live text's three bools fill the root assignment's padding, so a
+            // delivery's request loses its 8 B tag in each of 4,141 slots of
+            // 3,076 envelopes and 22 of the service's queue, less 32 B of
+            // inline piece counters and limits.
+            - (3_076 * 4_141 + 22)
+                * (200 - u64::try_from(size_of::<temper_engine_domain::Output>()).expect("root request layout"))
+            + 32
             // Exceeded grows the largest stored row by one byte. The two KV
             // stores and decoded page carriers add 21,379,829 B; three file
             // drivers add 15 B; six room-256 read queues add 1,536 B.
