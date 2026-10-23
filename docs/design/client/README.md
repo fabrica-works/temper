@@ -1020,8 +1020,9 @@ for its kind, its user's login and its installations. Its nodes:
   engine.
 - **`CLIENT_VERSION`:** the version of every record below, 1 at first,
   2 since the demo's read, 3 since a change's panel, 4 since a forge's
-  set up and the deployment's forges, 5 since the first repository
-  (`SetUp`'s fields and the row's `first`), moved as
+  set up and the deployment's forges, 5 since jig's client wire 13
+  carried in its refusals, 6 since the first repository (`SetUp`'s
+  fields and the row's `first`), moved as
   `../protocol/README.md`, section 9 says: at most once in a plan, at
   its first landing that changes one of these records, and shared by
   plans that run at once. A request, an outcome, a read, a subject or a
@@ -1075,8 +1076,10 @@ for its kind, its user's login and its installations. Its nodes:
   6.7). Its outcome, `Answer`'s: *setting up*, the box asked
   for the forge's group; *set up refused*, with why: not offered (the
   forge's connection does not offer it, or no such forge), not under
-  the box, busy (`../protocol/forge.md`, 2.8), or a new project, which
-  waits on jig's projects at runtime; or *unknown*, its
+  the box, busy (`../protocol/forge.md`, 2.8), a new project, which
+  waits on jig's projects at runtime, or invalid, the org, the
+  repository or a new project's name empty or past the engine's
+  `name_bytes`, as `Adopt`'s are; or *unknown*, its
   outcome no longer held (section 8), the same unknown as an
   adoption's. A refusal at admission is jig's answer, as for `Adopt`.
 - **The small store's record of a pending request** is `jig-client`'s
