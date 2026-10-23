@@ -64,8 +64,7 @@ class FilesTests(unittest.TestCase):
         self.assertEqual(cue, dict(cue='look-live-chat', turns=[
             dict(lines=[dict(text='First reply.'), dict(call='wait', arguments={})], finish='tool_calls', tokens=1),
             dict(lines=[dict(text='Second reply.'), dict(call='wait', arguments={})], finish='tool_calls', tokens=1),
-            dict(lines=[dict(call='finish', arguments=dict(form='report', text='Live chat closed.', fields={}))],
-                 finish='tool_calls', tokens=1)]))
+            dict(lines=[dict(text='Live chat closed.')], finish='stop', tokens=1)]))
         actual['cued'].remove(cue)
         self.assertEqual(actual, expected)
 

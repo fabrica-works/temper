@@ -91,7 +91,12 @@ fn messages(words: &[tasks::Word]) -> Box<[host::StartMessage]> {
             tasks::Party::Deployment { .. } => b"deployment".as_slice().into(),
         };
         messages
-            .push(host::StartMessage { name: Token::new(word.number), sender, words: root::inbox_words(word) })
+            .push(host::StartMessage {
+                name: Token::new(word.number),
+                sender,
+                words: root::inbox_words(word),
+                finish_requested: word.finish_requested(),
+            })
             .expect("bounded messages");
     }
     messages.into_boxed()

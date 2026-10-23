@@ -621,18 +621,18 @@ temper's agent processes do not give (`docs/design/protocol/llm.md`,
 - **`cluster-web/`'s, copied** byte for byte, as `cluster-web/`
   copies `cluster/`'s (above), but two:
   - **`llm.json`** adds one cue, `look-live-chat`: a reply and `wait`,
-    a second reply and `wait`, then `finish`. The person's message
-    wakes the first wait and the first reply commits; the second turn
-    then waits uncommitted, a quiet page whose composer stays, where
-    `cluster-first-chat`'s second turn would finish the chat and take
-    its composer away.
+    a second reply and `wait`, then final text when Close asks the Open
+    run to finish. The person's message wakes the first wait and the
+    first reply commits; the second turn then waits uncommitted, a quiet
+    page whose composer stays. `cluster-first-chat`'s second turn is
+    already its final text.
   - **`engine.json`'s chat charter** waits 300 s (`waiting_ms`), its
     time and the policy's bounds widened to hold it, as temper's
     startup checks require: the quiet window, about ten times the
     30 s its steps and captures take. No turn commits inside it, so
     the chatbar holds still (its status "waiting on your words", its
     spend). When it closes, the second reply commits, the spend moves,
-    and the chat finishes at once, taking its composer: each live
+    and the chat closes under its existing grace, taking its composer: each live
     scene is ready by the composer (`textbox "Message"`; the dialog in
     `chat-closing`), so a capture after the window is `missed`, never
     a wrong picture.

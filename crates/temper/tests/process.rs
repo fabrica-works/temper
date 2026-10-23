@@ -1147,7 +1147,7 @@ fn a_task_runs_on_each_worker() {
 // A waiting reply is uncommitted: killing w1 loses it. The retry on w2
 // resumes without an assistant message, so the same cue replies and waits
 // again. Only after close/end is that reply committed, exactly once; the
-// old attempt ends lost and the replacement finishes done. This covers loss
+// old attempt ends lost and the replacement parks. This covers loss
 // and retry; the hung-worker story will test fencing a surviving old run.
 #[test]
 fn a_worker_killed_mid_run_is_lost_and_its_run_answered_once_on_another() {
@@ -1485,7 +1485,7 @@ impl ClusterChatJudge {
             eprintln!("cluster close evidence: {}", path.display());
         }
         // The chat is ended by its requester (domain/agent.md, 4.6): its person's Close
-        // cancels it, and the grace turn's finish is no result.
+        // asks its Open run to wind down; the final text parks with no task result.
         let cancelled = &read.owner()["details"]["ending"]["cancelled"];
         assert_eq!(cancelled["by"]["person"], 1, "chat closed by its person: {}", read.task);
         assert!(cancelled["result"].is_null(), "a closed chat keeps no finish's result: {}", read.task);
@@ -1512,7 +1512,7 @@ impl ClusterChatJudge {
             let ends: Vec<_> = lines.iter().filter(|line| line["run_ended"].is_object()).collect();
             assert_eq!(ends.len(), REPLY_ONCE, "same healed attempt ended once");
             assert_eq!(ends[0]["run_ended"]["attempt"], attempt);
-            // An Open chat's finish parks its run (jig's domain/tasks.md, 5.8).
+            // The admitted finish request makes the Open run's next text park (jig's domain/hosts.md, 9).
             assert_eq!(ends[0]["run_ended"]["end"], "parked");
             self.checking.pop_front();
             self.queue(

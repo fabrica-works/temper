@@ -160,7 +160,12 @@ pub fn decode(run: Token, source: host::Start, limits: &agent::Limits) -> Result
     }
     let mut messages = Vec::with_capacity(source.messages.len());
     for message in source.messages {
-        messages.push(agent::Message { name: message.name, label: message.sender, text: message.words });
+        messages.push(agent::Message {
+            name: message.name,
+            label: message.sender,
+            text: message.words,
+            finish_requested: message.finish_requested,
+        });
     }
     let mut grants = Vec::with_capacity(source.grants.len());
     for grant in source.grants {

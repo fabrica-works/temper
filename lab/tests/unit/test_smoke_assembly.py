@@ -93,9 +93,9 @@ class AssemblyTests(unittest.TestCase):
             word = ordinal.capitalize()
             self.assertEqual(turns[0]['lines'], [dict(text=f'{word} worker replied.'),
                                                dict(call='wait', arguments={})])
-            self.assertEqual(turns[1]['lines'], [dict(call='finish', arguments=dict(
-                form='report', text=f'{word} chat closed.', fields={}))])
-            self.assertTrue(all(t['tokens'] == 1 and t['finish'] == 'tool_calls' for t in turns))
+            self.assertEqual(turns[1]['lines'], [dict(text=f'{word} chat closed.')])
+            self.assertEqual([t['finish'] for t in turns], ['tool_calls', 'stop'])
+            self.assertTrue(all(t['tokens'] == 1 for t in turns))
         chat = read(CLUSTER / 'engine.json')['engine']['charters'][0]
         self.assertEqual((chat['waiting_ms'], chat['time_ms'], chat['reserve_time_ms']),
                          (120000, 130000, 10000))
@@ -115,8 +115,8 @@ class AssemblyTests(unittest.TestCase):
             kinds=[dict(kind='agent', number=2)], tasks=4, depth=2))
         self.assertEqual(chat[1]['lines'], [dict(text='I asked for the change; its task follows it.'),
                                           dict(call='wait', arguments={})])
-        self.assertEqual(chat[2]['lines'][0]['arguments'], dict(form='report',
-            text="The change's task has ended; it says how.", fields={}))
+        self.assertEqual(chat[2]['lines'], [dict(text="The change's task has ended; it says how.")])
+        self.assertEqual([t['finish'] for t in chat], ['tool_calls', 'tool_calls', 'stop'])
         coding = scripts['@coding NOTICE']
         self.assertEqual(coding[0]['lines'], [dict(call='write', arguments=dict(
             path='NOTICE', content=(SMOKE / 'NOTICE').read_text()))])
@@ -127,7 +127,8 @@ class AssemblyTests(unittest.TestCase):
         review = scripts['Review this change at the named head']
         self.assertEqual(review[0]['lines'], [dict(call='finish', arguments=dict(
             form='verdict', label='1', text='Checked', fields={}, items=[]))])
-        for turns in (chat, coding, review):
+        self.assertTrue(all(t['tokens'] == 20 for t in chat))
+        for turns in (coding, review):
             self.assertTrue(all(t['tokens'] == 20 and t['finish'] == 'tool_calls' for t in turns))
 
     def test_delegated_authority_is_under_project_and_rules_ceiling(self):
@@ -225,6 +226,7 @@ class AssemblyTests(unittest.TestCase):
         original = read(SMOKE / 'llm.json')
         expected = copy.deepcopy(original)
         notice = next(s for s in expected['cued'] if s['cue'] == _runtime_llm.CUE)
+        notice['turns'][2]['finish'] = 'tool_calls'
         notice['turns'][2]['lines'] = [
             {'text': "The change's task has ended; it says how."}, {'call': 'wait', 'arguments': {}}]
         with tempfile.TemporaryDirectory() as directory:

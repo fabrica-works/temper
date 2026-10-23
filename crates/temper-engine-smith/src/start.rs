@@ -82,7 +82,12 @@ pub fn start(
             tasks::Party::Deployment { .. } => bytes::copy_of(b"deployment"),
         };
         messages
-            .push(run::Message { name: Token::new(word.number), label: sender, text: engine::inbox_words(word) })
+            .push(run::Message {
+                name: Token::new(word.number),
+                label: sender,
+                text: engine::inbox_words(word),
+                finish_requested: word.finish_requested(),
+            })
             .expect("bounded start messages");
     }
     let mut grants = List::with_capacity(assignment.grants.len().try_into().expect("bounded grants"));

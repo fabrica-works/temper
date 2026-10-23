@@ -434,6 +434,7 @@ pub(crate) fn message(run: Token, attempt: Token, word: &tasks::Word) -> host::L
         name: Token::new(word.number),
         sender: sender(word.from),
         words: inbox_words(word),
+        finish_requested: word.finish_requested(),
     }
 }
 
@@ -463,6 +464,7 @@ pub fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
         | tasks::MessageKind::Notice { .. }
         | tasks::MessageKind::News { .. }
         | tasks::MessageKind::Timer { .. }
+        | tasks::MessageKind::FinishRequested { .. }
         | tasks::MessageKind::Amendment { .. }
         | tasks::MessageKind::Proposal { .. }
         | tasks::MessageKind::Escalation { .. } => return word.words.clone(),

@@ -52,8 +52,8 @@ pub(crate) fn to_agent(domain: &mut Domain, env: &Env<Limits>, request: host::To
             let run = domain.host.hosting(owner).expect("a hosted start").run;
             return out.push(Request::Decode { agent: owner, run, start });
         }
-        host::ToAgent::Message { agent, name, sender, words } => {
-            smith::parent::Event::Message { agent, name, label: sender, text: words }
+        host::ToAgent::Message { agent, name, sender, words, finish_requested } => {
+            smith::parent::Event::Message { agent, name, label: sender, text: words, finish_requested }
         }
         host::ToAgent::Acknowledge { agent, turn } => smith::parent::Event::Acknowledge { agent, turn },
         host::ToAgent::Cancel { agent } => smith::parent::Event::Stop { agent },

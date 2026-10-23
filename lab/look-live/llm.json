@@ -14,7 +14,7 @@
     }}
   ],
   "cued": [
-    {{"cue": "look-live-chat", "turns": [{{"lines": [{{"text": "First reply."}}, {{"call": "wait", "arguments": {{}}}}], "finish": "tool_calls", "tokens": 1}}, {{"lines": [{{"text": "Second reply."}}, {{"call": "wait", "arguments": {{}}}}], "finish": "tool_calls", "tokens": 1}}, {{"lines": [{{"call": "finish", "arguments": {{"form": "report", "text": "Live chat closed.", "fields": {{}}}}}}], "finish": "tool_calls", "tokens": 1}}]}},
+    {{"cue": "look-live-chat", "turns": [{{"lines": [{{"text": "First reply."}}, {{"call": "wait", "arguments": {{}}}}], "finish": "tool_calls", "tokens": 1}}, {{"lines": [{{"text": "Second reply."}}, {{"call": "wait", "arguments": {{}}}}], "finish": "tool_calls", "tokens": 1}}, {{"lines": [{{"text": "Live chat closed."}}], "finish": "stop", "tokens": 1}}]}},
     {{
       "cue": "cluster-first-chat",
       "turns": [
@@ -34,15 +34,10 @@
         {{
           "lines": [
             {{
-              "call": "finish",
-              "arguments": {{
-                "form": "report",
-                "text": "First chat closed.",
-                "fields": {{}}
-              }}
+              "text": "First chat closed."
             }}
           ],
-          "finish": "tool_calls",
+          "finish": "stop",
           "tokens": 1
         }}
       ]
@@ -66,15 +61,10 @@
         {{
           "lines": [
             {{
-              "call": "finish",
-              "arguments": {{
-                "form": "report",
-                "text": "Second chat closed.",
-                "fields": {{}}
-              }}
+              "text": "Second chat closed."
             }}
           ],
-          "finish": "tool_calls",
+          "finish": "stop",
           "tokens": 1
         }}
       ]
@@ -219,15 +209,10 @@
         {{
           "lines": [
             {{
-              "call": "finish",
-              "arguments": {{
-                "form": "report",
-                "text": "The change's task has ended; it says how.",
-                "fields": {{}}
-              }}
+              "text": "The change's task has ended; it says how."
             }}
           ],
-          "finish": "tool_calls",
+          "finish": "stop",
           "tokens": 20
         }}
       ]

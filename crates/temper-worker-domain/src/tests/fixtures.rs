@@ -231,7 +231,12 @@ pub fn start(run: Token, source: &host::Start) -> agent::Start {
     assert!(source.turns.is_empty() && source.answered.is_empty(), "a fresh conversation");
     let mut messages = List::with_capacity(u32::try_from(source.messages.len()).expect("a few messages"));
     for message in &source.messages {
-        let message = agent::Message { name: message.name, label: message.sender.clone(), text: message.words.clone() };
+        let message = agent::Message {
+            name: message.name,
+            label: message.sender.clone(),
+            text: message.words.clone(),
+            finish_requested: message.finish_requested,
+        };
         messages.push(message).expect("room for each message");
     }
     let mut grants = List::with_capacity(u32::try_from(source.grants.len()).expect("a few grants"));
@@ -288,8 +293,12 @@ pub fn assignment_of(run: u64, names: &[&[u8]], messages: u64) -> crate::Event {
     assignment.assignment.run = Token::new(run);
     let mut inbox = List::with_capacity(u32::try_from(messages).expect("a few messages"));
     for name in 1..=messages {
-        let message =
-            host::StartMessage { name: Token::new(name), sender: Box::from(&b"a"[..]), words: Box::from(&b"b"[..]) };
+        let message = host::StartMessage {
+            name: Token::new(name),
+            sender: Box::from(&b"a"[..]),
+            words: Box::from(&b"b"[..]),
+            finish_requested: false,
+        };
         inbox.push(message).expect("room for each message");
     }
     assignment.messages = inbox.into_boxed();

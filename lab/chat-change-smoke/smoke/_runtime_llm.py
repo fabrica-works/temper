@@ -16,14 +16,13 @@ def adapt(document):
     if len(scripts) != 1:
         raise ValueError('expected one NOTICE root script')
     turns = scripts[0]['turns']
-    expected = {'lines': [{'call': 'finish', 'arguments': {'form': 'report',
-        'text': "The change's task has ended; it says how.", 'fields': {}}}],
-        'finish': 'tool_calls', 'tokens': 20}
+    expected = {'lines': [{'text': "The change's task has ended; it says how."}],
+        'finish': 'stop', 'tokens': 20}
     if len(turns) != 3 or turns[2] != expected:
         raise ValueError('NOTICE root script differs from reviewed contract')
     # This is the last root turn: delegation/reply/wait remain byte-for-byte
     # equivalent JSON. The fallback is text only; no later mutating call exists.
-    turns[2] = dict(expected, lines=[{'text': expected['lines'][0]['arguments']['text']},
+    turns[2] = dict(expected, finish='tool_calls', lines=[expected['lines'][0],
                                    {'call': 'wait', 'arguments': {}}])
     return document
 

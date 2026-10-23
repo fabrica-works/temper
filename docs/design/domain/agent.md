@@ -240,13 +240,15 @@ Checks at `.temper/pre-pr`, guides at `AGENTS.md` (smith's
 - **Its mode is its task's ending** (jig's `domain/tasks.md`, 5.8;
   `domain/hosts.md`, 8.1), the assignment's `ended_by`, whatever the
   charter: a task its result ends runs smith's `Finite` mode, and one
-  its requester ends runs `Open`, granted the wait and never
-  `deliver`. temper's chats are Open (`../protocol/configuration.md`,
-  section 2): a chat's run that answers and rests, by a text alone or
-  by `finish`, ends its turn with its reply committed, and the chat
-  waits for its person's next words, its finish's result discarded and
-  no try spent; only the person's Close, or a cancel, ends it. Goals
-  and every delegate run Finite and end by their results.
+  its requester ends runs `Open`, granted the wait and neither `finish`
+  nor `deliver`. temper's chats are Open (`../protocol/configuration.md`,
+  section 2): ordinary text listens for the person's next words. Idle or
+  wind-down parks the run, committing its reply with no result and no try
+  spent. Close carries the grace's finish request live or in Start; its
+  admission puts the Open run into wind-down, so its next text parks.
+  Cancellation after the grace keeps its existing meaning; only the
+  person's Close, or a cancel, ends the chat. Goals and every delegate
+  run Finite and end by their results.
 
 ## 5. Messages
 

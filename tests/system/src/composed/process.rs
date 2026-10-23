@@ -201,7 +201,8 @@ impl Process {
                 let agent = self.agent.as_mut().expect("live agent");
                 agent.return_host_reply(submission.relay, reply).expect("one pending relay");
             }
-            agent::Down::Message { name, label, text } => {
+            agent::Down::Message { name, label, text, finish_requested } => {
+                assert!(!finish_requested, "finish-request scripts use the shipped process tier");
                 around.observed.messages.push((name, text.clone()));
                 let agent = self.agent.as_mut().expect("live agent");
                 agent.message_at(agent.now(), name, label, text);
@@ -458,7 +459,12 @@ fn mount(directories: &[agent::Directory], disk: &Checkout, mounted: &mut Disk) 
 fn messages(messages: Box<[agent::Message]>) -> Box<[run::Message]> {
     let mut translated = Vec::with_capacity(messages.len());
     for message in messages {
-        translated.push(run::Message { name: message.name, label: message.label, text: message.text });
+        translated.push(run::Message {
+            name: message.name,
+            label: message.label,
+            text: message.text,
+            finish_requested: message.finish_requested,
+        });
     }
     translated.into_boxed_slice()
 }

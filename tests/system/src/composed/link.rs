@@ -131,6 +131,7 @@ fn messages(words: &[tasks::Word]) -> Box<[host::StartMessage]> {
             name: Token::new(word.number),
             sender: sender(word.from),
             words: word.words.clone(),
+            finish_requested: word.finish_requested(),
         });
     }
     messages.into_boxed_slice()
