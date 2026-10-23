@@ -221,6 +221,18 @@ pub const WELCOME_MUTED: Style = Style { owner: owner(), token: 107 };
 pub const WELCOME_AFTER: Style = Style { owner: owner(), token: 108 };
 /// Back, Later and the playground alternative.
 pub const WELCOME_FOOT: Style = Style { owner: owner(), token: 109 };
+/// Shared flow presentation (client/README.md, 5.2).
+pub const FLOW_STEPS: Style = Style { owner: owner(), token: 110 };
+/// Shared flow presentation (client/README.md, 5.2).
+pub const FLOW_STEP: Style = Style { owner: owner(), token: 111 };
+/// Shared flow presentation (client/README.md, 5.2).
+pub const FLOW_DONE: Style = Style { owner: owner(), token: 112 };
+/// Shared flow presentation (client/README.md, 5.2).
+pub const FLOW_CARD: Style = Style { owner: owner(), token: 113 };
+/// Shared flow presentation (client/README.md, 5.2).
+pub const FLOW_MUTED: Style = Style { owner: owner(), token: 114 };
+/// Shared flow presentation (client/README.md, 5.2).
+pub const FLOW_PROGRESS: Style = Style { owner: owner(), token: 115 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -336,6 +348,12 @@ pub const NAMES: Names<'static> = Names {
         b"temper-welcome-muted",
         b"temper-welcome-after",
         b"temper-welcome-foot",
+        b"temper-flow-steps",
+        b"temper-flow-step",
+        b"temper-flow-done",
+        b"temper-flow-card",
+        b"temper-flow-muted",
+        b"temper-flow-progress",
     ],
     regions: &[b"temper-link"],
 };

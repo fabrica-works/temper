@@ -6,6 +6,7 @@ mod accounts;
 pub mod cards;
 mod choice;
 mod confirm;
+mod flow;
 pub mod forge;
 pub mod frame;
 pub mod limits;
