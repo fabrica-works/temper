@@ -68,6 +68,18 @@ pub struct First {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Account {
+    pub id: u64,
+    pub login: Box<[u8]>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Installation {
+    pub id: u64,
+    pub account: Option<Account>,
+    pub suspended: bool,
+    pub stray: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
     pub number: u16,
     pub kind: Kind,
@@ -75,6 +87,8 @@ pub struct Row {
     pub connection: Connection,
     pub offer: Offer,
     pub first: Option<First>,
+    pub installations: Box<[Installation]>,
+    pub ended: Option<Box<[u8]>>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SetUpOutcome {

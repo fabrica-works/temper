@@ -609,6 +609,8 @@ fn forge_rows(root: &mut crate::Domain, watch: skein_lib::Token, connected: bool
                     mode: w::Mode::Owned,
                     connection,
                     offer: w::Offer::NotOffered,
+                    installations: List::with_capacity(0),
+                    ended: None,
                 },
             )
             .unwrap(),

@@ -1,5 +1,6 @@
 //! Volatile public connects; only handles cross this boundary (client/README.md, 8).
 use crate::{Answered, Ask, ConnectAnswer, Connection, Domain, ForgeRefusal, InstallAnswer, Request};
+use alloc::boxed::Box;
 use jig_domain_core::Carried;
 use jig_domain_people::Role;
 use skein_lib::{Map, Queue, Token};
@@ -90,6 +91,9 @@ pub(crate) fn start(
         d.connect.answer(request, token, answer, out);
         return;
     }
+    if d.ended.remove(&forge).is_some() {
+        out.push(Request::MarkedForges);
+    }
     d.connect.pending.insert(request, token).expect("room checked");
     match ask {
         Ask::Connect { app, .. } => {
@@ -132,17 +136,34 @@ pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: Conn
         d.connect.answer(request, token, Answered::Connect(answer), out);
     }
 }
-pub(crate) fn installed(d: &mut Domain, forge: u16, request: Token, answer: InstallAnswer, out: &mut Queue<Request>) {
+pub(crate) fn installed(
+    d: &mut Domain,
+    forge: u16,
+    request: Token,
+    answer: InstallAnswer,
+    stopped: Option<Box<[u8]>>,
+    out: &mut Queue<Request>,
+) {
     if let Some(token) = d.connect.pending.remove(&request) {
         if let Some((held, _)) = d.connect.running.get(&forge)
             && *held == request
         {
             d.connect.running.remove(&forge);
+            if let Some(why) = stopped {
+                stopped_end(d, forge, &why, out);
+            }
         }
         d.connect.answer(request, token, Answered::Install(answer), out);
     }
 }
-pub(crate) fn ended(d: &mut Domain, forge: u16, request: Token, connected: bool, out: &mut Queue<Request>) {
+pub(crate) fn ended(
+    d: &mut Domain,
+    forge: u16,
+    request: Token,
+    connected: bool,
+    why: Option<Box<[u8]>>,
+    out: &mut Queue<Request>,
+) {
     if let Some((held, _)) = d.connect.running.get(&forge)
         && *held == request
     {
@@ -150,6 +171,9 @@ pub(crate) fn ended(d: &mut Domain, forge: u16, request: Token, connected: bool,
             out.push(Request::EraseCarried { number: carried.number });
         }
         if !connected {
+            if let Some(why) = why {
+                stopped_end(d, forge, &why, out);
+            }
             let kept = match d.connections.get(&forge) {
                 Some((_, kept)) => *kept,
                 None => None,
@@ -158,4 +182,20 @@ pub(crate) fn ended(d: &mut Domain, forge: u16, request: Token, connected: bool,
             out.push(Request::MarkedForges);
         }
     }
+}
+
+/// Volatile per-forge diagnostics, bounded in bytes without splitting UTF-8 (client/forge.md, 5.4).
+fn stopped_end(d: &mut Domain, forge: u16, why: &[u8], out: &mut Queue<Request>) {
+    // The host supplies UTF-8. Back over continuation bytes at the cut;
+    // text validation belongs to the protocol boundary.
+    let mut end = why.len().min(crate::CONNECT_WHY_BYTES);
+    while end > 0 {
+        let Some(byte) = why.get(end) else { break };
+        if byte & 0xc0 != 0x80 {
+            break;
+        }
+        end = end.saturating_sub(1);
+    }
+    d.ended.insert(forge, Box::from(why.get(..end).expect("bounded reason prefix"))).expect("configured forge ends");
+    out.push(Request::MarkedForges);
 }

@@ -1011,6 +1011,14 @@ pub fn records(
             );
         }
     }
+    // Every observed installation must fit the deployment's client document (client/README.md, 4.6).
+    let bound = temper_client_protocol_wire::INSTALLATIONS;
+    if limits.forge_component.installations > bound {
+        problems.push(
+            own(b"forge_component.installations"),
+            What::Past { bytes: u64::from(limits.forge_component.installations), bound: u64::from(bound) },
+        );
+    }
     if limits.forges.installations == 0 || limits.forges.installations > limits.forge_component.installations {
         against(problems, b"forges.installations", b"forge_component.installations");
     }

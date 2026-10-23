@@ -2309,7 +2309,6 @@ dependencies = [
  "temper-fake-git",
  "temper-forge-setup",
  "temper-forge-setup-shell",
- "temper-github-app",
  "temper-init",
  "temper-protocol-store",
  "temper-real-loop-world",

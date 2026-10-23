@@ -529,6 +529,15 @@ pub(crate) fn connect(engine: &mut crate::engine::Engine, number: u16, start: Re
         Ok(Start::Restored(start)) => {
             engine.forge.down(skein_forge_connection::Request::Connect { forge: number, access: start.access });
             if start.slug.is_some() {
+                for installation in &start.accepted {
+                    crate::setup::lifecycle::installation(
+                        engine,
+                        number,
+                        *installation,
+                        None,
+                        skein_forge_connection::Change::Created,
+                    );
+                }
                 engine
                     .forge
                     .down(skein_forge_connection::Request::Installations { forge: number, accepted: start.accepted });

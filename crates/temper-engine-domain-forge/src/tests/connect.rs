@@ -110,7 +110,8 @@ fn admitted_connect_marks_connecting_answers_then_erases_once_at_its_end() {
             Some(Answered::Connect(ConnectAnswer::Refused(ForgeRefusal::Busy)))
         );
         assert_eq!(out.iter().filter(|r| if let Request::CarriedUnused { .. } = r { true } else { false }).count(), 1);
-        let out = outputs(&mut d, Event::ConnectEnded { forge: 1, request: Token::new(1), connected: success });
+        let out =
+            outputs(&mut d, Event::ConnectEnded { why: None, forge: 1, request: Token::new(1), connected: success });
         assert_eq!(
             out.iter()
                 .filter(|r| if let Request::EraseCarried { number } = r { *number == VALUE.number } else { false })
@@ -118,7 +119,8 @@ fn admitted_connect_marks_connecting_answers_then_erases_once_at_its_end() {
             1
         );
         assert!(
-            outputs(&mut d, Event::ConnectEnded { forge: 1, request: Token::new(1), connected: success }).is_empty()
+            outputs(&mut d, Event::ConnectEnded { why: None, forge: 1, request: Token::new(1), connected: success })
+                .is_empty()
         );
         if !success {
             assert_eq!(d.connection(1), Connection::NotConnected);
@@ -175,7 +177,10 @@ fn install_requires_connection_and_defers_its_answer_until_the_run_finishes() {
             d.application_answer(Token::new(2)),
             Some(Answered::Install(InstallAnswer::Refused(ForgeRefusal::Busy)))
         );
-        outputs(&mut d, Event::InstallAnswered { forge: 1, request: Token::new(1), answer: answer.clone() });
+        outputs(
+            &mut d,
+            Event::InstallAnswered { stopped: None, forge: 1, request: Token::new(1), answer: answer.clone() },
+        );
         assert_eq!(d.application_answer(Token::new(1)), Some(Answered::Install(answer)));
     }
 }
@@ -191,4 +196,106 @@ fn a_busy_service_refusal_names_the_carried_value_unused_once() {
     assert_eq!(out.iter().filter(|r| if let Request::CarriedUnused { .. } = r { true } else { false }).count(), 1);
     assert!(!out.iter().any(|r| if let Request::EraseCarried { .. } = r { true } else { false }));
     assert_eq!(d.connection(1), Connection::NotConnected);
+}
+
+const STOP_REASON: &[u8] = b"the pasted value changed";
+fn stopped_connect() -> Domain {
+    let mut d = github(Kind::GitHub, Mode::Connected);
+    application(&mut d, 1, connect(1), Some(PartyRole::Owner), Some(VALUE));
+    outputs(
+        &mut d,
+        Event::ConnectEnded { forge: 1, request: Token::new(1), connected: false, why: Some(Box::from(STOP_REASON)) },
+    );
+    d
+}
+#[test]
+fn stopped_connect_marks_its_end_until_the_next_admitted_run() {
+    let mut d = stopped_connect();
+    assert_eq!(d.forges().rows[0].ended.as_deref(), Some(STOP_REASON));
+    let out = application(&mut d, 2, connect(1), Some(PartyRole::Owner), Some(VALUE));
+    assert_eq!(d.forges().rows[0].ended, None);
+    assert!(out.contains(&Request::MarkedForges));
+}
+#[test]
+fn refusals_neither_set_nor_clear_the_last_connect_end() {
+    let mut d = stopped_connect();
+    refused(&mut d, connect(1), None, Some(VALUE), ForgeRefusal::Role);
+    assert_eq!(d.forges().rows[0].ended.as_deref(), Some(STOP_REASON));
+    let mut d = github(Kind::GitHub, Mode::Connected);
+    refused(&mut d, connect(1), None, Some(VALUE), ForgeRefusal::Role);
+    assert_eq!(d.forges().rows[0].ended, None);
+}
+#[test]
+fn connected_and_the_next_install_clear_a_stopped_install_end() {
+    for next_install in [false, true] {
+        let mut d = github(Kind::GitHub, Mode::Connected);
+        let state = Connection::Connected { id: 9, login: Box::from(b"app[bot]".as_slice()) };
+        outputs(&mut d, Event::Connection { forge: 1, state: state.clone() });
+        application(&mut d, 1, Ask::Install { forge: 1, back: None }, Some(PartyRole::Owner), None);
+        let out = outputs(
+            &mut d,
+            Event::InstallAnswered {
+                forge: 1,
+                request: Token::new(1),
+                answer: InstallAnswer::Connecting,
+                stopped: Some(Box::from(STOP_REASON)),
+            },
+        );
+        assert_eq!(d.forges().rows[0].ended.as_deref(), Some(STOP_REASON));
+        assert!(out.contains(&Request::MarkedForges));
+        let out = if next_install {
+            application(&mut d, 2, Ask::Install { forge: 1, back: None }, Some(PartyRole::Owner), None)
+        } else {
+            outputs(&mut d, Event::Connection { forge: 1, state })
+        };
+        assert_eq!(d.forges().rows[0].ended, None);
+        assert!(out.contains(&Request::MarkedForges));
+    }
+}
+#[test]
+fn connect_end_reasons_are_bounded_without_splitting_utf8() {
+    // A two-byte character straddles the 256-byte boundary.
+    let mut reason = skein_lib::Writer::new(CONNECT_WHY_BYTES + 1);
+    reason.put(&[b'x'; CONNECT_WHY_BYTES - 1]).unwrap();
+    reason.put("é".as_bytes()).unwrap();
+    let mut d = github(Kind::GitHub, Mode::Connected);
+    application(&mut d, 1, connect(1), Some(PartyRole::Owner), Some(VALUE));
+    let out = outputs(
+        &mut d,
+        Event::ConnectEnded { forge: 1, request: Token::new(1), connected: false, why: Some(reason.finish()) },
+    );
+    assert_eq!(d.forges().rows[0].ended.as_deref(), Some([b'x'; CONNECT_WHY_BYTES - 1].as_slice()));
+    assert!(out.contains(&Request::MarkedForges));
+}
+#[test]
+fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
+    let mut limits = LIMITS;
+    limits.client.repositories = 3; // The three configured forge fixtures below.
+    limits.output = 128; // Includes the client's larger repository burst.
+    let mut d = Domain::new(
+        &limits,
+        4,
+        skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
+        &[],
+        &[
+            Configured { number: 1, kind: Kind::GitHub, mode: Mode::Connected, asked: false },
+            Configured { number: 2, kind: Kind::GitHub, mode: Mode::Connected, asked: false },
+            Configured { number: 3, kind: Kind::Forgejo, mode: Mode::Connected, asked: false },
+        ],
+        false,
+    )
+    .unwrap();
+    d.connection_limits(3, 4);
+    let info = Installation { account: None, suspended: false, stray: false };
+    for (forge, installation) in [(1, 22), (2, 33), (1, 11), (3, 44)] {
+        let out = outputs(&mut d, Event::Installation { forge, installation, state: Some(info.clone()) });
+        assert_eq!(out.as_ref(), [Request::MarkedForges]);
+    }
+    let rows = d.forges().rows;
+    assert_eq!(rows[0].installations.as_ref(), [(11, info.clone()), (22, info.clone())]);
+    assert_eq!(rows[1].installations.as_ref(), [(33, info.clone())]);
+    assert!(rows[2].installations.is_empty());
+    let out = outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: None });
+    assert_eq!(out.as_ref(), [Request::MarkedForges]);
+    assert_eq!(d.forges().rows[0].installations.as_ref(), [(22, info)]);
 }

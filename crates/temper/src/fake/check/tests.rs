@@ -413,3 +413,28 @@ fn verb() {
     }
     fs::remove_dir_all(root).expect("scratch removed");
 }
+
+#[test]
+fn installation_records_are_validated_and_full_is_terminal_past_a_checkpoint() {
+    let root = scratch("fake-check-installations");
+    let path = root.join("observations");
+    let created = b"{\"observation\":\"installation_created\",\"installation\":1}\n";
+    let deleted = b"{\"observation\":\"installation_deleted\",\"installation\":1}\n";
+    fs::write(&path, [created.as_slice(), deleted, START].concat()).expect("installation observation fixture");
+    let observations = Observations::open(&path).expect("installation observation fixture");
+    assert_eq!(
+        observations.records().expect("installation observation fixture").count(),
+        1,
+        "only checkpoint goes to domain judge"
+    );
+    fs::write(&path, [START, b"{\"observation\":\"installations_full\",\"capacity\":2}\n"].concat())
+        .expect("installation observation fixture");
+    assert_eq!(Observations::open(&path).err().as_deref(), Some(INSTALLATIONS_FULL));
+    fs::write(
+        &path,
+        [b"{\"observation\":\"installation_created\",\"installation\":1,\"token\":\"leak\"}\n", START].concat(),
+    )
+    .expect("installation observation fixture");
+    assert!(Observations::open(&path).is_err(), "unknown fields cannot be skipped as observations");
+    fs::remove_dir_all(root).expect("installation observation fixture");
+}

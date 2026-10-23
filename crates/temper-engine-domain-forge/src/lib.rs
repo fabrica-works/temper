@@ -37,7 +37,7 @@ pub use brief::{HOME_SECTION_BYTES, hex, home_access_reason};
 pub use domain::{Domain, fire, max_out, resume, step, tag, untag, writer};
 pub use gates::{GateCandidate, GateLast, GatePattern, GatePolicy, GateTemplate};
 pub use judge::{Criterion, Freshness as JudgeFreshness, Judges, Reviewer, Verdict as JudgeVerdict};
-pub use limits::{BOT_LOGIN_SUFFIX, Limits, STOPPED_TEXT_BYTES, connection_worst_case, worst_case};
+pub use limits::{BOT_LOGIN_SUFFIX, CONNECT_WHY_BYTES, Limits, STOPPED_TEXT_BYTES, connection_worst_case, worst_case};
 pub use panel::{MARKED, PANEL_AHEAD, PANEL_GATES, PANEL_NAME_BYTES, Panel, PanelGate, PanelStep, PanelUsed};
 /// Connector-owned access to one exact effect on an adopted resource.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

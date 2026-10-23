@@ -96,6 +96,7 @@ pub(crate) fn install(engine: &mut Engine, forge: u16, request: Token, back: Opt
                 forge,
                 request,
                 answer: domain::InstallAnswer::Refused(domain::ForgeRefusal::Busy),
+                stopped: None,
             },
         );
         return;
@@ -115,12 +116,16 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
     if let root::SetupEnd::Stopped { reason, .. } = end {
         engine.notes.push(crate::Note::BoxLink { line: reason.clone() });
     }
+    let stopped = match end {
+        root::SetupEnd::Stopped { reason, .. } => Some(reason.clone()),
+        root::SetupEnd::Done { .. } => None,
+    };
     match caller {
         Caller::Connect { forge, request, number, .. } => {
             if done(end) {
                 engine.setup.pastes.insert(number, forge).expect("one pending connect per forge");
             }
-            event(engine, domain::Event::ConnectEnded { forge, request, connected: done(end) });
+            event(engine, domain::Event::ConnectEnded { forge, request, connected: done(end), why: stopped });
         }
         Caller::Install { forge, request, back } => {
             let answer = match end {
@@ -130,7 +135,7 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
                 }
                 root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => domain::InstallAnswer::Connecting,
             };
-            event(engine, domain::Event::InstallAnswered { forge, request, answer });
+            event(engine, domain::Event::InstallAnswered { forge, request, answer, stopped });
         }
         Caller::Accept { forge, call, back } => match end {
             root::SetupEnd::Done { .. } => engine.clients.github_answer(

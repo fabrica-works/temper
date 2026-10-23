@@ -274,6 +274,8 @@ pub struct Row {
     pub connection: Connection,
     pub offer: Offer,
     pub first: Option<First>,
+    pub installations: Box<[(u64, Installation)]>,
+    pub ended: Option<Box<[u8]>>,
 }
 /// The deployment's forges, ordered by number (domain/forge.md, 4.1).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -718,11 +720,13 @@ pub enum Event {
         forge: u16,
         request: Token,
         answer: InstallAnswer,
+        stopped: Option<Box<[u8]>>,
     },
     ConnectEnded {
         forge: u16,
         request: Token,
         connected: bool,
+        why: Option<Box<[u8]>>,
     },
     /// The routing's answer to a core-admitted setup request.
     SetUpAnswered {

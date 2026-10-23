@@ -2571,10 +2571,10 @@ exec "$@"
     assert_eq!(ended.left, Some(Vec::new()), "no process outlived the box: {diagnostic}");
 }
 
-// domain/testing.md, 2.6: the worker receives its repository's installation token.
+// domain/testing.md, 2.6: the person's App, one push and both services restarted.
 #[test]
-fn a_worker_pushes_to_github_by_its_installations_token() {
-    support::github::push();
+fn a_persons_github_app_connects_pushes_once_and_is_found_after_an_engine_restart() {
+    support::github::restart();
 }
 
 // Shows the opener and timer cancellation on three processes. Leaves out pools,

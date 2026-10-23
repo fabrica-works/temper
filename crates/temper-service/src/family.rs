@@ -591,11 +591,38 @@ fn protection(value: forge::Protection, limits: &w::Limits) -> Option<w::Protect
 pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
     let mut forges = List::with_capacity(limits.forges_forges);
     for row in value.rows {
+        let mut installations = List::with_capacity(limits.forge_row_installations);
+        for (id, installation) in row.installations {
+            let account = match installation.account {
+                Some((id, login)) => Some(w::Account::new(limits, w::AccountParts { id, login }).ok()?),
+                None => None,
+            };
+            installations
+                .push(
+                    w::Installation::new(
+                        limits,
+                        w::InstallationParts {
+                            id,
+                            account,
+                            suspended: installation.suspended,
+                            stray: installation.stray,
+                        },
+                    )
+                    .ok()?,
+                )
+                .ok()?;
+        }
+        let ended = match row.ended {
+            Some(why) => Some(w::ConnectStopped::new(limits, w::ConnectStoppedParts { why }).ok()?),
+            None => None,
+        };
         forges
             .push(
                 w::ForgeRow::new(
                     limits,
                     w::ForgeRowParts {
+                        installations,
+                        ended,
                         number: row.number,
                         kind: match row.kind {
                             forge::Kind::Forgejo => w::Kind::Forgejo,

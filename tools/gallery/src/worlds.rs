@@ -248,6 +248,8 @@ fn forges(world: World) -> Box<[u8]> {
                             .expect("demo login"),
                     ),
                     offer: w::Offer::NotOffered,
+                    installations: List::with_capacity(0),
+                    ended: None,
                 },
             )
             .expect("demo forge"),
@@ -265,6 +267,8 @@ fn forges(world: World) -> Box<[u8]> {
                     connection: w::Connection::NotConnected,
                     offer: w::Offer::NotOffered,
                     first: None,
+                    installations: List::with_capacity(0),
+                    ended: None,
                 },
             )
             .expect("GitHub choice"),
@@ -289,6 +293,8 @@ fn forges(world: World) -> Box<[u8]> {
                     mode: w::Mode::Owned,
                     connection,
                     offer: w::Offer::Offered,
+                    installations: List::with_capacity(0),
+                    ended: None,
                     first: if step == 6 || step == 7 {
                         Some(
                             w::FirstRepository::new(

@@ -689,20 +689,57 @@ fn paste_start(service: &mut crate::Service, bundle: Secret, digest: [u8; 32]) {
         jig_domain_core::Carried { number: records::CARRIED, digest },
     );
 }
+// Script only the parent's already-admitted request, then feed the service's real
+// terminal into the real connector. Authentication is the root world's contract.
+fn paste_row(limits: &domain::Limits, request: Token, connected: bool, why: Option<Box<[u8]>>) -> domain::Forges {
+    let mut forge = domain::Domain::new(
+        limits,
+        7,
+        skein_forge_client::Config { namespace: Box::from(b"fixture".as_slice()), writers: Box::new([]) },
+        &[],
+        &[domain::Configured { number: 1, kind: domain::Kind::GitHub, mode: domain::Mode::Connected, asked: false }],
+        false,
+    )
+    .unwrap();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let mut out = Queue::with_capacity(domain::max_out(limits));
+    domain::step(
+        &mut forge,
+        &env,
+        domain::Event::Application {
+            request,
+            token: request,
+            retention: Duration::from_secs(3600),
+            ask: domain::Ask::Connect { forge: 1, app: core::num::NonZeroU64::new(7).unwrap() },
+            role: Some(jig_domain_people::Role::Owner),
+            carried: Some(jig_domain_core::Carried { number: records::CARRIED, digest: [0; 32] }),
+        },
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    domain::step(&mut forge, &env, domain::Event::ConnectEnded { forge: 1, request, connected, why }, &mut out);
+    forge.forges()
+}
 #[expect(clippy::wildcard_enum_match_arm, reason = "test rejects all unrelated forge events")]
 #[expect(clippy::disallowed_macros, reason = "test formats captured records to scan for PEM")]
-fn paste_ended(service: &mut crate::Service, connected: bool, pem: &[u8]) {
+fn paste_ended(service: &mut crate::Service, connected: bool, pem: &[u8]) -> Option<Box<[u8]>> {
     let engine = service.engine.as_mut().unwrap();
     assert!(engine.setup.public.is_empty(), "run releases the PEM");
     assert_eq!(engine.store.erases, 0, "routing waits for the root's erase decision");
     let mut ended = 0_u32;
+    let mut last_end = None;
     while let Some(event) = engine.events.pop() {
         let text = alloc::format!("{event:?}");
         assert!(!contains(text.as_bytes(), pem));
         if let root::Event::Forge(event) = event {
             match *event {
-                domain::Event::ConnectEnded { forge: 1, request, connected: actual } => {
+                domain::Event::ConnectEnded { why, forge: 1, request, connected: actual } => {
                     assert_eq!((request, actual), (Token::new(90), connected));
+                    let rows = paste_row(&engine.env.limits.forge, request, actual, why.clone());
+                    assert_eq!(rows.rows[0].ended, why);
+                    let bytes = crate::family::forges(rows, &temper_client_protocol_wire::v1::CEILINGS).unwrap();
+                    assert!(!contains(&bytes, pem));
+                    last_end = why;
                     ended = ended.checked_add(1).unwrap();
                 }
                 domain::Event::ConnectAnswered { answer: domain::ConnectAnswer::Connecting, .. } => {}
@@ -746,6 +783,7 @@ fn paste_ended(service: &mut crate::Service, connected: bool, pem: &[u8]) {
     ) else {
         panic!("carried row erased")
     };
+    last_end
 }
 #[test]
 fn paste_reads_the_carried_pem_keeps_identity_then_origin_connects_and_erases_after_root_decides() {
@@ -773,7 +811,7 @@ fn paste_reads_the_carried_pem_keeps_identity_then_origin_connects_and_erases_af
     assert!(service.engine.as_ref().unwrap().forge.starts.is_empty());
     keep_next(&mut service, Item::Origin);
     assert!(service.engine.as_ref().unwrap().forge.starts.is_empty(), "Connect waits for root-directed durable erase");
-    paste_ended(&mut service, true, pem.expose());
+    assert_eq!(paste_ended(&mut service, true, pem.expose()), None);
     service.engine.as_mut().unwrap().forge.above.push(connection::Event::Connected { forge: 1 });
     crate::engine::forge_pass(service.engine.as_mut().unwrap());
     let event = service.engine.as_mut().unwrap().events.pop().expect("Connected tells the root");
@@ -797,7 +835,7 @@ fn a_changed_digest_writes_nothing_logs_the_reason_and_erases_after_root_decides
     } else {
         false
     }));
-    paste_ended(&mut service, false, pem.expose());
+    assert_eq!(paste_ended(&mut service, false, pem.expose()).as_deref(), Some(b"the pasted value changed".as_slice()));
 }
 #[test]
 fn a_stopped_paste_erases_its_carried_row_and_keeps_no_pem_in_its_terminal() {
@@ -810,7 +848,7 @@ fn a_stopped_paste_erases_its_carried_row_and_keeps_no_pem_in_its_terminal() {
     // Valid JSON with a different App proves that a host stop uses the same cleanup path.
     face.reply(&mut service, br#"{"id":8,"slug":"other-app","permissions":{},"events":[]}"#);
     assert!(service.engine.as_ref().unwrap().setup.writes.is_empty());
-    paste_ended(&mut service, false, pem.expose());
+    assert!(paste_ended(&mut service, false, pem.expose()).is_some());
 }
 #[test]
 fn a_carried_bundle_of_the_wrong_item_is_not_a_key() {
@@ -900,7 +938,12 @@ fn install_stop_answers_connecting_without_a_link() {
     };
     assert_eq!(
         *event,
-        domain::Event::InstallAnswered { forge: 1, request: Token::new(91), answer: domain::InstallAnswer::Connecting }
+        domain::Event::InstallAnswered {
+            stopped: Some(Box::from(b"setup App slug: Missing".as_slice())),
+            forge: 1,
+            request: Token::new(91),
+            answer: domain::InstallAnswer::Connecting
+        }
     );
 }
 #[test]
@@ -1032,4 +1075,55 @@ fn setup_forgejo_is_not_found() {
     service.engine.as_mut().unwrap().workers.forges[0].kind = crate::settings::Kind::Forgejo;
     let peer = visit(&mut service, b"GET", b"/forges/1/github/setup");
     status(&peer, b"404");
+}
+
+#[test]
+fn restored_accepted_installations_reach_the_row_before_any_component_reply() {
+    let mut service = routing_service(8, Duration::from_secs(3600));
+    app(&mut service);
+    accepted(&mut service, &[11, 22]);
+    lifecycle::connect(service.engine.as_mut().unwrap(), 1);
+    run_events(&mut service);
+    let expected = domain::Installation { account: None, suspended: false, stray: false };
+    assert_eq!(
+        service.engine.as_ref().unwrap().domain.forges().rows[0].installations.as_ref(),
+        [(11, expected.clone()), (22, expected.clone())]
+    );
+    assert_eq!(service.engine.as_ref().unwrap().setup.lifecycle.installations.get(&(1, 11)), Some(&expected));
+}
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "scan captured public events and notes for the fake token")]
+fn git_token_fills_a_restored_installations_account_without_exposing_its_value() {
+    const TOKEN: &[u8] = b"fixture-secret-git-token";
+    let mut service = routing_service(8, Duration::from_secs(3600));
+    app(&mut service);
+    accepted(&mut service, &[11]);
+    lifecycle::connect(service.engine.as_mut().unwrap(), 1);
+    run_events(&mut service);
+    for login in [b"account-fixture".as_slice(), b"renamed-fixture".as_slice()] {
+        service.engine.as_mut().unwrap().forge.above.push(connection::Event::GitToken {
+            forge: 1,
+            installation: 11,
+            account: connection::Account { id: 111, login: Box::from(login) },
+            token: Secret::new(Box::from(TOKEN)),
+            expires: Wall::from_nanos(3_600_000_000_000),
+        });
+        crate::engine::forge_pass(service.engine.as_mut().unwrap());
+        for event in &service.engine.as_ref().unwrap().events {
+            assert!(!contains(alloc::format!("{event:?}").as_bytes(), TOKEN));
+        }
+        run_events(&mut service);
+        let rows = service.engine.as_ref().unwrap().domain.forges().rows;
+        assert_eq!(rows[0].installations[0].1.account, Some((111, Box::from(login))));
+        assert!(!contains(alloc::format!("{rows:?}").as_bytes(), TOKEN));
+    }
+    for note in &service.engine.as_ref().unwrap().notes {
+        assert!(!contains(alloc::format!("{note:?}").as_bytes(), TOKEN));
+    }
+    installation(&mut service, 11, Change::Suspended);
+    run_events(&mut service);
+    let rows = service.engine.as_ref().unwrap().domain.forges().rows;
+    assert_eq!(rows[0].installations[0].1.account, Some((111, Box::from(b"account-fixture".as_slice()))));
+    assert!(rows[0].installations[0].1.suspended);
 }

@@ -620,6 +620,36 @@ fn encode_rows(rows: &[Row], digest: Option<Digest>, out: &mut Encoder) {
                 out.string(reason);
             }
         }
+        out.key(b"installations");
+        out.array_start();
+        for installation in &row.installations {
+            out.object_start();
+            out.key(b"id");
+            out.unsigned(installation.id);
+            out.key(b"account");
+            match &installation.account {
+                Some(account) => {
+                    out.object_start();
+                    out.key(b"id");
+                    out.unsigned(account.id);
+                    out.key(b"login");
+                    out.string(&account.login);
+                    out.object_end();
+                }
+                None => out.null(),
+            }
+            out.key(b"suspended");
+            out.boolean(installation.suspended);
+            out.key(b"stray");
+            out.boolean(installation.stray);
+            out.object_end();
+        }
+        out.array_end();
+        out.key(b"ended");
+        match &row.ended {
+            Some(why) => out.string(why),
+            None => out.null(),
+        }
         out.key(b"first");
         match &row.first {
             Some(first) => first_json(first, out),

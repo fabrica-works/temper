@@ -385,7 +385,7 @@ impl Observations {
                     boundary = Some(Self { path: path.into(), end: reader.offset, lines, lost });
                 }
                 Ok(Some(Recorded::Observed { .. }) | None) => {}
-                Err(why) if why == GIT_FULL => return Err(why),
+                Err(why) if why == GIT_FULL || why == INSTALLATIONS_FULL => return Err(why),
                 Err(why) => {
                     if refused.is_none() {
                         refused = Some(format!("line {lines}: {why}"));
@@ -406,11 +406,19 @@ impl Observations {
     }
 }
 const GIT_FULL: &str = "GitHub git-call record is full";
+const INSTALLATIONS_FULL: &str = "GitHub installation record is full";
 fn decode(bytes: &[u8]) -> Result<Option<Recorded>, String> {
     match decode_with_limits(bytes, &temper_fake::forge::LIMITS.limits) {
         Ok(record) => Ok(Some(record)),
         Err(refused) => match temper_fake::forge::observations::decode(bytes) {
-            Ok(Some(temper_fake::forge::observations::Observation::GitCall(_))) => Ok(None),
+            Ok(Some(
+                temper_fake::forge::observations::Observation::GitCall(_)
+                | temper_fake::forge::observations::Observation::InstallationCreated { .. }
+                | temper_fake::forge::observations::Observation::InstallationDeleted { .. },
+            )) => Ok(None),
+            Ok(Some(temper_fake::forge::observations::Observation::InstallationsFull { .. })) => {
+                Err(INSTALLATIONS_FULL.into())
+            }
             Ok(Some(temper_fake::forge::observations::Observation::GitCallsFull { .. })) => Err(GIT_FULL.into()),
             Ok(None) | Err(_) => Err(format!("decode: {refused:?}")),
         },

@@ -66,6 +66,9 @@ fn limits_take_each_bound_from_its_source_field() {
             set_up_failed_why: crate::SET_UP_WHY_BYTES,
             group_failed_why: crate::SET_UP_WHY_BYTES,
             connected_login: 16,
+            account_login: 16,
+            forge_row_installations: crate::INSTALLATIONS,
+            connect_stopped_why: crate::CONNECT_WHY_BYTES,
             stopped_reason: 16,
             pull_address: crate::ADDRESS_BYTES,
             queued_ahead: crate::TASKS_AHEAD,
@@ -305,6 +308,8 @@ fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
                 v1::ForgeRow::new(
                     &limits,
                     v1::ForgeRowParts {
+                        installations: List::with_capacity(0),
+                        ended: None,
                         first: None,
                         number: *number,
                         kind: v1::Kind::Forgejo,
@@ -328,6 +333,8 @@ fn each_forge_offer_round_trips() {
         let row = v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                installations: List::with_capacity(0),
+                ended: None,
                 first: None,
                 number,
                 kind: v1::Kind::Forgejo,
@@ -413,6 +420,8 @@ fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
+                installations: List::with_capacity(0),
+                ended: None,
                 first: None,
                 number: 1,
                 kind: v1::Kind::Github,
@@ -444,6 +453,8 @@ fn forges_refuse_seventeen_rows_unsorted_rows_and_duplicate_numbers() {
         v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                installations: List::with_capacity(0),
+                ended: None,
                 first: None,
                 number: 17,
                 kind: v1::Kind::Github,
@@ -500,6 +511,8 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
                     let row = v1::ForgeRow::new(
                         &limits,
                         v1::ForgeRowParts {
+                            installations: List::with_capacity(0),
+                            ended: None,
                             first: None,
                             number: u16::MAX,
                             kind: kind.clone(),
@@ -664,4 +677,96 @@ fn connect_outcomes_round_trip() {
         let record = v1::Answer::new(&limits, v1::AnswerParts { outcome }).unwrap();
         assert_eq!(v1::Answer::decode(&limits, &mut Reader::new(&crate::answer(&record))).unwrap(), record);
     }
+}
+
+// client/README.md, 4.6: at most 64 installations and a 256-byte end.
+const INSTALLATIONS: u32 = 64;
+const CONNECT_WHY: usize = 256;
+fn installation_row(count: u32, why_bytes: usize) -> v1::ForgeRowParts {
+    let mut installations = List::with_capacity(count);
+    for id in 0..count {
+        installations
+            .push(
+                v1::Installation::new(
+                    &v1::CEILINGS,
+                    v1::InstallationParts {
+                        id: u64::from(id),
+                        account: Some(
+                            v1::Account::new(
+                                &v1::CEILINGS,
+                                v1::AccountParts { id: 42, login: Box::from(b"acme".as_slice()) },
+                            )
+                            .unwrap(),
+                        ),
+                        suspended: true,
+                        stray: false,
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+    }
+    v1::ForgeRowParts {
+        number: 1,
+        kind: v1::Kind::Github,
+        mode: v1::Mode::Connected,
+        connection: v1::Connection::NotConnected,
+        offer: v1::Offer::NotOffered,
+        first: None,
+        installations,
+        ended: Some(
+            v1::ConnectStopped::new(&v1::CEILINGS, v1::ConnectStoppedParts { why: filled(why_bytes) }).unwrap(),
+        ),
+    }
+}
+// Encode the fields explicitly to feed invalid lengths to the receiving boundary.
+fn installation_row_bytes(parts: v1::ForgeRowParts, why: &[u8]) -> Box<[u8]> {
+    // Number (2), four enum tags, first tag, list length (4), end tag, why length (4).
+    let mut size = why.len().checked_add(16).unwrap();
+    for installation in &parts.installations {
+        size = size.checked_add(usize::try_from(installation.measure()).unwrap()).unwrap();
+    }
+    let mut writer = skein_lib::Writer::new(size);
+    writer.put(&parts.number.to_be_bytes()).unwrap();
+    parts.kind.encode(&mut writer).unwrap();
+    parts.mode.encode(&mut writer).unwrap();
+    parts.connection.encode(&mut writer).unwrap();
+    parts.offer.encode(&mut writer).unwrap();
+    writer.put(&[0]).unwrap(); // no first repository
+    writer.put(&parts.installations.len().to_be_bytes()).unwrap();
+    for installation in &parts.installations {
+        installation.encode(&mut writer).unwrap();
+    }
+    writer.put(&[1]).unwrap(); // an end
+    writer.put(&u32::try_from(why.len()).unwrap().to_be_bytes()).unwrap();
+    writer.put(why).unwrap();
+    writer.finish()
+}
+#[test]
+fn installation_rows_round_trip_and_refuse_lengths_past_the_ceilings() {
+    let limits = v1::CEILINGS;
+    for count in [0, INSTALLATIONS] {
+        let row = v1::ForgeRow::new(&limits, installation_row(count, CONNECT_WHY)).unwrap();
+        let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).unwrap());
+        row.encode(&mut writer).unwrap();
+        assert_eq!(v1::ForgeRow::decode(&limits, &mut Reader::new(&writer.finish())), Ok(row));
+    }
+    for (count, why_bytes, accepted) in [
+        (INSTALLATIONS, CONNECT_WHY, true),
+        (INSTALLATIONS + 1, CONNECT_WHY, false),
+        (INSTALLATIONS, CONNECT_WHY + 1, false),
+    ] {
+        let parts = installation_row(count, 0);
+        let bytes = installation_row_bytes(parts, &filled(why_bytes));
+        assert_eq!(v1::ForgeRow::decode(&limits, &mut Reader::new(&bytes)).is_ok(), accepted);
+    }
+    v1::ForgeRow::new(&limits, installation_row(INSTALLATIONS + 1, 0)).unwrap_err();
+    v1::ConnectStopped::new(&limits, v1::ConnectStoppedParts { why: filled(CONNECT_WHY + 1) }).unwrap_err();
+}
+fn filled(bytes: usize) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(bytes);
+    for _ in 0..bytes {
+        writer.put(b"x").unwrap();
+    }
+    writer.finish()
 }

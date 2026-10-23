@@ -899,6 +899,8 @@ fn forges_encode_the_domains_rows_without_settings() {
     let value = forge::Forges {
         rows: Box::new([
             forge::Row {
+                installations: Box::new([]),
+                ended: None,
                 first: None,
                 number: 1,
                 kind: forge::Kind::Forgejo,
@@ -907,6 +909,8 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::Offered,
             },
             forge::Row {
+                installations: Box::new([]),
+                ended: None,
                 first: None,
                 number: 2,
                 kind: forge::Kind::GitHub,
@@ -915,6 +919,8 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotOffered,
             },
             forge::Row {
+                installations: Box::new([]),
+                ended: None,
                 first: None,
                 number: 3,
                 kind: forge::Kind::Forgejo,
@@ -923,6 +929,8 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotUnderTheBox,
             },
             forge::Row {
+                installations: Box::new([]),
+                ended: None,
                 first: None,
                 number: 4,
                 kind: forge::Kind::Forgejo,
@@ -952,8 +960,20 @@ fn forges_encode_the_domains_rows_without_settings() {
     for (row, (number, kind, mode, connection, offer)) in rows.into_iter().zip(expected) {
         assert_eq!(
             row,
-            &w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { first: None, number, kind, mode, connection, offer })
-                .unwrap()
+            &w::ForgeRow::new(
+                &w::CEILINGS,
+                w::ForgeRowParts {
+                    installations: List::with_capacity(0),
+                    ended: None,
+                    first: None,
+                    number,
+                    kind,
+                    mode,
+                    connection,
+                    offer
+                }
+            )
+            .unwrap()
         );
     }
 }
@@ -1054,6 +1074,8 @@ fn setup_projects_and_first_repository_states_translate_without_losing_fields() 
             };
             let value = forge::Forges {
                 rows: Box::new([forge::Row {
+                    installations: Box::new([]),
+                    ended: None,
                     number: 3,
                     kind: forge::Kind::Forgejo,
                     mode: forge::Mode::Owned,
@@ -1299,4 +1321,46 @@ fn install_without_a_back_is_admitted() {
     else {
         panic!("install without back")
     };
+}
+
+#[test]
+fn installations_and_the_last_connect_end_encode_unchanged() {
+    let bytes = family::forges(
+        forge::Forges {
+            rows: Box::new([forge::Row {
+                number: 1,
+                kind: forge::Kind::GitHub,
+                mode: forge::Mode::Connected,
+                connection: forge::Connection::NotConnected,
+                offer: forge::Offer::NotOffered,
+                first: None,
+                installations: Box::new([
+                    (
+                        11,
+                        forge::Installation {
+                            account: Some((111, Box::from(b"acme".as_slice()))),
+                            suspended: true,
+                            stray: false,
+                        },
+                    ),
+                    (22, forge::Installation { account: None, suspended: false, stray: true }),
+                ]),
+                ended: Some(Box::from(b"the pasted value changed".as_slice())),
+            }]),
+        },
+        &w::CEILINGS,
+    )
+    .unwrap();
+    let rows = wire::decode_forges(&bytes, &w::CEILINGS).unwrap().into_parts().forges;
+    let row = rows.get(0).unwrap();
+    let installation = row.installations().get(0).unwrap();
+    assert_eq!((installation.id(), installation.suspended(), installation.stray()), (11, true, false));
+    let account = installation.account().as_ref().unwrap();
+    assert_eq!((account.id(), account.login()), (111, b"acme".as_slice()));
+    let installation = row.installations().get(1).unwrap();
+    assert_eq!(
+        (installation.id(), installation.account(), installation.suspended(), installation.stray()),
+        (22, &None, false, true)
+    );
+    assert_eq!(row.ended().as_ref().unwrap().why(), b"the pasted value changed");
 }

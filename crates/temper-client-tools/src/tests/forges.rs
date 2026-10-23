@@ -11,7 +11,16 @@ use temper_client_domain::forge::{
 };
 use temper_client_protocol_wire::{self as wire, v1 as w};
 fn row(connection: C) -> Row {
-    Row { first: None, number: 3, kind: Kind::Forgejo, mode: Mode::Owned, offer: Offer::Offered, connection }
+    Row {
+        installations: Box::new([]),
+        ended: None,
+        first: None,
+        number: 3,
+        kind: Kind::Forgejo,
+        mode: Mode::Owned,
+        offer: Offer::Offered,
+        connection,
+    }
 }
 fn record(connection: w::Connection) -> client::Family {
     record_first(connection, None)
@@ -24,6 +33,8 @@ fn record_first(connection: w::Connection, first: Option<w::FirstRepository>) ->
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    installations: List::with_capacity(0),
+                    ended: None,
                     first,
                     number: 3,
                     kind: w::Kind::Forgejo,
@@ -123,7 +134,7 @@ fn every_state_renders_as_text_and_structured_json() {
         let document = concat(&[
             br#"{"forges":[{"number":3,"kind":"forgejo","mode":"owned","offer":"offered","#,
             fields,
-            br#","first":null}]}"#,
+            br#","installations":[],"ended":null,"first":null}]}"#,
         ]);
         let digest = jig::digest::Digest::of(&document).hex();
         let expected = concat(&[
@@ -689,4 +700,24 @@ fn demo_start_keeps_drawn_keys_and_recovers_its_own_answer() {
         };
         assert_eq!(root.kept_lines.as_slice(), &[Box::<[u8]>::from(expected)]);
     }
+}
+
+#[test]
+fn forges_json_names_installations_and_the_last_connect_end() {
+    use forge::forges::{Account, Installation};
+    let mut row = row(C::NotConnected);
+    row.kind = Kind::GitHub;
+    row.installations = Box::new([
+        Installation {
+            id: 11,
+            account: Some(Account { id: 111, login: Box::from(b"acme".as_slice()) }),
+            suspended: true,
+            stray: false,
+        },
+        Installation { id: 22, account: None, suspended: false, stray: true },
+    ]);
+    row.ended = Some(Box::from(b"the pasted value changed".as_slice()));
+    let json = forges::print_rows(Some(&[row]), true, None, &f::limits_root());
+    assert!(f::json_has(&json, br#""installations":[{"id":11,"account":{"id":111,"login":"acme"},"suspended":true,"stray":false},{"id":22,"account":null,"suspended":false,"stray":true}]"#));
+    assert!(f::json_has(&json, br#""ended":"the pasted value changed""#));
 }

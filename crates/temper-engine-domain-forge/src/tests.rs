@@ -1138,7 +1138,7 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
     .unwrap()
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
-    Row { first: None, number, kind, mode: Mode::Owned, connection, offer }
+    Row { installations: Box::new([]), ended: None, first: None, number, kind, mode: Mode::Owned, connection, offer }
 }
 #[test]
 fn setup_rows_and_answers_agree_in_every_connection_state() {
@@ -1289,12 +1289,16 @@ fn routing_installations_keep_their_stray_and_suspended_states_without_durable_r
     let mut d = domain();
     let state = Installation { account: Some((42, Box::from(b"account".as_slice()))), stray: true, suspended: true };
     for _ in 0_u32..2 {
-        assert!(
-            outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: Some(state.clone()) }).is_empty()
+        assert_eq!(
+            outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: Some(state.clone()) }).as_ref(),
+            [Request::MarkedForges]
         );
     }
     assert_eq!(d.installation(1, 11), Some(&state));
-    assert!(outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: None }).is_empty());
+    assert_eq!(
+        outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: None }).as_ref(),
+        [Request::MarkedForges]
+    );
     assert_eq!(d.installation(1, 11), None);
 }
 
@@ -1305,7 +1309,10 @@ fn routing_tables_take_every_installation_with_the_connection_components_bounds(
     for forge in 1..=2 {
         for installation in 1..=8 {
             let state = Installation { account: None, stray: true, suspended: false };
-            assert!(outputs(&mut d, Event::Installation { forge, installation, state: Some(state) }).is_empty());
+            assert_eq!(
+                outputs(&mut d, Event::Installation { forge, installation, state: Some(state) }).as_ref(),
+                [Request::MarkedForges]
+            );
         }
     }
     assert!(d.installation(2, 8).unwrap().stray);

@@ -245,11 +245,14 @@ fn encoded_setup_writes_fit_exactly_and_name_the_short_bound() {
             1196,
             "application.limits.overrides.records.value_bytes: must agree with AppKey (forge_component.key_bytes)\n",
         ),
-        (150, 1201, ""),
+        (150, 1201, "application.limits.overrides.forge_component.installations: 150 bytes, past its bound of 64\n"),
         (
             150,
             1200,
-            "application.limits.overrides.records.value_bytes: must agree with Accepted (forges.installations)\n",
+            concat!(
+                "application.limits.overrides.records.value_bytes: must agree with Accepted (forges.installations)\n",
+                "application.limits.overrides.forge_component.installations: 150 bytes, past its bound of 64\n"
+            ),
         ),
     ] {
         own.forges.installations = installations;
@@ -369,5 +372,20 @@ fn github_component_checks_key_deadline_and_renewal() {
         let found = crate::startup::Problems::jig(found, &jig_protocol_config::Path::root());
         let lines = crate::startup::lines(&found);
         assert!(core::str::from_utf8(&lines).unwrap().contains(expected), "{expected}: {lines:?}");
+    }
+}
+
+#[test]
+fn installation_capacity_fits_the_client_row_at_64_and_refuses_65() {
+    // client/README.md, 4.6: the row carries at most 64 installations.
+    const ROW_INSTALLATIONS: u32 = 64;
+    let jig = fixtures::engine().jig;
+    for (installations, accepted) in [(ROW_INSTALLATIONS, true), (ROW_INSTALLATIONS + 1, false)] {
+        let mut own = limits::profile(limits::Profile::Small);
+        own.forges.installations = installations;
+        own.forge_component.installations = installations;
+        let mut problems = crate::startup::Problems::empty();
+        crate::startup::checks::records(&jig, &own, &[], &mut problems);
+        assert_eq!(problems.is_empty(), accepted);
     }
 }

@@ -177,11 +177,32 @@ fn every_connection_decodes_into_the_forges_words() {
         let number = u16::try_from(index + 1).unwrap();
         records
             .push(
-                w::ForgeRow::new(&limits(), w::ForgeRowParts { first: None, number, kind, mode, connection, offer })
-                    .unwrap(),
+                w::ForgeRow::new(
+                    &limits(),
+                    w::ForgeRowParts {
+                        installations: List::with_capacity(0),
+                        ended: None,
+                        first: None,
+                        number,
+                        kind,
+                        mode,
+                        connection,
+                        offer,
+                    },
+                )
+                .unwrap(),
             )
             .unwrap();
-        let row = Row { first: None, number, kind: k, mode: m, offer: o, connection: state };
+        let row = Row {
+            installations: Box::new([]),
+            ended: None,
+            first: None,
+            number,
+            kind: k,
+            mode: m,
+            offer: o,
+            connection: state,
+        };
         assert_eq!(words::forge_connection(&row).as_ref(), words);
         expected.push(row).unwrap();
     }
@@ -200,6 +221,8 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
+        installations: Box::new([]),
+        ended: None,
         first: None,
         number: 3,
         kind: Kind::Forgejo,
@@ -247,6 +270,8 @@ fn an_out_of_order_document_is_refused() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        installations: List::with_capacity(0),
+                        ended: None,
                         first: None,
                         number,
                         kind: w::Kind::Forgejo,
@@ -344,6 +369,8 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     w::ForgeRow::new(
                         &limits(),
                         w::ForgeRowParts {
+                            installations: List::with_capacity(0),
+                            ended: None,
                             number: 3,
                             kind: w::Kind::Forgejo,
                             mode: w::Mode::Owned,
@@ -391,4 +418,64 @@ fn demo_start_outcomes_fit_neither_adopt_nor_setup() {
         assert_eq!(family::set_up_answer(&record, &limits()), None);
         assert_eq!(family::answer(&record, &limits(), &link), None);
     }
+}
+
+#[test]
+fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
+    use forge::forges::{Account, Installation};
+    let limits = limits();
+    let mut installations = List::with_capacity(2);
+    for (id, account, suspended, stray) in [
+        (
+            11,
+            Some(w::Account::new(&limits, w::AccountParts { id: 111, login: Box::from(b"acme".as_slice()) }).unwrap()),
+            true,
+            false,
+        ),
+        (22, None, false, true),
+    ] {
+        installations
+            .push(w::Installation::new(&limits, w::InstallationParts { id, account, suspended, stray }).unwrap())
+            .unwrap();
+    }
+    let mut forges = List::with_capacity(1);
+    forges
+        .push(
+            w::ForgeRow::new(
+                &limits,
+                w::ForgeRowParts {
+                    number: 1,
+                    kind: w::Kind::Github,
+                    mode: w::Mode::Connected,
+                    connection: w::Connection::NotConnected,
+                    offer: w::Offer::NotOffered,
+                    first: None,
+                    installations,
+                    ended: Some(
+                        w::ConnectStopped::new(
+                            &limits,
+                            w::ConnectStoppedParts { why: Box::from(b"the pasted value changed".as_slice()) },
+                        )
+                        .unwrap(),
+                    ),
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let bytes = wire::forges(&w::Forges::new(&limits, w::ForgesParts { forges }).unwrap());
+    let rows = family::forges(&bytes, &limits).unwrap();
+    assert_eq!(
+        rows[0].installations.as_ref(),
+        [
+            Installation {
+                id: 11,
+                account: Some(Account { id: 111, login: Box::from(b"acme".as_slice()) }),
+                suspended: true,
+                stray: false
+            },
+            Installation { id: 22, account: None, suspended: false, stray: true },
+        ]
+    );
+    assert_eq!(rows[0].ended.as_deref(), Some(b"the pasted value changed".as_slice()));
 }

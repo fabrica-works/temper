@@ -92,3 +92,46 @@ fn query_records_preserve_bytes_roles_and_part_order() {
         assert!(short.is_empty());
     }
 }
+
+#[test]
+fn installation_snapshots_record_creation_and_deletion_once_and_stop_at_the_bound() {
+    use crate::forge::observations::{Installations, Observation, decode};
+    use skein_fake_forge_github::installations::{Installations as Store, Kind, Limits, Reach};
+    use skein_lib::Wall;
+    let mut store = Store::new(&Limits { installations: 2, tokens: 2, listed: 2 }, 0);
+    let mut observer = Installations::new(2, 2);
+    let mut out = List::with_capacity(4096);
+    assert!(!observer.drain(&store, &mut out).unwrap());
+    assert!(out.is_empty());
+    let id = store.install(10, b"acme", Kind::Organization, Reach::All, Wall::EPOCH).unwrap();
+    assert!(!observer.drain(&store, &mut out).unwrap());
+    let length = out.len();
+    assert!(!observer.drain(&store, &mut out).unwrap());
+    assert_eq!(out.len(), length, "unchanged snapshots add no acceptance");
+    assert!(store.remove(id));
+    assert!(observer.drain(&store, &mut out).unwrap());
+    let rows: Vec<_> = out
+        .as_slice()
+        .split(|b| *b == b'\n')
+        .filter(|s| !s.is_empty())
+        .map(|row| decode(row).unwrap().unwrap())
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            Observation::InstallationCreated { installation: id },
+            Observation::InstallationDeleted { installation: id },
+            Observation::InstallationsFull { capacity: 2 },
+        ]
+    );
+    let length = out.len();
+    assert!(observer.drain(&store, &mut out).unwrap());
+    assert_eq!(out.len(), length, "full is terminal");
+    for row in [
+        br#"{"observation":"installation_created","installation":1,"token":"secret"}"#.as_slice(),
+        br#"{"observation":"installation_deleted","installation":"ghs_secret"}"#,
+        br#"{"observation":"installations_full","capacity":4294967296}"#,
+    ] {
+        assert!(decode(row).is_err(), "closed, bounded installation records");
+    }
+}

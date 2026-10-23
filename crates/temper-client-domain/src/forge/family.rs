@@ -228,7 +228,7 @@ pub fn set_up_answer(record: &jig_client::Family, limits: &w::Limits) -> Option<
 #[must_use]
 #[expect(clippy::manual_map, reason = "the translation uses explicit matches (programming-model.md, 10)")]
 pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Row]>> {
-    use forge::forges::{Connection as C, Kind, Mode, Offer, Row, Step};
+    use forge::forges::{Account, Connection as C, Installation, Kind, Mode, Offer, Row, Step};
     let record = wire::decode_forges(bytes, limits)?.into_parts();
     let mut rows = List::with_capacity(record.forges.len());
     for row in record.forges.into_boxed() {
@@ -252,7 +252,30 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
             }
             w::Connection::Stopped(value) => C::Stopped { reason: value.into_parts().reason },
         };
+        let mut installations = List::with_capacity(row.installations.len());
+        for installation in row.installations.into_boxed() {
+            let installation = installation.into_parts();
+            installations
+                .push(Installation {
+                    id: installation.id,
+                    account: match installation.account {
+                        Some(account) => {
+                            let account = account.into_parts();
+                            Some(Account { id: account.id, login: account.login })
+                        }
+                        None => None,
+                    },
+                    suspended: installation.suspended,
+                    stray: installation.stray,
+                })
+                .ok()?;
+        }
         rows.push(Row {
+            installations: installations.into_boxed(),
+            ended: match row.ended {
+                Some(ended) => Some(ended.into_parts().why),
+                None => None,
+            },
             number: row.number,
             kind: match row.kind {
                 w::Kind::Forgejo => Kind::Forgejo,

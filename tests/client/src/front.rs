@@ -855,6 +855,8 @@ impl Joint {
                         mode: w::Mode::Fake,
                         connection,
                         offer: w::Offer::NotOffered,
+                        installations: skein_lib::List::with_capacity(0),
+                        ended: None,
                     },
                 )
                 .expect("scripted demo forge"),

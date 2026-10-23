@@ -13,7 +13,20 @@ pub(super) fn row(
     connection: w::Connection,
     offer: w::Offer,
 ) -> w::ForgeRow {
-    w::ForgeRow::new(&w::CEILINGS, w::ForgeRowParts { first: None, number, kind, mode, connection, offer }).unwrap()
+    w::ForgeRow::new(
+        &w::CEILINGS,
+        w::ForgeRowParts {
+            installations: List::with_capacity(0),
+            ended: None,
+            first: None,
+            number,
+            kind,
+            mode,
+            connection,
+            offer,
+        },
+    )
+    .unwrap()
 }
 pub(super) fn rows(connection: w::Connection, offer: w::Offer) -> List<w::ForgeRow> {
     let mut rows = List::with_capacity(2);
@@ -446,6 +459,8 @@ fn first_rows(connection: w::Connection, state: w::FirstState) -> List<w::ForgeR
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                installations: List::with_capacity(0),
+                ended: None,
                 number: HERE,
                 kind: w::Kind::Forgejo,
                 mode: w::Mode::Owned,

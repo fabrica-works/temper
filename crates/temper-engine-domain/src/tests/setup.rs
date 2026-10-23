@@ -186,6 +186,8 @@ fn the_deployment_owner_watches_forges_again_after_a_connection_changes() {
             watcher: WATCHER,
             forges: forge::Forges {
                 rows: Box::new([forge::Row {
+                    installations: Box::new([]),
+                    ended: None,
                     first: None,
                     number: 1,
                     kind: forge::Kind::Forgejo,
@@ -215,6 +217,8 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
 
 fn row(connection: forge::Connection) -> forge::Row {
     forge::Row {
+        installations: Box::new([]),
+        ended: None,
         first: None,
         number: 1,
         kind: forge::Kind::Forgejo,
@@ -272,7 +276,7 @@ fn public_connect_preserves_the_admitted_owner_and_carry_then_root_orders_its_er
     crate::try_step(
         &mut domain,
         &env,
-        Event::Forge(Box::new(forge::Event::ConnectEnded { forge: 1, request, connected: false })),
+        Event::Forge(Box::new(forge::Event::ConnectEnded { why: None, forge: 1, request, connected: false })),
     )
     .unwrap();
     assert_eq!(settle(&mut domain, &env).as_ref(), [Request::EraseCarried { number: carried.number }]);
@@ -290,7 +294,12 @@ fn public_install_defers_the_keyed_answer_until_its_run_answers() {
     crate::try_step(
         &mut domain,
         &env,
-        Event::Forge(Box::new(forge::Event::InstallAnswered { forge: 1, request: *request, answer: answer.clone() })),
+        Event::Forge(Box::new(forge::Event::InstallAnswered {
+            stopped: None,
+            forge: 1,
+            request: *request,
+            answer: answer.clone(),
+        })),
     )
     .unwrap();
     assert_eq!(

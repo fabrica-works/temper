@@ -395,6 +395,7 @@ fn start(arguments: &Arguments, created: &mut Created) -> Result<(Host, skein_sh
         observations,
         writer,
         git_calls: forge::observations::GitCalls::new(),
+        installations: forge::observations::Installations::new(temper_fake::ENTRIES, 128),
         llm_cursor: 0,
         buffer,
         stopped: false,
@@ -486,6 +487,7 @@ struct Host {
     writer: Option<skein_fake_forge_protocol::observations::Writer>,
     buffer: List<u8>,
     git_calls: forge::observations::GitCalls,
+    installations: forge::observations::Installations,
     llm_cursor: usize,
     stopped: bool,
     peer_submissions: u32,
@@ -611,6 +613,19 @@ impl Host {
             } else {
                 false
             };
+            let installations_full = if let Peer::Forge(peer) = &self.peer
+                && let Some(layer) = peer.github_layer()
+            {
+                if let Ok(full) = self.installations.drain(layer.installations(), &mut self.buffer) {
+                    full
+                } else {
+                    self.buffer.clear();
+                    self.fail("observations", &"installation drain exceeds its byte bound");
+                    return;
+                }
+            } else {
+                false
+            };
             if !self.buffer.is_empty() {
                 let result = self.observations.as_mut().expect("writer has file").write_all(self.buffer.as_slice());
                 self.buffer.clear();
@@ -619,6 +634,9 @@ impl Host {
                     self.fail(&path, &why);
                     return;
                 }
+            }
+            if installations_full {
+                self.fail("observations", &"the GitHub installation record is full; the stream has ended");
             }
             if full {
                 self.fail(
@@ -778,6 +796,7 @@ impl skein_shell::Host for Host {
         self.peer.host().worst_case()
             + self.control.as_ref().map_or(0, |_| control::Control::worst_case())
             + List::<u8>::worst_case(self.buffer.capacity()).expect("bounded observation buffer")
+            + List::<u64>::worst_case(temper_fake::ENTRIES).expect("bounded installation snapshot")
             + if self.writer.is_some() { u64::from(limits::OBSERVATION_STATE_BYTES) } else { 0 }
             + self.ready.as_ref().map_or(0, |prefix| u64::try_from(prefix.len()).expect("ready bytes"))
             + self

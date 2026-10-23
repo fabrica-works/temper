@@ -72,6 +72,7 @@ pub(crate) fn token(
     token: Secret,
     expires: Wall,
 ) {
+    crate::setup::lifecycle::installation_account(engine, forge, installation, &account);
     let Some(state) = engine.values.tokens.forges.get_mut(&forge) else { return };
     let entry = Entry { account: account.id, login: account.login, token, expires };
     if state.entries.get(&installation) == Some(&entry) {

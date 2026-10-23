@@ -12,6 +12,9 @@ use skein_lib::{List, Overflow, Queue};
 pub enum Observation {
     GitCall(GitCall),
     GitCallsFull { capacity: u32 },
+    InstallationCreated { installation: u64 },
+    InstallationDeleted { installation: u64 },
+    InstallationsFull { capacity: u32 },
 }
 /// A length cursor over the layer's ring. Full is terminal, before evictions
 /// could silently replace a record; no further observations may follow it.
@@ -44,6 +47,65 @@ impl GitCalls {
             self.full = true;
         }
         Ok(self.full)
+    }
+}
+/// A bounded snapshot of the layer, compared after each process iteration.
+/// The layer consumes its own change events for deliveries, so this observer
+/// never takes those events away from the peer. Ids are never reused.
+#[derive(Debug)]
+pub struct Installations {
+    previous: List<u64>,
+    written: u32,
+    capacity: u32,
+    full: bool,
+}
+impl Installations {
+    #[must_use]
+    pub fn new(entries: u32, changes: u32) -> Self {
+        Self { previous: List::with_capacity(entries), written: 0, capacity: changes, full: false }
+    }
+    /// A full stream is terminal, including when a snapshot exceeds its bound.
+    pub fn drain(
+        &mut self,
+        installations: &skein_fake_forge_github::installations::Installations,
+        out: &mut List<u8>,
+    ) -> Result<bool, Overflow> {
+        if self.full {
+            return Ok(true);
+        }
+        for row in installations.iter() {
+            if !self.previous.as_slice().contains(&row.id) {
+                if self.written == self.capacity {
+                    return self.end(out);
+                }
+                encode(Observation::InstallationCreated { installation: row.id }, out)?;
+                self.written = self.written.checked_add(1).expect("bounded changes");
+            }
+        }
+        for id in &self.previous {
+            if installations.get(*id).is_none() {
+                if self.written == self.capacity {
+                    return self.end(out);
+                }
+                encode(Observation::InstallationDeleted { installation: *id }, out)?;
+                self.written = self.written.checked_add(1).expect("bounded changes");
+            }
+        }
+        self.previous.clear();
+        for row in installations.iter() {
+            if self.previous.push(row.id).is_err() {
+                return self.end(out);
+            }
+        }
+        if self.written == self.capacity {
+            return self.end(out);
+        }
+        Ok(false)
+    }
+    fn end(&mut self, out: &mut List<u8>) -> Result<bool, Overflow> {
+        encode(Observation::InstallationsFull { capacity: self.capacity }, out)?;
+        self.full = true;
+        Ok(true)
     }
 }
 fn encode(observation: Observation, out: &mut List<u8>) -> Result<(), Overflow> {
@@ -83,6 +145,21 @@ fn render(observation: Observation, json: &mut Encoder) {
             json.key(b"status");
             json.unsigned(u64::from(call.status));
         }
+        Observation::InstallationCreated { installation } => {
+            json.string(b"installation_created");
+            json.key(b"installation");
+            json.unsigned(installation);
+        }
+        Observation::InstallationDeleted { installation } => {
+            json.string(b"installation_deleted");
+            json.key(b"installation");
+            json.unsigned(installation);
+        }
+        Observation::InstallationsFull { capacity } => {
+            json.string(b"installations_full");
+            json.key(b"capacity");
+            json.unsigned(u64::from(capacity));
+        }
         Observation::GitCallsFull { capacity } => {
             json.string(b"git_calls_full");
             json.key(b"capacity");
@@ -120,6 +197,20 @@ pub fn decode(bytes: &[u8]) -> Result<Option<Observation>, Refusal> {
             let at = read::required(&mut o, &d, b"status", &p)?;
             let status = read::integer(&d, at, u64::from(u16::MAX), &p.member(b"status"))?;
             Observation::GitCall(GitCall { minted, writes, status: u16::try_from(status).expect("bounded status") })
+        }
+        b"installation_created" | b"installation_deleted" => {
+            let at = read::required(&mut o, &d, b"installation", &p)?;
+            let installation = read::integer(&d, at, u64::MAX, &p.member(b"installation"))?;
+            if name.as_ref() == b"installation_created" {
+                Observation::InstallationCreated { installation }
+            } else {
+                Observation::InstallationDeleted { installation }
+            }
+        }
+        b"installations_full" => {
+            let at = read::required(&mut o, &d, b"capacity", &p)?;
+            let capacity = read::integer(&d, at, u64::from(u32::MAX), &p.member(b"capacity"))?;
+            Observation::InstallationsFull { capacity: u32::try_from(capacity).expect("bounded capacity") }
         }
         b"git_calls_full" => {
             let at = read::required(&mut o, &d, b"capacity", &p)?;

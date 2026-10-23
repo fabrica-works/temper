@@ -543,6 +543,21 @@ fn installation_event(
 ) {
     engine.events.push(root::Event::Forge(Box::new(domain::Event::Installation { forge, installation, state })));
 }
+/// A minted token fills the public account without changing suspension or acceptance.
+pub(crate) fn installation_account(
+    engine: &mut crate::engine::Engine,
+    forge: u16,
+    installation: u64,
+    account: &connection::Account,
+) {
+    let Some(info) = engine.setup.lifecycle.installations.get_mut(&(forge, installation)) else { return };
+    let heard = (account.id, account.login.clone());
+    if info.account.as_ref() != Some(&heard) {
+        info.account = Some(heard);
+        let info = info.clone();
+        installation_event(engine, forge, installation, Some(info));
+    }
+}
 pub(crate) fn installation(
     engine: &mut crate::engine::Engine,
     forge: u16,

@@ -108,6 +108,7 @@ pub struct Domain {
     pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
     pub(crate) connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
     first: Map<u16, crate::First>,
+    pub(crate) ended: Map<u16, Box<[u8]>>,
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,
     setup_pending: Map<Token, Token>,
     pub(crate) connect: crate::connect::State,
@@ -165,6 +166,7 @@ impl Domain {
         assert!(self.connections.is_empty() && self.installations.is_empty(), "connection limits before inputs");
         self.connections = Map::with_capacity(forges);
         self.first = Map::with_capacity(forges);
+        self.ended = Map::with_capacity(forges);
         self.installations = Map::with_capacity(forges.checked_mul(installations).expect("connection bounds"));
     }
     #[must_use]
@@ -200,6 +202,14 @@ impl Domain {
             if self.forge_ended(*forge) {
                 continue;
             }
+            let mut installations = List::with_capacity(self.installations.len());
+            if config.kind == crate::Kind::GitHub {
+                for ((owner, id), installation) in &self.installations {
+                    if owner == forge {
+                        installations.push((*id, installation.clone())).expect("bounded installations");
+                    }
+                }
+            }
             rows.push(crate::Row {
                 number: *forge,
                 kind: config.kind,
@@ -207,6 +217,8 @@ impl Domain {
                 connection: self.connection(*forge),
                 offer: self.offer(*forge),
                 first: self.first.get(forge).cloned(),
+                installations: installations.into_boxed(),
+                ended: self.ended.get(forge).cloned(),
             })
             .expect("configured forges");
         }
@@ -463,6 +475,7 @@ impl Domain {
             demo_answers: Map::with_capacity(l.applications),
             connections: Map::with_capacity(l.client.repositories),
             first: Map::with_capacity(l.client.repositories),
+            ended: Map::with_capacity(l.client.repositories),
             setup_unknown: None,
             setup_pending: Map::with_capacity(l.applications),
             connect: crate::connect::State::new(l.applications),
@@ -914,8 +927,12 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             out.push(Request::MarkedForges);
         }
         Event::ConnectAnswered { forge, request, answer } => crate::connect::connected(d, forge, request, answer, out),
-        Event::InstallAnswered { forge, request, answer } => crate::connect::installed(d, forge, request, answer, out),
-        Event::ConnectEnded { forge, request, connected } => crate::connect::ended(d, forge, request, connected, out),
+        Event::InstallAnswered { forge, request, answer, stopped } => {
+            crate::connect::installed(d, forge, request, answer, stopped, out);
+        }
+        Event::ConnectEnded { forge, request, connected, why } => {
+            crate::connect::ended(d, forge, request, connected, why, out);
+        }
         Event::SetUpAnswered { forge, request, answer } => {
             if d.demo_pending.contains_key(&request) {
                 if let crate::SetUpAnswer::Refused(_) = answer {
@@ -945,6 +962,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             }
             match &state {
                 crate::Connection::Connected { id, .. } => {
+                    d.ended.remove(&forge);
                     crate::demo::connected(d, forge, out);
                     assert!(
                         writer(d, env, skein_forge_client::Writer { forge, author: *id }, out),
@@ -976,14 +994,17 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             d.connections.insert(forge, (state, kept)).expect("configured forge connections");
             out.push(Request::MarkedForges);
         }
-        Event::Installation { forge, installation, state } => match state {
-            Some(state) => {
-                d.installations.insert((forge, installation), state).expect("bounded installations");
+        Event::Installation { forge, installation, state } => {
+            match state {
+                Some(state) => {
+                    d.installations.insert((forge, installation), state).expect("bounded installations");
+                }
+                None => {
+                    let _gone = d.installations.remove(&(forge, installation));
+                }
             }
-            None => {
-                let _gone = d.installations.remove(&(forge, installation));
-            }
-        },
+            out.push(Request::MarkedForges);
+        }
         Event::Application { request, token, retention, ask, role, carried } => match ask {
             ask @ (crate::Ask::Connect { .. } | crate::Ask::Install { .. }) => {
                 crate::connect::start(d, request, token, ask, role, carried, out);

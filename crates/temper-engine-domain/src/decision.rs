@@ -425,6 +425,19 @@ impl Decision {
                 let mut owned = forges.rows.len().saturating_mul(size_of::<temper_engine_domain_forge::Row>());
                 for row in &forges.rows {
                     use temper_engine_domain_forge::Connection;
+                    owned = owned.saturating_add(
+                        row.installations
+                            .len()
+                            .saturating_mul(size_of::<(u64, temper_engine_domain_forge::Installation)>()),
+                    );
+                    for (_, installation) in &row.installations {
+                        if let Some((_, login)) = &installation.account {
+                            owned = owned.saturating_add(login.len());
+                        }
+                    }
+                    if let Some(why) = &row.ended {
+                        owned = owned.saturating_add(why.len());
+                    }
                     owned = owned.saturating_add(match &row.connection {
                         Connection::Connected { login, .. } => login.len(),
                         Connection::SetUpFailed { why } => why.len(),
