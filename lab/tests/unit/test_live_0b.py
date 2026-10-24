@@ -47,7 +47,7 @@ class Live0bTests(unittest.TestCase):
         self.assertEqual(raw.decode().count('{held.chatgpt}'), 2)
         self.assertEqual(experiment['meter']['name'], 'spend')
         self.assertEqual([check['name'] for check in experiment['checks']], ['ground', 'chat'])
-        self.assertEqual(experiment['cost'], 'temper-live-0b-calibration')
+        self.assertEqual(experiment['cost'], 'temper-live-0b')
 
         def sources(value):
             if isinstance(value, dict):
