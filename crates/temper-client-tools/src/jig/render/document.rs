@@ -61,7 +61,7 @@ pub(crate) fn print(
         text(&document, &book, limits, vocabulary, &mut out);
         out.finish()
     };
-    Printed { status: 0, stdout, stderr: Box::default() }
+    Printed { file: crate::jig::FileEnd::Keep, status: 0, stdout, stderr: Box::default() }
 }
 fn text(
     document: &Document<'_>,

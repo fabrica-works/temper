@@ -16,6 +16,7 @@ macro_rules! encode {
     }};
 }
 pub mod local;
+pub mod moves;
 mod recovery;
 pub mod waits;
 pub use recovery::{dropped, kept_chat, other_party, small_store};
@@ -30,7 +31,24 @@ const STDERR: Fd = Fd::new(3);
 const USER: u32 = 7;
 pub const TOKEN_BYTES: &[u8] = b"0123456789012345678901234567890123456789";
 pub const PARTIAL: usize = 3; // More than one short write is needed for every host diagnostic.
+#[expect(clippy::struct_excessive_bools, reason = "independent scripted file and network facts")]
 pub struct Frame {
+    pub move_answers: VecDeque<moves::Answer>,
+    pub move_requests: Vec<(w::AccountHolder, w::AccountChange)>,
+    pub file_steps: Vec<&'static str>,
+    pub record_exists: bool,
+    pub record_existing_kind: Option<Kind>,
+    pub hold_record_create: bool,
+    pub race_record_create: bool,
+    pub store_history: Vec<Vec<u8>>,
+    pub record_error: Option<Error>,
+    pub record_fault: Option<&'static str>,
+    pub record_removed: bool,
+    pub record_data: Vec<u8>,
+    pub record_how: Option<OpenHow>,
+    pub record_root: Option<Fd>,
+    move_mode: bool,
+    record_fd: Option<Fd>,
     pub host: OneShot,
     pub link: &'static [u8],
     pub input: &'static [u8],
@@ -90,6 +108,7 @@ pub struct Frame {
 impl Frame {
     pub fn act(words: &[&[u8]]) -> Self {
         let parsed = arguments::parse(words).expect("fixture call");
+        let move_mode = matches!(&parsed, temper_client_tools::jig::call::Parsed::Call { call, .. } if call.tool == 39 || call.tool == 40);
         let file_parent = arguments::file_root(&parsed).map(|_| FILE_PARENT);
         let files = arguments::text_files(&parsed)
             .into_iter()
@@ -111,6 +130,22 @@ impl Frame {
         )
         .expect("native limits");
         Self {
+            move_answers: VecDeque::new(),
+            move_requests: Vec::new(),
+            file_steps: Vec::new(),
+            record_exists: false,
+            record_existing_kind: None,
+            hold_record_create: false,
+            race_record_create: false,
+            store_history: Vec::new(),
+            record_error: None,
+            record_fault: None,
+            record_removed: false,
+            record_data: Vec::new(),
+            record_how: None,
+            record_root: None,
+            move_mode,
+            record_fd: None,
             host,
             link: LINK,
             input: b"",
@@ -256,6 +291,12 @@ impl Frame {
             self.probe_reply();
             let mut answered = false;
             while let Some(mut submit) = self.host.submissions().pop() {
+                if self.hold_record_create
+                    && matches!(&submit.kind, Op::Open { path, how: OpenHow::CreateNoFollow { .. }, .. } if path.as_ref() == b"record")
+                {
+                    self.held.push(submit);
+                    continue;
+                }
                 if self.hold_stores.is_some() && matches!(submit.kind, Op::Sync { .. }) {
                     self.held.push(submit);
                     continue;
@@ -315,6 +356,23 @@ impl Frame {
     }
     fn open_file(&mut self, root: Fd, path: &[u8], how: OpenHow) -> Result<Done, Error> {
         self.opened.push(path.into());
+        if path == b"record" && matches!(how, OpenHow::CreateNoFollow { .. }) {
+            self.record_how = Some(how);
+            self.record_root = Some(root);
+            if self.record_exists || self.record_existing_kind.is_some() {
+                return Err(Error::Exists);
+            }
+            if let Some(error) = self.record_error {
+                return Err(error);
+            }
+            self.file_steps.push("create");
+            let fd = Fd::new(self.next_socket);
+            self.next_socket += 1;
+            self.files.insert(fd, Vec::new());
+            self.record_fd = Some(fd);
+            self.record_exists = true;
+            return Ok(Done::Fd(fd));
+        }
         if matches!(how, OpenHow::Create { .. } | OpenHow::CreateNoFollow { .. }) {
             let fd = Fd::new(self.next_socket);
             self.next_socket += 1;
@@ -322,7 +380,7 @@ impl Frame {
             self.names.insert(path.into(), fd);
             return Ok(Done::Fd(fd));
         }
-        if path == b"call.json" || path == b"link-file" || path == b"link" {
+        if path == b"call.json" || path == b"link-file" || path == b"link" || path == b"record" {
             assert_eq!(how, OpenHow::ReadNoFollow, "check the file at its name");
             if let Some(error) = self.linked_leaf {
                 return Err(error);
@@ -366,6 +424,7 @@ impl Frame {
         match kind {
             Op::Open { root, path, how } => self.open_file(*root, path, *how),
             Op::Write { fd, bytes, from, at } => {
+                self.record_write(*fd, bytes, *from, *at)?;
                 let start = usize::try_from(*from).expect("write offset");
                 let at = usize::try_from(*at).expect("file offset");
                 let bytes = &bytes[start..];
@@ -377,6 +436,7 @@ impl Frame {
             Op::Rename { from, to, .. } => {
                 let fd = self.names.remove(from).expect("temporary name");
                 self.stored.insert(to.clone(), self.files.get(&fd).expect("temporary contents").clone());
+                self.store_history.push(self.files.get(&fd).expect("stored contents").clone());
                 if to.as_ref() == b"store" {
                     self.store_writes += 1;
                 }
@@ -403,6 +463,8 @@ impl Frame {
                 self.sockets.insert(fd, Socket::default());
                 Ok(Done::Fd(fd))
             }
+            Op::Sync { fd } if Some(*fd) == self.record_fd || *fd == FILE_PARENT => self.record_sync(*fd),
+            Op::Remove { name, dir, .. } if name.as_ref() == b"record" => self.record_remove(*dir),
             Op::Sync { .. } if self.fail_store.is_some() => Err(Error::Permission),
             Op::Close { fd } if *fd == DIRECTORY && self.locked.is_some() => {
                 self.released_after = Some(self.store_count());
@@ -430,19 +492,7 @@ impl Frame {
                 }
                 Ok(Done::Count(u32::try_from(count).expect("recv count")))
             }
-            Op::Cancel { target } => {
-                if let Some(index) = self.held.iter().position(|submit| submit.op == *target) {
-                    let Submit { op, kind } = self.held.remove(index);
-                    self.host.completions().push(Complete { op, kind, result: Err(Error::Cancelled) });
-                    return Ok(Done::Nothing);
-                }
-                if self.signal.as_ref().is_none_or(|signal| signal.op != *target) {
-                    return Err(Error::TooLate);
-                }
-                let Submit { op, kind } = self.signal.take().expect("signal stays in flight");
-                self.host.completions().push(Complete { op, kind, result: Err(Error::Cancelled) });
-                Ok(Done::Nothing)
-            }
+            Op::Cancel { target } => self.cancel(*target),
             Op::PipeRead { buf, .. } => {
                 let count = buf.len().min(self.input.len());
                 buf[..count].copy_from_slice(&self.input[..count]);
@@ -463,6 +513,26 @@ impl Frame {
             | Op::Window { .. }
             | Op::ReadSignal { .. } => panic!("unexpected kernel operation"),
         }
+    }
+    fn cancel(&mut self, target: skein_lib::Token) -> Result<Done, Error> {
+        if let Some(index) = self.held.iter().position(|submit| submit.op == target) {
+            let Submit { op, kind } = self.held.remove(index);
+            let mut kind = kind;
+            let result =
+                if self.race_record_create && matches!(&kind, Op::Open { path, .. } if path.as_ref() == b"record") {
+                    self.answer(&mut kind)
+                } else {
+                    Err(Error::Cancelled)
+                };
+            self.host.completions().push(Complete { op, kind, result });
+            return Ok(Done::Nothing);
+        }
+        if self.signal.as_ref().is_none_or(|signal| signal.op != target) {
+            return Err(Error::TooLate);
+        }
+        let Submit { op, kind } = self.signal.take().expect("signal stays in flight");
+        self.host.completions().push(Complete { op, kind, result: Err(Error::Cancelled) });
+        Ok(Done::Nothing)
     }
 }
 
@@ -566,6 +636,8 @@ impl Frame {
                 if self.deliver.is_some() {
                     if subject == w::Subject::Me {
                         self.deliver_me();
+                    } else if self.move_mode {
+                        self.deliver_move_accounts(open.watch(), &subject);
                     } else {
                         self.deliver_task(false);
                     }
@@ -580,12 +652,12 @@ impl Frame {
                 self.hold_stores = Some(());
                 self.reply(fd, &encode!(w::SignOutAnswer::SignedOut));
             }
-            b"/jig/v1/stream-gone" => self.reply(fd, &[]),
+            b"/jig/v1/stream-gone" | b"/jig/v1/unwatch" => self.reply(fd, &[]),
             _ => panic!("unexpected HTTP route"),
         }
     }
     fn deliver_me(&mut self) {
-        let value = w::DeliveryValue::Me(if self.offers.is_some() {
+        let value = w::DeliveryValue::Me(if self.offers.is_some() || self.move_mode {
             recovery::chat_me()
         } else {
             jig_client_test_records::frame_record()

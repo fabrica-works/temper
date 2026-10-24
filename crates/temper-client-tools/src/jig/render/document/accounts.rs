@@ -354,7 +354,7 @@ fn state(value: c::OwnerAccountState, out: &mut Encoder) {
     out.object_start();
     out.key(b"kind");
     out.string(match value {
-        S::Moving => unreachable!("an account's move before temper routes it"),
+        S::Moving => unreachable!("an account's move before the tools route it"),
         S::Asking => b"asking",
         S::Granted => b"granted",
         S::Later { .. } => b"later",
@@ -365,7 +365,7 @@ fn state(value: c::OwnerAccountState, out: &mut Encoder) {
         S::Closing => b"closing",
     });
     match value {
-        S::Moving => unreachable!("an account's move before temper routes it"),
+        S::Moving => unreachable!("an account's move before the tools route it"),
         S::Later { until } => wall(b"until", until, out),
         S::Unloaded { at, why } => unloaded(at, why, out),
         S::Asking | S::Granted | S::SignInAgain | S::Misconfigured | S::Cancelled | S::Closing => {}
@@ -405,7 +405,7 @@ fn end(value: c::OwnerAccountEnd, out: &mut Encoder) {
             out.key(b"refused");
             out.string(match refusal {
                 R::NotSignedIn | R::NotOurs | R::Cancelled | R::Moving => {
-                    unreachable!("an account's move before temper routes it")
+                    unreachable!("an account's move before the tools route it")
                 }
                 R::NotLimited => b"not_limited",
                 R::Uses => b"uses",
@@ -422,7 +422,7 @@ fn end(value: c::OwnerAccountEnd, out: &mut Encoder) {
             });
             match refusal {
                 R::NotSignedIn | R::NotOurs | R::Cancelled | R::Moving => {
-                    unreachable!("an account's move before temper routes it")
+                    unreachable!("an account's move before the tools route it")
                 }
                 R::Held { provider } | R::Provider { provider } => number(b"provider", u64::from(provider), out),
                 R::NotKept { why } => {

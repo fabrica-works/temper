@@ -34,13 +34,16 @@ impl<'a> Part<'a> {
     #[must_use]
     pub fn read(value: &'a ReadValue) -> Option<Self> {
         match value {
-            ReadValue::Settings(_) | ReadValue::Setting(_) | ReadValue::Revision(_) | ReadValue::Revisions(_) => None,
             ReadValue::Inbox(value) => Some(Self::InboxPage(value)),
             ReadValue::OwnerInbox(value) => Some(Self::OwnerInboxPage(value)),
             ReadValue::Tasks(value) => Some(Self::TaskPage(value)),
             ReadValue::Task(value) => Some(Self::Task(value)),
             ReadValue::Historical(value) => Some(Self::Task(historical_task(value)?.0)),
-            ReadValue::OwnerProject(_)
+            ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
+            | ReadValue::OwnerProject(_)
             | ReadValue::Me(_)
             | ReadValue::Turn(_)
             | ReadValue::Proposal(_)
@@ -270,7 +273,7 @@ pub fn failure(reason: &[u8], json: bool, status: u8) -> Printed {
         out.put(b"\n").expect("measured newline");
         out.finish()
     };
-    Printed { status, stdout: Box::default(), stderr }
+    Printed { file: crate::jig::FileEnd::Keep, status, stdout: Box::default(), stderr }
 }
 fn error(out: &mut Encoder, reason: &[u8]) {
     out.object_start();

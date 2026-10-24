@@ -6,6 +6,8 @@ use jig_client::{Answered, Ask, Outcome, contract as c};
 use skein_json::writer::Encoder;
 #[derive(Debug)]
 pub(crate) struct Operation {
+    pub exported: Option<(u32, u32)>,
+    pub file: Option<Box<[u8]>>,
     pub word: &'static [u8],
     pub account: Option<Account>,
     pub task: Option<u64>,
@@ -27,7 +29,7 @@ impl Operation {
         let (word, task): (&[u8], Option<u64>) = match ask {
             Ask::Family { .. } => (b"adopt", None),
             Ask::Jig(ask) => match ask.as_ref() {
-                c::Ask::ChangeSettings(_) => unreachable!("temper does not request settings"),
+                c::Ask::ChangeSettings(_) => unreachable!("the tools do not request settings"),
                 c::Ask::Create { .. } | c::Ask::Propose { action: c::ProposeAction::Batch { .. }, .. } => {
                     (b"chat", None)
                 }
@@ -79,9 +81,8 @@ impl Operation {
                 c::Ask::SignOut { .. } => (b"disconnect", None),
                 c::Ask::AccountChange { change, .. } => (
                     match change {
-                        c::AccountChange::MoveOut { .. }
-                        | c::AccountChange::Written { .. }
-                        | c::AccountChange::MoveIn { .. } => unreachable!("an account's move before temper routes it"),
+                        c::AccountChange::MoveOut { .. } | c::AccountChange::Written { .. } => b"export".as_slice(),
+                        c::AccountChange::MoveIn { .. } => b"import",
                         c::AccountChange::DeclareProgram { .. } => b"declare".as_slice(),
                         c::AccountChange::CheckProgram { .. } => b"verify",
                         c::AccountChange::AddKey { .. } => b"add-key".as_slice(),
@@ -95,7 +96,17 @@ impl Operation {
                 ),
             },
         };
-        Self { word, account: None, task, to: None, party: None, retry: None, value_name: None }
+        Self {
+            exported: None,
+            file: None,
+            word,
+            account: None,
+            task,
+            to: None,
+            party: None,
+            retry: None,
+            value_name: None,
+        }
     }
 }
 pub(crate) fn print(
@@ -119,9 +130,9 @@ pub(crate) fn print(
     };
     let bytes = bytes(operation, outcome, json, me, limits, false);
     if status == 0 {
-        Printed { status, stdout: bytes, stderr: Box::default() }
+        Printed { file: crate::jig::FileEnd::Keep, status, stdout: bytes, stderr: Box::default() }
     } else {
-        Printed { status, stdout: Box::default(), stderr: bytes }
+        Printed { file: crate::jig::FileEnd::Keep, status, stdout: Box::default(), stderr: bytes }
     }
 }
 pub(crate) fn kept(
@@ -195,6 +206,10 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
     }
     let Outcome::Answered(Answered::Jig(answer)) = outcome else { unreachable!("client answers handled") };
     match answer {
+        c::Answer::Done(_) if operation.exported.is_some() => moved_out(operation, out),
+        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountMovedIn { account, renewed })) => {
+            moved_in(*account, *renewed, out);
+        }
         c::Answer::Done(c::Outcome::Proposed { proposal }) => proposed(*proposal, operation, me, out),
         c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::Proposed { proposal })) => proposed(
             c::ProposalKey {
@@ -240,7 +255,7 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
         c::Answer::Done(done) => {
             out.put(b"done: ");
             let task = match done {
-                c::Outcome::SettingsChanged(_) => unreachable!("temper does not request settings"),
+                c::Outcome::SettingsChanged(_) => unreachable!("the tools do not request settings"),
                 c::Outcome::Made { what: c::Made::Tasks { tasks } } => tasks.get(0).copied(),
                 c::Outcome::Owner(c::OwnerOutcome::Created { first, .. }) => Some(*first),
                 c::Outcome::Owner(_)
@@ -320,7 +335,18 @@ fn encode(
         out.object_end();
     } else {
         let Outcome::Answered(Answered::Jig(answer)) = outcome else { unreachable!("client answers handled") };
-        document::answer_json(answer, out);
+        if let (Some((account, number)), c::Answer::Done(_)) = (operation.exported, answer) {
+            out.object_start();
+            out.key(b"account");
+            out.unsigned(u64::from(account));
+            out.key(b"number");
+            out.unsigned(u64::from(number));
+            out.key(b"file");
+            out.string(operation.file.as_deref().expect("export file"));
+            out.object_end();
+        } else {
+            document::answer_json(answer, out);
+        }
     }
     if let Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(
         c::OwnerOutcome::AccountProgramDeclared { name, .. },
@@ -397,7 +423,7 @@ pub(crate) fn retry(call: &crate::jig::call::Call) -> Box<[u8]> {
         13 => &rows::RELEASE,
         14 => &rows::STOP,
         15 => &rows::CANCEL,
-        24..=30 | 32 | 33 => account_tool(call.tool),
+        24..=30 | 32 | 33 | 39 | 40 => account_tool(call.tool),
         31 => &rows::AMEND,
         _ => unreachable!("act tool"),
     };
@@ -432,6 +458,8 @@ pub(crate) fn account_tool(tool: u8) -> &'static crate::jig::table::Tool {
         30 => &rows::RETRY,
         32 => &rows::DECLARE,
         33 => &rows::VERIFY,
+        39 => &rows::EXPORT,
+        40 => &rows::IMPORT,
         _ => unreachable!("account tool"),
     }
 }
@@ -529,4 +557,18 @@ fn sign_out(
         out.put(operation.word);
     }
     advice
+}
+
+fn moved_out(operation: &Operation, out: &mut Text) {
+    out.put(b"moved out: account ");
+    out.number(u64::from(operation.exported.expect("exported").0));
+    out.put(b" to ");
+    out.put(operation.file.as_deref().expect("export file"));
+}
+fn moved_in(account: u32, renewed: bool, out: &mut Text) {
+    out.put(b"moved in: account ");
+    out.number(u64::from(account));
+    if renewed {
+        out.put(b", renewed");
+    }
 }

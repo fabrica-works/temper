@@ -9,7 +9,7 @@ pub mod render;
 pub mod rows;
 pub mod runner;
 pub mod subject;
-pub use runner::Printed;
+pub use runner::{FileEnd, Printed};
 
 pub mod conditions;
 pub mod digest;
