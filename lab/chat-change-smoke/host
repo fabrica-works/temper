@@ -1,3 +1,0 @@
-#!/bin/sh
-# Attended S only; no runner runtime_command, loop, run or judge.
-exec /usr/bin/python3 -I -B "${0%/*}/host.py" "$@"

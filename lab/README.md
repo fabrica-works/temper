@@ -1,62 +1,43 @@
 # M1 lab pieces
 
-`chat-change-smoke/` holds S's `lab-experiment/1` manifest, templates and
-checks from `docs/design/qa.md`. It has no driver, fault or generic runner.
-**S awaits integration review and has not run.** The exact remaining joins
-and the case-2 review boundary are in
-[chat-change-smoke/README.md](chat-change-smoke/README.md).
+[chat-change-smoke/](chat-change-smoke/README.md) is S, the free NOTICE smoke
+from `docs/design/qa.md`. It runs on skein's runner with no driver or model,
+using the canonical [cluster/](cluster/) documents, a TLS fake LLM, two
+remote workers and the subject's fake git.
 
-The canonical process description is [cluster/](cluster/). QA supplies its
-TLS fake model, NOTICE scripts, two charters, authority, landing rules and
-capacities. Case-2 supplies the canonical forge process, records-only setup,
-worker fake git and shared process reader. Until those contracts join,
-canonical QA templates refer to a future forge readiness capture. S retains
-an anticipated forge configuration for that review; it is not a second
-canonical cluster.
+The runner's private bootstrap pipes engine stdout into `ctl sign-in -`.
+The seed adds the fake key, waits for accounts and forge, adopts `fake/widget`,
+then runs the story through `tools/ctl`. The story asks for NOTICE, requires
+the delegate's historical successful landing result and a complete root tree
+with no live or held delegates. The root chat stays open. Public ctl calls
+use exactly `http://HOST:PORT/` from the engine's clients readiness capture.
 
-After the attended seed signs in and adopts `fake/widget`, its story uses:
+The live forge collection retains an observation snapshot and object replies;
+its end-state check reads those files only. Stopped collections copy the
+forge observations before the engine store, after confirmed exits and empty
+trees; the promises check reads these copies and independent temper records.
+See [checks/README.md](chat-change-smoke/checks/README.md).
+
+With the owner's subject digest, run from this repository:
 
 ```sh
-/bin/sh lab/chat-change-smoke/tools/ctl TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN me
-/bin/sh lab/chat-change-smoke/tools/ctl TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN help task
-/bin/sh lab/chat-change-smoke/smoke/story TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN
+L=/path/to/skein/scripts/lab/lab
+S=sha256:...
+$L validate lab/chat-change-smoke --subject "$S"
+$L run lab/chat-change-smoke --subject "$S" --seed 1
+$L run lab/chat-change-smoke --subject "$S" --seed 2
+$L run lab/chat-change-smoke --subject "$S" --seed 3
+$L judge lab/chat-change-smoke --subject "$S"
 ```
 
-`PUBLIC_ORIGIN` is exactly `http://HOST:PORT/`, from the engine's public
-clients listener, with numeric loopback and an explicit port. The wrapper
-pins every call, including help, to the directory's exact authority. It
-permits area 1 only and refuses sign-in/out and JSON call indirection in
-any argument. It uses shell builtins before exec, preserving streams and
-exit status. The address file is one newline-terminated line. The host owns
-directory permissions and protection from writes by the driver.
-
-The sign-in link is a credential. The attended host must remove it from
-engine stdout before persistence and supply it only through an in-memory
-pipe to `ctl sign-in -`. No manifest capture, stdin template or credential
-file is provided. The wrapper rejects sign-in URLs as its trusted prefix.
-
-The story asks for NOTICE, reads its created task number, waits for ended
-with timeout 220 and reads the task tree. Seed waits are 200; the approved
-cost class is ready120/command240/stop20. No new budget or polling schedule
-is introduced. Both reads require the chat's successful historical result
-and the tree must show the same settled root phase. Ended alone can include
-failure and never establishes landing. S also requires every service to
-exit zero after requested stop, retaining its existing stop allowances.
-The independent live check reads observations and C/P objects; the promises
-check reads an engine store copy only after engine exit and empty trees.
-See [checks/README.md](chat-change-smoke/checks/README.md) for its existing
-arguments and evidence requirements.
-
-Python 3.11+ standard library remains the authorized temporary lab tooling
-exception to programming-model.md, section 1. Contract tests check the
-fixture's scripts, TLS, authority, capacities and assembly; shell process
-tests use real shell/canary executables. They make no product or containment
-proof. Run targeted checks through `heavy` only, for example:
+The class stays `temper-m1-calibration`: ready 120 s, command 240 s, stop
+20 s. Seed waits allow 200 s; the story has one 220 s deadline. Python's
+standard library is the approved temporary lab-tooling exception. Tests run
+through `heavy`:
 
 ```sh
-heavy python3 -I -B -m unittest discover -s lab/tests/unit -p test_smoke_assembly.py -v
-heavy python3 -I -B -m unittest discover -s lab/tests/unit -p test_end_state.py -v
-heavy python3 -I -B -m unittest discover -s lab/tests/process -p test_ctl.py -v
+heavy python3 -I -B -m unittest discover -s lab/tests/unit -v
+heavy python3 -I -B -m unittest discover -s lab/tests/process -p 'test_ctl.py' -v
 ```
 
 # The look experiment
