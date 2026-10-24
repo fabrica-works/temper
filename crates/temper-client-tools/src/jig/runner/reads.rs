@@ -149,6 +149,18 @@ pub(super) fn page(
     let local = u32::try_from(handle.number & u64::from(u32::MAX)).expect("low half");
     let Some(mut reading) = runner.active.remove(&prefix) else { return };
     reading.pending &= !1u8.checked_shl(local).expect("fixed read slot");
+    // The setting read requires a concrete revision; omission in ctl means
+    // the newest revision named by the authorized inventory read.
+    if reading.called.call.tool == rows::SETTING_AT
+        && local == 6
+        && let Readout::Jig(c::ReadResult::Value(c::ReadValue::Settings(settings))) = &page
+    {
+        let setting = super::super::settings_file::selector(&reading.called.call);
+        let what = c::Read::Setting(c::ReadSetting { setting, revision: settings.newest });
+        read(runner, &mut reading, 1, what, out);
+        complete(runner, client, env, reading, out);
+        return;
+    }
     if let Some(thread) = &mut reading.thread
         && let Readout::Jig(c::ReadResult::Value(c::ReadValue::Activity(page))) = &page
         && let Some(next) = thread.accept(*page.clone())
@@ -183,7 +195,7 @@ pub(super) fn changed(runner: &mut Runner, client: &Client, env: &Env<Limits>, h
     let bit = 1u8.checked_shl(local).expect("fixed watch slot");
     if reading.pending & bit != 0
         && let Some(document) = client.document(handle)
-        && document.state == jig_client::State::Live
+        && matches!(document.state, jig_client::State::Live | jig_client::State::Ended)
         && let Some(Latest::Jig(delivery)) = document.latest
     {
         reading.pending &= !bit;
@@ -202,7 +214,14 @@ pub(super) fn changed(runner: &mut Runner, client: &Client, env: &Env<Limits>, h
 }
 pub(super) fn ended(runner: &mut Runner, handle: Handle, why: Why, out: &mut Queue<Out>) {
     let prefix = u32::try_from(handle.number >> 32u32).expect("high half");
+    let local = u32::try_from(handle.number & u64::from(u32::MAX)).expect("low half");
     let Some(reading) = runner.active.remove(&prefix) else { return };
+    // A first delivery already filled this slot; its closure cannot cancel
+    // the other documents still needed by the call.
+    if reading.documents.contains_key(&local) {
+        runner.active.insert(prefix, reading);
+        return;
+    }
     let status = match why {
         Why::Unknown | Why::NotAllowed | Why::SubjectEnded => 2,
         Why::NotServed | Why::SignedOut | Why::Limit => 1,
@@ -334,11 +353,13 @@ fn settings_start(runner: &Runner, reading: &mut Reading, out: &mut Queue<Out>) 
         rows::SETTING_AT => {
             let call = &reading.called.call;
             let setting = super::super::settings_file::selector(call);
-            let revision = match number(call, 2) {
-                Some(n) => u32::try_from(n).expect("parsed revision"),
-                None => 0,
-            };
-            read(runner, reading, 1, c::Read::Setting(c::ReadSetting { setting, revision }), out);
+            match number(call, 2) {
+                Some(n) => {
+                    let revision = u32::try_from(n).expect("parsed revision");
+                    read(runner, reading, 1, c::Read::Setting(c::ReadSetting { setting, revision }), out);
+                }
+                None => read(runner, reading, 6, c::Read::Settings, out),
+            }
         }
         rows::REVISION_AT => {
             let number = u32::try_from(task).expect("parsed revision");

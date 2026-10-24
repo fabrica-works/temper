@@ -68,7 +68,8 @@ fn head_text(head: &c::RevisionHead, out: &mut Text) {
     out.put(b", against revision ");
     out.number(u64::from(head.against));
     out.put(b", at ");
-    super::acts::wall(Some(head.at), out);
+    super::utc(head.at, out);
+    out.put(b" UTC");
     out.put(b", by ");
     match &head.by {
         c::RevisionDecider::FirstStart => out.put(b"the first start"),
@@ -120,7 +121,7 @@ fn encode_head(head: &c::RevisionHead, out: &mut Encoder) {
     out.boolean(head.moved);
     out.object_end();
 }
-pub(super) fn text(value: &c::ReadValue, limits: &Limits, out: &mut Text) {
+pub(super) fn text(value: &c::ReadValue, requested: Option<u64>, limits: &Limits, out: &mut Text) {
     match value {
         c::ReadValue::Settings(document) => inventory_text(document, out),
         c::ReadValue::Setting(document) => {
@@ -130,7 +131,7 @@ pub(super) fn text(value: &c::ReadValue, limits: &Limits, out: &mut Text) {
             out.put(b"\n");
             value_text(&document.value, limits, out);
         }
-        c::ReadValue::Revision(answer) => revision_text(answer, limits, out),
+        c::ReadValue::Revision(answer) => revision_text(answer, requested.expect("revision call"), limits, out),
         c::ReadValue::Revisions(page) => {
             for row in &page.rows {
                 head_text(&row.head, out);
@@ -322,7 +323,7 @@ fn inventory_text(document: &c::SettingsDocument, out: &mut Text) {
     }
 }
 
-fn revision_text(answer: &c::RevisionAnswer, limits: &Limits, out: &mut Text) {
+fn revision_text(answer: &c::RevisionAnswer, requested: u64, limits: &Limits, out: &mut Text) {
     match answer {
         c::RevisionAnswer::Revision(document) => {
             head_text(&document.head, out);
@@ -352,7 +353,9 @@ fn revision_text(answer: &c::RevisionAnswer, limits: &Limits, out: &mut Text) {
             }
         }
         c::RevisionAnswer::Forgotten(f) => {
-            out.put(b"revision forgotten; oldest kept: revision ");
+            out.put(b"revision ");
+            out.number(requested);
+            out.put(b" is forgotten; the oldest kept is revision ");
             out.number(u64::from(f.oldest));
             out.put(b"\n");
         }

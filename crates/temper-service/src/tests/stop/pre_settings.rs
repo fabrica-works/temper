@@ -132,7 +132,7 @@ fn pre_settings_refusals_preserve_data_and_leave_at_most_one_empty_segment() {
         fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
     }
     let (root, core, profile) = fixtures::store_limits();
-    let limits = store::limits(&root, &core, &root.forge, &profile).unwrap();
+    let limits = store::limits(&root, &root.forge, &profile).unwrap();
     let deployment = fixtures::seeds().deployment;
     let old = component_v2::Format::new(
         &component_v2::CEILINGS,
