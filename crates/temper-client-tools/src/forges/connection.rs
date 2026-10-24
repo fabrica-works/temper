@@ -128,7 +128,7 @@ pub(super) fn told(state: &mut Forges, env: &Env<Limits>, told: &Told, out: &mut
                 w::Request::Install(value) => (value.forge(), true, false),
                 w::Request::Connect(value) => match value.how() {
                     w::How::GithubManifest(_) => (value.forge(), false, true),
-                    w::How::GithubApp(_) => return false,
+                    w::How::GithubApp(_) | w::How::ForgejoAdmin(_) => return false,
                 },
                 w::Request::Reachable(_)
                 | w::Request::Return(_)

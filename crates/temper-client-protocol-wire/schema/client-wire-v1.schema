@@ -18,7 +18,9 @@ record Return { source: u32 path: bytes 512 }
 # start_demo: the demo document's start (client/README.md, 4.6; protocol/setup.md, 8.4).
 record GitHubApp { id: u64 }
 record GitHubManifest { back: option bytes 512 }
-enum How { github_app: GitHubApp, github_manifest: GitHubManifest }
+record FirstAsk { org: bytes 1024 repository: bytes 1024 project: SetUpProject label: bytes 64 }
+record ForgejoAdmin { first: option FirstAsk }
+enum How { github_app: GitHubApp, github_manifest: GitHubManifest, forgejo_admin: ForgejoAdmin }
 record Connect { forge: u16 how: How }
 record Install { forge: u16 back: option bytes 512 }
 record Reachable { forge: u16 installation: option u64 page: u32 }

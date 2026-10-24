@@ -88,6 +88,9 @@ fn limits_take_each_bound_from_its_source_field() {
             demo_answer_name: 16,
             demo_answer_cues: crate::CUES,
             demo_answer_cues_item: crate::CUE_BYTES,
+            first_ask_org: 16,
+            first_ask_repository: 16,
+            first_ask_label: 64,
             set_up_org: 16,
             set_up_repository: 16,
             new_project_name: 16,
@@ -819,3 +822,5 @@ fn manifest_connects_and_app_ways_round_trip() {
         assert_eq!(v1::ForgeRow::decode(&limits, &mut Reader::new(&writer.finish())), Ok(row));
     }
 }
+
+mod forgejo_admin;

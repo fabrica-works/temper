@@ -52,11 +52,23 @@ pub(crate) fn start(
         reachable(d, request, token, forge, installation, page, role, carried, out);
         return;
     }
+    // E1 carries the intent but does not admit an admin run yet.
+    if let Ask::Connect { how: crate::How::ForgejoAdmin { .. }, .. } = &ask {
+        if let Some(value) = carried {
+            out.push(Request::CarriedUnused { number: value.number });
+        }
+        d.connect.answer(request, token, Answered::Connect(ConnectAnswer::Refused(ForgeRefusal::NotTaken)), out);
+        return;
+    }
     let (forge, install, manifest) = match &ask {
         Ask::Connect { forge, how: crate::How::GitHubApp { .. } } => (*forge, false, false),
         Ask::Connect { forge, how: crate::How::GitHubManifest { .. } } => (*forge, false, true),
         Ask::Install { forge, .. } => (*forge, true, false),
-        Ask::Reachable { .. } | Ask::Adopt(_) | Ask::SetUp { .. } | Ask::StartDemo => unreachable!("connect admission"),
+        Ask::Connect { how: crate::How::ForgejoAdmin { .. }, .. }
+        | Ask::Reachable { .. }
+        | Ask::Adopt(_)
+        | Ask::SetUp { .. }
+        | Ask::StartDemo => unreachable!("connect admission"),
     };
     let (connected, connecting) = match d.connection(forge) {
         Connection::Connected { .. } => (true, false),
@@ -131,7 +143,11 @@ pub(crate) fn start(
             d.connect.running.insert(forge, (request, None)).expect("room checked");
             out.push(Request::Install { forge, request, back });
         }
-        Ask::Reachable { .. } | Ask::Adopt(_) | Ask::SetUp { .. } | Ask::StartDemo => unreachable!("connect admission"),
+        Ask::Connect { how: crate::How::ForgejoAdmin { .. }, .. }
+        | Ask::Reachable { .. }
+        | Ask::Adopt(_)
+        | Ask::SetUp { .. }
+        | Ask::StartDemo => unreachable!("connect admission"),
     }
 }
 pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: ConnectAnswer, out: &mut Queue<Request>) {

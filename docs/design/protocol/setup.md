@@ -455,9 +455,11 @@ otherwise nothing but the setup host runs it or writes what it makes.
 
 ### 5.6 What holds of every plan on Forgejo
 
-- **Plaintext to loopback alone:** a managed or owned forge's
-  `transport` is plaintext, and one whose transport is TLS is refused at
-  start, naming it (section 15).
+- **Plaintext to loopback alone, for owned and fake:** an owned or fake
+  forge's `transport` is plaintext, and one whose transport is TLS is
+  refused at start, naming it (section 15). A managed forge's is TLS, or
+  plaintext to a loopback host alone; plaintext to another host is refused
+  at start, naming it.
 - **The bot's email** is the setup's `bot.email` when reconcile makes
   the bot, and stays as it is after: a change to `bot.email` reaches
   only a bot made after it, and an existing bot's email is the
@@ -1253,10 +1255,15 @@ running its commands, and the client names them (6.5).
   | `fake.owner` | a Forgejo login | other than the bot's and `temper-admin`: the user who owns the fake's repositories |
   | `fake.repositories` | a list of `{"name", "landing"}` | at least 1, at most 8, each `name` a Forgejo repository name, unique ignoring ASCII case as Forgejo's are, and `landing` a branch name; their contents are `temper-fake`'s (8.4) |
 
+  `"mode": "managed"` takes no `directory`, `start` or `orgs`, and its forge in `forges[]`
+  names no token files: its records are made when the person connects as
+  its admin (5.5). The object form `{"managed": {"admin_token": PATH}}`
+  stays until `temper forge reconcile` goes (`../draft/github.md`, 16.6).
+
   An owned entry names no org: its org is its first repository's,
   made by `Create` (6.7). An owned entry that still gives
   `person.orgs`, or the entry's own older `orgs`, is refused as an
-  unknown member, naming its path. A managed entry keeps its `orgs`,
+  unknown member, naming its path. A legacy managed entry keeps its `orgs`,
   at least one and at most `setup.orgs`, and a fake entry has none,
   until the entry's form is brought to this table (temper-15).
 

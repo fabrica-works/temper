@@ -1778,3 +1778,57 @@ fn clients_public_bounds_dns_labels_and_the_host() {
         }
     }
 }
+
+#[test]
+fn string_managed_starts_disconnected_without_a_setup_run() {
+    use temper_forge_setup::check;
+    let setup = br#"[{"forge":1,"bot":{"login":"temper","email":"temper@example.test"},"mode":"managed"}]"#;
+    let input = fixtures::with(&records_only_document(), b"application.setup", setup);
+    let document =
+        config::document(&input, &config::DocumentLimits { bytes: 65_536, tokens: 16_384, depth: 32 }).unwrap();
+    let named = crate::named(&input, &config::Directories::working()).unwrap();
+    let application = config::read::Object::new(&document, 0).unwrap().member(&document, b"application").unwrap();
+    let at = config::read::Object::new(&document, application).unwrap().member(&document, b"setup").unwrap();
+    let members = check::Members {
+        forges: Box::new([check::Forge {
+            number: 1,
+            api: Some(([127, 0, 0, 1], 9).into()),
+            plaintext: true,
+            git: named.forges[0].git.clone(),
+            user: check::User::Id(0),
+            api_token: Box::new([]),
+            webhook_secret: None,
+            identity_token: Box::new([]),
+            identity_login: b"temper".as_slice().into(),
+        }]),
+        listeners: Box::new([]),
+    };
+    let checked = check::checked(&document, at, &config::Directories::working(), &members, None, &[]).unwrap();
+    let mut service = crate::startup::with_setup(
+        &input,
+        &config::Directories::working(),
+        &fixtures::files(),
+        Some(&fixtures::startup_agent()),
+        &fixtures::seeds(),
+        None,
+        Some(fixtures::worker_runtime()),
+        fixtures::forge_runtime(),
+        Some(&checked),
+        false,
+    )
+    .unwrap();
+    service.engine.as_mut().unwrap().store = fixtures::records_store();
+    // Drain the startup record reads, then let setup act on their absence.
+    for _ in 0_u32..8 {
+        crate::forge::records::advance(service.engine.as_mut().unwrap());
+    }
+    crate::setup::advance(service.engine.as_mut().unwrap());
+    let engine = service.engine.as_ref().unwrap();
+    let bytes = crate::family::forges(engine.domain.forges(), &temper_client_protocol_wire::v1::CEILINGS).unwrap();
+    let rows = temper_client_protocol_wire::decode_forges(&bytes, &temper_client_protocol_wire::v1::CEILINGS).unwrap();
+    assert_eq!(rows.forges().get(0).unwrap().mode(), &temper_client_protocol_wire::v1::Mode::Managed);
+    assert_eq!(rows.forges().get(0).unwrap().connection(), &temper_client_protocol_wire::v1::Connection::NotConnected);
+    assert!(!engine.setup.busy(1));
+    assert!(engine.setup.staged.is_empty());
+    assert!(engine.setup.io.is_empty());
+}

@@ -69,3 +69,30 @@ fn reconcile_refuses_records_only_owned_and_fake_without_writing_files() {
     }
     fs::remove_dir_all(directory).expect("settings scratch removed");
 }
+
+#[test]
+fn reconcile_directs_string_managed_to_the_client_before_files() {
+    let directory = std::path::Path::new("/fixture/client-managed");
+    let directories = jig_protocol_config::Directories::given(
+        b"/fixture/client-managed",
+        b"/fixture/client-managed",
+        b"/fixture/cache",
+    )
+    .expect("fixture directories");
+    for transport in
+        [serde_json::json!("plaintext"), serde_json::json!({"tls":{"server_name":"forge.example","trust":null}})]
+    {
+        let mut value = configuration::check_document(directory);
+        value["application"]["webhooks"] = serde_json::Value::Null;
+        value["application"]["forges"][0]["transport"] = transport;
+        value["application"]["setup"][0] = serde_json::json!({
+            "forge":1,"mode":"managed","bot":{"login":"temper","email":"temper@example.test"}
+        });
+        let deployment = crate::setup::check(&serde_json::to_vec(&value).expect("fixture JSON"), &directories)
+            .expect("checked deployment");
+        assert_eq!(
+            reconcile_settings(&deployment.named, &deployment.checked, 1).err(),
+            Some("forge 1's admin’s token is given from the client: connect it as its admin there".into())
+        );
+    }
+}

@@ -107,6 +107,9 @@ pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
         demo_answer_name: bounds.field_bytes,
         demo_answer_cues: CUES,
         demo_answer_cues_item: CUE_BYTES,
+        first_ask_org: bounds.field_bytes,
+        first_ask_repository: bounds.field_bytes,
+        first_ask_label: 64,
         set_up_org: bounds.field_bytes,
         set_up_repository: bounds.field_bytes,
         new_project_name: bounds.field_bytes,
@@ -235,6 +238,13 @@ pub fn decode_requesting(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Reques
         v1::Request::Connect(connect) => match connect.how() {
             v1::How::GithubApp(app) if app.id() == 0 => return None,
             v1::How::GithubApp(_) | v1::How::GithubManifest(_) => {}
+            v1::How::ForgejoAdmin(admin) => {
+                if let Some(first) = admin.first()
+                    && !runner_label(first.label())
+                {
+                    return None;
+                }
+            }
         },
         v1::Request::Reachable(value) if value.page() == 0 => return None,
         v1::Request::Reachable(_)
@@ -273,4 +283,18 @@ pub fn decode_forges(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Forges> {
         previous = Some(row.number());
     }
     Some(record)
+}
+
+/// Whether a runner label can be used as one workflow scalar (client/README.md, 8).
+#[must_use]
+pub fn runner_label(label: &[u8]) -> bool {
+    if label.is_empty() || label.len() > 64 {
+        return false;
+    }
+    for byte in label {
+        if !byte.is_ascii_alphanumeric() && !b"._-".contains(byte) {
+            return false;
+        }
+    }
+    true
 }

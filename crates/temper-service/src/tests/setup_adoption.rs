@@ -422,7 +422,7 @@ fn old_form_owned_and_managed_serve_reads_without_start_time_writing_plans() {
         let mut config = old_form_configured(false);
         config.setup[0].handover = None;
         config.setup[0].entry.mode = if managed {
-            Mode::Managed { admin_token: b"/data/admin".as_slice().into() }
+            Mode::Managed { admin_token: Some(b"/data/admin".as_slice().into()) }
         } else {
             fixtures::owned_setup(1).entry.mode
         };

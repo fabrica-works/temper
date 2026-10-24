@@ -81,6 +81,28 @@ pub fn to_root(
                         w::Request::Connect(value) => {
                             let value = value.into_parts();
                             let how = match value.how {
+                                w::How::ForgejoAdmin(admin) => {
+                                    let first = match admin.into_parts().first {
+                                        Some(first) => {
+                                            let first = first.into_parts();
+                                            Some(forge::FirstAsk {
+                                                org: first.org,
+                                                repository: first.repository,
+                                                project: match first.project {
+                                                    w::SetUpProject::Existing(value) => {
+                                                        forge::SetUpProject::Existing(value.project())
+                                                    }
+                                                    w::SetUpProject::New(value) => {
+                                                        forge::SetUpProject::New(value.into_parts().name)
+                                                    }
+                                                },
+                                                label: first.label,
+                                            })
+                                        }
+                                        None => None,
+                                    };
+                                    forge::How::ForgejoAdmin { first }
+                                }
                                 w::How::GithubApp(app) => forge::How::GitHubApp {
                                     app: core::num::NonZeroU64::new(app.id()).expect("decoded nonzero App"),
                                 },

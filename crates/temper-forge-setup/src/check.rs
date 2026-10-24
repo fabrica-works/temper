@@ -69,7 +69,7 @@ pub fn members(setup: &Setup, members: &Members, webhooks: bool, ps: &mut Proble
             .child(Segment::Index(u32::try_from(i).expect("bounded entries")));
         for prev in setup.entries.iter().take(i) {
             require(e.forge != prev.forge, p.member(b"forge"), ps);
-            require(e.directory != prev.directory, p.member(b"directory"), ps);
+            require(e.directory.is_empty() || e.directory != prev.directory, p.member(b"directory"), ps);
         }
         let mut found = None;
         for f in &members.forges {
@@ -94,7 +94,18 @@ pub fn members(setup: &Setup, members: &Members, webhooks: bool, ps: &mut Proble
             && f.webhook_secret.is_none()
             && f.identity_token.is_empty();
         // temper-15 removes the old file cross-check, preserving its exact refusals.
-        if !records {
+        let client_managed = e.mode == (Mode::Managed { admin_token: None });
+        if client_managed {
+            require(f.api_token.is_empty(), fp.member(b"api_token"), ps);
+            require(f.user == User::Id(0), fp.member(b"user"), ps);
+            require(f.webhook_secret.is_none(), fp.member(b"webhook_secret"), ps);
+            require(f.identity_token.is_empty(), p.member(b"forge"), ps);
+            let loopback = match f.api {
+                Some(address) => address.ip().is_loopback(),
+                None => false,
+            };
+            require(!f.plaintext || loopback, fp.member(b"transport"), ps);
+        } else if !records {
             if webhooks {
                 require(
                     f.webhook_secret == Some(joined(&[&e.directory, b"/webhook_secret"])),
@@ -108,7 +119,8 @@ pub fn members(setup: &Setup, members: &Members, webhooks: bool, ps: &mut Proble
             require(f.identity_login == e.bot.login, p.member(b"bot").member(b"login"), ps);
         }
         match &e.mode {
-            Mode::Managed { .. } => {
+            Mode::Managed { admin_token: None } => {}
+            Mode::Managed { admin_token: Some(_) } => {
                 require(!records, p.member(b"mode"), ps);
                 require(!e.asked, p.member(b"start"), ps);
             }
