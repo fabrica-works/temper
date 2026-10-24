@@ -610,7 +610,8 @@ section 3), and temper's `application.sign_in.forges`:
   Forgejo, the temper source added by the printed command, a scripted
   client with a cookie jar that signs in to temper by the printed link
   and then to Forgejo through temper, and Forgejo's API naming the
-  member's account by their login and address. It proves the claims and
+  member's account by their login, their address and the `sub` it
+  keeps. It proves the claims and
   Forgejo's settings, which no fake can. The printed link, not the fake
   Google: with `sign_in` configured it signs in the member of Google's
   provider (2.3), so Forgejo gets the same claims; Google's leg is the

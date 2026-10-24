@@ -885,11 +885,15 @@ and 10).
   provider, 2.3), opens `/user/oauth2/temper` on Forgejo, follows
   temper's authorization (its `Authorize` sent by jig's codec, as the
   page sends it) back to Forgejo's callback, and Forgejo's API, by its
-  admin, then names the member's account by their login and their
-  address, which only Google's provider gives, so the link provider's
-  identity cannot pass. It aims at 2 s past Forgejo's start (about 0.5 s;
-  about 3 s whole, Forgejo's preparation and start being the rest). It
-  shares no start: nextest runs each test in a process of its own.
+  admin, then names the member's account by their login, their address
+  and its external id, `sub` (`3:sam@example.com`, Google's provider and
+  the address), which only Google's provider gives, so the link
+  provider's identity cannot pass. It aims at 2 s, as a world's story
+  does (6.1), and takes about 3 s whole: about 2.5 s is the owned
+  Forgejo's preparation and start, as every owned-Forgejo story pays,
+  and about 0.5 s is temper's part; being past its aim, it waits on the
+  user's call with these figures. It shares no start: nextest runs each
+  test in a process of its own.
 - **The throwaway Forgejo** is the one in skein's `fake-forge.md`,
   section 6, never an existing Forgejo: temper's `tools/git-transcripts`
   records real git against it (../protocol/git.md, section 9). temper's
