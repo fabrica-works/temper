@@ -101,6 +101,7 @@ pub(crate) fn print(outcome: &Outcome, as_json: bool, kept: bool, limits: &Limit
             operation.word = b"demo-start";
             if kept {
                 return jig::Printed {
+                    file: jig::FileEnd::Keep,
                     status: 1,
                     stdout: Box::default(),
                     stderr: render::outcome::kept(&operation, outcome, as_json, None, &limits.tools),
@@ -135,8 +136,8 @@ pub(crate) fn print(outcome: &Outcome, as_json: bool, kept: bool, limits: &Limit
         return render::failure(b"result limit", as_json, 1);
     }
     if status == 0 {
-        jig::Printed { status, stdout: bytes, stderr: Box::default() }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: bytes, stderr: Box::default() }
     } else {
-        jig::Printed { status, stdout: Box::default(), stderr: bytes }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: Box::default(), stderr: bytes }
     }
 }

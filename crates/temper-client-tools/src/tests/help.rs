@@ -22,6 +22,8 @@ const GOLDENS: &[(Option<u8>, &str)] = &[
     (Some(31), "help_amend"),
     (Some(37), "help_forge_connect"),
     (Some(38), "help_forge_install"),
+    (Some(39), "help_export"),
+    (Some(40), "help_import"),
 ];
 #[test]
 fn the_help_prints_as_its_golden_files() {
@@ -78,6 +80,8 @@ const USAGES: &[&[u8]] = &[
     b"forge-connect F github-app ID FILE --key NAME\nforge-connect F github --key NAME\nforge-connect F forgejo|forgejo-admin FILE --key NAME\n",
     b"forge-install F [--key NAME]\n",
     b"repositories F [--installation I] [--page N]\n",
+    b"export ACCOUNT FILE\n",
+    b"import FILE --key NAME\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {
@@ -229,4 +233,10 @@ fn help_refuses_a_writer_one_byte_short() {
     let mut out = skein_lib::Writer::new(short);
     assert_eq!(crate::help::text(None, &mut out), Err(skein_lib::Overflow));
     assert_eq!(out.written(), fixtures::NO_HELP_BYTES, "overflow does not publish a partial help");
+}
+#[test]
+fn the_moves_places_name_their_rows_in_the_table() {
+    for (at, row) in [(jig::rows::EXPORT_AT, &jig::rows::EXPORT), (jig::rows::IMPORT_AT, &jig::rows::IMPORT)] {
+        assert_eq!(table::TOOLS[usize::from(at)].name, row.name);
+    }
 }

@@ -10,6 +10,8 @@ pub const PROGRAM_NAME: u32 = jig_client::contract::PROGRAM_NAME;
 /// jig's protocol/configuration.md program-adapter names are at most 32 bytes.
 pub const PROGRAM_ADAPTER: u32 = 32;
 pub const KEY_BYTES: u32 = 4096;
+/// Whole moved records, client/tools.md, 12.
+pub const MOVED_BYTES: u32 = 128 * 1024;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Call {
     pub tool: u8,

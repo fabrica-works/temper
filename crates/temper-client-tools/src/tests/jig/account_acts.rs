@@ -4,6 +4,8 @@ use skein_lib::{List, Secret};
 const KEY: &[u8] = b"one-use-private-key";
 const ADD: &[&str] = &["add-key", "9", "key-file", "--deployment", "--key", "add"];
 const FORMS: &[&[&str]] = &[
+    &["export", "43", "file"],
+    &["import", "file", "--key", "move-in"],
     &["connect", "9", "--key", "connect"],
     &["connect", "0", "--key", "zero-provider"],
     &["add-key", "0", "file", "--key", "zero-provider"],
@@ -34,7 +36,12 @@ fn account_forms_round_trip_through_the_table() {
 #[test]
 fn account_usage_is_refused_before_sending() {
     for words in [
-        &["connect", "9"][..],
+        &["export", "43", "file", "--key", "forbidden"][..],
+        &["export", "4294967296", "file"],
+        &["export", "43", "-"],
+        &["import", "file"],
+        &["import", "-", "--key", "move-in"],
+        &["connect", "9"],
         &["add-key", "9", "file"],
         &["add-key", "9", "-", "--key", "add"],
         &["rank", "43", "0"],
@@ -613,6 +620,143 @@ fn program_disconnect_and_forget_report_confirmation_or_each_failed_host() {
                 }
                 assert!(!f::has(&printed, b"under Apps"));
             }
+        }
+    }
+}
+
+#[test]
+fn exports_resolve_the_holder_without_selecting_a_source() {
+    for owner in [false, true] {
+        let mut root = f::account_root(owner);
+        let call = root.submit(&["export", "43", "record"]);
+        let mut accounts = f::accounts();
+        // Source state and completeness are the engine's policy, not ctl's.
+        accounts.accounts.get_mut(0).expect("account").sources = List::with_capacity(0);
+        accounts.accounts.get_mut(0).expect("account").cut = true;
+        if owner {
+            accounts.accounts = List::with_capacity(0);
+        }
+        f::deliver_accounts(&mut root, accounts);
+        if owner {
+            f::deliver_deployment(&mut root, f::deployment());
+        }
+        let (_, _, ask) = root.sends.get(&call).expect("move out sent");
+        let holder = if owner { c::AccountHolder::Deployment } else { c::AccountHolder::Own };
+        assert_eq!(
+            ask,
+            &jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
+                holder,
+                change: c::AccountChange::MoveOut { account: f::ACCOUNT }
+            }))
+        );
+        assert!(root.saved.is_empty());
+        assert!(root.carried.is_empty());
+    }
+}
+#[test]
+fn imports_carry_the_whole_record_once_as_own_at_the_bound() {
+    const RECORD: &[u8] = &[b'r'; 131_072]; // client/tools.md, 12.
+    let mut root = f::account_root(false);
+    let call = root.submit_value(&["import", "record", "--key", "move-in"], Some(Secret::new(RECORD.into())));
+    let (_, _, ask) = root.sends.get(&call).expect("move in sent");
+    assert_eq!(
+        ask,
+        &jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
+            holder: c::AccountHolder::Own,
+            change: c::AccountChange::MoveIn { digest: skein_lib::sha256::digest(RECORD) },
+        }))
+    );
+    assert_eq!(root.carried.get(&call).expect("carried record").expose(), RECORD);
+    assert!(root.saved.is_empty());
+}
+#[test]
+fn imports_refuse_empty_or_oversized_values_before_sending() {
+    const TOO_LARGE: &[u8] = &[b'r'; 131_073]; // One beyond client/tools.md, 12.
+    for bytes in [b"".as_slice(), TOO_LARGE] {
+        let mut root = f::account_root(false);
+        let call = root.submit_value(&["import", "record", "--key", "move-in"], Some(Secret::new(bytes.into())));
+        let printed = root.answer(call).expect("bound failure");
+        assert_eq!(printed.status, 1);
+        assert_eq!(printed.file, crate::jig::FileEnd::Keep);
+        assert!(root.sends.is_empty());
+    }
+}
+
+#[test]
+fn exports_wait_for_the_record_acknowledgment_and_render_public_fields() {
+    const RECORD: &[u8] = b"opaque-move-record";
+    for json in [false, true] {
+        let mut root = f::account_root(false);
+        let call = root.submit(if json { &["export", "43", "record", "--json"] } else { &["export", "43", "record"] });
+        f::deliver_accounts(&mut root, f::accounts());
+        let name = root.sent_name(call).expect("move name");
+        root.done(
+            call,
+            c::Outcome::Made {
+                what: c::Made::MovingOut { account: f::ACCOUNT, number: 83, record: Secret::new(RECORD.into()) },
+            },
+        );
+        assert_eq!(root.records.remove(&call).expect("shell record").expose(), RECORD);
+        assert!(root.answer(call).is_none());
+        assert!(root.saved.is_empty());
+        let mut out = skein_lib::Queue::with_capacity(f::OUTPUTS);
+        let env = skein_lib::Env {
+            now: root.now,
+            wall: root.wall,
+            limits: crate::root::Limits { domain: root.limits.domain, tools: root.limits.tools },
+        };
+        root.root.recorded(&env, call, Ok(()), &mut out);
+        root.outputs(out);
+        assert_ne!(root.sent_name(call).expect("written name"), name);
+        let (_, _, ask) = root.sends.get(&call).expect("written");
+        assert_eq!(
+            ask,
+            &jig_client::Ask::Jig(Box::new(c::Ask::AccountChange {
+                holder: c::AccountHolder::Own,
+                change: c::AccountChange::Written { number: 83 }
+            }))
+        );
+        root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountChanged));
+        let printed = root.answer(call).expect("exported");
+        assert_eq!((printed.status, printed.file), (0, crate::jig::FileEnd::Keep));
+        if json {
+            assert!(
+                skein_lib::bytes::find(&printed.stdout, br#""outcome":{"account":43,"number":83,"file":"record"}"#)
+                    .is_some()
+            );
+        } else {
+            assert_eq!(printed.stdout.as_ref(), b"moved out: account 43 to record\n");
+        }
+        assert!(skein_lib::bytes::find(&printed.stdout, RECORD).is_none());
+        assert!(printed.stderr.is_empty());
+    }
+}
+#[test]
+fn imports_render_the_account_and_renewal_from_the_answer() {
+    for json in [false, true] {
+        for (renewed, text) in
+            [(false, b"moved in: account 43\n".as_slice()), (true, b"moved in: account 43, renewed\n")]
+        {
+            let mut root = f::account_root(false);
+            let words = if json {
+                &["import", "record", "--key", "move-in", "--json"][..]
+            } else {
+                &["import", "record", "--key", "move-in"]
+            };
+            let call = root.submit_value(words, Some(Secret::new(KEY.into())));
+            root.done(call, c::Outcome::Owner(c::OwnerOutcome::AccountMovedIn { account: f::ACCOUNT, renewed }));
+            let printed = root.answer(call).expect("imported");
+            assert_eq!((printed.status, printed.file), (0, crate::jig::FileEnd::Remove));
+            if json {
+                assert!(
+                    skein_lib::bytes::find(&printed.stdout, br#""account_moved_in":{"account":43,"renewed":"#)
+                        .is_some()
+                );
+            } else {
+                assert_eq!(printed.stdout.as_ref(), text);
+            }
+            assert!(skein_lib::bytes::find(&printed.stdout, KEY).is_none());
+            assert!(printed.stderr.is_empty());
         }
     }
 }

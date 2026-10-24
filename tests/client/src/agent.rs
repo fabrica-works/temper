@@ -138,6 +138,7 @@ pub fn step(agent: &mut Agent, env: &Env<domain::Limits>, event: Event, out: &mu
 fn drain(agent: &mut Agent, requests: &mut Queue<root::Request>, out: &mut Queue<Request>) {
     while let Some(request) = requests.pop() {
         match request {
+            temper_client_tools::root::Request::Record { .. } => unreachable!("world agent does not move accounts"),
             root::Request::Client { request } => out.push(Request::Client { request }),
             root::Request::Fact { fact } => out.push(Request::Fact { fact }),
             root::Request::Ready => agent.ready = true,

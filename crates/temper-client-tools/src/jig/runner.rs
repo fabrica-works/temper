@@ -8,10 +8,17 @@ use jig_client::{
 use skein_lib::{Deadlines, Env, Queue};
 mod accounts;
 pub(crate) mod acts;
+mod moves;
 pub(crate) mod reads;
 mod recovery;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FileEnd {
+    Keep,
+    Remove,
+}
 #[derive(Debug)]
 pub struct Printed {
+    pub file: FileEnd,
     pub status: u8,
     pub stdout: Box<[u8]>,
     pub stderr: Box<[u8]>,
@@ -27,6 +34,7 @@ pub struct Runner {
     names: skein_lib::Rng,
     acts: BTreeMap<u32, acts::Reading>,
     sent: BTreeMap<jig_client::Key, acts::Sent>,
+    recording: BTreeMap<u32, moves::Recording>,
     kept: BTreeMap<jig_client::Key, render::outcome::Operation>,
     kept_json: bool,
     ready: bool,
@@ -45,6 +53,7 @@ pub struct Called {
 pub enum Out {
     Client { event: Event },
     Ready,
+    Record { number: u32, record: skein_lib::Secret },
     Kept { line: Box<[u8]> },
     Progress { line: Box<[u8]> },
     Printed { number: u32, printed: Printed },
@@ -63,6 +72,7 @@ impl Runner {
             names: skein_lib::Rng::new(seed ^ 0x4143_434F_554E_5453),
             acts: BTreeMap::new(),
             sent: BTreeMap::new(),
+            recording: BTreeMap::new(),
             kept: BTreeMap::new(),
             kept_json: false,
             ready: false,
@@ -76,6 +86,8 @@ impl Runner {
     pub(crate) fn calls(&self) -> usize {
         self.waiting
             .len()
+            .checked_add(self.recording.len())
+            .expect("bounded calls")
             .checked_add(self.active.len())
             .expect("bounded calls")
             .checked_add(self.acts.len())
@@ -105,14 +117,24 @@ impl Runner {
     }
 }
 pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, called: Called, out: &mut Queue<Out>) {
+    let importing = called.call.tool == crate::jig::rows::IMPORT_AT;
+    let bound = if importing { crate::jig::call::MOVED_BYTES } else { crate::jig::call::KEY_BYTES };
     if let Some(value) = &called.value
-        && (value.is_empty() || value.len() > usize::try_from(crate::jig::call::KEY_BYTES).expect("key bound"))
+        && (value.is_empty() || value.len() > usize::try_from(bound).expect("value bound"))
     {
-        let printed = render::failure(b"key file must contain 1 to 4096 bytes", called.json, 1);
+        let printed = render::failure(
+            if importing {
+                b"record file must contain 1 to 131072 bytes"
+            } else {
+                b"key file must contain 1 to 4096 bytes"
+            },
+            called.json,
+            1,
+        );
         finish(called, printed, out);
         return;
     }
-    if called.value.is_some() != (called.call.tool == 26 || called.call.tool == 27) {
+    if called.value.is_some() != (called.call.tool == 26 || called.call.tool == 27 || importing) {
         let printed = render::failure(b"key file must be supplied only for add-key or replace-key", called.json, 1);
         finish(called, printed, out);
         return;
@@ -140,8 +162,8 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
                 render::me(me, called.json, &env.limits, runner.parts.expect("host supplies part vocabulary"));
             finish(called, printed, out);
         }
-        1..=7 | 22 | 23 | 25 | 27..=30 | 33 => reads::start(runner, client, env, called, out),
-        24 | 26 | 32 => accounts::start(runner, client, env, called, out),
+        1..=7 | 22 | 23 | 25 | 27..=30 | 33 | 39 => reads::start(runner, client, env, called, out),
+        24 | 26 | 32 | 40 => accounts::start(runner, client, env, called, out),
         8..=15 | 31 => acts::start(runner, client, env, called, out),
         16 => wait::start(runner, client, env, called, out),
         _ => {
@@ -186,9 +208,44 @@ pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
         Told::Kept { key, request } => recovery::kept(runner, key, &request, client),
         Told::Dropped { count } => recovery::dropped(runner, count, out),
         Told::Answered { key, outcome } => acts::answered(runner, client, env, key, &outcome, out),
-        Told::Link { .. } | Told::Pending { .. } => {}
+        Told::Pending { key } => {
+            if let Some(sent) = runner.sent.get_mut(&key)
+                && sent.operation.exported.is_some()
+                && let Some(pending) = client.pending(key)
+            {
+                match pending.progress {
+                    jig_client::Progress::InFlight | jig_client::Progress::Retrying { .. } => sent.dispatched = true,
+                    jig_client::Progress::Parked | jig_client::Progress::Unknown | jig_client::Progress::NotServed => {}
+                }
+            }
+        }
+        Told::Link { .. } => {}
     }
 }
-pub(crate) fn finish(called: Called, printed: Printed, out: &mut Queue<Out>) {
+pub(crate) fn finish(called: Called, mut printed: Printed, out: &mut Queue<Out>) {
+    if called.call.tool == crate::jig::rows::EXPORT_AT {
+        printed.file = FileEnd::Remove;
+    }
     out.push(Out::Printed { number: called.number, printed });
+}
+
+/// The runner decides cleanup on signals and shell failures too.
+#[must_use]
+pub fn file_end(runner: &Runner, number: u32) -> FileEnd {
+    for sent in runner.sent.values() {
+        if sent.called.number == number && sent.dispatched {
+            return FileEnd::Keep;
+        }
+    }
+    FileEnd::Remove
+}
+pub fn recorded(
+    runner: &mut Runner,
+    client: &Client,
+    env: &Env<crate::jig::Limits>,
+    number: u32,
+    result: Result<(), Box<[u8]>>,
+    out: &mut Queue<Out>,
+) {
+    moves::recorded(runner, client, env, number, result, out);
 }

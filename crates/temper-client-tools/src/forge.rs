@@ -258,6 +258,7 @@ pub(crate) fn print(
                 render::outcome::Operation::of(&forge::ask(adoption, &limits.domain.forge).expect("validated ask"));
             if kept {
                 return jig::Printed {
+                    file: jig::FileEnd::Keep,
                     status: 1,
                     stdout: Box::default(),
                     stderr: render::outcome::kept(&operation, outcome, json, None, &limits.tools),
@@ -289,9 +290,9 @@ pub(crate) fn print(
         write.finish()
     };
     if status == 0 {
-        jig::Printed { status, stdout: bytes, stderr: Box::default() }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: bytes, stderr: Box::default() }
     } else {
-        jig::Printed { status, stdout: Box::default(), stderr: bytes }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: Box::default(), stderr: bytes }
     }
 }
 fn phrase(word: Word, holes: &[Hole], out: &mut Text) {
@@ -616,7 +617,7 @@ fn decode_failure(json: bool, kept: bool) -> jig::Printed {
         out.put(b"\n");
         out.finish()
     };
-    jig::Printed { status: 1, stdout: Box::default(), stderr }
+    jig::Printed { file: jig::FileEnd::Keep, status: 1, stdout: Box::default(), stderr }
 }
 fn error_json(reason: &[u8], out: &mut Encoder) {
     out.object_start();

@@ -1,0 +1,5 @@
+export ACCOUNT FILE
+Move a signed-in account out to a new private file, synced before written
+Result: export
+  account: Account number
+  file: New private record file; never stdin

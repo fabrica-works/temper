@@ -22,7 +22,7 @@ pub fn pending(rows: &[RequestRecord<Held>], unread: u32, json: bool) -> Printed
         text(rows, unread, &mut out);
         out.finish()
     };
-    Printed { status: 0, stdout, stderr: Box::default() }
+    Printed { file: crate::jig::FileEnd::Keep, status: 0, stdout, stderr: Box::default() }
 }
 fn text(rows: &[RequestRecord<Held>], unread: u32, out: &mut Text) {
     for row in rows {

@@ -29,6 +29,16 @@ ADAPTER must appear in the provider's programs in me; the declare request carrie
 NAME is 1 to 32 lower-case letters, digits or hyphens.
 declare prints temper program-login NAME to run on each host; the tools never run it.
 verify accepts only a program source, answers once asked, then prints wait accounts --until settled.
+Move a signed-in account between deployments:
+  temper ctl DIRECTORY export 43 FILE
+  temper ctl DIRECTORY import FILE --key move-in
+export creates FILE new and private before sending, writes and syncs the record, then sends written.
+It takes no --key. Until written, failures remove FILE; lost exports can be tried again after the move's deadline.
+After written, FILE is kept unless the engine refuses cancelled. A later call resends a kept written.
+import reads a private owned regular file, never a link: 1 to 131072 bytes whole, with no newline trimmed.
+A newer JIGM form requires upgrading temper before sending. Other forms are the engine's to decide.
+Moved in prints the account and removes FILE; a failed removal exits 1 and says its record is spent.
+Refused or lost imports keep FILE: ask again with the same --key and FILE. No record is printed or stored.
 Keys use private files, never stdin or arguments; 1 to 4096 bytes after stripping one final newline.
 Value requests are sent once, never kept or automatically replayed. Unsent/lost exits 1;
 rerun with the same --key and file to recover the original answer. Only engine refusals exit 2.
@@ -62,7 +72,7 @@ Without these flags the template's choice or engine default is sent unchanged.
 A model change preserves the supplied account and sub-agent choices; there is no --account flag.
 Unknown model or effort names fail locally (exit 1), without sending.
 
-Name keys for chat, message, close, adopt, connect, add-key, declare and forge-connect; other acts accept an optional --key NAME.
+Name keys for chat, message, close, adopt, connect, add-key, declare, import and forge-connect; export takes no --key and other acts accept an optional --key NAME.
 Names are one to 64 lower-case letters, digits or hyphens.
 Give each agent a distinct prefix, such as investigate-41; reads and waits need no key.
 A repeat keeps its name, party and ask within retention. A changed template or bound in me

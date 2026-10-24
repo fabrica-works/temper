@@ -253,8 +253,8 @@ pub fn party(number: u64, me: Option<&Me>, out: &mut Text) {
 pub fn refusal(why: &Refusal, book: &Phrasebook, out: &mut Text) {
     let word = Word::refusal(why);
     let text = match why {
-        Refusal::Stale(_) | Refusal::Full(_) | Refusal::AccountMove { .. } => {
-            unreachable!("the engine does not request settings")
+        Refusal::Stale(_) | Refusal::Full(_) => {
+            unreachable!("the tools do not request settings")
         }
         Refusal::Account { account, .. } => book.say(0, word.id(), &[Hole::Number(u64::from(*account))]),
         Refusal::Taken { by } => book.say(0, word.id(), &[Hole::Number(*by)]),
@@ -275,6 +275,7 @@ pub fn refusal(why: &Refusal, book: &Phrasebook, out: &mut Text) {
         | Refusal::Dependency { .. }
         | Refusal::Kept { .. }
         | Refusal::NameTaken
+        | Refusal::AccountMove { .. }
         | Refusal::Provider => book.say(0, word.id(), &[]),
     }
     .expect("checked refusal phrase")

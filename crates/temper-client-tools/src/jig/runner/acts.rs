@@ -16,8 +16,10 @@ pub(super) struct Reading {
 }
 #[derive(Debug)]
 pub(super) struct Sent {
-    called: Called,
-    operation: Operation,
+    pub(super) called: Called,
+    pub(super) operation: Operation,
+    pub(super) holder: Option<c::AccountHolder>,
+    pub(super) dispatched: bool,
 }
 pub(crate) fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
     match client.document(runner.me())?.latest? {
@@ -374,6 +376,9 @@ fn decision(call: &Call, limits: &Limits) -> Result<c::Decision, Failed> {
     })
 }
 pub(crate) enum Request {
+    MoveOut { holder: c::AccountHolder, account: u32 },
+    Written { holder: c::AccountHolder, account: u32, number: u32 },
+    MoveIn,
     Ask(c::Ask),
     Account { ask: c::Ask, context: render::outcome::Account },
     AddKey { holder: c::AccountHolder, provider: u32, join: Option<u32> },
@@ -385,7 +390,7 @@ pub(crate) fn prepared(
     runner: &mut Runner,
     client: &Client,
     _env: &Env<Limits>,
-    mut called: Called,
+    called: Called,
     request: Prepared,
     out: &mut Queue<Out>,
 ) {
@@ -402,36 +407,55 @@ pub(crate) fn prepared(
             return;
         }
     };
+    send(runner, client, called, request, to, out);
+}
+fn send(
+    runner: &mut Runner,
+    client: &Client,
+    mut called: Called,
+    request: Request,
+    to: Option<c::Recipient>,
+    out: &mut Queue<Out>,
+) {
     let key = Key { asker: runner.asker, number: (u64::from(called.call_number) << 32u32) | 1 };
     if client.pending(key).is_some() {
         let printed = render::failure(b"tools' bug; client key collision; report it as a finding", called.json, 1);
         finish(called, printed, out);
         return;
     }
-    // Tool 33 draws a key because check_program requires one even when verify omits --key.
-    if (called.value.is_some() || called.call.tool == 33) && called.call.key.is_none() {
-        let mut bytes = [0; 32];
-        for chunk in bytes.chunks_mut(16) {
-            let hex = crate::jig::digest::Digest::from_bytes(runner.names.next_u64().to_le_bytes()).hex();
-            for (slot, byte) in chunk.iter_mut().zip(hex) {
-                *slot = byte;
-            }
-        }
-        called.call.key = Some(crate::jig::key::Name::new(&bytes).expect("drawn hexadecimal name"));
-    }
+    draw_name(runner, &mut called);
     let name = match &called.call.key {
         Some(name) => Some(crate::jig::key::named(runner.salt, name)),
         None => None,
     };
     let (request, account) = match request {
         Request::Account { ask, context } => (Request::Ask(ask), Some(context)),
-        request @ (Request::Ask(_)
+        request @ (Request::MoveOut { .. }
+        | Request::Written { .. }
+        | Request::MoveIn
+        | Request::Ask(_)
         | Request::AddKey { .. }
         | Request::ReplaceKey { .. }
         | Request::DeclareProgram { .. }
         | Request::CheckProgram { .. }) => (request, None),
     };
+    let mut holder = None;
+    let mut exported = None;
     let event = match request {
+        Request::MoveOut { holder: h, account } => {
+            holder = Some(h);
+            jig_client::accounts::move_out(key, name.expect("move name"), h, account)
+        }
+        Request::Written { holder, account, number } => {
+            exported = Some((account, number));
+            jig_client::accounts::written(key, name.expect("written name"), holder, number)
+        }
+        Request::MoveIn => jig_client::accounts::move_in(
+            key,
+            name.expect("import name"),
+            c::AccountHolder::Own,
+            called.value.take().expect("record supplied"),
+        ),
         Request::Account { .. } => unreachable!("account context extracted"),
         Request::DeclareProgram { holder, provider, join, name: program } => {
             jig_client::accounts::declare_program(key, name.expect("declaration name"), holder, provider, join, program)
@@ -459,9 +483,16 @@ pub(crate) fn prepared(
     let (Event::Send { request, .. } | Event::Carry { request, .. }) = &event else { unreachable!("act event") };
     let mut operation = Operation::of(request);
     operation.to = to;
+    operation.exported = exported;
+    if called.call.tool == crate::jig::rows::EXPORT_AT {
+        let Some(Value::File(file)) = value(&called.call, 1) else { unreachable!("export file") };
+        operation.file = Some(file.clone());
+    }
     operation.account = account;
-    operation.retry = Some(render::outcome::retry(&called.call));
-    if called.call.tool == 26 || called.call.tool == 27 {
+    if called.call.tool != crate::jig::rows::EXPORT_AT {
+        operation.retry = Some(render::outcome::retry(&called.call));
+    }
+    if called.call.tool == 26 || called.call.tool == 27 || called.call.tool == crate::jig::rows::IMPORT_AT {
         operation.value_name.clone_from(&called.call.key);
     }
     if let Some(me) = me(runner, client) {
@@ -471,10 +502,15 @@ pub(crate) fn prepared(
     if called.call.tool == 10 {
         operation.word = b"close";
     }
-    if (24..=30).contains(&called.call.tool) || called.call.tool == 32 || called.call.tool == 33 {
+    if (24..=30).contains(&called.call.tool)
+        || called.call.tool == 32
+        || called.call.tool == 33
+        || called.call.tool == crate::jig::rows::EXPORT_AT
+        || called.call.tool == crate::jig::rows::IMPORT_AT
+    {
         operation.word = render::outcome::account_tool(called.call.tool).name;
     }
-    runner.sent.insert(key, Sent { called, operation });
+    runner.sent.insert(key, Sent { called, operation, holder, dispatched: false });
     out.push(Out::Client { event });
 }
 pub(super) fn answered(
@@ -486,8 +522,19 @@ pub(super) fn answered(
     out: &mut Queue<Out>,
 ) {
     if let Some(sent) = runner.sent.remove(&key) {
-        let printed =
+        if sent.called.call.tool == crate::jig::rows::EXPORT_AT {
+            super::moves::answered(runner, client, env, sent, outcome, out);
+            return;
+        }
+        let mut printed =
             render::outcome::print(&sent.operation, outcome, sent.called.json, me(runner, client), &env.limits);
+        if sent.called.call.tool == crate::jig::rows::IMPORT_AT
+            && let jig_client::Outcome::Answered(jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(
+                c::OwnerOutcome::AccountMovedIn { .. },
+            )))) = outcome
+        {
+            printed.file = super::FileEnd::Remove;
+        }
         finish(sent.called, printed, out);
     } else if let Some(operation) = runner.kept.remove(&key) {
         let line = render::outcome::kept(&operation, outcome, runner.kept_json, me(runner, client), &env.limits);
@@ -525,5 +572,19 @@ fn close(call: &Call, document: &c::ReadValue, me: &c::Me, project: u32, limits:
     match shapes::close_chat(me, project, task.chip.task, delegates.as_slice(), words(call, 2, limits)?) {
         Ok(ask) => Ok(ask),
         Err(_) => Err(Failed::Fixed(b"close not offered")),
+    }
+}
+
+fn draw_name(runner: &mut Runner, called: &mut Called) {
+    // Tool 33 draws a key because check_program requires one even when verify omits --key.
+    if (called.value.is_some() || called.call.tool == 33 || called.call.tool == crate::jig::rows::EXPORT_AT) && called.call.key.is_none() {
+        let mut bytes = [0; 32];
+        for chunk in bytes.chunks_mut(16) {
+            let hex = crate::jig::digest::Digest::from_bytes(runner.names.next_u64().to_le_bytes()).hex();
+            for (slot, byte) in chunk.iter_mut().zip(hex) {
+                *slot = byte;
+            }
+        }
+        called.call.key = Some(crate::jig::key::Name::new(&bytes).expect("drawn hexadecimal name"));
     }
 }

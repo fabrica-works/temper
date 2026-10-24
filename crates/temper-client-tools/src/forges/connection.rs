@@ -301,6 +301,7 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
             }
             if kept {
                 return jig::Printed {
+                    file: jig::FileEnd::Keep,
                     status: 1,
                     stdout: Box::default(),
                     stderr: render::outcome::kept(&operation, outcome, structured, None, &limits.tools),
@@ -339,8 +340,8 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
         return render::failure(b"result limit", structured, 1);
     }
     if status == 0 {
-        jig::Printed { status, stdout: bytes, stderr: Box::default() }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: bytes, stderr: Box::default() }
     } else {
-        jig::Printed { status, stdout: Box::default(), stderr: bytes }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: Box::default(), stderr: bytes }
     }
 }

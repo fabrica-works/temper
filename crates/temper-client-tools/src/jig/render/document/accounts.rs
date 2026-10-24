@@ -354,7 +354,7 @@ fn state(value: c::OwnerAccountState, out: &mut Encoder) {
     out.object_start();
     out.key(b"kind");
     out.string(match value {
-        S::Moving => unreachable!("the engine does not render account moves"),
+        S::Moving => b"moving",
         S::Asking => b"asking",
         S::Granted => b"granted",
         S::Later { .. } => b"later",
@@ -365,10 +365,9 @@ fn state(value: c::OwnerAccountState, out: &mut Encoder) {
         S::Closing => b"closing",
     });
     match value {
-        S::Moving => unreachable!("the engine does not render account moves"),
         S::Later { until } => wall(b"until", until, out),
         S::Unloaded { at, why } => unloaded(at, why, out),
-        S::Asking | S::Granted | S::SignInAgain | S::Misconfigured | S::Cancelled | S::Closing => {}
+        S::Moving | S::Asking | S::Granted | S::SignInAgain | S::Misconfigured | S::Cancelled | S::Closing => {}
     }
     out.object_end();
 }
@@ -404,9 +403,10 @@ fn end(value: c::OwnerAccountEnd, out: &mut Encoder) {
         E::Refused { refusal } => {
             out.key(b"refused");
             out.string(match refusal {
-                R::NotSignedIn | R::NotOurs | R::Cancelled | R::Moving => {
-                    unreachable!("the engine does not render account moves")
-                }
+                R::NotSignedIn => b"not_signed_in",
+                R::NotOurs => b"not_ours",
+                R::Cancelled => b"cancelled",
+                R::Moving => b"moving",
                 R::NotLimited => b"not_limited",
                 R::Uses => b"uses",
                 R::NotKept { .. } => b"not_kept",
@@ -421,9 +421,6 @@ fn end(value: c::OwnerAccountEnd, out: &mut Encoder) {
                 R::NotStarted => b"not_started",
             });
             match refusal {
-                R::NotSignedIn | R::NotOurs | R::Cancelled | R::Moving => {
-                    unreachable!("the engine does not render account moves")
-                }
                 R::Held { provider } | R::Provider { provider } => number(b"provider", u64::from(provider), out),
                 R::NotKept { why } => {
                     out.key(b"why");
@@ -450,7 +447,17 @@ fn end(value: c::OwnerAccountEnd, out: &mut Encoder) {
                         c::OwnerAccountKind::None => b"none",
                     });
                 }
-                R::NotLimited | R::Uses | R::Subject | R::Unknown | R::Numbers | R::Closing | R::NotStarted => {}
+                R::NotSignedIn
+                | R::NotOurs
+                | R::Cancelled
+                | R::Moving
+                | R::NotLimited
+                | R::Uses
+                | R::Subject
+                | R::Unknown
+                | R::Numbers
+                | R::Closing
+                | R::NotStarted => {}
             }
         }
     }
