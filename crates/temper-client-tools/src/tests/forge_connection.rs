@@ -146,6 +146,7 @@ fn every_forge_refusal_prints_words_json_and_exit_two() {
         (w::ForgeRefusal::NotConnected, "not_connected", "not connected: connect the App first"),
         (w::ForgeRefusal::Busy, "busy", "busy"),
         (w::ForgeRefusal::NoKey, "no_key", "no key"),
+        (w::ForgeRefusal::FirstIsBot, "first_is_bot", "the organization is the bot's login: name another organization"),
     ] {
         for json in [false, true] {
             for words in [CONNECT, ADMIN, MANIFEST, INSTALL] {
@@ -606,5 +607,38 @@ fn admin_first_stop_and_failed_create_exit_one_without_the_token() {
             no_token(&printed);
             assert!(crate::root::next_deadline(&root.root).is_none());
         }
+    }
+}
+
+#[test]
+fn admin_first_refused_as_the_bot_s_login_exits_two_naming_the_remedy() {
+    for json in [false, true] {
+        let mut root = f::signed_in(f::PARTY);
+        let words = f::extended(ADMIN, &["--first", "temper-bot/hello"]);
+        let call = root.submit_prepared(f::call(words.as_slice()), json, Some(Secret::new(TOKEN.into())));
+        let w::Request::Connect(connect) = request(&root, call) else { panic!("connect") };
+        let w::How::ForgejoAdmin(admin) = connect.how() else { panic!("admin connect") };
+        assert_eq!(admin.first().as_ref().unwrap().org(), b"temper-bot");
+        let limits = temper_client_domain::forge::wire_limits(&root.limits.domain.forge).unwrap();
+        root.adoption_answer(
+            call,
+            w::Outcome::ConnectRefused(
+                w::ConnectRefused::new(&limits, w::ConnectRefusedParts { why: w::ForgeRefusal::FirstIsBot }).unwrap(),
+            ),
+        );
+        let printed = root.answer(call).unwrap();
+        assert_eq!(printed.status, 2);
+        assert!(printed.stdout.is_empty());
+        assert!(
+            skein_lib::bytes::find(
+                &printed.stderr,
+                if json { b"first_is_bot" } else { b"the organization is the bot's login: name another organization" },
+            )
+            .is_some()
+        );
+        no_token(&printed);
+        assert_eq!(root.sends.len(), 1);
+        assert_eq!(request(&root, call), w::Request::Connect(connect));
+        assert!(crate::root::next_deadline(&root.root).is_none());
     }
 }

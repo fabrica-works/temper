@@ -727,3 +727,24 @@ fn admin_scope_refusals_reach_the_row_at_the_failed_stage() {
         );
     }
 }
+
+#[test]
+fn admin_connect_refuses_a_first_organization_named_as_the_bot() {
+    let mut forge = forge(true, true, false);
+    let mut service = service(&forge);
+    let mut first = first(b"docker");
+    first.org = b"TeMpEr".as_slice().into();
+    ask(&mut service, bundle(1, ADMIN), Some(first));
+    // An admitted connect would be Connecting; admission's CarriedUnused goes to jig, not the store.
+    assert_eq!(service.engine.as_ref().unwrap().domain.forge_connection(1), domain::Connection::NotConnected);
+    for tick in 1..64 {
+        turn(&mut service, &mut forge, tick);
+        let engine = service.engine.as_ref().unwrap();
+        assert!(engine.setup.staged.is_empty() && engine.setup.public.is_empty() && engine.setup.runs.is_empty());
+    }
+    let engine = service.engine.as_ref().unwrap();
+    assert_eq!(engine.domain.forge_connection(1), domain::Connection::NotConnected);
+    assert!(engine.domain.forges().rows[0].first.is_none());
+    assert!(forge.service.setup().organization(b"TeMpEr").is_none());
+    assert!(admin_record(&service).is_none());
+}

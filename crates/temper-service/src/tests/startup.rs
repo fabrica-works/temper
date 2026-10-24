@@ -1625,6 +1625,7 @@ fn forge_configuration_keeps_kind_mode_and_asked_start() {
         assert_eq!(
             application::configured(&settings).as_ref(),
             [Configured {
+                bot: Box::new([]),
                 admin_connect: false,
                 owned: None,
                 web: None,
@@ -1641,6 +1642,7 @@ fn forge_configuration_keeps_kind_mode_and_asked_start() {
     assert_eq!(
         application::configured(&settings).as_ref(),
         [Configured {
+            bot: b"temper".as_slice().into(),
             admin_connect: false,
             owned: Some(temper_engine_domain_forge::Owned {
                 forgejo: skein_forge::forgejo::pin::VERSION.as_bytes().into(),

@@ -23,6 +23,7 @@ fn configured(under_box: bool) -> ClientWorld {
         let mut config = walking::config(fixtures::SEED);
         config.forges = Box::new([forge::Configured {
             admin_connect: false,
+            bot: Box::new([]),
             owned: None,
             web: None,
             read_only: false,

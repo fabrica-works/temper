@@ -625,6 +625,11 @@ and `connect-forge.html`.
   repository or starter workflow), with the diagnostic and "Paste the
   token again to finish it." Every stop says "temper kept nothing of the
   token." No "Set up again" action is offered.
+- **Refused at admission,** the refusal shows above the fields, the token
+  asked for again. `first is bot`: "That organization has the name of
+  temper's bot on this forge, and on Forgejo users and organizations
+  share names: name another organization.", and the organization's field
+  is marked invalid.
 - **Ready, on that Forgejo,** says "Connected as LOGIN (id ID), managed."
   and "Made ORG/NAME, and its project PROJECT. Its CI runs on your forge’s
   runners labelled LABEL; with none, a change’s checks wait." LABEL is
