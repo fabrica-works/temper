@@ -32,6 +32,9 @@ pub enum Word {
     AdminRepository,
     AdminHost,
 
+    GitHubReadNoAccess,
+    GitHubReadNotFound,
+    GitHubReadReload,
     GitHubUnknown,
     GitHubPicker,
     GitHubInstalled,
@@ -620,9 +623,10 @@ pub enum Word {
 // The Authorize place and page-owned forge sign-in add twelve phrases.
 // The owned row's Runs and first-password lines add two words and three phrases.
 // A failed setup's step adds five phrases.
-const PHRASES: u32 = 1110;
-const SEGMENTS: u32 = 1959;
-const ALL: [Word; 562] = [
+// Ready's refused read and exhausted busy rereads add three phrases.
+const PHRASES: u32 = 1113;
+const SEGMENTS: u32 = 1962;
+const ALL: [Word; 565] = [
     Word::NoProjectYet,
     Word::AdminTitle,
     Word::AdminDescription,
@@ -644,6 +648,9 @@ const ALL: [Word; 562] = [
     Word::AdminReady,
     Word::AdminRepository,
     Word::AdminHost,
+    Word::GitHubReadNoAccess,
+    Word::GitHubReadNotFound,
+    Word::GitHubReadReload,
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -1221,6 +1228,9 @@ impl Word {
             Self::SetupProject => 1822,
             Self::SetupExisting => 1823,
             Self::GitHubUnknown => 1965,
+            Self::GitHubReadNoAccess => 1966,
+            Self::GitHubReadNotFound => 1967,
+            Self::GitHubReadReload => 1968,
             Self::GitHubPicker => 1950,
             Self::GitHubInstalled => 1951,
             Self::GitHubReading => 1952,
@@ -2027,6 +2037,9 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::NoForges => (&[b"No forge of yours yet."], &[]),
         Word::ForgeSummary => (&[b"forge ", b" \xc2\xb7 ", b""], &[Number, Name]),
         Word::GitHubUnknown => (&[b"It is not known whether the project was made."], &[]),
+        Word::GitHubReadNoAccess => (&[b"GitHub refused temper's read of the App's repositories: the App may be suspended. See Forges."], &[]),
+        Word::GitHubReadNotFound => (&[b"GitHub no longer has this installation: install the App again."], &[]),
+        Word::GitHubReadReload => (&[b"Reload this page to try again."], &[]),
         Word::GitHubPicker => (&[b"Choose a repository to start in"], &[]),
         Word::GitHubInstalled => (&[b"", b" is installed on ", b"."], &[Name, Name]),
         Word::GitHubReading => (&[b"Reading GitHub's repositories\xe2\x80\xa6"], &[]),

@@ -2,8 +2,11 @@
 use super::{Limits, Request, Served, Side, family, forges, github};
 use alloc::boxed::Box;
 use jig_client::{Ask, Client, Family, Key, Outcome, Told, contract as c};
-use skein_lib::{Queue, Token};
+use skein_lib::{Duration, Queue, Time, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
+
+const BUSY_WAIT: Duration = Duration::from_secs(2);
+const BUSY_REREADS: u8 = 3;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
@@ -14,6 +17,7 @@ pub enum Act {
     Adopt,
 }
 #[derive(Debug)]
+#[expect(clippy::partial_pub_fields, reason = "the view reads presentation while retry timing stays private")]
 pub struct Picker {
     pub forge: u16,
     pub installation: u64,
@@ -29,8 +33,30 @@ pub struct Picker {
     pub party: u64,
     pub starting: Option<forges::FirstProject>,
     pub adoption: Option<forges::FirstAdoption>,
+    busy_rereads: u8,
+    retry_at: Option<Time>,
 }
 impl Picker {
+    #[must_use]
+    pub fn retry_exhausted(&self) -> bool {
+        self.busy_rereads == BUSY_REREADS && self.answer == Some(github::Answer::Refused(w::ForgeRefusal::Busy))
+    }
+    fn retry_due(&mut self, now: Time) -> bool {
+        if self.answer != Some(github::Answer::Refused(w::ForgeRefusal::Busy)) || self.busy_rereads == BUSY_REREADS {
+            return false;
+        }
+        match self.retry_at {
+            Some(at) if at <= now => {
+                self.busy_rereads = self.busy_rereads.checked_add(1).expect("bounded busy rereads");
+                true
+            }
+            Some(_) => false,
+            None => {
+                self.retry_at = now.checked_add(BUSY_WAIT);
+                false
+            }
+        }
+    }
     #[must_use]
     pub fn selected(&self) -> Option<&family::Reached> {
         let Some(github::Answer::Page(page)) = &self.answer else { return None };
@@ -99,6 +125,7 @@ pub(crate) fn progress(
     client: &Client,
     address: &crate::Address,
     limits: Limits,
+    now: Time,
     out: &mut Queue<Request>,
 ) {
     if side.party.is_none() || side.served == Served::OutOfDate {
@@ -122,6 +149,7 @@ pub(crate) fn progress(
         | crate::Address::Task { .. }
         | crate::Address::Adopt { .. } => None,
     };
+    let mut shown = None;
     if let Some(row) = row
         && row.kind == forges::Kind::GitHub
         && row.repositories.is_empty()
@@ -129,6 +157,7 @@ pub(crate) fn progress(
             super::connect::step(Some(crate::Choice::Forge(row.number)), &side.forges, side.demo.answer.as_ref())
     {
         let forge = row.number;
+        shown = Some(forge);
         let installations = row.installations.clone();
         if index(side, forge).is_none() {
             let Some(first) = installation(&installations, None) else { return };
@@ -149,6 +178,8 @@ pub(crate) fn progress(
                     party: side.party.expect("confirmed"),
                     starting: None,
                     adoption: None,
+                    busy_rereads: 0,
+                    retry_at: None,
                 })
                 .expect("one picker per configured forge");
         }
@@ -162,16 +193,39 @@ pub(crate) fn progress(
             picker.page = 1;
             picker.key = None;
             picker.answer = None;
+            picker.busy_rereads = 0;
+            picker.retry_at = None;
         }
-        if picker.key.is_none() {
+        if picker.key.is_none() || picker.retry_due(now) {
             read(side, limits, forge, out);
         }
     }
     // An answered project may precede the Me frame that names it. Wait for that
     // frame, including after navigation, rather than adopting into an unknown name.
     for index in 0..side.pickers.len() {
+        let picker = side.pickers.get_mut(index).expect("picker index");
+        if Some(picker.forge) != shown {
+            // Hidden flows do not read. Returning starts a fresh wait, keeping
+            // the same retry bound rather than restarting it on navigation.
+            picker.retry_at = None;
+        }
         advance(side, client, limits, index, out);
     }
+}
+pub(crate) fn next_deadline(side: &Side) -> Option<Time> {
+    if side.party.is_none() || side.served == Served::OutOfDate {
+        return None;
+    }
+    let mut next = None;
+    for picker in &side.pickers {
+        if let Some(at) = picker.retry_at {
+            next = Some(match next {
+                Some(earlier) => at.min(earlier),
+                None => at,
+            });
+        }
+    }
+    next
 }
 fn read(side: &mut Side, limits: Limits, forge: u16, out: &mut Queue<Request>) {
     let Some(index) = index(side, forge) else { return };
@@ -189,6 +243,7 @@ fn read(side: &mut Side, limits: Limits, forge: u16, out: &mut Queue<Request>) {
     let key = Key { asker: crate::owner::Owner::Forge.asker(), number: side.serial };
     picker.key = Some(key);
     picker.answer = None;
+    picker.retry_at = None;
     picker.chosen = 0;
     out.push(Request::Send {
         request: Token::new(key.number),
@@ -216,6 +271,7 @@ pub(crate) fn act(side: &mut Side, limits: Limits, forge: u16, act: Act, out: &m
             }
             picker.installation = id;
             picker.page = 1;
+            picker.busy_rereads = 0;
             read(side, limits, forge, out);
         }
         Act::Page(page) => {
@@ -224,6 +280,7 @@ pub(crate) fn act(side: &mut Side, limits: Limits, forge: u16, act: Act, out: &m
                 return;
             }
             picker.page = page;
+            picker.busy_rereads = 0;
             read(side, limits, forge, out);
         }
         Act::Choose(chosen) => {

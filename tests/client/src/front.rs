@@ -30,6 +30,8 @@ pub struct Joint {
     pub demo_removals: Vec<skein_lib::RequestKey>,
     pub demo_reads: usize,
     pub reachable_reads: Vec<(u16, Option<u64>, u32)>,
+    pub reachable_empty: bool,
+    pub installs: Vec<(u16, Token)>,
     pub demo_outcomes: VecDeque<temper_client_protocol_wire::v1::Outcome>,
     pub answer_runs: bool,
     pub reply_runs: bool,
@@ -98,6 +100,11 @@ impl Joint {
     /// The GitHub first run: real project/adoption engine, fixed reachable page.
     #[must_use]
     pub fn github_fixture(seed: u64) -> (Self, crate::app::Root) {
+        Self::github_fixture_with(seed, true, false)
+    }
+    /// GitHub at the setup boundary: optionally uninstalled, or with no repositories.
+    #[must_use]
+    pub fn github_fixture_with(seed: u64, installed: bool, empty: bool) -> (Self, crate::app::Root) {
         use temper_engine_domain_forge as forge;
         let limits = fixtures::domain_limits();
         let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
@@ -119,16 +126,17 @@ impl Joint {
             (config, engine_limits)
         });
         let mut front = Self::with_engine(seed, &limits, Store::new(), [bootstrap, config], &engine_limits, 1);
+        front.reachable_empty = empty;
         front.engine.forge = Some(temper_engine_domain_world::forge_stand::ForgeStand::with(&[
             (b"acme", b"shop", 7),
             (b"acme", b"second", 8),
         ]));
-        for event in [
-            forge::Event::Connection {
-                forge: 1,
-                state: forge::Connection::Connected { id: 1, login: b"app[bot]".as_slice().into() },
-            },
-            forge::Event::Installation {
+        front.engine.send(engine::Event::Forge(Box::new(forge::Event::Connection {
+            forge: 1,
+            state: forge::Connection::Connected { id: 1, login: b"app[bot]".as_slice().into() },
+        })));
+        if installed {
+            front.engine.send(engine::Event::Forge(Box::new(forge::Event::Installation {
                 forge: 1,
                 installation: 1,
                 state: Some(forge::Installation {
@@ -136,9 +144,7 @@ impl Joint {
                     stray: false,
                     suspended: false,
                 }),
-            },
-        ] {
-            front.engine.send(engine::Event::Forge(Box::new(event)));
+            })));
         }
         front.engine.settle();
         let who = ClientId(0);
@@ -649,6 +655,8 @@ impl Joint {
             demo_removals: Vec::new(),
             demo_reads: 0,
             reachable_reads: Vec::new(),
+            reachable_empty: false,
+            installs: Vec::new(),
             demo_outcomes: VecDeque::new(),
             answer_runs: false,
             reply_runs: false,
@@ -745,6 +753,9 @@ impl Joint {
         self.reachable_reads.push((read.forge(), *read.installation(), read.page()));
         let mut rows = skein_lib::List::with_capacity(2);
         for (id, name) in [(7, b"shop".as_slice()), (8, b"second".as_slice())] {
+            if self.reachable_empty {
+                break;
+            }
             rows.push(
                 w::Reached::new(
                     &w::CEILINGS,
@@ -1211,6 +1222,9 @@ impl Joint {
     fn immediate(&mut self) {
         let immediate = std::mem::take(&mut self.engine.immediate);
         for request in immediate {
+            if let engine::Request::Install { forge, request, .. } = &request {
+                self.installs.push((*forge, *request));
+            }
             if let engine::Request::Connect {
                 forge,
                 request: attempt,
