@@ -850,28 +850,32 @@ pub(crate) fn startup_worst_case(
     io: &io::Limits,
     forge_bytes: (u64, u64, &skein_forge_connection::Settings),
 ) -> Result<u64, Problems> {
+    crate::startup::memory_sum(&startup_memory_terms(
+        settings,
+        root,
+        store,
+        runtime,
+        worker_operations,
+        io,
+        forge_bytes,
+    )?)
+    .ok_or(start_problem(b"memory_bytes", What::Bound))
+}
+pub(crate) fn startup_memory_terms(
+    settings: &settings::Engine,
+    root: &temper_engine_domain::Limits,
+    store: &jig_protocol_store::Limits,
+    runtime: Option<&AccountsRuntime>,
+    worker_operations: u32,
+    io: &io::Limits,
+    forge_bytes: (u64, u64, &skein_forge_connection::Settings),
+) -> Result<[crate::startup::MemoryTerm; 20], Problems> {
     let queue = temper_engine_domain::max_out(root).checked_mul(2).ok_or(start_problem(b"limits", What::Bound))?;
     let operations = startup_operations(io, queue, worker_operations).ok_or(start_problem(b"limits", What::Bound))?;
-    let bytes = memory(settings, root, store, runtime, operations, io, (forge_bytes.1, forge_bytes.2))
-        .ok_or(start_problem(b"memory_bytes", What::Bound))?;
-    let setup = crate::setup::worst_case(
-        settings,
-        forge_bytes.2,
-        temper_engine_domain::max_out(root)
-            .checked_add(SETUP_ROUTING_HEADROOM)
-            .ok_or(start_problem(b"memory_bytes", What::Bound))?,
-    )
-    .ok_or(start_problem(b"memory_bytes", What::Bound))?;
-    // Checked input and its resolved entry clones coexist with construction.
-    let checked = checked_setup_bytes(settings).ok_or(start_problem(b"memory_bytes", What::Bound))?;
-    bytes
-        .checked_add(checked)
-        .ok_or(start_problem(b"memory_bytes", What::Bound))?
-        .checked_add(forge_bytes.0)
-        .ok_or(start_problem(b"memory_bytes", What::Bound))?
-        .checked_add(setup)
+    memory(settings, root, store, runtime, operations, io, forge_bytes)
         .ok_or(start_problem(b"memory_bytes", What::Bound))
 }
+
 fn checked_setup_bytes(settings: &settings::Engine) -> Option<u64> {
     let mut bytes = u64::try_from(settings.records_only.len()).ok()?.checked_mul(4)?;
     if !settings.setup.is_empty() {
@@ -927,8 +931,8 @@ fn memory(
     runtime: Option<&AccountsRuntime>,
     operations: u32,
     io: &io::Limits,
-    forge: (u64, &skein_forge_connection::Settings),
-) -> Option<u64> {
+    forge: (u64, u64, &skein_forge_connection::Settings),
+) -> Option<[crate::startup::MemoryTerm; 20]> {
     let queue = temper_engine_domain::max_out(root).checked_mul(2)?;
     let retained = temper_engine_domain::worst_case(root)?;
     let payload = temper_engine_domain::payload_worst_case(root)?;
@@ -938,17 +942,8 @@ fn memory(
         settings.limits.forge_component.installations,
         settings.limits.forge.name_bytes.max(temper_protocol_worker_wire::v1::CEILINGS.identity_login),
     )?;
-    let mut bytes = retained
-        .checked_add(handover_diagnostics(settings, queue, events)?)?
-        .checked_add(connections)?
-        .checked_add(crate::forge::held_worst_case(settings)?)?
+    let system = handover_diagnostics(settings, queue, events)?
         .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
-        .checked_add(skein_io::worst_case(io)?)?
-        .checked_add(store::worst_case(root, store)?)?
-        .checked_add(jig_protocol_accounts::table::worst_case(
-            settings.jig.limits.driver.accounts,
-            values::credential_bytes(&settings.jig),
-        )?)?
         .checked_add(List::<(u32, u64)>::worst_case(root.authority.projects)?)?
         .checked_add(Queue::<temper_engine_domain::Event>::worst_case(events)?)?
         .checked_add(Queue::<temper_engine_domain::Request>::worst_case(temper_engine_domain::max_out(root))?)?
@@ -965,30 +960,32 @@ fn memory(
         .checked_add(u64::from(queue).checked_mul(u64::from(io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?
         .checked_add(Map::<Token, Token>::worst_case(operations)?)?;
-    bytes = bytes.checked_add(workers::worst_case(
+    let workers = workers::worst_case(
         settings,
         temper_engine_domain::max_out(root).checked_mul(jig_protocol_engine_workers::MAX_OUT_DOWN)?,
-    )?)?;
-    bytes = bytes.checked_add(clients::worst_case(
+    )?;
+    let clients = clients::worst_case(
         &settings.jig.limits.clients,
         &limits::server(&settings.jig.limits),
         &settings.jig.limits.clients_http,
         temper_engine_domain::max_out(root).checked_add(1)?.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
         &root.journal,
-    )?)?;
+    )?;
+    let mut public_bytes = 0_u64;
     if let Some(public) = &settings.clients.public {
         // The clients retain the origin; listening gives the mount its Host copy.
-        bytes = bytes
-            .checked_add(u64::try_from(public.name.len()).ok()?.checked_mul(3)?)?
+        public_bytes = u64::try_from(public.name.len())
+            .ok()?
+            .checked_mul(3)?
             .checked_add(u64::try_from(public.host.len()).ok()?.checked_mul(2)?)?;
     }
-    bytes = bytes.checked_add(clients::bundle::worst_case(&settings.limits.clients)?)?;
+    let bundle = clients::bundle::worst_case(&settings.limits.clients)?;
+    let mut google = 0;
     if settings.sign_in.is_some() {
-        bytes = bytes.checked_add(clients::google::worst_case(
-            settings.limits.sign_in,
-            limits::server(&settings.jig.limits).connections,
-        )?)?;
+        google =
+            clients::google::worst_case(settings.limits.sign_in, limits::server(&settings.jig.limits).connections)?;
     }
+    let mut demo_bytes = 0_u64;
     if let Some(demo) = &settings.demo {
         let mut retained = List::<Box<[u8]>>::worst_case(u32::try_from(demo.cues.len()).ok()?)?
             .checked_add(u64::try_from(demo.owner.len()).ok()?)?
@@ -998,51 +995,75 @@ fn memory(
         for cue in &demo.cues {
             retained = retained.checked_add(u64::try_from(cue.len()).ok()?)?;
         }
-        bytes = bytes
-            .checked_add(u64::try_from(demo.key_file.len()).ok()?.checked_mul(u64::from(clients::DEMO_STARTS))?)?;
+        demo_bytes = u64::try_from(demo.key_file.len()).ok()?.checked_mul(u64::from(clients::DEMO_STARTS))?;
         // Configuration, plus one transient typed answer and its encoded record.
-        bytes = bytes.checked_add(retained.checked_mul(2)?)?.checked_add(
+        demo_bytes = demo_bytes.checked_add(retained.checked_mul(2)?)?.checked_add(
             temper_client_protocol_wire::v1::DemoAnswer::worst_case_bytes(&temper_client_protocol_wire::v1::CEILINGS)?,
         )?;
     }
-    let forges = skein_forge_connection::limits::Forges::of(forge.1)?;
+    let forges = skein_forge_connection::limits::Forges::of(forge.2)?;
     let batch = temper_engine_domain::max_out(root).checked_add(SETUP_ROUTING_HEADROOM)?;
-    bytes = bytes
-        .checked_add(skein_forge_connection::limits::worst_case(
-            &settings.limits.forge_component,
-            &crate::forge::shared(&settings.limits, &settings.jig.limits.io),
-            forges,
-            forge.0,
-        )?)?
-        .checked_add(Queue::<skein_forge_connection::Event>::worst_case(
-            batch.checked_mul(skein_forge_connection::MAX_OUT.above)?,
-        )?)?
-        .checked_add(
-            u64::from(batch.checked_mul(skein_forge_connection::MAX_OUT.above)?)
-                .checked_mul(u64::from(settings.limits.forge.client.answer_bytes))?,
-        )?
-        .checked_add(Queue::<io::Request>::worst_case(batch.checked_mul(skein_forge_connection::MAX_OUT.below)?)?)?;
+    let forge_connections = skein_forge_connection::limits::worst_case(
+        &settings.limits.forge_component,
+        &crate::forge::shared(&settings.limits, &settings.jig.limits.io),
+        forges,
+        forge.1,
+    )?
+    .checked_add(Queue::<skein_forge_connection::Event>::worst_case(
+        batch.checked_mul(skein_forge_connection::MAX_OUT.above)?,
+    )?)?
+    .checked_add(
+        u64::from(batch.checked_mul(skein_forge_connection::MAX_OUT.above)?)
+            .checked_mul(u64::from(settings.limits.forge.client.answer_bytes))?,
+    )?
+    .checked_add(Queue::<io::Request>::worst_case(batch.checked_mul(skein_forge_connection::MAX_OUT.below)?)?)?;
     let identities = u32::try_from(settings.identities.len()).ok()?;
     let wire = translate::limits(&settings.limits)?;
-    bytes = bytes
-        .checked_add(values::Identities::worst_case(identities)?)?
-        .checked_add(List::<u32>::worst_case(identities)?)?
-        .checked_add(
+    let identities =
+        values::Identities::worst_case(identities)?.checked_add(List::<u32>::worst_case(identities)?)?.checked_add(
             u64::from(identities)
                 .checked_mul(2)?
                 .checked_mul(temper_protocol_worker_wire::v1::Identity::worst_case_bytes(&wire)?)?,
         )?;
-    bytes = bytes.checked_add(crate::forge::tokens::worst_case(settings)?)?;
+    let tokens = crate::forge::tokens::worst_case(settings)?;
+    let mut accounts = 0;
     if !settings.jig.llm.providers.is_empty() {
         let driver = settings.jig.limits.driver;
-        bytes = bytes.checked_add(accounts::worst_case(&driver, queue.checked_mul(3)?, store.secrets.page.rows)?)?;
+        accounts = accounts::worst_case(&driver, queue.checked_mul(3)?, store.secrets.page.rows)?;
     }
-    bytes = bytes.checked_add(accounts::configured_bytes(&settings.jig)?)?;
-    if let Some(runtime) = runtime {
-        bytes = bytes.checked_add(skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?)?;
-    }
-    bytes = bytes.checked_add(crate::forge::records::worst_case(settings)?)?;
-    Some(bytes)
+    let configured = accounts::configured_bytes(&settings.jig)?;
+    let roots = match runtime {
+        Some(runtime) => skein_tls::roots_worst_case(runtime.trust_roots, runtime.trust_root_bytes)?,
+        None => 0,
+    };
+    Some([
+        ("engine", retained),
+        ("system", system),
+        ("forge.held", connections.checked_add(crate::forge::held_worst_case(settings)?)?),
+        ("io", skein_io::worst_case(io)?),
+        ("store", store::worst_case(root, store)?),
+        (
+            "values",
+            jig_protocol_accounts::table::worst_case(
+                settings.jig.limits.driver.accounts,
+                values::credential_bytes(&settings.jig),
+            )?,
+        ),
+        ("workers", workers),
+        ("clients", clients),
+        ("clients.public", public_bytes),
+        ("clients.bundle", bundle),
+        ("clients.google", google),
+        ("clients.demo", demo_bytes),
+        ("forge", forge_connections),
+        ("identities", identities),
+        ("forge.tokens", tokens),
+        ("accounts", accounts.checked_add(configured)?.checked_add(roots)?),
+        ("forge.records", crate::forge::records::worst_case(settings)?),
+        ("setup.checked", checked_setup_bytes(settings)?),
+        ("forge.settings", forge.0),
+        ("setup", crate::setup::worst_case(settings, forge.2, batch)?),
+    ])
 }
 
 /// The worker's envelope plus the process IO, routing and kernel queues.
@@ -1051,12 +1072,20 @@ pub(crate) fn worker_alone_worst_case(
     agent: &settings::Agent,
     limits: &limits::Limits,
 ) -> Option<u64> {
+    crate::worker_worst_case(worker, agent, limits)?
+        .checked_add(crate::startup::memory_sum(&worker_process_memory_terms(worker, agent, limits)?)?)
+}
+/// Process queues and IO added only when the worker owns the process.
+pub(crate) fn worker_process_memory_terms(
+    worker: &settings::Worker,
+    agent: &settings::Agent,
+    limits: &limits::Limits,
+) -> Option<[crate::startup::MemoryTerm; 2]> {
     let queue = crate::worker_settings::prepare(worker, agent, limits).ok()?.room;
     let operations =
         worker_alone_operations(&worker.jig.limits.io, crate::worker_settings::operations(&limits.git_component)?)?;
-    crate::worker_worst_case(worker, agent, limits)?
-        .checked_add(u64::try_from(size_of::<Service>()).ok()?)?
-        .checked_add(io::worst_case(&worker.jig.limits.io)?)?
+    let system = u64::try_from(size_of::<Service>())
+        .ok()?
         .checked_add(Queue::<Complete>::worst_case(queue)?)?
         .checked_add(Queue::<Submit>::worst_case(queue)?)?
         .checked_add(Queue::<Submit>::worst_case(operations)?)?
@@ -1064,7 +1093,8 @@ pub(crate) fn worker_alone_worst_case(
         .checked_add(Queue::<Box<[u8]>>::worst_case(queue)?)?
         .checked_add(u64::from(queue).checked_mul(u64::from(worker.jig.limits.io.output).checked_add(512)?)?)?
         .checked_add(Map::<Token, (Token, Option<Token>)>::worst_case(operations)?)?
-        .checked_add(Map::<Token, Token>::worst_case(operations)?)
+        .checked_add(Map::<Token, Token>::worst_case(operations)?)?;
+    Some([("system", system), ("system.io", io::worst_case(&worker.jig.limits.io)?)])
 }
 
 fn forget_handover(settings: &mut settings::Engine) {

@@ -233,66 +233,17 @@ fn a_stale_filter_link_opens_less_filtered_at_its_printed_address() {
     assert_eq!(host.show, Some((Box::from(b"/?project=3".as_slice()), true)));
 }
 
-#[path = "../../../testing/memory_literal.rs"]
-mod memory_literal;
-// Retained domain draft: 3 x 1,048,576 document bytes + 280 B size_of::<Draft>()
-// = 3,146,008 B. Base 87c82f753: 119,483,766,536 + 3,146,008 B domain draft
-// + 304 added view nodes x 574,364 B = 119,661,519,200 B. A chat's 12 delegations
-// (client/README.md, 5.7): 12 x 1,048,576 document bytes + 1,392 B of lists
-// = 12,584,304 B, so 119,674,103,504 B. Their 12 cards (5.7): 12 x (514 markdown
-// + 14) nodes x 574,364 B + 12 x 8 B of carded tasks = 3,639,170,400 B,
-// so 123,313,273,904 B.
-// Cards remembered across the window: 12 x 8 B = 96 B, so 123,313,274,000 B.
-// Live delegates add 12 x 8 B of scratch and a 574,364 B region: 123,313,848,460 B.
-// A goal's result, contract and budget card add 392,869,712 B: 123,706,718,172 B.
-// Plan rows add 32 x 574,364 B, phrases 2,368 B and a tool name 256 B,
-// less 8 B of root stack: +18,382,264 B, giving 123,725,100,436 B.
-// Lower-case phase words add 16 phrases' room, 2,368 B: 123,725,102,804 B.
-// Smaller receiving bounds and the full chat window price each turn's shared budget (client/README.md, 5.4).
-// Agent page: 557 added nodes x 574,364 B + 16,782,488 B for the bounded thread
-// and borrowed view lines = 336,703,236 B, giving 124,061,806,040 B.
-// The context line adds one repository/forge text node; chat words use existing phrase room.
-// Your chats adds filter/empty nodes and five phrases to the checked envelope.
-// Procedure goal slot: five added nodes including its paragraph and link text.
-// The chat projection adds seven phrases while retaining the agent's work-line words.
-// Amendment editor: sixteen nodes and eleven phrases; the web root also retains
-// its bounded draft, typed specification and separate amendment outcome.
-// Added dependency marks (client/README.md, 5.8): two nodes per dependency,
-// across two plan rows and the brief: (2 * 2 + 2) * 2 = 12 nodes x 1,674,892 B.
-// Their five phrases add five entries' room, 740 B.
-// Naming navigation and cards adds two phrases (296 B).
-// The forge side's kept change panel (client/README.md 4.6): its handle, its box
-// and the panel's bounded heap add 4,976 B.
-// A task's name over its words in a chat adds one phrase (148 B).
-// The four time forms add 47 phrases x 148 B = 6,956 B.
-// jig 388a71ec counts reads in max_out and prices each as a PendingRead: +12,483,662,288 B.
-// The change panel adds 86 forge phrases (12,728 B); its full address and
-// combined pull/bounds texts fit the existing maximum text envelope.
-// The procedure's ended page and its three phrases move the checked envelope.
-// Parent-based plan ordering adds 56 B per bounded tree row: 3 rows, 168 B.
-// skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
-// The page reserves its patch queue once, at four patches a node.
-// A chat's composer placeholder adds one phrase (148 B).
-// Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
-// Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
-// The flow's three state words (444 B).
-// The Accounts navigation's two state words (296 B).
-// ConnectForge's and the welcome's forge words and nodes, and 128 more phrase segments (77,364 B).
-// The chat's saved run state adds 320 B inline and three 512 B call texts (1,856 B).
-// The Forges page, the setup strip and the dot's words (2,664 B).
-// Wire 6's SetUp fields and the row's first repository, written by SKEIN_CODEGEN_WRITE=1 (+27,648 B).
-// The setup draft, retained intent and adoption, shared keys and Ready words add 70,031 B.
-// The demo start's retained state, words, failure text and retry nodes (2,509,493 B).
-#[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 332244890261;
+#[path = "../../../testing/memory_figures.rs"]
+mod memory_figures;
+// Domain state, view tree/bindings/words, HTTP decoding and exchange bodies.
+
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
     let actual = limits::worst_case(&limits::client()).expect("priced web preset");
-    memory_literal::check(
-        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/host_tests.rs"),
-        "const WEB_BYTES: u64 = ",
-        WEB_BYTES,
+    memory_figures::check(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../temper/tests/figures/memory/client-web"),
+        &limits::memory_terms(&limits::client()).expect("web memory terms"),
         actual,
     );
 }

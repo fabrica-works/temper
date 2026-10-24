@@ -90,10 +90,19 @@ pub fn stream() -> Option<jig_client_protocol_http::Limits> {
 /// Sum the root, view, stream and the exchanges' bodies, with overflow refusing the bounds.
 #[must_use]
 pub fn worst_case(client: &client::Limits) -> Option<u64> {
+    let mut total = 0_u64;
+    for (_, bytes) in memory_terms(client)? {
+        total = total.checked_add(bytes)?;
+    }
+    Some(total)
+}
+/// The page's root, view, stream decoder and concurrent exchange bodies.
+#[must_use]
+pub fn memory_terms(client: &client::Limits) -> Option<[(&'static str, u64); 4]> {
     let (bounds, words) = view(client)?;
     let root = client::worst_case(client)?;
     let view = temper_client_view::worst_case(&bounds, client, &words)?;
     let stream = jig_client_protocol_http::worst_case(&stream()?)?;
     let bodies = u64::from(EXCHANGES.checked_add(1)?).checked_mul(u64::from(BODY_BYTES))?;
-    root.checked_add(view)?.checked_add(stream)?.checked_add(bodies)
+    Some([("domain", root), ("view", view), ("http", stream), ("host", bodies)])
 }

@@ -712,6 +712,20 @@ impl Bounded {
         )
         .unwrap_or_else(|why| panic!("{}", String::from_utf8_lossy(&temper_service::startup::lines(&why))))
     }
+    #[must_use]
+    pub fn memory_terms(&self) -> temper_service::startup::MemoryTerms {
+        temper_service::startup::memory_terms(
+            &self.document,
+            &jig_protocol_config::Directories::working(),
+            &self.files,
+            &self.agent,
+            &self.seeds,
+            Some(&self.accounts()),
+            self.forges(),
+            Some(&self.setup),
+        )
+        .unwrap_or_else(|why| panic!("{}", String::from_utf8_lossy(&temper_service::startup::lines(&why))))
+    }
     pub fn startup(&self, document: &[u8]) -> Result<temper_service::Service, temper_service::startup::Problems> {
         temper_service::startup::with_setup(
             document,
