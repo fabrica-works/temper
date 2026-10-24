@@ -77,6 +77,16 @@ fn a_temper_told_to_stop_with_a_sign_in_under_way_ends_at_once() {
 }
 
 #[test]
+fn an_account_moves_between_two_deployments_and_the_first_holds_nothing() {
+    let clock = skein_shell::Clock::new();
+    let started = clock.now().now;
+    let scratch = support::Scratch::new(&format!("account_move_{}", std::process::id()));
+    support::account_move::run(scratch.path());
+    scratch.remove();
+    eprintln!("account move story: {:?}", clock.now().now.saturating_since(started));
+}
+
+#[test]
 fn a_person_signs_in_with_chatgpt_and_a_chat_on_the_plan_lasts() {
     let scratch = support::Scratch::new("sign_in_chat");
     let issuer = support::sign_in::configuration(scratch.path());
