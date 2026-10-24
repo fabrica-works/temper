@@ -108,6 +108,7 @@ fn demo_providers(config: &mut engine::Config) {
     other.offers = a::Offers { sign_in: true, key: true, programs: Box::new([]) };
     config.core.settings.llm_providers.providers = Box::new([demo, other]);
 }
+#[expect(clippy::too_many_lines, reason = "one complete client fixture with its configured forge fields")]
 fn fixture_root(
     seed: u64,
     tools: bool,

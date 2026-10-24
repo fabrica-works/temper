@@ -262,7 +262,14 @@ pub fn config(seed: u64) -> engine::Config {
         implies: authority::Implies::new(Box::new([]), 0).expect("empty implication configuration"),
         requirements: Box::new([]),
     };
-    let domain = authority::Domain::new(rules, authority_limits()).expect("valid authority configuration");
+    // Check the same fixture bounds without allocating a discarded live policy table.
+    let policy_limits = authority_limits();
+    assert!(
+        authority::max_out(&policy_limits).is_some()
+            && authority::worst_case(&policy_limits).is_some()
+            && authority::valid_rules(&rules, &policy_limits),
+        "valid authority configuration"
+    );
     let policy = authority::Policy {
         projections: ceiling.grants.clone(),
         escalation_role: Some(0),
@@ -291,7 +298,7 @@ pub fn config(seed: u64) -> engine::Config {
             }]),
             grants: Box::new([]),
             defaults: jig_domain_core::settings::Defaults {
-                rules: domain.rules().clone(),
+                rules,
                 charters: Box::new([charter()]),
                 templates: crate::fixtures::templates(),
                 policies: skein_lib::Map::with_capacity(authority_limits().projects),
