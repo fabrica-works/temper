@@ -921,9 +921,12 @@ The tiers, the fakes and the layout are `../domain/testing.md`'s (sections 2,
   through bytes: a change produced, opened, checked, queued and landed;
   a creation and a merge whose answers were lost, found after a restart
   and never made twice; a failed head repaired and checked again; a held
-  branch moved by another hand, reported as drift. Its invariants: what
-  the engine's domain asked is what the fake's domain did; each call is
-  answered once, however its streams are cut; no credential reaches any
+  branch moved by another hand, reported as drift; on GitHub, a change
+  waiting out 90 seconds of CI without delivery hints, landing within
+  the pull keep's maximum poll after its verdict, with request costs
+  bounded by the keep's paces and App log reads counted apart. Its
+  invariants: what the engine's domain asked is what the fake's domain
+  did; each call is answered once, however its streams are cut; no credential reaches any
   record but its own in jig's secrets' store, nor any request, fact,
   answer or log line. The fake's deliveries reach the engine's listener
   signed, late, out of order or never, so its stories run with hints and

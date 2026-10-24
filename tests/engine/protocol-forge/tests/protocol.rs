@@ -737,3 +737,232 @@ fn github_reaches_ready_through_its_accepted_installations() {
     assert!(world.script_done());
     assert!(world.close());
 }
+
+fn branch_name(branch: &[u8]) -> top::Name {
+    top::Name {
+        forge: REPO.forge,
+        repository: REPO.repository,
+        what: top::What::Branch(branch.split(|b| *b == b'/').map(Box::from).collect()),
+    }
+}
+
+fn request_routes(world: &Protocol, since: Wall, until: Wall) -> std::collections::BTreeMap<String, u64> {
+    let mut routes = std::collections::BTreeMap::new();
+    for (_, line) in world.requests().filter(|(at, _)| *at >= since && *at < until) {
+        let line = String::from_utf8_lossy(line);
+        let route = line.split(" HTTP/").next().expect("HTTP request").split('?').next().expect("target");
+        *routes.entry(route.to_owned()).or_default() += 1;
+    }
+    routes
+}
+
+// A minute at the fastest shipped paces, plus the finite opening reads:
+// listing: 60/5 + 1; three branch watches: 3*(60/40 + 1);
+// pull passes (Item/comments + Pull/CI/GraphQL = 6 HTTP):
+// 6*(60/5 + 60/40 + 2), including a slow repair and boundary passes;
+// two fresh procedure reads: 2*(2 branches + lookup + 4 pull/CI +
+// 2 base CI + compare + 2 files + reviews), plus opening the pull.
+const PENDING_INSTALLATION_REQUESTS_PER_MINUTE: u64 =
+    (60 / 5 + 1) + 3 * (60 / 40 + 1) + 6 * (60 / 5 + 60 / 40 + 2) + 2 * (2 + 1 + 4 + 2 + 1 + 2 + 1) + 1;
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "one no-hint CI story with its clock, root names and cost referee")]
+fn a_github_change_waits_out_a_ninety_second_ci_and_merges_on_its_verdict() {
+    use skein_fake_forge_domain::api::Check;
+    use skein_forge_machine_world::joint;
+    use skein_lib::Duration;
+    use temper_service::limits::{Profile, profile};
+
+    let shipped = profile(Profile::Small).forge;
+    assert_eq!(shipped.change_policy.stall, Duration::from_secs(30 * 60));
+    let mut limits = temper_engine_forge_world::LIMITS;
+    limits.client = shipped.client;
+    limits.change_policy.stall = shipped.change_policy.stall;
+    limits.resources_per_task = shipped.resources_per_task;
+    let mut checks = joint::checks(1000);
+    checks.latency_min = Duration::from_secs(90);
+    checks.latency_max = Duration::from_secs(90);
+    let mut world = Protocol::github_with_limits(71, checks, &limits);
+    world.adopt();
+    let run = branch_name(b"temper/1/r1");
+    world.event(top::Event::Names { task: 1, resources: Box::new([run.clone()]) });
+    world.event(top::Event::Hold { task: 1, resource: run, from: None });
+    let mut row = change_row();
+    row.change.since = world.wall();
+    world.event(top::Event::Change { row });
+    let branch = branch_name(b"temper/51");
+    world.event(top::Event::Names { task: 51, resources: Box::new([branch.clone(), branch_name(b"main")]) });
+    world.event(top::Event::Hold { task: 51, resource: branch.clone(), from: None });
+    world.run_for(0);
+    assert_eq!(
+        change_step(&mut world, 2, change::Status::Unknown, Box::new([])),
+        change::Decision::Delegate(change::Delegate::Produce)
+    );
+    let pushed = world.wall();
+    world.produce(b"temper/51");
+    let head = world.branch(b"temper/51");
+    let verdict = Wall::from_nanos(pushed.as_nanos() + Duration::from_secs(90).as_nanos());
+    let deadline =
+        Wall::from_nanos(verdict.as_nanos() + shipped.client.poll_max.as_nanos() + Duration::from_secs(1).as_nanos());
+    assert_eq!(
+        change_step(&mut world, 3, change::Status::Passed, Box::new([])),
+        change::Decision::Effect(change::Effect::Open)
+    );
+    let mut named_pull = false;
+    let mut due = true;
+    let mut until = None;
+    let mut entry = 4;
+    let mut hold_reason = None;
+    let mut finished = false;
+    // Play the root's procedure scheduler: wakes and the procedure's actual wait,
+    // never a periodic StepChange that could discover CI on the keep's behalf.
+    while world.wall() <= deadline {
+        if !named_pull
+            && let Some(top::Stored::Change(row)) = world.stored().get(&top::Key::Change(51))
+            && let Some(number) = row.pull
+        {
+            world.event(top::Event::Rename {
+                task: 51,
+                resources: Box::new([
+                    branch.clone(),
+                    top::Name { forge: REPO.forge, repository: REPO.repository, what: top::What::Pull(number) },
+                ]),
+            });
+            named_pull = true;
+        }
+        for request in world.take_seen() {
+            #[expect(clippy::wildcard_enum_match_arm, reason = "only this change's scheduler requests drive the story")]
+            match request {
+                top::Request::WakeProcedure { task: 51 } => due = true,
+                top::Request::ChangeDecision { task: 51, decision, entry: committed, .. } => {
+                    if let Some(entry) = committed {
+                        world.event(top::Event::Committed { entry });
+                    }
+                    match decision {
+                        change::Decision::Wait { until: at } => until = at,
+                        change::Decision::Hold(why) => hold_reason = Some(why),
+                        change::Decision::Finish { .. } => finished = true,
+                        change::Decision::None
+                        | change::Decision::Delegate(_)
+                        | change::Decision::Effect(_)
+                        | change::Decision::Ready
+                        | change::Decision::QueueRepair
+                        | change::Decision::Cancel => due = true,
+                    }
+                }
+                _ => {}
+            }
+        }
+        if hold_reason.is_some() || finished || world.tally().routes.get(&Route::Merge) == Some(&1) {
+            break;
+        }
+        if until.is_some_and(|at| world.wall() >= at) {
+            due = true;
+            until = None;
+        }
+        if due {
+            due = false;
+            world.event(top::Event::StepChange {
+                task: 51,
+                entry,
+                heard: change::Heard {
+                    delegate: change::Status::Unknown,
+                    effect: change::EffectResult::None,
+                    released: false,
+                    cancelled: false,
+                },
+                gates: Box::new([]),
+                queue_repair_active: false,
+                kept: false,
+            });
+            entry += 1;
+            world.run_for(0);
+        } else {
+            world.run_for(1);
+        }
+    }
+    let end = Wall::from_nanos(world.wall().as_nanos() + 1);
+    let routes = request_routes(&world, pushed, end);
+    let all = request_routes(&world, Wall::from_nanos(0), end);
+    eprintln!(
+        "90s CI: elapsed={}s, pending routes={:?}, all routes={all:?}",
+        (world.wall().as_nanos() - pushed.as_nanos()) / 1_000_000_000,
+        request_routes(&world, pushed, verdict)
+    );
+    let opening = world
+        .requests()
+        .find_map(|(at, line)| line.starts_with(b"POST /repos/acme/widgets/pulls HTTP/").then_some(at))
+        .expect("pull opened");
+    eprintln!(
+        "phases: before pull={:?}; verdict through merge={:?}",
+        request_routes(&world, Wall::from_nanos(0), opening),
+        request_routes(&world, verdict, end)
+    );
+    for offset in 0..=30 {
+        let since = Wall::from_nanos(pushed.as_nanos() + Duration::from_secs(offset).as_nanos());
+        let until = Wall::from_nanos(since.as_nanos() + Duration::from_secs(60).as_nanos());
+        let minute = request_routes(&world, since, until);
+        let app = minute.get("GET /app/hook/deliveries").copied().unwrap_or(0);
+        let installation: u64 = minute.values().sum::<u64>() - app;
+        assert!(
+            installation <= PENDING_INSTALLATION_REQUESTS_PER_MINUTE,
+            "pending minute +{offset}s: {installation} installation requests, {app} App log reads; \
+             bound {PENDING_INSTALLATION_REQUESTS_PER_MINUTE}; routes={minute:?}; all={all:?}"
+        );
+    }
+    assert_eq!(world.requests().count() as u64, world.tally().total, "count every served request; {all:?}");
+    assert!(named_pull, "pull must be named; {routes:?}");
+    assert!(hold_reason.is_none(), "healthy CI held: {hold_reason:?}; {routes:?}");
+    assert_eq!(world.delivery_hints(), 0, "no delivery hints; {routes:?}");
+    assert!(
+        world
+            .observations()
+            .iter()
+            .any(|o| matches!(o, Observation::Reported { commit, state: Check::Passed, .. } if *commit == head)),
+        "CI verdict; {routes:?}"
+    );
+    assert_eq!(world.tally().routes.get(&Route::Merge), Some(&1), "merge by poll_max + 1s; {routes:?}");
+    assert!(world.wall() <= deadline, "merge by CI verdict + poll_max + 1s; {routes:?}");
+    assert!(
+        world.observations().iter().any(|o| matches!(o, Observation::Merged { head: merged, .. } if *merged == head)),
+        "merge checked head; {routes:?}"
+    );
+    let resolutions: u64 =
+        all.iter().filter(|(route, _)| route.starts_with("GET /repositories/")).map(|(_, count)| count).sum();
+    assert!(resolutions <= 1, "resolve repository once; {all:?}");
+    let seconds = (world.wall().as_nanos() - pushed.as_nanos()) / 1_000_000_000;
+    assert!(
+        routes.get("GET /repos/acme/widgets/branches/temper/1/r1").copied().unwrap_or(0) <= seconds / 40 + 1,
+        "missing run branch at slow; {routes:?}"
+    );
+}
+
+#[test]
+fn a_pull_watch_swap_reads_through_bytes_but_cannot_rename_a_released_task() {
+    let mut world = Protocol::github(93);
+    world.adopt();
+    world.produce(b"temper/51");
+    let number = world.open_pull(b"temper/51", b"main");
+    let branch = branch_name(b"temper/51");
+    let pull = top::Name { forge: REPO.forge, repository: REPO.repository, what: top::What::Pull(number) };
+    world.event(top::Event::Names { task: 51, resources: Box::new([branch.clone(), branch_name(b"main")]) });
+    world.event(top::Event::Rename { task: 51, resources: Box::new([branch.clone(), pull.clone()]) });
+    world.run_for(1);
+    assert!(matches!(world.stored().get(&top::Key::Names(51)),
+        Some(top::Stored::Names { resources, .. }) if resources.as_ref() == [branch.clone(), pull.clone()]));
+    let pull_route = format!("GET /repos/acme/widgets/pulls/{number}");
+    let reads = request_routes(&world, Wall::EPOCH, world.wall()).get(&pull_route).copied().unwrap_or(0);
+    assert!(reads > 0, "the swapped pull read through bytes");
+    world.event(top::Event::Unnamed { task: 51 });
+    world.run_for(1);
+    let reads = request_routes(&world, Wall::EPOCH, world.wall()).get(&pull_route).copied().unwrap_or(0);
+    world.event(top::Event::Rename { task: 51, resources: Box::new([branch, pull]) });
+    world.run_for(60);
+    assert!(world.stored().get(&top::Key::Names(51)).is_none(), "the queued swap cannot recreate names");
+    assert_eq!(
+        request_routes(&world, Wall::EPOCH, world.wall()).get(&pull_route).copied().unwrap_or(0),
+        reads,
+        "no pull watch recreated"
+    );
+    world.finish();
+}

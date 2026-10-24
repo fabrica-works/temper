@@ -30,6 +30,7 @@ jig-domain-people.workspace = true
 
 
 [dev-dependencies]
+temper-service = { path = "../../../crates/temper-service" }
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -102,11 +102,42 @@ pub(crate) fn window(d: &Domain, task: u64) -> Option<(Wall, Wall)> {
     d.settling.get(&task)?.open
 }
 
-/// Bring a timed wait forward to the next read: doubling, at most `poll` apart, bounded by its end.
-pub(crate) fn cap(d: &Domain, env: &Env<Limits>, task: u64, decision: change::Decision) -> change::Decision {
-    let Some((start, end)) = window(d, task) else { return decision };
+/// A watched pull wakes the first change when mergeability settles; its
+/// deadline bounds a persistent conflict. Other waits still retry their reads.
+pub(crate) fn cap(
+    d: &Domain,
+    env: &Env<Limits>,
+    row: &ChangeRow,
+    facts: &change::Facts,
+    decision: change::Decision,
+) -> change::Decision {
+    let Some((start, end)) = window(d, row.task) else { return decision };
     match decision {
         change::Decision::Wait { until: Some(until) } => {
+            let first = match row.change.state {
+                change::State::First { .. } => true,
+                change::State::Producing { .. }
+                | change::State::Opening { .. }
+                | change::State::Recreating { .. }
+                | change::State::Reopening { .. }
+                | change::State::Checking { .. }
+                | change::State::Gating { .. }
+                | change::State::Queued { .. }
+                | change::State::Updating { .. }
+                | change::State::Resolving { .. }
+                | change::State::Repairing { .. }
+                | change::State::Landing { .. }
+                | change::State::Landed { .. }
+                | change::State::Held { .. } => false,
+            };
+            if first
+                && facts.contains_base == change::Status::Passed
+                && facts.mergeable == change::Status::Pending
+                && !facts.writer_taken
+                && watches_pull(d, row)
+            {
+                return change::Decision::Wait { until: Some(end.min(until)) };
+            }
             let hinted = env.limits.client.hinted.as_nanos();
             let interval = env
                 .wall
@@ -127,4 +158,18 @@ pub(crate) fn cap(d: &Domain, env: &Env<Limits>, task: u64, decision: change::De
         | change::Decision::Cancel
         | change::Decision::Hold(_) => decision,
     }
+}
+
+fn watches_pull(d: &Domain, row: &ChangeRow) -> bool {
+    let Some(pull) = row.pull else { return false };
+    let Some(names) = d.names(row.task) else { return false };
+    for name in names {
+        if name.forge == row.repository.forge
+            && name.repository == row.repository.repository
+            && name.what == crate::What::Pull(pull)
+        {
+            return true;
+        }
+    }
+    false
 }
