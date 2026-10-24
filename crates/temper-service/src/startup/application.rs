@@ -1222,16 +1222,17 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
     let mut rows = List::with_capacity(u32::try_from(settings.forges.len()).expect("configured forges"));
     for forge in &settings.forges {
         let mut mode = Mode::Connected;
+        let mut admin_connect = false;
         let mut asked = match &settings.demo {
             Some(demo) => demo.forge == forge.number,
             None => false,
         };
         for setup in &settings.setup {
             if setup.entry.forge == forge.number {
-                mode = match &setup.entry.mode {
-                    temper_forge_setup::setup::Mode::Managed { .. } => Mode::Managed,
-                    temper_forge_setup::setup::Mode::Owned(_) => Mode::Owned,
-                    temper_forge_setup::setup::Mode::Fake(_) => Mode::Fake,
+                (mode, admin_connect) = match &setup.entry.mode {
+                    temper_forge_setup::setup::Mode::Managed { admin_token } => (Mode::Managed, admin_token.is_none()),
+                    temper_forge_setup::setup::Mode::Owned(_) => (Mode::Owned, false),
+                    temper_forge_setup::setup::Mode::Fake(_) => (Mode::Fake, false),
                 };
                 asked |= setup.entry.asked;
                 break;
@@ -1242,6 +1243,7 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
             settings::Kind::GitHub => Kind::GitHub,
         };
         rows.push(Configured {
+            admin_connect,
             number: forge.number,
             kind,
             mode,

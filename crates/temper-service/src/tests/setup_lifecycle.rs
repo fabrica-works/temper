@@ -698,6 +698,7 @@ fn paste_row(limits: &domain::Limits, request: Token, connected: bool, why: Opti
         skein_forge_client::Config { namespace: Box::from(b"fixture".as_slice()), writers: Box::new([]) },
         &[],
         &[domain::Configured {
+            admin_connect: false,
             web: None,
             read_only: false,
             number: 1,
@@ -1476,4 +1477,47 @@ fn pasted_app_key_form_and_401_failures_use_the_persons_words() {
         paste_ended(&mut service, false, pem.expose()).as_deref(),
         Some(b"GitHub refused the App's id and key (401): check both are the same App's.".as_slice())
     );
+}
+
+#[test]
+fn the_admin_connect_route_stub_refuses_not_taken_and_erases_the_carried_token() {
+    use jig_protocol_store::{SecretOwner, Secrets};
+    let mut service = routing_service(4, Duration::from_secs(60));
+    let engine = service.engine.as_mut().unwrap();
+    let token = b"admin-token-placeholder-0123";
+    engine.store.secrets(
+        Token::new(901),
+        Secrets::Keep {
+            owner: SecretOwner::Application,
+            number: records::CARRIED,
+            value: Secret::new(Box::from(token.as_slice())),
+        },
+    );
+    let Some(StoreEvent::Kept { .. }) = engine.store.above.pop() else { panic!("carried seed kept") };
+    while engine.events.pop().is_some() {}
+    crate::route::request(
+        engine,
+        root::Request::Connect {
+            forge: 1,
+            request: Token::new(90),
+            how: domain::How::ForgejoAdmin { first: None },
+            carried: jig_domain_core::Carried { number: records::CARRIED, digest: skein_lib::sha256::digest(token) },
+        },
+    );
+    let Some(root::Event::Forge(event)) = engine.events.pop() else { panic!("connect refused") };
+    let domain::Event::ConnectAnswered { forge, request, answer } = *event else { panic!("connect answer") };
+    assert_eq!(
+        (forge, request, answer),
+        (1, Token::new(90), domain::ConnectAnswer::Refused(domain::ForgeRefusal::NotTaken))
+    );
+    assert!(engine.events.is_empty());
+    assert!(engine.setup.public.is_empty());
+    assert!(engine.setup.staged.is_empty());
+    assert_eq!(engine.store.erases, 1);
+    let Some(StoreEvent::Secret { value: None, .. }) = engine
+        .store
+        .secrets(Token::new(902), Secrets::Get { owner: SecretOwner::Application, number: records::CARRIED })
+    else {
+        panic!("admin token erased")
+    };
 }

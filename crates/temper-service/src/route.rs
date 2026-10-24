@@ -35,9 +35,15 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
             engine.box_link.ask(forge, request, &mut out);
             box_link::drain(engine, &mut out);
         }
-        root::Request::Connect { forge, request, app, carried } => {
-            crate::setup::public::connect(engine, forge, request, app, carried);
-        }
+        root::Request::Connect { forge, request, how, carried } => match how {
+            temper_engine_domain_forge::How::GitHubApp { app } => {
+                crate::setup::public::connect(engine, forge, request, app, carried);
+            }
+            temper_engine_domain_forge::How::ForgejoAdmin { .. } => {
+                crate::setup::public::refuse_admin_connect(engine, forge, request, carried);
+            }
+            temper_engine_domain_forge::How::GitHubManifest { .. } => unreachable!("manifest has its own door"),
+        },
         root::Request::Manifest { forge, request, back } => {
             crate::setup::public::manifest(engine, forge, request, back);
         }

@@ -272,6 +272,8 @@ pub enum Mode {
 /// Public startup configuration, without credentials.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Configured {
+    /// The records-only managed string form accepts an admin paste.
+    pub admin_connect: bool,
     pub web: Option<Box<[u8]>>,
     pub read_only: bool,
     pub number: u16,
@@ -1116,7 +1118,7 @@ pub enum Request {
     Connect {
         forge: u16,
         request: Token,
-        app: core::num::NonZeroU64,
+        how: How,
         carried: jig_domain_core::Carried,
     },
     Manifest {

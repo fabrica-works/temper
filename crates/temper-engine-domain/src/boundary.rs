@@ -512,7 +512,7 @@ pub enum Request {
     Connect {
         forge: u16,
         request: Token,
-        app: ::core::num::NonZeroU64,
+        how: forge::How,
         carried: jig_domain_core::Carried,
     },
     Manifest {

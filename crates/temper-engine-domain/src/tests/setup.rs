@@ -17,6 +17,7 @@ fn signed_in(role: Option<people::Role>) -> (Domain, Env<Limits>) {
 fn signed_in_on(role: Option<people::Role>, kind: forge::Kind) -> (Domain, Env<Limits>) {
     let mut config = config(1);
     config.forges = Box::new([forge::Configured {
+        admin_connect: false,
         web: None,
         read_only: false,
         number: 1,
@@ -277,7 +278,9 @@ fn public_connect_preserves_the_admitted_owner_and_carry_then_root_orders_its_er
     )
     .unwrap();
     let requests = settle(&mut domain, &env);
-    let [Request::Connect { forge: 1, request, app, carried: value }] = requests.as_ref() else {
+    let [Request::Connect { forge: 1, request, how: forge::How::GitHubApp { app }, carried: value }] =
+        requests.as_ref()
+    else {
         panic!("connect: {requests:?}")
     };
     assert_eq!((app.get(), *value), (7, carried));
@@ -519,4 +522,133 @@ fn a_taken_project_name_is_refused_without_making_a_project() {
     );
     assert_eq!(domain.core.projects.as_slice(), &[1]);
     assert!(domain.core.authority.policy(2).is_none());
+}
+
+fn admin_root(role: Option<people::Role>) -> (Domain, Env<Limits>) {
+    let mut config = config(1);
+    config.forges = Box::new([forge::Configured {
+        admin_connect: true,
+        web: None,
+        read_only: false,
+        number: 1,
+        kind: forge::Kind::Forgejo,
+        mode: forge::Mode::Managed,
+        asked: false,
+    }]);
+    signed_in_root(root_with_config(config), role)
+}
+fn admin_first() -> forge::FirstAsk {
+    forge::FirstAsk {
+        org: b"work".as_slice().into(),
+        repository: b"hello".as_slice().into(),
+        project: forge::SetUpProject::Existing(1),
+        label: b"docker".as_slice().into(),
+    }
+}
+#[test]
+fn admin_connect_routes_the_whole_how_and_erases_at_both_ends() {
+    for first in [None, Some(admin_first())] {
+        for connected in [false, true] {
+            let (mut domain, env) = admin_root(Some(people::Role::Owner));
+            let previous = forge::Connection::Stopped { reason: b"previous end".as_slice().into() };
+            connection(&mut domain, &env, previous.clone());
+            let carried = jig_domain_core::Carried { number: 1_u64 << 63_u32, digest: [73; 32] };
+            let how = forge::How::ForgejoAdmin { first: first.clone() };
+            crate::try_step(
+                &mut domain,
+                &env,
+                public_request(forge::Ask::Connect { forge: 1, how: how.clone() }, Some(carried)),
+            )
+            .unwrap();
+            let requests = settle(&mut domain, &env);
+            let [Request::Connect { forge: 1, request, how: actual, carried: value }] = requests.as_ref() else {
+                panic!("admin connect: {requests:?}")
+            };
+            assert_eq!((actual, *value), (&how, carried));
+            assert_eq!(domain.forge_connection(1), forge::Connection::Connecting);
+            assert_eq!(
+                domain.forges().rows[0].first,
+                first.clone().map(|first| forge::First {
+                    org: first.org,
+                    repository: first.repository,
+                    project: first.project,
+                    state: forge::FirstState::Making,
+                })
+            );
+            let request = *request;
+            crate::try_step(
+                &mut domain,
+                &env,
+                Event::Forge(Box::new(forge::Event::ConnectAnswered {
+                    forge: 1,
+                    request,
+                    answer: forge::ConnectAnswer::Connecting,
+                })),
+            )
+            .unwrap();
+            settle(&mut domain, &env);
+            let state = forge::Connection::Connected { id: 1, login: b"bot".as_slice().into() };
+            let why = if connected {
+                connection(&mut domain, &env, state.clone());
+                crate::try_step(
+                    &mut domain,
+                    &env,
+                    Event::Forge(Box::new(forge::Event::FirstMade { forge: 1, id: 42 })),
+                )
+                .unwrap();
+                None
+            } else {
+                crate::try_step(
+                    &mut domain,
+                    &env,
+                    Event::Forge(Box::new(forge::Event::FirstFailed { forge: 1, step: forge::CreateStep::File })),
+                )
+                .unwrap();
+                Some(Box::from(b"making work/hello: File (Refused)".as_slice()))
+            };
+            crate::try_step(
+                &mut domain,
+                &env,
+                Event::Forge(Box::new(forge::Event::ConnectEnded { forge: 1, request, connected, why: why.clone() })),
+            )
+            .unwrap();
+            assert_eq!(settle(&mut domain, &env).as_ref(), [Request::EraseCarried { number: carried.number }]);
+            assert_eq!(domain.forge_connection(1), if connected { state } else { previous });
+            assert_eq!(domain.forges().rows[0].ended, why);
+            assert_eq!(
+                domain.forges().rows[0].first.as_ref().map(|first| first.state),
+                first.as_ref().map(|_| if connected {
+                    forge::FirstState::Made { id: 42 }
+                } else {
+                    forge::FirstState::Failed { step: forge::CreateStep::File }
+                })
+            );
+        }
+    }
+}
+#[test]
+fn admin_connect_role_refusals_deliver_the_carried_value_unused() {
+    for role in [Some(people::Role::Member), Some(people::Role::Maintainer), Some(people::Role::Observer)] {
+        let (mut domain, env) = admin_root(role);
+        let carried = jig_domain_core::Carried { number: 1_u64 << 63_u32, digest: [73; 32] };
+        crate::try_step(
+            &mut domain,
+            &env,
+            public_request(
+                forge::Ask::Connect { forge: 1, how: forge::How::ForgejoAdmin { first: None } },
+                Some(carried),
+            ),
+        )
+        .unwrap();
+        let requests = settle(&mut domain, &env);
+        assert!(
+            requests
+                .contains(&Request::Party(PartyRequest::Deliver(Delivery::CarriedUnused { number: carried.number })))
+        );
+        assert!(requests.contains(&Request::Party(PartyRequest::Deliver(Delivery::Application {
+            to: ReplyTo::new(Token::new(90)),
+            outcome: Some(crate::ApplicationAnswer::Connect(forge::ConnectAnswer::Refused(forge::ForgeRefusal::Role))),
+        }))));
+        assert!(!requests.iter().any(|r| if let Request::Connect { .. } = r { true } else { false }));
+    }
 }

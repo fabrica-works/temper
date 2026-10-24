@@ -109,7 +109,7 @@ pub struct Domain {
     pub(crate) demo_pending: Map<Token, Token>,
     pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
     pub(crate) connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
-    first: Map<u16, crate::First>,
+    pub(crate) first: Map<u16, crate::First>,
     pub(crate) ended: Map<u16, Box<[u8]>>,
     pub(crate) apps: Map<u16, crate::AppWay>,
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,

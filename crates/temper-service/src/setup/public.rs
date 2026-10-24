@@ -36,6 +36,18 @@ fn stage(engine: &mut Engine, run: Token, plan: host::Plan) {
     engine.setup.staged.insert(run, plan).expect("public run room checked");
     super::request(engine, run);
 }
+/// Temporary service boundary until the admin lifecycle is installed.
+pub(crate) fn refuse_admin_connect(engine: &mut Engine, forge: u16, request: Token, carried: Carried) {
+    erase(engine, carried.number);
+    event(
+        engine,
+        domain::Event::ConnectAnswered {
+            forge,
+            request,
+            answer: domain::ConnectAnswer::Refused(domain::ForgeRefusal::NotTaken),
+        },
+    );
+}
 pub(crate) fn connect(engine: &mut Engine, forge: u16, request: Token, app: NonZeroU64, carried: Carried) {
     if full(engine, forge) {
         event(
