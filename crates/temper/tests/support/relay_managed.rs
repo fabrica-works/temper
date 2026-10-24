@@ -47,6 +47,7 @@ struct State {
     pulls: BTreeSet<u64>,
     commits: BTreeSet<u64>,
     count: usize,
+    delivery_polls: usize,
     secrets: Vec<(&'static str, Vec<u8>)>,
 }
 
@@ -77,6 +78,21 @@ struct Shared {
     evidence: Mutex<File>,
 }
 impl State {
+    fn charge_request(&mut self, method: &str, path: &str, auth: &str, git: bool) -> bool {
+        // Delivery polling continues while the person works. Only these JWT reads
+        // have their own budget; git and every other route share the original cap.
+        let delivery_poll = !git
+            && method == "GET"
+            && self.jwt(auth)
+            && (path == "/app/hook/deliveries"
+                || path.strip_prefix("/app/hook/deliveries/").and_then(positive).is_some());
+        let (count, cap) = if delivery_poll { (&mut self.delivery_polls, 5000) } else { (&mut self.count, 400) };
+        if *count >= cap {
+            return false;
+        }
+        *count += 1;
+        true
+    }
     fn remember_auth(&mut self, auth: &str) -> io::Result<()> {
         if let Some(token) = auth.strip_prefix("Bearer ").or_else(|| auth.strip_prefix("token ")) {
             let field = if token.split('.').count() == 3 { "JWT" } else { "installation_token" };
@@ -189,10 +205,9 @@ impl Shared {
         let auth = request.header("authorization")?.unwrap_or("");
         let mut state = self.state.lock().map_err(|_| invalid())?;
         state.remember_auth(auth)?;
-        if state.count >= 400 {
+        if !state.charge_request(method, path, auth, git) {
             return Ok(false);
         }
-        state.count += 1;
         if git {
             return Ok(self.git_allowed(&state, method, target, &body, auth));
         }
@@ -618,6 +633,80 @@ fn journal_distinguishes_learn_redirect_guard_and_upstream_refusals() {
             assert!(!journal.contains(private));
         }
     }
+    drop(shared);
+    std::fs::remove_file(path).expect("remove journal");
+}
+
+#[test]
+fn delivery_polls_have_their_own_cap_and_leave_the_git_budget_available() {
+    use std::net::TcpStream;
+    let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("managed-polls-{}.jsonl", std::process::id()));
+    std::fs::create_dir_all(path.parent().expect("test directory")).expect("test directory");
+    let shared = Shared {
+        fake: true,
+        transport: Transport::new(Some("127.0.0.1:9".parse().expect("loopback"))).expect("plain transport"),
+        guard: Guard {
+            owner: "freeekanayaka".into(),
+            repository: "temper-probe-2".into(),
+            installation: 0,
+            prefix: "temper/live-test/".into(),
+        },
+        state: Mutex::new(State {
+            app: Some(42),
+            checked: true,
+            tokens: vec!["fake-minted".into()],
+            ..State::default()
+        }),
+        journal: Mutex::new(
+            OpenOptions::new().create_new(true).read(true).write(true).mode(0o600).open(&path).expect("journal"),
+        ),
+        evidence: Mutex::new(OpenOptions::new().write(true).open("/dev/null").expect("discard evidence")),
+    };
+    // iss=42, recognized exactly as the existing guard recognizes the App's JWT.
+    let poll = |target: &str| {
+        format!("GET {target} HTTP/1.1\r\nHost: local\r\nAuthorization: Bearer e30.eyJpc3MiOjQyfQ.sig\r\n\r\n")
+    };
+    let list = Request::from_bytes(poll("/app/hook/deliveries?per_page=100").as_bytes()).expect("poll framing");
+    let detail = Request::from_bytes(poll("/app/hook/deliveries/1").as_bytes()).expect("detail framing");
+    for _ in 0..500 {
+        assert!(shared.allows(&list, false).expect("list poll"));
+        assert!(shared.allows(&detail, false).expect("detail poll"));
+    }
+    let git = Request::from_bytes(b"POST /.fake/git/clone HTTP/1.1\r\nHost: local\r\nAuthorization: Basic eC1hY2Nlc3MtdG9rZW46ZmFrZS1taW50ZWQ=\r\nContent-Length: 45\r\n\r\n{\"repository\":\"freeekanayaka/temper-probe-2\"}")
+        .expect("git framing");
+    assert!(shared.allows(&git, true).expect("git after 1000 polls"));
+    assert_eq!(shared.state.lock().expect("state").count, 1);
+    let other = Request::from_bytes(
+        b"GET /installation/repositories HTTP/1.1\r\nHost: local\r\nAuthorization: Bearer fake-minted\r\n\r\n",
+    )
+    .expect("ordinary framing");
+    for _ in 1..400 {
+        assert!(shared.allows(&other, false).expect("ordinary request"));
+    }
+    assert!(!shared.allows(&git, true).expect("git cap stays 400"));
+    // Exhausting the ordinary budget does not stop delivery polling either.
+    for _ in 1000..5000 {
+        assert!(shared.allows(&list, false).expect("independent delivery budget"));
+    }
+    assert_eq!(shared.state.lock().expect("state").delivery_polls, 5000);
+    let listener = TcpListener::bind("127.0.0.1:0").expect("loopback relay");
+    thread::scope(|scope| {
+        scope.spawn(|| {
+            let (socket, _) = listener.accept().expect("relay accepts");
+            shared.serve(socket, false).expect("serve refused 5001st poll");
+        });
+        let mut client = TcpStream::connect(listener.local_addr().expect("relay address")).expect("client");
+        client.set_read_timeout(Some(Duration::from_secs(2))).expect("timeout");
+        client.write_all(poll("/app/hook/deliveries/1").as_bytes()).expect("request");
+        let mut response = Vec::new();
+        client.read_to_end(&mut response).expect("response");
+        assert!(response.starts_with(b"HTTP/1.1 403"));
+    });
+    let journal = std::fs::read_to_string(&path).expect("journal");
+    let row: Value = serde_json::from_str(journal.trim()).expect("one journal row");
+    assert_eq!(row["reason"], "guard");
+    assert_eq!(row["upstream_status"], Value::Null);
+    assert_eq!(row["path"], "/app/hook/deliveries/1");
     drop(shared);
     std::fs::remove_file(path).expect("remove journal");
 }
