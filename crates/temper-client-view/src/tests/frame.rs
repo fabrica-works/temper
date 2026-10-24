@@ -727,6 +727,18 @@ fn accounts_navigation_has_no_dot_without_accounts_or_with_usable_accounts() {
 }
 
 #[test]
+fn a_moving_account_has_no_navigation_mark() {
+    let (mut root, watch) = fixtures::account_root();
+    deliver_navigation_accounts(
+        &mut root,
+        watch,
+        navigation_accounts(&[jig_client::contract::OwnerAccountState::Moving]),
+    );
+    assert_eq!(crate::accounts::words::mark(&root), None);
+    assert_account_mark(&root, None);
+}
+
+#[test]
 fn accounts_navigation_is_red_for_each_state_needing_the_person() {
     use c::OwnerAccountState as S;
     use jig_client::contract as c;
