@@ -97,6 +97,9 @@ enum Handoff {
     Handed,
 }
 
+/// Volatile connection, retained setup answer and the last failure's step.
+pub(crate) type ConnectionState = (crate::Connection, Option<(Token, crate::SetUpAnswer)>, Option<crate::FailedStep>);
+
 /// The bounded forge connector subtree.
 #[derive(Debug)]
 pub struct Domain {
@@ -108,7 +111,7 @@ pub struct Domain {
     pub(crate) demo_acts: Map<[u8; 16], crate::DemoActKind>,
     pub(crate) demo_pending: Map<Token, Token>,
     pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
-    pub(crate) connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
+    pub(crate) connections: Map<u16, ConnectionState>,
     first: Map<u16, crate::First>,
     pub(crate) ended: Map<u16, Box<[u8]>>,
     pub(crate) apps: Map<u16, crate::AppWay>,
@@ -181,7 +184,7 @@ impl Domain {
             return crate::Connection::NotConnected;
         }
         match self.connections.get(&forge) {
-            Some((state, _)) => state.clone(),
+            Some((state, _, _)) => state.clone(),
             None => crate::Connection::NotConnected,
         }
     }
@@ -235,6 +238,10 @@ impl Domain {
                 kind: config.kind,
                 mode: config.mode,
                 connection: self.connection(*forge),
+                failed: match self.connections.get(forge) {
+                    Some((_, _, failed)) => *failed,
+                    None => None,
+                },
                 offer: self.offer(*forge),
                 first: self.first.get(forge).cloned(),
                 installations: installations.into_boxed(),
@@ -282,11 +289,11 @@ impl Domain {
     fn setup_answer(&mut self, forge: u16, request: Token, answer: crate::SetUpAnswer, out: &mut Queue<Request>) {
         if let Some(token) = self.setup_pending.remove(&request) {
             if self.configured.contains_key(&forge) {
-                if let Some((_, kept)) = self.connections.get_mut(&forge) {
+                if let Some((_, kept, _)) = self.connections.get_mut(&forge) {
                     *kept = Some((token, answer));
                 } else {
                     self.connections
-                        .insert(forge, (crate::Connection::NotConnected, Some((token, answer))))
+                        .insert(forge, (crate::Connection::NotConnected, Some((token, answer)), None))
                         .expect("configured forge answers");
                 }
             } else {
@@ -305,7 +312,7 @@ impl Domain {
         if let Some(answer) = self.demo_answers.get(&token) {
             return Some(crate::Answered::StartDemo(answer.clone()));
         }
-        for (_, (_, kept)) in &self.connections {
+        for (_, (_, kept, _)) in &self.connections {
             if let Some((held, answer)) = kept
                 && *held == token
             {
@@ -995,9 +1002,10 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 if d.forge_ended(*forge) {
                     continue;
                 }
-                if let Some((state, _)) = d.connections.get_mut(forge)
+                if let Some((state, _, failed)) = d.connections.get_mut(forge)
                     && let crate::Connection::SettingUp { .. } = state
                 {
+                    *failed = failed_at(state, *failed);
                     *state = crate::Connection::SetUpFailed { why: Box::from(b"the box closed the pipe".as_slice()) };
                 }
             }
@@ -1073,10 +1081,22 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 | crate::Connection::Stopped { .. } => {}
             }
             let kept = match d.connections.get(&forge) {
-                Some((_, kept)) => *kept,
+                Some((_, kept, _)) => *kept,
                 None => None,
             };
-            d.connections.insert(forge, (state, kept)).expect("configured forge connections");
+            let failed = match &state {
+                crate::Connection::SetUpFailed { .. } => match d.connections.get(&forge) {
+                    Some((held, _, failed)) => failed_at(held, *failed),
+                    None => None,
+                },
+                crate::Connection::NotConnected
+                | crate::Connection::NotSetUp
+                | crate::Connection::SettingUp { .. }
+                | crate::Connection::Connecting
+                | crate::Connection::Connected { .. }
+                | crate::Connection::Stopped { .. } => None,
+            };
+            d.connections.insert(forge, (state, kept, failed)).expect("configured forge connections");
             out.push(Request::MarkedForges);
         }
         Event::Installation { forge, installation, state } => {
@@ -1120,7 +1140,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                             crate::Offer::NotUnderTheBox => Some(crate::SetUpRefusal::NotUnderTheBox),
                             crate::Offer::Offered => {
                                 let mut busy = false;
-                                for (_, (state, _)) in &d.connections {
+                                for (_, (state, _, _)) in &d.connections {
                                     if let crate::Connection::SettingUp { .. } = state {
                                         busy = true;
                                     }
@@ -4460,5 +4480,21 @@ pub const fn untag(tag: u64) -> Option<(u16, u32)> {
         None
     } else {
         Some((u16::from_be_bytes([forge_high, forge_low]), u32::from_be_bytes([one, two, three, four])))
+    }
+}
+
+// One rule for a producer's failure and the box pipe closing (domain/forge.md, 4.1).
+fn failed_at(held: &crate::Connection, failed: Option<crate::FailedStep>) -> Option<crate::FailedStep> {
+    match held {
+        crate::Connection::SettingUp { step: Some(crate::SetUpStep::Fetch) } => Some(crate::FailedStep::Fetch),
+        crate::Connection::SettingUp { step: Some(crate::SetUpStep::Prepare) } => Some(crate::FailedStep::Prepare),
+        crate::Connection::SettingUp { step: Some(crate::SetUpStep::Run) } => Some(crate::FailedStep::Run),
+        crate::Connection::Connecting => Some(crate::FailedStep::Connect),
+        crate::Connection::SetUpFailed { .. } => failed,
+        crate::Connection::NotConnected
+        | crate::Connection::NotSetUp
+        | crate::Connection::SettingUp { step: None }
+        | crate::Connection::Connected { .. }
+        | crate::Connection::Stopped { .. } => None,
     }
 }

@@ -198,6 +198,7 @@ fn the_deployment_owner_watches_forges_again_after_a_connection_changes() {
             watcher: WATCHER,
             forges: forge::Forges {
                 rows: Box::new([forge::Row {
+                    failed: Some(forge::FailedStep::Prepare),
                     web: None,
                     repositories: Box::new([]),
                     app: None,
@@ -234,6 +235,7 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
 
 fn row(connection: forge::Connection) -> forge::Row {
     forge::Row {
+        failed: None,
         web: None,
         repositories: Box::new([]),
         app: None,

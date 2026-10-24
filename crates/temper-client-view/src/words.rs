@@ -120,6 +120,12 @@ pub enum Word {
     ForgeStorage,
     ForgeSetUp,
     ForgeAgain,
+    ForgeFetchFailed,
+    ForgePrepareFailed,
+    ForgeRunFailed,
+    ForgeConnectFailed,
+    ForgeSetupFailed,
+
     ForgeTerminal,
     ForgeTerminalDetails,
     ForgeTerminalNext,
@@ -589,9 +595,10 @@ pub enum Word {
 // GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
 // Account moves add four account literals and one task-wait phrase.
 // The Authorize place and page-owned forge sign-in add twelve phrases.
-const PHRASES: u32 = 1080;
-const SEGMENTS: u32 = 1889;
-const ALL: [Word; 535] = [
+// A failed setup's step adds five phrases.
+const PHRASES: u32 = 1085;
+const SEGMENTS: u32 = 1904;
+const ALL: [Word; 540] = [
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -701,6 +708,11 @@ const ALL: [Word; 535] = [
     Word::ForgeStorage,
     Word::ForgeSetUp,
     Word::ForgeAgain,
+    Word::ForgeFetchFailed,
+    Word::ForgePrepareFailed,
+    Word::ForgeRunFailed,
+    Word::ForgeConnectFailed,
+    Word::ForgeSetupFailed,
     Word::ForgeTerminal,
     Word::ForgeTerminalDetails,
     Word::ForgeTerminalNext,
@@ -1241,6 +1253,12 @@ impl Word {
             Self::ForgeStorage => 1745,
             Self::ForgeSetUp => 1746,
             Self::ForgeAgain => 1747,
+            Self::ForgeFetchFailed => 1912,
+            Self::ForgePrepareFailed => 1913,
+            Self::ForgeRunFailed => 1914,
+            Self::ForgeConnectFailed => 1915,
+            Self::ForgeSetupFailed => 1916,
+
             Self::ForgeTerminal => 1748,
             Self::ForgeTerminalDetails => 1749,
             Self::ForgeTerminalNext => 1843,
@@ -1701,9 +1719,21 @@ pub struct Words {
 // A refusal joins only this closed vocabulary, bounded numbers and a calendar
 // clock: 256 bytes holds its longest three-sentence explanation whole.
 const REFUSAL_BYTES: u32 = 256;
+const SET_UP_FAILURE_BYTES: u32 = temper_client_domain::forge::forges::FAILURE_BYTES;
 fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32, Invalid> {
     if word == Word::SignInForgeAt || word == Word::AuthorizeContinuing || word == Word::SignInSignedOut {
         return Ok(joined.max(300));
+    }
+    if [
+        Word::ForgeFetchFailed,
+        Word::ForgePrepareFailed,
+        Word::ForgeRunFailed,
+        Word::ForgeConnectFailed,
+        Word::ForgeSetupFailed,
+    ]
+    .contains(&word)
+    {
+        return Ok(SET_UP_FAILURE_BYTES);
     }
     if word == Word::DemoGroupFailed {
         return Ok(temper_client_domain::forge::DEMO_WHY_BYTES);
@@ -1855,7 +1885,8 @@ impl Words {
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined
                 .max(temper_client_domain::forge::DEMO_FIELD_BYTES)
-                .max(temper_client_domain::forge::DEMO_WHY_BYTES),
+                .max(temper_client_domain::forge::DEMO_WHY_BYTES)
+                .max(SET_UP_FAILURE_BYTES),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { shell, book, language: 0, connector, name_bytes: joined })
@@ -2023,6 +2054,12 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ForgeStorage => (&[b"Forgejo stops when temper box stops. Its repositories are kept in temper\xe2\x80\x99s data directory."], &[]),
         Word::ForgeSetUp => (&[b"Set up a Forgejo here"], &[]),
         Word::ForgeAgain => (&[b"Set up again"], &[]),
+        Word::ForgeFetchFailed => (&[b"Fetching failed: ", b""], &[Name]),
+        Word::ForgePrepareFailed => (&[b"Preparing failed: ", b""], &[Name]),
+        Word::ForgeRunFailed => (&[b"Starting failed: ", b""], &[Name]),
+        Word::ForgeConnectFailed => (&[b"Connecting failed: ", b""], &[Name]),
+        Word::ForgeSetupFailed => (&[b"Set up failed: ", b""], &[Name]),
+
         Word::ForgeTerminal => (&[b"Set it up from a terminal"], &[]),
         Word::ForgeTerminalNext => (&[b"Once it is connected, make your first repository here."], &[]),
         Word::ForgeTerminalDetails => (&[b"temper was not started by temper box, so it does not start a Forgejo itself. Run these, keep the last two running (a service manager is best), then restart temper:"], &[]),

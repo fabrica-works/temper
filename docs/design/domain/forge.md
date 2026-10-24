@@ -276,6 +276,14 @@ temper-engine-domain-forge              the connector's top: resources and holds
   tells it, in memory: nothing of it is stored, and each start rebuilds
   it from the routing's events, every forge not connected until its
   `Connected`.
+- **A failed setup names the step it held,** alongside the connection in
+  `Row.failed`: setting up at fetch, prepare or run names that step;
+  connecting names connect; already set up failed keeps its first step;
+  every other held state names none. This rule also applies when the
+  box pipe closes during setup. Every nonfailure state clears the step,
+  so a retry that reaches setting up or connecting fails at its own
+  step. Both fields are volatile; no store or record version changes.
+  Making the first repository has its own `first.state` failure.
 - **A forge not connected answers `NotConnected`,** at once, at cost 0,
   and so does a connecting or stopped one (`../protocol/forge.md`, 2.7).
   A read it answers is final; a write's entry fails at once, as a typed

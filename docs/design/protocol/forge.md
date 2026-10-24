@@ -577,6 +577,13 @@ service's io.
   - `failed FORGE WHY`: the ask ends, and the forge's set up failed,
     with `WHY` as the box wrote it, which holds no secret (setup.md,
     7.1).
+- **The failed step** is the forge domain's, from the connection it
+  held when told set up failed (`../domain/forge.md`, 4.1), including
+  `BoxClosed` during setup. The producers keep their existing events;
+  the FORGE row's `SetUpFailed` carries `why` and `at: option
+  FailedStep` (fetch, prepare, run or connect). The schema, generated
+  codec and goldens update in place at CLIENT_VERSION 11 before the
+  first release; no store or record version changes.
 - **A stop** is the forge domain's too, at the demo's end (setup.md,
   8.4), which no request waits on: the link writes `stop FORGE`,
   holding it while another ask is out and sending it once that one is
