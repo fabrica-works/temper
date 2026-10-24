@@ -16,7 +16,14 @@ use temper_client_domain::{
     },
 };
 
-pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, forge: &mut ForgeBindings) {
+pub(crate) fn main(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut Bindings,
+    forge: &mut ForgeBindings,
+    sign_in: &crate::forge_sign_in::Forges,
+) {
     b.open(Role::Main);
     b.style(look::MAIN);
     b.style(look::FORGES);
@@ -39,7 +46,7 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 connect::link(b, w, bindings, Word::ConnectForge, Address::ConnectForge { forge: None });
             }
             for row in &rows {
-                personal(b, root, w, bindings, forge, row);
+                personal(b, root, w, bindings, forge, row, sign_in);
             }
             if let Some((demo, row)) = listed::playground(root) {
                 connect::text(b, w, Role::Heading { level: 2 }, Word::ForgePlaygroundHeading);
@@ -73,7 +80,15 @@ fn connection(row: &Row) -> Box<[u8]> {
         | Connection::Stopped { .. } => forge::words::forge_connection(row),
     }
 }
-fn personal(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, forge: &mut ForgeBindings, row: &Row) {
+fn personal(
+    b: &mut Builder,
+    root: &Domain,
+    w: &Words,
+    bindings: &mut Bindings,
+    forge: &mut ForgeBindings,
+    row: &Row,
+    sign_in: &crate::forge_sign_in::Forges,
+) {
     b.open(Role::Disclosure);
     b.style(look::FORGE_ROW);
     b.name(&connect::name(w, row, root));
@@ -101,6 +116,22 @@ fn personal(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, 
     }
     account(b, w, row);
     access(b, w, row);
+    if row.kind == Kind::Forgejo
+        && let Connection::Connected { .. } = row.connection
+        && let Some(forge) = sign_in.number(row.number)
+    {
+        let label = w.say(Word::SignInOpen, &[]);
+        b.open(Role::Link);
+        b.name(&label);
+        b.external(&forge.open());
+        b.text(skein_ui::Run::Plain, &label);
+        b.close();
+        if let Some(me) = root.pages().me(root.client()) {
+            b.open(Role::Paragraph);
+            w.text(b, Word::SignInOpenBody, &[Hole::Name(me.party.login.bytes().into())]);
+            b.close();
+        }
+    }
     connect::app_line(b, w, row);
     if let Some(line) = forge::words::last_connect(row) {
         crate::cards::text(b, Role::Paragraph, &line);

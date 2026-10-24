@@ -42,6 +42,13 @@ fn a_chat_ask_reaches_the_root_as_a_party_ask() {
     assert_eq!(ask, super::fixtures::chat(1, b"question"));
 }
 #[test]
+fn whose_preserves_its_reply_right_and_sign_in() {
+    let event = core::Event::People(people::Event::Whose { reply_to: REPLY, sign_in: 3 });
+    let Ok(root::PartyInput::Whose { reply_to, sign_in }) = translation::to_root(event) else { panic!("party whose") };
+    assert_eq!(reply_to, REPLY);
+    assert_eq!(sign_in, 3);
+}
+#[test]
 fn sign_out_preserves_its_reply_right_and_sign_in() {
     let event = core::Event::People(people::Event::SignOut { reply_to: REPLY, sign_in: 3 });
     let Ok(root::PartyInput::SignOut { reply_to, sign_in }) = translation::to_root(event) else {
@@ -53,6 +60,11 @@ fn sign_out_preserves_its_reply_right_and_sign_in() {
 #[test]
 fn not_ready_uses_the_clients_reply_vocabulary() {
     for (row, input, expected) in [
+        (
+            "whose",
+            root::PartyInput::Whose { reply_to: REPLY, sign_in: 3 },
+            people::Reply::Again(people::Again::NotReady),
+        ),
         (
             "sign out",
             root::PartyInput::SignOut { reply_to: REPLY, sign_in: 3 },
@@ -151,6 +163,7 @@ fn a_sign_in_ending_waits_for_its_erase_to_commit() {
         64,
         &journal,
         None,
+        &[],
     )
     .unwrap();
     clients.commit(3, &[root::Write::Erase(root::Key::Core(core::Key::People(people::Key::SignIn(7))))]);
@@ -346,6 +359,7 @@ fn clients_public_admits_the_public_and_listener_hosts_and_refuses_an_unknown_ho
             64,
             &config.limits.root.journal,
             None,
+            &[],
         )
         .unwrap();
         engine.clients.iterate(

@@ -15,7 +15,7 @@ fn exchange(host: &mut Host) -> (u32, Box<[u8]>) {
         .expect("keyed request left the linked host")
 }
 
-fn linked() -> Host {
+pub(super) fn linked() -> Host {
     let mut host = Host::new(11, Time::ZERO, Wall::EPOCH, temper_client_view::sign_in::Ways::NONE);
     host.start(b"/accounts/connect", Vec::new(), None);
     host.requests();

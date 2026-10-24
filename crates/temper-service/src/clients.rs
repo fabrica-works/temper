@@ -18,6 +18,7 @@ mod github;
 pub mod google;
 pub(crate) mod policy;
 pub(crate) mod printed;
+mod provider;
 pub mod translation;
 const PREFIX: u64 = crate::tokens::CLIENTS;
 pub(crate) const DEMO_STARTS: u32 = 8;
@@ -29,6 +30,9 @@ pub struct Clients {
     public: Option<crate::startup::application::Origin>,
     component: kit::Component,
     initial: Option<kit::Settings>,
+    provider_documents: Option<provider::Documents>,
+    provider_replies: Map<Token, provider::Reply>,
+    next_provider: u64,
     server: crate::server::Server,
     mount: http::Mount,
     mount_env: Env<http::Limits>,
@@ -132,6 +136,7 @@ impl Clients {
         self.server.listening()
     }
     #[expect(clippy::too_many_lines, reason = "startup constructs bounded queues beside the client component")]
+    #[expect(clippy::manual_map, reason = "the programming model uses explicit branches without closures")]
     pub fn new(
         config: &config::Engine,
         clients: &crate::startup::application::Clients,
@@ -139,6 +144,7 @@ impl Clients {
         room: u32,
         journal: &root::JournalLimits,
         sign_in: Option<&crate::settings::SignIn>,
+        files: &[(Box<[u8]>, skein_lib::Secret)],
     ) -> Result<Self, Problems> {
         let config::Address::Addr(listener) = &clients.listener else {
             return Err(invalid(What::Form));
@@ -199,17 +205,45 @@ impl Clients {
                 last: temper_client_protocol_wire::CLIENT_VERSION,
             })
             .or(Err(invalid(What::Bound)))?;
-        let initial =
-            client_settings(config, seeds, link.clone(), served.clone(), providers.clone(), deployment_provider);
-        let settings = client_settings(config, seeds, link, served, providers, deployment_provider);
+        // The provider owns its signer; construct the initial settings twice without cloning it.
+        let settings = || -> Result<kit::Settings, Problems> {
+            let provider = match &config.clients.provider {
+                Some(provider) => match config::clients::provider_issuer(
+                    provider,
+                    files,
+                    provider::urls(clients, *listener)?,
+                    &config.limits.clients,
+                ) {
+                    Ok(issuer) => Some(issuer),
+                    Err(problem) => return Err(provider::problem(problem)),
+                },
+                None => None,
+            };
+            Ok(kit::Settings {
+                provider,
+                addresses: match &config.clients.provider {
+                    Some(provider) => provider.addresses.clone(),
+                    None => Box::new([]),
+                },
+                ..client_settings(config, seeds, link.clone(), served.clone(), providers.clone(), deployment_provider)
+            })
+        };
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
         let mut out = Queue::with_capacity(room);
-        let component = kit::Component::new(settings, &env, &mut out).or(Err(invalid(What::Bound)))?;
+        let initial = settings()?;
+        let provider_documents = match &initial.provider {
+            Some(issuer) => Some(provider::Documents { discovery: issuer.discovery(), keys: issuer.key_set() }),
+            None => None,
+        };
+        let component = kit::Component::new(initial, &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
             listening: None,
             public: clients.public.clone(),
             component,
-            initial: Some(initial),
+            initial: Some(settings()?),
+            provider_documents,
+            provider_replies: Map::with_capacity(crate::limits::server(&config.limits).connections),
+            next_provider: 1,
             server: crate::server::Server::new(*listener, &crate::limits::server(&config.limits)),
             mount: http::Mount::new(http_settings(clients.public.as_ref()), &config.limits.clients_http),
             mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
@@ -377,6 +411,8 @@ impl Clients {
                     let claimed = http::claims(&http_settings(None), &head);
                     if claimed && self.mount.room() > 0 {
                         self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
+                    } else if !claimed && provider::claims(&head.target) {
+                        self.provider_call(call, head);
                     } else if !claimed && google::claims(&head.target) {
                         self.google_call(call, head);
                     } else if !claimed && github::claims(&head.target) {
@@ -386,7 +422,9 @@ impl Clients {
                     }
                 }
                 crate::server::Routed::Http { call, event } => {
-                    if self.google_replies.contains_key(&call) {
+                    if self.provider_replies.contains_key(&call) {
+                        self.provider_event(call, event);
+                    } else if self.google_replies.contains_key(&call) {
                         self.google_event(call, event);
                     } else if self.github.contains_key(&call) {
                         self.github_event(call, event);
@@ -492,8 +530,8 @@ impl Clients {
                     self.google_minted(exchange, Some((credential, expires)));
                 }
                 kit::Request::MintRefused { exchange, .. } => self.google_minted(exchange, None),
-                kit::Request::Redeemed { .. } | kit::Request::Claimed { .. } => {
-                    unreachable!("temper configures no OpenID provider")
+                kit::Request::Redeemed { exchange, answer } | kit::Request::Claimed { exchange, answer } => {
+                    self.provider_answer(exchange, answer);
                 }
                 kit::Request::Closed => self.component_closed = true,
             }
@@ -627,6 +665,7 @@ pub fn worst_case(
         .checked_add(Map::<Token, bundle::Reply>::worst_case(transport.connections)?)?
         // Current query decoding and measured page construction, before ownership moves.
         .checked_add(u64::from(transport.http.head).checked_add(4096)?)?
+        .checked_add(provider::worst_case(limits, transport)?)?
         .checked_add(Map::<Token, github::Reply>::worst_case(transport.connections)?)?
         .checked_add(Queue::<(Token, skein_http::server::Call)>::worst_case(transport.connections)?)?
         .checked_add(

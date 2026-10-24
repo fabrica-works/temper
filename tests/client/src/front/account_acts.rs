@@ -239,7 +239,7 @@ fn flush(
 ) {
     Temper::take(root, env, out);
     while let Some(request) = out.pop() {
-        if let temper_client_domain::Request::Leave { to } = request {
+        if let temper_client_domain::Request::Leave { to, .. } = request {
             front.leaves.push(to);
             continue;
         }

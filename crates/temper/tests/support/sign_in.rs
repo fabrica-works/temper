@@ -99,7 +99,7 @@ pub fn restart_issuer(directory: &Path) -> oauth::Peer {
     issuer(address, registration, redirect.as_bytes())
 }
 
-fn issuer(address: std::net::SocketAddr, registration: &serde_json::Value, redirect: &[u8]) -> oauth::Peer {
+pub(super) fn issuer(address: std::net::SocketAddr, registration: &serde_json::Value, redirect: &[u8]) -> oauth::Peer {
     let bytes =
         |member: &str| -> Box<[u8]> { registration[member].as_str().expect("registration member").as_bytes().into() };
     let profile = jig_protocol_config::profile::profile(jig_protocol_config::profile::Profile::Small);

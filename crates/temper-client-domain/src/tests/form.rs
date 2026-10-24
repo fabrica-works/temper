@@ -333,13 +333,14 @@ fn version_refused() -> (crate::Domain, jig_client::Key) {
     link.step(skein_lib::Time::ZERO, link::Event::Reply { exchange, message: version_answer(&bounds) }, &mut sent);
     while let Some(request) = sent.pop() {
         let up = match request {
-            jig_client_protocol_link::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
             link::Request::Hello { family: Some(family), versions } => {
                 jig_client::Up::FamilyServed { family, versions }
             }
             link::Request::Answer { attempt, envelope, answer, why } => {
                 jig_client::Up::Answer { attempt, envelope, answer, why }
             }
+            // M4's Authorize place answers it
+            link::Request::Authorized(_) => continue,
             link::Request::Save { .. }
             | link::Request::Erase { .. }
             | link::Request::Kept { .. }

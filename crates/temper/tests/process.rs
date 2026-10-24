@@ -2979,3 +2979,10 @@ fn a_restarted_workstation_keeps_the_directors_question_and_answers_it_once_as_p
 fn a_chats_change_lands_on_connected_github_and_is_found_after_a_restart() {
     support::github_land::restart();
 }
+
+#[test]
+fn an_owned_forgejo_signs_its_member_in_through_temper() {
+    let scratch = support::Scratch::new("forgejo_sign_in");
+    support::forgejo_sign_in::run(scratch.path());
+    scratch.remove();
+}

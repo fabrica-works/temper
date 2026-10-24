@@ -1,7 +1,7 @@
 //! The one exception for the lock and exec (protocol/setup.md, 6.4).
 use std::{
     fs, io,
-    os::unix::{fs::OpenOptionsExt, process::CommandExt},
+    os::unix::{ffi::OsStrExt, fs::OpenOptionsExt, process::CommandExt},
     path::Path,
     process::{Command, Stdio},
 };
@@ -52,4 +52,22 @@ pub fn command(spec: &Spec, lock: Lock) -> Command {
 #[must_use]
 pub fn exec(spec: &Spec, lock: Lock) -> io::Error {
     command(spec, lock).exec()
+}
+
+/// Writes a sign-in key to a preopened private partial file; the caller publishes it by rename.
+pub fn sign_in_key(file: fs::File) -> Result<(), String> {
+    // The preopened stdout is 0600; umask also confines any file opens by openssl.
+    Command::new("/bin/sh")
+        .args(["-c", "umask 077; exec openssl \"$@\"", "openssl"])
+        .args(temper_forge_setup::sign_in::KEY_ARGUMENTS.iter().map(|arg| std::ffi::OsStr::from_bytes(arg)))
+        .stdin(Stdio::null())
+        .stdout(file)
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|why| format!("openssl could not start: {why}"))
+        .and_then(
+            |status| {
+                if status.success() { Ok(()) } else { Err("openssl genpkey failed; openssl must be on PATH".into()) }
+            },
+        )
 }

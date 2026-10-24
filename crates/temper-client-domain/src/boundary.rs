@@ -37,6 +37,7 @@ pub enum Request {
     /// Send the page away to this address, once (client/README.md, 3.5).
     Leave {
         to: Box<[u8]>,
+        replace: bool,
     },
     SignOut,
     Dropped {

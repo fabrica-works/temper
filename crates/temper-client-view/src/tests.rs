@@ -4,7 +4,7 @@ mod confirm;
 mod delegation;
 mod demo;
 mod demo_start;
-mod fixtures;
+pub(crate) mod fixtures;
 mod forge_page;
 mod forges;
 mod frame;

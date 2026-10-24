@@ -879,3 +879,38 @@ fn terminal_with_google_keeps_its_signed_out_main() {
     );
     assert_eq!(&*fixtures::main_text(view.tree()), b"Signed out.");
 }
+
+#[test]
+fn signing_out_explains_each_forges_independent_sign_in() {
+    let mut root = fixtures::signed_out();
+    fixtures::root_event(&mut root, temper_client_domain::Event::Act { action: Action::Pages(pages::Act::SignOut) });
+    let domain = fixtures::domain_limits();
+    let limits = crate::Limits { tree: fixtures::tree_limits() };
+    let mut view = crate::View::with_sign_in(
+        &limits,
+        &domain,
+        fixtures::browser_words(),
+        fixtures::FORGE,
+        crate::sign_in::Ways::parse("google", b"https://temper.example"),
+    );
+    let mut facts = crate::forge_sign_in::Forges::new();
+    facts.read("1 forgejo https://forge.example other");
+    facts.read("2 owned http://127.0.0.1:3000 owned");
+    view.forge_sign_in(facts);
+    fixtures::build(&mut view, &root);
+    let text = fixtures::main_text(view.tree());
+    assert!(
+        skein_lib::bytes::find(
+            &text,
+            b"You signed out. Forgejo at forge.example keeps its own sign-in: sign out there too."
+        )
+        .is_some()
+    );
+    assert!(
+        skein_lib::bytes::find(
+            &text,
+            b"You signed out. Forgejo on this machine keeps its own sign-in: sign out there too."
+        )
+        .is_some()
+    );
+}

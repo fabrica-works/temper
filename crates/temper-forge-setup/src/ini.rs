@@ -56,7 +56,7 @@ pub(crate) fn socket(address: SocketAddr) -> Box<[u8]> {
 }
 /// Forgejo settings. Only a configured listener adds an allowed webhook host.
 #[must_use]
-pub fn text(owned: &Owned, place: &Place, secrets: &Secrets, allowed_host: Option<IpAddr>) -> Secret {
+pub fn text(owned: &Owned, place: &Place, secrets: &Secrets, allowed_host: Option<IpAddr>, sign_in: bool) -> Secret {
     let work = place.work_path();
     let address = ip(owned.listen.ip());
     let socket = socket(owned.listen);
@@ -73,6 +73,11 @@ pub fn text(owned: &Owned, place: &Place, secrets: &Secrets, allowed_host: Optio
             joined(&[b"\nDOMAIN = ", &origin.host, b"\nROOT_URL = https://", &origin.host, &suffix, b"/"])
         }
         None => joined(&[b"\nROOT_URL = http://", &socket, b"/"]),
+    };
+    let registration = if sign_in {
+        b"ALLOW_ONLY_EXTERNAL_REGISTRATION = true\n[oauth2_client]\nENABLE_AUTO_REGISTRATION = true\nUSERNAME = preferred_username\nACCOUNT_LINKING = login\n".as_slice()
+    } else {
+        b""
     };
     Secret::new(joined(&[
         b"RUN_USER = ",
@@ -96,7 +101,9 @@ pub fn text(owned: &Owned, place: &Place, secrets: &Secrets, allowed_host: Optio
         secrets.internal_token.expose(),
         b"\n[oauth2]\nJWT_SECRET = ",
         secrets.jwt_secret.expose(),
-        b"\n[service]\nDISABLE_REGISTRATION = true\n[mailer]\nENABLED = false\n",
+        b"\n[service]\nDISABLE_REGISTRATION = true\n",
+        registration,
+        b"[mailer]\nENABLED = false\n",
         &webhook,
         b"[actions]\nENABLED = ",
         actions,

@@ -24,6 +24,7 @@ pub struct Host {
     tickets: BTreeMap<u32, Token>,
     next: u32,
     pub navigate: Option<Box<[u8]>>,
+    pub replace: Option<Box<[u8]>>,
     pub show: Option<(Box<[u8]>, bool)>,
 }
 impl Host {
@@ -46,25 +47,38 @@ impl Host {
             next: 0,
             show: None,
             navigate: None,
+            replace: None,
         }
     }
+    pub fn forge_sign_in(&mut self, forges: view::forge_sign_in::Forges) {
+        self.view.forge_sign_in(forges);
+    }
     pub fn start(&mut self, path: &[u8], records: Vec<skein_ui_web::store::Record>, secret: Option<Box<[u8]>>) {
+        if parse(path) == Place::AuthorizeMalformed {
+            self.event(Event::Went { place: Place::AuthorizeMalformed });
+            return;
+        }
         let mut kept = List::with_capacity(u32::try_from(records.len()).expect("bounded store"));
         for record in records {
             if let Some(record) = records::decode(record) {
                 kept.push(record).expect("counted store");
             }
         }
+        let place = parse(path);
         self.address = self.opened(path);
         let with = match secret {
             Some(bytes) => jig_client::With::Link { secret: Secret::new(bytes), held: None },
             None => jig_client::With::Transport,
         };
         self.event(Event::Start { address: self.address.clone(), kept, with: Some(with) });
+        if !matches!(place, Place::Address(_)) {
+            self.event(Event::Went { place });
+        }
     }
     // The page a path names; a path that prints otherwise is replaced by the printed one.
     fn opened(&mut self, path: &[u8]) -> Address {
         let address = match parse(path) {
+            Place::Authorize { .. } | Place::AuthorizeMalformed => return self.address.clone(),
             Place::Address(address) => address,
             Place::Missing => Address::Inbox { filter: Filter::ALL },
         };
@@ -76,7 +90,7 @@ impl Host {
     }
     pub fn went(&mut self, path: &[u8]) {
         self.address = self.opened(path);
-        self.event(Event::Went { place: Place::Address(self.address.clone()) });
+        self.event(Event::Went { place: parse(path) });
     }
     pub fn href(&mut self, node: NodeId) -> Option<Box<[u8]>> {
         view::href(&mut self.view, node)
@@ -164,16 +178,22 @@ impl Host {
                     self.carry(request, &mut asked);
                 }
                 Request::Show { address, replace } => {
-                    if address != self.address {
+                    if address != self.address || self.root.authorization().is_some() {
                         let path = print(&address);
-                        if path != print(&self.address) {
+                        if path != print(&self.address) || self.root.authorization().is_some() {
                             self.show = Some((path, replace));
                         }
                         self.address = address.clone();
                         self.event(Event::Went { place: Place::Address(address) });
                     }
                 }
-                Request::Leave { to } => self.navigate = Some(to),
+                Request::Leave { to, replace } => {
+                    if replace {
+                        self.replace = Some(to);
+                    } else {
+                        self.navigate = Some(to);
+                    }
+                }
                 Request::SignOut => self.client(jig_client::Event::SignOut),
                 Request::Dropped { .. } | Request::Fact { .. } => {}
             }
@@ -183,7 +203,6 @@ impl Host {
     }
     fn carry(&mut self, request: jig_client::Request, asked: &mut Vec<Asked>) {
         match request {
-            jig_client::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
             jig_client::Request::Save { records } => {
                 for record in records.into_boxed().into_vec() {
                     let (key, value) = records::encode(record);
@@ -212,7 +231,8 @@ impl Host {
                 });
             }
             jig_client::Request::CloseStream => asked.push(Asked::CloseStream),
-            jig_client::Request::Told { .. }
+            jig_client::Request::Authorized(_)
+            | jig_client::Request::Told { .. }
             | jig_client::Request::Down { .. }
             | jig_client::Request::SignOut
             | jig_client::Request::ServiceCredential { .. } => {}

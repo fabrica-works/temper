@@ -538,3 +538,84 @@ fn forge_fetch_command() {
         Some("temper forge fetch [DIRECTORIES] FORGE")
     );
 }
+
+#[test]
+fn forge_sign_in_refuses_without_openssl_a_named_forge_or_a_provider() {
+    use support::forge_sign_in;
+    let scratch = support::Scratch::new("forge_sign_in_refusals");
+    let directory = scratch.path();
+    let _programs = support::owned::scripted(directory);
+    forge_sign_in::configure(directory, "127.0.0.1:3000", "127.0.0.1:31000", "127.0.0.1:31999");
+    let path = directory.join("temper.json");
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
+    for (case, expected) in [(0, "openssl"), (1, "application.sign_in.forges"), (2, "engine.clients.provider")] {
+        let mut changed = value.clone();
+        if case == 1 {
+            changed["application"]["sign_in"]["forges"] = serde_json::json!([]);
+        }
+        if case == 2 {
+            changed["engine"]["clients"]["provider"] = serde_json::Value::Null;
+        }
+        support::write_private(&path, &serde_json::to_vec(&changed).expect("JSON"));
+        let output =
+            forge_sign_in::command(directory).env("PATH", directory.join("no-programs")).output().expect("refusal");
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!directory.join("provider.key").exists());
+        assert!(!directory.join("forgejo.secret").exists());
+        assert!(
+            fs::read_dir(directory).expect("scratch entries").all(|entry| !entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".partial"))
+        );
+    }
+    scratch.remove();
+}
+
+#[test]
+fn forge_sign_in_prints_the_owned_command_without_its_private_secret() {
+    use support::forge_sign_in;
+    let scratch = support::Scratch::new("forge_sign_in_prints");
+    let directory = scratch.path();
+    let _programs = support::owned::scripted(directory);
+    forge_sign_in::configure(directory, "127.0.0.1:3000", "127.0.0.1:31000", "127.0.0.1:31999");
+    let output = forge_sign_in::command(directory).output().expect("sign-in command");
+    forge_sign_in::success(&output);
+    let secret = fs::read(directory.join("forgejo.secret")).expect("scratch secret");
+    assert_eq!(secret.len(), 43);
+    assert!(secret.iter().all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(byte)));
+    for bytes in [&output.stdout, &output.stderr] {
+        assert!(!bytes.windows(secret.len()).any(|part| part == secret));
+    }
+    let place = temper_forge_setup::place::Place {
+        directory: directory.join("forge-1").as_os_str().as_encoded_bytes().into(),
+        user: Box::new([]),
+    };
+    assert_eq!(
+        output.stdout,
+        temper_forge_setup::sign_in::instructions(
+            directory.join("forgejo").as_os_str().as_encoded_bytes(),
+            Some(&place),
+            b"forgejo",
+            directory.join("forgejo.secret").as_os_str().as_encoded_bytes(),
+            b"http://127.0.0.1:31000/.well-known/openid-configuration"
+        )
+        .as_ref()
+    );
+    for name in ["provider.key", "forgejo.secret"] {
+        assert!(support::private(&directory.join(name)));
+    }
+    let repeated = forge_sign_in::command(directory).output().expect("repeat sign-in command");
+    forge_sign_in::success(&repeated);
+    assert_eq!(repeated.stdout, output.stdout);
+    assert!(repeated.stderr.is_empty());
+    assert!(fs::read(directory.join("forgejo.secret")).expect("same scratch secret") == secret);
+    scratch.remove();
+}

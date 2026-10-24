@@ -2272,6 +2272,7 @@ version = "0.0.0"
 dependencies = [
  "jig-channel-world",
  "jig-client-protocol-link",
+ "jig-client-protocol-wire",
  "jig-client-shell-native",
  "jig-domain-core",
  "jig-domain-fleet",

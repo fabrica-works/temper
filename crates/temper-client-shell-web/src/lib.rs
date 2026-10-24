@@ -67,6 +67,7 @@ pub fn start() {
         platform::Browser::new(fetch::web::Fetch::new(limits::EXCHANGES + 1, Rc::clone(&inbox), Report::Fetch));
     let store = Store::new(b"temper.", None);
     let mut host = host::Host::new(facts.seed, facts.now, facts.wall, ways);
+    host.forge_sign_in(forge_sign_in(&document));
     host.start(path.as_bytes(), store.read_all(&platform), secret);
     let page = Rc::new(RefCell::new(Page::new(
         Look {
@@ -114,6 +115,14 @@ impl Shell {
                 // navigating. The previous turn's close warning is already stale.
                 web_sys::window().expect("window").set_onbeforeunload(None);
             }
+            if let Some(to) = self.host.replace.take() {
+                let window = web_sys::window().expect("window");
+                window.set_onbeforeunload(None);
+                window
+                    .location()
+                    .replace(std::str::from_utf8(&to).expect("jig address is UTF-8"))
+                    .expect("replace authorization address");
+            }
             let mut carried = Vec::new();
             transport::carry(requests, &mut self.store, &mut self.platform, &mut carried);
             if writes != 0 || !carried.is_empty() {
@@ -137,6 +146,31 @@ impl Shell {
             }
         }
         self.dom.apply(&ops);
+        let document = web_sys::window().expect("window").document().expect("document");
+        // Nodes can be reused by a later page: remove this shell's previous
+        // tab policy before applying it to the current forge links.
+        for _ in 0..temper_client_view::forge_sign_in::FORGES {
+            let Some(link) =
+                document.query_selector("a[data-temper-forge-sign-in]").expect("previous forge link selector")
+            else {
+                break;
+            };
+            for name in ["target", "rel", "data-temper-forge-sign-in"] {
+                link.remove_attribute(name).expect("previous forge link policy");
+            }
+        }
+        // These are the page-owned Forgejo sign-in links. The semantic link
+        // supplies its checked href; the browser owns opening a new tab.
+        for _ in 0..temper_client_view::forge_sign_in::FORGES {
+            let Some(link) =
+                document.query_selector("a[href$='/user/oauth2/temper']:not([target])").expect("forge link selector")
+            else {
+                break;
+            };
+            link.set_attribute("data-temper-forge-sign-in", "").expect("forge link policy marker");
+            link.set_attribute("target", "_blank").expect("link target");
+            link.set_attribute("rel", "noopener noreferrer").expect("link relation");
+        }
         self.finish(&ops, new_page, now);
     }
     fn finish(&mut self, ops: &[skein_ui_web::page::Op], new_page: bool, now: skein_lib::Time) {
@@ -160,4 +194,17 @@ impl Shell {
         self.history.restore();
         self.timer.set(self.host.deadline(), now);
     }
+}
+
+fn forge_sign_in(document: &web_sys::Document) -> temper_client_view::forge_sign_in::Forges {
+    let mut facts = temper_client_view::forge_sign_in::Forges::new();
+    let mut selector = String::from("meta[name='temper-forge-sign-in']");
+    for _ in 0..temper_client_view::forge_sign_in::FORGES {
+        let Some(meta) = document.query_selector(&selector).expect("forge meta selector") else { break };
+        if let Some(content) = meta.get_attribute("content") {
+            facts.read(&content);
+        }
+        selector.push_str(" ~ meta[name='temper-forge-sign-in']");
+    }
+    facts
 }

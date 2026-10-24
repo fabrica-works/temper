@@ -68,7 +68,7 @@ pub fn clients(document: &Document, at: u32, path: &Path, bundle: bool, problems
     }
     let mut public = None;
     if bundle
-        && let Some(at) = read::required(&mut object, document, b"public", path, problems)
+        && let Some(at) = read::nullable(&mut object, document, b"public", path, problems)
         && document.token(at)?.kind != Kind::Null
     {
         match config::read::text(document, at, 267) {
@@ -730,6 +730,7 @@ fn webhooks(document: &Document, at: Option<u32>, path: &Path, problems: &mut Pr
     let value = clients(document, at, &path.member(b"webhooks"), false, problems)?;
     Some(Webhooks { listener: value.listener })
 }
+#[expect(clippy::too_many_lines, reason = "startup reads and checks the application members together")]
 pub fn parse(
     document: &Document,
     at: u32,
@@ -758,7 +759,7 @@ pub fn parse(
         Some(at) => clients(document, at, &path.member(b"clients"), true, problems),
         None => None,
     };
-    let sign_in_at = read::required(&mut object, document, b"sign_in", &path, problems);
+    let sign_in_at = read::nullable(&mut object, document, b"sign_in", &path, problems);
     let sign_in = sign_in::parse(document, sign_in_at, jig, bounds.sign_in, directories, problems);
     let landing_at = read::required(&mut object, document, b"landing", &path, problems);
     let at = read::required(&mut object, document, b"webhooks", &path, problems);
@@ -802,6 +803,9 @@ pub fn parse(
                 identities.push(identity).expect("bounded identities");
             }
         }
+    }
+    if let Some(sign_in) = &sign_in {
+        sign_in::check_forges(&sign_in.forges, forges.as_slice(), jig, problems);
     }
     github_listener(&forges, clients.as_ref(), &path, problems);
     let demo = demo::parse(document, demo_at, setup_at, &forges, directories, problems);

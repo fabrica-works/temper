@@ -236,6 +236,7 @@ impl Google {
                 keys: settings.keys.clone(),
                 transport: None,
                 members: settings.members.clone(),
+                forges: settings.forges.clone(),
             },
             limits,
             identity_bytes,

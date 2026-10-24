@@ -160,6 +160,7 @@ impl Service {
             client_room,
             &limits.journal,
             settings.sign_in.as_ref(),
+            settings.files.entries.as_slice(),
         )?;
         if let Some(sign_in) = &settings.sign_in {
             clients.configure_google(sign_in, settings.limits.sign_in, seeds, &settings.jig);

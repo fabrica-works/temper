@@ -439,6 +439,19 @@ pub enum Word {
     SignedOutMain,
     SignInTitle,
     ContinueGoogle,
+    AuthorizeTitle,
+    AuthorizeContinuing,
+    AuthorizeRefused,
+    AuthorizeUnknown,
+    AuthorizeBack,
+    AuthorizeBusy,
+    AuthorizeBusyBody,
+    SignInForgeAt,
+    SignInContinue,
+    SignInSignedOut,
+    SignInOpen,
+    SignInOpenBody,
+
     SignInFull,
     SignInBusy,
     SignInNotReady,
@@ -575,9 +588,10 @@ pub enum Word {
 // The browser sign-in heading and Google link add two phrases.
 // GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
 // Account moves add four account literals and one task-wait phrase.
-const PHRASES: u32 = 1068;
-const SEGMENTS: u32 = 1865;
-const ALL: [Word; 523] = [
+// The Authorize place and page-owned forge sign-in add twelve phrases.
+const PHRASES: u32 = 1080;
+const SEGMENTS: u32 = 1889;
+const ALL: [Word; 535] = [
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -997,6 +1011,18 @@ const ALL: [Word; 523] = [
     Word::SignedOutMain,
     Word::SignInTitle,
     Word::ContinueGoogle,
+    Word::AuthorizeTitle,
+    Word::AuthorizeContinuing,
+    Word::AuthorizeRefused,
+    Word::AuthorizeUnknown,
+    Word::AuthorizeBack,
+    Word::AuthorizeBusy,
+    Word::AuthorizeBusyBody,
+    Word::SignInForgeAt,
+    Word::SignInContinue,
+    Word::SignInSignedOut,
+    Word::SignInOpen,
+    Word::SignInOpenBody,
     Word::SignInFull,
     Word::SignInBusy,
     Word::SignInNotReady,
@@ -1348,6 +1374,18 @@ impl Word {
             Self::OutOfDate => 181,
             Self::SignedOutMain => 182,
             Self::SignInTitle => 1910,
+            Self::AuthorizeTitle => 2000,
+            Self::AuthorizeContinuing => 2001,
+            Self::AuthorizeRefused => 2002,
+            Self::AuthorizeUnknown => 2003,
+            Self::AuthorizeBack => 2004,
+            Self::AuthorizeBusy => 2005,
+            Self::AuthorizeBusyBody => 2006,
+            Self::SignInForgeAt => 2007,
+            Self::SignInContinue => 2008,
+            Self::SignInSignedOut => 2009,
+            Self::SignInOpen => 2010,
+            Self::SignInOpenBody => 2011,
             Self::ContinueGoogle => 1911,
             Self::SignInFull => 1907,
             Self::SignInBusy => 1908,
@@ -1664,6 +1702,9 @@ pub struct Words {
 // clock: 256 bytes holds its longest three-sentence explanation whole.
 const REFUSAL_BYTES: u32 = 256;
 fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32, Invalid> {
+    if word == Word::SignInForgeAt || word == Word::AuthorizeContinuing || word == Word::SignInSignedOut {
+        return Ok(joined.max(300));
+    }
     if word == Word::DemoGroupFailed {
         return Ok(temper_client_domain::forge::DEMO_WHY_BYTES);
     }
@@ -2329,6 +2370,18 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::SignedOut => (&[b"Signed out"], &[]),
         Word::OutOfDate => (&[b"Out of date"], &[]),
         Word::SignInTitle => (&[b"Sign in"], &[]),
+        Word::AuthorizeTitle => (&[b"Continuing to Forgejo\xe2\x80\xa6"], &[]),
+        Word::AuthorizeContinuing => (&[b"Signed in as ", b". ", b" opens in a moment, signed in as ", b"."], &[Name, Name, Name]),
+        Word::AuthorizeRefused => (&[b"This sign-in can\xe2\x80\x99t continue"], &[]),
+        Word::AuthorizeUnknown => (&[b"The site that sent you here asked temper to send you back to an address temper doesn\xe2\x80\x99t know. Nothing was sent anywhere."], &[]),
+        Word::AuthorizeBack => (&[b"Back to sign in"], &[]),
+        Word::AuthorizeBusy => (&[b"temper couldn\xe2\x80\x99t sign you in just now"], &[]),
+        Word::AuthorizeBusyBody => (&[b"It is starting or stopping, or signing many people in at once. Nothing was kept: try again in a moment."], &[]),
+        Word::SignInForgeAt => (&[b"Forgejo at ", b""], &[Name]),
+        Word::SignInContinue => (&[b"to continue to "], &[]),
+        Word::SignInSignedOut => (&[b"You signed out. ", b" keeps its own sign-in: sign out there too."], &[Name]),
+        Word::SignInOpen => (&[b"Open Forgejo \xe2\x86\x97"], &[]),
+        Word::SignInOpenBody => (&[b"Open Forgejo signs you in as ", b", through temper: Forgejo\xe2\x80\x99s sign-in is temper\xe2\x80\x99s."], &[Name]),
         Word::ContinueGoogle => (&[b"Continue with Google"], &[]),
         Word::SignedOutMain => match shell {
             Shell::Terminal => (&[b"Signed out."], &[]),

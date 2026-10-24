@@ -377,6 +377,11 @@ pub enum ApplicationAnswer {
 }
 #[derive(Debug)]
 pub enum PartyInput {
+    /// Resolve a sign-in through the people child for provider authorization.
+    Whose {
+        reply_to: ReplyTo,
+        sign_in: u64,
+    },
     /// End one authenticated sign-in through the people child (ruling 116).
     SignOut {
         reply_to: ReplyTo,

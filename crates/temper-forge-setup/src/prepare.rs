@@ -132,12 +132,18 @@ enum RunnerCourse {
     Removed,
     None,
 }
+#[derive(Clone, Copy, Debug)]
+enum Registration {
+    Local,
+    ThroughTemper,
+}
 /// The opaque state of one preparation, with private credentials and no host.
 #[derive(Debug)]
 pub struct Prepare {
     owned: Owned,
     place: Place,
     allowed_host: Option<IpAddr>,
+    registration: Registration,
     phase: Phase,
     found: Option<Found>,
     state: State,
@@ -161,6 +167,7 @@ impl Prepare {
             owned,
             place,
             allowed_host,
+            registration: Registration::Local,
             phase: Phase::Found,
             found: None,
             state: State {
@@ -184,6 +191,12 @@ impl Prepare {
             token: None,
             password: None,
         }
+    }
+    /// Enable external registration only for a forge named by `sign_in.forges`.
+    #[must_use]
+    pub fn with_sign_in(mut self, sign_in: bool) -> Self {
+        self.registration = if sign_in { Registration::ThroughTemper } else { Registration::Local };
+        self
     }
     fn request(&mut self, phase: Phase, request: Request) -> Request {
         self.phase = phase;
@@ -302,7 +315,16 @@ impl Prepare {
     fn ini(&mut self) -> Request {
         self.write(
             File::AppIni,
-            ini::text(&self.owned, &self.place, &self.state.secrets, self.allowed_host),
+            ini::text(
+                &self.owned,
+                &self.place,
+                &self.state.secrets,
+                self.allowed_host,
+                match self.registration {
+                    Registration::Local => false,
+                    Registration::ThroughTemper => true,
+                },
+            ),
             Phase::Ini,
         )
     }

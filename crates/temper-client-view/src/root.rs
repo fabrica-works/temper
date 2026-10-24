@@ -9,6 +9,7 @@ use temper_client_domain::{Action, Domain};
 pub struct View {
     render: skein_ui::View,
     sign_in: crate::sign_in::Ways,
+    forge_sign_in: crate::forge_sign_in::Forges,
     forge_words: Words,
     forge: forge::bindings::Bindings,
     pages: crate::frame::Bindings,
@@ -37,6 +38,7 @@ impl View {
         assert!(crate::worst_case(limits, domain, &forge_words).is_some(), "view capacities are checked");
         View {
             sign_in,
+            forge_sign_in: crate::forge_sign_in::Forges::new(),
             render: skein_ui::View::new(&limits.tree),
             forge: forge::bindings::Bindings::new(limits.tree.bindings, domain.forge.checks, forge),
             pages: crate::frame::Bindings::new(limits.tree.bindings),
@@ -48,6 +50,10 @@ impl View {
             next_change: None,
             clock_revision: 0,
         }
+    }
+    /// Supply the page's forge facts before its first build.
+    pub fn forge_sign_in(&mut self, forges: crate::forge_sign_in::Forges) {
+        self.forge_sign_in = forges;
     }
     fn task_main(&mut self, b: &mut Builder, root: &Domain, times: &mut crate::words::Times) {
         crate::pages::task::main(b, root, &self.forge_words, &mut self.pages, self.rows, times);
@@ -118,10 +124,20 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
             crate::frame::demo_banner(&mut builder, root, &view.forge_words, &mut view.pages);
         }
     }
-    if crate::sign_in::offered(root, &view.forge_words, &view.sign_in)
+    if let Some(page) = root.authorization() {
+        crate::sign_in::authorize(
+            &mut builder,
+            root,
+            page.state(),
+            page.query(),
+            &view.forge_words,
+            &view.sign_in,
+            &view.forge_sign_in,
+        );
+    } else if crate::sign_in::offered(root, &view.forge_words, &view.sign_in)
         && let Some(origin) = &view.sign_in.origin
     {
-        crate::sign_in::main(&mut builder, root, &view.forge_words, origin);
+        crate::sign_in::main(&mut builder, root, &view.forge_words, origin, &view.forge_sign_in);
     } else if crate::frame::unavailable(root).is_some() {
         builder.open(Role::Main);
         builder.style(crate::look::MAIN);
@@ -183,7 +199,14 @@ pub fn build(view: &mut View, root: &Domain, wall: Wall, out: &mut Queue<Patch>)
     } else if let temper_client_domain::Address::ConnectForge { forge } = root.pages().address() {
         forge::connect::main(&mut builder, root, &view.forge_words, &mut view.pages, &mut view.forge, *forge);
     } else if *root.pages().address() == temper_client_domain::Address::Forges {
-        forge::forges::main(&mut builder, root, &view.forge_words, &mut view.pages, &mut view.forge);
+        forge::forges::main(
+            &mut builder,
+            root,
+            &view.forge_words,
+            &mut view.pages,
+            &mut view.forge,
+            &view.forge_sign_in,
+        );
     } else if let temper_client_domain::Address::Adopt { .. } = root.pages().address() {
         view.adoption_main(&mut builder, root);
     }

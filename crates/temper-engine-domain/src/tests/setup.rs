@@ -520,3 +520,56 @@ fn a_taken_project_name_is_refused_without_making_a_project() {
     assert_eq!(domain.core.projects.as_slice(), &[1]);
     assert!(domain.core.authority.policy(2).is_none());
 }
+
+#[test]
+fn whose_returns_the_live_person_and_none_after_sign_out_or_for_an_unknown_sign_in() {
+    const DESTINATION: Token = Token::new(91);
+    let (mut domain, env) = signed_in(Some(people::Role::Owner));
+    crate::try_step(
+        &mut domain,
+        &env,
+        Event::Party(PartyInput::Whose { reply_to: ReplyTo::new(DESTINATION), sign_in: SIGN_IN }),
+    )
+    .unwrap();
+    let requests = settle(&mut domain, &env);
+    let [
+        Request::Party(PartyRequest::Deliver(Delivery::WebReply {
+            to: destination,
+            reply: people::Reply::Signer(Some(signer)),
+        })),
+    ] = requests.as_ref()
+    else {
+        panic!("one live signer: {requests:?}")
+    };
+    assert_eq!(*destination, ReplyTo::new(DESTINATION));
+    assert_eq!(signer.kind, people::Kind::Person);
+    assert_eq!(signer.identity.key, people::IdentityKey { provider: 0, subject: b"owner".as_slice().into() });
+    crate::try_step(
+        &mut domain,
+        &env,
+        Event::Party(PartyInput::SignOut { reply_to: ReplyTo::new(DESTINATION), sign_in: SIGN_IN }),
+    )
+    .unwrap();
+    assert_eq!(
+        settle(&mut domain, &env).as_ref(),
+        [Request::Party(PartyRequest::Deliver(Delivery::WebReply {
+            to: ReplyTo::new(DESTINATION),
+            reply: people::Reply::SignedOut
+        }))]
+    );
+    for sign_in in [SIGN_IN, SIGN_IN + 1] {
+        crate::try_step(
+            &mut domain,
+            &env,
+            Event::Party(PartyInput::Whose { reply_to: ReplyTo::new(DESTINATION), sign_in }),
+        )
+        .unwrap();
+        assert_eq!(
+            settle(&mut domain, &env).as_ref(),
+            [Request::Party(PartyRequest::Deliver(Delivery::WebReply {
+                to: ReplyTo::new(DESTINATION),
+                reply: people::Reply::Signer(None)
+            }))]
+        );
+    }
+}

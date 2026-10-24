@@ -26,6 +26,7 @@ pub mod bundle;
 pub mod ctl;
 pub mod fake;
 pub mod forge;
+mod forge_sign_in;
 mod google_runtime;
 mod host;
 mod init;
@@ -34,7 +35,7 @@ mod program_login;
 mod setup;
 mod worker_alone;
 pub use host::Host;
-pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] [--box] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
+pub const USAGE: &str = "usage: temper init [DIRECTORIES] | temper serve [DIRECTORIES] [--box] | temper agent AGENT.json | temper program-login [DIRECTORIES] NAME | temper open DIRECTORY LINK_OR_ADDRESS | temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper forge sign-in [DIRECTORIES] FORGE | temper box [DIRECTORIES] | temper fake llm --document FILE [--ready PREFIX] [--seed N] | temper fake forge [DIRECTORIES] N [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge --document FILE [--ready PREFIX] [--seed N] [--observations FILE] | temper fake forge check [DIRECTORIES] N OBSERVATIONS STORE | temper fake git ARGS... | temper ctl DIRECTORY TOOL [ARGUMENT...] | temper ctl help [TOOL]";
 const CONFIG_BYTES: u32 = 1 << 20;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -104,7 +105,7 @@ pub fn configure_with(
     }
     let (verb, arguments) = if command.as_ref() == b"forge" {
         let Some((verb, arguments)) = arguments.split_first() else { return Err(invalid()) };
-        if ![b"fetch".as_slice(), b"prepare", b"run", b"reconcile"].contains(&verb.as_ref()) {
+        if ![b"fetch".as_slice(), b"prepare", b"run", b"reconcile", b"sign-in"].contains(&verb.as_ref()) {
             return Err(invalid());
         }
         (Some(verb), arguments)
@@ -371,9 +372,11 @@ fn prepare_with_limits(
         None => bundle::own(named.bundle_limits)?,
     };
     if let Some(bundle) = &mut bundle {
-        bundle.fill_sign_in(named.sign_in.is_some()).ok_or_else(|| {
+        bundle.fill_sign_in(named.sign_in.is_some()).and_then(|()| {
+            bundle.fill_forge_sign_in(named.sign_in.as_ref(), &named.forges, &checked.setup, named.bundle_limits.bundle_bytes)
+        }).ok_or_else(|| {
             format!(
-                "application.clients.bundle: {}: page has no </head>",
+                "application.clients.bundle: {}: page needs </head> and room within clients.bundle_bytes for sign-in metadata",
                 named.bundle.as_deref().map_or("embedded".into(), |name| String::from_utf8_lossy(name))
             )
         })?;

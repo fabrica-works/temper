@@ -352,7 +352,7 @@ fn install_sends_its_way_back_and_leaves_once_only_from_the_answer() {
     let mut out = event(&mut root, Event::Client { event: jig_client::Event::Up { up: up.clone() } });
     let mut leaves = 0_u32;
     while let Some(request) = out.pop() {
-        if let Request::Leave { to } = request {
+        if let Request::Leave { to, .. } = request {
             leaves += 1;
             assert_eq!(to.as_ref(), b"https://fake.invalid/install");
         }

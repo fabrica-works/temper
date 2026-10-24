@@ -302,12 +302,6 @@ fn load(
     let engine = match engine_at {
         Some(at) => match config::engine(&document, at, directories) {
             Ok(mut engine) => {
-                if engine.clients.provider.is_some() {
-                    problems.push(
-                        root.member(b"engine").member(b"clients").member(b"provider"),
-                        What::Jig(config::What::Form),
-                    );
-                }
                 engine.limits.clients.watches_per_stream = temper_engine_domain::WATCHES_PER_STREAM;
                 Some(engine)
             }

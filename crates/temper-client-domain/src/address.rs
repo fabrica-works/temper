@@ -70,6 +70,12 @@ pub enum Kind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Place {
     Address(Address),
+    /// Raw authorization query; never canonicalized or printed.
+    Authorize {
+        query: Box<[u8]>,
+    },
+    /// An authorization query beyond jig's bound.
+    AuthorizeMalformed,
     Missing,
 }
 
@@ -138,7 +144,16 @@ pub fn print(address: &Address) -> Box<[u8]> {
 pub fn parse(path: &[u8]) -> Place {
     let query = skein_lib::bytes::find(path, b"?").unwrap_or(path.len());
     let fields = path.get(query..).expect("query in path").strip_prefix(b"?").unwrap_or(b"");
-    let path = path.get(..query).expect("query in path");
+    let route = path.get(..query).expect("query in path");
+    if route == b"/oauth/authorize" {
+        return if fields.len() <= usize::try_from(crate::authorize::QUERY_BYTES).expect("jig query ceiling fits usize")
+        {
+            Place::Authorize { query: fields.into() }
+        } else {
+            Place::AuthorizeMalformed
+        };
+    }
+    let path = route;
     let path = path.strip_suffix(b"/").unwrap_or(path);
     if path.is_empty() {
         return Place::Address(Address::Inbox { filter: parse_filter(fields) });

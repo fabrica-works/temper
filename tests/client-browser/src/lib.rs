@@ -13,6 +13,7 @@ use std::{
     net::TcpListener,
     path::{Path, PathBuf},
 };
+mod authorize;
 mod configuration;
 mod forgery;
 mod github;

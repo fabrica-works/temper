@@ -722,6 +722,26 @@ fn the_webhook_listener_and_secret_file_are_read() {
     problems.push(file.at.clone(), What::Jig(config::What::Missing));
     assert_eq!(&*lines(&problems), b"application.forges[0].webhook_secret: missing\n");
 }
+// protocol/sign-in.md, 9: a configured provider is admitted, and startup reads its key and
+// client secret as private files, refusing either one missing by its path.
+#[test]
+fn a_clients_provider_key_and_secret_are_private_files_named_by_path() {
+    let document = core::str::from_utf8(&fixtures::document()).unwrap().replace(
+        "\"clients\": {",
+        r#""clients": {"provider":{"key":"provider.pem","clients":[{"id":"app","secret":"app.secret","redirect_uri":"https://app.example.com/cb"}],"addresses":[]},"#,
+    );
+    let named = crate::named(document.as_bytes(), &jig_protocol_config::Directories::working()).unwrap();
+    for (name, expected) in [
+        (b"provider.pem".as_slice(), b"engine.clients.provider.key: missing\n".as_slice()),
+        (b"app.secret", b"engine.clients.provider.clients[0].secret: missing\n"),
+    ] {
+        let file = named.files.iter().find(|file| file.path.as_ref() == name).unwrap();
+        assert!(file.private);
+        let mut problems = Problems::empty();
+        problems.push(file.at.clone(), What::Jig(config::What::Missing));
+        assert_eq!(&*lines(&problems), expected);
+    }
+}
 #[test]
 fn null_webhook_members_are_read_as_none() {
     let (members, problems) = application(fixtures::APPLICATION, &fixtures::engine().jig);
@@ -1715,7 +1735,7 @@ fn clients_public_refusals_name_the_public_member() {
     let input = core::str::from_utf8(fixtures::APPLICATION).unwrap();
     let missing = input.replace("\"public\":null,", "");
     let (_, problems) = application(missing.as_bytes(), &jig);
-    assert_eq!(lines(&problems).as_ref(), b"application.clients.public: missing\n");
+    assert_eq!(lines(&problems).as_ref(), b"application.clients.public: missing: null for none\n");
     for origin in [
         "https://temper.example.com:443",
         "https://Temper.example.com",
@@ -1777,16 +1797,6 @@ fn clients_public_bounds_dns_labels_and_the_host() {
             assert_eq!(lines(&problems).as_ref(), b"application.clients.public: invalid form\n");
         }
     }
-}
-
-#[test]
-fn a_clients_provider_is_refused_because_temper_serves_no_provider_routes() {
-    let document = core::str::from_utf8(&fixtures::document()).unwrap().replace(
-        "\"clients\": {",
-        r#""clients": {"provider":{"key":"provider.pem","clients":[{"id":"app","secret":"app.secret","redirect_uri":"https://app.example.com/cb"}],"addresses":[]},"#,
-    );
-    let problems = crate::named(document.as_bytes(), &jig_protocol_config::Directories::working()).unwrap_err();
-    assert_eq!(&*lines(&problems), b"engine.clients.provider: invalid form\n");
 }
 
 #[test]

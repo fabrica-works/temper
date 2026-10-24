@@ -18,6 +18,8 @@ impl Limits {
         // An account heading joins the provider, plan/display and holder's words.
         let text = text.max(receiving.text.checked_add(words.name_bytes.min(256).checked_mul(3)?)?.checked_add(64)?);
         let text = text.max(fold_bytes(receiving, words)?);
+        // The sign-in return link percent-encodes a whole authorization address.
+        let text = text.max(3400);
         let markdown = skein_ui::markdown::max_nodes(receiving.text)?;
         let cards = card_nodes(receiving, markdown)?;
         // Each watched task has one card at its first anchor: fourteen structural
@@ -204,7 +206,7 @@ pub fn memory_terms(
     limits: &Limits,
     domain: &temper_client_domain::Limits,
     words: &Words,
-) -> Option<[(&'static str, u64); 9]> {
+) -> Option<[(&'static str, u64); 10]> {
     let pages = u64::from(domain.client.domain.text)
         .checked_add(skein_lib::List::<u64>::worst_case(domain.client.domain.rows)?)?
         // Plan ordering: task/parent input, sorted task index, child/sibling links,
@@ -227,6 +229,11 @@ pub fn memory_terms(
         ("ui", skein_ui::worst_case(&limits.tree)?),
         ("pages", pages),
         ("forge.bindings", crate::forge::bindings::worst_case(limits.tree.bindings)?),
+        (
+            "forge.sign_in",
+            skein_lib::List::<crate::forge_sign_in::Forge>::worst_case(crate::forge_sign_in::FORGES)?
+                .checked_add(u64::from(crate::forge_sign_in::FORGES).checked_mul(1280)?)?,
+        ),
         ("frame", crate::frame::Bindings::worst_case(limits.tree.bindings)?),
         (
             "accounts.bindings",

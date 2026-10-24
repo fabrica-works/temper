@@ -38,3 +38,5 @@ mod server;
 pub(crate) mod sign_in;
 
 mod sign_in_configuration;
+
+mod provider;

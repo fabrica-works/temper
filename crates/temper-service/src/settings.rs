@@ -209,4 +209,5 @@ pub struct SignIn {
     pub keys: Box<[u8]>,
     pub transport: Option<Transport>,
     pub members: Box<[crate::startup::application::sign_in::Member]>,
+    pub forges: Box<[crate::startup::application::sign_in::ForgeSignIn]>,
 }

@@ -1,4 +1,5 @@
 //! Members and issuer configuration (protocol/sign-in.md, 3.1).
+mod forges;
 use super::{Transport, read, resolved_transport};
 use crate::{
     limits::SignIn as Limits,
@@ -6,6 +7,8 @@ use crate::{
     startup::{Problems, What},
 };
 use alloc::boxed::Box;
+pub use forges::ForgeSignIn;
+pub(super) use forges::check as check_forges;
 use jig_protocol_config::{self as config, Path};
 use skein_json::{Document, document::Kind};
 use skein_lib::{List, bytes};
@@ -22,6 +25,7 @@ pub struct SignIn {
     pub secret: Box<[u8]>,
     pub endpoints: Endpoints,
     pub members: Box<[Member]>,
+    pub forges: Box<[ForgeSignIn]>,
 }
 #[derive(Debug)]
 pub struct Endpoints {
@@ -291,6 +295,7 @@ pub(super) fn parse(
     let mut object = read::object(document, at, &path, problems)?;
     let google = read::required(&mut object, document, b"google", &path, problems);
     let members = read::list(&mut object, document, b"members", limits.members, &path, problems);
+    let forges = forges::parse(document, &mut object, &path, problems);
     read::finish(object, document, &path, problems);
     let members_out = self::members(document, members, jig, limits, &path, problems);
     let path = path.member(b"google");
@@ -351,7 +356,7 @@ pub(super) fn parse(
         problems.push(Path::root().member(b"engine").member(b"owners"), What::Jig(config::What::Refers));
     }
     let secret = super::joined(directories, config::Directory::Data, &secret?, &path.member(b"secret"), problems)?;
-    Some(SignIn { provider, client, secret, endpoints: endpoints?, members: members_out.into_boxed() })
+    Some(SignIn { provider, client, secret, endpoints: endpoints?, members: members_out.into_boxed(), forges })
 }
 pub(super) fn files(sign_in: &SignIn, limits: Limits, files: &mut List<config::File>) {
     let path = path().member(b"google");
@@ -399,5 +404,6 @@ pub(super) fn resolve(
         keys: sign_in.endpoints.keys.clone(),
         transport,
         members: sign_in.members.clone(),
+        forges: sign_in.forges.clone(),
     })
 }

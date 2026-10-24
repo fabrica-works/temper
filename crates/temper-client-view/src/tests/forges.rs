@@ -331,3 +331,25 @@ fn all_sixty_four_installations_fit_without_shortening_their_logins() {
     let text = core::str::from_utf8(&text).unwrap();
     assert_eq!(text.matches('�').count(), 64 * 256);
 }
+
+#[test]
+fn a_connected_forge_in_the_page_facts_opens_through_temper() {
+    let root = root(Address::Forges, cf::connected());
+    let mut view = f::view_of(f::browser_words());
+    let mut facts = crate::forge_sign_in::Forges::new();
+    facts.read("3 forgejo https://forge.example:3000 owned");
+    view.forge_sign_in(facts);
+    f::build(&mut view, &root);
+    let link = f::find(view.tree(), Role::Link, "Open Forgejo ↗".as_bytes()).expect("forge sign-in link");
+    assert_eq!(
+        crate::href(&mut view, link).as_deref(),
+        Some(b"https://forge.example:3000/user/oauth2/temper".as_slice())
+    );
+    assert!(
+        core::str::from_utf8(&f::main_text(view.tree()))
+            .unwrap()
+            .contains("Open Forgejo signs you in as pat, through temper: Forgejo’s sign-in is temper’s.")
+    );
+    let view = f::browser_page_view(&root);
+    assert!(f::find(view.tree(), Role::Link, "Open Forgejo ↗".as_bytes()).is_none());
+}

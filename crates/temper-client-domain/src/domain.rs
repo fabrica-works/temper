@@ -9,6 +9,10 @@ pub struct Domain {
     pub(crate) client: jig_client::Client,
     pub(crate) unlinked: bool,
     pub(crate) departing: bool,
+    pub(crate) authorization: Option<crate::authorize::Authorization>,
+    pub(crate) authorizing: crate::authorize::Flight,
+    pub(crate) authorization_revision: u64,
+    pub(crate) signed_out: bool,
     pub(crate) returning: Option<(jig_client::Key, Box<[u8]>)>,
 }
 #[must_use]
@@ -49,9 +53,21 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
         unlinked,
         departing: false,
         returning: None,
+        authorization: None,
+        authorizing: crate::authorize::Flight::Idle,
+        authorization_revision: 0,
+        signed_out: false,
     }
 }
 impl Domain {
+    #[must_use]
+    pub const fn authorization(&self) -> Option<&crate::authorize::Authorization> {
+        self.authorization.as_ref()
+    }
+    #[must_use]
+    pub const fn signed_out(&self) -> bool {
+        self.signed_out
+    }
     #[must_use]
     pub const fn demo_answered(&self) -> bool {
         self.forge.demo_answered()
@@ -91,6 +107,7 @@ pub fn step(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<
     route::event(root, env, event, out);
     route::picker_progress(root, env, out);
     route::demo_progress(root, env, out);
+    crate::authorize::progress(root, env, out);
     welcome(root, out);
 }
 pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
@@ -99,6 +116,7 @@ pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     route::route_client(root, env, &mut client, out);
     route::picker_progress(root, env, out);
     route::demo_progress(root, env, out);
+    crate::authorize::progress(root, env, out);
     welcome(root, out);
 }
 #[must_use]
@@ -113,10 +131,17 @@ pub fn take(root: &mut Domain, _env: &Env<Limits>, _out: &mut Queue<Request>) {
 #[must_use]
 pub fn shown(root: &Domain) -> u64 {
     let count = crate::pages::shown(&root.pages);
-    count.checked_add(forge::shown(&root.forge)).expect("forge shown count fits")
+    count
+        .checked_add(forge::shown(&root.forge))
+        .expect("forge shown count fits")
+        .checked_add(root.authorization_revision)
+        .expect("authorization revision fits")
 }
 
 fn welcome(root: &mut Domain, out: &mut Queue<Request>) {
+    if root.authorization.is_some() {
+        return;
+    }
     if *root.pages.address() != (crate::Address::Welcome { step: crate::Step::Welcome }) {
         return;
     }

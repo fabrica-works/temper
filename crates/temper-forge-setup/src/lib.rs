@@ -14,6 +14,7 @@ pub mod problem;
 pub mod run;
 pub mod runner;
 pub mod setup;
+pub mod sign_in;
 pub mod spec;
 pub mod state;
 pub mod step;

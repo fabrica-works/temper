@@ -35,9 +35,10 @@ pub fn answer(root: &mut Domain, read: Token, value: c::ReadValue, out: &mut Que
 pub fn down(request: Request) -> Option<jig_client::Down> {
     match request {
         Request::Client { request } => match request {
-            jig_client::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
             jig_client::Request::Down { down } => Some(down),
-            jig_client::Request::Exchange { .. }
+            // M4's Authorize place answers it
+            jig_client::Request::Authorized(_)
+            | jig_client::Request::Exchange { .. }
             | jig_client::Request::OpenStream { .. }
             | jig_client::Request::CloseStream
             | jig_client::Request::Save { .. }

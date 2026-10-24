@@ -8,6 +8,7 @@ mod choice;
 mod confirm;
 mod flow;
 pub mod forge;
+pub mod forge_sign_in;
 pub mod frame;
 pub mod limits;
 pub mod look;

@@ -153,3 +153,18 @@ pub(super) fn decimal(input: &[u8]) -> Option<u64> {
     }
     Some(value)
 }
+
+/// These optional values are explicit in init's document; old files need their fix.
+pub(super) fn nullable(
+    object: &mut read::Object,
+    document: &Document,
+    name: &[u8],
+    path: &Path,
+    problems: &mut Problems,
+) -> Option<u32> {
+    let at = object.member(document, name);
+    if at.is_none() {
+        problems.push(path.member(name), What::MissingNull);
+    }
+    at
+}

@@ -133,8 +133,9 @@ fn drain(
     for _ in 0..bound {
         if let Some(request) = client.pop() {
             match request {
-                jig_client::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
                 jig_client::Request::Told { told } => route(root, env, told, child, out),
+                // M4's Authorize place answers it
+                jig_client::Request::Authorized(_) => {}
                 request @ (jig_client::Request::Exchange { .. }
                 | jig_client::Request::OpenStream { .. }
                 | jig_client::Request::CloseStream

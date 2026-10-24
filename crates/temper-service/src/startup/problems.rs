@@ -29,6 +29,7 @@ pub enum What {
     Escalation,
     Provider,
     Handover,
+    MissingNull,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Problem {
@@ -83,6 +84,7 @@ fn put(writer: &mut Writer, length: &mut usize, measuring: bool, bytes: &[u8]) {
 }
 fn words(what: What) -> &'static [u8] {
     match what {
+        What::MissingNull => b"missing: null for none",
         What::Standalone => b"standalone takes one worker, joined to the engine by the in-process name \"workers\"",
         What::EngineAlone => b"an engine alone takes no local worker, one plaintext loopback listener and workers with distinct digest paths",
         What::WorkerAlone => b"a worker alone takes one worker dialling a plaintext loopback socket, and only application.workers and application.limits",
@@ -217,6 +219,7 @@ fn render_path(path: &config::Path, writer: &mut Writer, length: &mut usize, mea
         }
     }
 }
+#[expect(clippy::too_many_lines, reason = "one exhaustive diagnostic vocabulary shared by both rendering passes")]
 fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
     let mut length = 0_usize;
     for problem in &problems.problems {
@@ -308,6 +311,7 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
             | What::Credentials
             | What::Escalation
             | What::Provider
+            | What::MissingNull
             | What::Handover => {}
         }
         put(writer, &mut length, measuring, b"\n");

@@ -23,6 +23,11 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         }
         Event::Went { place } => went(root, env, place, out),
         Event::Act { action } => match action {
+            Action::Pages(crate::pages::Act::SignOut) => {
+                root.signed_out = true;
+                root.authorization_revision = root.authorization_revision.checked_add(1).expect("revision fits");
+                pages(root, env, crate::pages::Event::Act { act: crate::pages::Act::SignOut }, out);
+            }
             Action::Pages(crate::pages::Act::RetryDemo) => {
                 forge(root, env, forge::Event::Act { act: forge::Act::StartDemo }, out);
             }
@@ -38,6 +43,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
     }
 }
 fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Request>) {
+    crate::authorize::went(root, &place);
     match place {
         Place::Address(address) => {
             pages(root, env, crate::pages::Event::Went { address: address.clone() }, out);
@@ -47,7 +53,7 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
                 forge(root, env, forge::Event::Left, out);
             }
         }
-        Place::Missing => {
+        Place::Authorize { .. } | Place::AuthorizeMalformed | Place::Missing => {
             pages(root, env, crate::pages::Event::Left, out);
             forge(root, env, forge::Event::Left, out);
         }
@@ -87,7 +93,7 @@ pub(crate) fn route_forge(
     for _ in 0..child.len() {
         match child.pop().expect("counted forge output") {
             forge::Request::Client { asked } => client(root, env, asked, out),
-            forge::Request::Leave { to } => out.push(Request::Leave { to }),
+            forge::Request::Leave { to } => out.push(Request::Leave { to, replace: false }),
             forge::Request::Show { address } => {
                 let forge::Address::Adopt { project } = address;
                 out.push(Request::Show { address: Address::Adopt { project }, replace: false });
@@ -119,7 +125,7 @@ pub(crate) fn route_client(
     while let Some(request) = child.pop() {
         match request {
             jig_client::Request::Told { told: value } => told(root, env, value, out),
-            jig_client::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
+            jig_client::Request::Authorized(answer) => crate::authorize::answered(root, answer, out),
             request @ (jig_client::Request::Save { .. }
             | jig_client::Request::Erase { .. }
             | jig_client::Request::Exchange { .. }

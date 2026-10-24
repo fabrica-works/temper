@@ -37,13 +37,13 @@ impl Frame {
         let mut other = Vec::new();
         while let Some(event) = memory.events.pop() {
             match event {
-                jig_client::Event::Authorize { .. } => unreachable!("temper starts no OpenID authorization"),
                 jig_client::Event::Reply { exchange: reply, message } if reply == exchange => {
                     self.probe_replies.push((reply.raw() & !(1 << 63), self.now, message));
                     self.probe = None;
                 }
                 jig_client::Event::Lost { exchange: lost } if lost == exchange => panic!("probe exchange lost"),
                 event @ (jig_client::Event::Start { .. }
+                | jig_client::Event::Authorize { .. }
                 | jig_client::Event::StartUnlinked { .. }
                 | jig_client::Event::SignIn { .. }
                 | jig_client::Event::SignOut

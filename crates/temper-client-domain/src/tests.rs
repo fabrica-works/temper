@@ -2,7 +2,7 @@ mod acts;
 mod address;
 mod amend;
 mod demo;
-mod fixtures;
+pub(crate) mod fixtures;
 mod forge_words;
 mod forges;
 mod form;

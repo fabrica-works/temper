@@ -17,6 +17,7 @@ const WALL: Wall = Wall::from_nanos(1_000_000_000);
 const PUBLIC: &[u8] = b"temper.example.com";
 pub(crate) fn configured() -> settings::SignIn {
     settings::SignIn {
+        forges: Box::new([]),
         provider: 3,
         client: b"temper-test".as_slice().into(),
         secret: Secret::new(b"throwaway-client-secret".as_slice().into()),
@@ -35,15 +36,31 @@ pub(crate) fn world(pending: u32) -> (crate::Service, fake::Issuer) {
     world_lifetime(pending, Duration::from_secs(600))
 }
 fn world_lifetime(pending: u32, lifetime: Duration) -> (crate::Service, fake::Issuer) {
+    world_origin(pending, lifetime, true)
+}
+fn world_origin(pending: u32, lifetime: Duration, public: bool) -> (crate::Service, fake::Issuer) {
+    world_settings(pending, lifetime, public, None, &[])
+}
+pub(crate) fn world_settings(
+    pending: u32,
+    lifetime: Duration,
+    public: bool,
+    provider: Option<jig_protocol_config::clients::Provider>,
+    files: &[(Box<[u8]>, Secret)],
+) -> (crate::Service, fake::Issuer) {
     let mut service = fixtures::ready();
     let mut config = fixtures::engine();
     let settings = configured();
-    config.clients.public = Some(crate::startup::application::Origin {
-        scheme: crate::startup::application::Scheme::Https,
-        host: PUBLIC.into(),
-        port: None,
-        name: PUBLIC.into(),
-    });
+    config.clients.public = if public {
+        Some(crate::startup::application::Origin {
+            scheme: crate::startup::application::Scheme::Https,
+            host: PUBLIC.into(),
+            port: None,
+            name: PUBLIC.into(),
+        })
+    } else {
+        None
+    };
     let mut providers = List::with_capacity(3);
     for provider in config.jig.providers {
         providers.push(provider).unwrap();
@@ -52,13 +69,14 @@ fn world_lifetime(pending: u32, lifetime: Duration) -> (crate::Service, fake::Is
         .push(jig_protocol_config::Provider { number: 3, kind: jig_protocol_config::ProviderKind::Application })
         .unwrap();
     config.jig.providers = providers.into_boxed();
+    config.jig.clients.provider = provider;
     let room = temper_engine_domain::max_out(&service.engine.as_ref().unwrap().env.limits)
         .checked_add(1)
         .unwrap()
         .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
         .unwrap();
     let mut clients =
-        Clients::new(&config.jig, &config.clients, &fixtures::seeds(), room, &config.limits.root.journal, None)
+        Clients::new(&config.jig, &config.clients, &fixtures::seeds(), room, &config.limits.root.journal, None, files)
             .unwrap();
     let mut limits = config.limits.sign_in;
     limits.pending = pending;
@@ -75,7 +93,11 @@ fn world_lifetime(pending: u32, lifetime: Duration) -> (crate::Service, fake::Is
             token_endpoint: settings.token,
             client_id: settings.client,
             client_secret: Some(settings.secret.expose().into()),
-            redirect_uri: b"https://temper.example.com/sign-in/google/return".as_slice().into(),
+            redirect_uri: if public {
+                b"https://temper.example.com/sign-in/google/return".as_slice().into()
+            } else {
+                b"http://127.0.0.1:7100/sign-in/google/return".as_slice().into()
+            },
             refresh_token: b"throwaway-refresh".as_slice().into(),
             terms: Some(fake::Terms {
                 issued: Box::new([]),
@@ -189,7 +211,7 @@ pub(crate) fn ending(peer: &Peer, status: &[u8], text: &[u8]) {
     let cleared = b"temper-sign-in=; Path=/sign-in/google; HttpOnly; SameSite=Lax; Max-Age=0";
     assert!(peer.received().windows(cleared.len()).any(|part| part == cleared));
 }
-fn account(issuer: &mut fake::Issuer, subject: &[u8], address: Option<&[u8]>, verified: bool) {
+pub(crate) fn account(issuer: &mut fake::Issuer, subject: &[u8], address: Option<&[u8]>, verified: bool) {
     issuer
         .sign_in_as(fake::Account {
             subject: subject.into(),
@@ -204,9 +226,9 @@ fn token_plan(issuer: &mut fake::Issuer) {
             status: 200,
             body: fake::Body::Token(oauth::TokenResponse {
                 access_token: b"throwaway-access".as_slice().into(),
-                refresh_token: Some(b"throwaway-refresh".as_slice().into()),
+                refresh_token: None,
                 expires_in: 3600,
-                scope: None,
+                scope: Some(b"openid email profile".as_slice().into()),
                 id_token: None,
                 earliest_refresh_at: None,
             }),
@@ -215,7 +237,7 @@ fn token_plan(issuer: &mut fake::Issuer) {
         })
         .unwrap();
 }
-fn signed_return(service: &mut crate::Service, issuer: &mut fake::Issuer, target: &[u8]) -> Peer {
+pub(crate) fn signed_return(service: &mut crate::Service, issuer: &mut fake::Issuer, target: &[u8]) -> Peer {
     let (url, cookie) = start(service, issuer, target);
     let redirect = redirect(issuer, url);
     token_plan(issuer);
@@ -440,4 +462,41 @@ fn a_held_return_outlives_the_http_stall_and_gets_its_expired_page() {
     assert!(!peer.is_closed(), "the return outlives the HTTP stall");
     peer.pump_at(service.engine.as_mut().unwrap(), true, Time::from_nanos(601_000_000_000), WALL);
     ending(&peer, b"HTTP/1.1 400", b"It took too long");
+}
+
+#[test]
+fn a_confidential_google_sign_in_without_public_uses_the_exact_loopback_redirect() {
+    let (mut service, mut issuer) = world_origin(2, Duration::from_secs(600), false);
+    account(&mut issuer, b"first-sub", Some(b"sam@example.com"), true);
+    let mut start = Peer::raw(
+        service.engine.as_mut().unwrap(),
+        b"GET /sign-in/google HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nConnection: close\r\n\r\n",
+    );
+    pump(&mut service, &mut start);
+    answer_fetch(&mut service, &mut issuer);
+    pump(&mut service, &mut start);
+    assert!(start.received().starts_with(b"HTTP/1.1 303"));
+    let location = header(&start, "location");
+    assert!(
+        core::str::from_utf8(location)
+            .unwrap()
+            .contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A7100%2Fsign-in%2Fgoogle%2Freturn")
+    );
+    let cookie = header(&start, "set-cookie");
+    assert!(!cookie.ends_with(b"; Secure"));
+    let cookie = cookie.split(|byte| *byte == b';').next().unwrap().to_vec();
+    let target = redirect(&mut issuer, location.into());
+    token_plan(&mut issuer);
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nCookie: {}\r\nConnection: close\r\n\r\n",
+        core::str::from_utf8(&target).unwrap(),
+        core::str::from_utf8(&cookie).unwrap()
+    );
+    let mut returned = Peer::raw(service.engine.as_mut().unwrap(), request.as_bytes());
+    pump(&mut service, &mut returned);
+    answer_fetch(&mut service, &mut issuer);
+    pump(&mut service, &mut returned);
+    ending(&returned, b"HTTP/1.1 303", b"");
+    assert!(core::str::from_utf8(returned.received()).unwrap().contains("jig-sign-in="));
+    assert_eq!(header(&returned, "location"), b"/");
 }

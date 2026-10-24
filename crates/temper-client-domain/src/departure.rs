@@ -16,7 +16,7 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: &Told, out: &mut 
             && let Some(answer) = return_answer(&record.bytes)
             && *answer.outcome() == w::Outcome::Returning
         {
-            out.push(Request::Leave { to: address });
+            out.push(Request::Leave { to: address, replace: false });
         }
         return true;
     }

@@ -13,6 +13,9 @@ pub fn to_root(event: core::Event) -> Result<root::PartyInput, Box<kit::Event>> 
         core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask, models }) => {
             root::PartyInput::Ask { reply_to, sign_in, key, ask, models }
         }
+        core::Event::People(people::Event::Whose { reply_to, sign_in }) => {
+            root::PartyInput::Whose { reply_to, sign_in }
+        }
         core::Event::People(people::Event::SignOut { reply_to, sign_in }) => {
             root::PartyInput::SignOut { reply_to, sign_in }
         }
@@ -144,8 +147,12 @@ fn delivered(delivery: root::Delivery) -> Option<kit::Event> {
 }
 /// Refuse decisions while restoration or the first periods are incomplete.
 #[must_use]
+#[expect(clippy::match_same_arms, reason = "Whose keeps its explicit not-ready answer beside the party refusals")]
 pub fn not_ready(input: root::PartyInput) -> Option<kit::Event> {
     match input {
+        root::PartyInput::Whose { reply_to, .. } => {
+            Some(kit::Event::Reply { to: reply_to, reply: people::Reply::Again(people::Again::NotReady) })
+        }
         root::PartyInput::SignedIn { reply_to, .. }
         | root::PartyInput::SignOut { reply_to, .. }
         | root::PartyInput::Ask { reply_to, .. }

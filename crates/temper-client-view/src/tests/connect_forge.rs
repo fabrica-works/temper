@@ -1021,7 +1021,7 @@ fn connect_github_link_leaves_the_tab_once() {
     let mut out = drive(&mut root, answer_event(attempt, outcome.clone()));
     let mut leaves = Vec::new();
     while let Some(request) = out.pop() {
-        if let d::Request::Leave { to } = request {
+        if let d::Request::Leave { to, .. } = request {
             leaves.push(to);
         }
     }

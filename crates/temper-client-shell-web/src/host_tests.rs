@@ -2,6 +2,8 @@
 use super::*;
 use jig_client::contract as c;
 use skein_ui::{EntryKind, Role};
+#[path = "host_tests_authorize.rs"]
+mod authorize;
 #[path = "host_tests_departure.rs"]
 mod departure;
 const KEY: &[u8] = b"private-host-key";

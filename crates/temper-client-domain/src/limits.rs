@@ -27,6 +27,8 @@ pub fn max_out(limits: &Limits) -> u32 {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let mut total = crate::pages::task::worst_case(limits)?;
+    total = total.checked_add(u64::from(crate::authorize::QUERY_BYTES))?;
+    total = total.checked_add(u64::try_from(size_of::<crate::authorize::Authorization>()).ok()?)?;
     total = total.checked_add(crate::pages::choice::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::accounts::worst_case(limits)?)?;
     total = total

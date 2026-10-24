@@ -140,12 +140,13 @@ pub(crate) fn start(
         Refused {
         verb: "prepare",
         number: None,
-        why: "usage: temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE".into(),
+        why: "usage: temper forge fetch [DIRECTORIES] FORGE | temper forge prepare [DIRECTORIES] FORGE | temper forge run [DIRECTORIES] FORGE forgejo|runner | temper forge reconcile [DIRECTORIES] FORGE | temper forge sign-in [DIRECTORIES] FORGE".into(),
     }
     };
     let (verb, number, which) = match arguments {
         [verb, number] if verb == "fetch" => ("fetch", number, None),
         [verb, number] if verb == "prepare" => ("prepare", number, None),
+        [verb, number] if verb == "sign-in" => ("sign-in", number, None),
         [verb, number] if verb == "reconcile" => ("reconcile", number, None),
         [verb, number, which] if verb == "run" => {
             let which = match which.to_str() {
@@ -162,6 +163,9 @@ pub(crate) fn start(
     let bytes = directories.read().map_err(refused)?;
     let super::setup::Deployment { named, checked, .. } =
         super::setup::check(&bytes, &directories.jig()).map_err(refused)?;
+    if verb == "sign-in" {
+        return super::forge_sign_in::run(directories, &bytes, &named, &checked, number).map_err(refused);
+    }
     if verb == "reconcile" {
         let settings = reconcile_settings(&named, &checked, number).map_err(refused)?;
         return temper_forge_setup_shell::reconcile::reconcile(settings, &skein_shell::Clock::new())
@@ -225,6 +229,9 @@ pub(crate) fn start(
             owned.clone(),
             place.clone(),
             webhook_listener(&named).map_err(refused)?.map(|socket| socket.ip()),
+        )
+        .with_sign_in(
+            named.sign_in.as_ref().is_some_and(|sign_in| sign_in.forges.iter().any(|row| row.forge == number)),
         ),
     )
     .map_err(|why| refused(failure(why, &place)))?;
