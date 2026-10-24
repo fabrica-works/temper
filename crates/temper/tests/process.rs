@@ -1845,8 +1845,8 @@ fn the_cluster_stops_in_reverse_each_exiting_0() {
     scratch.remove();
 }
 
-// The worker retains the owned example's limits; only its memory envelope
-// is raised to the worker-only requirement while the payload work is separate.
+// The worker retains the owned example's limits; derive its exact memory
+// envelope through this fixture's agent reader and process preparation.
 fn prepare_owned_worker(members: &mut support::cluster::Members) {
     let directory = members.prepare("w1");
     let configuration = directory.join("config");

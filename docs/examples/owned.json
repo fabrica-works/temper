@@ -212,7 +212,7 @@
     "connectors": [
       1
     ],
-    "memory_bytes": 646168440238212,
+    "memory_bytes": 720000000000000,
     "rules": {
       "ceiling": {
         "tools": 1,
@@ -851,7 +851,7 @@
           "hub.turn_queue_bytes": 12720368
         }
       },
-      "memory_bytes": 3380142270631
+      "memory_bytes": 3800000000000
     }
   ],
   "application": {

@@ -982,14 +982,29 @@ fn checked_setup(bytes: &[u8], named: &temper_service::Named) -> temper_forge_se
     .expect("bounded setup check")
 }
 
+/// Ten percent headroom, rounded up to two significant decimal digits.
+#[must_use]
+pub fn memory_with_headroom(required: u64) -> u64 {
+    let headed = (u128::from(required) * 11).div_ceil(10);
+    let mut place = 1;
+    while headed > 99 * place {
+        place *= 10;
+    }
+    u64::try_from(headed.div_ceil(place) * place).expect("memory with headroom fits u64")
+}
+
+#[must_use]
+pub fn memory_in_band(declared: u64, required: u64) -> bool {
+    declared >= required && u128::from(declared) * 4 <= u128::from(required) * 5
+}
+
 /// Only this drift check writes the document's memory literals, in the established explicit mode.
 pub fn check_memory(relative: &str, required: temper_service::startup::Requirements) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(relative);
     let mut text = fs::read_to_string(&path).expect("owned example");
     let value: serde_json::Value = serde_json::from_str(&text).expect("owned JSON");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
-    let again =
-        "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'";
+    let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run --locked -p temper --test startup -E 'test(owned_memory_figures)'";
     for (previous, required, name) in [
         (
             value["engine"]["memory_bytes"].as_u64().expect("engine memory_bytes"),
@@ -1002,20 +1017,23 @@ pub fn check_memory(relative: &str, required: temper_service::startup::Requireme
             "workers[0].memory_bytes",
         ),
     ] {
-        if write {
+        let declared = if write {
+            let declared = memory_with_headroom(required);
             let literal = format!("\"memory_bytes\": {previous}");
             assert_eq!(text.matches(&literal).count(), 1, "one literal per envelope");
-            text = text.replace(&literal, &format!("\"memory_bytes\": {required}"));
+            text = text.replace(&literal, &format!("\"memory_bytes\": {declared}"));
+            declared
         } else {
-            assert_eq!(previous, required, "{name} drifted; {again}");
-        }
+            previous
+        };
+        assert!(
+            memory_in_band(declared, required),
+            "{relative}: {name} declares {declared}, outside worst case {required} through 1.25 times it; {again}"
+        );
     }
     if write {
         fs::write(&path, text).expect("write only owned memory literals");
     }
-    let value: serde_json::Value = serde_json::from_slice(&fs::read(path).expect("owned example")).expect("owned JSON");
-    assert_eq!(value["engine"]["memory_bytes"].as_u64(), Some(required.engine_bytes));
-    assert_eq!(value["workers"][0]["memory_bytes"].as_u64(), Some(required.worker_bytes));
 }
 /// temper-01a's Adopt stand-in (forge-setup.md, 4.5 and 4.8); temper-15 removes it.
 /// Uses the kept webhook secret, drawing one only when absent.

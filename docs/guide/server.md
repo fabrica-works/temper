@@ -197,10 +197,11 @@ temper.example.com {
    `workers[0]` with `engine` `{"socket": "127.0.0.1:8369"}`, `name`
    `"w1"`, `secret` `"secrets/w1.secret"`, and `agent` naming
    temper's binary and its `agent.json` by absolute paths. The example's
-   `memory_bytes` is a standalone worker's figure, which a worker
-   alone's worst case passes: the start refuses it, naming by how many
-   bytes. It is a bound the start checks, and reserves nothing: raise
-   it past that.
+   worker `memory_bytes`, with its headroom, also holds a worker alone's
+   worst case with its strings at their bounds. It is a bound the start
+   checks, and reserves nothing. If a changed configuration's start is
+   refused, it names by how many bytes the worst case passes the bound:
+   raise `memory_bytes` past that.
 5. **The runner,** when the owned setup has one: Forgejo's preparation
    on `engine` registers it and writes `runner/secret` and
    `runner/config.yaml` in the forge's directory; it draws a new secret

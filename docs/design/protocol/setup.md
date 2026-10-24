@@ -1464,15 +1464,20 @@ runs it (section 7).
   memory's writer runs (below):
 
   ```sh
-  SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(turn_bounds)'
+  SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run --locked -p temper --test startup -E 'test(turn_bounds)'
   ```
 
   jig's store and its KV bounds and the worker wire's ceilings stay as
   they are: a turn's body is a transcript file's, never a KV value, and
   each figure is within its wire field's ceiling.
-- **Its `memory_bytes`** hold its worst cases wherever a person lays it
-  and whatever its forge's records hold: each start passes with each
-  string its service's worst case counts, and a person's copy changes,
+- **Its `memory_bytes`** are at least its worst cases, with 10% headroom
+  rounded up to two significant digits. The check admits declarations
+  from the worst case through 1.25 times it; past either end it says to
+  run the writer below. The exact terms live in
+  `crates/temper/tests/figures/memory/owned/{engine,worker}/`.
+  They hold wherever a person lays it and whatever its forge's records
+  hold: each start passes with each string its service's worst case
+  counts, and a person's copy changes,
   at its bound (configuration.md, section 7, one worst case per
   service).
   - The engine's counts the forge's API token, its `ApiToken` record,
@@ -1498,20 +1503,21 @@ runs it (section 7).
   are retained once, separately from the per-slot spawn command paths.
   `temper-service::startup::memory_requirements` derives both envelopes
   from startup's checked calculations without starting a service. The
-  owned startup test checks the two literals against that query with
-  these strings at their bounds in service settings, and checks each
-  one-byte deficit at startup. Artificial paths are never opened. A
+  owned startup test checks the two literals against that query's band
+  with these strings at their bounds in service settings. Separately,
+  it checks that the exact worst case starts and each one-byte deficit
+  is refused at startup. Artificial paths are never opened. A
   separate shell test prepares the example with ordinary paths.
-  Regenerate only the two literals with:
+  Regenerate the two literals and the exact term figures with:
 
   ```sh
-  SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper --test startup -E 'test(owned_memory_figures)'
+  SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run --locked -p temper --test startup -E 'test(owned_memory_figures)'
   ```
 
-  At these pins the engine requires 646,061,993,993,576 bytes and the worker
-  3,380,142,268,295 bytes. Ordinary runs fail on drift and never write the
-  example. Program declarations survive startup; runnable program grants
-  still wait for smith's program backend and jig's program sources.
+  Ordinary runs fail when a declaration leaves the band or an exact term
+  figure drifts, and never write the example or the figure files.
+  Program declarations survive startup; runnable program grants still
+  wait for smith's program backend and jig's program sources.
 - **Three loopback addresses,** Forgejo's (`listen`, `127.0.0.1:3000`),
   the clients' listener's (`127.0.0.1:7100`) and the webhooks'
   listener's (`127.0.0.1:7101`), are what a host changes to run several
@@ -1740,11 +1746,14 @@ defaults for a person's real work are open (section 16).
   `127.0.0.1:<port>` (8.2).
 - **Its limits:** the owned example's (8.1), but room for its three
   forges: `forge.repositories` and `forge.client.repositories` 3, and
-  `forge.output` 82. Its `memory_bytes` are
-  derived as the owned example's are, with its own strings at their
-  bounds, the fake entry's `git`, which the engine names to the worker,
-  among them; two literals of `temper-init`'s checked by its tests the
-  same way.
+  `forge.output` 82. Its `memory_bytes` are at least its own worst cases,
+  with 10% headroom rounded up to two significant digits, checked in the
+  band from the worst case through 1.25 times it, as the owned example's
+  are (8.1). Its own strings are at their bounds, the fake entry's `git`,
+  which the engine names to the worker, among them; the two literals of
+  `temper-init`'s forgejo-elsewhere/demo document are written and checked
+  the same way. The exact terms live in
+  `crates/temper/tests/figures/memory/init/{engine,worker}/`.
 - **`application.demo`,** the demo's (8.4).
 - **Its box's steps:** `temper serve`; the demo's group, the fake LLM,
   forge 1's preparation and its fake, dormant until the person chooses
@@ -2981,10 +2990,13 @@ Each is intended; what it needs is named with it.
   a managed connect; Replace is a connected forge's alone.
 - **The owned example's agent, sized for a person's work.** Default: the
   process tier's profile (8.1), sized for the live tier's stories.
-- **The owned example's `memory_bytes`** are `small`'s worst cases with
-  its strings at their bounds (8.1): 646,061,993,993,576 bytes for the
-  engine and 3,380,142,268,295 for the worker, more than any machine
-  has, so the start's check bounds nothing a person's machine holds.
+- **The owned example's `memory_bytes`** are at least `small`'s worst
+  cases with its strings at their bounds (8.1), with 10% headroom rounded
+  up to two significant digits and a checked band through 1.25 times
+  each worst case. The exact terms live in
+  `crates/temper/tests/figures/memory/owned/{engine,worker}/`.
+  They remain more than any machine has, so the start's check bounds
+  nothing a person's machine holds.
   Default: as the example states them; which terms of the worst cases
   make them so large is open (configuration.md, section 11).
 - **The check's decisions** (8.4) are read from rows kept for other

@@ -977,6 +977,33 @@ fn memory_figure(
 }
 
 #[test]
+fn example_memory_headroom_rounds_up_to_two_significant_digits() {
+    for (required, declared) in [(0, 0), (90, 99), (91, 110), (100, 110), (101, 120), (999, 1100), (1001, 1200)] {
+        assert_eq!(support::owned::memory_with_headroom(required), declared, "worst case {required}");
+    }
+}
+
+#[test]
+fn example_memory_band_includes_both_bounds_and_rejects_each_side() {
+    for (required, declared, admitted) in [
+        (100, 99, false),
+        (100, 100, true),
+        (100, 110, true),
+        (100, 125, true),
+        (100, 126, false),
+        (101, 126, true),
+        (101, 127, false),
+        (u64::MAX, u64::MAX, true),
+    ] {
+        assert_eq!(
+            support::owned::memory_in_band(declared, required),
+            admitted,
+            "{declared} for worst case {required}"
+        );
+    }
+}
+
+#[test]
 fn owned_memory_figures_match_startup_requirements_at_bounded_strings() {
     let scratch = support::Scratch::startup("owned-memory-figures");
     let bounded = support::owned::bounded(scratch.path());
