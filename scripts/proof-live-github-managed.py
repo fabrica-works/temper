@@ -223,6 +223,8 @@ class Sitting:
         require(mode in ('fake', 'fake-wide', 'live'))
         self.wide = mode == 'fake-wide'
         self.mode = 'fake' if self.wide else mode
+        self.wait_secs = int(os.environ.get('TEMPER_SITTING_WAIT_SECS', '0')) if self.mode == 'fake' else 0
+        require(self.wait_secs >= 0)
         self.port = int(port)
         self.root = Path(__file__).resolve().parent.parent
         self.scratch = Path(scratch).resolve(strict=True)
@@ -277,10 +279,16 @@ class Sitting:
         self.processes.append(proc)
         return proc
 
-    def command(self, args, data=None, cwd=None, extra_env=None):
-        result = subprocess.run(args, input=data, cwd=cwd or self.scratch,
+    def command(self, args, data=None, cwd=None, extra_env=None, ready=False):
+        # The person's Enter belongs to this process, never to a ctl or git child.
+        result = subprocess.run(args, input=b'' if data is None else data, cwd=cwd or self.scratch,
                                 env=self.env | (extra_env or {}), stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, timeout=60)
+        if ready and result.returncode != 0:
+            # Only our fixed diagnostic vocabulary escapes the private client output.
+            failed = re.search(rb'Ready failed at semantic step (\d+)', result.stderr)
+            if failed:
+                self.step += ' at semantic step ' + failed[1].decode()
         require(result.returncode == 0 and len(result.stdout) <= BOUND)
         return result.stdout
 
@@ -386,7 +394,9 @@ class Sitting:
 
     def connect_fake(self, link):
         self.step = 'fake sign-in and Connect'
-        self.ctl('sign-in', '-', data=(link + '\n').encode())
+        self.ready_client(link, 'sign-in')
+        # The native shell keeps the session; ctl also needs the public engine address.
+        private(self.scratch/'client/address', ('http://' + urlsplit(link).netloc + '\n').encode())
         output = self.ctl('forge-connect', '1', 'github', '--key', 'managed-connect').decode()
         url = next(line for line in output.splitlines() if line.startswith('http://'))
         status, _, body = self.page('GET', url)
@@ -407,6 +417,11 @@ class Sitting:
         require(status == 200 and b'temper has the installation' in body)
         self.ctl('wait', 'forges', '--until', 'settled')
         self.mark('Connect, manifest creation and selected installation completed')
+
+    def ready_client(self, link, mode):
+        self.step = 'signed-in Ready ' + mode
+        self.command([self.harness, '--ignored', '--exact', 'managed_ready_client', '--nocapture'],
+                     data=(link + '\n').encode(), extra_env={'TEMPER_MANAGED_CLIENT': mode}, ready=True)
 
     def wait_ready(self):
         from cryptography.hazmat.primitives.serialization import load_der_private_key
@@ -681,12 +696,12 @@ class Sitting:
         require(not self.wide)  # A wide installation must never reach adoption or writes.
         self.mark('installation reaches exactly freeekanayaka/temper-probe-2')
         if self.mode == 'fake':
-            adopted = json.loads(self.ctl('adopt', '--project', '1', '--forge', '1', '--owner', OWNER,
-                                          '--name', NAME, '--landing', 'main', '--key', 'managed-adopt', '--json'))
-            require('adopted' in adopted)
+            self.ready_client(link, 'adopt')
         # Owner confirms the UI has reached the adopted card; a blank line has no authority value.
         # The dry run reads it too, so every prompt of the sitting has been answered once before.
         self.mark('after the adopted card appears, press Enter here')
+        if self.mode == 'fake':
+            time.sleep(self.wait_secs)
         require(sys.stdin.readline() == '\n')
         self.mark('repository adopted from Ready')
         require(self.evidence.stat().st_mode & 0o777 == 0o600)
