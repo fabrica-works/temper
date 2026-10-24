@@ -305,7 +305,7 @@ pub fn check(table: &[&Tool], call: &Call, limits: &Limits) -> Result<(), Usage>
     if tool.name == b"forge-connect" && call.form == 0 && call.values.contains(&Some(Values::One(Value::Stdin))) {
         return Err(Usage::Stdin);
     }
-    if tool.area == 5 && tool.keyed != Keyed::Never {
+    if tool.area == 5 && (tool.keyed != Keyed::Never || tool.name == b"export") {
         for (index, (arg, slot)) in args.iter().zip(&call.values).enumerate() {
             if let Some(Values::One(Value::Number(n))) = slot
                 && ((*n == 0 && arg.name == b"position") || u32::try_from(*n).is_err())

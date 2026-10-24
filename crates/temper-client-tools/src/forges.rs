@@ -794,7 +794,12 @@ pub(crate) fn print_rows(rows: Option<&[Row]>, json: bool, met: Option<bool>, li
     if bytes.len() > usize::try_from(limits.tools.text).expect("text fits") {
         return render::failure(b"result limit", json, 1);
     }
-    jig::Printed { status: if met == Some(false) { 3 } else { 0 }, stdout: bytes, stderr: Box::default() }
+    jig::Printed {
+        file: jig::FileEnd::Keep,
+        status: if met == Some(false) { 3 } else { 0 },
+        stdout: bytes,
+        stderr: Box::default(),
+    }
 }
 fn setup_text(forge: u16, answer: &SetUpAnswer, kept: bool, limits: &Limits, out: &mut Text) {
     if kept {
@@ -885,6 +890,7 @@ pub(crate) fn setup_print(forge: u16, outcome: &Outcome, json: bool, kept: bool,
             operation.word = b"forge-setup";
             if kept {
                 return jig::Printed {
+                    file: jig::FileEnd::Keep,
                     status: 1,
                     stdout: Box::default(),
                     stderr: render::outcome::kept(&operation, outcome, json, None, &limits.tools),
@@ -915,9 +921,9 @@ pub(crate) fn setup_print(forge: u16, outcome: &Outcome, json: bool, kept: bool,
         out.finish()
     };
     if status == 0 {
-        jig::Printed { status, stdout: bytes, stderr: Box::default() }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: bytes, stderr: Box::default() }
     } else {
-        jig::Printed { status, stdout: Box::default(), stderr: bytes }
+        jig::Printed { file: jig::FileEnd::Keep, status, stdout: Box::default(), stderr: bytes }
     }
 }
 

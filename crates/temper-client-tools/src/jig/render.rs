@@ -273,7 +273,7 @@ pub fn failure(reason: &[u8], json: bool, status: u8) -> Printed {
         out.put(b"\n").expect("measured newline");
         out.finish()
     };
-    Printed { status, stdout: Box::default(), stderr }
+    Printed { file: crate::jig::FileEnd::Keep, status, stdout: Box::default(), stderr }
 }
 fn error(out: &mut Encoder, reason: &[u8]) {
     out.object_start();

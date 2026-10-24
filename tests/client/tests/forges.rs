@@ -228,6 +228,7 @@ impl World {
                     root::Request::Printed { number, printed } => {
                         assert!(self.printed.insert(number, printed).is_none(), "one answer");
                     }
+                    root::Request::Record { .. } => unreachable!("forge tests do not move accounts"),
                     root::Request::Ready => {}
                     root::Request::Progress { line } => self.progress.push(line),
                     root::Request::Client { request } => panic!("unlinked transport: {request:?}"),
