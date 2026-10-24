@@ -1402,8 +1402,14 @@ pub fn step_6_5_rules() -> Box<[Box<[Rule]>]> {
 // Act 3, step 6.4 (domain/testing.md, 5.3)
 #[must_use]
 pub fn step_6_4(forge: SocketAddr) -> Box<[Script]> {
-    use super::*;
-    let owner = direction_owner(forge, RED_OWNER_SPEC, 20, 0, 4);
+    use super::{
+        Agent, RED_A4, RED_A4_FILE, RED_BASE, RED_BROKEN, RED_CHANGE_SPEC, RED_CHANGE_SPEND, RED_FILE, RED_FIRST_HEAD,
+        RED_OWNER_REPORT, RED_OWNER_SPEC, RED_OWNER_SPEND, RED_REPAIR, RED_REPAIR_HOLD, RED_REPORT, RED_REVIEW_HOLD,
+        RED_RULE, RED_TIMER, RED_TIMER_AT, RED_UPDATED_HEAD, REVIEWED,
+    };
+    let owner = direction_owner(forge, RED_OWNER_SPEC, RED_OWNER_SPEND, 0, 4);
+    let mut change = direction_change(forge, RED_CHANGE_SPEC, RED_A4_FILE, 3);
+    change["authority"]["budget"]["spend"] = RED_CHANGE_SPEND.into();
     let verdict = || call(b"finish", &json!({"form":"verdict","label":"1","text":REVIEWED,"fields":{},"items":[]}));
     let mut interim = call(b"subscribe", &json!({"kind":"timer","at":RED_TIMER_AT}));
     let mut lines = vec![Line::Text { text: RED_RULE.as_bytes().into() }];
@@ -1413,10 +1419,8 @@ pub fn step_6_4(forge: SocketAddr) -> Box<[Script]> {
         Script {
             cue: Agent::RedDirector.cue().into(),
             turns: Box::new([
-                call(b"delegate", &json!({"batch":[owner]})),
-                wait("A1 owns a4."),
-                interim,
-                wait("The interim timer is armed."),
+                then_wait(call(b"delegate", &json!({"batch":[owner]})), "A1 owns a4."),
+                then_wait(interim, "The interim timer is armed."),
                 call(b"unsubscribe", &json!({"subscription":RED_TIMER})),
                 report(RED_REPORT),
                 wait("A1 is still working."),
@@ -1425,8 +1429,7 @@ pub fn step_6_4(forge: SocketAddr) -> Box<[Script]> {
         Script {
             cue: Agent::RedOwner.cue().into(),
             turns: Box::new([
-                call(b"delegate", &json!({"batch":[direction_change(forge, RED_CHANGE_SPEC, RED_A4_FILE, 3)]})),
-                wait("a4 is delegated."),
+                then_wait(call(b"delegate", &json!({"batch":[change]})), "a4 is delegated."),
                 report(RED_OWNER_REPORT),
                 wait("a4 waits for the landing branch repair."),
             ]),
@@ -1458,21 +1461,21 @@ pub fn step_6_4(forge: SocketAddr) -> Box<[Script]> {
 
 #[must_use]
 pub fn step_6_4_rules() -> Box<[Box<[Rule]>]> {
-    use super::*;
+    use super::{RED_CHANGE, RED_MESSAGE, RED_OWNER_REPORT, RED_TIMER};
     let table = |entries: &[(&str, u32)]| -> Box<[Rule]> {
         entries.iter().map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn: *turn }).collect()
     };
     Box::new([
         table(&[
-            ("Subscription removed", 5),
-            (RED_OWNER_REPORT, 4),
-            (&format!("Subscription {RED_TIMER} added"), 3),
-            (RED_MESSAGE, 2),
-            (DELEGATED, 1),
+            ("Subscription removed", 3),
+            (RED_OWNER_REPORT, 2),
+            (&format!("Subscription {RED_TIMER} added"), 4),
+            (RED_MESSAGE, 1),
+            (DELEGATED, 4),
             (BEGIN, 0),
-            ("", 6),
+            ("", 4),
         ]),
-        table(&[(&format!("Result from task {RED_CHANGE}:"), 2), (CROSSED, 2), (DELEGATED, 1), (BEGIN, 0), ("", 3)]),
+        table(&[(&format!("Result from task {RED_CHANGE}:"), 1), (CROSSED, 1), (DELEGATED, 2), (BEGIN, 0), ("", 2)]),
         Box::new([]),
         Box::new([]),
         Box::new([]),

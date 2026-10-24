@@ -7619,7 +7619,10 @@ const RED_INTERIM: Promise = Promise::Must("the director arms and removes its in
 const RED_ATTEMPTS: Promise = Promise::Add("every attempt ended, none failed");
 
 fn red_tasks() -> [(Read, u64, u64); 9] {
-    use super::*;
+    use super::{
+        RED_CHANGE, RED_CODER, RED_DIRECTOR, RED_OWNER, RED_REPAIR, RED_REPAIR_CODER, RED_REPAIR_REVIEW, RED_REVIEW,
+        RED_UPDATED_REVIEW,
+    };
     [
         (Read::RedDirectorEnded, RED_DIRECTOR, 0),
         (Read::RedOwnerEnded, RED_OWNER, RED_DIRECTOR),
@@ -7695,7 +7698,7 @@ fn red_director_done(observed: &Observed) -> bool {
 
 #[must_use]
 pub fn step_6_4(observed: &Observed) -> Vec<Miss> {
-    use super::*;
+    use super::{Agent, PROJECT, RED_CHANGE, RED_DIRECTOR, RED_OWNER, RED_REPAIR, RED_REVISION};
     let mut misses = Vec::new();
     for (read, task, parent) in red_tasks() {
         let doc = task_document(observed, read);
@@ -7746,7 +7749,10 @@ pub fn step_6_4(observed: &Observed) -> Vec<Miss> {
 }
 
 fn red_landings(observed: &Observed, misses: &mut Vec<Miss>) {
-    use super::*;
+    use super::{
+        RED_A4, RED_A4_FILE, RED_A4_PULL, RED_BASE, RED_CHANGE, RED_DIRECTOR, RED_FILE, RED_FIRST_HEAD, RED_REPAIR,
+        RED_REPAIR_PULL, RED_UPDATED_HEAD,
+    };
     use skein_fake_forge_domain::{Observation, api};
     let records = &observed.kit.records;
     let pushes: Vec<_> = records
@@ -7834,7 +7840,7 @@ fn red_landings(observed: &Observed, misses: &mut Vec<Miss>) {
 }
 
 fn red_repair(observed: &Observed, misses: &mut Vec<Miss>) {
-    use super::*;
+    use super::{Agent, PROJECT, RED_CHANGE, RED_REPAIR, RED_REPAIR_CODER, RED_REVIEW};
     let repair = task_document(observed, Read::RedRepairPending);
     let final_repair = task_document(observed, Read::RedRepairEnded);
     let agents = [Agent::RedDirector, Agent::RedOwner, Agent::RedCoder, Agent::RedRepairCoder, Agent::Review];
@@ -7858,7 +7864,7 @@ fn red_repair(observed: &Observed, misses: &mut Vec<Miss>) {
             && roots.get("live").and_then(Value::as_array).is_some_and(Vec::is_empty)
             && roots.get("live_after") == Some(&Value::Null)
             && roots.pointer("/ended/rows/after") == Some(&Value::Null)
-            && roots.pointer("/ended/rows/rows").and_then(Value::as_array).is_some_and(|rows| rows.is_empty())
+            && roots.pointer("/ended/rows/rows").and_then(Value::as_array).is_some_and(Vec::is_empty)
             && [repair, final_repair].iter().all(|doc| {
                 number(doc, "/chip/task") == Some(RED_REPAIR)
                     && number(doc, "/project") == Some(PROJECT)
@@ -7886,8 +7892,41 @@ fn red_repair(observed: &Observed, misses: &mut Vec<Miss>) {
     );
 }
 
+// A subscribe and wait can share a completion. Its acknowledgement then
+// first appears in the query carrying A1's report: order the actual messages
+// within that query, retaining the call identity and the successful reply.
+fn red_timer_ack_before_report(told: &Told) -> bool {
+    use skein_fake_llm_domain::api::{Part, Role};
+    let mut subscriptions = BTreeSet::new();
+    let mut acknowledged = false;
+    for message in &told.history {
+        for part in &message.parts {
+            match part {
+                Part::ToolCall { id, name, .. } if message.role == Role::Assistant && name.as_ref() == b"subscribe" => {
+                    subscriptions.insert(id.as_ref());
+                }
+                Part::Text { text } if message.role == Role::User && contains(text, super::RED_OWNER_REPORT) => {
+                    return acknowledged;
+                }
+                Part::ToolOutput { id, output, .. } if message.role == Role::User => {
+                    if contains(output, super::RED_OWNER_REPORT) {
+                        return acknowledged;
+                    }
+                    if subscriptions.contains(id.as_ref())
+                        && contains(output, &format!("Subscription {} added", super::RED_TIMER))
+                    {
+                        acknowledged = true;
+                    }
+                }
+                Part::Opaque { .. } | Part::Text { .. } | Part::ToolCall { .. } | Part::ToolOutput { .. } => {}
+            }
+        }
+    }
+    false
+}
+
 fn red_timer(observed: &Observed, misses: &mut Vec<Miss>) {
-    use super::*;
+    use super::{Agent, RED_DIRECTOR, RED_MESSAGE, RED_OWNER_REPORT, RED_PERSON_MESSAGE, RED_TIMER, RED_TIMER_AT};
     let armed = task_document(observed, Read::RedTimerArmed);
     let ended = task_document(observed, Read::RedDirectorEnded);
     let added = plan_tool_results(observed, Agent::RedDirector, b"subscribe");
@@ -7924,7 +7963,10 @@ fn red_timer(observed: &Observed, misses: &mut Vec<Miss>) {
             && removed.len() == 1
             && added.first().zip(removed.first()).is_some_and(|((at, args, _), (later, remove, output))| {
                 request_at.is_some_and(|request| request <= *at)
-                    && report_at.is_some_and(|report| *at < report && report <= *later)
+                    && report_at.is_some_and(|report| {
+                        report <= *later
+                            && (*at < report || (*at == report && red_timer_ack_before_report(&observed.told[report])))
+                    })
                     && at < later
                     && args["kind"] == "timer"
                     && args["at"] == RED_TIMER_AT
@@ -7955,14 +7997,14 @@ mod red_tests {
     fn input(words: &str) -> Message {
         Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
     }
-    fn tool(id: &str, name: &str, args: Value, output: &str) -> [Message; 2] {
+    fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
         [
             Message {
                 role: Role::Assistant,
                 parts: Box::new([Part::ToolCall {
                     id: id.as_bytes().into(),
                     name: name.as_bytes().into(),
-                    arguments: serde_json::to_vec(&args).expect("args").into(),
+                    arguments: serde_json::to_vec(args).expect("args").into(),
                 }]),
             },
             Message {
@@ -7987,7 +8029,7 @@ mod red_tests {
             .collect();
         json!({"rows":rows,"cut":false,"before":null,"after":null})
     }
-    fn met() -> Observed {
+    fn met_documents() -> BTreeMap<Read, Value> {
         let mut documents = BTreeMap::new();
         for (read, task, parent) in red_tasks() {
             documents.insert(read, json!({"task":{
@@ -8042,6 +8084,9 @@ mod red_tests {
                 "chip":{"task":RED_REPAIR},"requester":{"deployment":{"project":PROJECT}}
             }]}}),
         );
+        documents
+    }
+    fn met_kit() -> Kit {
         let repo: Box<[u8]> = b"acme/app".as_slice().into();
         let mut records = vec![
             Observation::Moved {
@@ -8120,11 +8165,22 @@ mod red_tests {
                 deleted: None,
             })
             .collect();
+        Kit {
+            records,
+            pulls,
+            merged_green: true,
+            main: BTreeMap::from([
+                (RED_FILE.as_bytes().to_vec(), RED_BASE.as_bytes().to_vec()),
+                (RED_A4_FILE.as_bytes().to_vec(), RED_A4.as_bytes().to_vec()),
+            ]),
+        }
+    }
+    fn met_queries() -> Vec<Told> {
         let mut director = Vec::new();
         director.extend(tool(
             "owner",
             "delegate",
-            json!({"batch":[{"spec":{"words":RED_OWNER_SPEC}}]}),
+            &json!({"batch":[{"spec":{"words":RED_OWNER_SPEC}}]}),
             &format!("Delegated tasks: {RED_OWNER}"),
         ));
         let mut queries = vec![told(Agent::RedDirector, &director)];
@@ -8132,36 +8188,26 @@ mod red_tests {
         director.extend(tool(
             "timer",
             "subscribe",
-            json!({"kind":"timer","at":RED_TIMER_AT}),
+            &json!({"kind":"timer","at":RED_TIMER_AT}),
             &format!("Subscription {RED_TIMER} added"),
         ));
         queries.push(told(Agent::RedDirector, &director));
         director.push(input(RED_OWNER_REPORT));
-        director.extend(tool("remove", "unsubscribe", json!({"subscription":RED_TIMER}), "Subscription removed"));
+        director.extend(tool("remove", "unsubscribe", &json!({"subscription":RED_TIMER}), "Subscription removed"));
         queries.push(told(Agent::RedDirector, &director));
         let mut owner = Vec::from(tool(
             "a4",
             "delegate",
-            json!({"batch":[{"spec":{"words":RED_CHANGE_SPEC}}]}),
+            &json!({"batch":[{"spec":{"words":RED_CHANGE_SPEC}}]}),
             &format!("Delegated tasks: {RED_CHANGE}"),
         ));
         queries.push(told(Agent::RedOwner, &owner));
         owner.push(input(&format!("Result from task {RED_CHANGE}:\n{}", direction_commit(7))));
         queries.push(told(Agent::RedOwner, &owner));
-        Observed {
-            documents,
-            told: queries,
-            commands: Vec::new(),
-            kit: Kit {
-                records,
-                pulls,
-                merged_green: true,
-                main: BTreeMap::from([
-                    (RED_FILE.as_bytes().to_vec(), RED_BASE.as_bytes().to_vec()),
-                    (RED_A4_FILE.as_bytes().to_vec(), RED_A4.as_bytes().to_vec()),
-                ]),
-            },
-        }
+        queries
+    }
+    fn met() -> Observed {
+        Observed { documents: met_documents(), told: met_queries(), commands: Vec::new(), kit: met_kit() }
     }
     fn rejects(observed: &Observed, promise: Promise) {
         assert!(
@@ -8237,7 +8283,7 @@ mod red_tests {
             &tool(
                 "repair",
                 "delegate",
-                json!({"batch":[{"spec":{"words":"Repair landing branch CI"}}]}),
+                &json!({"batch":[{"spec":{"words":"Repair landing branch CI"}}]}),
                 &format!("Delegated tasks: {RED_REPAIR}"),
             ),
         ));
@@ -8273,6 +8319,23 @@ mod red_tests {
             input("Result from task 3: not a merge").parts;
         rejects(&bad, RED_RESULT);
     }
+    #[test]
+    fn a_batched_timer_reply_must_precede_the_report_within_the_same_query() {
+        let mut observed = met();
+        let mut batched = observed.told[2].clone();
+        // The subscription reply and A1's report are now in the same query;
+        // the next query still supplies unsubscribe's successful result.
+        batched.history = batched.history[..6].into();
+        observed.told[1] = batched;
+        assert_met(&step_6_4(&observed));
+        for told in observed.told.iter_mut().filter(|told| told.agent == Agent::RedDirector) {
+            if told.history.len() >= 6 {
+                told.history.swap(4, 5);
+            }
+        }
+        rejects(&observed, RED_INTERIM);
+    }
+
     #[test]
     fn timer_requires_its_returned_number_armed_read_and_removal() {
         for path in [

@@ -1028,6 +1028,9 @@ pub const RED_A4: &str = "# A4\n\nA4's story.\n";
 pub const RED_REVIEW_HOLD: &[u8] = b"case-6-4-review";
 pub const RED_REPAIR_HOLD: &[u8] = b"case-6-4-repair";
 
+pub const RED_OWNER_SPEND: u64 = 16;
+pub const RED_CHANGE_SPEND: u64 = 6;
+
 #[must_use]
 pub fn fixture_6_4() -> forge::Fixture {
     forge::Fixture {
@@ -1042,37 +1045,42 @@ pub fn fixture_6_4() -> forge::Fixture {
         },
         configure: |value, agent, forge| {
             (fixture().configure)(value, agent, forge);
-            // Small admits both trees without a profile change. Draft overrides:
-            // calls_per_response 2 and hub.run_calls 2 pair each coder
-            // write with finish in one completion; fleet.calls 3 matches PAUSE_WORKERS;
-            // hub.accounts 2 carries LLM/git; documents.lines 3 exposes a4's
-            // resource, base and path. The director's allowance is 30 (its
-            // ten-unit admission plus A1's 20); A1 reserves its ten plus a4's
-            // ten. The role's spend is likewise 30. Tools 423 = 391 | 32
-            // adds subscribe/unsubscribe. Listing polls 20001 ms sit just
-            // beyond PATIENCE, since adoption/hooks supply each change (5.4).
-            // Role period_spend 30 funds the chat pool; project period_spend
-            // 36 leaves repair_seed six outside it (three held the coder
-            // for budget). Inherited eight live task slots admit the trees;
-            // a4 allows three delegates, A1 four, including exact-head
-            // re-review. The inherited repairs bound is 3. Forge statuses
-            // 3 (State::new) retain the open head, red tip and repair head.
-            // Minimum spend sizing remains to be rechecked after batching.
-            agent["profile"]["declared"]["calls_per_response"] = 2.into();
-            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
+            // Small, with each capacity/allowance below checked by a passing
+            // whole story and a failing one-less probe in a fresh process.
+            // calls_per_response 1 admits the aggregate turn; hub.run_calls
+            // 1 serializes its paired calls. hub.accounts 2 carries LLM/git;
+            // fleet.calls 1 services worker requests serially; documents.lines
+            // 1 still carries every field this oracle reads. Live tasks and
+            // project tasks need 5 and 5; tree tasks 6 retains the root's descendants.
+            // a4's allowance 6 funds its coder and two exact-head reviews;
+            // A1's 16 adds its ten-unit run reservation, and the director's
+            // 26 adds ten again. Role spend 26, role period spend 26, and
+            // project period spend 31 leave 5 for the deployment's repair.
+            // A1 allows 4 descendants and a4 3; one repair suffices (repairs
+            // 1). Tools 423 = 391 | 32 adds timer subscription tools, with
+            // 5.4's six forge grants unchanged. Forge statuses 3 (State::new)
+            // retain a4's head, the red tip and repair head; 2 omits repair CI.
+            // Listing polls stay PATIENCE + 1 ms (20001): adoption/hooks supply
+            // changes. This timing bound and every oracle bound stay unchanged.
+            agent["profile"]["declared"]["calls_per_response"] = 1.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 1.into();
             value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
-            value["engine"]["limits"]["overrides"]["fleet.calls"] = PAUSE_WORKERS.len().into();
-            value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
-            value["engine"]["templates"][0]["budget"] = json!({"as_allowed":30});
-            let tools = 391 | 32;
+            value["engine"]["limits"]["overrides"]["fleet.calls"] = 1.into();
+            value["engine"]["limits"]["overrides"]["documents.lines"] = 1.into();
+            value["engine"]["templates"][0]["budget"] = json!({"as_allowed":26});
+            let tools = 0x0187 | 0x0020;
             value["engine"]["rules"]["ceiling"]["tools"] = tools.into();
             for project in value["engine"]["projects"].as_array_mut().expect("projects") {
                 project["policy"]["ceiling"]["tools"] = tools.into();
                 project["policy"]["roles"][0]["authority"]["tools"] = tools.into();
-                project["policy"]["roles"][0]["authority"]["budget"]["spend"] = 30.into();
-                project["policy"]["roles"][0]["period_spend"] = 30.into();
-                project["policy"]["period_spend"] = 36.into();
+                project["policy"]["roles"][0]["authority"]["budget"]["spend"] = 26.into();
+                project["policy"]["roles"][0]["period_spend"] = 26.into();
+                project["policy"]["period_spend"] = 31.into();
             }
+            for (name, size) in [("tasks.tasks", 5), ("tasks.project_tasks", 5), ("tasks.tree_tasks", 6)] {
+                value["engine"]["limits"]["overrides"][name] = size.into();
+            }
+            value["application"]["limits"]["overrides"]["forge.change_policy.repairs"] = 1.into();
             let story_ms = crate::PATIENCE.as_nanos().div_euclid(1_000_000);
             for name in ["poll_ms", "poll_max_ms"] {
                 value["application"]["limits"]["overrides"][format!("forge.client.{name}")] = (story_ms + 1).into();

@@ -11,15 +11,24 @@ fn a_red_tip_pauses_kits_queue_for_one_repair_that_lands_before_a4_while_the_dir
     // Ninety minutes is represented by a far-future timer, read armed and
     // removed, never waited out. One repair restores CI; exhaustion of the
     // repairs bound belongs to the lower world. All waits follow events.
-    // A ready change discovers the red base only after its blocking gate:
-    // release a4's review after the push, then hold the repair's coder while
+    // The product's first needs a4's head CI and blocking review passed:
+    // release a4's review after the red push and before repair creation.
+    // Hold the repair's coder while
     // the director arms its timer and the paused change is read.
     // Exact-head freshness asks another a4 review after its clean update;
     // head cues hold only the first review. Coders write and finish in one
-    // response. The armed activity prefix completes the ended journal page.
+    // response. Director/A1 delegation and the timer subscription share
+    // completions with their waits, serviced serially by one call slot.
+    // Coder progress uses ctl events; creation and held-writing reads stay
+    // on exact document fields. Reuse repair reads instead of reading twice.
+    // Timer acknowledgement precedes A1's report even within one query.
+    // The armed activity prefix completes the ended journal page.
     // Owners/changes use 5.4's six grants and its change/hold helpers.
-    // The pause's news to waiting goals is missing (forge.md, 9):
-    // start_queue_repair notifies no goal. A1's actual a4 result is checked.
+    // F9, the pause's news to waiting goals (forge.md, 9), is missing on main:
+    // crates/temper-engine-domain/src/route/forge_route.rs:1958
+    // start_queue_repair notifies no goal.
+    // crates/temper-engine-domain-forge/src/boundary.rs:484 News has no pause event.
+    // A1's actual a4 result is checked.
     // a4 writes its own file: its pre-push head keeps the green cue, and
     // updating onto the repaired main needs no conflict coder.
     let ran = run_cluster_forge(

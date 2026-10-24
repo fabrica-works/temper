@@ -1021,19 +1021,21 @@ pub fn step_6_5() -> Vec<calls::Step> {
 
 // Act 3, step 6.4 (domain/testing.md, 5.3)
 pub const READS_6_4: &[(Read, usize)] = &[
-    (Read::RedReviewWriting, 6),
-    (Read::RedChangeOpen, 7),
-    (Read::RedRootsPending, 8),
-    (Read::RedRepairWriting, 10),
+    (Read::RedReviewWriting, 8),
+    (Read::RedChangeOpen, 9),
+    (Read::RedRootsPending, 10),
+    (Read::RedRepairWriting, 12),
+    // Reuse the creation read; the held coder has its separate document.
     (Read::RedRepairPending, 11),
-    (Read::RedTimerArmed, 13),
-    (Read::RedChangePaused, 14),
-    (Read::RedDirectorEnded, 17),
-    (Read::RedOwnerEnded, 18),
-    (Read::RedChangeEnded, 19),
-    (Read::RedCoderEnded, 20),
-    (Read::RedReviewEnded, 21),
-    (Read::RedRepairEnded, 22),
+    (Read::RedTimerArmed, 14),
+    (Read::RedChangePaused, 15),
+    (Read::RedDirectorEnded, 18),
+    (Read::RedOwnerEnded, 19),
+    (Read::RedChangeEnded, 20),
+    (Read::RedCoderEnded, 21),
+    (Read::RedReviewEnded, 22),
+    // The ended wait already returns the complete procedure document.
+    (Read::RedRepairEnded, 16),
     (Read::RedRepairCoderEnded, 23),
     (Read::RedRepairReviewEnded, 24),
     (Read::RedUpdatedReviewEnded, 25),
@@ -1041,7 +1043,11 @@ pub const READS_6_4: &[(Read, usize)] = &[
 ];
 #[must_use]
 pub fn step_6_4() -> Vec<calls::Step> {
-    use super::*;
+    use super::{
+        Agent, PROJECT, RED_BROKEN, RED_CHANGE, RED_CODER, RED_DIRECTOR, RED_FILE, RED_MESSAGE, RED_OWNER, RED_PERSON,
+        RED_REPAIR, RED_REPAIR_CODER, RED_REPAIR_HOLD, RED_REPAIR_REVIEW, RED_REVIEW, RED_REVIEW_HOLD,
+        RED_UPDATED_REVIEW,
+    };
     let mut steps = vec![
         sign_in(D1),
         call(
@@ -1064,9 +1070,13 @@ pub fn step_6_4() -> Vec<calls::Step> {
         call(D1, argv!["chat", "--project", number(PROJECT), "--key", "red", RED_PERSON]),
         call(D1, argv!["wait", "task", number(RED_DIRECTOR), "--until", "replied"]),
         call(D1, argv!["wait", "task", number(RED_OWNER), "--until", "replied"]),
+        // The producing procedure parks after making its coder; watch that ending.
+        call(D1, argv!["wait", "task", number(RED_CHANGE), "--until", "phase:idle"]),
+        call(D1, argv!["wait", "task", number(RED_CODER), "--until", "ended"]),
+        // No ctl predicate selects review creation: poll only this later transition.
         calls::until(D1, argv!["task", number(RED_CHANGE), "--json"], Agent::Review.cue(), b"\"task\""),
         calls::until(D1, argv!["task", number(RED_REVIEW), "--json"], b"\"work\":\"writing\"", b"\"task\""),
-        call(D1, argv!["task", number(RED_CHANGE), "--activity", "32", "--json"]),
+        call(D1, argv!["task", number(RED_CHANGE), "--json"]),
         calls::push(RED_FILE.as_bytes(), RED_BROKEN.as_bytes()),
         // A ready change, after its gate passes, discovers the red base.
         calls::release_hold(RED_REVIEW_HOLD),
@@ -1080,7 +1090,6 @@ pub fn step_6_4() -> Vec<calls::Step> {
         ),
         calls::until(D1, argv!["task", number(RED_REPAIR), "--json"], Agent::RedRepairCoder.cue(), b"\"task\""),
         calls::until(D1, argv!["task", number(RED_REPAIR_CODER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
-        call(D1, argv!["task", number(RED_REPAIR), "--activity", "32", "--json"]),
         call(D1, argv!["message", number(RED_DIRECTOR), "--key", "red-tip", RED_MESSAGE]),
         calls::until(
             D1,
@@ -1088,9 +1097,9 @@ pub fn step_6_4() -> Vec<calls::Step> {
             b"\"kind\":{\"timer\":{",
             b"\"task\"",
         ),
-        call(D1, argv!["task", number(RED_CHANGE), "--activity", "32", "--json"]),
+        call(D1, argv!["task", number(RED_CHANGE), "--json"]),
         calls::release_hold(RED_REPAIR_HOLD),
-        call(D1, argv!["wait", "task", number(RED_REPAIR), "--until", "ended"]),
+        call(D1, argv!["wait", "task", number(RED_REPAIR), "--until", "ended", "--json"]),
         call(D1, argv!["wait", "task", number(RED_DIRECTOR), "--until", "ended"]),
     ];
     for task in [
@@ -1099,7 +1108,6 @@ pub fn step_6_4() -> Vec<calls::Step> {
         RED_CHANGE,
         RED_CODER,
         RED_REVIEW,
-        RED_REPAIR,
         RED_REPAIR_CODER,
         RED_REPAIR_REVIEW,
         RED_UPDATED_REVIEW,
