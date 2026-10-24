@@ -22,8 +22,8 @@ const GOLDENS: &[(Option<u8>, &str)] = &[
     (Some(31), "help_amend"),
     (Some(37), "help_forge_connect"),
     (Some(38), "help_forge_install"),
-    (Some(39), "help_export"),
-    (Some(40), "help_import"),
+    (Some(jig::rows::EXPORT_AT), "help_export"),
+    (Some(jig::rows::IMPORT_AT), "help_import"),
 ];
 #[test]
 fn the_help_prints_as_its_golden_files() {

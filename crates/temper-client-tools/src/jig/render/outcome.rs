@@ -423,7 +423,7 @@ pub(crate) fn retry(call: &crate::jig::call::Call) -> Box<[u8]> {
         13 => &rows::RELEASE,
         14 => &rows::STOP,
         15 => &rows::CANCEL,
-        24..=30 | 32 | 33 | 39 | 40 => account_tool(call.tool),
+        24..=30 | 32 | 33 | crate::jig::rows::EXPORT_AT | crate::jig::rows::IMPORT_AT => account_tool(call.tool),
         31 => &rows::AMEND,
         _ => unreachable!("act tool"),
     };
@@ -458,8 +458,8 @@ pub(crate) fn account_tool(tool: u8) -> &'static crate::jig::table::Tool {
         30 => &rows::RETRY,
         32 => &rows::DECLARE,
         33 => &rows::VERIFY,
-        39 => &rows::EXPORT,
-        40 => &rows::IMPORT,
+        rows::EXPORT_AT => &rows::EXPORT,
+        rows::IMPORT_AT => &rows::IMPORT,
         _ => unreachable!("account tool"),
     }
 }

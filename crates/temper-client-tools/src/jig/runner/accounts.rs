@@ -16,7 +16,7 @@ pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, cal
     }
     let ask = match called.call.tool {
         24 => acts::Request::Ask(c::Ask::SignIn { holder: c::AccountHolder::Own, provider: integer(&called.call, 0) }),
-        40 => acts::Request::MoveIn,
+        crate::jig::rows::IMPORT_AT => acts::Request::MoveIn,
         26 => acts::Request::AddKey {
             holder: if value(&called.call, 3).is_some() { c::AccountHolder::Deployment } else { c::AccountHolder::Own },
             provider: integer(&called.call, 0),
