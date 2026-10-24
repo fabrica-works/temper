@@ -139,15 +139,14 @@ programs = ["cargo", "build", "-p", "temper", "--bin", "temper",
             "-p", "temper-fake-claude", "--bin", "fake-claude"]
 # Keep these process commands aligned with proof-one-process.sh. Separate
 # build/discovery from command wall time; nextest still reports execution time.
-process = ["cargo", "nextest", "run", "-p", "temper", "--profile", "process",
-           "--no-fail-fast", "--failure-output", "immediate-final"] + tool_config
-qa = ["cargo", "nextest", "run", "--workspace", "--profile", "qa",
-      "--no-fail-fast", "--retries", "0", "--failure-output", "immediate-final"] + tool_config
+# --no-run rejects execution-only flags; add them only to test invocations.
+process = ["cargo", "nextest", "run", "-p", "temper", "--profile", "process"] + tool_config
+qa = ["cargo", "nextest", "run", "--workspace", "--profile", "qa"] + tool_config
 phase("process-lab", "test", ["python3", "-I", "-B", "-m", "unittest", "discover",
                               "-s", "lab/tests/process", "-v"])
 programs_ok = phase("process-programs", "build", programs)
 if programs_ok and phase("process-build", "build-discovery", process + ["--no-run"]):
-    tests("process-tests", "process", process)
+    tests("process-tests", "process", process + ["--no-fail-fast", "--failure-output", "immediate-final"])
 else:
     if not programs_ok:
         blocked("process-build")
@@ -173,7 +172,7 @@ emit("qa-environment", end=stamp(), exit_code=statuses["qa-environment"],
      requirement="Chromium and designated pinned TEMPER_FORGEJO/TEMPER_FORGEJO_RUNNER executables")
 if bundle_ok and programs_ok and environment_ok:
     if phase("qa-build", "build-discovery", qa + ["--no-run"]):
-        tests("qa-tests", "qa", qa)
+        tests("qa-tests", "qa", qa + ["--no-fail-fast", "--retries", "0", "--failure-output", "immediate-final"])
     else:
         blocked("qa-tests")
 else:
