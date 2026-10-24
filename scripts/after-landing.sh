@@ -15,6 +15,7 @@ import shutil
 import socket
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 
 
 def emit(event, **fields):
@@ -27,6 +28,8 @@ def stamp():
 
 statuses = {}
 measurements = []
+failed_tests = {}
+unavailable = {}
 
 
 def phase(name, kind, command):
@@ -51,39 +54,100 @@ def blocked(name):
     emit("phase-blocked", phase=name, reason="failed prerequisite")
 
 
+def tests(name, profile, command):
+    result = target / "nextest" / profile / "after-landing.xml"
+    # Never attribute a previous run's failures to a build/spawn failure.
+    try:
+        result.unlink(missing_ok=True)
+    except OSError as error:
+        statuses[name] = 1
+        unavailable[name] = "could not clear stale JUnit"
+        emit("junit-unavailable", phase=name, reason=str(error))
+        return
+    phase(name, "test", command)
+    try:
+        report = ET.parse(result)
+        names = set()
+        for suite in report.iter("testsuite"):
+            for test in suite.findall("testcase"):
+                if test.find("failure") is not None or test.find("error") is not None:
+                    binary = test.get("classname") or suite.get("name")
+                    if not binary or not test.get("name"):
+                        raise ValueError("JUnit failure lacks binary/test name")
+                    names.add(f"{binary}::{test.get('name')}")
+        if names:
+            failed_tests[name] = sorted(names)
+        if statuses[name] != 0 and not names:
+            unavailable[name] = "completed JUnit contains no failed test names"
+    except (OSError, ET.ParseError, ValueError) as error:
+        unavailable[name] = "missing or invalid completed JUnit"
+        emit("junit-unavailable", phase=name, reason=str(error))
+
+
+def finish(process_ok, qa_ok):
+    code = 0 if process_ok and qa_ok else 1
+    if code:
+        failures = {name: status for name, status in statuses.items() if status != 0}
+        details = dict(sha=sha, failed_phases=failures, failed_tests=failed_tests,
+                       unavailable_names={name: unavailable.get(name, "not executed" if status == "blocked"
+                                          else "no completed JUnit for this phase")
+                                          for name, status in failures.items()
+                                          if not failed_tests.get(name)})
+        workspace = os.environ.get("DEV_TMP", "")
+        if workspace and Path(workspace).is_absolute():
+            inbox = Path(workspace) / "director/inbox/after-landing.md"
+            details["log"] = None
+            try:
+                common = Path(subprocess.check_output(["git", "rev-parse", "--git-common-dir"], text=True).strip())
+                repo = common.resolve().parent.name
+                short = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+                details["log"] = str(Path(workspace) / "after-landing" / f"{repo}-{short}.log")
+                inbox.parent.mkdir(parents=True, exist_ok=True)
+                with inbox.open("a", encoding="utf-8") as output:
+                    output.write(stamp() + " after-landing details: " + json.dumps(details, sort_keys=True) + "\n")
+            except (OSError, subprocess.SubprocessError) as error:
+                statuses["failure-report"] = 1
+                emit("report-failed", reason=str(error), inbox=str(inbox))
+        else:
+            details["log"] = None
+            emit("report-unavailable", reason="DEV_TMP absent or not absolute; stdout only, no inbox written")
+        emit("failure-summary", **details)
+    emit("run-end", sha=sha, host=socket.gethostname(), start=started, end=stamp(),
+         process_exit_code=0 if process_ok else 1, qa_exit_code=0 if qa_ok else 1,
+         phases=statuses, exit_code=code)
+    raise SystemExit(code)
+
+
 root = Path.cwd()
 sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 started = stamp()
 emit("run-start", sha=sha, host=socket.gethostname(), start=started)
-# The bundle builder uses target/ too. Refuse a different configured target
-# rather than mixing outputs or touching a target the outer runner cannot clean.
+# The bundle builder and outer cleanup use target/ too. Ignore an inherited
+# external target without inspecting or touching it; all outputs belong here.
 target = root / "target"
-configured = Path(os.environ.get("CARGO_TARGET_DIR", str(target)))
-if (target.is_symlink() or (target.exists() and not target.is_dir())
-        or configured.resolve() != target.resolve()):
+if target.is_symlink() or (target.exists() and not target.is_dir()):
     statuses["setup"] = 1
     emit("setup-failed", reason="after-landing requires the worktree's physical target directory")
-    emit("run-end", sha=sha, host=socket.gethostname(), start=started, end=stamp(),
-         process_exit_code=1, qa_exit_code=1, phases=statuses, exit_code=1)
-    raise SystemExit(1)
+    finish(False, False)
 os.environ.update(CARGO_TARGET_DIR=str(target), TEMPER_BUNDLE="none",
                   TEMPER_TEST_BUNDLE=str(target / "temper-bundle"),
                   TEMPER_TEST_CLAUDE=str(target / "debug/fake-claude"),
                   NEXTEST_DOUBLE_SPAWN="0", NEXTEST_USER_CONFIG_FILE="none")
+tool_config = ["--tool-config-file", f"after-landing:{root / '.config/nextest-after-landing.toml'}"]
 
 programs = ["cargo", "build", "-p", "temper", "--bin", "temper",
             "-p", "temper-fake-claude", "--bin", "fake-claude"]
 # Keep these process commands aligned with proof-one-process.sh. Separate
 # build/discovery from command wall time; nextest still reports execution time.
 process = ["cargo", "nextest", "run", "-p", "temper", "--profile", "process",
-           "--no-fail-fast", "--failure-output", "immediate-final"]
+           "--no-fail-fast", "--failure-output", "immediate-final"] + tool_config
 qa = ["cargo", "nextest", "run", "--workspace", "--profile", "qa",
-      "--no-fail-fast", "--retries", "0", "--failure-output", "immediate-final"]
+      "--no-fail-fast", "--retries", "0", "--failure-output", "immediate-final"] + tool_config
 phase("process-lab", "test", ["python3", "-I", "-B", "-m", "unittest", "discover",
                               "-s", "lab/tests/process", "-v"])
 programs_ok = phase("process-programs", "build", programs)
 if programs_ok and phase("process-build", "build-discovery", process + ["--no-run"]):
-    phase("process-tests", "test", process)
+    tests("process-tests", "process", process)
 else:
     if not programs_ok:
         blocked("process-build")
@@ -109,7 +173,7 @@ emit("qa-environment", end=stamp(), exit_code=statuses["qa-environment"],
      requirement="Chromium and designated pinned TEMPER_FORGEJO/TEMPER_FORGEJO_RUNNER executables")
 if bundle_ok and programs_ok and environment_ok:
     if phase("qa-build", "build-discovery", qa + ["--no-run"]):
-        phase("qa-tests", "test", qa)
+        tests("qa-tests", "qa", qa)
     else:
         blocked("qa-tests")
 else:
@@ -121,9 +185,5 @@ emit("qa-extension-end", start=extension, end=stamp(),
 # Repeat timings at the end so the outer heavy tail retains them too.
 for result in measurements:
     emit("phase-summary", **result)
-code = 0 if process_ok and qa_ok else 1
-emit("run-end", sha=sha, host=socket.gethostname(), start=started, end=stamp(),
-     process_exit_code=0 if process_ok else 1, qa_exit_code=0 if qa_ok else 1,
-     phases=statuses, exit_code=code)
-raise SystemExit(code)
+finish(process_ok, qa_ok)
 PY

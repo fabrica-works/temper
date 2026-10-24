@@ -1,0 +1,8 @@
+# Only scripts/after-landing.sh loads this tool config. The repository's
+# profiles retain their filters, concurrency, timeouts and retry settings.
+# Paths are relative to target/nextest/<profile>/, within outer cleanup.
+[profile.process.junit]
+path = "after-landing.xml"
+
+[profile.qa.junit]
+path = "after-landing.xml"
