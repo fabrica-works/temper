@@ -161,6 +161,10 @@ temper.example.com {
   its public host beside its listener's address, and sets `Secure` on
   its cookies by it. Never rewrite it to the listener's address: the
   cookies would lose `Secure`.
+- **Nothing else in the transport:** `read_timeout 10m` outlasts jig's
+  stream's heartbeat. Leave Caddy's upstream keepalive at its default,
+  and add no retry (`lb_try_duration`): temper answers a new connection
+  however long it was idle.
 - **Check from outside:** `https://temper.example.com/` answers 200;
   `POST https://temper.example.com/jig/v1/sign-in/link` answers 403;
   `https://temper.example.com/sign-in/google` answers 303 to
