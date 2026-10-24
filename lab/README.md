@@ -61,6 +61,14 @@ on Forgejo's Actions, from ctl's documents and the forge's API. The class is
 `temper-live-0a`, 2× three calibration passes; it was judged pass on three
 seeds, free (2026-10-24).
 
+[live-0b/](live-0b/README.md) is rung 0b: 0a with the lab's held ChatGPT
+record, `chatgpt`, moved in by `ctl import`, one chat turn whose reply the
+`chat` check reads, and the record moved out by the release's `ctl export`
+for the runner to give back. Its meter reads temper's spend. temper's run
+cap, the charter's 280 units, is the stop while a turn runs. It was rehearsed
+without a model on the real stack (a fake LLM, a junk held record); its paid
+runs wait on the owner's go and a person's sign-in (2026-10-24).
+
 # The look experiment
 
 `look/` holds temper's pages to the mockups (`docs/design/draft/qa-web.md`,
