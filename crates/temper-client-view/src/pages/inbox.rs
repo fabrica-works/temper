@@ -358,6 +358,10 @@ fn has_facts(page: &ReadValue) -> bool {
         | ReadValue::PersonTask(_)
         | ReadValue::OwnerPersonTask(_)
         | ReadValue::Result(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Historical(_)
@@ -417,6 +421,10 @@ fn body(b: &mut Builder, page: &ReadValue, words: &Words) {
         | ReadValue::Result(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::Proposal(_)
+        | ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
         | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Me(_)
@@ -466,7 +474,11 @@ pub(crate) fn waiting_since(page: &ReadValue) -> Option<skein_lib::Wall> {
         },
         ReadValue::PersonTask(task) => task.since,
         ReadValue::OwnerPersonTask(task) => task.since,
-        ReadValue::Tasks(_)
+        ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
+        | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Historical(_)
         | ReadValue::Me(_)
@@ -552,7 +564,11 @@ fn arrival(page: &ReadValue, reply: bool) -> Option<skein_lib::Wall> {
             | OwnerHistoricalValue::Escalation { .. }
             | OwnerHistoricalValue::Question { .. } => None,
         },
-        ReadValue::Tasks(_)
+        ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
+        | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Me(_)
         | ReadValue::Turn(_)
@@ -602,7 +618,11 @@ fn update_body(b: &mut Builder, card: &Card, page: &ReadValue, words: &Words) {
             | OwnerHistoricalValue::Escalation { .. }
             | OwnerHistoricalValue::Question { .. } => return,
         },
-        ReadValue::Tasks(_)
+        ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
+        | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Me(_)
         | ReadValue::Turn(_)

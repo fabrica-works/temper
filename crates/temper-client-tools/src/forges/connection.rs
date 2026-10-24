@@ -110,7 +110,7 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
                 finish(called, printed, out);
                 return;
             };
-            Event::Carry { key, name: name.expect("connect requires a key"), request, value }
+            Event::Carry { key, name: name.expect("connect requires a key"), request, value: Some(value) }
         }
         None => Event::Send { key, name, request },
     };

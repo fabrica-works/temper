@@ -74,6 +74,7 @@ pub(super) fn text(
             c::Delivery::OwnerProject(_)
             | c::Delivery::OwnerProposal(_)
             | c::Delivery::Chips(_)
+            | c::Delivery::Settings(_)
             | c::Delivery::Deployment(_)
             | c::Delivery::OwnerDeployment(_)
             | c::Delivery::OwnerAccounts(_) => unreachable!("wait subject"),

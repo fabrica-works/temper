@@ -1,5 +1,5 @@
 use super::fixtures;
-use jig_client_protocol_wire::v16 as wire;
+use jig_client_protocol_wire::v19 as wire;
 use jig_protocol_engine_clients as kit;
 use skein_lib::{Env, List, Queue, Reader, Secret, Time, Token, Wall, Writer};
 
@@ -30,6 +30,16 @@ impl Stand {
             })
             .unwrap();
         let settings = kit::Settings {
+            provider: None,
+            addresses: Box::new([]),
+            key_bytes: config
+                .limits
+                .driver
+                .client
+                .document
+                .token_bytes
+                .min(config.limits.clients.wire.keyed_value_some),
+            moved_bytes: jig_protocol_accounts::moved::bound(&config.limits.driver.client.document),
             deployment_provider: 2,
             link: None,
             heartbeat: config.clients.heartbeat,

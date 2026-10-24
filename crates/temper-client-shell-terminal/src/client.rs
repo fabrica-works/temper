@@ -277,6 +277,7 @@ impl NativeClient {
             | jig_client::Event::Read { .. }
             | jig_client::Event::Send { .. }
             | jig_client::Event::Carry { .. }
+            | jig_client::Event::Authorize { .. }
             | jig_client::Event::Streamed { .. }
             | jig_client::Event::StreamGone
             | jig_client::Event::Stored
@@ -322,6 +323,7 @@ impl NativeClient {
             | jig_client::Event::Read { .. }
             | jig_client::Event::Send { .. }
             | jig_client::Event::Carry { .. }
+            | jig_client::Event::Authorize { .. }
             | jig_client::Event::Streamed { .. }
             | jig_client::Event::StreamGone
             | jig_client::Event::Stored
@@ -376,7 +378,8 @@ impl NativeClient {
                         let kind = match message {
                             jig_client::Message::SignInLink(_) | jig_client::Message::SignInService => Some(false),
                             jig_client::Message::SignOut => Some(true),
-                            jig_client::Message::Request(_)
+                            jig_client::Message::Authorize(_)
+                            | jig_client::Message::Request(_)
                             | jig_client::Message::Read(_)
                             | jig_client::Message::Watch(_)
                             | jig_client::Message::Unwatch(_)

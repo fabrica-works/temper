@@ -1778,3 +1778,13 @@ fn clients_public_bounds_dns_labels_and_the_host() {
         }
     }
 }
+
+#[test]
+fn a_clients_provider_is_refused_because_temper_serves_no_provider_routes() {
+    let document = core::str::from_utf8(&fixtures::document()).unwrap().replace(
+        "\"clients\": {",
+        r#""clients": {"provider":{"key":"provider.pem","clients":[{"id":"app","secret":"app.secret","redirect_uri":"https://app.example.com/cb"}],"addresses":[]},"#,
+    );
+    let problems = crate::named(document.as_bytes(), &jig_protocol_config::Directories::working()).unwrap_err();
+    assert_eq!(&*lines(&problems), b"engine.clients.provider: invalid form\n");
+}

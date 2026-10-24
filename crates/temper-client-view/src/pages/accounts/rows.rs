@@ -291,6 +291,7 @@ fn summary_state(w: &Words, source: Option<&c::OwnerAccountSource>) -> Box<[u8]>
                 W::Limited
             } else {
                 match source.state {
+                    c::OwnerAccountState::Moving => unreachable!("an account's move before temper routes it"),
                     c::OwnerAccountState::Granted if source.usable => W::Ready,
                     c::OwnerAccountState::Granted => W::Granted,
                     c::OwnerAccountState::Later { .. } => W::Limited,
@@ -541,6 +542,7 @@ fn notice(
         }
     } else {
         match source.state {
+            c::OwnerAccountState::Moving => unreachable!("an account's move before temper routes it"),
             c::OwnerAccountState::SignInAgain => {
                 text(b, w, Role::Paragraph, W::SignedOutPlan);
                 signin(b, root, w, bindings, row, provider, busy);

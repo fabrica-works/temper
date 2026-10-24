@@ -110,7 +110,7 @@ fn words(what: What) -> &'static [u8] {
             config::What::Duplicate => b"duplicate",
             config::What::Kind => b"wrong value kind",
             config::What::Bound => b"past its bound",
-            config::What::Form => b"invalid form",
+            config::What::Form | config::What::ProviderKey { .. } => b"invalid form",
             config::What::Unique => b"must be unique",
             config::What::Refers => b"unknown reference",
             config::What::Plaintext => b"plaintext requires loopback or in-process",
@@ -284,6 +284,7 @@ fn render(problems: &Problems, writer: &mut Writer, measuring: bool) -> usize {
                 | config::What::Plaintext
                 | config::What::Confidential
                 | config::What::NoProvider
+                | config::What::ProviderKey { .. }
                 | config::What::Digest
                 | config::What::Message
                 | config::What::Silence
