@@ -944,3 +944,126 @@ pub fn step_5_4_rules() -> Box<[Box<[Rule]>]> {
         Box::new([]),
     ])
 }
+
+// Act 3, step 6.1 (domain/testing.md, 5.3)
+fn batch_member(agent: Agent, spend: u64, tasks: u32, depth: u32, deadline: u64) -> Value {
+    json!({
+        "executor":{"kind":"agent","charter":1},
+        "spec":{"words":String::from_utf8_lossy(agent.cue()),"parameters":[]},
+        "contract":{"kind":"report","words":128},
+        "authority":{"tools":if depth == 0 {0} else {3},"grants":[],"notes":0,
+            "delegation":{"kinds":[{"kind":"agent","number":1}],"tasks":tasks,"depth":depth},
+            "budget":{"spend":spend,"deadline":deadline}}
+    })
+}
+fn batch_held(hold: &[u8], mut turn: Turn) -> Turn {
+    use skein_fake_llm_domain::api::Piece;
+    let mut lines = vec![Line::Pieces {
+        pieces: Box::new([
+            Piece { text: super::BATCH_WRITING.as_bytes().into(), hold: None },
+            Piece { text: b" Report follows.".as_slice().into(), hold: Some(hold.into()) },
+        ]),
+    }];
+    lines.extend(turn.lines);
+    turn.lines = lines.into();
+    turn
+}
+
+#[must_use]
+pub fn step_6_1(_forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        A_DEADLINE, A1_DEADLINE, BATCH_ANSWER, BATCH_DIRECTOR_REPORT, BATCH_HOLDS, BATCH_OWNER, BATCH_OWNER_REPORT,
+        BATCH_QUESTION, BATCH_QUESTION_NUMBER, BATCH_REPORTS, BATCH_SUBOWNER, BATCH_SUBOWNER_REPORT,
+    };
+    let mut owner = batch_member(Agent::BatchOwner, 61, 5, 2, A_DEADLINE);
+    owner["tracked"] = json!({"priority":1});
+    let agents = [Agent::BatchOne, Agent::BatchTwo, Agent::BatchThree, Agent::BatchStory];
+    let mut batch: Vec<_> = agents.iter().map(|agent| batch_member(*agent, 10, 0, 0, A1_DEADLINE)).collect();
+    batch[3]["dependencies"] = json!([{"kind":"batch","number":0},{"kind":"batch","number":1}]);
+    let mut scripts = vec![
+        Script {
+            cue: Agent::BatchDirector.cue().into(),
+            turns: Box::new([
+                then_wait(call(b"delegate", &json!({"batch":[owner]})), "A owns M1."),
+                report(BATCH_DIRECTOR_REPORT),
+                wait("A still owns M1."),
+            ]),
+        },
+        Script {
+            cue: Agent::BatchOwner.cue().into(),
+            turns: Box::new([
+                then_wait(
+                    call(b"delegate", &json!({"batch":[batch_member(Agent::BatchSubowner,51,4,1,A1_DEADLINE)]})),
+                    "A1 owns M1's design.",
+                ),
+                then_wait(
+                    call(
+                        b"message",
+                        &json!({"target":BATCH_SUBOWNER,"form":"answer","question":BATCH_QUESTION_NUMBER,"words":BATCH_ANSWER}),
+                    ),
+                    "The design has its green light.",
+                ),
+                report(BATCH_OWNER_REPORT),
+                wait("A1 is still working."),
+            ]),
+        },
+        Script {
+            cue: Agent::BatchSubowner.cue().into(),
+            turns: Box::new([
+                then_wait(
+                    call(b"message", &json!({"target":BATCH_OWNER,"form":"question","words":BATCH_QUESTION})),
+                    "The design awaits A's answer.",
+                ),
+                then_wait(call(b"delegate", &json!({"batch":batch})), "The batch is delegated."),
+                report(BATCH_SUBOWNER_REPORT),
+                wait("The remaining batch delegates are still working."),
+            ]),
+        },
+    ];
+    for ((agent, hold), report_words) in agents.into_iter().zip(BATCH_HOLDS).zip(BATCH_REPORTS) {
+        scripts.push(Script { cue: agent.cue().into(), turns: Box::new([batch_held(hold, report(report_words))]) });
+    }
+    scripts.into()
+}
+
+#[must_use]
+pub fn step_6_1_rules() -> Box<[Box<[Rule]>]> {
+    use super::{BATCH_ANSWER, BATCH_OWNER_REPORT, BATCH_QUESTION, BATCH_REPORTS, BATCH_SUBOWNER_REPORT};
+    // Results can wake A1 separately or together; held-task notices can
+    // reach a requester between its expected inputs (5.4's director).
+    let director =
+        [(BATCH_OWNER_REPORT, 1), (CROSSED, 1), (DELEGATED, 2), ("Held task needs a decision", 2), (BEGIN, 0), ("", 2)]
+            .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    let owner = [
+        (BATCH_SUBOWNER_REPORT, 2),
+        (CROSSED, 2),
+        (BATCH_QUESTION, 1),
+        (MESSAGE, 3),
+        (DELEGATED, 3),
+        ("Held task needs a decision", 3),
+        (BEGIN, 0),
+        ("", 3),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    let subowner = [
+        (BATCH_REPORTS[3], 2),
+        (CROSSED, 2),
+        (BATCH_ANSWER, 1),
+        (MESSAGE, 3),
+        (DELEGATED, 3),
+        ("Result from task", 3),
+        ("Held task needs a decision", 3),
+        (BEGIN, 0),
+        ("", 3),
+    ]
+    .map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn });
+    Box::new([
+        Box::new(director),
+        Box::new(owner),
+        Box::new(subowner),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+    ])
+}

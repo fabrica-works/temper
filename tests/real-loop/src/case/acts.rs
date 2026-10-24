@@ -86,6 +86,22 @@ pub enum Read {
     StoryOwnerFirst,
     DirectionNoteWritten,
     DirectionFirst,
+    BatchOneWriting,
+    BatchTwoWriting,
+    BatchThreeWriting,
+    BatchStoryWaiting,
+    BatchStoryAfterOne,
+    BatchOneBeforeStory,
+    BatchTwoBeforeStory,
+    BatchStoryWriting,
+    BatchThreeStillWriting,
+    BatchOneEnded,
+    BatchTwoEnded,
+    BatchThreeEnded,
+    BatchStoryEnded,
+    BatchSubownerEnded,
+    BatchOwnerEnded,
+    BatchDirectorEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -738,4 +754,77 @@ pub fn step_5_4() -> Vec<calls::Step> {
         // person's direction. Keep that run and the initial delegation too.
         call(D1, argv!["activity", number(DIRECTION), "--before", calls::activity_before(DIRECTION_ENDED), "--json"]),
     ]
+}
+
+// Act 3, step 6.1 (domain/testing.md, 5.3)
+pub const READS_6_1: &[(Read, usize)] = &[
+    (Read::BatchOneWriting, 8),
+    (Read::BatchTwoWriting, 9),
+    (Read::BatchThreeWriting, 10),
+    (Read::BatchStoryWaiting, 11),
+    (Read::BatchOneBeforeStory, 12),
+    (Read::BatchStoryAfterOne, 13),
+    (Read::BatchStoryWriting, 14),
+    (Read::BatchTwoBeforeStory, 15),
+    (Read::BatchThreeStillWriting, 16),
+    (Read::BatchThreeEnded, 17),
+    (Read::BatchOneEnded, 19),
+    (Read::BatchTwoEnded, 20),
+    (Read::BatchStoryEnded, 21),
+    (Read::BatchSubownerEnded, 22),
+    (Read::BatchOwnerEnded, 23),
+    (Read::BatchDirectorEnded, 24),
+];
+
+#[must_use]
+pub fn step_6_1() -> Vec<calls::Step> {
+    use super::{
+        BATCH_DIRECTOR, BATCH_HOLDS, BATCH_ONE, BATCH_OWNER, BATCH_PERSON, BATCH_STORY, BATCH_SUBOWNER, BATCH_THREE,
+        BATCH_TWO,
+    };
+    let mut steps =
+        vec![sign_in(D1), call(D1, argv!["chat", "--project", number(PROJECT), "--key", "batch", BATCH_PERSON])];
+    // Each requester has committed its delegation before its delegate is
+    // read. An Until cannot retry an unknown task.
+    steps.extend([
+        call(D1, argv!["wait", "task", number(BATCH_DIRECTOR), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(BATCH_OWNER), "--until", "replied"]),
+        calls::until(D1, argv!["task", number(BATCH_SUBOWNER), "--json"], b"\"live_delegates\":4", b"\"task\""),
+    ]);
+    // All four fake holds stay unreleased throughout these task reads.
+    for task in [BATCH_ONE, BATCH_TWO, BATCH_THREE] {
+        steps.push(calls::until(D1, argv!["task", number(task), "--json"], b"\"work\":\"writing\"", b"\"task\""));
+    }
+    for task in [BATCH_ONE, BATCH_TWO, BATCH_THREE] {
+        steps.push(call(D1, argv!["task", number(task), "--json"]));
+    }
+    steps.extend([
+        call(D1, argv!["task", number(BATCH_STORY), "--activity", "32", "--json"]),
+        calls::release_hold(BATCH_HOLDS[0]),
+        calls::until(
+            D1,
+            argv!["task", number(BATCH_ONE), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        call(D1, argv!["task", number(BATCH_STORY), "--activity", "32", "--json"]),
+        calls::release_hold(BATCH_HOLDS[1]),
+        calls::until(D1, argv!["task", number(BATCH_STORY), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["task", number(BATCH_TWO), "--activity", "32", "--json"]),
+        call(D1, argv!["task", number(BATCH_THREE), "--json"]),
+        calls::release_hold(BATCH_HOLDS[2]),
+        // a4's result is the final cue for A1, after a3 too has ended.
+        calls::until(
+            D1,
+            argv!["task", number(BATCH_THREE), "--activity", "32", "--json"],
+            b"\"phase\":\"ended\"",
+            b"\"task\"",
+        ),
+        calls::release_hold(BATCH_HOLDS[3]),
+        call(D1, argv!["wait", "task", number(BATCH_DIRECTOR), "--until", "ended"]),
+    ]);
+    for task in [BATCH_ONE, BATCH_TWO, BATCH_STORY, BATCH_SUBOWNER, BATCH_OWNER, BATCH_DIRECTOR] {
+        steps.push(call(D1, argv!["task", number(task), "--activity", "32", "--json"]));
+    }
+    steps
 }

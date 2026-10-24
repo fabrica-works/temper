@@ -154,6 +154,13 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::X3Writer,
         Agent::PlannedWriter,
         Agent::StoryWriter,
+        Agent::BatchDirector,
+        Agent::BatchOwner,
+        Agent::BatchSubowner,
+        Agent::BatchOne,
+        Agent::BatchTwo,
+        Agent::BatchThree,
+        Agent::BatchStory,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -4995,6 +5002,618 @@ mod direction_tests {
             let mut observed = met();
             observed.kit.pulls = pull_digest(&records);
             assert!(!step_5_4(&observed).is_empty(), "record mutation {mutation}");
+        }
+    }
+}
+
+// Act 3, step 6.1 (domain/testing.md, 5.3)
+const BATCH_MESSAGES: Promise = Promise::Must("a question and its answer (exact)");
+const BATCH_DEPENDENCIES: Promise = Promise::Must("a batch with its dependencies (exact)");
+const BATCH_PARALLEL: Promise = Promise::Must("parallel delegates (exact)");
+const BATCH_ATTEMPTS: Promise = Promise::Add("every attempt ended, none failed");
+
+fn batch_tasks() -> [(Read, u64, u64); 7] {
+    use super::{BATCH_DIRECTOR, BATCH_ONE, BATCH_OWNER, BATCH_STORY, BATCH_SUBOWNER, BATCH_THREE, BATCH_TWO};
+    [
+        (Read::BatchDirectorEnded, BATCH_DIRECTOR, 0),
+        (Read::BatchOwnerEnded, BATCH_OWNER, BATCH_DIRECTOR),
+        (Read::BatchSubownerEnded, BATCH_SUBOWNER, BATCH_OWNER),
+        (Read::BatchOneEnded, BATCH_ONE, BATCH_SUBOWNER),
+        (Read::BatchTwoEnded, BATCH_TWO, BATCH_SUBOWNER),
+        (Read::BatchThreeEnded, BATCH_THREE, BATCH_SUBOWNER),
+        (Read::BatchStoryEnded, BATCH_STORY, BATCH_SUBOWNER),
+    ]
+}
+fn batch_writing(observed: &Observed, read: Read, task: u64, ended: Read) -> bool {
+    let doc = task_document(observed, read);
+    number(doc, "/chip/task") == Some(task)
+        && text(doc, "/chip/phase") == "running"
+        && text(doc, "/chip/details/owner/details/observation/work") == "writing"
+        && number(doc, "/chip/details/owner/phase/active/running/attempt").is_some_and(|attempt| {
+            check_activity(observed, ended).iter().any(|row| number(row, "/line/run_began/attempt") == Some(attempt))
+        })
+}
+fn batch_journal(observed: &Observed, read: Read, task: u64) -> bool {
+    let rows = check_activity(observed, read);
+    plan_attempts(observed, &[read], task, 1)
+        && rows.last().is_some_and(|row| number(row, "/position") == Some(1))
+        && rows.windows(2).all(|pair| {
+            number(pair[0], "/position")
+                .zip(number(pair[1], "/position"))
+                .is_some_and(|(new, old)| new.checked_sub(1) == Some(old))
+        })
+        && rows.iter().enumerate().all(|(at, row)| {
+            let Some(end) = row.pointer("/line/run_ended") else { return true };
+            matches!(end["end"].as_str(), Some("parked" | "finished"))
+                || (end["end"] == "refused"
+                    && number(end, "/spent") == Some(0)
+                    && number(end, "/attempt").is_some_and(|attempt| {
+                        !rows.iter().any(|r| number(r, "/line/turn/attempt") == Some(attempt))
+                    })
+                    // Rows are newest first: a finished attempt must follow
+                    // this zero-spend placement recheck in commit order.
+                    && rows[..at].iter().any(|r| text(r, "/line/run_ended/end") == "finished"))
+        })
+}
+fn batch_unstarted(observed: &Observed, read: Read, pending: &[u64]) -> bool {
+    let doc = task_document(observed, read);
+    number(doc, "/chip/task") == Some(super::BATCH_STORY)
+        && text(doc, "/chip/phase") == "waiting"
+        && doc.pointer("/chip/details/owner/phase/waiting/dependencies") == Some(&serde_json::json!(pending))
+        && pause_activity(observed, read)["cut"] == false
+        && pause_activity(observed, read)["before"] == Value::Null
+        && pause_activity(observed, read)["after"] == Value::Null
+        && check_activity(observed, read).iter().all(|row| row.pointer("/line/run_began").is_none())
+}
+fn batch_done(observed: &Observed, read: Read, task: u64) -> bool {
+    let doc = task_document(observed, read);
+    number(doc, "/chip/task") == Some(task)
+        && text(doc, "/chip/phase") == "ended"
+        && doc.pointer("/result/ending/task/done").is_some_and(Value::is_object)
+        && batch_journal(observed, read, task)
+}
+
+#[must_use]
+pub fn step_6_1(observed: &Observed) -> Vec<Miss> {
+    use super::{A_DEADLINE, A1_DEADLINE, BATCH_ONE, BATCH_OWNER, BATCH_STORY, BATCH_THREE, BATCH_TWO, PROJECT};
+    let mut misses = Vec::new();
+    for (read, task, parent) in batch_tasks() {
+        let doc = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "6.1",
+            number(doc, "/chip/task") == Some(task)
+                && number(doc, "/project") == Some(PROJECT)
+                && (parent == 0 || number(doc, "/requester/task") == Some(parent))
+                && text(doc, "/chip/phase") == "ended",
+            BATCH_DEPENDENCIES,
+            &format!("{read:?} must identify the ended task {task} under {parent}"),
+        );
+        step_check(
+            &mut misses,
+            "6.1",
+            batch_done(observed, read, task),
+            BATCH_ATTEMPTS,
+            &format!("task {task}'s complete ordered journal must end every attempt successfully or parked"),
+        );
+    }
+    let a = task_document(observed, Read::BatchOwnerEnded);
+    let a1 = task_document(observed, Read::BatchSubownerEnded);
+    step_check(
+        &mut misses,
+        "6.1",
+        number(a, "/goal") == Some(BATCH_OWNER)
+            && number(a, "/authority/authority/deadline") == Some(A_DEADLINE)
+            && number(a1, "/authority/authority/deadline") == Some(A1_DEADLINE)
+            && number(a1, "/authority/authority/delegation/depth") == Some(1),
+        BATCH_DEPENDENCIES,
+        "A must be tracked and A1 must carry its earlier deadline and depth one",
+    );
+    let answer_at = batch_messages(observed, &mut misses);
+    let delegates = plan_tool_results(observed, Agent::BatchSubowner, b"delegate");
+    step_check(
+        &mut misses,
+        "6.1",
+        delegates.len() == 1
+            && delegates.iter().all(|(at, args, out)| {
+                answer_at.is_some_and(|answer| *at > answer)
+                    && contains(
+                        out,
+                        &format!("Delegated tasks: {BATCH_ONE}, {BATCH_TWO}, {BATCH_THREE}, {BATCH_STORY}"),
+                    )
+                    && args["batch"].as_array().is_some_and(|batch| {
+                        batch.len() == 4
+                            && batch[3]["dependencies"]
+                                == serde_json::json!([{"kind":"batch","number":0},{"kind":"batch","number":1}])
+                    })
+            })
+            && task_document(observed, Read::BatchStoryEnded)["dependency_facts"].as_array().is_some_and(|facts| {
+                facts.len() == 2
+                    && facts.iter().filter_map(|f| number(f, "/number")).collect::<BTreeSet<_>>()
+                        == BTreeSet::from([BATCH_ONE, BATCH_TWO])
+            }),
+        BATCH_DEPENDENCIES,
+        "one A1 delegation after its answer must make all four, with a4 depending on a1 and a2 alone",
+    );
+    step_check(
+        &mut misses,
+        "6.1",
+        [
+            (Read::BatchOneWriting, BATCH_ONE, Read::BatchOneEnded),
+            (Read::BatchTwoWriting, BATCH_TWO, Read::BatchTwoEnded),
+            (Read::BatchThreeWriting, BATCH_THREE, Read::BatchThreeEnded),
+        ]
+        .iter()
+        .all(|(read, task, end)| batch_writing(observed, *read, *task, *end)),
+        BATCH_PARALLEL,
+        "the three read run documents must all show their held first turns still writing",
+    );
+    step_check(
+        &mut misses,
+        "6.1",
+        batch_unstarted(observed, Read::BatchStoryWaiting, &[BATCH_ONE, BATCH_TWO])
+            && batch_done(observed, Read::BatchOneBeforeStory, BATCH_ONE)
+            && batch_unstarted(observed, Read::BatchStoryAfterOne, &[BATCH_TWO])
+            && batch_done(observed, Read::BatchTwoBeforeStory, BATCH_TWO)
+            && batch_writing(observed, Read::BatchStoryWriting, BATCH_STORY, Read::BatchStoryEnded)
+            && batch_writing(observed, Read::BatchThreeStillWriting, BATCH_THREE, Read::BatchThreeEnded)
+            && number(
+                task_document(observed, Read::BatchThreeWriting),
+                "/chip/details/owner/phase/active/running/attempt",
+            ) == number(
+                task_document(observed, Read::BatchThreeStillWriting),
+                "/chip/details/owner/phase/active/running/attempt",
+            ),
+        BATCH_PARALLEL,
+        "a4 must wait with no attempt before and after a1 ends, then write after both successful endings while a3 still writes",
+    );
+    misses
+}
+
+fn batch_messages(observed: &Observed, misses: &mut Vec<Miss>) -> Option<usize> {
+    use super::{
+        BATCH_ANSWER, BATCH_ANSWER_NUMBER, BATCH_OWNER, BATCH_QUESTION, BATCH_QUESTION_NUMBER, BATCH_SUBOWNER,
+    };
+    let questions = plan_tool_results(observed, Agent::BatchSubowner, b"message");
+    let answers = plan_tool_results(observed, Agent::BatchOwner, b"message");
+    let question_at = observed
+        .told
+        .iter()
+        .position(|t| t.agent == Agent::BatchOwner && user_words(t).any(|w| contains(w, BATCH_QUESTION)));
+    let answer_at = observed
+        .told
+        .iter()
+        .position(|t| t.agent == Agent::BatchSubowner && user_words(t).any(|w| contains(w, BATCH_ANSWER)));
+    step_check(
+        misses,
+        "6.1",
+        questions.len() == 1
+            && answers.len() == 1
+            && questions.iter().all(|(_, args, out)| {
+                args["target"] == BATCH_OWNER
+                    && args["form"] == "question"
+                    && args["words"] == BATCH_QUESTION
+                    && contains(out, &format!("Message {BATCH_QUESTION_NUMBER} sent"))
+            })
+            && answers.iter().all(|(_, args, out)| {
+                args["target"] == BATCH_SUBOWNER
+                    && args["form"] == "answer"
+                    && args["question"] == BATCH_QUESTION_NUMBER
+                    && args["words"] == BATCH_ANSWER
+                    && contains(out, &format!("Message {BATCH_ANSWER_NUMBER} sent"))
+            })
+            && plan_deliveries(observed, Agent::BatchOwner, BATCH_QUESTION) == 1
+            && plan_deliveries(observed, Agent::BatchSubowner, BATCH_ANSWER) == 1
+            && question_at.zip(answer_at).is_some_and(|(q, a)| q < a)
+            && check_activity(observed, Read::BatchSubownerEnded)
+                .iter()
+                .filter(|row| {
+                    number(row, "/line/words/message") == Some(BATCH_ANSWER_NUMBER)
+                        && number(row, "/line/words/by/task") == Some(BATCH_OWNER)
+                        && number(row, "/line/words/kind/answer/question") == Some(BATCH_QUESTION_NUMBER)
+                        && text(row, "/line/words/words") == BATCH_ANSWER
+                })
+                .count()
+                == 1,
+        BATCH_MESSAGES,
+        "A1's numbered design question and A's three-amendment answer must each be delivered once, in order",
+    );
+    answer_at
+}
+
+#[cfg(test)]
+mod batch_tests {
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+    use skein_fake_llm_domain::api::{Message, Part, Role};
+
+    fn input(words: &str) -> Message {
+        Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
+    }
+    fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
+        [
+            Message {
+                role: Role::Assistant,
+                parts: Box::new([Part::ToolCall {
+                    id: id.as_bytes().into(),
+                    name: name.as_bytes().into(),
+                    arguments: serde_json::to_vec(args).expect("arguments").into(),
+                }]),
+            },
+            Message {
+                role: Role::User,
+                parts: Box::new([Part::ToolOutput {
+                    id: id.as_bytes().into(),
+                    output: output.as_bytes().into(),
+                    is_error: false,
+                }]),
+            },
+        ]
+    }
+    fn told(agent: Agent, history: &[Message]) -> Told {
+        Told::new(agent.cue(), b"fake", None, history).expect("agent cue")
+    }
+    fn journal(task: u64, lines: &[Value]) -> Value {
+        let rows: Vec<_> = lines
+            .iter()
+            .enumerate()
+            .rev()
+            .map(|(at, line)| json!({"event":{"owner":{"source":{"task":task,"position":at+1,"line":line}}}}))
+            .collect();
+        json!({"rows":rows,"cut":false,"before":null,"after":null})
+    }
+    fn met() -> Observed {
+        let mut documents = BTreeMap::new();
+        for (read, task, parent) in batch_tasks() {
+            documents.insert(read, json!({"task":{
+                "chip":{"task":task,"phase":"ended"},"project":PROJECT,"requester":{"task":parent},
+                "goal":BATCH_OWNER,"authority":{"authority":{"deadline":if task == BATCH_OWNER { A_DEADLINE } else { A1_DEADLINE },"delegation":{"depth":1}}},
+                "result":{"ending":{"task":{"done":{}}}}
+            },"activity":journal(task, &[
+                json!({"run_began":{"attempt":1}}),
+                json!({"run_ended":{"attempt":1,"end":"finished"}}),
+            ])}));
+        }
+        let answer = json!({"words":{"message":BATCH_ANSWER_NUMBER,"by":{"task":BATCH_OWNER},
+            "kind":{"answer":{"question":BATCH_QUESTION_NUMBER}},"words":BATCH_ANSWER}});
+        documents.get_mut(&Read::BatchSubownerEnded).expect("A1")["activity"] = journal(
+            BATCH_SUBOWNER,
+            &[json!({"run_began":{"attempt":1}}), answer, json!({"run_ended":{"attempt":1,"end":"finished"}})],
+        );
+        documents.get_mut(&Read::BatchStoryEnded).expect("a4")["task"]["dependency_facts"] =
+            json!([{"number":BATCH_ONE},{"number":BATCH_TWO}]);
+        for (read, pending) in
+            [(Read::BatchStoryWaiting, vec![BATCH_ONE, BATCH_TWO]), (Read::BatchStoryAfterOne, vec![BATCH_TWO])]
+        {
+            documents.insert(
+                read,
+                json!({"task":{"chip":{"task":BATCH_STORY,"phase":"waiting","details":{"owner":{"phase":{"waiting":{"dependencies":pending}}}}}},
+                "activity":journal(BATCH_STORY, &[])}),
+            );
+        }
+        for (read, task) in [
+            (Read::BatchOneWriting, BATCH_ONE),
+            (Read::BatchTwoWriting, BATCH_TWO),
+            (Read::BatchThreeWriting, BATCH_THREE),
+            (Read::BatchStoryWriting, BATCH_STORY),
+            (Read::BatchThreeStillWriting, BATCH_THREE),
+        ] {
+            documents.insert(
+                read,
+                json!({"task":{"chip":{"task":task,"phase":"running","details":{"owner":{
+                    "phase":{"active":{"running":{"attempt":1}}},"details":{"observation":{"work":"writing"}}
+                }}}}}),
+            );
+        }
+        for (before, ended) in
+            [(Read::BatchOneBeforeStory, Read::BatchOneEnded), (Read::BatchTwoBeforeStory, Read::BatchTwoEnded)]
+        {
+            documents.insert(before, documents[&ended].clone());
+        }
+        let mut sub = tool(
+            "question",
+            "message",
+            &json!({"target":BATCH_OWNER,"form":"question","words":BATCH_QUESTION}),
+            &format!("Message {BATCH_QUESTION_NUMBER} sent"),
+        )
+        .to_vec();
+        let mut owner = vec![input(BATCH_QUESTION)];
+        owner.extend(tool(
+            "answer",
+            "message",
+            &json!({"target":BATCH_SUBOWNER,"form":"answer","question":BATCH_QUESTION_NUMBER,"words":BATCH_ANSWER}),
+            &format!("Message {BATCH_ANSWER_NUMBER} sent"),
+        ));
+        let mut queries = vec![told(Agent::BatchSubowner, &sub), told(Agent::BatchOwner, &owner)];
+        sub.push(input(BATCH_ANSWER));
+        queries.push(told(Agent::BatchSubowner, &sub));
+        sub.extend(tool(
+            "batch",
+            "delegate",
+            &json!({"batch":[{},{},{},{"dependencies":[{"kind":"batch","number":0},{"kind":"batch","number":1}]}]}),
+            &format!("Delegated tasks: {BATCH_ONE}, {BATCH_TWO}, {BATCH_THREE}, {BATCH_STORY}"),
+        ));
+        queries.push(told(Agent::BatchSubowner, &sub));
+        Observed {
+            documents,
+            told: queries,
+            commands: Vec::new(),
+            kit: Kit { main: BTreeMap::new(), merged_green: false, pulls: Vec::new() },
+        }
+    }
+    fn rejects(observed: &Observed, promise: Promise) {
+        let misses = step_6_1(observed);
+        assert!(
+            misses.iter().any(|miss| miss.step == "6.1" && miss.promise == promise),
+            "mutation must fail {promise:?}"
+        );
+    }
+    #[test]
+    fn batch_observation_meets_the_step() {
+        assert_met(&step_6_1(&met()));
+    }
+    #[test]
+    fn every_required_document_field_rejects_a_mutation() {
+        let passing = met();
+        for (read, task, _) in batch_tasks() {
+            for path in ["/task/chip/task", "/task/project", "/task/requester/task", "/task/chip/phase"] {
+                if task == BATCH_DIRECTOR && path == "/task/requester/task" {
+                    continue;
+                }
+                let mut changed = passing.clone();
+                *changed.documents.get_mut(&read).expect("document").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&changed, BATCH_DEPENDENCIES);
+            }
+        }
+        for (read, path) in [
+            (Read::BatchOwnerEnded, "/task/goal"),
+            (Read::BatchOwnerEnded, "/task/authority/authority/deadline"),
+            (Read::BatchSubownerEnded, "/task/authority/authority/deadline"),
+            (Read::BatchSubownerEnded, "/task/authority/authority/delegation/depth"),
+            (Read::BatchStoryEnded, "/task/dependency_facts"),
+        ] {
+            let mut changed = passing.clone();
+            *changed.documents.get_mut(&read).expect("document").pointer_mut(path).expect("field") = Value::Null;
+            rejects(&changed, BATCH_DEPENDENCIES);
+        }
+    }
+    #[test]
+    fn messages_and_batch_require_the_numbered_tools_and_delivery_order() {
+        let passing = met();
+        for (id, fields, promise) in [
+            (b"question".as_slice(), vec!["target", "form", "words"], BATCH_MESSAGES),
+            (b"answer".as_slice(), vec!["target", "form", "question", "words"], BATCH_MESSAGES),
+            (b"batch".as_slice(), vec!["batch"], BATCH_DEPENDENCIES),
+        ] {
+            for field in fields {
+                let mut changed = passing.clone();
+                let mut edits = 0;
+                for query in &mut changed.told {
+                    for message in &mut query.history {
+                        for part in &mut message.parts {
+                            if let Part::ToolCall { id: name, arguments, .. } = part
+                                && name.as_ref() == id
+                            {
+                                let mut args: Value = serde_json::from_slice(arguments).expect("args");
+                                args[field] = Value::Null;
+                                *arguments = serde_json::to_vec(&args).expect("args").into();
+                                edits += 1;
+                            }
+                        }
+                    }
+                }
+                assert!(edits > 0);
+                rejects(&changed, promise);
+            }
+        }
+        let mut missing_batch = passing.clone();
+        missing_batch.told.pop();
+        rejects(&missing_batch, BATCH_DEPENDENCIES);
+        let mut premature_batch = passing.clone();
+        premature_batch.told.remove(2);
+        rejects(&premature_batch, BATCH_DEPENDENCIES);
+        let mut reversed = passing.clone();
+        reversed.told.swap(1, 2);
+        rejects(&reversed, BATCH_MESSAGES);
+        let mut duplicate = passing.clone();
+        duplicate.told.push(told(Agent::BatchOwner, &[input(BATCH_QUESTION)]));
+        rejects(&duplicate, BATCH_MESSAGES);
+        let mut duplicate = passing;
+        duplicate.told.push(told(Agent::BatchSubowner, &[input(BATCH_ANSWER)]));
+        rejects(&duplicate, BATCH_MESSAGES);
+    }
+    #[test]
+    fn message_acknowledgements_and_the_recorded_answer_must_identify_the_exchange() {
+        for id in [b"question".as_slice(), b"answer", b"batch"] {
+            let mut changed = met();
+            for told in &mut changed.told {
+                for message in &mut told.history {
+                    for part in &mut message.parts {
+                        if let Part::ToolOutput { id: name, output, .. } = part
+                            && name.as_ref() == id
+                        {
+                            *output = b"Refused".as_slice().into();
+                        }
+                    }
+                }
+            }
+            rejects(&changed, if id == b"batch" { BATCH_DEPENDENCIES } else { BATCH_MESSAGES });
+        }
+        for field in ["message", "by", "kind", "words"] {
+            let mut changed = met();
+            let rows = changed.documents.get_mut(&Read::BatchSubownerEnded).expect("A1")["activity"]["rows"]
+                .as_array_mut()
+                .expect("rows");
+            for row in rows {
+                if let Some(words) = row.pointer_mut("/event/owner/source/line/words") {
+                    words[field] = Value::Null;
+                }
+            }
+            rejects(&changed, BATCH_MESSAGES);
+        }
+        for facts in [
+            json!([{"number":BATCH_ONE}]),
+            json!([{"number":BATCH_ONE},{"number":BATCH_THREE}]),
+            json!([{"number":BATCH_ONE},{"number":BATCH_TWO},{"number":BATCH_THREE}]),
+        ] {
+            let mut changed = met();
+            changed.documents.get_mut(&Read::BatchStoryEnded).expect("a4")["task"]["dependency_facts"] = facts;
+            rejects(&changed, BATCH_DEPENDENCIES);
+        }
+    }
+    #[test]
+    fn each_parallel_run_read_requires_its_held_attempt() {
+        let passing = met();
+        for read in [
+            Read::BatchOneWriting,
+            Read::BatchTwoWriting,
+            Read::BatchThreeWriting,
+            Read::BatchStoryWriting,
+            Read::BatchThreeStillWriting,
+        ] {
+            for path in [
+                "/task/chip/task",
+                "/task/chip/phase",
+                "/task/chip/details/owner/phase/active/running/attempt",
+                "/task/chip/details/owner/details/observation/work",
+            ] {
+                let mut changed = passing.clone();
+                *changed.documents.get_mut(&read).expect("run").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&changed, BATCH_PARALLEL);
+            }
+        }
+    }
+    #[test]
+    fn a4_cannot_start_while_either_dependency_is_pending() {
+        let passing = met();
+        for read in [Read::BatchStoryWaiting, Read::BatchStoryAfterOne] {
+            for path in [
+                "/task/chip/task",
+                "/task/chip/phase",
+                "/task/chip/details/owner/phase/waiting/dependencies",
+                "/activity/cut",
+            ] {
+                let mut changed = passing.clone();
+                *changed.documents.get_mut(&read).expect("waiting").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&changed, BATCH_PARALLEL);
+            }
+            let mut changed = passing.clone();
+            changed.documents.get_mut(&read).expect("waiting")["activity"] =
+                journal(BATCH_STORY, &[json!({"run_began":{"attempt":1}})]);
+            rejects(&changed, BATCH_PARALLEL);
+        }
+        for read in [Read::BatchOneBeforeStory, Read::BatchTwoBeforeStory] {
+            let mut changed = passing.clone();
+            changed.documents.get_mut(&read).expect("ended")["task"]["result"]["ending"] =
+                json!({"task":{"failed":{}}});
+            rejects(&changed, BATCH_PARALLEL);
+        }
+    }
+    #[test]
+    fn a4_must_still_be_waiting_and_a3_cannot_have_ended_in_its_writing_read() {
+        for (read, phase) in [
+            (Read::BatchStoryWaiting, "running"),
+            (Read::BatchStoryAfterOne, "running"),
+            (Read::BatchThreeStillWriting, "ended"),
+        ] {
+            let mut changed = met();
+            changed.documents.get_mut(&read).expect("task")["task"]["chip"]["phase"] = json!(phase);
+            rejects(&changed, BATCH_PARALLEL);
+        }
+    }
+    #[test]
+    fn only_zero_spend_uncommitted_rechecks_with_a_later_finished_attempt_are_allowed() {
+        use serde_json::json;
+        for (read, task, _) in batch_tasks() {
+            let lines = vec![
+                json!({"run_began":{"attempt":8}}),
+                json!({"run_ended":{"attempt":8,"end":"refused","spent":0}}),
+                json!({"run_began":{"attempt":1}}),
+                json!({"run_ended":{"attempt":1,"end":"finished","spent":1}}),
+            ];
+            let mut accepted = met();
+            // Keep message evidence in A1's journal while exercising its attempts.
+            let mut journal_lines = lines.clone();
+            if task == BATCH_SUBOWNER {
+                journal_lines.push(json!({"words":{"message":BATCH_ANSWER_NUMBER,"by":{"task":BATCH_OWNER},
+                    "kind":{"answer":{"question":BATCH_QUESTION_NUMBER}},"words":BATCH_ANSWER}}));
+            }
+            accepted.documents.get_mut(&read).expect("task")["activity"] = journal(task, &journal_lines);
+            assert_met(&step_6_1(&accepted));
+            for mutation in 0..3 {
+                let mut changed = accepted.clone();
+                let mut bad = lines.clone();
+                match mutation {
+                    0 => bad[1]["run_ended"]["spent"] = json!(1),
+                    1 => bad.truncate(2),
+                    _ => bad.insert(1, json!({"turn":{"attempt":8,"turn":1}})),
+                }
+                changed.documents.get_mut(&read).expect("task")["activity"] = journal(task, &bad);
+                rejects(&changed, BATCH_ATTEMPTS);
+            }
+        }
+    }
+    #[test]
+    fn journals_cannot_hide_an_attempt_in_a_gap_or_a_missing_page() {
+        for (read, task, _) in batch_tasks() {
+            for mutation in 0..7 {
+                let mut changed = met();
+                let activity = &mut changed.documents.get_mut(&read).expect("task")["activity"];
+                match mutation {
+                    0 => activity["before"] = json!(1),
+                    1 => activity["after"] = json!(1),
+                    2 => activity["rows"].as_array_mut().expect("rows").reverse(),
+                    3 => activity["rows"][0]["event"]["owner"]["source"]["position"] = json!(99),
+                    4 => activity["rows"][0]["event"]["owner"]["source"]["task"] = json!(task + 1),
+                    5 => {
+                        *activity = journal(
+                            task,
+                            &[
+                                json!({"run_began":{"attempt":1}}),
+                                json!({"run_ended":{"attempt":1,"end":"parked"}}),
+                                json!({"run_began":{"attempt":1}}),
+                                json!({"run_ended":{"attempt":1,"end":"finished"}}),
+                            ],
+                        );
+                    }
+                    _ => {
+                        *activity = journal(
+                            task,
+                            &[
+                                json!({"run_began":{"attempt":1}}),
+                                json!({"run_began":{"attempt":2}}),
+                                json!({"run_ended":{"attempt":2,"end":"finished"}}),
+                                json!({"run_ended":{"attempt":1,"end":"finished"}}),
+                            ],
+                        );
+                    }
+                }
+                rejects(&changed, BATCH_ATTEMPTS);
+            }
+        }
+    }
+    #[test]
+    fn every_attempt_must_end_without_failure_in_a_complete_journal() {
+        let passing = met();
+        for (read, task, _) in batch_tasks() {
+            for lines in [
+                vec![json!({"run_began":{"attempt":1}})],
+                vec![json!({"run_began":{"attempt":1}}), json!({"run_ended":{"attempt":1,"end":{"failed":{}}}})],
+                vec![json!({"run_began":{"attempt":1}}), json!({"run_ended":{"attempt":2,"end":"finished"}})],
+            ] {
+                let mut changed = passing.clone();
+                changed.documents.get_mut(&read).expect("task")["activity"] = journal(task, &lines);
+                rejects(&changed, BATCH_ATTEMPTS);
+            }
+            for result in [Value::Null, json!({"ending":{"task":{"failed":{}}}})] {
+                let mut changed = passing.clone();
+                changed.documents.get_mut(&read).expect("task")["task"]["result"] = result;
+                rejects(&changed, BATCH_ATTEMPTS);
+            }
+            let mut changed = passing.clone();
+            changed.documents.get_mut(&read).expect("task")["activity"]["cut"] = json!(true);
+            rejects(&changed, BATCH_ATTEMPTS);
         }
     }
 }

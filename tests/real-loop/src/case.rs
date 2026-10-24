@@ -117,11 +117,25 @@ pub enum Agent {
     X3Writer,
     PlannedWriter,
     StoryWriter,
+    BatchDirector,
+    BatchOwner,
+    BatchSubowner,
+    BatchOne,
+    BatchTwo,
+    BatchThree,
+    BatchStory,
 }
 impl Agent {
     #[must_use]
     pub fn cue(self) -> &'static [u8] {
         match self {
+            Self::BatchDirector => b"@case_batch_director",
+            Self::BatchOwner => b"@case_batch_owner",
+            Self::BatchSubowner => b"@case_batch_subowner",
+            Self::BatchOne => b"@case_batch_one",
+            Self::BatchTwo => b"@case_batch_two",
+            Self::BatchThree => b"@case_batch_three",
+            Self::BatchStory => b"@case_batch_story",
             Self::Misread => b"@case_misread_director",
             Self::MisreadHelper => b"@case_misread_helper",
             Self::Direction => b"@case_direction",
@@ -700,5 +714,69 @@ pub fn fixture_5_4() -> forge::Fixture {
             value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
             landing::admit(value);
         },
+    }
+}
+
+// Act 3, step 6.1 (domain/testing.md, 5.3)
+pub const BATCH_DIRECTOR: u64 = 1;
+pub const BATCH_OWNER: u64 = 2;
+pub const BATCH_SUBOWNER: u64 = 3;
+pub const BATCH_ONE: u64 = 4;
+pub const BATCH_TWO: u64 = 5;
+pub const BATCH_THREE: u64 = 6;
+pub const BATCH_STORY: u64 = 7;
+pub const BATCH_QUESTION_NUMBER: u64 = 1;
+pub const BATCH_PERSON: &str = "@case_batch_director Delegate A to own M1 and wait for its report.";
+pub const BATCH_ANSWER_NUMBER: u64 = 2;
+pub const BATCH_QUESTION: &str = "M1's design reports five departures. May I send the implementers and the story?";
+pub const BATCH_ANSWER: &str =
+    "Green light with three amendments: keep one path; name the dependencies; improve the explanation if cheap.";
+pub const BATCH_WRITING: &str = "The batch delegate is writing.";
+pub const BATCH_HOLDS: [&[u8]; 4] = [b"case-6-1-one", b"case-6-1-two", b"case-6-1-three", b"case-6-1-story"];
+pub const BATCH_REPORTS: [&str; 4] = ["a1 implemented.", "a2 implemented.", "a3 implemented.", "a4's story passed."];
+pub const BATCH_SUBOWNER_REPORT: &str = "All four batch delegates reported.";
+pub const BATCH_OWNER_REPORT: &str = "M1's sub-owner reported the batch.";
+pub const BATCH_DIRECTOR_REPORT: &str = "A reported M1's batch.";
+
+#[must_use]
+pub fn fixture_6_1() -> forge::Fixture {
+    forge::Fixture {
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            // A four-entry batch in one task record needs 3,693,669 B,
+            // past small's 1,567,829 B store value; size one profile up.
+            value["engine"]["limits"]["profile"] = "standard".into();
+            value["workers"][0]["limits"]["profile"] = "standard".into();
+            // The standard engine needed for a four-entry batch also needs
+            // matching application room: 128 retained calls; 8 workers *
+            // fleet.max_out (137) + 1 deliveries; three held per delivery;
+            // and route_bound (14,062) + 128 journal writes. A1's
+            // task read needs documents.lines = 4 for its complete live delegates.
+            value["application"]["limits"]["overrides"]["forge.named_calls"] = 128.into();
+            value["application"]["limits"]["overrides"]["root.journal.deliveries"] = 1097.into();
+            value["application"]["limits"]["overrides"]["root.journal.held"] = 3291.into();
+            value["application"]["limits"]["overrides"]["root.journal.writes"] = 14190.into();
+            // All owners, including the chat, park on the ordinary charter's
+            // wait. That releases the three slots for the three implementers.
+            agent["profile"]["declared"]["calls_per_response"] = 2.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
+            // A1 sends four entries in one batch, within the seven-task tree.
+            for name in ["tasks.batch", "authority.batch"] {
+                value["engine"]["limits"]["overrides"][name] = 4.into();
+            }
+            value["engine"]["limits"]["overrides"]["tasks.dependencies"] = 2.into();
+            value["engine"]["limits"]["overrides"]["documents.lines"] = 4.into();
+            value["engine"]["limits"]["overrides"]["fleet.calls"] = PAUSE_WORKERS.len().into();
+            // Each admitted run reserves ten; A1 also reserves forty for its
+            // delegates after spending one on its question. A and the director
+            // each reserve ten more.
+            value["engine"]["templates"][0]["budget"] = json!({"as_allowed":71});
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["roles"][0]["authority"]["budget"]["spend"] = 71.into();
+            }
+            value["application"]["landing"]["projects"] = json!([]);
+            landing::admit(value);
+        },
+        ..fixture()
     }
 }
