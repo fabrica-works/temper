@@ -79,6 +79,7 @@ fn build(reading: &reads::Reading) -> Result<acts::Request, &'static [u8]> {
             | c::Delivery::Tasks(_)
             | c::Delivery::Run(_)
             | c::Delivery::RunState(_)
+            | c::Delivery::Settings(_)
             | c::Delivery::Deployment(_) => {}
         }
     }

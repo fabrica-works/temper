@@ -641,6 +641,7 @@ pub(crate) fn mark(root: &temper_client_domain::Domain) -> Option<Mark> {
         }
         limited |= source.spent_until.is_some();
         match source.state {
+            OwnerAccountState::Moving => unreachable!("an account's move before temper routes it"),
             OwnerAccountState::SignInAgain | OwnerAccountState::Misconfigured | OwnerAccountState::Unloaded { .. } => {
                 return Some(Mark::Needs);
             }

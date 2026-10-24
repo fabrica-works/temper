@@ -485,7 +485,7 @@ fn key_operations_carry_the_row_holder_numbers_with_the_value() {
             };
             assert_eq!(name, NAME);
             assert_eq!(request, jig_client::Ask::Jig(Box::new(ask)));
-            assert_eq!(value.expose(), b"private-once");
+            assert_eq!(value.expect("carried private value").expose(), b"private-once");
             assert_finished_operation(&mut page, root.client(), &mut serial, &mut out);
         }
     }

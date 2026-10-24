@@ -190,6 +190,9 @@ impl App for Temper {
     }
     fn unsent(request: Request) -> Option<Event> {
         let event = match request {
+            temper_client_domain::Request::Client { request: jig_client::Request::Authorized(_) } => {
+                unreachable!("temper starts no OpenID authorization")
+            }
             Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } } } => {
                 jig_client::Event::Up {
                     up: jig_client::Up::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None, why: None },

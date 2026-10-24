@@ -61,6 +61,7 @@ impl Problems {
                 | config::What::Override
                 | config::What::Confidential
                 | config::What::NoProvider
+                | config::What::ProviderKey { .. }
                 | config::What::Unreadable => b"invalid form",
             };
             self.push(p.path.clone(), What::Reason(words));
