@@ -296,7 +296,10 @@ pub(crate) fn transcript_loaded(
                 return;
             }
         };
-        if !domain.core.append_transcript(task, turn, None) {
+        // The turn's own bytes are its tail text until the service renders
+        // them; jig keeps their end within the tail's budget.
+        let text = Some(turn.transcript.clone());
+        if !domain.core.append_transcript(task, turn, text) {
             transcript_failed(domain, waiter);
             return;
         }

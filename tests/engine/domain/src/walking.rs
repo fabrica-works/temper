@@ -296,7 +296,7 @@ pub fn config(seed: u64) -> engine::Config {
                 deployment_provider: 1,
                 charters: Box::new([charter()]),
                 resume_bytes: 256,
-                tail_bytes: 2048,
+                tail_bytes: 128,
                 tools: jig_domain_core::ToolFamilies::JIG,
                 models: models(),
                 llm_providers: accounts::Providers {
