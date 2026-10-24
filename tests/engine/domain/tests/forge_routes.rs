@@ -52,6 +52,12 @@ struct World {
     merges: u32,
 }
 
+#[derive(Clone, Copy, Default)]
+struct StoryLimits {
+    brief: Option<engine::BriefLimits>,
+    stall: Option<Duration>,
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Until {
     Ready,
@@ -94,10 +100,6 @@ impl World {
         Self::configured_brief(with_read, with_change, silent_ci, passes, gate, documents, None)
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one fixture configures the policy, fake, and bounds for root forge stories"
-    )]
     fn configured_brief(
         with_read: bool,
         with_change: bool,
@@ -107,6 +109,31 @@ impl World {
         documents: Option<jig_domain_core::documents::DocumentLimits>,
         brief: Option<engine::BriefLimits>,
     ) -> Self {
+        Self::configured_limits(
+            with_read,
+            with_change,
+            silent_ci,
+            passes,
+            gate,
+            documents,
+            StoryLimits { brief, ..StoryLimits::default() },
+        )
+    }
+
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one fixture configures the policy, fake, and bounds for root forge stories"
+    )]
+    fn configured_limits(
+        with_read: bool,
+        with_change: bool,
+        silent_ci: bool,
+        passes: u32,
+        gate: paths::Gate,
+        documents: Option<jig_domain_core::documents::DocumentLimits>,
+        timing: StoryLimits,
+    ) -> Self {
+        let StoryLimits { brief, stall } = timing;
         let paths::Gate { approval, agent: agent_gate, owner: owner_gate } = gate;
         let [(bootstrap, mut limits), (config, _)] = std::array::from_fn(|_| {
             let mut limits = walking::limits();
@@ -305,6 +332,9 @@ impl World {
                 // A shipped brief brings its own room: results hold it, forge sections read it.
                 limits.journal.result_bytes = limits.journal.result_bytes.max(brief.brief_bytes);
                 limits.forge.brief_bytes = limits.forge.brief_bytes.max(brief.read_bytes);
+            }
+            if let Some(stall) = stall {
+                limits.forge.change_policy.stall = stall;
             }
             limits.notes.scopes = 3 + limits.authority.grants;
             (config, limits)
@@ -1234,6 +1264,93 @@ fn a_change_whose_ci_never_reports_is_stalled_and_held() {
         )),
         "stalled change must not report a landing"
     );
+}
+
+#[test]
+fn a_change_whose_ci_takes_minutes_lands_without_being_held() {
+    let stall = temper_service::limits::profile(temper_service::limits::Profile::Small).forge.change_policy.stall;
+    let world = World::configured_limits(
+        true,
+        true,
+        true,
+        1000,
+        paths::Gate::default(),
+        None,
+        StoryLimits { stall: Some(stall), ..StoryLimits::default() },
+    );
+    let (mut world, _chat, producer, branch) =
+        change_world_in(world, paths::Change { no_ci: false, owner_gate: false, tracked: false });
+    assert!(matches!(
+        world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 })),
+        raw::Answer::Branch(raw::Created::Created)
+    ));
+    let head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
+        .expect("producer pushed its branch");
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Change {
+                connector: 0,
+                kind: 2,
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
+                words: Box::from(&b"pushed"[..]),
+            },
+            cancel_delegates: false,
+        },
+        engine::Parts::none(),
+    );
+    world.send(event);
+    // Three minutes of pending CI pass on the virtual clock, without a real wait.
+    for _ in 0..1800 {
+        world.tick();
+    }
+    assert_eq!(world.merges, 0, "pending CI cannot land");
+    let waiting = world
+        .store
+        .rows
+        .values()
+        .find_map(|stored| match stored {
+            Record::Forge { row, .. } => match row.as_ref() {
+                forge_top::Stored::Change(change) => Some(change),
+                _ => None,
+            },
+            Record::Core(_) => None,
+        })
+        .expect("the change is durable");
+    assert!(
+        matches!(waiting.change.state, temper_engine_domain_forge_change::State::Checking { .. }),
+        "ordinary CI must still be waiting, never held: {:?}",
+        waiting.change.state
+    );
+    assert!(waiting.change.since.as_nanos() + Duration::from_secs(120).as_nanos() < world.env.wall.as_nanos());
+    world.external(
+        1,
+        raw::Op::Write(raw::Write::Status {
+            commit: head,
+            context: Box::from(&b"build"[..]),
+            state: raw::Check::Passed,
+        }),
+    );
+    // Main resumes the wait at its stall alarm; the fresh read then sees green.
+    // Jump the virtual clock instead of spending ticks on that quiet interval.
+    world.env.now = world.env.now.saturating_add(stall);
+    for _ in 0..300 {
+        world.tick();
+        if world.store.rows.values().any(|stored| {
+            matches!(stored,
+            Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
+                if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. })))
+        }) {
+            break;
+        }
+    }
+    assert_eq!(world.merges, 1, "ordinary CI lands when it passes");
+    assert!(world.store.rows.values().any(|stored| matches!(stored,
+        Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
+            if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. })))));
 }
 
 #[test]

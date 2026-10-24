@@ -952,9 +952,12 @@ starts from current code. It never updates only because its base moved.
 - **Stalls:** each wait on the forge (CI that never reports, a
   mergeability never known, a forge's merge queue that neither lands
   nor ejects it, a gate's task stuck) is bounded by a stall counted from
-  the head's push or the last release; past it, the change is held. A
-  wait for access is not one: while its forge is not connected, or its
-  repository not reachable (4.1, 4.3), the stall does not count.
+  the head's push or the last release; past it, the change is held. The
+  default, 30 minutes, outlasts an ordinary CI run so a healthy change
+  is never held just for waiting, yet tells the person of a check that
+  never reports within the same sitting. A wait for access is not one:
+  while its forge is not connected, or its repository not reachable
+  (4.1, 4.3), the stall does not count.
 - **A release** lifts what it releases: repairs, resolutions and updates
   count again from it, its stall is counted from it, and the change
   decides afresh.

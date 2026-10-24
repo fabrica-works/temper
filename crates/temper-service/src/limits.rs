@@ -196,8 +196,8 @@ const FORGE: forge::Limits = forge::Limits {
         resolutions: 3,
         // Update attempts, from the engine forge world fixture.
         updates: 3,
-        // Time before a change stalls, from the engine forge world fixture.
-        stall: Duration::from_secs(30),
+        // Outlast ordinary CI; report a silent forge within the same sitting (domain/forge.md, 8.4).
+        stall: Duration::from_secs(30 * 60),
         // Gates retained by a change, from the engine forge world fixture.
         gates: 8,
         // Clean branch heads retained, from the engine forge world fixture.
