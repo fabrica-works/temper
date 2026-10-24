@@ -384,6 +384,8 @@ impl Store {
     fn event(&mut self, event: Event, requests: &mut VecDeque<Request>) {
         match event {
             Event::Opened { last, .. } => self.applied = last,
+            Event::Patched { .. } => {}
+            event @ Event::Site { .. } => self.route(event, requests),
             Event::Committed { number, .. } => {
                 let writes = self.inflight.remove(&number).expect("root commit");
                 for write in &writes {

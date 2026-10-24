@@ -191,6 +191,10 @@ pub fn up(routes: &mut Routes, event: store::Event, into: &mut Queue<Up>) {
             routes.pending.remove(&owner);
             stop(routes, into);
         }
+        store::Event::Site { owner, of, key, site, at, patcher } => {
+            into.push(Up::Ask(dispatch(owner, of, key, site, at, patcher)));
+        }
+        store::Event::Patched { .. } => {}
         store::Event::OpenRefused { .. } => stop(routes, into),
         store::Event::Opened { .. }
         | store::Event::Kept { .. }
@@ -333,4 +337,22 @@ pub(crate) fn worst_case(limits: &engine::Limits, key: u32, payload: u64) -> Opt
     Map::<Token, Flight>::worst_case(limits.loads.loads)?
         .checked_add(Map::<Token, Token>::worst_case(limits.loads.loads)?)?
         .checked_add(payload.checked_add(u64::from(key))?.checked_mul(u64::from(limits.loads.loads))?)
+}
+
+/// No owner has registered a written patch site in this build. Hand the
+/// machine back with the named refusal, so the active generation is preserved.
+fn dispatch(
+    owner: Token,
+    of: store::Owner,
+    _key: Box<[u8]>,
+    site: skein_codec::patch::Site,
+    _at: skein_codec::value::Node,
+    patcher: Box<skein_codec::patch::Patcher>,
+) -> store::Request {
+    let result = match of {
+        store::Owner::Skein | store::Owner::Smith | store::Owner::Jig | store::Owner::Application => {
+            Err(skein_codec::patch::Halt::NoSite(site))
+        }
+    };
+    store::Request::Site { owner, patcher, result }
 }

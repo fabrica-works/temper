@@ -105,6 +105,12 @@ impl Store {
             application,
             temper_protocol_store::bounds(&application.forge).expect("checked family bounds"),
         );
+        let mut drivers = [driver(limits, room), driver(limits, room), driver(limits, room)];
+        let [store, secrets, transcripts] = &mut drivers;
+        let seeded = protocol::seed(
+            [&mut store.io, &mut secrets.io, &mut transcripts.io],
+            u64::from_le_bytes(*installation.first_chunk::<8>().expect("installation seed")),
+        );
         Self {
             #[cfg(test)]
             forge_loads: skein_lib::List::with_capacity(128),
@@ -114,6 +120,7 @@ impl Store {
                 limits,
                 temper_protocol_store::application(&application.forge).expect("checked application sizes"),
                 models,
+                seeded,
             ),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
             routes,
@@ -126,7 +133,7 @@ impl Store {
                 secrets: Queue::with_capacity(room),
                 transcripts: Queue::with_capacity(room),
             },
-            drivers: [driver(limits, room), driver(limits, room), driver(limits, room)],
+            drivers,
             submitted: Queue::with_capacity(room),
             opened: false,
             installation,
@@ -183,7 +190,8 @@ impl Store {
             | protocol::Request::Load { .. }
             | protocol::Request::Read { .. }
             | protocol::Request::Get { .. }
-            | protocol::Request::Transcript { .. }) => {
+            | protocol::Request::Transcript { .. }
+            | protocol::Request::Site { .. }) => {
                 protocol::down(&mut self.component, &self.env, request, &mut self.above, &mut self.below);
             }
         }

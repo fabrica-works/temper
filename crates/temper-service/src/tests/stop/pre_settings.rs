@@ -1,4 +1,4 @@
-//! Refused pre-settings starts preserve data and leave at most one new empty segment.
+//! Refused pre-settings starts leave the whole deployment directory unchanged.
 #![expect(
     clippy::disallowed_types,
     clippy::disallowed_macros,
@@ -28,6 +28,7 @@ fn plant(directory: &Path, ops: Box<[skein_kv::Op]>) {
     let limits = profile.store;
     let mut kv = skein_kv::Store::new(&limits);
     let mut io = FileIo::new(8, limits.chunk, 32, limits.deadline);
+    io.seed_randomness(0);
     let root = skein_shell::open_root(directory).expect("plant root");
     let root_token = io.adopt_root(root).expect("root slot");
     let mut kernel = Kernel::open(Config { operations: 32 }).expect("file kernel");
@@ -122,7 +123,7 @@ fn inventory(root: &Path) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
 #[test]
 /// Existing data is untouched; skein-kv open starts a new empty segment before
 /// the first version refusal. A second start leaves that whole inventory unchanged.
-fn pre_settings_refusals_preserve_data_and_leave_at_most_one_empty_segment() {
+fn pre_settings_refusals_leave_the_whole_directory_unchanged() {
     let directory =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target").join(format!("pre-settings-{}", std::process::id()));
     fs::create_dir(&directory).expect("new deployment directory");
@@ -178,13 +179,10 @@ fn pre_settings_refusals_preserve_data_and_leave_at_most_one_empty_segment() {
     // An old deployment already has its secrets log, even with no secrets rows.
     plant(&directory.join("secrets"), Box::new([]));
     let before = inventory(&directory);
-    let mut expected = before;
     refuse(&directory, &root, &limits);
-    let name = PathBuf::from("store/log-00000000000000000002");
-    assert!(expected.insert(name, Some(Vec::new())).is_none());
-    assert_eq!(inventory(&directory), expected, "first refusal preserves data and adds one empty segment");
+    assert_eq!(inventory(&directory), before, "first refusal leaves the whole inventory unchanged");
     refuse(&directory, &root, &limits);
-    assert_eq!(inventory(&directory), expected, "second refusal leaves the first refusal's whole inventory unchanged");
+    assert_eq!(inventory(&directory), before, "second refusal leaves the whole inventory unchanged");
     fs::remove_dir_all(directory).unwrap();
 }
 
@@ -218,6 +216,11 @@ fn refuse(directory: &Path, root: &temper_engine_domain::Limits, limits: &jig_pr
             break;
         }
     }
-    assert_eq!(service.end(), Some(&End::Stopped(Stop::StoreVersion)));
+    assert_eq!(
+        service.end(),
+        Some(&End::Stopped(Stop::StoreOpen {
+            why: jig_protocol_store::OpenRefusal::OlderBuild { why: jig_protocol_store::Older::Directory }
+        }))
+    );
     assert!(service.engine.as_ref().unwrap().store.closed(), "file drivers drained");
 }

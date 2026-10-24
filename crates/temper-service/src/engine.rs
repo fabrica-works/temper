@@ -374,19 +374,77 @@ pub(crate) fn answer(engine: &mut Engine) {
         return;
     }
     for _ in 0..engine.store.above.len() {
-        if !engine.setup.room() || engine.store.routed.room() < jig_protocol_store::MAX_OUT_DOWN {
+        if !engine.setup.room()
+            || engine.store.routed.room() < jig_protocol_store::MAX_OUT_DOWN
+            || engine.notes.room() == 0
+        {
             break;
         }
         let event = engine.store.above.pop().expect("store terminals");
+        #[expect(clippy::match_same_arms, reason = "each store refusal keeps its own startup stop line")]
         match event {
             jig_protocol_store::Event::Opened { installation, .. } => {
                 engine.store.opened = true;
                 engine.store.installation = installation;
             }
-            jig_protocol_store::Event::OpenRefused { why: jig_protocol_store::OpenRefusal::Format { .. }, .. } => {
-                stop::version(engine);
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Format { .. },
+                ..
+            } => {
+                stop::open(engine, &why);
             }
-            jig_protocol_store::Event::OpenRefused { .. } => stop::unavailable(engine, b"deployment"),
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Deployment, ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Numbers { .. },
+                ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused { why: why @ jig_protocol_store::OpenRefusal::Failed, .. } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::OlderBuild { .. },
+                ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Generations { .. },
+                ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Ahead { .. }, ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Patch { .. }, ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Set { .. }, ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::OpenRefused {
+                why: why @ jig_protocol_store::OpenRefusal::Check { .. }, ..
+            } => {
+                stop::open(engine, &why);
+            }
+            jig_protocol_store::Event::Patched { of, patch, counts, .. } => {
+                engine.notes.try_push(crate::Note::Patched { of, patch, counts }).expect("patch progress note room");
+            }
+            event @ jig_protocol_store::Event::Site { .. } => {
+                crate::store::route::up(&mut engine.store.routes, event, &mut engine.store.routed);
+            }
             event @ (jig_protocol_store::Event::Kept { owner }
             | jig_protocol_store::Event::Stale { owner }
             | jig_protocol_store::Event::Erased { owner }

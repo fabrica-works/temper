@@ -94,6 +94,7 @@ fn decide_sends_its_two_forms() {
         (
             fixtures::DECIDE_TASK_CALL,
             c::DecideOn::Proposal {
+                running: None,
                 proposal: c::ProposalKey { proposer: c::Proposer::Task(fixtures::TASK), number: fixtures::PROPOSAL },
                 decision: c::Decision::Accepted,
             },
@@ -294,6 +295,7 @@ fn proposal_names_preserve_task_or_party() {
             &c::Ask::Decide {
                 project: fixtures::PROJECT,
                 on: c::DecideOn::Proposal {
+                    running: None,
                     proposal: c::ProposalKey { proposer, number: fixtures::PROPOSAL },
                     decision: c::Decision::Accepted,
                 }

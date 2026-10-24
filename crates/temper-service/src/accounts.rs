@@ -720,7 +720,9 @@ impl Accounts {
                 let _unkept = self.moves.adopted(source, false);
                 events.push(root::Event::Account(domain::Event::Adopted { source, kept: false }));
             }
-            store::Event::Opened { .. }
+            store::Event::Site { .. }
+            | store::Event::Patched { .. }
+            | store::Event::Opened { .. }
             | store::Event::OpenRefused { .. }
             | store::Event::Committed { .. }
             | store::Event::Failed { .. }
@@ -925,7 +927,9 @@ impl Accounts {
                 store::Event::Carried { .. } => {
                     unreachable!("the accounts only load and replace their records")
                 }
-                store::Event::Opened { .. }
+                store::Event::Site { .. }
+                | store::Event::Patched { .. }
+                | store::Event::Opened { .. }
                 | store::Event::OpenRefused { .. }
                 | store::Event::Committed { .. }
                 | store::Event::Failed { .. }

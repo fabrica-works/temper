@@ -869,6 +869,8 @@ impl Clients {
                 kit::SecretsAnswer::Got { owner, value }
             }
             Event::SecretsLoaded { .. }
+            | Event::Site { .. }
+            | Event::Patched { .. }
             | Event::Opened { .. }
             | Event::OpenRefused { .. }
             | Event::Committed { .. }

@@ -78,8 +78,8 @@ pub(crate) fn failed(engine: &mut Engine, number: u64) {
     engine.step(root::Event::Store(root::StoreInput::Uncommitted { number }));
     engine.end = Some(End::Stopped(Stop::CommitFailed { number }));
 }
-pub(crate) fn version(engine: &mut Engine) {
-    engine.end = Some(End::Stopped(Stop::StoreVersion));
+pub(crate) fn open(engine: &mut Engine, why: &jig_protocol_store::OpenRefusal) {
+    engine.end = Some(End::Stopped(Stop::StoreOpen { why: why.clone() }));
 }
 pub(crate) fn unavailable(engine: &mut Engine, member: &[u8]) {
     let mut problems = Problems::empty();
