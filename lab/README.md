@@ -50,6 +50,17 @@ the latter with `check/end-state/not-landed/fake/widget/main`. Before H's
 calibration sets `temper-m1`, validate and rehearse an external copy whose
 only change is `cost` set to `temper-m1-calibration`.
 
+[live-0a/](live-0a/README.md) is rung 0a of `docs/design/draft/qa-live.md`
+(3.1), the ground on real backends with no driver, account or model: a
+fresh `temper box` with one owned Forgejo from the lab's `forgejo` and
+`forgejo-runner` programs on the kept `forgejo` port. Its seed signs in by
+the box's link, runs `ctl forge-setup 1` and does the person's first act
+with Forgejo's CLI. Its `ground` check judges the forge connected,
+`work/hello` adopted into `hello` and the starter workflow's first run green
+on Forgejo's Actions, from ctl's documents and the forge's API. The class is
+`temper-live-0a`, 2× three calibration passes; it was judged pass on three
+seeds, free (2026-10-24).
+
 # The look experiment
 
 `look/` holds temper's pages to the mockups (`docs/design/draft/qa-web.md`,

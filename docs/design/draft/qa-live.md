@@ -80,8 +80,8 @@ section 11.
 
 | Rung | Story | Driver | What passes |
 |---|---|---|---|
-| 0a, the forge | the seed's `ctl forge-setup 1`: Forgejo and its runner prepared and started, temper's take-over, `work/hello` made with the starter workflow and adopted into project 1 (`../protocol/setup.md`, 6.5 and 6.7) | none | the forge connected; the starter workflow's first run green on Forgejo's Actions; the repository adopted |
-| 0b, the account | 0a, then the held account imported, one chat turn, and the release | none | the account usable once imported; the chat's reply; the record given back to the lab (4.3) |
+| 0a, the forge | the seed's `ctl forge-setup 1`: Forgejo and its runner prepared and started, temper's take-over, `work/hello` made with the starter workflow and adopted as the home of a new project, `hello` (`../protocol/setup.md`, 6.5 and 6.7) | none | the forge connected; the starter workflow's first run green on Forgejo's Actions; the repository adopted, read from `ctl forges`' first repository, made in `hello`, and from `forge-setup`'s printed adoption, since no ctl read lists a project's repositories |
+| 0b, the account | 0a, then the held account imported, one chat turn in `hello`, and the release | none | the account usable once imported; the chat's reply; the record given back to the lab (4.3) |
 | A | a person asks a chat for a one-file change on `work/hello`; it is delegated, pushed, passes CI on Actions and an agent's review, and lands: `../qa.md`'s story on real backends | yes | landed on `main`, the file as asked, nothing else changed |
 | B0 | A, with a question the delegate asks and the person's green light (`reference-case.md`, 4.1) | yes | A's end; nothing pushed before the answer |
 | B1 | B0, with a gate the first push fails and the change's repair (`reference-case.md`, 6.3) | yes | B0's end after a red run and a green one on Actions, the repair the delegate's |
@@ -134,8 +134,15 @@ run R, seed S, scratch directory D
   project's spend per period is the rung's (6.2).
 - **The seed** signs in as `../qa.md`'s does (its 5.1), by the link
   serve prints; runs `ctl forge-setup 1`, which waits for the forge and
-  adopts `work/hello`; imports the held account and waits for it usable
+  adopts `work/hello`; does the person's own act at first sign-in with
+  Forgejo's CLI on the run's work path (`ada`'s password change waived,
+  a `read:repository` token for the checks, private, never printed, and
+  removed once read); imports the held account and waits for it usable
   (4.3). For C, it also brings the act's prepared state (section 13).
+- **One kept port:** the box's clients and webhooks listen on
+  `127.0.0.1:0`, read from serve's `listening` lines
+  (`TEMPER_ECHO=steps`); only Forgejo takes the port the machine keeps
+  for the lab (section 13).
 - **Nothing outlives a run** but the held account and the machine's
   binaries: no store, no Forgejo, no cache. A run that passes leaves
   nothing (`lab.md`, 5.1); one that does not keeps its scratch for its
@@ -177,7 +184,9 @@ The record of one signed-in ChatGPT account is a held file of the lab,
    they need; each refresh rotates its refresh token, which only the
    deployment holds.
 4. **Exported:** once the drive and the live checks are done, the
-   release's `ctl export ACCOUNT {held.chatgpt}` withdraws the account,
+   release's `ctl export ACCOUNT {held.chatgpt}`, ACCOUNT the number
+   `ctl import` printed, which the seed keeps in a run directory,
+   withdraws the account,
    writes its record, and the deployment erases it; the runner gives
    the file back to the lab. The release runs however the drive ended,
    a bound or a cut included, while the box is up (`lab.md`, 4.8).
