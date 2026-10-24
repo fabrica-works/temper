@@ -270,7 +270,16 @@ fn set_up_failed_offers_set_up_again() {
     ));
     let view = f::page_view(&root);
     let reason = node(view.tree(), Role::Alert, b"Set up failed: fetch failed");
-    assert!(view.tree().nodes().iter().find(|n| n.id == reason).unwrap().styles.as_slice().contains(&crate::look::FLOW_FAILED));
+    assert!(
+        view.tree()
+            .nodes()
+            .iter()
+            .find(|n| n.id == reason)
+            .unwrap()
+            .styles
+            .as_slice()
+            .contains(&crate::look::FLOW_FAILED)
+    );
     let retry = node(view.tree(), Role::Button, b"Set up again");
     assert!(
         view.tree()

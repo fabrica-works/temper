@@ -208,8 +208,15 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
 fn welcome(root: &Domain) -> bool {
     match root.pages().address() {
         Address::Welcome { .. } => true,
-        Address::Forges | Address::ConnectForge { .. } | Address::Inbox { .. } | Address::Chats { .. }
-        | Address::Accounts | Address::ConnectModel { .. } | Address::Chat { .. } | Address::Task { .. } | Address::Adopt { .. } => false,
+        Address::Forges
+        | Address::ConnectForge { .. }
+        | Address::Inbox { .. }
+        | Address::Chats { .. }
+        | Address::Accounts
+        | Address::ConnectModel { .. }
+        | Address::Chat { .. }
+        | Address::Task { .. }
+        | Address::Adopt { .. } => false,
     }
 }
 fn muted(b: &mut Builder, words: &[u8]) {
@@ -364,29 +371,22 @@ pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
 /// Opens the key's details card; the shared body closes it after its outcome.
 fn key_details(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, way: Way, busy: bool) {
     let Some(me) = accounts::current_me(root.client()) else { return };
-            let (brand, _) = names(me, way);
-            flow::card(b, &named(w, W::KeyTitle, brand));
-            b.style(crate::look::MODEL_KEY);
-            crate::cards::text(
-                b,
-                Role::Paragraph,
-                &w.say(Word::ModelKeyDescription, &[Hole::Name(crate::choice::shown(brand, w))]),
-            );
-            b.open(Role::Form);
-            b.name(&say(w, W::Details));
-            key_field(b, root, w, bindings, busy, brand == b"OpenAI");
-            button(
-                b,
-                bindings,
-                &w.say(Word::ModelAddKey, &[]),
-                Act::Submit { name: root.pages().account_name() },
-                busy,
-                true,
-            );
-            b.close();
-            muted(b, &w.say(Word::ForgePasted, &[]));
-            muted(b, &w.say(Word::ModelKeyWarning, &[Hole::Name(crate::choice::shown(brand, w))]));
- }
+    let (brand, _) = names(me, way);
+    flow::card(b, &named(w, W::KeyTitle, brand));
+    b.style(crate::look::MODEL_KEY);
+    crate::cards::text(
+        b,
+        Role::Paragraph,
+        &w.say(Word::ModelKeyDescription, &[Hole::Name(crate::choice::shown(brand, w))]),
+    );
+    b.open(Role::Form);
+    b.name(&say(w, W::Details));
+    key_field(b, root, w, bindings, busy, brand == b"OpenAI");
+    button(b, bindings, &w.say(Word::ModelAddKey, &[]), Act::Submit { name: root.pages().account_name() }, busy, true);
+    b.close();
+    muted(b, &w.say(Word::ForgePasted, &[]));
+    muted(b, &w.say(Word::ModelKeyWarning, &[Hole::Name(crate::choice::shown(brand, w))]));
+}
 fn command(b: &mut Builder, w: &Words, name: &[u8]) {
     b.open(Role::Paragraph);
     b.open(Role::Text);
@@ -499,7 +499,9 @@ pub(super) fn sign_in_end(b: &mut Builder, root: &Domain, w: &Words, way: Way, e
         c::OwnerAccountEnd::Made { account, .. } | c::OwnerAccountEnd::Renewed { account, .. } => {
             let renewed = match end {
                 c::OwnerAccountEnd::Renewed { .. } => true,
-                c::OwnerAccountEnd::Made { .. } | c::OwnerAccountEnd::Refused { .. } | c::OwnerAccountEnd::Failed { .. } => false,
+                c::OwnerAccountEnd::Made { .. }
+                | c::OwnerAccountEnd::Refused { .. }
+                | c::OwnerAccountEnd::Failed { .. } => false,
             };
             let text = made_words(root, w, way, *account, renewed);
             if renewed || !model::open(root.pages().address()) {
