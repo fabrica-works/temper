@@ -180,7 +180,7 @@ fn dispatch(
             b"temper-app",
             &crate::key::Name::new(skein_lib::Decimal::of(side.serial).as_bytes()).expect("serial name fits"),
         );
-        Event::Carry { key, name, request, value }
+        Event::Carry { key, name, request, value: Some(value) }
     };
     side.app = Some(Pending { forge, key, linking, answer: None });
     out.push(Request::Client { asked: event });

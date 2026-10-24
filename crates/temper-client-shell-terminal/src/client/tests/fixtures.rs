@@ -25,6 +25,7 @@ pub(super) fn link_chat(stored: Option<skein_lib::Secret>) -> (NativeClient, ske
     while let Some(request) = host.out.pop() {
         if let domain::Request::Client { request: Request::Exchange { exchange, credential, message } } = request {
             match message {
+                jig_client::Message::Authorize(_) => unreachable!("temper starts no OpenID authorization"),
                 jig_client::Message::SignInLink(record) => {
                     host.authentication.insert(exchange, false).expect("bounded sign-in exchanges");
                     assert_eq!(credential, host.credential, "the link offers the directory bearer");

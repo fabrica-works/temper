@@ -139,7 +139,11 @@ pub(super) fn page(
         let chip = match document {
             c::ReadValue::Question(q) => Some(&q.task),
             c::ReadValue::Escalation(e) => Some(&e.task),
-            c::ReadValue::Tasks(_)
+            c::ReadValue::Settings(_)
+            | c::ReadValue::Setting(_)
+            | c::ReadValue::Revision(_)
+            | c::ReadValue::Revisions(_)
+            | c::ReadValue::Tasks(_)
             | c::ReadValue::OwnerProject(_)
             | c::ReadValue::Historical(_)
             | c::ReadValue::Me(_)
@@ -219,7 +223,11 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
             (chip_project(&escalation.task).or(project).ok_or(Failed::Fixed(b"project unavailable"))?, &escalation.acts)
         }
         c::ReadValue::OwnerEscalation(escalation) => (escalation.task.project, &escalation.acts),
-        c::ReadValue::Tasks(_)
+        c::ReadValue::Settings(_)
+        | c::ReadValue::Setting(_)
+        | c::ReadValue::Revision(_)
+        | c::ReadValue::Revisions(_)
+        | c::ReadValue::Tasks(_)
         | c::ReadValue::OwnerProject(_)
         | c::ReadValue::Historical(_)
         | c::ReadValue::Me(_)

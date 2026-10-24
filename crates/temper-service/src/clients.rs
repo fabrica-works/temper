@@ -199,25 +199,17 @@ impl Clients {
                 last: temper_client_protocol_wire::CLIENT_VERSION,
             })
             .or(Err(invalid(What::Bound)))?;
-        let settings = kit::Settings {
-            link,
-            deployment_provider,
-            heartbeat: config.clients.heartbeat,
-            rows: config.limits.core.documents.rows,
-            served,
-            providers,
-            seed: seeds.crypto.clone(),
-            stream: seeds.seed,
-            models: config::clients::models(&config.llm),
-        };
+        let initial =
+            client_settings(config, seeds, link.clone(), served.clone(), providers.clone(), deployment_provider);
+        let settings = client_settings(config, seeds, link, served, providers, deployment_provider);
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
         let mut out = Queue::with_capacity(room);
-        let component = kit::Component::new(settings.clone(), &env, &mut out).or(Err(invalid(What::Bound)))?;
+        let component = kit::Component::new(settings, &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
             listening: None,
             public: clients.public.clone(),
             component,
-            initial: Some(settings),
+            initial: Some(initial),
             server: crate::server::Server::new(*listener, &crate::limits::server(&config.limits)),
             mount: http::Mount::new(http_settings(clients.public.as_ref()), &config.limits.clients_http),
             mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
@@ -492,6 +484,11 @@ impl Clients {
                     self.google_minted(exchange, Some((credential, expires)));
                 }
                 kit::Request::MintRefused { exchange, .. } => self.google_minted(exchange, None),
+                kit::Request::Redeemed { .. } | kit::Request::Claimed { .. } => {
+                    unreachable!("temper configures no OpenID provider")
+                }
+                // Transitional: T1b (accounts-move M4) routes TakeMoved with the accounts' take_moved.
+                kit::Request::TakeMoved { .. } => unreachable!("an account's move before temper routes it"),
                 kit::Request::Closed => self.component_closed = true,
             }
         }
@@ -913,5 +910,30 @@ fn event_owner(event: &io::Event) -> Option<Token> {
         | io::Event::Failed { owner, .. }
         | io::Event::Closed { owner } => Some(*owner),
         io::Event::Resized | io::Event::Shutdown { .. } => None,
+    }
+}
+
+fn client_settings(
+    config: &config::Engine,
+    seeds: &Seeds,
+    link: Option<people::Identity>,
+    served: List<kit::Served>,
+    providers: List<u16>,
+    deployment_provider: u16,
+) -> kit::Settings {
+    kit::Settings {
+        provider: None,
+        addresses: Box::new([]),
+        link,
+        deployment_provider,
+        heartbeat: config.clients.heartbeat,
+        rows: config.limits.core.documents.rows,
+        served,
+        providers,
+        seed: seeds.crypto.clone(),
+        stream: seeds.seed,
+        models: config::clients::models(&config.llm),
+        key_bytes: config.limits.driver.client.document.token_bytes.min(config.limits.clients.wire.keyed_value_some),
+        moved_bytes: jig_protocol_accounts::moved::bound(&config.limits.driver.client.document),
     }
 }

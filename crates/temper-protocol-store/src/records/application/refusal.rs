@@ -1,6 +1,6 @@
 //! Jig's complete refusal facts at its pinned people-store version.
 use jig_domain_people as p;
-use jig_protocol_store::people_v12 as w;
+use jig_protocol_store::people_v13 as w;
 use skein_lib::Wall;
 pub(super) fn encode_failure_class(value: p::FailureClass, _l: &w::Limits) -> w::FailureClass {
     match value {
@@ -419,6 +419,18 @@ pub(super) fn encode_refusal(value: &p::Refusal, l: &w::Limits) -> Result<w::Ref
         p::Refusal::Llm { model, why } => {
             w::Refusal::Llm(w::RefusalLlm::new(l, w::RefusalLlmParts { model: *model, why: encode_llm_why(*why) })?)
         }
+        p::Refusal::AccountMove { why } => w::Refusal::AccountMove(w::RefusalAccountMove::new(
+            l,
+            w::RefusalAccountMoveParts {
+                why: match why {
+                    p::AccountMoveWhy::NotSignedIn => w::AccountMoveWhy::NotSignedIn,
+                    p::AccountMoveWhy::NotOurs => w::AccountMoveWhy::NotOurs,
+                    p::AccountMoveWhy::Held => w::AccountMoveWhy::Held,
+                    p::AccountMoveWhy::Cancelled => w::AccountMoveWhy::Cancelled,
+                    p::AccountMoveWhy::Moving => w::AccountMoveWhy::Moving,
+                },
+            },
+        )?),
     })
 }
 pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
@@ -495,6 +507,15 @@ pub(super) fn decode_refusal(value: w::Refusal) -> p::Refusal {
             let w::RefusalLlmParts { model, why } = value.into_parts();
             p::Refusal::Llm { model, why: decode_llm_why(why) }
         }
+        w::Refusal::AccountMove(value) => p::Refusal::AccountMove {
+            why: match value.why() {
+                w::AccountMoveWhy::NotSignedIn => p::AccountMoveWhy::NotSignedIn,
+                w::AccountMoveWhy::NotOurs => p::AccountMoveWhy::NotOurs,
+                w::AccountMoveWhy::Held => p::AccountMoveWhy::Held,
+                w::AccountMoveWhy::Cancelled => p::AccountMoveWhy::Cancelled,
+                w::AccountMoveWhy::Moving => p::AccountMoveWhy::Moving,
+            },
+        },
     }
 }
 

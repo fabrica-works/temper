@@ -20,6 +20,10 @@ fn batch(page: &c::ReadValue) -> Option<&skein_lib::List<c::ProposedTask>> {
             }
         },
         c::ReadValue::Task(_)
+        | c::ReadValue::Settings(_)
+        | c::ReadValue::Setting(_)
+        | c::ReadValue::Revision(_)
+        | c::ReadValue::Revisions(_)
         | c::ReadValue::Tasks(_)
         | c::ReadValue::OwnerProject(_)
         | c::ReadValue::Historical(_)
@@ -80,6 +84,10 @@ fn why(b: &mut Builder, page: &c::ReadValue) {
         c::ReadValue::OwnerProposal(proposal) => super::document(b, &proposal.reason),
         c::ReadValue::Proposal(proposal) => text(b, Role::Paragraph, proposal.why.bytes()),
         c::ReadValue::Task(_)
+        | c::ReadValue::Settings(_)
+        | c::ReadValue::Setting(_)
+        | c::ReadValue::Revision(_)
+        | c::ReadValue::Revisions(_)
         | c::ReadValue::Tasks(_)
         | c::ReadValue::OwnerProject(_)
         | c::ReadValue::Historical(_)
@@ -159,7 +167,11 @@ pub(super) fn facts(b: &mut Builder, page: &c::ReadValue, words: &Words, rows: u
         c::ReadValue::Escalation(escalation) => {
             phrase(b, words, P::HoldRevision, &[Hole::Number(escalation.hold.revision.value)]);
         }
-        c::ReadValue::Tasks(_)
+        c::ReadValue::Settings(_)
+        | c::ReadValue::Setting(_)
+        | c::ReadValue::Revision(_)
+        | c::ReadValue::Revisions(_)
+        | c::ReadValue::Tasks(_)
         | c::ReadValue::OwnerProject(_)
         | c::ReadValue::Historical(_)
         | c::ReadValue::Me(_)

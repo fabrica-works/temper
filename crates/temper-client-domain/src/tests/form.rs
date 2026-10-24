@@ -331,6 +331,7 @@ fn version_refused() -> (crate::Domain, jig_client::Key) {
     link.step(skein_lib::Time::ZERO, link::Event::Reply { exchange, message: version_answer(&bounds) }, &mut sent);
     while let Some(request) = sent.pop() {
         let up = match request {
+            jig_client_protocol_link::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
             link::Request::Hello { family: Some(family), versions } => {
                 jig_client::Up::FamilyServed { family, versions }
             }

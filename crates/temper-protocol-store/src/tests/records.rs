@@ -420,6 +420,15 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
     for why in [p::AccountWhy::Unknown, p::AccountWhy::Provider, p::AccountWhy::Uses, p::AccountWhy::Limited] {
         rows.push(p::Refusal::Account { account: 43, why }).expect("account refusal rows fit");
     }
+    for why in [
+        p::AccountMoveWhy::NotSignedIn,
+        p::AccountMoveWhy::NotOurs,
+        p::AccountMoveWhy::Held,
+        p::AccountMoveWhy::Cancelled,
+        p::AccountMoveWhy::Moving,
+    ] {
+        rows.push(p::Refusal::AccountMove { why }).expect("account move refusal rows fit");
+    }
     for row in [
         p::Refusal::Circle { tasks: Box::new([u64::MAX, 42]), cut: true },
         p::Refusal::Kept { pending: Box::new([42, u64::MAX]) },
@@ -514,8 +523,8 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
 fn application_refusal_lists(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
     use jig_domain_people as p;
     for (count, circle) in [
-        (jig_protocol_store::people_v12::CEILINGS.refusal_circle_tasks, true),
-        (jig_protocol_store::people_v12::CEILINGS.refusal_kept_pending, false),
+        (jig_protocol_store::people_v13::CEILINGS.refusal_circle_tasks, true),
+        (jig_protocol_store::people_v13::CEILINGS.refusal_kept_pending, false),
     ] {
         let mut tasks = skein_lib::List::with_capacity(count);
         for task in 0..count {
@@ -663,7 +672,7 @@ fn every_application_outcome_preserves_its_complete_record() {
         assert_eq!(bytes[2], 15, "the Application family tag");
     }
     assert!(
-        jig_protocol_store::people_v12::Refusal::worst_case_bytes(&jig_protocol_store::people_v12::CEILINGS)
+        jig_protocol_store::people_v13::Refusal::worst_case_bytes(&jig_protocol_store::people_v13::CEILINGS)
             .expect("bounded facts")
             <= u64::from(v10::CEILINGS.core_refused_refusal)
     );
@@ -808,7 +817,7 @@ fn embedded_people_refusals_changed_at_store_nine() {
     // The people v11 generated Unknown golden was [9]; v12 inserts NameTaken
     // before every existing refusal. All 38 existing Refusal goldens change.
     let mut after = skein_lib::Writer::new(1);
-    jig_protocol_store::people_v12::Refusal::Unknown.encode(&mut after).unwrap();
+    jig_protocol_store::people_v13::Refusal::Unknown.encode(&mut after).unwrap();
     assert_eq!(after.finish().as_ref(), &[10]);
     assert_eq!(crate::STORE_VERSION, 10);
 }

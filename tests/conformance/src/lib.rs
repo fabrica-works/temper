@@ -739,7 +739,7 @@ fn delivered(peers: &mut Peers, clock: Clock, delivery: root::Delivery) {
                 people::Reply::Outcome(_) | people::Reply::Refused(_) | people::Reply::SignedIn { .. } => {
                     peers.ask_bodies.remove(&call);
                 }
-                people::Reply::SignedOut => {}
+                people::Reply::SignedOut | people::Reply::Signer(_) => {}
             }
             let key = peers.requests.remove(&call);
             // Seen watermarks have no kept request answer.

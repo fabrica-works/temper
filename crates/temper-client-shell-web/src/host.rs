@@ -183,6 +183,7 @@ impl Host {
     }
     fn carry(&mut self, request: jig_client::Request, asked: &mut Vec<Asked>) {
         match request {
+            jig_client::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
             jig_client::Request::Save { records } => {
                 for record in records.into_boxed().into_vec() {
                     let (key, value) = records::encode(record);

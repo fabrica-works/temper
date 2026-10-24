@@ -170,7 +170,7 @@ impl Request {
         self.broken = None;
         let request = jig_client::Ask::Jig(Box::new(ask));
         let event = if carrying {
-            jig_client::Event::Carry { key, name, request, value: value.expect("checked value") }
+            jig_client::Event::Carry { key, name, request, value: Some(value.expect("checked value")) }
         } else {
             jig_client::Event::Send { key, name: Some(name), request }
         };
