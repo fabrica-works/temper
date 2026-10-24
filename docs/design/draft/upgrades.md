@@ -32,7 +32,8 @@ spellings are placeholders.
   so an old version is kept as its schema's text, not as code. Most
   patches are operations a tool derives from two schemas: a field added
   with its value, a field dropped, an integer widened. A change every old
-  value survives byte for byte needs none.
+  value survives byte for byte needs none, until a landed patch names
+  the family's version (4.3).
 - **Any store from the baseline on upgrades to any later `main`,** so a
   deployment may follow `main`. The baseline is the first release;
   until it, versions stay fixed and schemas change in place (4.1;
@@ -183,7 +184,13 @@ in its owner's crate beside the schemas. By kind:
 - **None needed:** a change every old value survives byte for byte. A
   field or variant renamed, a variant appended, a bound widened, a
   variant marked `boxed` (skein's `codec.md`, section 3). The family
-  keeps its version and no level moves.
+  keeps its version and no level moves, while its kept text is not
+  frozen. Once a landed patch names the family's version, its kept text
+  is frozen: an appended variant, a widened bound or an added
+  declaration also takes a patch the command writes, and a version move.
+  A rename or a dropped declaration stays none needed. This is the
+  user's rule (skein's `codec.md`, 12.2 step 3), and it applies from
+  the first release on, since no version moves before then (4.1).
 - **Derived:** a field added, with the value every old record takes; a
   field dropped; an integer widened; a type wrapped in `option`;
   variants reordered. The tool writes these from the two schemas, asking
