@@ -7909,11 +7909,17 @@ fn red_landings(observed: &Observed, misses: &mut Vec<Miss>) {
                                 == direction_commit(commit)
                         })
                 })
-            })
-            && observed.kit.main.get(RED_FILE.as_bytes()).is_some_and(|bytes| bytes == RED_BASE.as_bytes())
+            }),
+        RED_LANDING,
+        "each merge must use its green head and identify its task's result",
+    );
+    step_check(
+        misses,
+        "6.4",
+        observed.kit.main.get(RED_FILE.as_bytes()).is_some_and(|bytes| bytes == RED_BASE.as_bytes())
             && observed.kit.main.get(RED_A4_FILE.as_bytes()).is_some_and(|bytes| bytes == RED_A4.as_bytes()),
         RED_LANDING,
-        "each merge must use its green head and identify its task's result; a4's story must finish on main",
+        "main holds the repair and a4's story files",
     );
 }
 
@@ -7938,36 +7944,74 @@ fn red_repair(observed: &Observed, misses: &mut Vec<Miss>) {
                 repairs.len() == 1
                     && number(repairs[0], "/chip/task") == Some(RED_REPAIR)
                     && number(repairs[0], "/requester/deployment/project") == Some(PROJECT)
-            })
-            && roots.get("live").and_then(Value::as_array).is_some_and(Vec::is_empty)
+            }),
+        RED_DEPLOYMENT,
+        "one deployment repair among the pending roots",
+    );
+    step_check(
+        misses,
+        "6.4",
+        roots.get("live").and_then(Value::as_array).is_some_and(Vec::is_empty)
             && roots.get("live_after") == Some(&Value::Null)
             && roots.pointer("/ended/rows/after") == Some(&Value::Null)
-            && roots.pointer("/ended/rows/rows").and_then(Value::as_array).is_some_and(Vec::is_empty)
-            && [repair, final_repair].iter().all(|doc| {
-                number(doc, "/chip/task") == Some(RED_REPAIR)
-                    && number(doc, "/project") == Some(PROJECT)
-                    && doc.pointer("/requester/task").is_none()
-                    && number(doc, "/requester/deployment/project") == Some(PROJECT)
-                    && text(doc, "/spec/specification/words/bytes") == "Repair landing branch CI"
-            })
-            && delegates.len() == 2
+            && roots.pointer("/ended/rows/rows").and_then(Value::as_array).is_some_and(Vec::is_empty),
+        RED_DEPLOYMENT,
+        "no live or ended roots after",
+    );
+    step_check(
+        misses,
+        "6.4",
+        [repair, final_repair].iter().all(|doc| {
+            number(doc, "/chip/task") == Some(RED_REPAIR)
+                && number(doc, "/project") == Some(PROJECT)
+                && doc.pointer("/requester/task").is_none()
+                && number(doc, "/requester/deployment/project") == Some(PROJECT)
+                && text(doc, "/spec/specification/words/bytes") == "Repair landing branch CI"
+        }),
+        RED_DEPLOYMENT,
+        "the repair's documents name the deployment and its words",
+    );
+    step_check(
+        misses,
+        "6.4",
+        delegates.len() == 2
             && delegates.iter().all(|(_, args, output)| {
                 !contains(output, &format!("Delegated tasks: {RED_REPAIR}"))
                     && args["batch"].as_array().is_some_and(|batch| {
                         batch.len() == 1 && batch[0]["spec"]["words"] != "Repair landing branch CI"
                     })
-            })
-            && batch_writing(observed, Read::RedRepairWriting, RED_REPAIR_CODER, Read::RedRepairCoderEnded)
-            && batch_writing(observed, Read::RedReviewWriting, RED_REVIEW, Read::RedReviewEnded)
-            && [opened, paused].iter().all(|doc| {
-                number(doc, "/chip/task") == Some(RED_CHANGE)
-                    && number(doc, "/project") == Some(PROJECT)
-                    && text(doc, "/chip/phase") == "idle"
-                    && doc.get("result") == Some(&Value::Null)
             }),
         RED_DEPLOYMENT,
-        "one separately funded deployment repair must exist while a4 waits, with no agent delegation making it",
+        "two agent delegations, none making the repair",
     );
+    step_check(
+        misses,
+        "6.4",
+        batch_writing(observed, Read::RedRepairWriting, RED_REPAIR_CODER, Read::RedRepairCoderEnded),
+        RED_DEPLOYMENT,
+        "the repair coder writing",
+    );
+    step_check(
+        misses,
+        "6.4",
+        batch_writing(observed, Read::RedReviewWriting, RED_REVIEW, Read::RedReviewEnded),
+        RED_DEPLOYMENT,
+        "the review writing",
+    );
+    for (doc, what) in
+        [(opened, "a4 idle with no result at its open read"), (paused, "a4 idle with no result at its paused read")]
+    {
+        step_check(
+            misses,
+            "6.4",
+            number(doc, "/chip/task") == Some(RED_CHANGE)
+                && number(doc, "/project") == Some(PROJECT)
+                && text(doc, "/chip/phase") == "idle"
+                && doc.get("result") == Some(&Value::Null),
+            RED_DEPLOYMENT,
+            what,
+        );
+    }
 }
 
 // A subscribe and wait can share a completion. Its acknowledgement then
