@@ -81,7 +81,9 @@ if [ "$mode" = live ]; then
         --files crates/temper-client-shell-web/files \
         --noscript 'temper needs WebAssembly and scripts.' --out "$scratch/bundle" > "$scratch/bundle.log" 2>&1
 fi
-python3 scripts/proof-live-github-managed.py "$mode" "$port" "$scratch" "$evidence" <&0 &
+# A background job's stdin is /dev/null when job control is off (POSIX): keep the person's on fd 3.
+exec 3<&0
+python3 scripts/proof-live-github-managed.py "$mode" "$port" "$scratch" "$evidence" <&3 3<&- &
 runner=$!
 wait "$runner"
 runner=
