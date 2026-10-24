@@ -53,10 +53,13 @@ pub enum Word {
     Comment,
     Issue,
     Branch,
+    Runs,
+    RunsWithoutRunner,
+    Password,
 }
 use HoleKind::{Name, Number};
 pub type Row = (Word, &'static [&'static [u8]], &'static [HoleKind]);
-pub const ROWS: [Row; 48] = [
+pub const ROWS: [Row; 51] = [
     (Word::Title, &[b"Adopt a repository into ", b""], &[Name]),
     (Word::TitleNumber, &[b"Adopt a repository into project ", b""], &[Number]),
     (Word::Forge, &[b"Forge number"], &[]),
@@ -113,11 +116,14 @@ pub const ROWS: [Row; 48] = [
     (Word::Comment, &[b"comment"], &[]),
     (Word::Issue, &[b"create issues"], &[]),
     (Word::Branch, &[b"create and delete branches"], &[]),
+    (Word::Runs, &[b"Forgejo ", b" and its runner ", b", on this machine. CI jobs run here, as you."], &[Name, Name]),
+    (Word::RunsWithoutRunner, &[b"Forgejo ", b", on this machine, with no runner."], &[Name]),
+    (Word::Password, &[b"Your first password is in ", b". Forgejo asks you to change it when you sign in."], &[Name]),
 ];
 fn phrase_id(connector: u16, index: usize) -> PhraseId {
     PhraseId {
         owner: owner(connector),
-        number: u16::try_from(index).expect("48 phrases").checked_add(1000).expect("phrase id fits"),
+        number: u16::try_from(index).expect("51 phrases").checked_add(1000).expect("phrase id fits"),
     }
 }
 pub fn extend(connector: u16, text: u32, shapes: &mut List<PhraseShape>, phrases: &mut List<Phrase>) {
@@ -143,6 +149,9 @@ pub fn extend(connector: u16, text: u32, shapes: &mut List<PhraseShape>, phrases
 #[must_use]
 pub fn name_bytes(word: Word, index: usize, text: u32) -> u32 {
     match word {
+        // Arbitrary bytes can expand threefold when shown as UTF-8.
+        Word::Runs | Word::RunsWithoutRunner => 192,
+        Word::Password => super::OWNED_PASSWORD_BYTES,
         Word::Title => text.checked_add(16).expect("checked text bound"),
         Word::Adopted => {
             if index == 0 {
@@ -920,6 +929,25 @@ pub fn forge_connected_as(login: &[u8]) -> Box<[u8]> {
 #[must_use]
 pub fn forge_account(login: &[u8], id: u64) -> Box<[u8]> {
     join_words(&[&lossy(login), b" \xc2\xb7 user ", skein_lib::Decimal::of(id).as_bytes()])
+}
+/// What runs on this machine for an owned forge (client/forge.md, 5.4).
+#[must_use]
+pub fn forge_runs(owned: &super::forges::Owned) -> Box<[u8]> {
+    match &owned.runner {
+        Some(runner) => join_words(&[
+            b"Forgejo ",
+            &lossy(&owned.forgejo),
+            b" and its runner ",
+            &lossy(runner),
+            b", on this machine. CI jobs run here, as you.",
+        ]),
+        None => join_words(&[b"Forgejo ", &lossy(&owned.forgejo), b", on this machine, with no runner."]),
+    }
+}
+/// The first password's file path, never its value (protocol/setup.md, 6.5).
+#[must_use]
+pub fn forge_password(path: &[u8]) -> Box<[u8]> {
+    join_words(&[b"Your first password is in ", &lossy(path), b". Forgejo asks you to change it when you sign in."])
 }
 /// A row's summary, its "forge N · KIND" and its connection's words, joined
 /// here: a login or a reason can outgrow any phrase hole once shown as UTF-8.

@@ -149,6 +149,34 @@ fn cases() -> Box<[(w::Connection, Connection, &'static [u8])]> {
         ),
     ])
 }
+fn fixture_wire_owned(m: Mode) -> Option<w::OwnedForge> {
+    if m == Mode::Owned {
+        Some(
+            w::OwnedForge::new(
+                &limits(),
+                w::OwnedForgeParts {
+                    forgejo: b"17.0.0".as_slice().into(),
+                    runner: Some(b"13.2.0".as_slice().into()),
+                    password: b"/fake/forge/person_password".as_slice().into(),
+                },
+            )
+            .unwrap(),
+        )
+    } else {
+        None
+    }
+}
+fn fixture_owned(m: Mode) -> Option<forge::forges::Owned> {
+    if m == Mode::Owned {
+        Some(forge::forges::Owned {
+            forgejo: b"17.0.0".as_slice().into(),
+            runner: Some(b"13.2.0".as_slice().into()),
+            password: b"/fake/forge/person_password".as_slice().into(),
+        })
+    } else {
+        None
+    }
+}
 #[test]
 fn every_connection_decodes_into_the_forges_words() {
     let mut records = List::with_capacity(10);
@@ -180,6 +208,7 @@ fn every_connection_decodes_into_the_forges_words() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        owned: fixture_wire_owned(m),
                         web: Some(b"https://forge.example".as_slice().into()),
                         repositories: {
                             let mut adopted = List::with_capacity(1);
@@ -213,6 +242,7 @@ fn every_connection_decodes_into_the_forges_words() {
             )
             .unwrap();
         let row = Row {
+            owned: fixture_owned(m),
             web: Some(b"https://forge.example".as_slice().into()),
             repositories: Box::new([forge::forges::Adoption {
                 owner: b"acme".as_slice().into(),
@@ -247,6 +277,7 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
+        owned: None,
         web: None,
         repositories: Box::new([]),
         app: None,
@@ -299,6 +330,7 @@ fn an_out_of_order_document_is_refused() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        owned: None,
                         web: None,
                         repositories: List::with_capacity(0),
                         app: None,
@@ -401,6 +433,7 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     w::ForgeRow::new(
                         &limits(),
                         w::ForgeRowParts {
+                            owned: None,
                             web: None,
                             repositories: List::with_capacity(0),
                             app: None,
@@ -479,6 +512,7 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    owned: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,

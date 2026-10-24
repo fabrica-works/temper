@@ -229,6 +229,7 @@ impl Domain {
                 }
             }
             rows.push(crate::Row {
+                owned: config.owned.clone(),
                 web: config.web.clone(),
                 repositories: repositories.into_boxed(),
                 number: *forge,

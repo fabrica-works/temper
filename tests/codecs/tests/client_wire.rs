@@ -119,6 +119,7 @@ fn setup_and_every_first_repository_state_round_trip_at_version_eleven() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
+                owned: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,

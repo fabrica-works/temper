@@ -17,6 +17,7 @@ pub(super) fn row(
     w::ForgeRow::new(
         &w::CEILINGS,
         w::ForgeRowParts {
+            owned: None,
             web: None,
             repositories: List::with_capacity(0),
             app: None,
@@ -501,6 +502,7 @@ pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> Lis
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                owned: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,

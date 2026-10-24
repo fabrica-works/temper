@@ -14,6 +14,7 @@ use temper_client_protocol_wire::{self as wire, v1 as w};
 const HERE: u16 = 3;
 fn row(number: u16, kind: Kind, mode: Mode, connection: C, offer: Offer) -> Row {
     Row {
+        owned: None,
         web: None,
         repositories: Box::new([]),
         app: None,
@@ -460,6 +461,7 @@ fn deliver_first_record(
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                owned: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,
@@ -968,6 +970,7 @@ fn deliver_picker(root: &mut crate::Domain, watch: Token, changed: bool) -> Queu
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                owned: None,
                 number: 2,
                 kind: w::Kind::Github,
                 mode: w::Mode::Connected,

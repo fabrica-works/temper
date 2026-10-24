@@ -28,6 +28,7 @@ fn config(under_box: bool) -> engine::Config {
     config.forges = Box::new([
         forge::Configured {
             admin_connect: false,
+            owned: None,
             web: None,
             read_only: false,
             number: 1,
@@ -37,6 +38,7 @@ fn config(under_box: bool) -> engine::Config {
         },
         forge::Configured {
             admin_connect: false,
+            owned: None,
             web: None,
             read_only: false,
             number: 2,

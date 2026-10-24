@@ -1626,6 +1626,7 @@ fn forge_configuration_keeps_kind_mode_and_asked_start() {
             application::configured(&settings).as_ref(),
             [Configured {
                 admin_connect: false,
+                owned: None,
                 web: None,
                 read_only: false,
                 number: 1,
@@ -1641,12 +1642,17 @@ fn forge_configuration_keeps_kind_mode_and_asked_start() {
         application::configured(&settings).as_ref(),
         [Configured {
             admin_connect: false,
+            owned: Some(temper_engine_domain_forge::Owned {
+                forgejo: skein_forge::forgejo::pin::VERSION.as_bytes().into(),
+                runner: None,
+                password: b"/data/forge/person_password".as_slice().into(),
+            }),
             web: None,
             read_only: false,
             number: 1,
             kind: Kind::Forgejo,
             mode: Mode::Owned,
-            asked: true
+            asked: true,
         }]
     );
     for (admin_token, allowed) in [(None, true), (Some(b"admin-file".as_slice().into()), false)] {
@@ -1873,4 +1879,26 @@ fn string_managed_starts_disconnected_without_a_setup_run() {
     assert!(!engine.setup.busy(1));
     assert!(engine.setup.staged.is_empty());
     assert!(engine.setup.io.is_empty());
+}
+
+#[test]
+fn owned_startup_details_keep_the_runner_pin_and_directory_path_and_managed_has_none() {
+    use temper_forge_setup::setup::{Mode, Runner};
+    let mut settings = fixtures::engine();
+    settings.setup = Box::new([fixtures::owned_setup(1)]);
+    settings.setup[0].entry.directory = b"/data/another-forge".as_slice().into();
+    let Mode::Owned(owned) = &mut settings.setup[0].entry.mode else { panic!("owned fixture") };
+    owned.runner = Some(Runner {
+        binary: b"/bin/runner".as_slice().into(),
+        labels: Box::new([]),
+        capacity: 1,
+        path: b"/bin".as_slice().into(),
+    });
+    let rows = application::configured(&settings);
+    let details = rows[0].owned.as_ref().unwrap();
+    assert_eq!(details.forgejo.as_ref(), skein_forge::forgejo::pin::VERSION.as_bytes());
+    assert_eq!(details.runner.as_deref(), Some(skein_forge::forgejo::pin::RUNNER_VERSION.as_bytes()));
+    assert_eq!(details.password.as_ref(), b"/data/another-forge/person_password");
+    settings.setup[0].entry.mode = Mode::Managed { admin_token: Some(b"/fake/admin-token".as_slice().into()) };
+    assert!(application::configured(&settings)[0].owned.is_none());
 }

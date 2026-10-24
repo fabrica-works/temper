@@ -37,6 +37,8 @@ pub enum Word {
     ForgeAccessOwned,
     ForgeAccessManaged,
     ForgeAccessConnected,
+    ForgeRunsLabel,
+    ForgePasswordLabel,
     ForgeOpenSetup,
     ForgeRestartBox,
     ForgePlaygroundSummary,
@@ -579,7 +581,7 @@ pub enum Word {
 // The flow's three state words (5.2).
 // The Accounts navigation's two state words (5.3).
 // ConnectForge's and the welcome's forge words (client/forge.md, 5.4).
-// The Forges page, navigation dot and setup strip (22 phrases).
+// The Forges page, navigation dot and setup strip, with owned Runs and password (27 phrases).
 // Thirty-one model-flow phrases (client/README.md, 5.5).
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
@@ -589,9 +591,10 @@ pub enum Word {
 // GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
 // Account moves add four account literals and one task-wait phrase.
 // The Authorize place and page-owned forge sign-in add twelve phrases.
-const PHRASES: u32 = 1080;
-const SEGMENTS: u32 = 1889;
-const ALL: [Word; 535] = [
+// The owned row's Runs and first-password lines add two words and three phrases.
+const PHRASES: u32 = 1085;
+const SEGMENTS: u32 = 1902;
+const ALL: [Word; 537] = [
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -619,6 +622,8 @@ const ALL: [Word; 535] = [
     Word::ForgeAccessOwned,
     Word::ForgeAccessManaged,
     Word::ForgeAccessConnected,
+    Word::ForgeRunsLabel,
+    Word::ForgePasswordLabel,
     Word::ForgeOpenSetup,
     Word::ForgeRestartBox,
     Word::ForgePlaygroundSummary,
@@ -1143,6 +1148,8 @@ impl Word {
             Self::ForgeAccessOwned => 1840,
             Self::ForgeAccessManaged => 1841,
             Self::ForgeAccessConnected => 1842,
+            Self::ForgeRunsLabel => 1851,
+            Self::ForgePasswordLabel => 1852,
             Self::ForgeOpenSetup => 1807,
             Self::ForgeRestartBox => 1808,
             Self::ForgePlaygroundSummary => 1809,
@@ -1855,7 +1862,8 @@ impl Words {
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined
                 .max(temper_client_domain::forge::DEMO_FIELD_BYTES)
-                .max(temper_client_domain::forge::DEMO_WHY_BYTES),
+                .max(temper_client_domain::forge::DEMO_WHY_BYTES)
+                .max(temper_client_domain::forge::OWNED_PASSWORD_BYTES),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { shell, book, language: 0, connector, name_bytes: joined })
@@ -1941,6 +1949,8 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ForgeAccessOwned => (&[b"Site admin, with temper's own token"], &[]),
         Word::ForgeAccessManaged => (&[b"Site admin, with a token you gave"], &[]),
         Word::ForgeAccessConnected => (&[b"Its bot's tokens, which you gave"], &[]),
+        Word::ForgeRunsLabel => (&[b"Runs"], &[]),
+        Word::ForgePasswordLabel => (&[b"First password"], &[]),
         Word::ForgeOpenSetup => (&[b"Open its set-up \xe2\x80\xba"], &[]),
         Word::ForgeRestartBox => (&[b"Restart temper box: its preparation mends it"], &[]),
         Word::ForgePlaygroundSummary => (&[b"Playground forge \xc2\xb7 the playground\xe2\x80\x99s, until a forge of yours connects \xc2\xb7 ", b"/", b""], &[Name, Name]),

@@ -900,6 +900,11 @@ fn forges_encode_the_domains_rows_without_settings() {
     let value = forge::Forges {
         rows: Box::new([
             forge::Row {
+                owned: Some(forge::Owned {
+                    forgejo: b"17.0.0".as_slice().into(),
+                    runner: Some(b"13.2.0".as_slice().into()),
+                    password: b"/fake/forge/person_password".as_slice().into(),
+                }),
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -913,6 +918,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::Offered,
             },
             forge::Row {
+                owned: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -926,6 +932,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotOffered,
             },
             forge::Row {
+                owned: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -939,6 +946,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotUnderTheBox,
             },
             forge::Row {
+                owned: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -971,27 +979,49 @@ fn forges_encode_the_domains_rows_without_settings() {
     ];
     assert_eq!(rows.len(), u32::try_from(expected.len()).unwrap());
     for (row, (number, kind, mode, connection, offer)) in rows.into_iter().zip(expected) {
-        assert_eq!(
-            row,
-            &w::ForgeRow::new(
-                &w::CEILINGS,
-                w::ForgeRowParts {
-                    web: None,
-                    repositories: List::with_capacity(0),
-                    app: None,
-                    installations: List::with_capacity(0),
-                    ended: None,
-                    first: None,
-                    number,
-                    kind,
-                    mode,
-                    connection,
-                    offer
-                }
-            )
-            .unwrap()
-        );
+        assert_eq!(row, &expected_forge_row(number, kind, mode, connection, offer));
     }
+}
+
+fn expected_forge_row(
+    number: u16,
+    kind: w::Kind,
+    mode: w::Mode,
+    connection: w::Connection,
+    offer: w::Offer,
+) -> w::ForgeRow {
+    w::ForgeRow::new(
+        &w::CEILINGS,
+        w::ForgeRowParts {
+            owned: if number == 1 {
+                Some(
+                    w::OwnedForge::new(
+                        &w::CEILINGS,
+                        w::OwnedForgeParts {
+                            forgejo: b"17.0.0".as_slice().into(),
+                            runner: Some(b"13.2.0".as_slice().into()),
+                            password: b"/fake/forge/person_password".as_slice().into(),
+                        },
+                    )
+                    .unwrap(),
+                )
+            } else {
+                None
+            },
+            web: None,
+            repositories: List::with_capacity(0),
+            app: None,
+            installations: List::with_capacity(0),
+            ended: None,
+            first: None,
+            number,
+            kind,
+            mode,
+            connection,
+            offer,
+        },
+    )
+    .unwrap()
 }
 
 #[test]
@@ -1090,6 +1120,7 @@ fn setup_projects_and_first_repository_states_translate_without_losing_fields() 
             };
             let value = forge::Forges {
                 rows: Box::new([forge::Row {
+                    owned: None,
                     web: None,
                     repositories: Box::new([]),
                     app: None,
@@ -1366,6 +1397,7 @@ fn installations_and_the_last_connect_end_encode_unchanged() {
     let bytes = family::forges(
         forge::Forges {
             rows: Box::new([forge::Row {
+                owned: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -1414,4 +1446,56 @@ fn embedded_client_refusals_keep_their_bytes_at_client_eleven() {
     jig_client_protocol_wire::v19::Refusal::Unknown.encode(&mut after).unwrap();
     assert_eq!(after.finish().as_ref(), &[9]);
     assert_eq!(wire::CLIENT_VERSION, 11);
+}
+
+#[test]
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches")]
+fn owned_details_fit_their_bounds_and_an_overlong_field_drops_only_the_details() {
+    for (forgejo, runner, password, kept) in [
+        (64, Some(64), 512, true),
+        (64, None, 512, true),
+        (65, Some(64), 512, false),
+        (64, Some(65), 512, false),
+        (64, Some(64), 513, false),
+    ] {
+        let value = forge::Forges {
+            rows: Box::new([forge::Row {
+                owned: Some(forge::Owned {
+                    forgejo: Box::from(&[b'v'; 65][..forgejo]),
+                    runner: match runner {
+                        Some(len) => Some(Box::from(&[b'r'; 65][..len])),
+                        None => None,
+                    },
+                    password: Box::from(&[b'/'; 513][..password]),
+                }),
+                web: None,
+                repositories: Box::new([]),
+                app: None,
+                installations: Box::new([]),
+                ended: None,
+                first: None,
+                number: 1,
+                kind: forge::Kind::Forgejo,
+                mode: forge::Mode::Owned,
+                connection: forge::Connection::Connecting,
+                offer: forge::Offer::NotOffered,
+            }]),
+        };
+        let bytes = family::forges(value, &w::CEILINGS).expect("the row is still available");
+        let rows = temper_client_protocol_wire::decode_forges(&bytes, &w::CEILINGS).unwrap();
+        assert_eq!(rows.forges().len(), 1);
+        let owned = rows.forges().as_slice()[0].owned();
+        assert_eq!(owned.is_some(), kept);
+        if let Some(owned) = owned {
+            assert_eq!(owned.forgejo().len(), forgejo);
+            assert_eq!(
+                match owned.runner() {
+                    Some(runner) => Some(runner.len()),
+                    None => None,
+                },
+                runner
+            );
+            assert_eq!(owned.password().len(), password);
+        }
+    }
 }

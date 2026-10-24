@@ -269,11 +269,20 @@ pub enum Mode {
     Owned,
     Fake,
 }
+/// Public owned-forge startup details (protocol/setup.md, 6.5).
+/// The password field is an absolute file path, never the password itself.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Owned {
+    pub forgejo: Box<[u8]>,
+    pub runner: Option<Box<[u8]>>,
+    pub password: Box<[u8]>,
+}
 /// Public startup configuration, without credentials.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Configured {
     /// The records-only managed string form accepts an admin paste.
     pub admin_connect: bool,
+    pub owned: Option<Owned>,
     pub web: Option<Box<[u8]>>,
     pub read_only: bool,
     pub number: u16,
@@ -327,6 +336,7 @@ pub struct AdoptedRow {
 /// One configured forge, including its connection, offer and first repository.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Row {
+    pub owned: Option<Owned>,
     pub web: Option<Box<[u8]>>,
     pub repositories: Box<[AdoptedRow]>,
     pub number: u16,

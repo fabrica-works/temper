@@ -13,7 +13,16 @@ fn github(kind: Kind, mode: Mode) -> Domain {
         4,
         skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
         &[],
-        &[Configured { admin_connect: false, web: None, read_only: false, number: 1, kind, mode, asked: false }],
+        &[Configured {
+            owned: None,
+            admin_connect: false,
+            web: None,
+            read_only: false,
+            number: 1,
+            kind,
+            mode,
+            asked: false,
+        }],
         false,
     )
     .unwrap()
@@ -295,6 +304,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
         &[
             Configured {
                 admin_connect: false,
+                owned: None,
                 web: None,
                 read_only: false,
                 number: 1,
@@ -304,6 +314,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
             },
             Configured {
                 admin_connect: false,
+                owned: None,
                 web: None,
                 read_only: false,
                 number: 2,
@@ -313,6 +324,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
             },
             Configured {
                 admin_connect: false,
+                owned: None,
                 web: None,
                 read_only: false,
                 number: 3,

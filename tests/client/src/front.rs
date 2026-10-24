@@ -106,6 +106,7 @@ impl Joint {
             config.core.connectors = Box::new([fixtures::FORGE]);
             config.forges = Box::new([forge::Configured {
                 admin_connect: false,
+                owned: None,
                 number: 1,
                 kind: forge::Kind::GitHub,
                 mode: forge::Mode::Connected,
@@ -996,6 +997,7 @@ impl Joint {
                 w::ForgeRow::new(
                     &w::CEILINGS,
                     w::ForgeRowParts {
+                        owned: None,
                         web: None,
                         repositories: skein_lib::List::with_capacity(0),
                         app: None,

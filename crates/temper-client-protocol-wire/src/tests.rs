@@ -59,6 +59,9 @@ fn limits_take_each_bound_from_its_source_field() {
     assert_eq!(
         fixtures::limits(),
         v1::Limits {
+            owned_forge_forgejo: 64,
+            owned_forge_runner_some: 64,
+            owned_forge_password: 512,
             adoption_owner: 16,
             adoption_name: 16,
             forge_row_web_some: crate::ADDRESS_BYTES,
@@ -318,6 +321,7 @@ fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
                 v1::ForgeRow::new(
                     &limits,
                     v1::ForgeRowParts {
+                        owned: None,
                         web: None,
                         repositories: List::with_capacity(0),
                         app: None,
@@ -346,6 +350,7 @@ fn each_forge_offer_round_trips() {
         let row = v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                owned: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,
@@ -436,6 +441,7 @@ fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
+                owned: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,
@@ -472,6 +478,7 @@ fn forges_refuse_seventeen_rows_unsorted_rows_and_duplicate_numbers() {
         v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
+                owned: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,
@@ -533,6 +540,7 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
                     let row = v1::ForgeRow::new(
                         &limits,
                         v1::ForgeRowParts {
+                            owned: None,
                             web: None,
                             repositories: List::with_capacity(0),
                             app: None,
@@ -732,6 +740,7 @@ fn installation_row(count: u32, why_bytes: usize) -> v1::ForgeRowParts {
             .unwrap();
     }
     v1::ForgeRowParts {
+        owned: None,
         web: None,
         repositories: List::with_capacity(0),
         app: None,
@@ -749,8 +758,8 @@ fn installation_row(count: u32, why_bytes: usize) -> v1::ForgeRowParts {
 }
 // Encode the fields explicitly to feed invalid lengths to the receiving boundary.
 fn installation_row_bytes(parts: v1::ForgeRowParts, why: &[u8]) -> Box<[u8]> {
-    // Number (2), four enum tags, first tag, list length (4), end tag, why length (4), app tag, web tag, repositories length (4).
-    let mut size = why.len().checked_add(22).unwrap();
+    // Number (2), four enum tags, first tag, list length (4), end tag, why length (4), app tag, web tag, repositories length (4), owned tag.
+    let mut size = why.len().checked_add(23).unwrap();
     for installation in &parts.installations {
         size = size.checked_add(usize::try_from(installation.measure()).unwrap()).unwrap();
     }
@@ -771,6 +780,7 @@ fn installation_row_bytes(parts: v1::ForgeRowParts, why: &[u8]) -> Box<[u8]> {
     writer.put(&[0]).unwrap(); // no App way
     writer.put(&[0]).unwrap(); // no web address
     writer.put(&0_u32.to_be_bytes()).unwrap(); // no adoptions
+    writer.put(&[0]).unwrap(); // no owned details
     writer.finish()
 }
 #[test]

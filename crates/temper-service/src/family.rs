@@ -714,6 +714,18 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                 w::ForgeRow::new(
                     limits,
                     w::ForgeRowParts {
+                        owned: match row.owned {
+                            Some(owned) => w::OwnedForge::new(
+                                limits,
+                                w::OwnedForgeParts {
+                                    forgejo: owned.forgejo,
+                                    runner: owned.runner,
+                                    password: owned.password,
+                                },
+                            )
+                            .ok(),
+                            None => None,
+                        },
                         web: row.web,
                         repositories,
                         app: match row.app {

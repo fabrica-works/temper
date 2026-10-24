@@ -1227,6 +1227,7 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
     for forge in &settings.forges {
         let mut mode = Mode::Connected;
         let mut admin_connect = false;
+        let mut owned = None;
         let mut asked = match &settings.demo {
             Some(demo) => demo.forge == forge.number,
             None => false,
@@ -1235,7 +1236,19 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
             if setup.entry.forge == forge.number {
                 (mode, admin_connect) = match &setup.entry.mode {
                     temper_forge_setup::setup::Mode::Managed { admin_token } => (Mode::Managed, admin_token.is_none()),
-                    temper_forge_setup::setup::Mode::Owned(_) => (Mode::Owned, false),
+                    temper_forge_setup::setup::Mode::Owned(value) => {
+                        use skein_forge::forgejo::pin;
+                        let place = temper_forge_setup::place::Place {
+                            directory: setup.entry.directory.clone(),
+                            user: Box::new([]),
+                        };
+                        owned = Some(temper_engine_domain_forge::Owned {
+                            forgejo: pin::VERSION.as_bytes().into(),
+                            runner: value.runner.is_some().then_some(pin::RUNNER_VERSION.as_bytes().into()),
+                            password: place.path(temper_forge_setup::place::File::PersonPassword),
+                        });
+                        (Mode::Owned, false)
+                    }
                     temper_forge_setup::setup::Mode::Fake(_) => (Mode::Fake, false),
                 };
                 asked |= setup.entry.asked;
@@ -1248,6 +1261,7 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
         };
         rows.push(Configured {
             admin_connect,
+            owned,
             number: forge.number,
             kind,
             mode,

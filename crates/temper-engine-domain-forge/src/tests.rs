@@ -1135,6 +1135,7 @@ fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() 
 const CONFIGURED: [Configured; 2] = [
     Configured {
         admin_connect: false,
+        owned: None,
         web: None,
         read_only: false,
         number: 1,
@@ -1144,6 +1145,7 @@ const CONFIGURED: [Configured; 2] = [
     },
     Configured {
         admin_connect: false,
+        owned: None,
         web: None,
         read_only: false,
         number: 2,
@@ -1168,6 +1170,7 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
     Row {
+        owned: None,
         web: None,
         repositories: Box::new([]),
         app: None,
@@ -1299,7 +1302,9 @@ fn configured_forges_are_bounded_at_construction() {
     let count = usize::try_from(LIMITS.client.repositories).unwrap();
     let mut forges = skein_lib::List::with_capacity(LIMITS.client.repositories.checked_add(1).unwrap());
     for number in 0..=count {
-        forges.push(Configured { number: u16::try_from(number).unwrap(), ..CONFIGURED[0].clone() }).unwrap();
+        forges
+            .push(Configured { owned: None, number: u16::try_from(number).unwrap(), ..CONFIGURED[0].clone() })
+            .unwrap();
     }
     Domain::new(&LIMITS, 4, config(), &[], &forges.as_slice()[..count], false).unwrap();
     assert_eq!(
@@ -1767,6 +1772,7 @@ fn forges_lists_web_and_only_each_forges_adoptions_for_every_kind() {
         let mut d = setup_domain(
             &[Configured {
                 admin_connect: false,
+                owned: None,
                 number: 1,
                 kind,
                 mode: Mode::Connected,
@@ -1799,4 +1805,21 @@ fn forgetting_or_restoring_an_adoption_publishes_the_forges_row() {
     let out = outputs(&mut d, Event::ForgetAdoption { repository: own.provider, restore: Some(own.clone()) });
     assert!(out.contains(&Request::MarkedForges), "{out:?}");
     assert_eq!(d.forges().rows[0].repositories.len(), 1);
+}
+
+#[test]
+fn forges_carry_owned_startup_details_for_the_owned_row_alone() {
+    let owned = Owned {
+        forgejo: b"17.0.0".as_slice().into(),
+        runner: Some(b"13.2.0".as_slice().into()),
+        password: b"/fake/forge/person_password".as_slice().into(),
+    };
+    let configs = [
+        Configured { owned: Some(owned.clone()), ..CONFIGURED[0].clone() },
+        Configured { owned: None, mode: Mode::Managed, ..CONFIGURED[1].clone() },
+    ];
+    let domain = setup_domain(&configs, true);
+    let rows = domain.forges().rows;
+    assert_eq!(rows[0].owned, Some(owned));
+    assert_eq!(rows[1].owned, None);
 }

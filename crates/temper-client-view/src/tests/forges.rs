@@ -353,3 +353,82 @@ fn a_connected_forge_in_the_page_facts_opens_through_temper() {
     let view = f::browser_page_view(&root);
     assert!(f::find(view.tree(), Role::Link, "Open Forgejo ↗".as_bytes()).is_none());
 }
+fn owned_row(mode: w::Mode, connection: w::Connection, runner: Option<&[u8]>) -> w::ForgeRow {
+    let mut parts = cf::row(HERE, w::Kind::Forgejo, mode, connection, w::Offer::Offered).into_parts();
+    if parts.mode == w::Mode::Owned {
+        parts.owned = Some(
+            w::OwnedForge::new(
+                &w::CEILINGS,
+                w::OwnedForgeParts {
+                    forgejo: b"17.0.0".as_slice().into(),
+                    runner: runner.map(Into::into),
+                    password: b"/fake/forge/person_password".as_slice().into(),
+                },
+            )
+            .unwrap(),
+        );
+    }
+    w::ForgeRow::new(&w::CEILINGS, parts).unwrap()
+}
+fn slot_has(tree: &skein_ui::Tree, label: &[u8], words: &[u8]) -> bool {
+    tree.nodes().iter().enumerate().any(|(index, node)| {
+        if node.role != Role::Slot {
+            return false;
+        }
+        let slot = &tree.nodes()[index..index.checked_add(usize::try_from(node.size).unwrap()).unwrap()];
+        slot.iter().any(|n| n.role == Role::Term && n.name.as_deref() == Some(label))
+            && slot.iter().any(|n| n.role == Role::Description && n.name.as_deref() == Some(words))
+    })
+}
+#[test]
+fn owned_ready_rows_say_the_versions_and_first_password_path_in_slots() {
+    for (runner, runs) in [
+        (
+            Some(b"13.2.0".as_slice()),
+            b"Forgejo 17.0.0 and its runner 13.2.0, on this machine. CI jobs run here, as you.".as_slice(),
+        ),
+        (None, b"Forgejo 17.0.0, on this machine, with no runner.".as_slice()),
+    ] {
+        for connection in [
+            cf::connected(),
+            w::Connection::Connecting,
+            w::Connection::Stopped(
+                w::Stopped::new(&w::CEILINGS, w::StoppedParts { reason: b"stopped".as_slice().into() }).unwrap(),
+            ),
+        ] {
+            let mut rows = List::with_capacity(1);
+            rows.push(owned_row(w::Mode::Owned, connection, runner)).unwrap();
+            let root = f::forge_root(Address::Forges, rows);
+            let view = f::page_view(&root);
+            assert!(slot_has(view.tree(), b"Runs", runs));
+            assert!(slot_has(view.tree(), b"First password", b"Your first password is in /fake/forge/person_password. Forgejo asks you to change it when you sign in."));
+        }
+    }
+}
+#[test]
+fn unprepared_owned_rows_and_managed_rows_have_no_runs_or_password_lines() {
+    for (mode, connection) in [
+        (w::Mode::Owned, w::Connection::NotConnected),
+        (w::Mode::Owned, w::Connection::NotSetUp),
+        (
+            w::Mode::Owned,
+            w::Connection::SettingUp(w::SettingUp::new(&w::CEILINGS, w::SettingUpParts { step: None }).unwrap()),
+        ),
+        (
+            w::Mode::Owned,
+            w::Connection::SetUpFailed(
+                w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"failed".as_slice().into() }).unwrap(),
+            ),
+        ),
+        (w::Mode::Managed, cf::connected()),
+    ] {
+        let mut rows = List::with_capacity(1);
+        rows.push(owned_row(mode, connection, Some(b"13.2.0"))).unwrap();
+        let root = f::forge_root(Address::Forges, rows);
+        let view = f::page_view(&root);
+        for label in [b"Runs".as_slice(), b"First password"] {
+            assert!(f::find(view.tree(), Role::Term, label).is_none());
+        }
+        assert!(f::find(view.tree(), Role::Description, b"Your first password is in /fake/forge/person_password. Forgejo asks you to change it when you sign in.").is_none());
+    }
+}

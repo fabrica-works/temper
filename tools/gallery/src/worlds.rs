@@ -249,6 +249,7 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    owned: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,
@@ -274,6 +275,7 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    owned: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,
@@ -304,6 +306,7 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    owned: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,

@@ -30,6 +30,9 @@ pub struct Limits {
     pub connect_stopped_why: u32,
     pub adoption_owner: u32,
     pub adoption_name: u32,
+    pub owned_forge_forgejo: u32,
+    pub owned_forge_runner_some: u32,
+    pub owned_forge_password: u32,
     pub forge_row_installations: u32,
     pub forge_row_web_some: u32,
     pub forge_row_repositories: u32,
@@ -82,6 +85,9 @@ pub const CEILINGS: Limits = Limits {
     connect_stopped_why: 256,
     adoption_owner: 1_024,
     adoption_name: 1_024,
+    owned_forge_forgejo: 64,
+    owned_forge_runner_some: 64,
+    owned_forge_password: 512,
     forge_row_installations: 64,
     forge_row_web_some: 2_048,
     forge_row_repositories: 16,
@@ -317,6 +323,14 @@ pub enum Path {
     AdoptionProject,
     /// Bytes after `Adoption`.
     AdoptionTail,
+    /// The `forgejo` field of `OwnedForge`.
+    OwnedForgeForgejo,
+    /// The `runner` field of `OwnedForge`.
+    OwnedForgeRunner,
+    /// The `password` field of `OwnedForge`.
+    OwnedForgePassword,
+    /// Bytes after `OwnedForge`.
+    OwnedForgeTail,
     /// The `number` field of `ForgeRow`.
     ForgeRowNumber,
     /// The `kind` field of `ForgeRow`.
@@ -339,6 +353,8 @@ pub enum Path {
     ForgeRowWeb,
     /// The `repositories` field of `ForgeRow`.
     ForgeRowRepositories,
+    /// The `owned` field of `ForgeRow`.
+    ForgeRowOwned,
     /// Bytes after `ForgeRow`.
     ForgeRowTail,
     /// The `forges` field of `Forges`.
@@ -607,6 +623,9 @@ fn check_limits_0(limits: &Limits) -> Result<(), Problem> {
     if limits.connect_stopped_why > CEILINGS.connect_stopped_why { return Err(Problem { path: Path::ConnectStoppedWhy, reason: skein_codec::Reason::Bound }); }
     if limits.adoption_owner > CEILINGS.adoption_owner { return Err(Problem { path: Path::AdoptionOwner, reason: skein_codec::Reason::Bound }); }
     if limits.adoption_name > CEILINGS.adoption_name { return Err(Problem { path: Path::AdoptionName, reason: skein_codec::Reason::Bound }); }
+    if limits.owned_forge_forgejo > CEILINGS.owned_forge_forgejo { return Err(Problem { path: Path::OwnedForgeForgejo, reason: skein_codec::Reason::Bound }); }
+    if limits.owned_forge_runner_some > CEILINGS.owned_forge_runner_some { return Err(Problem { path: Path::OwnedForgeRunner, reason: skein_codec::Reason::Bound }); }
+    if limits.owned_forge_password > CEILINGS.owned_forge_password { return Err(Problem { path: Path::OwnedForgePassword, reason: skein_codec::Reason::Bound }); }
     if limits.forge_row_installations > CEILINGS.forge_row_installations { return Err(Problem { path: Path::ForgeRowInstallations, reason: skein_codec::Reason::Bound }); }
     if limits.forge_row_web_some > CEILINGS.forge_row_web_some { return Err(Problem { path: Path::ForgeRowWeb, reason: skein_codec::Reason::Bound }); }
     if limits.forge_row_repositories > CEILINGS.forge_row_repositories { return Err(Problem { path: Path::ForgeRowRepositories, reason: skein_codec::Reason::Bound }); }
@@ -2195,6 +2214,58 @@ impl Adoption {
     }
 }
 
+/// Movable fields of `OwnedForge`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OwnedForgeParts {
+    /// The `forgejo` field.
+    pub forgejo: Box<[u8]>,
+    /// The `runner` field.
+    pub runner: Option<Box<[u8]>>,
+    /// The `password` field.
+    pub password: Box<[u8]>,
+}
+
+/// `OwnedForge` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OwnedForge {
+    forgejo: Box<[u8]>,
+    runner: Option<Box<[u8]>>,
+    password: Box<[u8]>,
+}
+
+impl OwnedForge {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: OwnedForgeParts) -> Result<Self, Problem> {
+        let OwnedForgeParts { forgejo, runner, password } = parts;
+        let value = Self { forgejo, runner, password };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `forgejo` field.
+    #[must_use]
+    pub fn forgejo(&self) -> &[u8] { &self.forgejo }
+
+    /// Reads the `runner` field.
+    #[must_use]
+    pub fn runner(&self) -> &Option<Box<[u8]>> { &self.runner }
+
+    /// Reads the `password` field.
+    #[must_use]
+    pub fn password(&self) -> &[u8] { &self.password }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> OwnedForgeParts { OwnedForgeParts { forgejo: self.forgejo, runner: self.runner, password: self.password } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        if self.forgejo.len() > usize::try_from(limits.owned_forge_forgejo.min(CEILINGS.owned_forge_forgejo)).expect("u32 fits usize") { return Err(Problem { path: Path::OwnedForgeForgejo, reason: skein_codec::Reason::Bound }); }
+        if let Some(some_0) = self.runner.as_ref() && some_0.len() > usize::try_from(limits.owned_forge_runner_some.min(CEILINGS.owned_forge_runner_some)).expect("u32 fits usize") { return Err(Problem { path: Path::OwnedForgeRunner, reason: skein_codec::Reason::Bound }); }
+        if self.password.len() > usize::try_from(limits.owned_forge_password.min(CEILINGS.owned_forge_password)).expect("u32 fits usize") { return Err(Problem { path: Path::OwnedForgePassword, reason: skein_codec::Reason::Bound }); }
+        Ok(())
+    }
+}
+
 /// Movable fields of `ForgeRow`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ForgeRowParts {
@@ -2220,6 +2291,8 @@ pub struct ForgeRowParts {
     pub web: Option<Box<[u8]>>,
     /// The `repositories` field.
     pub repositories: List<Adoption>,
+    /// The `owned` field.
+    pub owned: Option<OwnedForge>,
 }
 
 /// `ForgeRow` in this codec family.
@@ -2236,13 +2309,14 @@ pub struct ForgeRow {
     app: Option<AppWay>,
     web: Option<Box<[u8]>>,
     repositories: List<Adoption>,
+    owned: Option<OwnedForge>,
 }
 
 impl ForgeRow {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: ForgeRowParts) -> Result<Self, Problem> {
-        let ForgeRowParts { number, kind, mode, connection, offer, first, installations, ended, app, web, repositories } = parts;
-        let value = Self { number, kind, mode, connection, offer, first, installations, ended, app, web, repositories };
+        let ForgeRowParts { number, kind, mode, connection, offer, first, installations, ended, app, web, repositories, owned } = parts;
+        let value = Self { number, kind, mode, connection, offer, first, installations, ended, app, web, repositories, owned };
         value.check(limits)?;
         Ok(value)
     }
@@ -2291,9 +2365,13 @@ impl ForgeRow {
     #[must_use]
     pub fn repositories(&self) -> &List<Adoption> { &self.repositories }
 
+    /// Reads the `owned` field.
+    #[must_use]
+    pub fn owned(&self) -> &Option<OwnedForge> { &self.owned }
+
     /// Moves the fields out without copying.
     #[must_use]
-    pub fn into_parts(self) -> ForgeRowParts { ForgeRowParts { number: self.number, kind: self.kind, mode: self.mode, connection: self.connection, offer: self.offer, first: self.first, installations: self.installations, ended: self.ended, app: self.app, web: self.web, repositories: self.repositories } }
+    pub fn into_parts(self) -> ForgeRowParts { ForgeRowParts { number: self.number, kind: self.kind, mode: self.mode, connection: self.connection, offer: self.offer, first: self.first, installations: self.installations, ended: self.ended, app: self.app, web: self.web, repositories: self.repositories, owned: self.owned } }
 
     fn check(&self, limits: &Limits) -> Result<(), Problem> {
         self.connection.check(limits)?;
@@ -2311,6 +2389,9 @@ impl ForgeRow {
         if self.repositories.capacity() > limits.forge_row_repositories.min(CEILINGS.forge_row_repositories) { return Err(Problem { path: Path::ForgeRowRepositories, reason: skein_codec::Reason::Bound }); }
         for item_0 in self.repositories.as_slice() {
         item_0.check(limits)?;
+        }
+        if let Some(some_0) = self.owned.as_ref() {
+        some_0.check(limits)?;
         }
         Ok(())
     }
@@ -5482,6 +5563,61 @@ impl Adoption {
     }
 }
 
+impl OwnedForge {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        let field_forgejo = &self.forgejo;
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(u32::try_from(field_forgejo.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
+        let field_runner = &self.runner;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if let Some(some_0) = field_runner {
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(u32::try_from(some_0.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
+        }
+        let field_password = &self.password;
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(u32::try_from(field_password.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_forgejo = &self.forgejo;
+        writer.put(&u32::try_from(field_forgejo.len()).expect("field ceiling fits u32").to_be_bytes())?;
+        writer.put(field_forgejo.as_ref())?;
+        let field_runner = &self.runner;
+        match field_runner {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&u32::try_from(some_0.len()).expect("field ceiling fits u32").to_be_bytes())?;
+        writer.put(some_0.as_ref())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
+        let field_password = &self.password;
+        writer.put(&u32::try_from(field_password.len()).expect("field ceiling fits u32").to_be_bytes())?;
+        writer.put(field_password.as_ref())?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::OwnedForgeTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_forgejo = { let length = match skein_codec::read_len(reader, limits.owned_forge_forgejo.min(CEILINGS.owned_forge_forgejo)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::OwnedForgeForgejo, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::OwnedForgeForgejo, reason: skein_codec::Reason::Short })?) };
+        let decoded_runner = match reader.u8().ok_or(Problem { path: Path::OwnedForgeRunner, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some({ let length = match skein_codec::read_len(reader, limits.owned_forge_runner_some.min(CEILINGS.owned_forge_runner_some)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::OwnedForgeRunner, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::OwnedForgeRunner, reason: skein_codec::Reason::Short })?) }), _ => return Err(Problem { path: Path::OwnedForgeRunner, reason: skein_codec::Reason::Tag }) };
+        let decoded_password = { let length = match skein_codec::read_len(reader, limits.owned_forge_password.min(CEILINGS.owned_forge_password)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::OwnedForgePassword, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::OwnedForgePassword, reason: skein_codec::Reason::Short })?) };
+        Ok(Self { forgejo: decoded_forgejo, runner: decoded_runner, password: decoded_password })
+    }
+}
+
 impl ForgeRow {
     /// Measures this record's wire encoding.
     #[must_use]
@@ -5526,6 +5662,11 @@ impl ForgeRow {
         size = size.checked_add(4).expect("schema ceilings fit u32");
         for item_0 in field_repositories.as_slice() {
         size = size.checked_add(item_0.measure()).expect("schema ceilings fit u32");
+        }
+        let field_owned = &self.owned;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if let Some(some_0) = field_owned {
+        size = size.checked_add(some_0.measure()).expect("schema ceilings fit u32");
         }
         size
     }
@@ -5585,6 +5726,14 @@ impl ForgeRow {
         for item_0 in field_repositories.as_slice() {
         item_0.encode(writer)?;
         }
+        let field_owned = &self.owned;
+        match field_owned {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        some_0.encode(writer)?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
         Ok(())
     }
 
@@ -5607,7 +5756,8 @@ impl ForgeRow {
         let decoded_app = match reader.u8().ok_or(Problem { path: Path::ForgeRowApp, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(AppWay::decode_from(limits, reader)?), _ => return Err(Problem { path: Path::ForgeRowApp, reason: skein_codec::Reason::Tag }) };
         let decoded_web = match reader.u8().ok_or(Problem { path: Path::ForgeRowWeb, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some({ let length = match skein_codec::read_len(reader, limits.forge_row_web_some.min(CEILINGS.forge_row_web_some)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::ForgeRowWeb, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::ForgeRowWeb, reason: skein_codec::Reason::Short })?) }), _ => return Err(Problem { path: Path::ForgeRowWeb, reason: skein_codec::Reason::Tag }) };
         let decoded_repositories = { let count = match skein_codec::read_count(reader, limits.forge_row_repositories.min(CEILINGS.forge_row_repositories)) { Ok(count) => count, Err(reason) => return Err(Problem { path: Path::ForgeRowRepositories, reason }), }; if count > reader.remaining() / 12 { return Err(Problem { path: Path::ForgeRowRepositories, reason: skein_codec::Reason::Short }); } let mut items_0 = List::with_capacity(count); for _index in 0_u32..count { let item = Adoption::decode_from(limits, reader)?; items_0.push(item).expect("count within capacity"); } items_0 };
-        Ok(Self { number: decoded_number, kind: decoded_kind, mode: decoded_mode, connection: decoded_connection, offer: decoded_offer, first: decoded_first, installations: decoded_installations, ended: decoded_ended, app: decoded_app, web: decoded_web, repositories: decoded_repositories })
+        let decoded_owned = match reader.u8().ok_or(Problem { path: Path::ForgeRowOwned, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(OwnedForge::decode_from(limits, reader)?), _ => return Err(Problem { path: Path::ForgeRowOwned, reason: skein_codec::Reason::Tag }) };
+        Ok(Self { number: decoded_number, kind: decoded_kind, mode: decoded_mode, connection: decoded_connection, offer: decoded_offer, first: decoded_first, installations: decoded_installations, ended: decoded_ended, app: decoded_app, web: decoded_web, repositories: decoded_repositories, owned: decoded_owned })
     }
 }
 
@@ -5646,7 +5796,7 @@ impl Forges {
     fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let version = reader.u16().ok_or(Problem { path: Path::ForgesVersion, reason: skein_codec::Reason::Short })?;
         if version != 11 { return Err(Problem { path: Path::ForgesVersion, reason: skein_codec::Reason::Version }); }
-        let decoded_forges = { let count = match skein_codec::read_count(reader, limits.forges_forges.min(CEILINGS.forges_forges)) { Ok(count) => count, Err(reason) => return Err(Problem { path: Path::ForgesForges, reason }), }; if count > reader.remaining() / 18 { return Err(Problem { path: Path::ForgesForges, reason: skein_codec::Reason::Short }); } let mut items_0 = List::with_capacity(count); for _index in 0_u32..count { let item = ForgeRow::decode_from(limits, reader)?; items_0.push(item).expect("count within capacity"); } items_0 };
+        let decoded_forges = { let count = match skein_codec::read_count(reader, limits.forges_forges.min(CEILINGS.forges_forges)) { Ok(count) => count, Err(reason) => return Err(Problem { path: Path::ForgesForges, reason }), }; if count > reader.remaining() / 19 { return Err(Problem { path: Path::ForgesForges, reason: skein_codec::Reason::Short }); } let mut items_0 = List::with_capacity(count); for _index in 0_u32..count { let item = ForgeRow::decode_from(limits, reader)?; items_0.push(item).expect("count within capacity"); } items_0 };
         Ok(Self { forges: decoded_forges })
     }
 }
@@ -8422,6 +8572,36 @@ impl Adoption {
     }
 }
 
+impl OwnedForge {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(4_u64.checked_add(u64::from(limits.owned_forge_forgejo))?)?.checked_add(1_u64.checked_add(4_u64.checked_add(u64::from(limits.owned_forge_runner_some))?)?)?;
+        size = size.checked_add(4_u64.checked_add(u64::from(limits.owned_forge_password))?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(u64::from(limits.owned_forge_forgejo))?.checked_add(u64::from(limits.owned_forge_runner_some))?;
+        heap = heap.checked_add(u64::from(limits.owned_forge_password))?;
+        heap.checked_add(0)
+    }
+}
+
 impl ForgeRow {
     /// Maximum encoded bytes under these limits.
     #[must_use]
@@ -8437,7 +8617,7 @@ impl ForgeRow {
         size = size.checked_add(Offer::worst_case_bytes_within(limits)?)?.checked_add(1_u64.checked_add(FirstRepository::worst_case_bytes_within(limits)?)?)?;
         size = size.checked_add(4_u64.checked_add(u64::from(limits.forge_row_installations).checked_mul(Installation::worst_case_bytes_within(limits)?)?)?)?.checked_add(1_u64.checked_add(ConnectStopped::worst_case_bytes_within(limits)?)?)?;
         size = size.checked_add(1_u64.checked_add(AppWay::worst_case_bytes_within(limits)?)?)?.checked_add(1_u64.checked_add(4_u64.checked_add(u64::from(limits.forge_row_web_some))?)?)?;
-        size = size.checked_add(4_u64.checked_add(u64::from(limits.forge_row_repositories).checked_mul(Adoption::worst_case_bytes_within(limits)?)?)?)?;
+        size = size.checked_add(4_u64.checked_add(u64::from(limits.forge_row_repositories).checked_mul(Adoption::worst_case_bytes_within(limits)?)?)?)?.checked_add(1_u64.checked_add(OwnedForge::worst_case_bytes_within(limits)?)?)?;
         size.checked_add(0)
     }
 
@@ -8455,7 +8635,7 @@ impl ForgeRow {
         heap = heap.checked_add(Offer::worst_case_heap_within(limits)?)?.checked_add(FirstRepository::worst_case_heap_within(limits)?)?;
         heap = heap.checked_add(List::<Installation>::worst_case(limits.forge_row_installations)?.checked_add(u64::from(limits.forge_row_installations).checked_mul(Installation::worst_case_heap_within(limits)?)?)?)?.checked_add(ConnectStopped::worst_case_heap_within(limits)?)?;
         heap = heap.checked_add(AppWay::worst_case_heap_within(limits)?)?.checked_add(u64::from(limits.forge_row_web_some))?;
-        heap = heap.checked_add(List::<Adoption>::worst_case(limits.forge_row_repositories)?.checked_add(u64::from(limits.forge_row_repositories).checked_mul(Adoption::worst_case_heap_within(limits)?)?)?)?;
+        heap = heap.checked_add(List::<Adoption>::worst_case(limits.forge_row_repositories)?.checked_add(u64::from(limits.forge_row_repositories).checked_mul(Adoption::worst_case_heap_within(limits)?)?)?)?.checked_add(OwnedForge::worst_case_heap_within(limits)?)?;
         heap.checked_add(0)
     }
 }
@@ -9525,6 +9705,7 @@ pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
     biggest = biggest.max(ConnectStopped::worst_case_bytes_within(limits)?);
     biggest = biggest.max(AppWay::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Adoption::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(OwnedForge::worst_case_bytes_within(limits)?);
     biggest = biggest.max(ForgeRow::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Forges::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Read::worst_case_bytes_within(limits)?);
@@ -9613,6 +9794,7 @@ pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
     biggest = biggest.max(ConnectStopped::worst_case_heap_within(limits)?);
     biggest = biggest.max(AppWay::worst_case_heap_within(limits)?);
     biggest = biggest.max(Adoption::worst_case_heap_within(limits)?);
+    biggest = biggest.max(OwnedForge::worst_case_heap_within(limits)?);
     biggest = biggest.max(ForgeRow::worst_case_heap_within(limits)?);
     biggest = biggest.max(Forges::worst_case_heap_within(limits)?);
     biggest = biggest.max(Read::worst_case_heap_within(limits)?);
@@ -9654,7 +9836,7 @@ pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
 
 #[cfg(test)]
 mod golden_tests {
-    use super::{CEILINGS, Role, Adopt, AdoptParts, ExistingProject, ExistingProjectParts, NewProject, NewProjectParts, SetUpProject, SetUp, SetUpParts, Return, ReturnParts, GitHubApp, GitHubAppParts, GitHubManifest, GitHubManifestParts, FirstAsk, FirstAskParts, ForgejoAdmin, ForgejoAdminParts, How, Connect, ConnectParts, Install, InstallParts, Reachable, ReachableParts, Request, Requesting, RequestingParts, SetUpRefusal, SetUpRefused, SetUpRefusedParts, StartRefusal, StartRefused, StartRefusedParts, GroupFailed, GroupFailedParts, StartFailure, StartFailed, StartFailedParts, DemoState, Kind, Mode, SetUpStep, SettingUp, SettingUpParts, SetUpFailed, SetUpFailedParts, Connected, ConnectedParts, Stopped, StoppedParts, Connection, Offer, CreateStep, Made, MadeParts, CreateFailed, CreateFailedParts, FirstState, FirstRepository, FirstRepositoryParts, Account, AccountParts, Installation, InstallationParts, ConnectStopped, ConnectStoppedParts, AppWay, Adoption, AdoptionParts, ForgeRow, ForgeRowParts, Forges, ForgesParts, Read, Reading, ReadingParts, DemoAnswer, DemoAnswerParts, ChangeSubject, ChangeSubjectParts, Watch, Watching, WatchingParts, Pull, PullParts, Queued, QueuedParts, GateReason, GateReasonParts, Reason, Repairing, RepairingParts, Landed, LandedParts, Step, Hold, Ci, GateKind, Verdict, Gate, GateParts, Used, UsedParts, ChangePanel, ChangePanelParts, Kinds, KindsParts, Rule, RuleParts, Protection, Adopted, AdoptedParts, CoreRefused, CoreRefusedParts, ForgeReason, ForgeRefused, ForgeRefusedParts, ForgeRefusal, ConnectRefused, ConnectRefusedParts, Link, LinkParts, Reached, ReachedParts, Page, PageParts, Outcome, Answer, AnswerParts, Path};
+    use super::{CEILINGS, Role, Adopt, AdoptParts, ExistingProject, ExistingProjectParts, NewProject, NewProjectParts, SetUpProject, SetUp, SetUpParts, Return, ReturnParts, GitHubApp, GitHubAppParts, GitHubManifest, GitHubManifestParts, FirstAsk, FirstAskParts, ForgejoAdmin, ForgejoAdminParts, How, Connect, ConnectParts, Install, InstallParts, Reachable, ReachableParts, Request, Requesting, RequestingParts, SetUpRefusal, SetUpRefused, SetUpRefusedParts, StartRefusal, StartRefused, StartRefusedParts, GroupFailed, GroupFailedParts, StartFailure, StartFailed, StartFailedParts, DemoState, Kind, Mode, SetUpStep, SettingUp, SettingUpParts, SetUpFailed, SetUpFailedParts, Connected, ConnectedParts, Stopped, StoppedParts, Connection, Offer, CreateStep, Made, MadeParts, CreateFailed, CreateFailedParts, FirstState, FirstRepository, FirstRepositoryParts, Account, AccountParts, Installation, InstallationParts, ConnectStopped, ConnectStoppedParts, AppWay, Adoption, AdoptionParts, OwnedForge, OwnedForgeParts, ForgeRow, ForgeRowParts, Forges, ForgesParts, Read, Reading, ReadingParts, DemoAnswer, DemoAnswerParts, ChangeSubject, ChangeSubjectParts, Watch, Watching, WatchingParts, Pull, PullParts, Queued, QueuedParts, GateReason, GateReasonParts, Reason, Repairing, RepairingParts, Landed, LandedParts, Step, Hold, Ci, GateKind, Verdict, Gate, GateParts, Used, UsedParts, ChangePanel, ChangePanelParts, Kinds, KindsParts, Rule, RuleParts, Protection, Adopted, AdoptedParts, CoreRefused, CoreRefusedParts, ForgeReason, ForgeRefused, ForgeRefusedParts, ForgeRefusal, ConnectRefused, ConnectRefusedParts, Link, LinkParts, Reached, ReachedParts, Page, PageParts, Outcome, Answer, AnswerParts, Path};
     use super::Limits;
 
     use alloc::boxed::Box;
@@ -9707,7 +9889,7 @@ mod golden_tests {
         };
         at && past
     }
-    static GOLDEN_0: [Case; 360] = [
+    static GOLDEN_0: [Case; 362] = [
         ("enum_role_owned_smallest", || { let value = Role::Owned; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Role::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_role_owned_full", || { let value = Role::Owned; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Role::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_role_adopted_smallest", || { let value = Role::Adopted; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Role::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -9876,10 +10058,12 @@ mod golden_tests {
         ("enum_app_way_pasted_full", || { let value = AppWay::Pasted; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, AppWay::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_adoption_smallest", || { let value = Adoption::new(&CEILINGS, AdoptionParts { owner: Box::from([].as_slice()), name: Box::from([].as_slice()), project: 0_u32 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Adoption::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_adoption_full", || { let value = Adoption::new(&CEILINGS, AdoptionParts { owner: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: u32::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Adoption::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_forge_row_smallest", || { let value = ForgeRow::new(&CEILINGS, ForgeRowParts { number: 0_u16, kind: Kind::Forgejo, mode: Mode::Connected, connection: Connection::NotConnected, offer: Offer::NotOffered, first: None, installations: skein_lib::List::with_capacity(0), ended: None, app: None, web: None, repositories: skein_lib::List::with_capacity(0) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRow::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_forge_row_full", || { let value = ForgeRow::new(&CEILINGS, ForgeRowParts { number: u16::MAX, kind: Kind::Forgejo, mode: Mode::Connected, connection: Connection::NotConnected, offer: Offer::NotOffered, first: Some(FirstRepository::new(&CEILINGS, FirstRepositoryParts { org: Box::from([0_u8, 127_u8, 255_u8].as_slice()), repository: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: SetUpProject::Existing(ExistingProject::new(&CEILINGS, ExistingProjectParts { project: u32::MAX }).expect("golden within ceilings")), state: FirstState::Making }).expect("golden within ceilings")), installations: { let mut items = skein_lib::List::with_capacity(1); items.push(Installation::new(&CEILINGS, InstallationParts { id: u64::MAX, account: Some(Account::new(&CEILINGS, AccountParts { id: u64::MAX, login: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), suspended: true, stray: true }).expect("golden within ceilings")).expect("one slot"); items }, ended: Some(ConnectStopped::new(&CEILINGS, ConnectStoppedParts { why: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), app: Some(AppWay::Manifest), web: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), repositories: { let mut items = skein_lib::List::with_capacity(1); items.push(Adoption::new(&CEILINGS, AdoptionParts { owner: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: u32::MAX }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 1, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRow::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_owned_forge_smallest", || { let value = OwnedForge::new(&CEILINGS, OwnedForgeParts { forgejo: Box::from([].as_slice()), runner: None, password: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnedForge::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_owned_forge_full", || { let value = OwnedForge::new(&CEILINGS, OwnedForgeParts { forgejo: Box::from([0_u8, 127_u8, 255_u8].as_slice()), runner: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), password: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnedForge::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_forge_row_smallest", || { let value = ForgeRow::new(&CEILINGS, ForgeRowParts { number: 0_u16, kind: Kind::Forgejo, mode: Mode::Connected, connection: Connection::NotConnected, offer: Offer::NotOffered, first: None, installations: skein_lib::List::with_capacity(0), ended: None, app: None, web: None, repositories: skein_lib::List::with_capacity(0), owned: None }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRow::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_forge_row_full", || { let value = ForgeRow::new(&CEILINGS, ForgeRowParts { number: u16::MAX, kind: Kind::Forgejo, mode: Mode::Connected, connection: Connection::NotConnected, offer: Offer::NotOffered, first: Some(FirstRepository::new(&CEILINGS, FirstRepositoryParts { org: Box::from([0_u8, 127_u8, 255_u8].as_slice()), repository: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: SetUpProject::Existing(ExistingProject::new(&CEILINGS, ExistingProjectParts { project: u32::MAX }).expect("golden within ceilings")), state: FirstState::Making }).expect("golden within ceilings")), installations: { let mut items = skein_lib::List::with_capacity(1); items.push(Installation::new(&CEILINGS, InstallationParts { id: u64::MAX, account: Some(Account::new(&CEILINGS, AccountParts { id: u64::MAX, login: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), suspended: true, stray: true }).expect("golden within ceilings")).expect("one slot"); items }, ended: Some(ConnectStopped::new(&CEILINGS, ConnectStoppedParts { why: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), app: Some(AppWay::Manifest), web: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), repositories: { let mut items = skein_lib::List::with_capacity(1); items.push(Adoption::new(&CEILINGS, AdoptionParts { owner: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: u32::MAX }).expect("golden within ceilings")).expect("one slot"); items }, owned: Some(OwnedForge::new(&CEILINGS, OwnedForgeParts { forgejo: Box::from([0_u8, 127_u8, 255_u8].as_slice()), runner: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), password: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 1, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRow::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_forges_smallest", || { let value = Forges::new(&CEILINGS, ForgesParts { forges: skein_lib::List::with_capacity(0) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 11, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Forges::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_forges_full", || { let value = Forges::new(&CEILINGS, ForgesParts { forges: { let mut items = skein_lib::List::with_capacity(1); items.push(ForgeRow::new(&CEILINGS, ForgeRowParts { number: u16::MAX, kind: Kind::Forgejo, mode: Mode::Connected, connection: Connection::NotConnected, offer: Offer::NotOffered, first: Some(FirstRepository::new(&CEILINGS, FirstRepositoryParts { org: Box::from([0_u8, 127_u8, 255_u8].as_slice()), repository: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: SetUpProject::Existing(ExistingProject::new(&CEILINGS, ExistingProjectParts { project: u32::MAX }).expect("golden within ceilings")), state: FirstState::Making }).expect("golden within ceilings")), installations: { let mut items = skein_lib::List::with_capacity(1); items.push(Installation::new(&CEILINGS, InstallationParts { id: u64::MAX, account: Some(Account::new(&CEILINGS, AccountParts { id: u64::MAX, login: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), suspended: true, stray: true }).expect("golden within ceilings")).expect("one slot"); items }, ended: Some(ConnectStopped::new(&CEILINGS, ConnectStoppedParts { why: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), app: Some(AppWay::Manifest), web: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), repositories: { let mut items = skein_lib::List::with_capacity(1); items.push(Adoption::new(&CEILINGS, AdoptionParts { owner: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: u32::MAX }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 11, 0, 0, 0, 1, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 1, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Forges::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_forges_full", || { let value = Forges::new(&CEILINGS, ForgesParts { forges: { let mut items = skein_lib::List::with_capacity(1); items.push(ForgeRow::new(&CEILINGS, ForgeRowParts { number: u16::MAX, kind: Kind::Forgejo, mode: Mode::Connected, connection: Connection::NotConnected, offer: Offer::NotOffered, first: Some(FirstRepository::new(&CEILINGS, FirstRepositoryParts { org: Box::from([0_u8, 127_u8, 255_u8].as_slice()), repository: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: SetUpProject::Existing(ExistingProject::new(&CEILINGS, ExistingProjectParts { project: u32::MAX }).expect("golden within ceilings")), state: FirstState::Making }).expect("golden within ceilings")), installations: { let mut items = skein_lib::List::with_capacity(1); items.push(Installation::new(&CEILINGS, InstallationParts { id: u64::MAX, account: Some(Account::new(&CEILINGS, AccountParts { id: u64::MAX, login: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), suspended: true, stray: true }).expect("golden within ceilings")).expect("one slot"); items }, ended: Some(ConnectStopped::new(&CEILINGS, ConnectStoppedParts { why: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), app: Some(AppWay::Manifest), web: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), repositories: { let mut items = skein_lib::List::with_capacity(1); items.push(Adoption::new(&CEILINGS, AdoptionParts { owner: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), project: u32::MAX }).expect("golden within ceilings")).expect("one slot"); items }, owned: Some(OwnedForge::new(&CEILINGS, OwnedForgeParts { forgejo: Box::from([0_u8, 127_u8, 255_u8].as_slice()), runner: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), password: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 11, 0, 0, 0, 1, 255, 255, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 0, 255, 255, 255, 255, 0, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 1, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Forges::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_demo_smallest", || { let value = Read::Demo; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Read::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_demo_full", || { let value = Read::Demo; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Read::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_reading_smallest", || { let value = Reading::new(&CEILINGS, ReadingParts { read: Read::Demo }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 11, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Reading::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -10075,7 +10259,7 @@ mod golden_tests {
         table(&GOLDEN_0);
     }
 
-    static BOUNDS_0: [Case; 48] = [
+    static BOUNDS_0: [Case; 51] = [
         ("bound_adopt_owner", || bound((Path::AdoptOwner, skein_codec::Reason::Bound), &Limits { adopt_owner: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Adopt::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_adopt_name", || bound((Path::AdoptName, skein_codec::Reason::Bound), &Limits { adopt_name: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Adopt::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_adopt_prefix", || bound((Path::AdoptPrefix, skein_codec::Reason::Bound), &Limits { adopt_prefix: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Adopt::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -10100,10 +10284,13 @@ mod golden_tests {
         ("bound_connect_stopped_why", || bound((Path::ConnectStoppedWhy, skein_codec::Reason::Bound), &Limits { connect_stopped_why: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match ConnectStopped::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_adoption_owner", || bound((Path::AdoptionOwner, skein_codec::Reason::Bound), &Limits { adoption_owner: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Adoption::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_adoption_name", || bound((Path::AdoptionName, skein_codec::Reason::Bound), &Limits { adoption_name: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Adoption::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_forge_row_installations", || bound((Path::ForgeRowInstallations, skein_codec::Reason::Bound), &Limits { forge_row_installations: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ForgeRow::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_forge_row_web_some", || bound((Path::ForgeRowWeb, skein_codec::Reason::Bound), &Limits { forge_row_web_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ForgeRow::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_forge_row_repositories", || bound((Path::ForgeRowRepositories, skein_codec::Reason::Bound), &Limits { forge_row_repositories: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ForgeRow::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_forges_forges", || bound((Path::ForgesForges, skein_codec::Reason::Bound), &Limits { forges_forges: 3, ..CEILINGS }, &[0, 11, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 11, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Forges::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_owned_forge_forgejo", || bound((Path::OwnedForgeForgejo, skein_codec::Reason::Bound), &Limits { owned_forge_forgejo: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnedForge::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_owned_forge_runner_some", || bound((Path::OwnedForgeRunner, skein_codec::Reason::Bound), &Limits { owned_forge_runner_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnedForge::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_owned_forge_password", || bound((Path::OwnedForgePassword, skein_codec::Reason::Bound), &Limits { owned_forge_password: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OwnedForge::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_forge_row_installations", || bound((Path::ForgeRowInstallations, skein_codec::Reason::Bound), &Limits { forge_row_installations: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ForgeRow::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_forge_row_web_some", || bound((Path::ForgeRowWeb, skein_codec::Reason::Bound), &Limits { forge_row_web_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ForgeRow::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_forge_row_repositories", || bound((Path::ForgeRowRepositories, skein_codec::Reason::Bound), &Limits { forge_row_repositories: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ForgeRow::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_forges_forges", || bound((Path::ForgesForges, skein_codec::Reason::Bound), &Limits { forges_forges: 3, ..CEILINGS }, &[0, 11, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 11, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Forges::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_demo_answer_owner", || bound((Path::DemoAnswerOwner, skein_codec::Reason::Bound), &Limits { demo_answer_owner: 3, ..CEILINGS }, &[0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match DemoAnswer::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_demo_answer_name", || bound((Path::DemoAnswerName, skein_codec::Reason::Bound), &Limits { demo_answer_name: 3, ..CEILINGS }, &[0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match DemoAnswer::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_demo_answer_cues", || bound((Path::DemoAnswerCues, skein_codec::Reason::Bound), &Limits { demo_answer_cues: 3, ..CEILINGS }, &[0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match DemoAnswer::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),

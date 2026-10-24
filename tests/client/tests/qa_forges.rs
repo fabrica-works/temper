@@ -45,6 +45,13 @@ fn follow(world: &mut Pages, client: ClientId, steps: Vec<PersonStep<Address>>) 
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
 }
+fn owned_details() -> forge::Owned {
+    forge::Owned {
+        forgejo: b"17.0.0".as_slice().into(),
+        runner: Some(b"13.2.0".as_slice().into()),
+        password: b"/fake/forge/person_password".as_slice().into(),
+    }
+}
 fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
     configured_with(
         owner,
@@ -52,6 +59,7 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
         &[
             forge::Configured {
                 admin_connect: false,
+                owned: (mode == forge::Mode::Owned).then(owned_details),
                 web: None,
                 read_only: false,
                 number: OWNED,
@@ -61,6 +69,7 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
             },
             forge::Configured {
                 admin_connect: false,
+                owned: None,
                 web: None,
                 read_only: false,
                 number: GITHUB,
@@ -120,6 +129,7 @@ fn world_for(number: u16) -> Pages {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: GITHUB,
@@ -129,6 +139,7 @@ fn world_for(number: u16) -> Pages {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: REMOTE,
@@ -144,6 +155,7 @@ fn world_for(number: u16) -> Pages {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: OWNED,
@@ -153,6 +165,7 @@ fn world_for(number: u16) -> Pages {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: FAKE,
@@ -369,6 +382,7 @@ fn unoffered_forge_has_no_owned_choose_card() {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: OWNED,
@@ -378,6 +392,7 @@ fn unoffered_forge_has_no_owned_choose_card() {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: GITHUB,
@@ -581,6 +596,10 @@ fn forges_rows_are_folded_and_keep_state_account_and_actions() {
         ),
     ] {
         let mut world = world();
+        let prepared = matches!(
+            state,
+            forge::Connection::Connecting | forge::Connection::Connected { .. } | forge::Connection::Stopped { .. }
+        );
         connection(&mut world, OWNED, state);
         let client = open(&mut world, Address::Forges);
         let row = node(&world, client, Role::Disclosure, b"Forgejo on this machine");
@@ -588,6 +607,22 @@ fn forges_rows_are_folded_and_keep_state_account_and_actions() {
         let drawing = text(&world, client);
         node(&world, client, Role::Term, b"Access");
         node(&world, client, Role::Description, b"Site admin, with temper's own token");
+        if prepared {
+            node(&world, client, Role::Term, b"Runs");
+            node(
+                &world,
+                client,
+                Role::Description,
+                b"Forgejo 17.0.0 and its runner 13.2.0, on this machine. CI jobs run here, as you.",
+            );
+            node(&world, client, Role::Term, b"First password");
+            node(&world, client, Role::Description, b"Your first password is in /fake/forge/person_password. Forgejo asks you to change it when you sign in.");
+        } else {
+            assert!(!drawing.contains("First password"));
+            assert!(!drawing.contains("Your first password is in"));
+            assert!(!drawing.contains("Runs"));
+            assert!(!drawing.contains("Forgejo 17.0.0"));
+        }
         for expected in ["forge 1 · Forgejo", words, action] {
             assert!(drawing.contains(expected), "missing {expected}: {drawing}");
         }
@@ -904,6 +939,7 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: OWNED,
@@ -913,6 +949,7 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    owned: None,
                     web: None,
                     read_only: false,
                     number: GITHUB,

@@ -259,6 +259,7 @@ fn old_form_service(hooks: bool) -> crate::Service {
         crate::startup::application::configured(&config).as_ref(),
         [domain::Configured {
             admin_connect: false,
+            owned: None,
             web: None,
             read_only: false,
             number: 1,
@@ -431,6 +432,15 @@ fn old_form_owned_and_managed_serve_reads_without_start_time_writing_plans() {
             crate::startup::application::configured(&config).as_ref(),
             [domain::Configured {
                 admin_connect: false,
+                owned: if managed {
+                    None
+                } else {
+                    Some(domain::Owned {
+                        forgejo: skein_forge::forgejo::pin::VERSION.as_bytes().into(),
+                        runner: None,
+                        password: b"/data/forge/person_password".as_slice().into(),
+                    })
+                },
                 web: None,
                 read_only: false,
                 number: 1,

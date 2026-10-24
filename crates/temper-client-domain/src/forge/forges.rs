@@ -91,8 +91,16 @@ pub struct Adoption {
     pub name: Box<[u8]>,
     pub project: u32,
 }
+/// Public owned-forge versions and first-password file path (client/forge.md, 5.4).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Owned {
+    pub forgejo: Box<[u8]>,
+    pub runner: Option<Box<[u8]>>,
+    pub password: Box<[u8]>,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
+    pub owned: Option<Owned>,
     pub web: Option<Box<[u8]>>,
     pub repositories: Box<[Adoption]>,
     pub app: Option<AppWay>,

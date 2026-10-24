@@ -132,6 +132,7 @@ fn personal(
             b.close();
         }
     }
+    owned(b, w, row);
     connect::app_line(b, w, row);
     if let Some(line) = forge::words::last_connect(row) {
         crate::cards::text(b, Role::Paragraph, &line);
@@ -234,5 +235,24 @@ fn access(b: &mut Builder, w: &Words, row: &Row) {
     b.open(Role::Slot);
     connect::text(b, w, Role::Term, Word::ForgeAccessLabel);
     connect::text(b, w, Role::Description, word);
+    b.close();
+}
+
+fn owned(b: &mut Builder, w: &Words, row: &Row) {
+    let Some(owned) = &row.owned else { return };
+    match row.connection {
+        Connection::Connecting | Connection::Connected { .. } | Connection::Stopped { .. } => {}
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::SetUpFailed { .. } => return,
+    }
+    b.open(Role::Slot);
+    connect::text(b, w, Role::Term, Word::ForgeRunsLabel);
+    crate::cards::text(b, Role::Description, &forge::words::forge_runs(owned));
+    b.close();
+    b.open(Role::Slot);
+    connect::text(b, w, Role::Term, Word::ForgePasswordLabel);
+    crate::cards::text(b, Role::Description, &forge::words::forge_password(&owned.password));
     b.close();
 }

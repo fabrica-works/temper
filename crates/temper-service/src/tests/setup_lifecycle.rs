@@ -699,6 +699,7 @@ fn paste_row(limits: &domain::Limits, request: Token, connected: bool, why: Opti
         &[],
         &[domain::Configured {
             admin_connect: false,
+            owned: None,
             web: None,
             read_only: false,
             number: 1,

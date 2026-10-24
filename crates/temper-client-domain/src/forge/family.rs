@@ -280,6 +280,17 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 .ok()?;
         }
         rows.push(Row {
+            owned: match row.owned {
+                Some(owned) => {
+                    let owned = owned.into_parts();
+                    Some(forge::forges::Owned {
+                        forgejo: owned.forgejo,
+                        runner: owned.runner,
+                        password: owned.password,
+                    })
+                }
+                None => None,
+            },
             web: row.web,
             repositories: repositories.into_boxed(),
             app: match row.app {
