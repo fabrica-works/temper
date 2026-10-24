@@ -50,6 +50,8 @@ pub enum Answer {
     Connecting,
     Link(Box<[u8]>),
     Page(super::family::Page),
+    NoAccess,
+    NotFound,
     Refused(w::ForgeRefusal),
     Entrance(c::EntranceRefusal),
     Unknown,
@@ -249,9 +251,18 @@ pub(crate) fn decode(outcome: &Outcome, linking: bool, limits: Limits) -> Option
                 w::Outcome::Link(link) if linking => Some(Answer::Link(link.into_parts().address)),
                 w::Outcome::Unknown => Some(Answer::Unknown),
                 w::Outcome::Page(page) => Some(Answer::Page(super::family::page(page))),
+                w::Outcome::ForgeRefused(refusal) => match refusal.into_parts().reason {
+                    w::ForgeReason::NoAccess => Some(Answer::NoAccess),
+                    w::ForgeReason::NotFound => Some(Answer::NotFound),
+                    w::ForgeReason::NoSuchForge
+                    | w::ForgeReason::Refused
+                    | w::ForgeReason::InFlight
+                    | w::ForgeReason::TooLarge
+                    | w::ForgeReason::Unreachable
+                    | w::ForgeReason::InvalidAnswer => None,
+                },
                 w::Outcome::Adopted(_)
                 | w::Outcome::CoreRefused(_)
-                | w::Outcome::ForgeRefused(_)
                 | w::Outcome::SettingUp
                 | w::Outcome::SetUpRefused(_)
                 | w::Outcome::Running
