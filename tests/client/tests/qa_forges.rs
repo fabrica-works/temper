@@ -537,6 +537,8 @@ fn forges_rows_are_folded_and_keep_state_account_and_actions() {
         let row = node(&world, client, Role::Disclosure, b"Forgejo on this machine");
         assert!(!row.states.as_slice().contains(&State::Expanded), "rows start folded");
         let drawing = text(&world, client);
+        node(&world, client, Role::Term, b"Access");
+        node(&world, client, Role::Description, b"Site admin, with temper's own token");
         for expected in ["forge 1 · Forgejo", words, action] {
             assert!(drawing.contains(expected), "missing {expected}: {drawing}");
         }

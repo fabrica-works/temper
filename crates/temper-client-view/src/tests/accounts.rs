@@ -712,9 +712,10 @@ mod memory_literal;
 // ConnectForge's and the welcome's forge words, and 128 more phrase segments (11,588 B).
 // The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
 // The demo start's words, full failure text and retry nodes (1,724,026 B).
+// The four Access phrases and their segments add 688 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 #[cfg(target_pointer_width = "64")]
-const ACCOUNT_BYTES: u64 = 11526790226;
+const ACCOUNT_BYTES: u64 = 11526790914;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

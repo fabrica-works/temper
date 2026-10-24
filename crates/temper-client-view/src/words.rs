@@ -17,6 +17,10 @@ pub enum Word {
     NoForges,
     ForgeSummary,
     ForgeAccountLabel,
+    ForgeAccessLabel,
+    ForgeAccessOwned,
+    ForgeAccessManaged,
+    ForgeAccessConnected,
     ForgeOpenSetup,
     ForgeRestartBox,
     ForgePlaygroundSummary,
@@ -545,16 +549,16 @@ pub enum Word {
 // The flow's three state words (5.2).
 // The Accounts navigation's two state words (5.3).
 // ConnectForge's and the welcome's forge words (client/forge.md, 5.4).
-// The Forges page, navigation dot and setup strip (18 phrases).
+// The Forges page, navigation dot and setup strip (22 phrases).
 // Thirty-one model-flow phrases (client/README.md, 5.5).
 // The account rows' nineteen literal and two shaped phrases (client/README.md, 5.5).
 // The setup fields and first repository add eleven phrases.
 // Seven demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
 // The browser sign-in heading and Google link add two phrases.
-const PHRASES: u32 = 1036;
-const SEGMENTS: u32 = 1817;
-const ALL: [Word; 502] = [
+const PHRASES: u32 = 1040;
+const SEGMENTS: u32 = 1821;
+const ALL: [Word; 506] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -562,6 +566,10 @@ const ALL: [Word; 502] = [
     Word::NoForges,
     Word::ForgeSummary,
     Word::ForgeAccountLabel,
+    Word::ForgeAccessLabel,
+    Word::ForgeAccessOwned,
+    Word::ForgeAccessManaged,
+    Word::ForgeAccessConnected,
     Word::ForgeOpenSetup,
     Word::ForgeRestartBox,
     Word::ForgePlaygroundSummary,
@@ -1069,6 +1077,10 @@ impl Word {
             Self::NoForges => 1803,
             Self::ForgeSummary => 1804,
             Self::ForgeAccountLabel => 1806,
+            Self::ForgeAccessLabel => 1839,
+            Self::ForgeAccessOwned => 1840,
+            Self::ForgeAccessManaged => 1841,
+            Self::ForgeAccessConnected => 1842,
             Self::ForgeOpenSetup => 1807,
             Self::ForgeRestartBox => 1808,
             Self::ForgePlaygroundSummary => 1809,
@@ -1809,6 +1821,10 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::NoForges => (&[b"No forge of yours yet."], &[]),
         Word::ForgeSummary => (&[b"forge ", b" \xc2\xb7 ", b""], &[Number, Name]),
         Word::ForgeAccountLabel => (&[b"Account"], &[]),
+        Word::ForgeAccessLabel => (&[b"Access"], &[]),
+        Word::ForgeAccessOwned => (&[b"Site admin, with temper's own token"], &[]),
+        Word::ForgeAccessManaged => (&[b"Site admin, with a token you gave"], &[]),
+        Word::ForgeAccessConnected => (&[b"Its bot's tokens, which you gave"], &[]),
         Word::ForgeOpenSetup => (&[b"Open its set-up \xe2\x80\xba"], &[]),
         Word::ForgeRestartBox => (&[b"Restart temper box: its preparation mends it"], &[]),
         Word::ForgePlaygroundSummary => (&[b"Playground forge \xc2\xb7 the playground\xe2\x80\x99s, until a forge of yours connects \xc2\xb7 ", b"/", b""], &[Name, Name]),

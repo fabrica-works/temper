@@ -283,8 +283,9 @@ mod memory_literal;
 // Wire 6's SetUp fields and the row's first repository, written by SKEIN_CODEGEN_WRITE=1 (+27,648 B).
 // The setup draft, retained intent and adoption, shared keys and Ready words add 70,031 B.
 // The demo start's retained state, words, failure text and retry nodes (2,509,493 B).
+// The four Access phrases and their segments add 688 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 332244890261;
+const WEB_BYTES: u64 = 332244890949;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {

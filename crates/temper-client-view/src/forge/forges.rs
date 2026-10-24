@@ -100,6 +100,7 @@ fn personal(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, 
         crate::cards::text(b, Role::Paragraph, &forge::words::first_repository(first));
     }
     account(b, w, row);
+    access(b, w, row);
     connect::app_line(b, w, row);
     if let Some(line) = forge::words::last_connect(row) {
         crate::cards::text(b, Role::Paragraph, &line);
@@ -187,4 +188,20 @@ fn account(b: &mut Builder, w: &Words, row: &Row) {
         crate::cards::text(b, Role::Description, &forge::words::forge_account(login, *id));
         b.close();
     }
+}
+fn access(b: &mut Builder, w: &Words, row: &Row) {
+    match row.kind {
+        Kind::GitHub => return,
+        Kind::Forgejo => {}
+    }
+    let word = match row.mode {
+        Mode::Owned => Word::ForgeAccessOwned,
+        Mode::Managed => Word::ForgeAccessManaged,
+        Mode::Connected => Word::ForgeAccessConnected,
+        Mode::Fake => return,
+    };
+    b.open(Role::Slot);
+    connect::text(b, w, Role::Term, Word::ForgeAccessLabel);
+    connect::text(b, w, Role::Description, word);
+    b.close();
 }

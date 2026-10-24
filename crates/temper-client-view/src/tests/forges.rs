@@ -41,6 +41,49 @@ fn the_forges_page_says_its_words_and_folds_each_row() {
     assert!(f::find(view.tree(), Role::Description, "temper · user 42".as_bytes()).is_some());
 }
 #[test]
+fn each_forgejo_mode_says_its_access_in_a_slot() {
+    for (mode, words) in [
+        (w::Mode::Owned, b"Site admin, with temper's own token".as_slice()),
+        (w::Mode::Managed, b"Site admin, with a token you gave"),
+        (w::Mode::Connected, b"Its bot's tokens, which you gave"),
+    ] {
+        let mut rows = List::with_capacity(1);
+        rows.push(cf::row(HERE, w::Kind::Forgejo, mode, cf::connected(), w::Offer::NotOffered)).unwrap();
+        let root = f::forge_root(Address::Forges, rows);
+        let view = f::page_view(&root);
+        assert!(view.tree().nodes().iter().enumerate().any(|(index, node)| {
+            if node.role != Role::Slot {
+                return false;
+            }
+            let slot = &view.tree().nodes()[index..index + usize::try_from(node.size).unwrap()];
+            slot.iter().any(|n| n.role == Role::Term && n.name.as_deref() == Some(b"Access"))
+                && slot.iter().any(|n| n.role == Role::Description && n.name.as_deref() == Some(words))
+        }));
+    }
+}
+#[test]
+fn an_owned_forge_keeps_its_access_when_stopped() {
+    let root = root(
+        Address::Forges,
+        w::Connection::Stopped(
+            w::Stopped::new(&w::CEILINGS, w::StoppedParts { reason: b"token refused".as_slice().into() }).unwrap(),
+        ),
+    );
+    let view = f::page_view(&root);
+    assert!(f::find(view.tree(), Role::Term, b"Access").is_some());
+    assert!(f::find(view.tree(), Role::Description, b"Site admin, with temper's own token").is_some());
+}
+#[test]
+fn the_playground_forge_has_no_access_line() {
+    let mut rows = List::with_capacity(1);
+    rows.push(cf::row(wire::FORGE, w::Kind::Forgejo, w::Mode::Fake, cf::connected(), w::Offer::NotOffered)).unwrap();
+    let root = f::demo_forges_root(Address::Forges, rows);
+    let view = f::page_view(&root);
+    assert!(f::find(view.tree(), Role::Heading { level: 2 }, b"The playground").is_some());
+    assert!(f::find(view.tree(), Role::Term, b"Account").is_some());
+    assert!(f::find(view.tree(), Role::Term, b"Access").is_none());
+}
+#[test]
 fn a_forge_row_opened_offers_its_action() {
     let failed = w::Connection::SetUpFailed(
         w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into() }).unwrap(),
@@ -223,6 +266,7 @@ fn a_full_forge_reason_and_login_fit_after_utf8_replacement() {
 fn the_github_row_draws_its_app_installations_and_last_connect() {
     let root = f::forge_root(Address::Forges, cf::github_rows(true));
     let view = f::browser_page_view(&root);
+    assert!(f::find(view.tree(), Role::Term, b"Access").is_none());
     cf::words_in_order(
         view.tree(),
         &[
