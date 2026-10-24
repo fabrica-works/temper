@@ -9,6 +9,9 @@ mod departure;
 const KEY: &[u8] = b"private-host-key";
 const ADDRESS: &[u8] = b"http://127.0.0.1:9/authorize?state=test";
 fn fixture() -> Host {
+    fixture_forges(None)
+}
+fn fixture_forges(forges: Option<&temper_client_protocol_wire::v1::Forges>) -> Host {
     let mut host = Host::new(11, Time::ZERO, Wall::EPOCH, temper_client_view::sign_in::Ways::NONE);
     host.root = root::unlinked(&host.env.limits, 11);
     host.event(Event::Start { address: Address::Accounts, kept: List::with_capacity(0), with: None });
@@ -59,8 +62,41 @@ fn fixture() -> Host {
     host.client(jig_client::Event::Up {
         up: jig_client::Up::Watched { watch: me, event: c::WatchEvent::Delivered(c::Delivery::Me(Box::new(frame))) },
     });
+    if let Some(forges) = forges {
+        deliver_forges(&mut host, forges);
+    }
     host.requests();
     host
+}
+fn deliver_forges(host: &mut Host, forges: &temper_client_protocol_wire::v1::Forges) {
+    let watch = host
+        .out
+        .iter()
+        .find_map(|request| match request {
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } },
+                    },
+            } => Some(*watch),
+            Request::Client { .. }
+            | Request::Show { .. }
+            | Request::Leave { .. }
+            | Request::SignOut
+            | Request::Dropped { .. }
+            | Request::Fact { .. } => None,
+        })
+        .expect("forges watch");
+    host.client(jig_client::Event::Up {
+        up: jig_client::Up::FamilyDelivered {
+            watch,
+            record: jig_client::Family {
+                family: temper_client_protocol_wire::FORGE,
+                version: temper_client_protocol_wire::CLIENT_VERSION,
+                bytes: temper_client_protocol_wire::forges(forges),
+            },
+        },
+    });
 }
 fn fixture_at(path: &[u8]) -> Host {
     let mut host = fixture();
@@ -395,4 +431,74 @@ fn the_patch_queue_is_reserved_once_at_start() {
     assert!(!host.patches().is_empty());
     assert!(host.patches.is_empty());
     assert_eq!(host.patches.room(), host.bounds.tree.patches);
+}
+
+#[test]
+fn the_github_rows_external_web_link_has_its_address_and_noopener() {
+    use temper_client_protocol_wire::v1 as w;
+    for web in [None, Some(b"https://github.test/base/?a=1&b=2".as_slice())] {
+        let mut forges = List::with_capacity(1);
+        forges
+            .push(
+                w::ForgeRow::new(
+                    &w::CEILINGS,
+                    w::ForgeRowParts {
+                        web: web.map(Into::into),
+                        repositories: List::with_capacity(0),
+                        app: Some(w::AppWay::Pasted),
+                        number: 2,
+                        kind: w::Kind::Github,
+                        mode: w::Mode::Connected,
+                        connection: w::Connection::Connected(
+                            w::Connected::new(
+                                &w::CEILINGS,
+                                w::ConnectedParts { id: 9, login: b"my-app[bot]".as_slice().into() },
+                            )
+                            .expect("connected App"),
+                        ),
+                        offer: w::Offer::NotOffered,
+                        first: None,
+                        installations: List::with_capacity(0),
+                        ended: None,
+                    },
+                )
+                .expect("forge row"),
+            )
+            .expect("one forge");
+        let mut host = fixture_forges(Some(&w::Forges::new(&w::CEILINGS, w::ForgesParts { forges }).expect("forges")));
+        host.went(b"/forges");
+        let mut page = skein_ui_web::page::Page::new(
+            skein_ui_web::Look {
+                names: &[temper_client_view::look::NAMES],
+                pictures: &[],
+                components: &[],
+                elements: &[],
+                draw: |_, _, _, _, _| false,
+            },
+            &host.bounds.tree,
+            b"temper",
+            skein_ui_web::mapping::Primary::Control,
+        );
+        let mut ops = Vec::new();
+        page.apply(&build(&mut host), &mut ops);
+        for link in page.links().to_vec() {
+            if let Some(address) = host.href(link) {
+                page.set_href(link, &address, &mut ops);
+            }
+        }
+        let html = page.html();
+        let label = "Open on GitHub ↗";
+        assert_eq!(html.contains(label), web.is_some());
+        if web.is_some() {
+            let at = html.find(label).expect("GitHub web link");
+            let start = html[..at].rfind("<a ").expect("external anchor");
+            let end = start + html[start..].find('>').expect("anchor attributes");
+            let anchor = &html[start..end];
+            assert!(anchor.contains("href=\"https://github.test/base/?a=1&amp;b=2\""), "{anchor}");
+            let (_, attributes) = anchor.split_once("rel=\"").expect("external link rel");
+            let (rel, _) = attributes.split_once('"').expect("closed rel attribute");
+            assert!(rel.split_ascii_whitespace().any(|word| word == "noopener"), "{anchor}");
+            assert!(anchor.contains("target=\"_blank\""), "{anchor}");
+        }
+    }
 }
