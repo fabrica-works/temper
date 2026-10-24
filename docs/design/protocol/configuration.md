@@ -634,7 +634,7 @@ have one, an engine alone none. Each:
   | `forge_component.hook_body_bytes` | a delivery's body, hashed and decoded as it streams, so time and bytes, not memory; one past it is answered `413` and hints nothing |
   | `forge_component.hook_deadline_ms` | `hook_deadline`: a delivery's read and answer, from its connection's accept or its last answer |
   | `forge_component.hook_secret_bytes` | a Forgejo forge's webhooks' secret; a GitHub forge has none (credentials.md, section 2) |
-  | `records.value_bytes` | a forge's record or a carried value, the largest of any item; a pasted value past it is refused, named (credentials.md, 2.1 and 2.2) |
+  | `records.value_bytes` | a forge's record or a carried value of temper's, the largest of any item; a pasted value past it is refused, named (credentials.md, 2.1 and 2.2). The client wire's value ceiling is the larger of it and a moved record's bound (jig's `protocol/client.md`, section 5; `../client/tools.md`, 12), so a moved record's file reaches the engine and temper's own values stay within this bound |
   | `forges.installations` | the installations a GitHub forge accepts, its `Accepted` record's ids (credentials.md, 2.1) |
   | `forges.log_origins` | a forge's `log_origins`; at most 4 (section 3) |
   | `forge_component.installations` | the installations the component holds tokens for, per forge |
