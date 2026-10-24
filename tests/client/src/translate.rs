@@ -135,8 +135,11 @@ pub fn request(
             let ask = match ask {
                 Ask::Jig(ask) => ask,
                 Ask::Family { record: ask, scope } => {
-                    assert!(value.is_none(), "this fixture serves account values only");
-                    events.push(forge::request(transport, who, *attempt, *key, *scope, ask));
+                    let carried = value.take().map(|value| {
+                        let digest = skein_lib::sha256::digest(value.expose());
+                        core::Carried { number: transport.carry(value), digest }
+                    });
+                    events.push(forge::request(transport, who, *attempt, *key, *scope, ask, carried));
                     return (events, None);
                 }
             };

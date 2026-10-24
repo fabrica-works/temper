@@ -84,6 +84,8 @@ pub(crate) fn key_file(call: &Call) -> Option<&[u8]> {
         0
     } else if name == b"forge-connect" && call.form == 0 {
         3
+    } else if name == b"forge-connect" && call.form == 3 {
+        2
     } else if name == rows::ADD_KEY.name || name == rows::REPLACE_KEY.name {
         1
     } else {
@@ -116,7 +118,7 @@ pub fn text_files(parsed: &Parsed) -> Vec<(u8, Box<[u8]>)> {
     files
 }
 
-/// PEM has six bytes of carried-bundle framing within jig's 4096-byte bound.
+/// A forge credential has six bytes of carried-bundle framing within jig's 4096-byte bound.
 pub(crate) fn key_bytes(call: &Call) -> u32 {
     if call.tool == temper_client_tools::jig::rows::IMPORT_AT {
         temper_client_tools::limits::MOVED_BYTES

@@ -59,6 +59,7 @@ fn first(state: v1::FirstState) -> v1::FirstRepository {
             repository: b"hello".as_slice().into(),
             project: project(),
             state,
+            label: Box::from(b"temper-host".as_slice()),
         },
     )
     .expect("record within schema ceilings")
@@ -119,18 +120,20 @@ fn setup_and_every_first_repository_state_round_trip_at_version_eleven() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
-                owned: None,
-                web: None,
-                repositories: List::with_capacity(0),
-                app: None,
-                installations: skein_lib::List::with_capacity(0),
-                ended: None,
                 number: 3,
                 kind: v1::Kind::Forgejo,
                 mode: v1::Mode::Owned,
                 connection: v1::Connection::Connecting,
                 offer: v1::Offer::NotOffered,
                 first: Some(first(state)),
+                installations: skein_lib::List::with_capacity(0),
+                ended: None,
+                app: None,
+                web: None,
+                repositories: List::with_capacity(0),
+                owned: None,
+                admin: false,
+                ended_stop: None,
             },
         )
         .expect("record within schema ceilings");
@@ -183,6 +186,7 @@ fn first_repository_names_are_bounded_at_construction_and_decode() {
                 repository: if field == 1 { name.clone() } else { b"r".as_slice().into() },
                 project: project(),
                 state: v1::FirstState::Making,
+                label: Box::from(b"temper-host".as_slice()),
             };
             assert_eq!(v1::FirstRepository::new(&limits, parts.clone()).is_ok(), size == 2, "row field {field}");
             let record = v1::FirstRepository::new(&v1::CEILINGS, parts).expect("record within schema ceilings");
@@ -214,6 +218,7 @@ fn first_repository_names_are_bounded_at_construction_and_decode() {
                 repository: if org { b"r".as_slice().into() } else { name.clone() },
                 project: project(),
                 state: v1::FirstState::Making,
+                label: Box::from(b"temper-host".as_slice()),
             };
             assert_eq!(v1::FirstRepository::new(&v1::CEILINGS, parts).is_ok(), size == 1024);
         }

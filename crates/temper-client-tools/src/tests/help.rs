@@ -77,7 +77,7 @@ const USAGES: &[&[u8]] = &[
     b"forges\n",
     b"forge-setup F [--org O] [--repository R] [--project P] [--key NAME]\n",
     b"demo-start [--key NAME]\n",
-    b"forge-connect F github-app ID FILE --key NAME\nforge-connect F github --key NAME\nforge-connect F forgejo|forgejo-admin FILE --key NAME\n",
+    b"forge-connect F github-app ID FILE --key NAME\nforge-connect F github --key NAME\nforge-connect F forgejo FILE --key NAME\nforge-connect F forgejo-admin FILE [--first ORG/NAME] [--project P] [--label L] --key NAME\n",
     b"forge-install F [--key NAME]\n",
     b"repositories F [--installation I] [--page N]\n",
     b"export ACCOUNT FILE\n",
