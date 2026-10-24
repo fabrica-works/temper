@@ -55,6 +55,7 @@ pub struct Frame {
     pub link_root: Option<Fd>,
     pub link_leaf: Option<Box<[u8]>>,
     pub input_stat: Option<Stat>,
+    pub input_reads: u32,
     pub linked_leaf: Option<Error>,
     pub carried_keys: Vec<skein_lib::Secret>,
     pub refuse_link: Option<()>,
@@ -152,6 +153,7 @@ impl Frame {
             link_root: None,
             link_leaf: None,
             input_stat: None,
+            input_reads: 0,
             linked_leaf: None,
             carried_keys: Vec::new(),
             refuse_link: None,
@@ -443,7 +445,12 @@ impl Frame {
                 Ok(Done::Nothing)
             }
             Op::Stat { fd } => Ok(self.stat(*fd)),
-            Op::Read { fd, buf, at } => Ok(self.read_file(*fd, buf, *at)),
+            Op::Read { fd, buf, at } => {
+                if *fd == LINK_FILE {
+                    self.input_reads += 1;
+                }
+                Ok(self.read_file(*fd, buf, *at))
+            }
             Op::Lock { fd } => self.lock_directory(*fd),
             Op::PipeWrite { fd, bytes, from } => {
                 assert!([STDERR, Fd::new(4)].contains(fd));

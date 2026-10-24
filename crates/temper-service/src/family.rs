@@ -714,6 +714,36 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                 w::ForgeRow::new(
                     limits,
                     w::ForgeRowParts {
+                        number: row.number,
+                        kind: match row.kind {
+                            forge::Kind::Forgejo => w::Kind::Forgejo,
+                            forge::Kind::GitHub => w::Kind::Github,
+                        },
+                        mode: match row.mode {
+                            forge::Mode::Connected => w::Mode::Connected,
+                            forge::Mode::Managed => w::Mode::Managed,
+                            forge::Mode::Owned => w::Mode::Owned,
+                            forge::Mode::Fake => w::Mode::Fake,
+                        },
+                        connection: connection(row.connection, row.failed, limits)?,
+                        offer: match row.offer {
+                            forge::Offer::NotOffered => w::Offer::NotOffered,
+                            forge::Offer::NotUnderTheBox => w::Offer::NotUnderTheBox,
+                            forge::Offer::Offered => w::Offer::Offered,
+                        },
+                        first: match row.first {
+                            Some(first) => Some(first_repository(first, limits)?),
+                            None => None,
+                        },
+                        installations,
+                        ended,
+                        app: match row.app {
+                            Some(forge::AppWay::Manifest) => Some(w::AppWay::Manifest),
+                            Some(forge::AppWay::Pasted) => Some(w::AppWay::Pasted),
+                            None => None,
+                        },
+                        web: row.web,
+                        repositories,
                         owned: match row.owned {
                             Some(owned) => w::OwnedForge::new(
                                 limits,
@@ -726,35 +756,10 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                             .ok(),
                             None => None,
                         },
-                        web: row.web,
-                        repositories,
-                        app: match row.app {
-                            Some(forge::AppWay::Manifest) => Some(w::AppWay::Manifest),
-                            Some(forge::AppWay::Pasted) => Some(w::AppWay::Pasted),
+                        admin: row.admin,
+                        ended_stop: match row.ended_stop {
+                            Some(stop) => Some(admin_stop(stop, limits)?),
                             None => None,
-                        },
-                        installations,
-                        ended,
-                        number: row.number,
-                        kind: match row.kind {
-                            forge::Kind::Forgejo => w::Kind::Forgejo,
-                            forge::Kind::GitHub => w::Kind::Github,
-                        },
-                        mode: match row.mode {
-                            forge::Mode::Connected => w::Mode::Connected,
-                            forge::Mode::Managed => w::Mode::Managed,
-                            forge::Mode::Owned => w::Mode::Owned,
-                            forge::Mode::Fake => w::Mode::Fake,
-                        },
-                        first: match row.first {
-                            Some(first) => Some(first_repository(first, limits)?),
-                            None => None,
-                        },
-                        connection: connection(row.connection, row.failed, limits)?,
-                        offer: match row.offer {
-                            forge::Offer::NotOffered => w::Offer::NotOffered,
-                            forge::Offer::NotUnderTheBox => w::Offer::NotUnderTheBox,
-                            forge::Offer::Offered => w::Offer::Offered,
                         },
                     },
                 )
@@ -841,7 +846,7 @@ fn first_repository(first: forge::First, limits: &w::Limits) -> Option<w::FirstR
     };
     w::FirstRepository::new(
         limits,
-        w::FirstRepositoryParts { org: first.org, repository: first.repository, project, state },
+        w::FirstRepositoryParts { org: first.org, repository: first.repository, project, state, label: first.label },
     )
     .ok()
 }
@@ -864,4 +869,32 @@ pub(crate) fn return_path(path: &[u8]) -> bool {
         }
     }
     true
+}
+
+fn admin_stop(stop: forge::AdminStop, limits: &w::Limits) -> Option<w::AdminStop> {
+    Some(match stop {
+        forge::AdminStop::NotAdmin => w::AdminStop::NotAdmin,
+        forge::AdminStop::Unmarked => w::AdminStop::Unmarked,
+        forge::AdminStop::Other => w::AdminStop::Other,
+        forge::AdminStop::Refused { status, stage } => w::AdminStop::Refused(
+            w::AdminRefused::new(
+                limits,
+                w::AdminRefusedParts {
+                    status,
+                    stage: match stage {
+                        forge::SetupStage::Admin => w::SetupStage::Admin,
+                        forge::SetupStage::Bot => w::SetupStage::Bot,
+                        forge::SetupStage::Token => w::SetupStage::Token,
+                        forge::SetupStage::Org => w::SetupStage::Org,
+                        forge::SetupStage::Repository => w::SetupStage::Repository,
+                        forge::SetupStage::File => w::SetupStage::File,
+                        forge::SetupStage::App => w::SetupStage::App,
+                        forge::SetupStage::Installation => w::SetupStage::Installation,
+                        forge::SetupStage::State => w::SetupStage::State,
+                    },
+                },
+            )
+            .ok()?,
+        ),
+    })
 }

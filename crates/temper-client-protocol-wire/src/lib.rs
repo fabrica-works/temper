@@ -118,6 +118,7 @@ pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
         new_project_name: bounds.field_bytes,
         first_repository_org: bounds.field_bytes,
         first_repository_repository: bounds.field_bytes,
+        first_repository_label: 64,
         adopt_owner: bounds.field_bytes,
         adopt_name: bounds.field_bytes,
         adopt_prefix: bounds.field_bytes,

@@ -35,6 +35,9 @@ pub fn step(choice: Option<Choice>, rows: &State, demo: Option<&Demo>) -> Shown 
         Some(Choice::Elsewhere) => Shown::Details(Choice::Elsewhere),
         Some(Choice::Forge(number)) => {
             let Some(row) = row(number, rows, demo) else { return Shown::Choose };
+            if row.admin && admin_stopped(row) {
+                return Shown::Details(Choice::Forge(number));
+            }
             if failed(row) {
                 return Shown::SettingUp(number);
             }
@@ -62,6 +65,23 @@ pub fn step(choice: Option<Choice>, rows: &State, demo: Option<&Demo>) -> Shown 
         }
     }
 }
+#[must_use]
+pub(crate) fn admin_stopped(row: &Row) -> bool {
+    if let Connection::Stopped { .. } = row.connection {
+        return true;
+    }
+    row.ended_stop.is_some() || failed(row)
+}
+fn disconnected(row: &Row) -> bool {
+    match row.connection {
+        Connection::NotConnected | Connection::Stopped { .. } => true,
+        Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::SetUpFailed { .. }
+        | Connection::Connecting
+        | Connection::Connected { .. } => false,
+    }
+}
 fn offered(row: &Row) -> bool {
     match row.kind {
         Kind::GitHub => match row.connection {
@@ -73,7 +93,8 @@ fn offered(row: &Row) -> bool {
             | Connection::Connected { .. } => false,
         },
         Kind::Forgejo => {
-            row.mode == Mode::Owned && row.connection == Connection::NotSetUp && row.offer != Offer::NotOffered
+            (row.admin && disconnected(row))
+                || (row.mode == Mode::Owned && row.connection == Connection::NotSetUp && row.offer != Offer::NotOffered)
         }
     }
 }
@@ -110,6 +131,9 @@ pub fn personal<'a>(rows: &'a State, demo: Option<&Demo>) -> Option<&'a Row> {
             && row.number == demo.forge
         {
             continue;
+        }
+        if row.admin && admin_stopped(row) {
+            return Some(row);
         }
         match row.connection {
             Connection::SettingUp { .. }

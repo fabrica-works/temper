@@ -96,6 +96,7 @@ pub(crate) const EVERY_TOOL: &[&[&str]] = &[
     &["forge-connect", "3", "github-app", "4242", "app.pem", "--key", "app"],
     &["forge-connect", "3", "github", "--key", "app"],
     &["forge-connect", "3", "forgejo", "tokens", "--key", "app"],
+    &["forge-connect", "3", "forgejo-admin", "token", "--key", "admin"],
     &["forge-install", "3"],
     &["repositories", "3"],
     &["wait", "forges"],
@@ -618,7 +619,7 @@ pub(super) const GUIDE_CALLS: u32 = 24;
 /// One slot per guide line, including the final line; fewer loses that line.
 const GUIDE_LINES: u32 = 123;
 /// One slot per row and form; fewer omits decide's second form.
-pub(super) const TOOL_FORMS: u32 = 46;
+pub(super) const TOOL_FORMS: u32 = 47;
 /// Exactly one example exercises each row and form; zero misses it entirely.
 pub(super) const EXAMPLES_PER_FORM: u32 = 1;
 /// One missing byte exercises the first refused destination; zero would fit.

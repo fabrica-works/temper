@@ -1467,7 +1467,28 @@
   function flowSteps(current, label3 = 'Setting up', labels = ['Choose', 'Details', label3, 'Ready']) {
     return `<div class="steps flow-steps" style="grid-template-columns:repeat(${labels.length}, minmax(0, 1fr))">${labels.map((label, i) => `<div class="step${i < current ? ' done' : i === current ? ' current' : ''}">${esc(label)}</div>`).join('')}</div>`;
   }
+  function adminCard(f) {
+    const s = f.setup;
+    if (f.state === 'connecting') return `<h2>Connecting forge ${esc(f.n)} as its admin.</h2><p>Making its bot, then ${esc(s.org)}/${esc(s.repo)}.</p>`;
+    if (f.state === 'connected') return `<h2>Connected as ${esc(f.login)} (id ${esc(f.id)}), managed.</h2><p>Made ${esc(s.org)}/${esc(s.repo)}, and its project ${esc(s.project)}. Its CI runs on your forge’s runners labelled ${esc(s.label)}; with none, a change’s checks wait.</p><div class="button-row"><a class="button primary" href="${esc(u(`chats.html?project=${s.project}`))}">Open ${esc(s.project)}</a><a class="text-link" href="#" data-later="Mockup: the repository on Forgejo">Open ${esc(s.org)}/${esc(s.repo)} on Forgejo ↗</a></div>`;
+    const stops = {
+      'not-admin': 'The token you gave is not a site admin’s. Paste one a site admin made.',
+      '401': 'Forgejo refused the token. Check that it was copied whole, and that it hasn’t been deleted.',
+      '403-bot': 'The token lacks a scope: making the bot was refused. Make one with write:admin, read:user, write:organization and write:repository.',
+      '403-org': 'The token lacks a scope: making the organization was refused. Make one with write:admin, read:user, write:organization and write:repository.',
+      unmarked: 'A user temper didn’t make holds the bot’s login, without temper’s mark: add temper:bot to its full name on Forgejo, or change the bot’s login in the configuration.',
+      other: 'The connection stopped: Forgejo answered 500.',
+    };
+    const stages = { admin: "checking the admin's token", org: 'its organization', repository: 'its repository', file: 'its starter workflow' };
+    const stop = f.stop?.startsWith('first-') ? `temper made its bot, but making ${s.org}/${s.repo} stopped at ${stages[f.stop.slice(6)]}: Forgejo answered 500. Paste the token again to finish it.` : stops[f.stop];
+    const field = (label, value, type = 'text') => {
+      const refusal = type === 'password' && f.stop === 'required' || label === 'Organization' && f.stop === 'org-required' || label === 'Repository' && f.stop === 'repository-required' ? 'Required.' : type === 'password' && f.stop === 'too-long' ? 'The pasted values are past 4 KiB, the most a request carries.' : label === 'Runner label' && f.stop === 'label' ? 'Letters, digits, dots, dashes and underscores, at most 64.' : '';
+      return `<label class="forge-field"><span>${label}</span><input type="${type}" value="${esc(refusal ? '' : value)}"${refusal ? ' aria-invalid="true"' : ''}>${refusal ? `<span class="forge-failure">${refusal}</span>` : ''}</label>`;
+    };
+    return `${stop ? `<p class="forge-failure">${esc(stop)}</p><p class="muted tiny">temper kept nothing of the token.</p>` : ''}<h2>Connect as its admin</h2><p>Paste a site admin’s token with the scopes write:admin, read:user, write:organization and write:repository. temper keeps it, and uses it only to make its bot and your first repository, and to give the bot access to it. To stop temper using it, delete the token on Forgejo.</p>${field('The site admin’s token', '', 'password')}<fieldset><legend>Your first repository</legend>${field('Organization', s.org)}${field('Repository', s.repo)}${field('Into a new project, named', s.project)}${field('Runner label', s.label)}<p class="muted tiny">Its CI runs on your forge’s runners with this label. Forgejo’s runner registers as docker unless told otherwise.</p></fieldset><button class="button primary" data-later="Mockup: send the token once, then Connecting">Connect as its admin</button>`;
+  }
   function flowCard(f, from = 'connect-forge') {
+    if (f.admin) return adminCard(f);
     if (f.kind === 'GitHub') return f.state === 'connected' ? githubReady(f, from) : f.state === 'connecting' ? githubConnecting(f, from) : githubAppForm(f);
     if (f.state === 'connected') return `<h3>${fact('temper: the repository made at set-up', esc(`${f.setup.org}/${f.setup.repo} is ready`))}</h3><p>In the new project ${fact('jig: the new project', esc(f.setup.project))}, on ${conf('the forge’s name', esc(forgeName(f)))}. Its first CI run passed, on this machine.</p>${ownedProgress(f, { allDone: true })}<div class="button-row"><a class="button primary" href="${esc(u(`chats.html?project=${encodeURIComponent(f.setup.project)}`))}">Open ${esc(f.setup.project)}</a><a class="text-link" href="#" data-later="${esc(`Mockup: Forgejo opens in a new tab, signed in as ${f.person} through temper.`)}">Open Forgejo ↗</a>${ahead('sign-in', 'signing in to an owned Forgejo through temper, as its OpenID provider: no mission yet')}</div><p class="muted tiny">${conf('the forge’s name', esc(forgeName(f)))} is on the <a class="text-link" href="${esc(u('forges.html'))}">Forges</a> page, with its details.</p>`;
     if (['setting up', 'set up failed'].includes(f.state)) return `<h3>Setting up Forgejo on this machine</h3>${chosenValues(f)}${ownedProgress(f, { failedAt: f.state === 'set up failed' ? 'preparing' : null })}${f.state === 'set up failed' ? `${ownedFailure()}<button class="button" data-later="Mockup: the box runs the steps again; a fetched binary is kept.">Set up again</button>` : '<p class="muted tiny">You may leave this page: the steps go on, and the banner says where they are.</p>'}`;
@@ -1478,7 +1499,8 @@
   function forgeChoices(target = 'connect-forge.html?forge=') {
     const github = world.forges.find(f => f.kind === 'GitHub' && f.state === 'not connected');
     const offer = world.forges.find(f => f.mode === 'owned' && f.state === 'not set up');
-    return `<div class="forge-choices">${github ? `<section class="card card-pad"><h3>GitHub</h3><p>Your repositories on GitHub. temper makes its own App there; you choose the account and the repositories it may use.</p><p class="muted tiny">In this tab, on GitHub · about two minutes</p><div class="button-row"><a class="button primary" href="${esc(toGithub('create', target.startsWith('welcome') ? 'welcome' : 'connect-forge', '2'))}">Connect GitHub</a><a class="text-link" href="${esc(u(`${target}${github.n}`))}">Use an App of your own ›</a></div></section>` : ''}${offer ? `<section class="card card-pad"><h3>Forgejo on this machine</h3><p>A forge of your own, run by temper box. No account needed: temper makes your first repository, and you start in it.</p><p class="muted tiny">${offer.box ? 'Here · about a minute' : 'Needs four commands and a restart'}</p><a class="button" href="${esc(u(`${target}${offer.n}`))}">Choose</a></section>` : ''}<section class="card card-pad"><h3>A Forgejo elsewhere</h3><p>Your own Forgejo server. temper connects as its admin, or with its bot’s tokens.</p><p class="muted tiny">Needs a change to temper’s configuration and a restart</p><a class="button" href="${esc(u(`${target}elsewhere`))}">Show how</a></section></div>`;
+    const admin = world.forges.filter(f => f.admin && f.state === 'not connected').map(f => `<section class="card card-pad"><h3>Forgejo at ${esc(f.web || `forge ${f.n}`)}</h3><p>temper connects as its site admin, makes its bot and your first repository.</p><a class="button" href="${esc(u(`${target}${f.n}`))}">Connect as its admin</a></section>`).join('');
+    return `<div class="forge-choices">${github ? `<section class="card card-pad"><h3>GitHub</h3><p>Your repositories on GitHub. temper makes its own App there; you choose the account and the repositories it may use.</p><p class="muted tiny">In this tab, on GitHub · about two minutes</p><div class="button-row"><a class="button primary" href="${esc(toGithub('create', target.startsWith('welcome') ? 'welcome' : 'connect-forge', '2'))}">Connect GitHub</a><a class="text-link" href="${esc(u(`${target}${github.n}`))}">Use an App of your own ›</a></div></section>` : ''}${offer ? `<section class="card card-pad"><h3>Forgejo on this machine</h3><p>A forge of your own, run by temper box. No account needed: temper makes your first repository, and you start in it.</p><p class="muted tiny">${offer.box ? 'Here · about a minute' : 'Needs four commands and a restart'}</p><a class="button" href="${esc(u(`${target}${offer.n}`))}">Choose</a></section>` : ''}${admin}<section class="card card-pad"><h3>A Forgejo elsewhere</h3><p>Your own Forgejo server. temper connects as its admin, or with its bot’s tokens.</p><p class="muted tiny">Needs a change to temper’s configuration and a restart</p><a class="button" href="${esc(u(`${target}elsewhere`))}">Show how</a></section></div>`;
   }
 
   // The first link offers a choice; real setup keeps its place while the
@@ -1513,7 +1535,7 @@
       const which = params.get('forge') || (githubOpen ? String(f.n) : null);
       const chosen = world.forges.find(f => String(f.n) === which && f.mode !== 'fake');
       const next = Math.max(...world.forges.map(f => f.n)) + 1;
-      const details = which === 'elsewhere' ? `${elsewhereHow(next)}<p class="muted">After the restart, the link opens this wizard where you left it.</p>` : chosen?.kind === 'GitHub' ? flowCard(chosen, 'welcome') : chosen ? ownedForm(chosen, 'welcome.html?at=model&world=first-run-real&step=2') : '';
+      const details = which === 'elsewhere' ? `${elsewhereHow(next)}<p class="muted">After the restart, the link opens this wizard where you left it.</p>` : (chosen?.kind === 'GitHub' || chosen?.admin) ? flowCard(chosen, 'welcome') : chosen ? ownedForm(chosen, 'welcome.html?at=model&world=first-run-real&step=2') : '';
       content = `${heading('Connect a forge')}<p class="muted welcome-lead">Where your repositories live: temper’s agents push branches and open pull requests there.</p>${which ? flowWrap(details) : forgeChoices('welcome.html?at=forge&forge=')}${foot}`;
     } else if (current === 'model') {
       // The forge's line: under way, with its steps, or done, ticked, with
@@ -1562,7 +1584,7 @@
       ['A link that has ended: the manifest’s, the redirect’s or the setup route’s page', githubRefusal('ended')],
       ['An App of your own: its details', githubAppForm(github)],
     ].map(([heading, card]) => `<h3>${esc(heading)}</h3>${flowWrap(card)}`).join('')}</section>` : '';
-    const steps = f?.kind === 'GitHub' ? githubSteps(f) : flowSteps(which ? flowCurrent(f) : 0);
+    const steps = f?.kind === 'GitHub' ? githubSteps(f) : f?.admin ? flowSteps(f.state === 'connected' ? 3 : f.state === 'connecting' ? 2 : 1, 'Connecting') : flowSteps(which ? flowCurrent(f) : 0);
     const atDetails = f?.kind === 'GitHub' ? f.state === 'not connected' : flowCurrent(f) === 1;
     return listPage('forges', [['Forges', 'forges.html'], ['Connect a forge']], `<div class="section-heading" style="margin-top:0"><h2>Connect a forge</h2></div>${steps}${which ? `${atDetails ? `<p><a class="text-link" href="${esc(u('connect-forge.html'))}">‹ All forges</a></p>` : ''}${flowWrap(f ? flowCard(f) : elsewhereHow(next))}` : choose}${variants}`);
   };

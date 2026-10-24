@@ -188,8 +188,9 @@ demo-start [--key NAME]
   Start the playground; run again to finish what is not done
 forge-connect F github-app ID FILE --key NAME
 forge-connect F github --key NAME
-forge-connect F forgejo|forgejo-admin FILE --key NAME
-  Connect GitHub through a manifest or an existing App
+forge-connect F forgejo FILE --key NAME
+forge-connect F forgejo-admin FILE [--first ORG/NAME] [--project P] [--label L] --key NAME
+  Connect GitHub or Forgejo as its admin
 forge-install F [--key NAME]
   Print a fresh GitHub App installation link
 repositories F [--installation I] [--page N]

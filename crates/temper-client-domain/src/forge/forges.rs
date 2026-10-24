@@ -69,12 +69,32 @@ pub enum FirstState {
     Made { id: u64 },
     Failed { step: CreateStep },
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SetupStage {
+    Admin,
+    Bot,
+    Token,
+    Org,
+    Repository,
+    File,
+    App,
+    Installation,
+    State,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdminStop {
+    NotAdmin,
+    Refused { status: u16, stage: SetupStage },
+    Unmarked,
+    Other,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct First {
     pub org: Box<[u8]>,
     pub repository: Box<[u8]>,
     pub project: SetUpProject,
     pub state: FirstState,
+    pub label: Box<[u8]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -109,10 +129,6 @@ pub struct Owned {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
-    pub owned: Option<Owned>,
-    pub web: Option<Box<[u8]>>,
-    pub repositories: Box<[Adoption]>,
-    pub app: Option<AppWay>,
     pub number: u16,
     pub kind: Kind,
     pub mode: Mode,
@@ -121,6 +137,12 @@ pub struct Row {
     pub first: Option<First>,
     pub installations: Box<[Installation]>,
     pub ended: Option<Box<[u8]>>,
+    pub app: Option<AppWay>,
+    pub web: Option<Box<[u8]>>,
+    pub repositories: Box<[Adoption]>,
+    pub owned: Option<Owned>,
+    pub admin: bool,
+    pub ended_stop: Option<AdminStop>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SetUpOutcome {
@@ -301,6 +323,8 @@ pub(crate) fn configure(side: &mut super::Side, limits: super::Limits, out: &mut
         if side.link == Link::SignedOut {
             side.set_up = None;
             side.pickers.clear();
+            side.admin_form = super::admin::Draft::new();
+            side.admin = None;
             side.app_form.clear();
             side.app = None;
         }
@@ -477,6 +501,7 @@ pub(crate) fn told(
         | Told::Kept { .. }
         | Told::Dropped { .. } => return false,
     }
+    super::admin::stopped(side);
     maybe_adopt(side, limits, out);
     side.changed();
     true
