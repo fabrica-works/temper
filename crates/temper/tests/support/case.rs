@@ -1008,10 +1008,10 @@ impl Judge {
                 .iter()
                 .map(|file| (decode(&file["path"]), decode(&file["content"])))
                 .collect();
-            Kit { main, merged_green: green, pulls: Vec::new() }
+            Kit { records: Vec::new(), main, merged_green: green, pulls: Vec::new() }
         } else {
             assert!(!rows.iter().any(|row| row["observation"] == "merged"), "restart story merges nothing");
-            Kit { main: BTreeMap::new(), merged_green: false, pulls: Vec::new() }
+            Kit { records: Vec::new(), main: BTreeMap::new(), merged_green: false, pulls: Vec::new() }
         };
         for call in &self.calls {
             success(call);
