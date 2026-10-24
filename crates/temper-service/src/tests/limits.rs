@@ -116,6 +116,51 @@ fn the_small_profile_passes_each_domains_worst_case() {
 }
 
 #[test]
+fn the_wire_admits_a_moved_file_and_temper_values_stay_at_their_bound() {
+    let mut settings = fixtures::engine();
+    let moved = jig_protocol_accounts::moved::bound(&settings.jig.limits.driver.client.document);
+    let value = settings.limits.records.value_bytes;
+    assert!(moved > u64::from(value));
+    let service = fixtures::started();
+    let wire = service.engine.as_ref().unwrap().clients.env.limits.wire.keyed_value_some;
+    assert_eq!(u64::from(wire), moved);
+
+    // The effective ceiling remains capped by jig even for a larger moved file.
+    let mut larger = settings.jig.limits;
+    larger.driver.client.document.record_bytes = u32::MAX;
+    assert_eq!(
+        limits::client_value_bytes(&larger, &settings.limits),
+        settings.jig.limits.clients.wire.keyed_value_some
+    );
+
+    settings.setup = Box::new([fixtures::owned_setup(1)]);
+    settings.records_only = Box::new([1]);
+    settings.forges[0].api_token = None;
+    for bytes in [value, value + 1] {
+        settings.setup[0].handover =
+            Some(skein_lib::Secret::new(vec![b'x'; usize::try_from(bytes).unwrap()].into_boxed_slice()));
+        let (mut forges, _) = crate::forge::prepare(&settings, fixtures::forge_runtime()).unwrap();
+        let result = crate::setup::prepare(&settings, &mut forges, &fixtures::seeds().crypto, 2, false);
+        if bytes == value {
+            assert!(result.is_ok());
+        } else {
+            let refused = result.err().expect("setup refuses the oversized value");
+            assert_eq!(refused.problems.len(), 1);
+            let problem = refused.problems.get(0).unwrap();
+            assert_eq!(problem.what, jig_protocol_config::What::Bound);
+            assert_eq!(
+                problem.path,
+                jig_protocol_config::Path::root()
+                    .member(b"application")
+                    .member(b"limits")
+                    .member(b"overrides")
+                    .member(b"records.value_bytes")
+            );
+        }
+    }
+}
+
+#[test]
 fn a_brief_holds_a_whole_task_specification() {
     let settings = fixtures::engine();
     let brief = settings.limits.root.brief;

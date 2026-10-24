@@ -242,7 +242,7 @@ fn engine_limits(
     jig: &mut config::Limits,
     own: &crate::limits::Limits,
 ) -> Result<temper_engine_domain::Limits, Problems> {
-    jig.clients.wire.keyed_value_some = jig.clients.wire.keyed_value_some.min(own.records.value_bytes);
+    jig.clients.wire.keyed_value_some = crate::limits::client_value_bytes(jig, own);
     crate::limits::engine(jig, own)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))
 }
