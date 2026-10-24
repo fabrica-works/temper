@@ -1092,6 +1092,10 @@ pub fn app_refusal(why: super::github::Answer, forge: u16) -> Option<Box<[u8]>> 
         }
         Answer::Refused(F::NoKey) => join_words(&[b"The key did not reach temper: paste it again."]),
         Answer::Refused(F::NotConnected) => join_words(&[b"Connect the App first."]),
+        Answer::NoAccess => join_words(&[
+            b"GitHub refused temper's read of the App's repositories: the App may be suspended. See Forges.",
+        ]),
+        Answer::NotFound => join_words(&[b"GitHub no longer has this installation: install the App again."]),
         Answer::Unknown => join_words(&[b"It is not known whether the App was connected: see Forges."]),
         Answer::Connecting | Answer::Link(_) | Answer::Page(_) | Answer::Entrance(_) => return None,
     })

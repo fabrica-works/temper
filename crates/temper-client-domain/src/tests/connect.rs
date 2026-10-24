@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use jig_client::{self as client, Down, Told, Up, contract as c};
-use skein_lib::{List, Queue, Token};
+use skein_lib::{Duration, List, Queue, Time, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 const HERE: u16 = 3;
 fn row(number: u16, kind: Kind, mode: Mode, connection: C, offer: Offer) -> Row {
@@ -77,8 +77,13 @@ fn choose_offers_github_forgejo_here_and_elsewhere_by_offer() {
     assert_eq!(connect::next_number(&rows(C::NotSetUp)), 4);
 }
 fn event(root: &mut crate::Domain, event: Event) -> Queue<Request> {
+    event_at(root, event, Time::ZERO)
+}
+fn event_at(root: &mut crate::Domain, event: Event, now: Time) -> Queue<Request> {
     let mut out = Queue::with_capacity(crate::max_out(&f::limits()));
-    crate::step(root, &f::env(&f::limits()), event, &mut out);
+    let mut env = f::env(&f::limits());
+    env.now = now;
+    crate::step(root, &env, event, &mut out);
     out
 }
 fn up(root: &mut crate::Domain, up: Up) -> Queue<Request> {
@@ -405,18 +410,26 @@ fn sent(mut out: Queue<Request>) -> (Token, skein_lib::RequestKey, w::Request) {
     found.expect("sent family request")
 }
 fn reply(root: &mut crate::Domain, attempt: Token, outcome: w::Outcome) -> Queue<Request> {
-    up(
+    reply_at(root, attempt, outcome, Time::ZERO)
+}
+fn reply_at(root: &mut crate::Domain, attempt: Token, outcome: w::Outcome, now: Time) -> Queue<Request> {
+    event_at(
         root,
-        Up::Answer {
-            attempt,
-            envelope: skein_lib::RequestEnvelope::Final,
-            answer: Some(client::Answered::Family(client::Family {
-                family: wire::FORGE,
-                version: wire::CLIENT_VERSION,
-                bytes: wire::answer(&w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).unwrap()),
-            })),
-            why: None,
+        Event::Client {
+            event: client::Event::Up {
+                up: Up::Answer {
+                    attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(client::Answered::Family(client::Family {
+                        family: wire::FORGE,
+                        version: wire::CLIENT_VERSION,
+                        bytes: wire::answer(&w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).unwrap()),
+                    })),
+                    why: None,
+                },
+            },
         },
+        now,
     )
 }
 fn first(state: forges::FirstState) -> forges::First {
@@ -1018,4 +1031,154 @@ fn a_picker_read_forgotten_by_a_restarted_service_gets_a_fresh_key() {
     };
     assert_ne!(first_key, next_key);
     assert_eq!(read.page(), 1);
+}
+
+fn busy() -> w::Outcome {
+    w::Outcome::ConnectRefused(
+        w::ConnectRefused::new(&w::CEILINGS, w::ConnectRefusedParts { why: w::ForgeRefusal::Busy }).unwrap(),
+    )
+}
+fn fire_at(root: &mut crate::Domain, now: Time) -> Queue<Request> {
+    let mut env = f::env(&f::limits());
+    env.now = now;
+    let mut out = Queue::with_capacity(crate::max_out(&env.limits));
+    crate::fire(root, &env, &mut out);
+    crate::take(root, &env, &mut out);
+    out
+}
+fn busy_words(root: &crate::Domain) {
+    let picker = root.forge().picker(2).unwrap();
+    assert!(picker.selected().is_none());
+    assert_eq!(picker.answer, Some(forge::github::Answer::Refused(w::ForgeRefusal::Busy)));
+    assert_eq!(
+        forge::words::app_refusal(picker.answer.clone().unwrap(), 2).unwrap().as_ref(),
+        b"temper is busy with forge 2: try again when it ends."
+    );
+}
+#[test]
+fn a_busy_picker_waits_then_reads_rows_with_a_fresh_key() {
+    let (mut root, _, _, out) = picker_opened();
+    let (attempt, key, _) = sent(out);
+    assert_eq!(f::sends(&mut reply(&mut root, attempt, busy())), 0, "no immediate retry");
+    busy_words(&root);
+    let at = Time::ZERO.checked_add(Duration::from_secs(2)).unwrap();
+    assert_eq!(forge::next_deadline(root.forge()), Some(at));
+    assert!(crate::next_deadline(&root).unwrap() <= at, "the root includes the forge's timer");
+    assert_eq!(f::sends(&mut fire_at(&mut root, Time::from_nanos(1_999_999_999))), 0);
+    busy_words(&root);
+    let (attempt, next_key, w::Request::Reachable(read)) = sent(fire_at(&mut root, at)) else {
+        panic!("fresh Reachable after bounded wait")
+    };
+    assert_ne!(key, next_key);
+    assert_eq!((read.forge(), *read.installation(), read.page()), (2, Some(1), 1));
+    assert_eq!(forge::next_deadline(root.forge()), None);
+    reply_at(&mut root, attempt, reachable_page(), at);
+    let picker = root.forge().picker(2).unwrap();
+    let Some(forge::github::Answer::Page(page)) = &picker.answer else { panic!("rows after busy") };
+    assert_eq!(page.rows.len(), 2);
+    assert_eq!(picker.selected().unwrap().name.as_ref(), b"first");
+    assert_eq!(forge::next_deadline(root.forge()), None);
+}
+#[test]
+fn a_picker_busy_past_three_rereads_keeps_its_words_without_more_reads() {
+    let (mut root, _, _, out) = picker_opened();
+    let (mut attempt, mut key, _) = sent(out);
+    let mut now = Time::ZERO;
+    for reread in 0_u8..=3 {
+        assert_eq!(f::sends(&mut reply_at(&mut root, attempt, busy(), now)), 0);
+        busy_words(&root);
+        assert_eq!(root.forge().picker(2).unwrap().retry_exhausted(), reread == 3);
+        if reread == 3 {
+            break;
+        }
+        let at = now.checked_add(Duration::from_secs(2)).unwrap();
+        assert_eq!(forge::next_deadline(root.forge()), Some(at));
+        let (next_attempt, next_key, w::Request::Reachable(_)) = sent(fire_at(&mut root, at)) else {
+            panic!("bounded reread")
+        };
+        assert_ne!(key, next_key);
+        attempt = next_attempt;
+        key = next_key;
+        now = at;
+    }
+    assert_eq!(forge::next_deadline(root.forge()), None);
+    for seconds in [2, 20, 200] {
+        let later = now.checked_add(Duration::from_secs(seconds)).unwrap();
+        assert_eq!(f::sends(&mut fire_at(&mut root, later)), 0);
+        busy_words(&root);
+        assert_eq!(forge::next_deadline(root.forge()), None);
+    }
+    let now = Time::from_nanos(206_000_000_000);
+    event_at(&mut root, Event::Went { place: Place::Address(Address::Forges) }, now);
+    let mut out = event_at(
+        &mut root,
+        Event::Went { place: Place::Address(Address::ConnectForge { forge: Some(Choice::Forge(2)) }) },
+        now,
+    );
+    assert_eq!(f::sends(&mut out), 0, "navigation does not reset the retry bound");
+    assert_eq!(forge::next_deadline(root.forge()), None);
+    busy_words(&root);
+    let (attempt, _, _) = sent(event_at(
+        &mut root,
+        Event::Act {
+            action: crate::Action::Forge(forge::Act::Picker { forge: 2, act: forge::picker::Act::Account(2) }),
+        },
+        now,
+    ));
+    reply_at(&mut root, attempt, busy(), now);
+    assert_eq!(forge::next_deadline(root.forge()), now.checked_add(Duration::from_secs(2)));
+}
+#[test]
+fn a_hidden_picker_waits_until_ready_is_shown_again_before_retrying() {
+    let (mut root, _, _, out) = picker_opened();
+    let (attempt, _, _) = sent(out);
+    reply(&mut root, attempt, busy());
+    event(&mut root, Event::Went { place: Place::Address(Address::Forges) });
+    assert_eq!(forge::next_deadline(root.forge()), None);
+    let now = Time::from_nanos(20_000_000_000);
+    assert_eq!(f::sends(&mut fire_at(&mut root, now)), 0);
+    let mut out = event_at(
+        &mut root,
+        Event::Went { place: Place::Address(Address::ConnectForge { forge: Some(Choice::Forge(2)) }) },
+        now,
+    );
+    assert_eq!(f::sends(&mut out), 0);
+    busy_words(&root);
+    let at = now.checked_add(Duration::from_secs(2)).unwrap();
+    assert_eq!(forge::next_deadline(root.forge()), Some(at));
+    let (_, _, w::Request::Reachable(_)) = sent(fire_at(&mut root, at)) else { panic!("visible reread") };
+}
+#[test]
+fn refused_picker_reads_keep_no_access_and_not_found_words_without_rows() {
+    for (reason, answer, words) in [
+        (
+            w::ForgeReason::NoAccess,
+            forge::github::Answer::NoAccess,
+            b"GitHub refused temper's read of the App's repositories: the App may be suspended. See Forges.".as_slice(),
+        ),
+        (
+            w::ForgeReason::NotFound,
+            forge::github::Answer::NotFound,
+            b"GitHub no longer has this installation: install the App again.".as_slice(),
+        ),
+    ] {
+        let (mut root, _, _, out) = picker_opened();
+        let (attempt, _, _) = sent(out);
+        reply(&mut root, attempt, reachable_page());
+        let (attempt, _, _) = sent(picker_act(&mut root, forge::picker::Act::Account(1)));
+        assert_eq!(
+            f::sends(&mut reply(
+                &mut root,
+                attempt,
+                w::Outcome::ForgeRefused(w::ForgeRefused::new(&w::CEILINGS, w::ForgeRefusedParts { reason }).unwrap())
+            )),
+            0
+        );
+        assert_eq!(forge::next_deadline(root.forge()), None);
+        assert_eq!(f::sends(&mut fire_at(&mut root, Time::from_nanos(20_000_000_000))), 0);
+        let picker = root.forge().picker(2).unwrap();
+        assert_eq!(picker.answer, Some(answer.clone()));
+        assert!(picker.selected().is_none(), "the old page is gone");
+        assert_eq!(forge::words::app_refusal(answer, 2).unwrap().as_ref(), words);
+    }
 }
