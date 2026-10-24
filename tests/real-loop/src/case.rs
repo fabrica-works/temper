@@ -135,6 +135,11 @@ pub enum Agent {
     BudgetSubowner,
     BudgetInvestigator,
     BudgetAdvisor,
+    // 6.4
+    RedDirector,
+    RedOwner,
+    RedCoder,
+    RedRepairCoder,
 }
 impl Agent {
     #[must_use]
@@ -151,6 +156,11 @@ impl Agent {
             Self::BudgetSubowner => b"@case_budget_subowner",
             Self::BudgetInvestigator => b"@case_budget_investigator",
             Self::BudgetAdvisor => b"@case_budget_advisor",
+            // 6.4
+            Self::RedDirector => b"@case_red_director",
+            Self::RedOwner => b"@case_red_owner",
+            Self::RedCoder => b"@case_red_coder",
+            Self::RedRepairCoder => b"Repair landing branch CI",
             Self::BatchDirector => b"@case_batch_director",
             Self::BatchOwner => b"@case_batch_owner",
             Self::BatchSubowner => b"@case_batch_subowner",
@@ -981,5 +991,101 @@ pub fn fixture_6_5() -> forge::Fixture {
             landing::admit(value);
         },
         ..fixture()
+    }
+}
+
+// Act 3, step 6.4 (domain/testing.md, 5.3)
+pub const RED_DIRECTOR: u64 = 1;
+pub const RED_OWNER: u64 = 2;
+pub const RED_CHANGE: u64 = 3;
+pub const RED_CODER: u64 = 4;
+pub const RED_REVIEW: u64 = 5;
+pub const RED_REPAIR: u64 = 6;
+pub const RED_REPAIR_CODER: u64 = 7;
+pub const RED_REPAIR_REVIEW: u64 = 8;
+pub const RED_UPDATED_REVIEW: u64 = 9;
+pub const RED_FIRST_HEAD: u64 = 2;
+pub const RED_UPDATED_HEAD: u64 = 6;
+pub const RED_A4_PULL: u64 = 1;
+pub const RED_REPAIR_PULL: u64 = 2;
+pub const RED_TIMER: u64 = 6;
+pub const RED_PERSON_MESSAGE: u64 = 5;
+pub const RED_REVISION: u64 = 0;
+pub const RED_TIMER_AT: u64 = 4_102_444_800_000_000_000;
+pub const RED_PERSON: &str = "@case_red_director Delegate A1 to own a4 and report its landing.";
+pub const RED_OWNER_SPEC: &str = "@case_red_owner Own a4 as a goal; delegate its change and report.";
+pub const RED_CHANGE_SPEC: &str = "@case_red_coder Write a4 in docs/a4.md, leaving the CI cue in docs/story.md green.";
+pub const RED_MESSAGE: &str = "Kit's tip is red. Rule that a4 fixes it or an interim fix lands within ninety minutes.";
+pub const RED_RULE: &str = "a4 fixes it or an interim fix lands within ninety minutes.";
+pub const RED_OWNER_REPORT: &str = "A1 reports a4 landed after the deployment repair.";
+pub const RED_REPORT: &str = "The interim repair and a4 landed; the timer is removed.";
+pub const RED_FILE: &str = "docs/story.md";
+pub const RED_GREEN: &str = "# Story green";
+pub const RED_BASE: &str = "# Story green\n\nBase story.\n";
+pub const RED_BROKEN: &str = "# Story red\n\nBase story.\n";
+pub const RED_A4_FILE: &str = "docs/a4.md";
+pub const RED_A4: &str = "# A4\n\nA4's story.\n";
+pub const RED_REVIEW_HOLD: &[u8] = b"case-6-4-review";
+pub const RED_REPAIR_HOLD: &[u8] = b"case-6-4-repair";
+
+pub const RED_OWNER_SPEND: u64 = 16;
+pub const RED_CHANGE_SPEND: u64 = 6;
+
+#[must_use]
+pub fn fixture_6_4() -> forge::Fixture {
+    forge::Fixture {
+        setup: || {
+            let mut setup = (fixture().setup)();
+            let mut tree = setup.tree.into_vec();
+            tree.push(api::File { path: RED_FILE.as_bytes().into(), content: RED_BASE.as_bytes().into() });
+            setup.tree = tree.into();
+            setup.checks.cue =
+                Some(api::Cue::File { path: RED_FILE.as_bytes().into(), green: RED_GREEN.as_bytes().into() });
+            setup
+        },
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            // Small, with each capacity/allowance below checked by a passing
+            // whole story and a failing one-less probe in a fresh process.
+            // calls_per_response 1 admits the aggregate turn; hub.run_calls
+            // 1 serializes its paired calls. hub.accounts 2 carries LLM/git;
+            // fleet.calls 1 services worker requests serially; documents.lines
+            // 1 still carries every field this oracle reads. Live tasks and
+            // project tasks need 5 and 5; tree tasks 6 retains the root's descendants.
+            // a4's allowance 6 funds its coder and two exact-head reviews;
+            // A1's 16 adds its ten-unit run reservation, and the director's
+            // 26 adds ten again. Role spend 26, role period spend 26, and
+            // project period spend 31 leave 5 for the deployment's repair.
+            // A1 allows 4 descendants and a4 3; one repair suffices (repairs
+            // 1). Tools 423 = 391 | 32 adds timer subscription tools, with
+            // 5.4's six forge grants unchanged. Forge statuses 3 (State::new)
+            // retain a4's head, the red tip and repair head; 2 omits repair CI.
+            // Listing polls stay PATIENCE + 1 ms (20001): adoption/hooks supply
+            // changes. This timing bound and every oracle bound stay unchanged.
+            agent["profile"]["declared"]["calls_per_response"] = 1.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 1.into();
+            value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
+            value["engine"]["limits"]["overrides"]["fleet.calls"] = 1.into();
+            value["engine"]["limits"]["overrides"]["documents.lines"] = 1.into();
+            value["engine"]["templates"][0]["budget"] = json!({"as_allowed":26});
+            let tools = 0x0187 | 0x0020;
+            value["engine"]["rules"]["ceiling"]["tools"] = tools.into();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["tools"] = tools.into();
+                project["policy"]["roles"][0]["authority"]["tools"] = tools.into();
+                project["policy"]["roles"][0]["authority"]["budget"]["spend"] = 26.into();
+                project["policy"]["roles"][0]["period_spend"] = 26.into();
+                project["policy"]["period_spend"] = 31.into();
+            }
+            for (name, size) in [("tasks.tasks", 5), ("tasks.project_tasks", 5), ("tasks.tree_tasks", 6)] {
+                value["engine"]["limits"]["overrides"][name] = size.into();
+            }
+            value["application"]["limits"]["overrides"]["forge.change_policy.repairs"] = 1.into();
+            let story_ms = crate::PATIENCE.as_nanos().div_euclid(1_000_000);
+            for name in ["poll_ms", "poll_max_ms"] {
+                value["application"]["limits"]["overrides"][format!("forge.client.{name}")] = (story_ms + 1).into();
+            }
+            landing::admit(value);
+        },
     }
 }
