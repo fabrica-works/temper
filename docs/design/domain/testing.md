@@ -1,6 +1,6 @@
 # Testing temper
 
-Provisional, 2026-10-03, revised 2026-10-23. How temper is tested. The
+Provisional, 2026-10-03, revised 2026-10-24. How temper is tested. The
 strategy is skein's `docs/foundation/testing-strategy.md`: the tiers,
 faults, what every fake shares, what every world checks, scenarios and
 the referee, the two suites, and where a failure is fixed. This document
@@ -578,9 +578,10 @@ in the lower world that owns it, never here.
     provisional),** half the tier's 2 s (1 s before the user's doubling of
     10-22, provisional) story guide, or 3 s (1.5 s before the user's
     doubling of 10-22, provisional) for one that runs a whole chat (its
-    agents, git and `ctl`), and the tier's sum within its 13 s (6.5 s before
-    the user's doubling of 10-22, provisional) ceiling (6.1). Their cases
-    are tested below: the records' and the identity's codecs in step tests,
+    agents, git and `ctl`), and the tier's sum within its 15 s (13 s before
+    the user's increase of 10-24; 6.5 s before the user's doubling of 10-22,
+    provisional) ceiling (6.1). Their cases are tested below: the records'
+    and the identity's codecs in step tests,
     the routing, GitHub's routes and Google's sign-in on the clients'
     listener in `temper-service`'s own tests (../protocol/forge.md,
     section 10; ../client/forge.md, 9.1; ../protocol/sign-in.md, section
@@ -2060,9 +2061,10 @@ by the commands in `docs/development/workflow.md`. In temper:
     machine, client, one-process and reconcile worlds) together at most 8 s
     (4 s before the user's doubling of 10-22, provisional) of the default
     suite;
-  - the real-loop world's tests, its stories included, together at most 13 s
-    (6.5 s before the user's doubling of 10-22, provisional) of the default
-    suite: a standing ceiling, the same for each plan, sized to the smoke
+  - the real-loop world's tests, its stories included, together at most 15 s
+    (13 s before the user's increase of 10-24; 6.5 s before the user's
+    doubling of 10-22, provisional) of the default suite: a standing ceiling,
+    the same for each plan, sized to the smoke
     that 2.4 keeps the real loop to ("one end-to-end path per feature, and
     each behaviour and corner case tested in the lower world that owns it,
     never here"), which the user revisits when the sum reaches it;
@@ -2083,10 +2085,10 @@ by the commands in `docs/development/workflow.md`. In temper:
   never merged with another and never named as an exception: a real-loop
   story with CI and webhooks (2.4) is held to the 2 s (1 s before the user's
   doubling of 10-22, provisional) as any other. If GitHub's stories would
-  push the real loop's sum past 13 s (6.5 s before the user's doubling of
-  10-22, provisional), the ceiling goes to the user, as below, and no
-  real-loop story moves to the fuzzy suite to make room for them unless the
-  user so decides.
+  push the real loop's sum past 15 s (13 s before the user's increase of
+  10-24; 6.5 s before the user's doubling of 10-22, provisional), the ceiling
+  goes to the user, as below, and no real-loop story moves to the fuzzy
+  suite to make room for them unless the user so decides.
 - **The worlds' sums are measured as the suites' rules are:** each test's
   own time, run alone on the idle development machine (testing-strategy.md,
   section 8), with `--profile measure -j 1` through `heavy --gate`, the
@@ -2094,17 +2096,21 @@ by the commands in `docs/development/workflow.md`. In temper:
 - **The sums are the worlds' guides, never a landing's.** A test within its
   own guide lands. A plan that adds to these worlds gives both default-suite
   sums at its base and at its end: the other worlds' against 8 s (4 s before
-  the user's doubling of 10-22, provisional), the real loop's against 13 s
-  (6.5 s before the user's doubling of 10-22, provisional). When the other
-  worlds together pass 8 s (4 s before the user's doubling of 10-22,
-  provisional), or the real-loop world 13 s (6.5 s before the user's
-  doubling of 10-22, provisional), their slowest tests are profiled, then
-  made cheaper at the cause the profile shows or moved to the fuzzy suite,
-  by steps a plan names. A plan whose end finds the real loop's sum at 13 s
-  (6.5 s before the user's doubling of 10-22, provisional) or past it puts
-  the ceiling to the user, as skein's `development.md`, 10.4, "What goes to
-  the user", says; until the user moves it, the 13 s (6.5 s before the
-  user's doubling of 10-22, provisional) stands.
+  the user's doubling of 10-22, provisional), the real loop's against 15 s
+  (13 s before the user's increase of 10-24; 6.5 s before the user's doubling
+  of 10-22, provisional). When the other worlds together pass 8 s (4 s before
+  the user's doubling of 10-22,
+  provisional), or the real-loop world 15 s (13 s before the user's increase
+  of 10-24; 6.5 s before the user's doubling of 10-22, provisional), their
+  slowest tests are profiled, then made cheaper at the cause the profile
+  shows or moved to the fuzzy suite,
+  by steps a plan names. A plan whose end finds the real loop's sum at 15 s
+  (13 s before the user's increase of 10-24; 6.5 s before the user's doubling
+  of 10-22, provisional) or past it puts the ceiling to the user, as skein's
+  `development.md`, 10.4, "What goes to
+  the user", says; until the user moves it, the 15 s (13 s before the user's
+  increase of 10-24; 6.5 s before the user's doubling of 10-22, provisional)
+  stands.
 - **Outside both suites:** the process tier's binary `process` and the
   live tier's binary `live`, which both suites' filters leave out, run
   under the nextest profiles `process` and `live` by
@@ -2186,7 +2192,7 @@ and one smoke above:
 | fuzzy, in an existing sweep | one operation in the forge world's `fuzzy_simulation`: random changes of landing rules among the changes stepping and merging; its referee holds that no merge lands without each requirement of the rules held at its decision | within the fuzzy suite's 120 s, measured with it; no new binary |
 | the client and the engine, joined (6.3) | "Tell temper how you work" starting the configuring chat, whose run proposes; "How work runs" read at its defaults and after a change, with its revisions in use; a proposal's review page split into temper enforces and your agents follow, with its effect; one accepted, making a revision; one withdrawn as stale; a member's, waiting for an owner | about 0.4 s against the 8 s guide |
 | the one-process world (2.5) | its fixture's document without the six members; its restart story with one change of settings before it | no new story |
-| the real loop (2.4) | one smoke: a gate added to a project's landing rule from the client, the next change asking for its review and landing after it | at most 2 s, its guide; about 11.5 s of the 13 s ceiling, from 9.5 s at its last measure (case 2’s M4) |
+| the real loop (2.4) | one smoke: a gate added to a project's landing rule from the client, the next change asking for its review and landing after it | at most 2 s, its guide; about 11.5 s of the 15 s ceiling (13 s before the user's increase of 10-24), from 9.5 s at its last measure (case 2’s M4) |
 | the process tier | none: no Must of settings depends on processes | |
 
 - **The tests that move:** every test document and typed builder that
@@ -2198,8 +2204,9 @@ and one smoke above:
   engine's domain world (how a merge is judged), so their `qa_*`
   profiles run before it lands (skein's `owners.md`).
 - **Measured** at mission 2's base and end, by 6.1's rule. Should the
-  smoke miss its 2 s, or the real loop pass its 13 s, the plan goes to
-  the user with its numbers; no story is cut or moved to fit.
+  smoke miss its 2 s, or the real loop pass its 15 s (13 s before the user's
+  increase of 10-24), the plan goes to the user with its numbers; no story
+  is cut or moved to fit.
 
 ## 7. Layout
 
