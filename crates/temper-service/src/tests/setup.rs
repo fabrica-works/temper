@@ -34,6 +34,27 @@ fn routing_service_at(
     life: Duration,
     public: Option<crate::startup::application::Origin>,
 ) -> crate::Service {
+    let config = github_config(states, life, public);
+    let mut runtime = List::with_capacity(1);
+    runtime
+        .push(crate::ForgeRuntime {
+            number: 1,
+            address: ([127, 0, 0, 1], 3000).into(),
+            transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        })
+        .unwrap();
+    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
+    service.engine.as_mut().expect("engine").store = fixtures::records_store();
+    load_routing(&mut service);
+    service
+}
+fn github_config(
+    states: u32,
+    life: Duration,
+    public: Option<crate::startup::application::Origin>,
+) -> crate::settings::Engine {
     let mut config = fixtures::engine();
     config.clients.public = public;
     config.forges[0].kind = crate::settings::Kind::GitHub;
@@ -48,18 +69,9 @@ fn routing_service_at(
     config.limits.setup.states = states;
     config.limits.setup.state_life = life;
     fixtures::fill_files(&mut config);
-    let mut runtime = List::with_capacity(1);
-    runtime
-        .push(crate::ForgeRuntime {
-            number: 1,
-            address: ([127, 0, 0, 1], 3000).into(),
-            transport: skein_forge_connection::settings::Transport::Plaintext { name: None },
-            trust_roots: 0,
-            trust_root_bytes: 0,
-        })
-        .unwrap();
-    let mut service = crate::Service::engine(config, &fixtures::seeds(), None, runtime).unwrap();
-    service.engine.as_mut().expect("engine").store = fixtures::records_store();
+    config
+}
+fn load_routing(service: &mut crate::Service) {
     assert!(service.engine.as_ref().expect("engine").setup.component.is_none(), "no host before the rows load");
     for _ in 0_u32..8 {
         crate::forge::records::advance(service.engine.as_mut().expect("engine"));
@@ -84,7 +96,6 @@ fn routing_service_at(
             &mut engine.events
         ));
     }
-    service
 }
 
 pub(super) fn start(service: &mut crate::Service, run: u64, plan: host::Plan) {

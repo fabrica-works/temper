@@ -790,3 +790,91 @@ fn tls_exchange(config: &skein_tls::Config, host: &str, wire: &[u8], method: &st
     client::down(&mut stream.tls, &stream.env, Request::Handshake, &mut stream.above, &mut stream.below);
     read_message(&mut io::BufReader::new(stream), Some(method))?.ok_or_else(invalid)
 }
+
+/// Transport adapters for the managed sitting. The existing relay and its guard are unchanged.
+pub mod managed_transport {
+    use super::{Message, Result, Upstream, invalid, read_message, tls_exchange};
+    use std::{
+        io::{self, Write},
+        net::{SocketAddr, TcpStream},
+        time::Duration,
+    };
+
+    pub struct Request(Message);
+    impl Request {
+        pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+            read_message(&mut io::Cursor::new(bytes), None)?.map(Self).ok_or_else(invalid)
+        }
+        pub fn read(socket: &mut TcpStream) -> Result<Self> {
+            socket.set_read_timeout(Some(Duration::from_secs(30)))?;
+            socket.set_write_timeout(Some(Duration::from_secs(30)))?;
+            read_message(&mut io::BufReader::new(socket), None)?.map(Self).ok_or_else(invalid)
+        }
+        pub fn route(&self) -> Result<(&str, &str)> {
+            self.0.request()
+        }
+        pub fn header(&self, name: &str) -> Result<Option<&str>> {
+            self.0.header(name)
+        }
+        pub fn body(&self) -> Result<Vec<u8>> {
+            self.0.body()
+        }
+        pub fn upstream_bytes(&self, git: bool) -> Result<usize> {
+            Ok(self.0.with_host(if git { "github.com" } else { "api.github.com" })?.len())
+        }
+    }
+    pub struct Answer(Message);
+    impl Answer {
+        pub fn status(&self) -> Result<u16> {
+            self.0.status()
+        }
+        pub fn body(&self) -> Result<Vec<u8>> {
+            self.0.body()
+        }
+        #[must_use]
+        pub fn refuse() -> Self {
+            Self(Message::answer(403, b"managed relay refused request"))
+        }
+        pub fn send(&self, socket: &mut TcpStream, method: &str) -> Result<()> {
+            let mut wire = self.0.framed(method)?;
+            // One request per connection: closing is explicit even for git's persistent client.
+            let at = wire.windows(4).position(|s| s == b"\r\n\r\n").ok_or_else(invalid)?;
+            wire.splice(at + 2..at + 2, b"Connection: close\r\n".iter().copied());
+            socket.write_all(&wire)
+        }
+    }
+    pub struct Transport(Upstream);
+    impl Transport {
+        pub fn new(fake: Option<SocketAddr>) -> Result<Self> {
+            if let Some(address) = fake {
+                if !address.ip().is_loopback() {
+                    return Err(invalid());
+                }
+                return Ok(Self(Upstream::Plain(address)));
+            }
+            let roots = skein_shell::read_trust_roots(
+                &skein_shell::Trust::Machine { ssl_cert_file: None },
+                &skein_shell::RootBounds { bundle_bytes: 4_194_304, certificates: 1024, certificate_bytes: 65536 },
+            )
+            .map_err(|_| invalid())?;
+            let (tls, _) = skein_tls::Config::from_der(&roots.certificates, &[b"http/1.1"]).map_err(|_| invalid())?;
+            Ok(Self(Upstream::Tls(tls)))
+        }
+        pub fn exchange(&self, request: &Request, git: bool) -> Result<Answer> {
+            let host = if git { "github.com" } else { "api.github.com" };
+            let wire = request.0.with_host(host)?;
+            let (method, _) = request.route()?;
+            let answer = match &self.0 {
+                Upstream::Tls(tls) => tls_exchange(tls, host, &wire, method)?,
+                Upstream::Plain(address) => {
+                    let mut socket = TcpStream::connect_timeout(address, Duration::from_secs(30))?;
+                    socket.set_read_timeout(Some(Duration::from_secs(30)))?;
+                    socket.set_write_timeout(Some(Duration::from_secs(30)))?;
+                    socket.write_all(&wire)?;
+                    read_message(&mut io::BufReader::new(socket), Some(method))?.ok_or_else(invalid)?
+                }
+            };
+            Ok(Answer(answer))
+        }
+    }
+}

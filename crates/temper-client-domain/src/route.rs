@@ -304,6 +304,6 @@ pub(crate) fn demo_progress(root: &mut Domain, env: &Env<Limits>, out: &mut Queu
 /// Ready reads only while its flow is shown; pending starts survive navigation.
 pub(crate) fn picker_progress(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
-    forge::picker::progress(&mut root.forge, &root.client, root.pages.address(), env.limits.forge, &mut child);
+    forge::picker::progress(&mut root.forge, &root.client, root.pages.address(), env.limits.forge, env.now, &mut child);
     route_forge(root, env, &mut child, out);
 }
