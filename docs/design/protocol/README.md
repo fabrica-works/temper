@@ -574,13 +574,14 @@ section 8 give them. temper's sit beside them:
 | keys' markers | the forge connector | the keys temper writes into forge bodies | the key's version, its first byte; the marker has none of its own (forge.md, section 4) |
 | configuration | none | — | unknown members refuse the start (configuration.md, section 2) |
 
-- **Each of temper's three moves at most once per plan,** at the first
-  landing in that plan that changes one of the encodings it covers; for
-  `PAYLOAD_VERSION`, a repin of smith that changes a delivery's record
-  counts (channel.md, section 3). Plans that run at once share one move:
-  the plan that names the move in its own README makes it, and the
-  others change their encodings in place in the schema `main` holds,
-  before the move or after it.
+- **The baseline is the first release** (skein's `codec.md`, section 5).
+  Until it, each of temper's three versions keeps its current number.
+  A change a reader would notice changes the schema, its generated code
+  and its one set of golden bytes in place, including a repin of smith
+  that changes a delivery's record (channel.md, section 3). Versions move
+  at a release, not at a landing. A store from an older build is started
+  afresh when its families change: its unchanged version does not tell
+  the layouts apart. A reader still refuses another version.
 - **Both channel components are given `PAYLOAD_VERSION`** when they are
   made; neither knows what it covers.
 

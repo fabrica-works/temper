@@ -89,12 +89,12 @@ worker's root      Event::Assign { assignment, items, save }            Request:
   components as they make them, and a worker whose credential names
   another is refused before any part crosses (jig's
   `protocol/channel.md`, 4.1).
-- **It moves** when one of those encodings changes, by the rule temper's
-  versions share (`README.md`, section 9); a repin of smith that changes
-  the delivery's record is such a change, and so were a repository's
-  `git` (section 4) and, at 4, its tag's widening to the pair, 64
-  bits. An engine and its workers are
-  one release, so nothing is translated between versions (jig's
+- **It stays at 4 until the first release.** A change to one of these
+  encodings, including a repin of smith that changes the delivery's
+  record, changes the schema, generated code and one set of golden bytes
+  in place. The version moves at a release (`README.md`, section 9;
+  skein's `codec.md`, section 5). An engine and its workers come from
+  the same build, and nothing is translated between versions (jig's
   `protocol/README.md`, section 7).
 
 ## 4. Down: the workspace items
