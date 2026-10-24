@@ -1039,11 +1039,8 @@ fn connect_github_link_leaves_the_tab_once() {
     let (mut root, out) = manifest_started(Address::ConnectForge { forge: None });
     let attempt = attempt(out);
     let outcome = w::Outcome::Link(
-        w::Link::new(
-            &w::CEILINGS,
-            w::LinkParts { address: b"http://fake.invalid/forges/2/github/manifest?state=fake".as_slice().into() },
-        )
-        .unwrap(),
+        w::Link::new(&w::CEILINGS, w::LinkParts { address: b"/forges/2/github/manifest?state=fake".as_slice().into() })
+            .unwrap(),
     );
     let mut out = drive(&mut root, answer_event(attempt, outcome.clone()));
     let mut leaves = Vec::new();
@@ -1052,7 +1049,7 @@ fn connect_github_link_leaves_the_tab_once() {
             leaves.push(to);
         }
     }
-    assert_eq!(leaves, [Box::<[u8]>::from(b"http://fake.invalid/forges/2/github/manifest?state=fake".as_slice())]);
+    assert_eq!(leaves, [Box::<[u8]>::from(b"/forges/2/github/manifest?state=fake".as_slice())]);
     let mut out = drive(&mut root, answer_event(attempt, outcome));
     while let Some(request) = out.pop() {
         if let d::Request::Leave { .. } = request {
@@ -1060,10 +1057,22 @@ fn connect_github_link_leaves_the_tab_once() {
         }
     }
     let view = f::browser_page_view(&root);
+    // The tab leaves by the path; no external link is drawn for it.
+    assert!(view.tree().nodes().iter().all(|n| n.external.is_none()));
+}
+#[test]
+fn a_whole_address_link_keeps_its_external_link_meanwhile() {
+    let (mut root, out) = manifest_started(Address::ConnectForge { forge: None });
+    let attempt = attempt(out);
+    let address = b"https://github.com/apps/temper-fake/installations/new?state=fake";
+    let outcome =
+        w::Outcome::Link(w::Link::new(&w::CEILINGS, w::LinkParts { address: address.as_slice().into() }).unwrap());
+    drive(&mut root, answer_event(attempt, outcome));
+    let view = f::browser_page_view(&root);
     let link = node(view.tree(), Role::Link, b"Connect GitHub");
     assert_eq!(
         view.tree().nodes().iter().find(|n| n.id == link).unwrap().external.as_deref(),
-        Some(b"http://fake.invalid/forges/2/github/manifest?state=fake".as_slice())
+        Some(address.as_slice())
     );
 }
 #[test]
