@@ -74,7 +74,8 @@ pub(super) fn peer(address: SocketAddr) -> Peer {
             plaintext: 65536,
             ciphertext: 65536,
             observations: 16,
-            observation_bytes: 4096,
+            // The history story retains both manifest POSTs.
+            observation_bytes: 8192,
         },
         config,
         limits,

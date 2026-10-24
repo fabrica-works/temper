@@ -1,6 +1,6 @@
 //! Deferred replies for the setup route (client/forge.md, 9.1).
 use super::Clients;
-use crate::setup::MANIFEST_SCRIPT_HASH;
+use crate::setup::{MANIFEST_SCRIPT_HASH, MANIFEST_STYLE_HASH, PAGE_STYLE_HASH};
 use alloc::boxed::Box;
 use skein_http::{Header, server as http};
 use skein_lib::{
@@ -27,17 +27,32 @@ impl Clients {
     pub(super) fn github_call(&mut self, call: Token, head: http::Call) {
         self.github.insert(call, Reply { body: None, offset: 0 }).expect("bounded HTTP calls");
         if self.github_calls.room() == 0 {
-            self.github_answer(call, 503, None, b"temper is busy; try again.");
+            crate::setup::busy(self, call, &head.target);
             return;
         }
         self.github_calls.push((call, head));
     }
     pub(crate) fn github_answer(&mut self, call: Token, status: u16, location: Option<&[u8]>, body: &[u8]) {
-        self.github_response(call, status, location, body, None);
+        if location.is_some() || body.is_empty() {
+            self.github_response(call, status, location, body, None);
+            return;
+        }
+        let parts = [b"default-src 'none'; style-src 'sha256-".as_slice(), PAGE_STYLE_HASH, b"'"];
+        self.github_policy_answer(call, status, body, &parts);
     }
     pub(crate) fn github_manifest_answer(&mut self, call: Token, body: &[u8], web: &[u8]) {
-        let parts =
-            [b"default-src 'none'; form-action ".as_slice(), web, b"; script-src 'sha256-", MANIFEST_SCRIPT_HASH, b"'"];
+        let parts = [
+            b"default-src 'none'; form-action ".as_slice(),
+            web,
+            b"; script-src 'sha256-",
+            MANIFEST_SCRIPT_HASH,
+            b"'; style-src 'sha256-",
+            MANIFEST_STYLE_HASH,
+            b"'",
+        ];
+        self.github_policy_answer(call, 200, body, &parts);
+    }
+    fn github_policy_answer(&mut self, call: Token, status: u16, body: &[u8], parts: &[&[u8]]) {
         let mut size = 0_usize;
         for part in parts {
             size = size.checked_add(part.len()).expect("bounded CSP");
@@ -46,7 +61,7 @@ impl Clients {
         for part in parts {
             writer.put(part).expect("measured CSP");
         }
-        self.github_response(call, 200, None, body, Some(&writer.finish()));
+        self.github_response(call, status, None, body, Some(&writer.finish()));
     }
     fn github_response(&mut self, call: Token, status: u16, location: Option<&[u8]>, body: &[u8], csp: Option<&[u8]>) {
         let Some(reply) = self.github.get_mut(&call) else { return };

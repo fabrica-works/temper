@@ -962,6 +962,18 @@ fn status(peer: &fixtures::http::Peer, code: &[u8]) {
     for header in [b"Cache-Control: no-store".as_slice(), b"Referrer-Policy: no-referrer"] {
         assert!(contains(peer.received(), header));
     }
+    if code != b"302" && code != b"303" {
+        for part in [
+            b"<!doctype html><html lang=\"en\">".as_slice(),
+            b"<meta charset=\"utf-8\">",
+            b"name=\"viewport\"",
+            b"<style>",
+            b"Back to temper</a>",
+            b"Content-Security-Policy: default-src 'none';",
+        ] {
+            assert!(contains(peer.received(), part));
+        }
+    }
 }
 fn complete_accept(service: &mut crate::Service, peer: &mut fixtures::http::Peer) {
     assert!(peer.received().is_empty(), "HTTP waits for Accept");
@@ -1015,7 +1027,9 @@ fn setup_accept_without_back_answers_its_close_tab_page() {
     let mut peer = visit(&mut service, b"GET", &setup_target(&state));
     complete_accept(&mut service, &mut peer);
     status(&peer, b"200");
+    assert!(contains(peer.received(), b"<h2>GitHub is connected</h2>"));
     assert!(contains(peer.received(), b"temper has the installation; you may close this tab."));
+    assert!(contains(peer.received(), b"href=\"/forges\""));
 }
 #[test]
 fn setup_unknown_state_is_ended_without_calling_github() {
@@ -1240,18 +1254,38 @@ fn redirect_target(state: &[u8]) -> Box<[u8]> {
 fn manifest_connect_answers_its_listener_page_with_policy_and_personal_form() {
     // fixtures::http::address is loopback:7100; the manifest's form is the forge's 3000.
     const PREFIX: &[u8] = b"http://127.0.0.1:7100/forges/1/github/manifest?state=";
-    let mut service = service(8, Duration::from_secs(3600));
-    let link = manifest_link(&mut service, Some(b"/forges?from=manifest"));
-    assert!(link.starts_with(PREFIX));
-    let state = manifest_state(&link);
-    let peer = visit(&mut service, b"GET", &manifest_target(state));
-    status(&peer, b"200");
-    assert!(contains(peer.received(), b"Content-Type: text/html; charset=utf-8"));
-    assert!(contains(peer.received(), b"Content-Security-Policy: default-src 'none'; form-action http://127.0.0.1:3000; script-src 'sha256-ePniVEkSivX/c7XWBGafqh8tSpiRrKiqYeqbG7N1TOE='"));
-    let target = joined(&[b"action=\"http://127.0.0.1:3000/settings/apps/new?state=", state, b"\""]);
-    assert!(contains(peer.received(), &target));
-    assert!(contains(peer.received(), b"method=\"post\""));
-    assert!(service.engine.as_ref().unwrap().setup.runs.is_empty());
+    for (back, escaped) in [
+        (
+            Some(b"/forges?from=manifest&next=\"<>".as_slice()),
+            b"href=\"/forges?from=manifest&amp;next=&quot;&lt;&gt;\"".as_slice(),
+        ),
+        (None, b"href=\"/forges/connect?forge=1\""),
+    ] {
+        let mut service = service(8, Duration::from_secs(3600));
+        let link = manifest_link(&mut service, back);
+        assert!(link.starts_with(PREFIX));
+        let state = manifest_state(&link);
+        let peer = visit(&mut service, b"GET", &manifest_target(state));
+        status(&peer, b"200");
+        assert!(contains(peer.received(), b"Content-Type: text/html; charset=utf-8"));
+        let policy = joined(&[
+            b"Content-Security-Policy: default-src 'none'; form-action http://127.0.0.1:3000; script-src 'sha256-",
+            MANIFEST_SCRIPT_HASH,
+            b"'; style-src 'sha256-",
+            MANIFEST_STYLE_HASH,
+            b"'\r\n",
+        ]);
+        assert!(contains(peer.received(), &policy));
+        assert!(contains(peer.received(), b"<button type=\"submit\">Continue to GitHub</button>"));
+        assert!(contains(peer.received(), escaped));
+        let target = joined(&[b"action=\"http://127.0.0.1:3000/settings/apps/new?state=", state, b"\""]);
+        assert!(contains(peer.received(), &target));
+        assert!(contains(peer.received(), b"method=\"post\""));
+        assert!(service.engine.as_ref().unwrap().setup.runs.is_empty());
+        let page = service.setup_page(1, state, Time::ZERO).unwrap();
+        assert!(page.len() <= usize::try_from(service.engine.as_ref().unwrap().setup.env.limits.body_bytes).unwrap());
+        measure_page(if back.is_some() { "manifest-held-back" } else { "manifest-fallback" }, page.len());
+    }
 }
 #[test]
 fn manifest_unknown_used_and_expired_pages_are_ended() {

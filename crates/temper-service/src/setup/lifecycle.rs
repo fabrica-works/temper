@@ -288,6 +288,13 @@ pub(super) enum Purpose {
     Admin(Token),
     Deleted(u16),
 }
+/// The connect's `back`, held with its manifest run, for the manifest page's Back.
+fn manifest_back(engine: &crate::engine::Engine, token: Token) -> Option<&[u8]> {
+    match engine.setup.public.get(&token) {
+        Some(super::public::Caller::Manifest { back, .. }) => back.as_deref(),
+        _ => None,
+    }
+}
 pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
     let run = engine.setup.runs.get(&token).expect("ended setup run");
     let (forge, kind) = (run.forge, run.kind);
@@ -357,7 +364,9 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
     let outcome = match outcome {
         reconcile::Outcome::Manifest { state, target, manifest } => {
             // The kit answers the form's parts; the page is temper's (forge-setup.md 5.1).
-            let Some(page) = super::routes::form(&target, &manifest, engine.setup.env.limits.body_bytes) else {
+            let back = manifest_back(engine, token);
+            let Some(page) = super::routes::form(&target, &manifest, back, forge, engine.setup.env.limits.body_bytes)
+            else {
                 let failure = reconcile::Failure {
                     forge,
                     step: reconcile::Stage::App,

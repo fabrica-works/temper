@@ -355,6 +355,7 @@ fn a_connected_forge_in_the_page_facts_opens_through_temper() {
     let view = f::browser_page_view(&root);
     assert!(f::find(view.tree(), Role::Link, "Open Forgejo ↗".as_bytes()).is_none());
 }
+
 fn owned_row(mode: w::Mode, connection: w::Connection, runner: Option<&[u8]>) -> w::ForgeRow {
     let mut parts = cf::row(HERE, w::Kind::Forgejo, mode, connection, w::Offer::Offered).into_parts();
     if parts.mode == w::Mode::Owned {
@@ -434,4 +435,99 @@ fn unprepared_owned_rows_and_managed_rows_have_no_runs_or_password_lines() {
         }
         assert!(f::find(view.tree(), Role::Description, b"Your first password is in /fake/forge/person_password. Forgejo asks you to change it when you sign in.").is_none());
     }
+}
+
+#[test]
+fn the_github_app_line_names_an_empty_installation_set_only_when_empty() {
+    for empty in [false, true] {
+        let mut parts = cf::github_rows(true).get(0).unwrap().clone().into_parts();
+        if empty {
+            parts.installations.clear();
+        }
+        let mut rows = List::with_capacity(1);
+        rows.push(w::ForgeRow::new(&w::CEILINGS, parts).unwrap()).unwrap();
+        let root = f::forge_root(Address::Forges, rows);
+        let view = f::browser_page_view(&root);
+        assert!(f::find(view.tree(), Role::Term, "temper’s App".as_bytes()).is_some());
+        assert_eq!(f::find(view.tree(), Role::Slot, "my-app · installed nowhere yet".as_bytes()).is_some(), empty);
+        assert_eq!(f::find(view.tree(), Role::Slot, b"acme").is_some(), !empty);
+    }
+}
+
+#[test]
+fn the_github_rows_install_block_follows_the_apps_way_and_acceptance() {
+    for app in [None, Some(w::AppWay::Manifest), Some(w::AppWay::Pasted)] {
+        for accepted in [false, true] {
+            let mut parts = cf::github_rows(accepted).get(0).unwrap().clone().into_parts();
+            parts.app = app.clone();
+            let mut rows = List::with_capacity(1);
+            rows.push(w::ForgeRow::new(&w::CEILINGS, parts).unwrap()).unwrap();
+            let root = f::forge_root(Address::Forges, rows);
+            let view = f::browser_page_view(&root);
+            let manifest = "my-app is made on GitHub, under your account, and installed nowhere yet. Install it, and choose the repositories temper may use.";
+            let pasted = "my-app is connected to temper, and installed nowhere yet. Install it, and choose the repositories temper may use.";
+            let explanation = if app == Some(w::AppWay::Manifest) { manifest } else { pasted };
+            assert_eq!(
+                f::find(view.tree(), Role::Heading { level: 2 }, "Install temper’s App".as_bytes()).is_some(),
+                !accepted
+            );
+            for words in [manifest, pasted] {
+                assert_eq!(
+                    f::find(view.tree(), Role::Paragraph, words.as_bytes()).is_some(),
+                    !accepted && words == explanation
+                );
+            }
+            if !accepted {
+                cf::words_in_order(
+                    view.tree(),
+                    &[
+                        "temper’s App",
+                        "The last connect stopped: fixture stopped",
+                        "Install temper’s App",
+                        explanation,
+                        "Install on GitHub",
+                    ],
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn the_github_row_opens_its_configured_web_address_only_when_carried() {
+    for kind in [w::Kind::Github, w::Kind::Forgejo] {
+        for web in [None, Some(b"https://github.test/base/?a=1&b=2".as_slice())] {
+            let mut parts = cf::github_rows(true).get(0).unwrap().clone().into_parts();
+            parts.kind = kind.clone();
+            parts.web = web.map(Into::into);
+            let mut rows = List::with_capacity(1);
+            rows.push(w::ForgeRow::new(&w::CEILINGS, parts).unwrap()).unwrap();
+            let root = f::forge_root(Address::Forges, rows);
+            let view = f::browser_page_view(&root);
+            let link = f::find(view.tree(), Role::Link, "Open on GitHub ↗".as_bytes());
+            assert_eq!(link.is_some(), kind == w::Kind::Github && web.is_some());
+            if let Some(link) = link {
+                let node = view.tree().nodes().iter().find(|node| node.id == link).unwrap();
+                assert_eq!(node.external.as_deref(), web);
+            }
+        }
+    }
+}
+
+#[test]
+fn a_stopped_github_row_has_no_app_or_install_block() {
+    let mut parts = cf::github_rows(false).get(0).unwrap().clone().into_parts();
+    parts.connection = w::Connection::Stopped(
+        w::Stopped::new(&w::CEILINGS, w::StoppedParts { reason: b"fixture stopped".as_slice().into() }).unwrap(),
+    );
+    parts.installations.clear();
+    let mut rows = List::with_capacity(1);
+    rows.push(w::ForgeRow::new(&w::CEILINGS, parts).unwrap()).unwrap();
+    let root = f::forge_root(Address::Forges, rows);
+    let view = f::browser_page_view(&root);
+    assert!(f::find(view.tree(), Role::Term, "temper’s App".as_bytes()).is_none());
+    assert!(f::find(view.tree(), Role::Slot, "my-app · installed nowhere yet".as_bytes()).is_none());
+    assert!(f::find(view.tree(), Role::Heading { level: 2 }, "Install temper’s App".as_bytes()).is_none());
+    assert!(f::find(view.tree(), Role::Button, b"Install on GitHub").is_none());
+    assert!(f::find(view.tree(), Role::Link, b"Connect an App of your own").is_some());
 }

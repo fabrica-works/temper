@@ -222,7 +222,10 @@ impl Judge {
         );
         let accepted = request_url(self.clients, "GET", &location, "", b"");
         assert_eq!(accepted.status, 200, "Must: setup accepted installation");
-        assert_eq!(accepted.body, b"temper has the installation; you may close this tab.");
+        assert!(
+            skein_lib::bytes::find(&accepted.body, b"temper has the installation; you may close this tab.").is_some(),
+            "the setup page says so"
+        );
         self.outputs.push(accepted.body);
         self.queue(host, vec![ctl::Call::new(&["wait", "forges", "--until", "settled"]), Self::adoption()]);
         self.stage = Stage::Adopt;

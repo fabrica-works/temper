@@ -1,6 +1,7 @@
 //! Folded forge rows and the playground apart (client/forge.md, 5.4).
 use super::{bindings::Bindings as ForgeBindings, connect};
 use crate::{
+    flow,
     frame::Bindings,
     look,
     words::{Word, Words},
@@ -138,28 +139,7 @@ fn personal(
         crate::cards::text(b, Role::Paragraph, &line);
     }
     if row.kind == Kind::GitHub {
-        match row.connection {
-            Connection::Connected { .. } => connect::app_control(
-                b,
-                root,
-                w,
-                forge,
-                row.number,
-                if forge::forges::accepted(row) { Word::ForgeInstallAnother } else { Word::ForgeInstall },
-                Some(Address::Forges),
-            ),
-            Connection::NotConnected | Connection::Stopped { .. } => connect::link(
-                b,
-                w,
-                bindings,
-                Word::ForgeConnectApp,
-                Address::ConnectForge { forge: Some(Choice::Forge(row.number)) },
-            ),
-            Connection::NotSetUp
-            | Connection::SetUpFailed { .. }
-            | Connection::SettingUp { .. }
-            | Connection::Connecting => {}
-        }
+        github(b, root, w, bindings, forge, row);
     }
     if forge::connect::failed(row) && row.offer == Offer::Offered {
         connect::setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
@@ -186,6 +166,55 @@ fn personal(
         }
     }
     b.close();
+}
+fn github(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, forge: &mut ForgeBindings, row: &Row) {
+    if let Some(web) = &row.web {
+        b.open(Role::Link);
+        b.name(&w.say(Word::GitHubOpen, &[]));
+        b.external(web);
+        b.close();
+    }
+    match row.connection {
+        Connection::Connected { .. } => {
+            let accepted = forge::forges::accepted(row);
+            if !accepted {
+                flow::card(b, &w.say(Word::ForgeInstallTitle, &[]));
+                if row.app == Some(forge::forges::AppWay::Manifest) {
+                    let slug = forge::forges::slug(row).expect("connected App slug");
+                    crate::cards::text(
+                        b,
+                        Role::Paragraph,
+                        &w.say(Word::ForgeManifestInstall, &[Hole::Name(Box::from(slug))]),
+                    );
+                } else {
+                    crate::cards::text(b, Role::Paragraph, &forge::words::app_install(row));
+                }
+            }
+            connect::app_control(
+                b,
+                root,
+                w,
+                forge,
+                row.number,
+                if accepted { Word::ForgeInstallAnother } else { Word::ForgeInstall },
+                Some(Address::Forges),
+            );
+            if !accepted {
+                b.close();
+            }
+        }
+        Connection::NotConnected | Connection::Stopped { .. } => connect::link(
+            b,
+            w,
+            bindings,
+            Word::ForgeConnectApp,
+            Address::ConnectForge { forge: Some(Choice::Forge(row.number)) },
+        ),
+        Connection::NotSetUp
+        | Connection::SetUpFailed { .. }
+        | Connection::SettingUp { .. }
+        | Connection::Connecting => {}
+    }
 }
 fn repository_line(root: &Domain, w: &Words, row: &Row) -> Option<Box<[u8]>> {
     if forge::connect::failed(row) {
