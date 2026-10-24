@@ -603,13 +603,14 @@ pub fn run_box(directory: &Path, script: person::Script, deadline: Duration) -> 
 }
 /// domain/testing.md 2.6 bounds each landing story at 360 seconds.
 pub const LANDING: Duration = Duration::from_secs(360);
-/// Past `LANDING`: poll, `poll_max`, slow and stall ship at 5, 30, 40 and 30 s (temper-service limits.rs).
+/// Past `LANDING`: poll, `poll_max` and slow ship at 5, 30 and 40 s; stall ships at 30 min.
+/// This sets the paces and stall to 600 s: above `LANDING`, but below the shipped 1800 s stall.
 pub const RAISED_MS: u64 = 600_000;
 const _: () = assert!(Duration::from_millis(RAISED_MS).as_nanos() > LANDING.as_nanos());
 // The hinted job's 8 s sleep outlasts settle (protocol/setup.md 10, 13.4).
 const HINTED_SETTLE_MS: u64 = 3000;
 
-/// Raises the three keep paces and the change's stall, and shortens the hinted story's settle.
+/// Raises the three keep paces, lowers the change's stall to 600 s, and shortens the hinted story's settle.
 pub fn raise_paces(directory: &Path) {
     let path = directory.join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
