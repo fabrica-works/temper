@@ -552,8 +552,8 @@ pub enum Word {
 // Seven demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
 // The browser sign-in heading and Google link add two phrases.
-const PHRASES: u32 = 1036;
-const SEGMENTS: u32 = 1817;
+const PHRASES: u32 = 1043;
+const SEGMENTS: u32 = 1826;
 const ALL: [Word; 502] = [
     Word::YourForgesTitle,
     Word::YourForges,
