@@ -63,7 +63,7 @@ pub(crate) fn label(me: &c::Me, way: Way, ways: &skein_lib::List<Way>, w: &Words
 }
 fn go(b: &mut Builder, bindings: &mut Bindings, name: &[u8], address: Address, primary: bool) {
     if let Some(to) = bindings.insert(Meaning::Go(address)) {
-        let action = if primary { Control::PrimaryLink { name, to } } else { Control::Link { name, to } };
+        let action = if primary { Control::PrimaryLink { name, to } } else { Control::SecondaryLink { name, to } };
         flow::control(b, action);
     }
 }
@@ -112,9 +112,17 @@ fn choice(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, wa
     let control = if model::model_way(way).kind == WayKind::SignIn {
         Control::PrimaryButton { name: &label, to }
     } else {
-        Control::Link { name: &label, to }
+        Control::SecondaryLink { name: &label, to }
     };
     flow::choice(b, &heading, &description, &say(w, note), control);
+}
+fn choices(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, ways: &skein_lib::List<Way>) {
+    b.open(Role::Slot);
+    b.style(crate::look::MODEL_CHOICES);
+    for way in ways {
+        choice(b, root, w, bindings, *way, ways);
+    }
+    b.close();
 }
 fn request_for_way(page: &model::ConnectModel, way: Way) -> bool {
     if page.request.returned() && model::model_way(way).kind == WayKind::SignIn {
@@ -227,29 +235,29 @@ pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 }
             }
         }
-        for way in &ways {
-            choice(b, root, w, bindings, *way, &ways);
-        }
+        choices(b, root, w, bindings, &ways);
         super::accounts::outcome(b, root, w, &page.request, text_per_node);
         b.close();
         return;
     };
-    go(b, bindings, &say(w, W::AllWays), model::address(root.pages().address(), None), false);
+    if let Some(to) = bindings.insert(Meaning::Go(model::address(root.pages().address(), None))) {
+        flow::control(b, Control::Link { name: &say(w, W::AllWays), to });
+    }
     if ready(root, way) {
-        flow::card(b, &say(w, W::Ready));
+        flow::details(b, &say(w, W::Ready));
         ready_body(b, root, w, bindings, way, &ways);
         b.close();
         return;
     }
     match way {
         Way::SignIn { .. } => {
-            flow::card(b, &say(w, W::SigningIn));
+            flow::details(b, &say(w, W::SigningIn));
             if !request_for_way(page, way) || page.request.sign_in_state(root.client()) == SignInState::Unknown {
                 choice(b, root, w, bindings, way, &ways);
             }
         }
         Way::Key { .. } => {
-            flow::card(b, &say(w, W::Details));
+            flow::details(b, &say(w, W::Details));
             b.open(Role::Form);
             b.name(&say(w, W::Details));
             super::accounts::key_field(b, w, bindings, &page.request, busy);
@@ -257,7 +265,7 @@ pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
             b.close();
         }
         Way::Program { .. } => {
-            flow::card(b, &say(w, W::Details));
+            flow::details(b, &say(w, W::Details));
             let name = page.program_name(root.client());
             b.open(Role::Form);
             b.name(&say(w, W::Details));
@@ -542,6 +550,7 @@ fn facts(b: &mut Builder, root: &Domain, w: &Words, way: Way) {
         && skein_ui::markdown::safe_url(address)
     {
         b.open(Role::Link);
+        b.style(crate::look::FLOW_QUIET);
         let name = w.say(Word::Usage, &[]);
         b.name(&name);
         b.text(Run::Plain, &name);

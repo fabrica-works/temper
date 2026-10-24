@@ -37,6 +37,8 @@ fn control(b: &mut Builder, w: &Words, bindings: &mut Bindings, word: Word, act:
     }
     if word == Word::WelcomePlayground || word == Word::WelcomeSetup {
         b.style(look::FLOW_PRIMARY);
+    } else if word != Word::WelcomePlaygroundInstead {
+        b.style(look::FLOW_QUIET);
     }
     b.close();
 }

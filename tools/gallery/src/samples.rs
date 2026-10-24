@@ -44,7 +44,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 53;
+pub const N: usize = 57;
 #[must_use]
 fn task(task: u64) -> Address {
     Address::Task { task, filter: PlanFilter::All }
@@ -60,12 +60,7 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "inbox-solo", world: Solo, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
         Sample { name: "task-solo-T3", world: Solo, address: task(3), then: Shown },
         Sample { name: "accounts-solo", world: Solo, address: Address::Accounts, then: Shown },
-        Sample {
-            name: "welcome-first-run-0",
-            world: FirstRun { step: 0 },
-            address: Address::Welcome { step: temper_client_domain::Step::Welcome },
-            then: Shown,
-        },
+        welcome_sample("welcome-first-run-0", temper_client_domain::Step::Welcome),
         Sample { name: "chats-first-run-1", world: FirstRun { step: 1 }, address: CHATS, then: Shown },
         Sample {
             name: "connect-forge-first-run-6",
@@ -86,6 +81,10 @@ pub fn samples() -> [Sample; N] {
             temper_client_domain::Step::Forge { forge: Some(temper_client_domain::Choice::Forge(3)) },
         ),
         welcome_sample("welcome-model-choose", temper_client_domain::Step::Model { way: None }),
+        github_sample("github-app-details", 0),
+        github_sample("github-install", 9),
+        github_sample("github-picker", 10),
+        github_sample("github-adopted", 11),
         owned_sample("forge-details", 0, false),
         owned_sample("forge-setting-up-middle", 6, false),
         owned_sample("welcome-ready-under-way", 6, true),
@@ -153,6 +152,14 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "task-solo-T9", world: Solo, address: task(9), then: Shown },
     ]
 }
+fn github_sample(name: &'static str, step: u8) -> Sample {
+    Sample {
+        name,
+        world: World::FirstRun { step },
+        address: Address::ConnectForge { forge: Some(temper_client_domain::Choice::Forge(2)) },
+        then: Then::Shown,
+    }
+}
 fn welcome_sample(name: &'static str, step: temper_client_domain::Step) -> Sample {
     Sample { name, world: World::FirstRun { step: 0 }, address: Address::Welcome { step }, then: Then::Shown }
 }
@@ -179,6 +186,12 @@ fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: T
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
     match sample.name {
+        "github-app-details" => {
+            return Some("connect-forge.html?world=first-run-github&step=1&forge=2&bare".to_owned());
+        }
+        "github-install" => return Some("connect-forge.html?world=first-run-github&step=3&forge=2&bare".to_owned()),
+        "github-picker" => return Some("connect-forge.html?world=first-run-github&step=4&forge=2&bare".to_owned()),
+        "github-adopted" => return Some("connect-forge.html?world=first-run-github&step=5&forge=2&bare".to_owned()),
         "welcome-forge-choose" => return Some("welcome.html?world=first-run&step=0&at=forge&bare".to_owned()),
         "welcome-forge-details" => return Some("welcome.html?world=first-run&step=0&at=forge&forge=3&bare".to_owned()),
         "welcome-model-choose" => return Some("welcome.html?world=first-run&step=0&at=model&bare".to_owned()),

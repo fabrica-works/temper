@@ -88,6 +88,17 @@ fn the_model_choose_names_the_plan_sign_in_and_key_ways() {
     assert_eq!(primary, [b"Continue with ChatGPT".as_slice()]);
     let names = control_names(&root);
     assert!(names.contains(&b"Continue with ChatGPT".to_vec()));
+    let key = fixtures::find(view.tree(), Role::Link, b"Use an API key").unwrap();
+    assert!(
+        view.tree()
+            .nodes()
+            .iter()
+            .find(|n| n.id == key)
+            .unwrap()
+            .styles
+            .as_slice()
+            .contains(&crate::look::FLOW_SECONDARY)
+    );
     assert!(names.contains(&b"Use an API key".to_vec()));
 }
 #[test]

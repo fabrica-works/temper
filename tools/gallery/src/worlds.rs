@@ -1,4 +1,5 @@
 //! Mockup documents, answered through the same windows as the engine.
+mod github;
 use crate::driver::{answer, deliver, limits, step};
 use crate::samples::{Then, World};
 use World::{FirstRun, Reference, Solo};
@@ -28,6 +29,7 @@ fn project(w: World) -> &'static str {
         Reference => "factory",
         Solo => "tally",
         World::Bare => "gallery",
+        FirstRun { step: 11 } => "widget",
         FirstRun { .. } => "Default",
     }
 }
@@ -212,6 +214,9 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                         }
                     }
                 }
+                jig_client::Down::Send { attempt, .. } if w == (FirstRun { step: 10 }) => {
+                    github::answer_page(&mut root, attempt, &mut out);
+                }
                 jig_client::Down::Save { .. }
                 | jig_client::Down::Erase { .. }
                 | jig_client::Down::Send { .. }
@@ -241,6 +246,9 @@ fn forges_watched(root: &mut Domain, world: World, watch: Token, out: &mut Queue
 }
 #[expect(clippy::too_many_lines, reason = "complete illustrative forge rows keep their additive fields together")]
 fn forges(world: World) -> Box<[u8]> {
+    if let FirstRun { step: 9..=11 } = world {
+        return github::forges(world);
+    }
     use temper_client_protocol_wire::{self as wire, v1 as w};
     let limits = temper_client_domain::forge::wire_limits(&limits().forge).expect("wire limits");
     let mut rows = List::with_capacity(3);
@@ -2360,6 +2368,8 @@ pub(super) fn now(w: World) -> Wall {
             5 => 15,
             6 => 16,
             7 | 8 => 19,
+            // Synthetic GitHub frames have no relative timestamps on screen.
+            9..=11 => 0,
             _ => unreachable!("mockup first-run step"),
         },
         Reference | Solo | World::Bare => 0,

@@ -15,7 +15,7 @@ fn names_are_the_promised_ones() {
 }
 
 #[test]
-fn every_link_has_an_address() {
+fn navigation_links_have_addresses_and_install_action_links_keep_their_binding() {
     for sample in samples::samples() {
         let mut view = view(&sample);
         let mut links = Vec::new();
@@ -26,8 +26,20 @@ fn every_link_has_an_address() {
             }
         }
         for node in links {
-            let address = temper_client_view::href(&mut view, node).expect("link has an href");
-            assert!(!address.is_empty(), "{}: empty href for {node:?}", sample.name);
+            if let Some(address) = temper_client_view::href(&mut view, node) {
+                assert!(!address.is_empty(), "{}: empty href for {node:?}", sample.name);
+            } else if let Some(temper_client_domain::Action::Forge(temper_client_domain::forge::Act::Install {
+                forge,
+                ..
+            })) = temper_client_view::act(&mut view, node, skein_ui::Act::Press)
+            {
+                // The existing picker link starts an asynchronous install request;
+                // it has no static destination until the forge answers.
+                assert_eq!(sample.name, "github-picker");
+                assert_eq!(forge, 2);
+            } else {
+                panic!("{}: link {node:?} has neither a destination nor its install act", sample.name);
+            }
         }
     }
 }
@@ -54,6 +66,29 @@ enum Part {
     PlanWithEnded { live: u32, ended: u32, before: &'static str, after: &'static str },
 }
 const HOLDS: [Holds; samples::N] = [
+    Holds {
+        name: "github-app-details",
+        heading: "Connect a forge",
+        parts: &[Part::Named { role: Role::Region, name: "An App of your own" }],
+    },
+    Holds {
+        name: "github-install",
+        heading: "Connect a forge",
+        parts: &[Part::Named { role: Role::Button, name: "Install on GitHub" }],
+    },
+    Holds {
+        name: "github-picker",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::Choice, name: "sam/widget" },
+            Part::Named { role: Role::Button, name: "Adopt sam/widget" },
+        ],
+    },
+    Holds {
+        name: "github-adopted",
+        heading: "Connect a forge",
+        parts: &[Part::Named { role: Role::Link, name: "Open widget" }],
+    },
     Holds {
         name: "welcome-forge-choose",
         heading: "Connect a forge",
@@ -810,6 +845,10 @@ fn connection_samples_assign_priority_and_progress_to_the_bundled_nodes() {
         ("welcome-forge-choose", vec!["Connect GitHub"]),
         ("welcome-forge-details", vec!["Set up a Forgejo here"]),
         ("welcome-model-choose", vec!["Continue with ChatGPT"]),
+        ("github-app-details", vec!["Connect the App"]),
+        ("github-install", vec!["Install on GitHub"]),
+        ("github-picker", vec!["Adopt sam/widget"]),
+        ("github-adopted", vec!["Open widget"]),
     ] {
         let sample = samples::samples().into_iter().find(|sample| sample.name == name).expect("sample");
         let view = view(&sample);
@@ -824,7 +863,7 @@ fn connection_samples_assign_priority_and_progress_to_the_bundled_nodes() {
         if name == "welcome-forge-details" {
             assert_eq!(
                 view.tree().nodes().iter().filter(|node| node.styles.as_slice().contains(&look::FLOW_PAIR)).count(),
-                1
+                2
             );
         }
     }

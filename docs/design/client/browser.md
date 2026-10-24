@@ -372,11 +372,18 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   9 px card corners; its opening introduction keeps its larger heading.
   Standalone connection cards use 5 px corners. The
   current step takes the accent. The view assigns `FLOW_PRIMARY` to
-  filled terracotta acts and `FLOW_PAIR` to the organization/repository
-  row, stacked below 600 px. Progress draws ✓, ●, ✕ and ○ for done,
+  filled terracotta acts, `FLOW_SECONDARY` to neutral small buttons and
+  `FLOW_QUIET` to quiet terracotta links. Forge choices use three equal
+  columns and model choices two, stacking below 760 px. Choice cards keep
+  small headings, ink body text, muted metadata and bottom-aligned acts;
+  details share their padding. `FLOW_PAIR` groups organization/repository
+  and the half-width project field, stacking below 760 px. Setup field
+  labels are small and muted, and setup notes are a muted bulleted list.
+  The welcome's phone gutter is 16 px. Progress draws ✓, ●, ✕ and ○ for done,
   current, failed and pending; status words remain accessible in the DOM,
   visually hidden. Back, Later and the playground alternative are quiet
-  underlined text controls.
+  text controls without underlines; Back and Later are bold terracotta,
+  and the playground alternative is plain ink. Each keeps a focus ring.
 - **The task pages' stylesheet,** `task-pages.css`, comes third, after
   `temper.css`, whose variables and rules it builds on: what the task
   pages add to the look, as `task.html` draws it in the terminal
@@ -888,6 +895,10 @@ view draws, never changing a view to suit a sample.
 | `forges-first-run-7` | the first run's Forges at step 7: Forgejo here connected |
 | `welcome-forge-choose` | the welcome's Forge choices, before any forge is connected |
 | `welcome-forge-details` | the welcome's Forgejo Details, with organization and repository paired |
+| `github-app-details` | GitHub's own-App form, with masked key input |
+| `github-install` | GitHub's connected App, installed nowhere yet |
+| `github-picker` | the installation's reached repositories, ready to adopt |
+| `github-adopted` | the adopted GitHub repository and its primary Open act |
 | `welcome-model-choose` | the welcome's Model choices, with ChatGPT sign-in and an API key |
 | `connect-forge-choose` | `ConnectForge`'s Choose: GitHub, Forgejo here and a Forgejo elsewhere |
 | `chats-setup-strip` | the chats with no demo, no usable account and no forge: the setup strip |

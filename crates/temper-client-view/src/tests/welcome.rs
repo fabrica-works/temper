@@ -316,6 +316,19 @@ fn each_later_step_offers_back_later_and_the_playground_while_the_demo_is_answer
                 d::Action::Pages(pages::Act::Go { address: Address::Chats { filter: ChatsFilter::All, start: false } })
             );
             let view = f::page_view(&root);
+            for name in ["‹ Back", "Later"] {
+                let id = node(view.tree(), Role::Link, name);
+                assert!(
+                    view.tree()
+                        .nodes()
+                        .iter()
+                        .find(|n| n.id == id)
+                        .unwrap()
+                        .styles
+                        .as_slice()
+                        .contains(&crate::look::FLOW_QUIET)
+                );
+            }
             assert_eq!(f::find(view.tree(), Role::Button, b"Try the playground instead").is_some(), demo);
             if demo {
                 let id = node(view.tree(), Role::Button, "Try the playground instead");

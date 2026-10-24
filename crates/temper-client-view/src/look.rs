@@ -259,6 +259,24 @@ pub const FLOW_FAILED: Style = Style { owner: owner(), token: 126 };
 pub const FLOW_PAIR: Style = Style { owner: owner(), token: 127 };
 /// The opening welcome keeps its introductory heading scale.
 pub const WELCOME_INTRO: Style = Style { owner: owner(), token: 128 };
+/// A neutral small action.
+pub const FLOW_SECONDARY: Style = Style { owner: owner(), token: 129 };
+/// A quiet terracotta text link.
+pub const FLOW_QUIET: Style = Style { owner: owner(), token: 130 };
+/// The forge choices, three across on desktop.
+pub const FLOW_CHOICES: Style = Style { owner: owner(), token: 131 };
+/// A choice card with bottom-aligned actions.
+pub const FLOW_CHOICE: Style = Style { owner: owner(), token: 132 };
+/// A stacked choice action group.
+pub const FLOW_ACTIONS: Style = Style { owner: owner(), token: 133 };
+/// A small muted setup field label.
+pub const FLOW_FIELD: Style = Style { owner: owner(), token: 134 };
+/// The setup notes as muted bullet points.
+pub const FLOW_FACTS: Style = Style { owner: owner(), token: 135 };
+/// The model choices, two across on desktop.
+pub const MODEL_CHOICES: Style = Style { owner: owner(), token: 136 };
+/// A connection details card, separate from Model’s outer Choose card.
+pub const FLOW_DETAILS: Style = Style { owner: owner(), token: 137 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -393,6 +411,15 @@ pub const NAMES: Names<'static> = Names {
         b"temper-flow-failed",
         b"temper-flow-pair",
         b"temper-welcome-intro",
+        b"temper-flow-secondary",
+        b"temper-flow-quiet",
+        b"temper-flow-choices",
+        b"temper-flow-choice",
+        b"temper-flow-actions",
+        b"temper-flow-field",
+        b"temper-flow-facts",
+        b"temper-model-choices",
+        b"temper-flow-details",
     ],
     regions: &[b"temper-link"],
 };

@@ -445,7 +445,15 @@ fn signings_without_rows(
 }
 fn connect(b: &mut Builder, w: &Words, bindings: &mut Bindings, word: W) {
     if let Some(to) = bindings.insert(Meaning::Go(temper_client_domain::Address::ConnectModel { way: None })) {
-        crate::flow::control(b, crate::flow::Control::Link { name: &words::say(w, word, &[]), to });
+        let name = words::say(w, word, &[]);
+        crate::flow::control(
+            b,
+            if word == W::Connect {
+                crate::flow::Control::PrimaryLink { name: &name, to }
+            } else {
+                crate::flow::Control::SecondaryLink { name: &name, to }
+            },
+        );
     }
 }
 pub(super) fn key_field(

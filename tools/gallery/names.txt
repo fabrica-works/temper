@@ -11,6 +11,10 @@ connect-forge-choose
 welcome-forge-choose
 welcome-forge-details
 welcome-model-choose
+github-app-details
+github-install
+github-picker
+github-adopted
 forge-details
 forge-setting-up-middle
 welcome-ready-under-way
