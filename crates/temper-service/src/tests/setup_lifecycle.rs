@@ -1263,8 +1263,13 @@ fn manifest_connect_answers_its_listener_page_with_policy_and_personal_form() {
     ] {
         let mut service = service(8, Duration::from_secs(3600));
         let link = manifest_link(&mut service, back);
-        assert!(link.starts_with(PREFIX));
         let state = manifest_state(&link);
+        // skein-ui-web admits paths in every bundle; plaintext loopback needs loopback-navigation, absent in the shipped bundle.
+        if back.is_some() {
+            assert_eq!(link, manifest_target(state));
+        } else {
+            assert!(link.starts_with(PREFIX));
+        }
         let peer = visit(&mut service, b"GET", &manifest_target(state));
         status(&peer, b"200");
         assert!(contains(peer.received(), b"Content-Type: text/html; charset=utf-8"));
