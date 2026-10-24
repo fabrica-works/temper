@@ -237,8 +237,8 @@ pub fn checked(
         for f in &members_value.forges {
             let local = match setup.as_ref().expect("clean parse").entry(f.number) {
                 Some(entry) => match &entry.mode {
-                    Mode::Owned(_) | Mode::Fake(_) => true,
-                    Mode::Managed { .. } => false,
+                    Mode::Owned(_) | Mode::Fake(_) | Mode::Managed { admin_token: None } => true,
+                    Mode::Managed { admin_token: Some(_) } => false,
                 },
                 None => false,
             };

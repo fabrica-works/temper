@@ -39,8 +39,8 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
             temper_engine_domain_forge::How::GitHubApp { app } => {
                 crate::setup::public::connect(engine, forge, request, app, carried);
             }
-            temper_engine_domain_forge::How::ForgejoAdmin { .. } => {
-                crate::setup::public::refuse_admin_connect(engine, forge, request, carried);
+            temper_engine_domain_forge::How::ForgejoAdmin { first } => {
+                crate::setup::public::admin_connect(engine, forge, request, first, carried);
             }
             temper_engine_domain_forge::How::GitHubManifest { .. } => unreachable!("manifest has its own door"),
         },
