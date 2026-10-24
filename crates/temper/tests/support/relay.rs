@@ -819,6 +819,9 @@ pub mod managed_transport {
         pub fn body(&self) -> Result<Vec<u8>> {
             self.0.body()
         }
+        pub fn upstream_bytes(&self, git: bool) -> Result<usize> {
+            Ok(self.0.with_host(if git { "github.com" } else { "api.github.com" })?.len())
+        }
     }
     pub struct Answer(Message);
     impl Answer {

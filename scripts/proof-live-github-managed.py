@@ -42,8 +42,9 @@ def private(path, data):
 
 class Process:
     """Drain both pipes without persisting raw output or exposing it on failure."""
-    def __init__(self, argv, cwd, env):
-        self.proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+    def __init__(self, argv, cwd, env, control=False):
+        self.proc = subprocess.Popen(argv, cwd=cwd, env=env,
+                                     stdin=subprocess.PIPE if control else subprocess.DEVNULL,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.lines = queue.Queue(maxsize=4096)
         self.overflow = False
@@ -233,6 +234,9 @@ class Sitting:
         self.api = None
         self.jwt_key = None
         self.app_id = None
+        self.secrets = {'App_key_DER': [], 'App_key_base64': [], 'JWT': [], 'installation_token': []}
+        self.relay = None
+        self.scanned = False
         self.binary = Path(os.environ['CARGO_TARGET_DIR']) / 'debug/temper'
         artifacts = [json.loads(line) for line in (self.scratch/'build.jsonl').read_text().splitlines()
                      if line.startswith('{')]
@@ -262,7 +266,7 @@ class Sitting:
         self.step = 'starting ' + name
         cwd = self.scratch/name
         cwd.mkdir(mode=0o700)
-        proc = Process(argv, cwd, self.env | (extra or {}))
+        proc = Process(argv, cwd, self.env | (extra or {}), control=name == 'relay')
         self.processes.append(proc)
         return proc
 
@@ -309,7 +313,9 @@ class Sitting:
         now = int(time.time())
         claims = json.dumps({'iat': now-30, 'exp': now+300, 'iss': str(self.app_id)}, separators=(',', ':')).encode()
         message = encode(b'{"alg":"RS256","typ":"JWT"}') + b'.' + encode(claims)
-        return 'Bearer ' + (message + b'.' + encode(self.jwt_key.sign(message, padding.PKCS1v15(), hashes.SHA256()))).decode()
+        token = (message + b'.' + encode(self.jwt_key.sign(message, padding.PKCS1v15(), hashes.SHA256()))).decode()
+        self.secrets['JWT'].append(token)
+        return 'Bearer ' + token
 
     def ask(self, method, path, body=None, app=False, expected=200):
         status, _, data = self.http(self.api, method, path,
@@ -322,9 +328,13 @@ class Sitting:
         document = {'listen': {'socket': '127.0.0.1:0'}, 'admin_token': str(self.scratch/'fake-admin'),
                     'owner': OWNER,
                     'repositories': [{'owner': OWNER, 'name': NAME, 'landing': 'main', 'ci': None,
-                                      'id': 1}],
+                                      'id': 1},
+                                     {'owner': OWNER, 'name': 'temper-probe', 'landing': 'main',
+                                      'ci': None, 'id': 2}],
                     'github': {'app': {'id': 4242, 'slug': 'temper-test', 'bot': 4243, 'key': 0},
-                               'accounts': [{'login': OWNER, 'id': 10, 'kind': 'user', 'installation': None}],
+                               'accounts': [{'login': OWNER, 'id': 10, 'kind': 'user', 'installation': None},
+                                            {'login': 'managed-other', 'id': 20, 'kind': 'user',
+                                             'installation': {'id': 1, 'repositories': 'all'}}],
                                'token_life_seconds': 3600}}
         path = self.scratch/'fake.json'
         private(path, json.dumps(document).encode())
@@ -387,6 +397,10 @@ class Sitting:
         while time.monotonic() < until:
             try:
                 app_id, key = app_records(self.scratch/'data/state/secrets')
+                encoded_key = base64.b64encode(key).decode()
+                if encoded_key not in self.secrets['App_key_DER']:
+                    self.secrets['App_key_DER'].append(encoded_key)
+                    self.secrets['App_key_base64'].append(encoded_key)
                 self.jwt_key = load_der_private_key(key, password=None)
                 self.app_id = app_id
                 installations = self.ask('GET', '/app/installations?per_page=100&page=1', app=True)
@@ -394,11 +408,16 @@ class Sitting:
                     # Twenty minutes of human clicks must fit the relay's request cap.
                     time.sleep(5)
                     continue
+                if self.mode == 'fake':
+                    other = [row for row in installations if row['account']['login'] == 'managed-other']
+                    require(len(other) == 1 and other[0]['id'] == 1)
+                    installations = [row for row in installations if row['account']['login'] == OWNER]
                 require(len(installations) == 1 and installations[0]['account']['login'] == OWNER)
                 installation = installations[0]['id']
                 row = self.ask('GET', '/app/installations/' + str(installation), app=True)
                 require(row['account']['login'] == OWNER)
                 self.token = self.ask('POST', '/app/installations/' + str(installation) + '/access_tokens', app=True, expected=201)['token']
+                self.secrets['installation_token'].append(self.token)
                 repos = self.ask('GET', '/installation/repositories?per_page=100&page=1')
                 require(repos['total_count'] == 1 and len(repos['repositories']) == 1
                         and repos['repositories'][0]['owner']['login'] == OWNER
@@ -432,6 +451,61 @@ class Sitting:
                                'commit': parent})['result'] == 'created')
         require(git('push', {'repository': REPOSITORY, 'branch': self.branch,
                              'commit': commit, 'expected': parent})['result'] == 'pushed')
+        self.fake_parent, self.fake_commit = parent, commit
+
+    def planted_refusals(self):
+        require(self.mode == 'fake' and self.pull is not None)
+        basic = 'Basic ' + base64.b64encode(('x-access-token:' + self.token).encode()).decode()
+        cases = [
+            ('another installation token', self.api, 'POST', '/app/installations/1/access_tokens',
+             {}, self.jwt(), '/app/installations/1/access_tokens'),
+            ('another repository read', self.api, 'GET', '/repos/' + OWNER + '/temper-probe?planted=1',
+             None, 'Bearer ' + self.token, '/repos/' + OWNER + '/temper-probe'),
+            ('push outside the run prefix', self.git, 'POST', '/.fake/git/push',
+             {'repository': REPOSITORY, 'branch': 'outside-run', 'commit': self.fake_commit,
+              'expected': self.fake_parent}, basic, '/.fake/git/push'),
+            ('second conversion', self.api, 'POST', '/app-manifests/plantedsecond/conversions',
+             {}, None, '/app-manifests/[code]/conversions'),
+        ]
+        journal = self.scratch/'relay.jsonl'
+        for label, address, method, target, body, auth, path in cases:
+            before = len(journal.read_bytes().splitlines())
+            status, _, _ = self.http(address, method, target,
+                                     b'' if body is None else json.dumps(body).encode(), auth)
+            require(status == 403)
+            rows = [json.loads(line) for line in journal.read_bytes().splitlines()[before:]]
+            require(any(row.get('method') == method and row.get('path') == path
+                        and row.get('status') == 403 and row.get('refused') is True
+                        and row.get('upstream_request_bytes') == 0 for row in rows))
+            self.mark('relay refused and logged: ' + label)
+
+    def scan_secrets(self):
+        if self.relay is None or self.scanned:
+            return
+        # Stop temper before the relay drains its workers and scans both files.
+        for process in reversed(self.processes):
+            if process is not self.relay:
+                process.stop()
+        require(self.relay.proc.poll() is None)
+        self.relay.proc.stdin.write(json.dumps(self.secrets).encode() + b'\n')
+        self.relay.proc.stdin.close()
+        try:
+            status = self.relay.proc.wait(timeout=45)
+        except subprocess.TimeoutExpired:
+            self.relay.stop()
+            raise RuntimeError('relay shutdown timed out') from None
+        for thread in self.relay.threads:
+            thread.join(timeout=1)
+        if status != 0:
+            # Only the fixed field label may leave the relay's private pipe.
+            while not self.relay.lines.empty():
+                line = self.relay.lines.get_nowait().decode(errors='replace').strip()
+                if re.fullmatch(r'secret bytes found: (pem|webhook_secret|client_secret|client_id|App_key_DER|App_key_base64|JWT|installation_token)', line):
+                    print(line, file=sys.stderr, flush=True)
+            require(False)
+        self.relay.line('no secret bytes in the relay log or the record')
+        self.scanned = True
+        self.mark('no secret bytes in the relay log or the record')
 
     def push(self):
         if self.mode == 'fake':
@@ -496,6 +570,7 @@ class Sitting:
                            {'TEMPER_MANAGED_MODE': self.mode, 'TEMPER_MANAGED_SCRATCH': str(self.scratch),
                             'TEMPER_MANAGED_UPSTREAM': upstream, 'TEMPER_MANAGED_PREFIX': self.prefix,
                             'TEMPER_MANAGED_EVIDENCE': str(self.evidence)})
+        self.relay = relay
         until = time.monotonic() + 30
         ready = self.scratch/'relay-ready.json'
         while not ready.exists():
@@ -528,6 +603,8 @@ class Sitting:
         self.mark('redacted conversion retained: ' + str(self.evidence))
         self.step = 'pushing branch and opening pull request'
         self.push()
+        if self.mode == 'fake':
+            self.planted_refusals()
         self.cleanup_remote()
         if self.mode == 'live':
             self.mark('delete this run\'s GitHub App, then press Enter here')
@@ -542,6 +619,8 @@ class Sitting:
             self.mark('deleted App JWT refused with 401')
         else:
             self.mark('fake has no App-deletion HTTP control; deletion and JWT 401 check skipped')
+        self.step = 'scanning relay artifacts for secret bytes'
+        self.scan_secrets()
         self.mark('managed sitting completed')
 
     def finish(self):
@@ -549,8 +628,11 @@ class Sitting:
             if self.token and (self.pull is not None or self.pushed):
                 self.cleanup_remote()
         finally:
-            for process in reversed(self.processes):
-                process.stop()
+            try:
+                self.scan_secrets()
+            finally:
+                for process in reversed(self.processes):
+                    process.stop()
 
 
 def main():
