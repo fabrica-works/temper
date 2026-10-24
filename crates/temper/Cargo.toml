@@ -147,3 +147,7 @@ path = "tests/relay.rs"
 [[test]]
 name = "qa_account_file"
 path = "tests/qa_account_file.rs"
+
+[[test]]
+name = "live_github_managed"
+path = "tests/live_github_managed.rs"

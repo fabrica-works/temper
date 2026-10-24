@@ -130,7 +130,26 @@ pub fn request(
     let limits = forge::wire_limits(&crate::app::limits().forge).expect("wire bounds");
     let mut reader = skein_lib::Reader::new(&ask.bytes);
     let a = (match v1::Requesting::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts().request {
-        v1::Request::Reachable(_) | v1::Request::Install(_) | v1::Request::StartDemo => {
+        v1::Request::Install(install) => {
+            assert!(reader.is_empty(), "whole install request");
+            let value = install.into_parts();
+            let reply_to = transport.reply_to(Reply::Keyed {
+                client: who,
+                attempt,
+                key,
+                owner: KeyedOwner::Application { connector: crate::fixtures::FORGE },
+            });
+            return engine::Event::Party(PartyInput::Application {
+                scope: jig_domain_people::ApplicationScope::Deployment,
+                reply_to,
+                sign_in: transport.sign_in(who).expect("authenticated install"),
+                key,
+                digest: skein_lib::sha256::digest(&ask.bytes),
+                carried: None,
+                request: engine::Application::Forge(owner::Ask::Install { forge: value.forge, back: value.back }),
+            });
+        }
+        v1::Request::Reachable(_) | v1::Request::StartDemo => {
             panic!("client sends no demo start yet")
         }
         v1::Request::Connect(connect) => {

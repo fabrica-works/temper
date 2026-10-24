@@ -11,7 +11,7 @@
 # The private service composition keeps its sign-in world in sign_in.rs;
 # its seeded sweep belongs to the fuzzy profile alone.
 [profile.default]
-default-filter = "not test(/^tests::sign_in::fuzzy_/) & not binary(/^fuzzy_/) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/) & not binary(/^browser_/)"
+default-filter = "not test(/^tests::sign_in::fuzzy_/) & not binary(/^fuzzy_/) & not binary(/^(process|live|live_github)$/) & not binary(/^qa_/) & not test(/::qa_/) & not binary(/^browser_/)"
 global-timeout = "30s"
 slow-timeout = { period = "6s" }
 
@@ -56,9 +56,9 @@ retries = 0
 
 [profile.qa]
 # The QA passes' tests (skein's docs/foundation/owners.md, 4.6): the binaries
-# named qa_*, which the gate builds and does not run. One at a time: some start
-# the shipped binary.
-default-filter = "binary(/^qa_/)"
+# named qa_*, and private service tests named qa_* within its unit binary,
+# which the gate builds and does not run. One at a time: some start the shipped binary.
+default-filter = "binary(/^qa_/) | test(/::qa_/)"
 global-timeout = "20m"
 test-threads = 1
 

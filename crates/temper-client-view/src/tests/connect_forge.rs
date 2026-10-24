@@ -1518,6 +1518,69 @@ fn github_picker_keeps_empty_pending_and_refused_states() {
         &["Choose a repository to start in", "Another project has that name"],
     );
 }
+
+#[test]
+fn github_picker_read_refusals_show_their_words_and_keep_install_available() {
+    for (reason, expected) in [
+        (
+            w::ForgeReason::NoAccess,
+            b"GitHub refused temper's read of the App's repositories: the App may be suspended. See Forges.".as_slice(),
+        ),
+        (w::ForgeReason::NotFound, b"GitHub no longer has this installation: install the App again.".as_slice()),
+    ] {
+        let (mut root, _, token) = picker_started(false);
+        answer(
+            &mut root,
+            token,
+            w::Outcome::ForgeRefused(w::ForgeRefused::new(&w::CEILINGS, w::ForgeRefusedParts { reason }).unwrap()),
+        );
+        for mut view in [f::page_view(&root), f::browser_page_view(&root)] {
+            node(view.tree(), Role::Alert, expected);
+            assert!(f::find(view.tree(), Role::ChoiceGroup, b"Repositories").is_none());
+            let install = node(
+                view.tree(),
+                Role::Link,
+                b"Not listed? Choose its repositories on GitHub, and GitHub sends you back here.",
+            );
+            assert_eq!(
+                crate::act(&mut view, install, Act::Press),
+                Some(d::Action::Forge(d::forge::Act::Install {
+                    forge: GITHUB,
+                    back: d::address::print(root.pages().address()),
+                }))
+            );
+        }
+    }
+}
+
+#[test]
+fn github_picker_exhausted_busy_rereads_offer_reload_with_the_busy_words() {
+    let (mut root, _, mut token) = picker_started(false);
+    let mut env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: f::NOW, limits: f::domain_limits() };
+    for reread in 0_u8..=3 {
+        let mut out = skein_lib::Queue::with_capacity(d::max_out(&env.limits));
+        d::step(
+            &mut root,
+            &env,
+            answer_event(
+                token,
+                w::Outcome::ConnectRefused(
+                    w::ConnectRefused::new(&w::CEILINGS, w::ConnectRefusedParts { why: w::ForgeRefusal::Busy })
+                        .unwrap(),
+                ),
+            ),
+            &mut out,
+        );
+        let view = f::browser_page_view(&root);
+        node(view.tree(), Role::Alert, b"temper is busy with forge 2: try again when it ends.");
+        assert_eq!(f::find(view.tree(), Role::Paragraph, b"Reload this page to try again.").is_some(), reread == 3);
+        if reread != 3 {
+            env.now = env.now.checked_add(skein_lib::Duration::from_secs(2)).unwrap();
+            d::fire(&mut root, &env, &mut out);
+            token = attempt(out);
+        }
+    }
+}
 fn adopted_github_rows(web: bool) -> List<w::ForgeRow> {
     let mut parts = github_rows(true).as_slice()[0].clone().into_parts();
     let mut rows = List::with_capacity(1);
