@@ -322,6 +322,7 @@ pub struct Row {
     pub kind: Kind,
     pub mode: Mode,
     pub connection: Connection,
+    pub failed: Option<FailedStep>,
     pub offer: Offer,
     pub first: Option<First>,
     pub installations: Box<[(u64, Installation)]>,
@@ -745,6 +746,14 @@ pub enum SetUpStep {
     Fetch,
     Prepare,
     Run,
+}
+/// The held connection's step when setup failed (domain/forge.md, 4.1).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FailedStep {
+    Fetch,
+    Prepare,
+    Run,
+    Connect,
 }
 /// Why a `SetUp` is refused (protocol/forge.md, 2.8; domain/forge.md, 4.1).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

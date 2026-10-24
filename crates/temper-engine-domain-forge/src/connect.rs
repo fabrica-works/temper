@@ -110,10 +110,10 @@ pub(crate) fn start(
             let carried = carried.expect("admitted key");
             d.connect.running.insert(forge, (request, Some(carried))).expect("room checked");
             let kept = match d.connections.get(&forge) {
-                Some((_, kept)) => *kept,
+                Some((_, kept, _)) => *kept,
                 None => None,
             };
-            d.connections.insert(forge, (Connection::Connecting, kept)).expect("configured forge");
+            d.connections.insert(forge, (Connection::Connecting, kept, None)).expect("configured forge");
             out.push(Request::MarkedForges);
             out.push(Request::Connect { forge, request, app, carried });
         }
@@ -150,10 +150,10 @@ pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: Conn
                 out.push(Request::CarriedUnused { number: carried.number });
             }
             let kept = match d.connections.get(&forge) {
-                Some((_, kept)) => *kept,
+                Some((_, kept, _)) => *kept,
                 None => None,
             };
-            d.connections.insert(forge, (Connection::NotConnected, kept)).expect("configured forge");
+            d.connections.insert(forge, (Connection::NotConnected, kept, None)).expect("configured forge");
             out.push(Request::MarkedForges);
         }
         d.connect.answer(request, token, Answered::Connect(answer), out);
@@ -202,10 +202,10 @@ pub(crate) fn ended(
                 stopped_end(d, forge, &why, out);
             }
             let kept = match d.connections.get(&forge) {
-                Some((_, kept)) => *kept,
+                Some((_, kept, _)) => *kept,
                 None => None,
             };
-            d.connections.insert(forge, (Connection::NotConnected, kept)).expect("configured forge");
+            d.connections.insert(forge, (Connection::NotConnected, kept, None)).expect("configured forge");
             out.push(Request::MarkedForges);
         }
     }

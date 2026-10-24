@@ -206,3 +206,37 @@ pub fn name(row: &Row, demo: Option<&Demo>) -> Name {
         }
     }
 }
+
+/// The five visible setup steps; repository creation has its own failure facts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailedStep {
+    Fetch,
+    Prepare,
+    Run,
+    Connect,
+    Repository,
+}
+#[must_use]
+pub fn failed_step(row: &Row) -> Option<FailedStep> {
+    if let Some(first) = &row.first {
+        match first.state {
+            super::forges::FirstState::Failed { .. } => return Some(FailedStep::Repository),
+            super::forges::FirstState::Making | super::forges::FirstState::Made { .. } => {}
+        }
+    }
+    match &row.connection {
+        Connection::SetUpFailed { at, .. } => match at {
+            Some(super::forges::FailedStep::Fetch) => Some(FailedStep::Fetch),
+            Some(super::forges::FailedStep::Prepare) => Some(FailedStep::Prepare),
+            Some(super::forges::FailedStep::Run) => Some(FailedStep::Run),
+            Some(super::forges::FailedStep::Connect) => Some(FailedStep::Connect),
+            None => None,
+        },
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::Connecting
+        | Connection::Connected { .. }
+        | Connection::Stopped { .. } => None,
+    }
+}

@@ -125,10 +125,13 @@ fn cases() -> Box<[(w::Connection, Connection, &'static [u8])]> {
         ),
         (
             w::Connection::SetUpFailed(
-                w::SetUpFailed::new(&limits(), w::SetUpFailedParts { why: Box::from(b"fetch failed".as_slice()) })
-                    .unwrap(),
+                w::SetUpFailed::new(
+                    &limits(),
+                    w::SetUpFailedParts { why: Box::from(b"fetch failed".as_slice()), at: None },
+                )
+                .unwrap(),
             ),
-            Connection::SetUpFailed { why: Box::from(b"fetch failed".as_slice()) },
+            Connection::SetUpFailed { why: Box::from(b"fetch failed".as_slice()), at: None },
             b"Set up failed: fetch failed",
         ),
         (w::Connection::Connecting, Connection::Connecting, b"Connecting"),
@@ -263,7 +266,7 @@ fn the_offer_drives_the_manual_words_and_setup_actions() {
     row.offer = Offer::NotUnderTheBox;
     assert_eq!(words::forge_set_up_action(&row), None);
     assert_eq!(words::forge_connection(&row).as_ref(), b"Not set up: run `temper forge fetch 3`, `temper forge prepare 3`, `temper forge run 3 forgejo` and `temper forge run 3 runner`, then restart `temper serve`");
-    row.connection = Connection::SetUpFailed { why: Box::from(b"why".as_slice()) };
+    row.connection = Connection::SetUpFailed { why: Box::from(b"why".as_slice()), at: None };
     row.offer = Offer::Offered;
     assert_eq!(words::forge_set_up_action(&row), Some(b"Set up again".as_slice()));
     for (kind, text) in [(Kind::Forgejo, b"Forgejo".as_slice()), (Kind::GitHub, b"GitHub")] {

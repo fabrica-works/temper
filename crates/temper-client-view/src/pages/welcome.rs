@@ -207,7 +207,7 @@ fn legacy_ready(
             );
         } else {
             connect::status(b, root, w, row, true);
-            if connect::underway(row) {
+            if connect::underway(row) || temper_client_domain::forge::connect::failed(row) {
                 connect::each_step(b, root, w, row);
             }
         }
