@@ -9,7 +9,7 @@ use std::{fs, path::Path, sync::LazyLock};
 
 const STOPS_WITHIN: Duration = Duration::from_secs(10);
 
-static ACCESS: LazyLock<Box<[u8]>> = LazyLock::new(|| {
+pub(super) static ACCESS: LazyLock<Box<[u8]>> = LazyLock::new(|| {
     use skein_lib::{Writer, base64};
     let mut token = Vec::new();
     for json in [br#"{"alg":"RS256","typ":"JWT"}"#.as_slice(), br#"{"sub":"process-person"}"#] {
@@ -110,7 +110,8 @@ fn issuer(address: std::net::SocketAddr, registration: &serde_json::Value, redir
         codes: 1,
         rotations: 2,
         carried: 5,
-        plans: 1,
+        // Code grant, a move's refresh, and a spare successful rotation.
+        plans: 3,
     };
     let mut peer = oauth::Peer::new(
         address,
@@ -508,6 +509,13 @@ fn answer_peer(allowance: u64, exceeded: bool) -> skein_fake_peers::llm::Peer {
 /// The existing TLS peer, with the plan bearer and room for the largest scripted item.
 #[must_use]
 pub(super) fn plan_peer(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
+    plan_peer_at("127.0.0.1:34443".parse().expect("fake LLM address"), scripts)
+}
+
+pub(super) fn plan_peer_at(
+    address: std::net::SocketAddr,
+    scripts: Box<[skein_fake_llm_domain::api::Script]>,
+) -> skein_fake_peers::llm::Peer {
     use skein_fake_llm_domain::api::Line;
     let largest = scripts
         .iter()
@@ -530,7 +538,7 @@ pub(super) fn plan_peer(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> s
     recipe.protocol_limits.http.head = 8192;
     recipe.credential = skein_llm::Credential::bearer(ACCESS.as_ref().into());
     skein_fake_peers::llm::Peer::new(
-        "127.0.0.1:34443".parse().expect("fake LLM address"),
+        address,
         Transport::Tls,
         recipe.limits,
         recipe.config,
