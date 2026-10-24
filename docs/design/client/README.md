@@ -727,9 +727,11 @@ keeps (`../protocol/configuration.md`, section 2).
     demo's start under way, as in that project.
     *"Set up temper"* opens its Forge step.
   - *Forge* is `ConnectForge`'s Choose and Details (`forge.md`, 5.4),
-    its choice in the welcome's address (`browser.md`, 2.3), "‹ All
-    forges" back to its Choose. A forge already setting up, connecting
-    or connected is no choice: the step says it, "FORGE · CONNECTION",
+    its choice in the welcome's address (`browser.md`, 2.3); inside a
+    choice, the foot's one "‹ Back" returns to Forge's Choose. The
+    welcome has no "‹ All forges"; `ConnectForge` keeps it. A forge
+    already setting up, connecting or connected is no choice: the
+    step says it, "FORGE · CONNECTION",
     with "View", to `ConnectForge` at it; but a GitHub forge with no
     accepted installation, or with none of its repositories adopted,
     shows `ConnectForge`'s Connecting or Ready in the step, its `back`
@@ -750,7 +752,7 @@ keeps (`../protocol/configuration.md`, section 2).
     says what Forge did: while it sets up or connects, "FORGE ·
     CONNECTION · ORG/NAME, into PROJECT", and a disclosure, "Each
     step", holding `ConnectForge`'s Setting up steps; once connected
-    with its first repository adopted, ticked, "FORGE · ORG/NAME, in
+    with its first repository adopted, ticked, "✓ FORGE · ORG/NAME, in
     PROJECT", on GitHub the repository Ready adopted; PROJECT reads
     "the new project NAME" for a new one. A GitHub forge with none
     adopted yet reads "GitHub · no repository chosen yet", as a forge
@@ -763,13 +765,15 @@ keeps (`../protocol/configuration.md`, section 2).
     ticked one keeps "Each step". *The seam:* the Model step's
     body is `ConnectModel`'s, the step's frame, heading, lead, set up
     line and foot the welcome's.
-    *Ready* names the forge and the model as set up or under way, under
-    "Almost ready": a list of "Forge: FORGE, connected as LOGIN" or
-    "Forge: FORGE · CONNECTION" (with its "Each step"), or "Forge: none
-    yet" with "Connect a forge", to the Forge step; while a model is
-    usable, as *Whether it shows* says (the one test Ready and the
+    *Ready* is a checklist, under "Almost ready" while work is under
+    way: Model, Forge, then Project. Forge reads
+    "Forge: FORGE, connected as LOGIN" or
+    "Forge: FORGE · CONNECTION" (with its "Each step" folded), or
+    "Forge: none yet" with "Connect a forge", to the Forge step; while
+    a model is usable, as *Whether it shows* says (the one test Ready and the
     setup strip share), "Model: ACCOUNT", the first usable account's
-    heading (5.5, An account): the `accounts` document's first usable
+    heading (5.5, An account), followed by " · MODEL" where the model
+    and its account are known: the `accounts` document's first usable
     row, else, for an owner, the first of the deployment's accounts
     that counts for the demo's model half (4.8), never the demo's
     own; or "Model: MODEL" where no such account
@@ -782,9 +786,10 @@ keeps (`../protocol/configuration.md`, section 2).
     with "Connect a model", to the Model step; and no model line until
     the `accounts` document is delivered; and "Project
     PROJECT, with ORG/NAME" once the forge's first repository is on its
-    row. Once that repository is adopted (`forge.md`, 5.4, Ready), its
-    heading is "ORG/NAME is ready", with "Open PROJECT", to the chats
-    page in that project; while the forge is connected with no first
+    row. Until adopted, "Open PROJECT" is disabled, with "It opens once
+    ORG/NAME is made." Once that repository is adopted (`forge.md`,
+    5.4, Ready), its heading is "ORG/NAME is ready", its checklist
+    done, with "Open PROJECT", to the chats page in that project; while the forge is connected with no first
     repository, "Adopt a repository", to `Adopt` into a new project
     (4.4). Ready is
     done, not current, along the top once its forge and model both
@@ -2063,12 +2068,13 @@ the cues the demo's, copied in:
   "Where your repositories live: temper’s agents push branches and
   open pull requests there."; Model's "Connect a model", then "temper’s
   agents run on it: on a plan you sign in to, or on a key.". Each
-  step after Welcome offers "‹ Back", to the step before, "Later", to
-  the chats page, and "Try the playground instead" while the demo is
-  answered (4.8), which it no longer is once a forge of the person's
-  connects. A document with no demo (`application.demo` null, the
-  demo's read answering none) has neither the playground's card nor
-  the closing line, and no step offers the playground.
+  step between Welcome and Ready offers a foot: "‹ Back", to its
+  Choose inside a choice, otherwise to the step before; "Later", to
+  the chats page; and "Try the playground instead" while the demo is
+  answered (4.8) and no real forge is connected, including before the
+  demo's end is read. Ready has no foot. A document with no demo
+  (`application.demo` null, the demo's read answering none) has neither
+  the playground's card nor the closing line, and no step offers the playground.
 - **The setup strip:** "temper has no forge and no model yet.", or the
   one missing alone ("temper has no forge yet.", "temper has no model
   yet."; for a person whose role does not hold the deployment's forges,

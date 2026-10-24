@@ -55,6 +55,43 @@ enum Part {
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
+        name: "forge-details",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::TextField, name: "Organization" },
+            Part::Named { role: Role::TextField, name: "Repository" },
+            Part::Named { role: Role::TextField, name: "Into a new project, named" },
+        ],
+    },
+    Holds {
+        name: "forge-setting-up-middle",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::Status, name: "under way" },
+            Part::Named { role: Role::List, name: "Each step" },
+        ],
+    },
+    Holds {
+        name: "welcome-ready-under-way",
+        heading: "Almost ready",
+        parts: &[
+            Part::Named { role: Role::Disclosure, name: "Each step" },
+            Part::Named { role: Role::Paragraph, name: "Project Default, with work/hello" },
+            Part::Named { role: Role::Button, name: "Open Default" },
+            Part::Named { role: Role::Paragraph, name: "It opens once work/hello is made." },
+        ],
+    },
+    Holds {
+        name: "welcome-ready-adopted",
+        heading: "work/hello is ready",
+        parts: &[
+            Part::Named { role: Role::Paragraph, name: "Forge: Forgejo on this machine, connected as temper" },
+            Part::Named { role: Role::Paragraph, name: "Project Default, with work/hello" },
+            Part::Named { role: Role::Link, name: "Open Default" },
+            Part::Absent { role: Role::Disclosure, name: "Each step" },
+        ],
+    },
+    Holds {
         name: "connect-forge-first-run-6",
         heading: "Connect a forge",
         parts: &[

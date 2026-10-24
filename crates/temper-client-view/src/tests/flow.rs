@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_types, clippy::disallowed_methods, reason = "test assertions inspect progress states")]
 use super::fixtures as f;
 use crate::flow::{self, Mark};
 use skein_ui::{Builder, Role, State};
@@ -38,4 +39,7 @@ fn a_progress_says_each_lines_state() {
         }
     }
     assert_eq!(statuses, 3_u32);
+    let items: Vec<_> = tree.nodes().iter().filter(|n| n.role == Role::Item).collect();
+    assert!(items[0].styles.as_slice().contains(&crate::look::FLOW_DONE));
+    assert!(items[1].states.as_slice().contains(&State::Current));
 }

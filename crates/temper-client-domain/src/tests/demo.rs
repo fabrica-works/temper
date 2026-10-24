@@ -300,6 +300,7 @@ fn the_first_demo_read_answer_counts_even_when_it_has_no_record() {
         demo::told(&mut side, &Told::Page { handle, page }, f::limits().forge, &mut Queue::with_capacity(1));
         assert!(side.demo_answered());
         assert!(side.demo().is_none());
+        assert_eq!(side.demo_provider(), None);
         assert!(forge::shown(&side) > before, "an answered absence redraws the welcome");
         demo::told(&mut side, &Told::Link { link: Link::Offline }, f::limits().forge, &mut Queue::with_capacity(1));
         assert!(side.demo_answered());
@@ -735,10 +736,12 @@ fn deliver_role(root: &mut crate::Domain, me: skein_lib::Token, role: Option<c::
 fn the_forge_end_rereads_once_settles_without_removal_and_none_clears_the_demo() {
     // The deployment lists the demo model's account: the engine removes it at this end, not the client.
     let (mut root, account, forges, watch) = ending_root_with_deployment();
+    assert_eq!(root.forge().demo_provider(), Some(PROVIDER));
     assert!(deployment_watch(&mut deliver_accounts(&mut root, account, ending_accounts(false))).is_none());
     assert!(forge_rows(&mut root, forges, false).is_empty());
     let mut out = forge_rows(&mut root, forges, true);
     let read = demo_reread(&mut out);
+    assert_eq!(root.forge().demo_provider(), Some(PROVIDER), "the ended playground stays known");
     assert!(!closed(&out, watch), "the running answer still holds the watch");
     assert!(deployment_watch(&mut out).is_none());
     assert!(removed(&mut out).is_empty(), "forge end sends no Remove");
@@ -747,6 +750,7 @@ fn the_forge_end_rereads_once_settles_without_removal_and_none_clears_the_demo()
     assert!(closed(&out, watch), "settled removal drops the watch once running ends");
     assert!(removed(&mut out).is_empty());
     assert!(root.forge().demo().is_none());
+    assert_eq!(root.forge().demo_provider(), Some(PROVIDER), "rereading None retains the provider");
     assert!(root.demo().is_none());
     assert!(removed(&mut deliver_deployment(&mut root, watch, deployment(&[DEMO_ACCOUNT]))).is_empty());
     assert!(removed(&mut deliver_accounts(&mut root, account, ending_accounts(true))).is_empty());

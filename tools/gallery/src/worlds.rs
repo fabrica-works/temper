@@ -142,6 +142,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
     ] {
         step(&mut root, Event::Client { event }, &mut out);
     }
+    let mut forge_watch = None;
     // Every response is to an actual open/read, including the demo family read.
     for _ in 0_u32..256 {
         let Some(request) = out.pop() else { break };
@@ -185,6 +186,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                     .expect("gallery forge watch");
                     let subject = match watching.watch() {
                         w::Watch::Forges => {
+                            forge_watch = Some(watch);
                             forges_watched(&mut root, w, watch, &mut out);
                             continue;
                         }
@@ -216,6 +218,9 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
         }
     }
     assert!(out.is_empty(), "world fixture settles");
+    if w == (FirstRun { step: 8 }) {
+        adopt_owned_sample(&mut root, forge_watch.expect("owned forge watch"), &mut out);
+    }
     if matches!(w, FirstRun { step: 1..=4 }) {
         assert!(root.demo().expect("answered demo").1.model);
     }
@@ -2339,7 +2344,7 @@ pub(super) fn now(w: World) -> Wall {
             4 => 6,
             5 => 15,
             6 => 16,
-            7 => 19,
+            7 | 8 => 19,
             _ => unreachable!("mockup first-run step"),
         },
         Reference | Solo | World::Bare => 0,
@@ -2358,4 +2363,93 @@ fn offset(w: World, minutes: i64) -> Wall {
     Wall::from_nanos(
         if minutes < 0 { hour0.checked_sub(delta) } else { hour0.checked_add(delta) }.expect("mockup time fits"),
     )
+}
+
+fn sample_attempt(root: &mut Domain, out: &mut Queue<Request>) -> Token {
+    step(root, Event::Client { event: jig_client::Event::Stored }, out);
+    while let Some(request) = out.pop() {
+        if let Some(jig_client::Down::Send { attempt, .. }) = crate::driver::down(request) {
+            return attempt;
+        }
+    }
+    unreachable!("sample sent its request")
+}
+fn sample_answer(root: &mut Domain, attempt: Token, answer: jig_client::Answered, out: &mut Queue<Request>) {
+    step(
+        root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(answer),
+                    why: None,
+                },
+            },
+        },
+        out,
+    );
+}
+fn sample_forge_answer(
+    root: &mut Domain,
+    attempt: Token,
+    outcome: temper_client_protocol_wire::v1::Outcome,
+    out: &mut Queue<Request>,
+) {
+    use temper_client_protocol_wire::{self as wire, v1 as w};
+    sample_answer(
+        root,
+        attempt,
+        jig_client::Answered::Family(jig_client::Family {
+            family: wire::FORGE,
+            version: wire::CLIENT_VERSION,
+            bytes: wire::answer(&w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).expect("sample answer")),
+        }),
+        out,
+    );
+}
+fn adopt_owned_sample(root: &mut Domain, watch: Token, out: &mut Queue<Request>) {
+    use temper_client_protocol_wire::v1 as w;
+    step(
+        root,
+        Event::Act {
+            action: temper_client_domain::Action::Forge(temper_client_domain::forge::Act::SetUp { forge: 3 }),
+        },
+        out,
+    );
+    let attempt = sample_attempt(root, out);
+    sample_forge_answer(root, attempt, w::Outcome::SettingUp, out);
+    // The first row is durable Made; the project's creation and Adopt follow it.
+    forges_watched(root, FirstRun { step: 7 }, watch, out);
+    let attempt = sample_attempt(root, out);
+    sample_answer(
+        root,
+        attempt,
+        jig_client::Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::ProjectMade {
+            project: PROJECT,
+        }))),
+        out,
+    );
+    let attempt = sample_attempt(root, out);
+    sample_forge_answer(
+        root,
+        attempt,
+        w::Outcome::Adopted(
+            w::Adopted::new(
+                &w::CEILINGS,
+                w::AdoptedParts {
+                    forge: 3,
+                    repository: 42,
+                    owner: b"work".as_slice().into(),
+                    name: b"hello".as_slice().into(),
+                    role: w::Role::Owned,
+                    home: true,
+                    kinds: w::Kinds::new(&w::CEILINGS, w::KindsParts { skein_bools: [true; 9] }).expect("sample kinds"),
+                    protection: w::Protection::Unknown,
+                },
+            )
+            .expect("sample adopted"),
+        ),
+        out,
+    );
 }

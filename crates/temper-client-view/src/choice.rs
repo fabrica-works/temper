@@ -41,7 +41,6 @@ fn control(b: &mut Builder, bindings: &mut Bindings, role: Role, name: &[u8], ac
 fn account_link(b: &mut Builder, bindings: &mut Bindings, name: &[u8]) {
     control(b, bindings, Role::Link, name, Act::Go { address: Address::Accounts }, false);
 }
-#[expect(clippy::manual_map, reason = "optional demo facts are read without closures in step code")]
 pub(crate) fn banner(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings) {
     if crate::frame::unavailable(root).is_some()
         || match root.pages().address() {
@@ -63,10 +62,7 @@ pub(crate) fn banner(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut B
     b.style(crate::look::ACCOUNTS);
     line(b, w, W::AccountBanner, &[]);
     if let Some(me) = temper_client_domain::pages::accounts::current_me(root.client()) {
-        let demo = match root.forge().demo() {
-            Some(demo) => Some(demo.provider),
-            None => None,
-        };
+        let demo = root.forge().demo_provider();
         let ways = temper_client_domain::pages::accounts::ways(&me.providers, demo, c::AccountHolder::Own);
         for way in &ways {
             let name = crate::pages::connect_model::label(me, *way, &ways, w);
@@ -368,6 +364,67 @@ fn using(b: &mut Builder, root: &Domain, task: Option<&c::Task>, w: &Words) {
     } else {
         line(b, w, W::UsingDefault, &[]);
     }
+}
+
+/// Ready pairs a supplied model only with an account selected for that model's provider.
+pub(crate) fn ready_model(root: &Domain, w: &Words) -> Box<[u8]> {
+    use crate::accounts::words::{self as aw, Word as A};
+    let project = root.pages().project();
+    let choice = match (temper_client_domain::pages::accounts::current_me(root.client()), project) {
+        (Some(me), Some(project)) => match jig_client::shapes::template(me, project, jig_client::shapes::CHAT) {
+            Some(template) => template.llm.as_ref(),
+            None => None,
+        },
+        _ => None,
+    };
+    let Some((model, provider)) = model_words(root, None, choice, project, w) else {
+        return match crate::pages::accounts::first_usable_heading(root, w) {
+            Some(account) => account,
+            None => new_chat_model(root, w),
+        };
+    };
+    let Some(me) = temper_client_domain::pages::accounts::current_me(root.client()) else { return model };
+    let Some(doc) = temper_client_domain::pages::accounts::document(root.client()) else { return model };
+    if doc.cut {
+        return model;
+    }
+    let Some(program) = program_endpoint(me, provider) else { return model };
+    let preferred = match choice {
+        Some(choice) => choice.account,
+        None => None,
+    };
+    let account = match pinned(doc, me.party.number, provider, [preferred, None]) {
+        Some(row) => Some(row),
+        None => selected_account(doc, me.party.number, provider, program),
+    };
+    let Some(account) = account else { return model };
+    if account.cut {
+        return model;
+    }
+    let SourceChoice::Chosen(index) = chosen_source(account, program) else { return model };
+    let source = account.sources.get(index).expect("chosen account source");
+    let mut supplied = None;
+    for offer in &me.providers {
+        if Some(offer.provider) == provider && !offer.name.cut {
+            supplied = Some(offer.name.bytes());
+            break;
+        }
+    }
+    let Some(supplied) = supplied else { return model };
+    let (brand, plan) = aw::provider_words(supplied);
+    let label = match source.kind {
+        c::OwnerAccountKind::Key => aw::say(w, A::ApiKeyBrand, &[Hole::Name(shown(brand, w))]),
+        c::OwnerAccountKind::SignIn => shown(if account.plan { plan } else { brand }, w),
+        c::OwnerAccountKind::Program => aw::say(w, A::Subscription, &[Hole::Name(shown(plan, w))]),
+        c::OwnerAccountKind::None => return model,
+    };
+    let display = match source.kind {
+        c::OwnerAccountKind::SignIn if !account.display.cut => account.display.bytes(),
+        c::OwnerAccountKind::Program => source.name.as_deref().unwrap_or(b""),
+        c::OwnerAccountKind::Key | c::OwnerAccountKind::SignIn | c::OwnerAccountKind::None => b"",
+    };
+    let separator = aw::say(w, A::Separator, &[]);
+    aw::join(&[&label, if display.is_empty() { b"" } else { &separator }, &shown(display, w), &separator, &model])
 }
 
 /// Ready uses the same model and effort words as a new chat's composer.

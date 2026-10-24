@@ -24,6 +24,17 @@ pub(super) struct State {
 pub(super) struct Starting {
     pub request: Token,
 }
+impl Side {
+    /// The playground's provider, retained after its end for account-offer policy.
+    #[must_use]
+    pub fn demo_provider(&self) -> Option<u32> {
+        match self.demo.answer.as_ref() {
+            Some(demo) => Some(demo.provider),
+            None => self.demo.end_provider,
+        }
+    }
+}
+
 impl State {
     pub const fn new() -> Self {
         Self {
@@ -270,8 +281,8 @@ fn observe_end(side: &mut Side, accounts: Option<&c::OwnerAccounts>, client: &Cl
     let changed = (model_ended && !side.demo.model_ended) || reread;
     side.demo.model_ended |= model_ended;
     side.demo.forge_ended |= forge_ended;
-    if model_ended {
-        // Retain the provider if a role change closes the watch before removal settles.
+    if model_ended || forge_ended {
+        // Retain the provider after the engine retires the demo or the owner watch closes.
         side.demo.end_provider = Some(demo.provider);
     }
     if reread {

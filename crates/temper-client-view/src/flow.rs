@@ -54,6 +54,11 @@ pub(crate) fn progress(b: &mut Builder, w: &Words, name: &[u8], lines: &[(&[u8],
     b.style(look::FLOW_PROGRESS);
     for (line, mark) in lines {
         b.open(Role::Item);
+        match mark {
+            Mark::Done => b.style(look::FLOW_DONE),
+            Mark::UnderWay => b.state(State::Current),
+            Mark::Failed | Mark::ToCome => {}
+        }
         b.text(Run::Plain, line);
         let word = match mark {
             Mark::Done => Some(Word::FlowDone),

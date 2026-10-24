@@ -1166,3 +1166,162 @@ fn an_unusable_later_program_source_names_no_account_when_a_program_source_after
         assert_eq!(using_text(&root), expected, "ready {ready:?}, pin {pin:?}");
     }
 }
+
+#[test]
+fn ready_pairs_the_default_model_with_its_selected_account() {
+    let root = line_facts(
+        Some(c::PayerReadiness {
+            provider: 17,
+            payer: c::OwnerAccountUse::Party(73),
+            readiness: c::Readiness::Usable,
+            settled: Some(true),
+        }),
+        accounts(&[account(3, c::OwnerAccountKind::SignIn, None)]),
+        None,
+        None,
+        None,
+        false,
+    );
+    assert_eq!(
+        crate::choice::ready_model(&root, &fixtures::words()).as_ref(),
+        "ChatGPT · Personal · gpt-6-luna".as_bytes()
+    );
+}
+#[test]
+fn ready_does_not_pair_another_providers_account_with_the_model() {
+    let mut other = account(3, c::OwnerAccountKind::SignIn, None);
+    other.provider = Some(18);
+    let root = line_facts(
+        Some(c::PayerReadiness {
+            provider: 17,
+            payer: c::OwnerAccountUse::Party(73),
+            readiness: c::Readiness::Usable,
+            settled: Some(true),
+        }),
+        accounts(&[other]),
+        None,
+        None,
+        None,
+        false,
+    );
+    assert_eq!(crate::choice::ready_model(&root, &fixtures::words()).as_ref(), b"gpt-6-luna");
+}
+
+/// Keep the catalogue unchanged across the playground's retirement.
+pub(super) fn playground_offers_root(address: Address, playground: bool) -> (d::Domain, Token) {
+    use temper_client_protocol_wire::v1 as w;
+    let (mut root, me_watch, _, _, accounts, forges) = fixtures::root_at_with_forges(
+        address,
+        &fixtures::domain_limits(),
+        b"Shop",
+        playground.then_some((fixtures::PROJECT, true, w::DemoState::Running)),
+        None,
+        Some(super::connect_forge::rows(w::Connection::Connecting, w::Offer::Offered)),
+    );
+    let mut me = d::pages::accounts::current_me(root.client()).unwrap().clone();
+    me.providers = List::with_capacity(2);
+    for (provider, name, sign_in) in [(17, b"demo".as_slice(), false), (18, b"openai".as_slice(), true)] {
+        me.providers
+            .push(c::ProviderOffer {
+                provider,
+                name: super::connect_model::text(name),
+                key_bytes: 4096,
+                sign_in,
+                signed_in_plan: sign_in,
+                key: true,
+                programs: List::with_capacity(0),
+                programs_cut: false,
+                none: false,
+                manage_usage: None,
+            })
+            .unwrap();
+    }
+    delivered(&mut root, me_watch, c::Delivery::Me(Box::new(me)));
+    delivered(
+        &mut root,
+        accounts.unwrap(),
+        c::Delivery::OwnerAccounts(Box::new(c::OwnerAccounts {
+            program_hosts: List::with_capacity(0),
+            accounts: List::with_capacity(0),
+            signing: List::with_capacity(0),
+            last_end: None,
+            usable: false,
+            settled: true,
+            cut: false,
+            readiness: List::with_capacity(0),
+            readiness_cut: false,
+        })),
+    );
+    (root, forges.unwrap())
+}
+
+pub(super) fn retire_playground(root: &mut d::Domain, watch: Token) -> Token {
+    use temper_client_protocol_wire::v1 as w;
+    let mut out = super::connect_forge::deliver(
+        root,
+        watch,
+        super::connect_forge::rows(super::connect_forge::connected(), w::Offer::Offered),
+    );
+    while let Some(request) = out.pop() {
+        if let d::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Read { read, what: jig_client::Readable::Family { record, .. } },
+                },
+        } = request
+        {
+            assert_eq!(
+                temper_client_protocol_wire::decode_reading(&record.bytes, &w::CEILINGS).unwrap().read(),
+                &w::Read::Demo
+            );
+            return read;
+        }
+    }
+    panic!("a real forge's connection rereads the demo");
+}
+
+pub(super) fn answer_retired_playground(root: &mut d::Domain, read: Token) {
+    fixtures::root_event(
+        root,
+        d::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read,
+                    result: jig_client::Readout::Family { family: temper_client_protocol_wire::FORGE, record: None },
+                },
+            },
+        },
+    );
+    assert!(root.forge().demo().is_none());
+}
+
+#[test]
+fn forge_banners_exclude_the_playgrounds_provider_before_and_after_retirement() {
+    for address in [Address::ConnectForge { forge: None }, Address::Forges] {
+        let (mut root, watch) = playground_offers_root(address.clone(), true);
+        let check = |root: &d::Domain| {
+            let mut view = fixtures::page_view(root);
+            let tree = view.tree();
+            assert!(fixtures::find(tree, Role::Paragraph, b"Agents need an LLM account to run.").is_some());
+            assert!(fixtures::find(tree, Role::Link, b"Use a demo API key").is_none());
+            let sign_in = fixtures::find(tree, Role::Link, b"Continue with ChatGPT").unwrap();
+            let key = fixtures::find(tree, Role::Link, b"Use an API key").unwrap();
+            for (node, kind) in [(sign_in, d::WayKind::SignIn), (key, d::WayKind::Key)] {
+                assert_eq!(
+                    crate::act(&mut view, node, skein_ui::Act::Press),
+                    Some(d::Action::Pages(d::pages::Act::Go {
+                        address: Address::ConnectModel { way: Some(d::ModelWay { provider: 18, source: None, kind }) }
+                    }))
+                );
+            }
+        };
+        check(&root);
+        let read = retire_playground(&mut root, watch);
+        check(&root);
+        answer_retired_playground(&mut root, read);
+        check(&root);
+        // A provider named demo in a configuration without a playground is a legitimate key offer.
+        let (root, _) = playground_offers_root(address, false);
+        assert!(fixtures::find(fixtures::page_view(&root).tree(), Role::Link, b"Use a demo API key").is_some());
+    }
+}

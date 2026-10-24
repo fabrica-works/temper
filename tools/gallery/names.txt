@@ -8,6 +8,10 @@ chats-first-run-1
 connect-forge-first-run-6
 forges-first-run-7
 connect-forge-choose
+forge-details
+forge-setting-up-middle
+welcome-ready-under-way
+welcome-ready-adopted
 chats-setup-strip
 adoption
 adoption-filled

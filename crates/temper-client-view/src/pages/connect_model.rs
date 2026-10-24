@@ -196,14 +196,10 @@ pub(crate) fn main(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     body(b, root, w, bindings, text_per_node);
     b.close();
 }
-#[expect(clippy::manual_map, reason = "optional demo facts are read without closures in step code")]
 pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, text_per_node: u32) {
     let Some(page) = root.pages().connect_model() else { return };
     let Some(me) = accounts::current_me(root.client()) else { return };
-    let demo = match root.forge().demo() {
-        Some(demo) => Some(demo.provider),
-        None => None,
-    };
+    let demo = root.forge().demo_provider();
     let ways = accounts::ways(&me.providers, demo, page.holder);
     let way = model::way(root.pages(), root.client());
     let busy = match &page.request.pending {

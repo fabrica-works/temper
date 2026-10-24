@@ -39,7 +39,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 46;
+pub const N: usize = 50;
 #[must_use]
 fn task(task: u64) -> Address {
     Address::Task { task, filter: PlanFilter::All }
@@ -79,6 +79,10 @@ pub fn samples() -> [Sample; N] {
             address: Address::ConnectForge { forge: None },
             then: Shown,
         },
+        owned_sample("forge-details", 0, false),
+        owned_sample("forge-setting-up-middle", 6, false),
+        owned_sample("welcome-ready-under-way", 6, true),
+        owned_sample("welcome-ready-adopted", 8, true),
         Sample { name: "chats-setup-strip", world: Bare, address: CHATS, then: Shown },
         Sample { name: "adoption", world: Reference, address: Address::Adopt { project: 1 }, then: Shown },
         Sample { name: "adoption-filled", world: Reference, address: Address::Adopt { project: 1 }, then: Filled },
@@ -142,6 +146,18 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "task-solo-T9", world: Solo, address: task(9), then: Shown },
     ]
 }
+fn owned_sample(name: &'static str, step: u8, ready: bool) -> Sample {
+    Sample {
+        name,
+        world: World::FirstRun { step },
+        address: if ready {
+            Address::Welcome { step: temper_client_domain::Step::Ready }
+        } else {
+            Address::ConnectForge { forge: Some(temper_client_domain::Choice::Forge(3)) }
+        },
+        then: Then::Shown,
+    }
+}
 fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: Then) -> Sample {
     let way = temper_client_domain::ModelWay {
         source: None,
@@ -152,6 +168,11 @@ fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: T
 }
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
+    match sample.name {
+        "welcome-ready-under-way" => return Some("welcome.html?world=first-run-real&step=3&at=ready&bare".to_owned()),
+        "welcome-ready-adopted" => return Some("welcome.html?world=first-run-real&step=4&at=ready&bare".to_owned()),
+        _ => {}
+    }
     if sample.then == Then::GoogleSignIn {
         return Some("sign-in.html?world=google-sign-in&bare".to_owned());
     }

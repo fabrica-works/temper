@@ -265,7 +265,7 @@ fn root_at_with_activity(
 }
 
 #[expect(clippy::too_many_lines, reason = "one fixture delivers the page's documents and the session's reads together")]
-fn root_at_with_forges(
+pub(super) fn root_at_with_forges(
     address: temper_client_domain::Address,
     limits: &Limits,
     project_name: &[u8],

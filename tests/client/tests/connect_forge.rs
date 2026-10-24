@@ -180,7 +180,7 @@ fn setting_up_forgejo_here_from_the_welcome() {
             d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Ready }) },
         );
         let ready = view(&root);
-        node(&ready, Role::Heading { level: 2 }, b"work/hello is ready");
+        node(&ready, Role::Heading { level: 1 }, b"work/hello is ready");
         node(&ready, Role::Link, b"Open hello");
         assert_eq!(front.applications_admitted(), before + 1, "revisiting Ready does not adopt again");
     }

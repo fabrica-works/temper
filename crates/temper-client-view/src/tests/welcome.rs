@@ -71,6 +71,8 @@ fn model_ticks_the_first_repository_made_in_its_project() {
     let line = line_before_model(view.tree(), "Forgejo on this machine · work/hello, in Shop");
     let line = view.tree().nodes().iter().find(|n| n.id == line).unwrap();
     assert!(line.styles.as_slice().contains(&crate::look::FLOW_DONE));
+    let index = view.tree().nodes().iter().position(|n| n.id == line.id).unwrap();
+    assert!(f::node_text(view.tree(), index).starts_with("✓ ".as_bytes()));
     each_step(view.tree(), false);
 }
 
@@ -267,7 +269,7 @@ fn the_model_step_offers_the_accounts_ways() {
     );
     let view = f::page_view(&root);
     node(view.tree(), Role::Heading { level: 1 }, "Connect a model");
-    node(view.tree(), Role::Paragraph, "temper’s agents run on it, and what they use is billed to its account.");
+    node(view.tree(), Role::Paragraph, "temper’s agents run on it: on a plan you sign in to, or on a key.");
     node(view.tree(), Role::Button, "Continue with ChatGPT");
     let action = press(&root, Role::Link, "Use an API key");
     let d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Model { way: Some(_) } } }) = &action
@@ -281,11 +283,9 @@ fn the_model_step_offers_the_accounts_ways() {
 }
 #[test]
 fn each_later_step_offers_back_later_and_the_playground_while_the_demo_is_answered() {
-    for (step, back) in [
-        (Step::Forge { forge: None }, Step::Welcome),
-        (Step::Model { way: None }, Step::Forge { forge: None }),
-        (Step::Ready, Step::Model { way: None }),
-    ] {
+    for (step, back) in
+        [(Step::Forge { forge: None }, Step::Welcome), (Step::Model { way: None }, Step::Forge { forge: None })]
+    {
         for demo in [false, true] {
             let root = f::welcome_root(step, demo);
             assert_eq!(
@@ -441,4 +441,121 @@ fn ready_names_the_new_chat_templates_model_and_effort() {
     super::accounts::deliver(&mut root, accounts_watch.unwrap(), document);
     let view = f::page_view(&root);
     node(view.tree(), Role::Paragraph, "Model: configured-model · high");
+}
+
+#[test]
+fn selected_forge_choices_have_one_back_to_choose() {
+    for choice in [d::Choice::Forge(2), d::Choice::Forge(3), d::Choice::Elsewhere] {
+        let root = f::forge_root(
+            Address::Welcome { step: Step::Forge { forge: Some(choice) } },
+            forge::rows(w::Connection::NotSetUp, w::Offer::Offered),
+        );
+        let view = f::browser_page_view(&root);
+        assert!(f::find(view.tree(), Role::Link, "‹ All forges".as_bytes()).is_none());
+        assert_eq!(view.tree().nodes().iter().filter(|n| n.name.as_deref() == Some("‹ Back".as_bytes())).count(), 1);
+        assert_eq!(
+            press(&root, Role::Link, "‹ Back"),
+            d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Forge { forge: None } } })
+        );
+        if choice == d::Choice::Forge(2) {
+            node(view.tree(), Role::Heading { level: 2 }, "An App of your own");
+            assert!(f::find(view.tree(), Role::Heading { level: 2 }, b"GitHub").is_none());
+        }
+    }
+}
+
+#[test]
+fn ready_has_no_foot_controls() {
+    for demo in [false, true] {
+        let root = f::welcome_root(Step::Ready, demo);
+        let view = f::page_view(&root);
+        for (role, name) in
+            [(Role::Link, "‹ Back"), (Role::Link, "Later"), (Role::Button, "Try the playground instead")]
+        {
+            assert!(f::find(view.tree(), role, name.as_bytes()).is_none());
+        }
+        assert!(!view.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&crate::look::WELCOME_FOOT)));
+    }
+}
+
+#[test]
+fn a_connected_real_forge_hides_the_playground_before_its_end_is_read() {
+    let mut cases = Vec::new();
+    cases.push(forge::rows(forge::connected(), w::Offer::Offered));
+    for app in [w::AppWay::Manifest, w::AppWay::Pasted] {
+        let mut rows = forge::github_rows(false);
+        let mut parts = rows.get(0).unwrap().clone().into_parts();
+        parts.app = Some(app);
+        *rows.get_mut(0).unwrap() = w::ForgeRow::new(&w::CEILINGS, parts).unwrap();
+        cases.push(rows);
+    }
+    for rows in cases {
+        for step in [Step::Forge { forge: None }, Step::Model { way: None }] {
+            let root = f::demo_forges_root(Address::Welcome { step }, rows.clone());
+            assert!(root.forge().demo().is_some(), "the cached answer has not been reread yet");
+            let view = f::page_view(&root);
+            assert!(f::find(view.tree(), Role::Button, b"Try the playground instead").is_none());
+        }
+    }
+}
+#[test]
+fn ready_under_way_lists_model_forge_and_project_with_folded_progress() {
+    let (mut root, account) = f::forge_root_accounts(
+        Address::Welcome { step: Step::Ready },
+        forge::first_rows(w::Connection::Connecting, w::FirstState::Making),
+    );
+    f::welcome_account(&mut root, account);
+    let view = f::page_view(&root);
+    node(view.tree(), Role::Heading { level: 1 }, "Almost ready");
+    forge::words_in_order(
+        view.tree(),
+        &[
+            "Model:",
+            "Forge: Forgejo on this machine",
+            "Project Shop, with work/hello",
+            "Open Shop",
+            "It opens once work/hello is made.",
+        ],
+    );
+    let disclosure = node(view.tree(), Role::Disclosure, "Each step");
+    assert!(
+        !view.tree().nodes().iter().find(|n| n.id == disclosure).unwrap().states.as_slice().contains(&State::Expanded)
+    );
+    assert!(!view.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&crate::look::FLOW_CARD)));
+    let open = node(view.tree(), Role::Button, "Open Shop");
+    assert!(view.tree().nodes().iter().find(|n| n.id == open).unwrap().states.as_slice().contains(&State::Disabled));
+}
+
+#[test]
+fn model_choose_excludes_the_playgrounds_provider_before_and_after_retirement() {
+    let address = Address::Welcome { step: Step::Model { way: None } };
+    let (mut root, watch) = super::choice::playground_offers_root(address, true);
+    let check = |root: &d::Domain| {
+        let mut view = f::page_view(root);
+        let tree = view.tree();
+        assert!(f::find(tree, Role::Heading { level: 2 }, b"A demo API key").is_none());
+        node(tree, Role::Heading { level: 2 }, "ChatGPT");
+        node(tree, Role::Heading { level: 2 }, "An OpenAI API key");
+        let headings: Vec<_> = tree
+            .nodes()
+            .iter()
+            .filter(|n| n.role == (Role::Heading { level: 2 }))
+            .map(|n| n.name.as_deref().unwrap())
+            .collect();
+        assert_eq!(headings, [b"Choose".as_slice(), b"ChatGPT", b"An OpenAI API key"]);
+        let key = node(tree, Role::Link, "Use an API key");
+        assert_eq!(
+            crate::act(&mut view, key, Act::Press),
+            Some(d::Action::Pages(pages::Act::Go {
+                address: Address::Welcome {
+                    step: Step::Model { way: Some(d::ModelWay { provider: 18, source: None, kind: d::WayKind::Key }) }
+                }
+            }))
+        );
+    };
+    check(&root);
+    let read = super::choice::retire_playground(&mut root, watch);
+    check(&root);
+    super::choice::answer_retired_playground(&mut root, read);
+    check(&root);
 }

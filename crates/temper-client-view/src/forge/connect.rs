@@ -114,7 +114,9 @@ pub(crate) fn body(
     match connect::step(choice, root.forges(), root.forge().demo()) {
         Shown::Choose => choose(b, root, w, bindings, forge, place),
         Shown::Details(choice) => {
-            link(b, w, bindings, Word::ForgeAll, place.address(None));
+            if let Place::Connect = place {
+                link(b, w, bindings, Word::ForgeAll, place.address(None));
+            }
             match choice {
                 Choice::Elsewhere => elsewhere(b, root, w),
                 Choice::Forge(number) => {
@@ -158,6 +160,8 @@ pub(crate) fn welcome(
     }
 }
 fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, forge: &mut ForgeBindings, place: Place) {
+    b.open(Role::Slot);
+    b.style(look::WELCOME_CHOICES);
     for choice in &connect::choices(root.forges(), root.forge().demo()) {
         let (heading, words, note, action) = match *choice {
             Choice::Elsewhere => {
@@ -200,10 +204,10 @@ fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, fo
             },
         );
     }
+    b.close();
 }
 fn github(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
-    flow::card(b, &w.say(Word::ForgeGitHub, &[]));
-    text(b, w, Role::Heading { level: 3 }, Word::ForgeAppTitle);
+    flow::card(b, &w.say(Word::ForgeAppTitle, &[]));
     text(b, w, Role::Paragraph, Word::ForgeAppDescription);
     crate::cards::text(b, Role::Paragraph, &w.say(Word::ForgeSetupUrl, &[Hole::Number(u64::from(row.number))]));
     if w.shell == crate::words::Shell::Terminal {
@@ -299,14 +303,21 @@ fn here(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings,
         text(b, w, Role::Paragraph, Word::ForgeTerminalDetails);
         let commands = forge::words::set_up_commands(row.number);
         let mut rest = commands.as_ref();
+        b.open(Role::Paragraph);
+        b.style(look::FLOW_CODE);
         // The shared forge words delimit exactly the four terminal commands with backticks.
-        for _ in 0_u32..4 {
+        for index in 0_u32..4 {
             let Some(start) = skein_lib::bytes::find(rest, b"`") else { break };
             let tail = rest.get(start..).expect("command start").strip_prefix(b"`").expect("backtick");
             let Some(end) = skein_lib::bytes::find(tail, b"`") else { break };
-            code(b, tail.get(..end).expect("command end"));
+            if index != 0 {
+                b.text(Run::Code, b"\n");
+            }
+            b.text(Run::Code, tail.get(..end).expect("command end"));
             rest = tail.get(end..).expect("command end").strip_prefix(b"`").expect("backtick");
         }
+        b.close();
+        text(b, w, Role::Paragraph, Word::ForgeTerminalNext);
     } else {
         text(b, w, Role::Paragraph, Word::ForgeHereDetails);
         setup_fields(b, root, w, bindings, row.number);
@@ -379,49 +390,99 @@ pub(crate) fn setup_control(
         }
     }
 }
-pub(crate) fn progress(b: &mut Builder, w: &Words, row: &Row) {
+pub(crate) fn progress_in(b: &mut Builder, root: Option<&Domain>, w: &Words, row: &Row) {
+    if row.kind == Kind::GitHub {
+        flow::progress(
+            b,
+            w,
+            &w.say(Word::ForgeProgress, &[]),
+            &[(
+                &forge::words::forge_connection(row),
+                if forge::forges::accepted(row) { Mark::Done } else { Mark::UnderWay },
+            )],
+        );
+        return;
+    }
     let current = match row.connection {
-        Connection::SettingUp { step: Some(forge::forges::Step::Prepare) } => 1,
-        Connection::SettingUp { step: Some(forge::forges::Step::Run) } => 2,
-        Connection::Connecting => 3,
-        Connection::Connected { .. } => {
-            if connect::underway(row) {
-                3
-            } else {
-                4
-            }
-        }
-        Connection::SettingUp { step: None | Some(forge::forges::Step::Fetch) }
+        Connection::SettingUp { step: Some(forge::forges::Step::Fetch) } => Some(0),
+        Connection::SettingUp { step: Some(forge::forges::Step::Prepare) } => Some(1),
+        Connection::SettingUp { step: Some(forge::forges::Step::Run) } => Some(2),
+        Connection::Connecting => Some(3),
+        Connection::Connected { .. } => Some(match root {
+            Some(root) if adopted_project(root, row).is_some() => 5,
+            Some(_) | None => 4,
+        }),
+        Connection::SettingUp { step: None }
         | Connection::NotConnected
         | Connection::NotSetUp
         | Connection::SetUpFailed { .. }
-        | Connection::Stopped { .. } => 0,
+        | Connection::Stopped { .. } => None,
     };
-    let fetch = w.say(Word::ForgeFetch, &[]);
+    let fetch = w.say(if current > Some(0) { Word::ForgeFetched } else { Word::ForgeFetch }, &[]);
     let prepare = w.say(Word::ForgePrepare, &[]);
     let run = w.say(Word::ForgeRun, &[]);
-    let (connecting, connecting_mark) = match &row.first {
+    let connecting = w.say(Word::ForgeConnectingAsTemper, &[]);
+    let target: Option<(&[u8], &[u8], &SetUpProject)> = match &row.first {
+        Some(first) => Some((&first.org, &first.repository, &first.project)),
+        None => match root {
+            Some(root) => setup_target(root, row),
+            None => None,
+        },
+    };
+    let making = match target {
+        Some((org, repository, project)) => {
+            let project = match root {
+                Some(root) => project_name(root, w, project),
+                None => match project {
+                    SetUpProject::New(name) => copy_of(name),
+                    SetUpProject::Existing(project) => w.say(Word::Project, &[Hole::Number(u64::from(*project))]),
+                },
+            };
+            w.say(
+                Word::ForgeMakingAndAdopting,
+                &[Hole::Name(forge::words::full_name(org, repository)), Hole::Name(project)],
+            )
+        }
+        None => w.say(Word::ForgeMakingFirst, &[]),
+    };
+    let (making, last_mark) = match &row.first {
         Some(first) => match first.state {
             FirstState::Failed { .. } => (forge::words::first_repository(first), Mark::Failed),
-            FirstState::Making | FirstState::Made { .. } => (
-                w.say(Word::SetupMaking, &[Hole::Name(forge::words::full_name(&first.org, &first.repository))]),
-                mark(current, 3),
-            ),
+            FirstState::Making | FirstState::Made { .. } => (making, stage_mark(current, 4)),
         },
-        None => (w.say(Word::ForgeConnecting, &[]), mark(current, 3)),
+        None => (making, stage_mark(current, 4)),
     };
+    if current.is_none()
+        && let Connection::SettingUp { step: None } = row.connection
+    {
+        text(b, w, Role::Status, Word::FlowUnderWay);
+    }
     flow::progress(
         b,
         w,
         &w.say(Word::ForgeProgress, &[]),
         &[
-            (&fetch, mark(current, 0)),
-            (&prepare, mark(current, 1)),
-            (&run, mark(current, 2)),
-            (&connecting, connecting_mark),
+            (&fetch, stage_mark(current, 0)),
+            (&prepare, stage_mark(current, 1)),
+            (&run, stage_mark(current, 2)),
+            (&connecting, stage_mark(current, 3)),
+            (&making, last_mark),
         ],
     );
 }
+fn stage_mark(current: Option<usize>, index: usize) -> Mark {
+    match current {
+        Some(current) => mark(current, index),
+        None => Mark::ToCome,
+    }
+}
+fn setup_target<'a>(root: &'a Domain, row: &Row) -> Option<(&'a [u8], &'a [u8], &'a SetUpProject)> {
+    match root.forge().set_up() {
+        Some(last) if last.forge == row.number => Some((&last.org, &last.repository, &last.project)),
+        Some(_) | None => None,
+    }
+}
+
 fn mark(current: usize, index: usize) -> Mark {
     match index.cmp(&current) {
         core::cmp::Ordering::Less => Mark::Done,
@@ -460,7 +521,7 @@ pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &m
         crate::cards::text(b, Role::Alert, &forge::words::forge_connection(row));
         setup_control(b, root, w, bindings, row.number, Word::ForgeAgain);
     } else {
-        progress(b, w, row);
+        progress_in(b, Some(root), w, row);
         text(b, w, Role::Paragraph, Word::ForgeLeave);
     }
     b.close();
@@ -482,7 +543,7 @@ pub(crate) fn ready_card(
             Role::Paragraph,
             &w.say(Word::SetupIn, &[Hole::Name(project.clone()), Hole::Name(name(w, row, root))]),
         );
-        progress(b, w, row);
+        progress_in(b, Some(root), w, row);
         let pending = match root.forge().set_up() {
             Some(last) if last.forge == row.number => match &last.adoption {
                 Some(adoption) => adoption.outcome.is_none(),
@@ -517,6 +578,43 @@ pub(crate) fn ready_card(
                 flow::control(b, Control::Link { name: &open, to: bindings.insert(Act::OpenProject { project }) });
             }
         }
+        setup_ending(b, root, w, forge, row);
+    } else {
+        flow::card(b, &w.say(Word::ForgeConnectedTitle, &[Hole::Name(name(w, row, root))]));
+        if let Connection::Connected { login, .. } = &row.connection {
+            crate::cards::text(b, Role::Paragraph, &w.say(Word::ForgeConnectedAs, &[Hole::Name(copy_of(login))]));
+        }
+        app_line(b, w, row);
+        adopt(b, root, w, bindings);
+    }
+    b.open(Role::Paragraph);
+    w.text(b, Word::ForgeOnForges, &[Hole::Name(name(w, row, root))]);
+    link(b, w, bindings, Word::ForgesTitle, Address::Forges);
+    w.text(b, Word::ForgeOnForgesTail, &[]);
+    b.close();
+    b.close();
+}
+/// Completion requires the originating tab's successful Adopt, rather than a Made row alone.
+pub(crate) fn adopted_project(root: &Domain, row: &Row) -> Option<u32> {
+    if let Connection::Connected { .. } = row.connection
+        && let Some(first) = &row.first
+        && let FirstState::Made { .. } = first.state
+        && let Some(last) = root.forge().set_up()
+        && last.forge == row.number
+        && let Some(adoption) = &last.adoption
+        && let Some(forge::Answer::Adopted(_)) = &adoption.outcome
+    {
+        return Some(adoption.value.project);
+    }
+    None
+}
+/// Refusals remain actionable from the welcome's checklist as well as `ConnectForge`'s card.
+pub(crate) fn setup_ending(b: &mut Builder, root: &Domain, w: &Words, forge: &mut ForgeBindings, row: &Row) {
+    if connect::failed(row) {
+        crate::cards::text(b, Role::Alert, &forge::words::forge_connection(row));
+        setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
+    }
+    if let Some(first) = &row.first {
         if let Some(last) = root.forge().set_up()
             && last.forge == row.number
             && let Some(starting) = &last.starting
@@ -546,20 +644,7 @@ pub(crate) fn ready_card(
                 }
             }
         }
-    } else {
-        flow::card(b, &w.say(Word::ForgeConnectedTitle, &[Hole::Name(name(w, row, root))]));
-        if let Connection::Connected { login, .. } = &row.connection {
-            crate::cards::text(b, Role::Paragraph, &w.say(Word::ForgeConnectedAs, &[Hole::Name(copy_of(login))]));
-        }
-        app_line(b, w, row);
-        adopt(b, root, w, bindings);
     }
-    b.open(Role::Paragraph);
-    w.text(b, Word::ForgeOnForges, &[Hole::Name(name(w, row, root))]);
-    link(b, w, bindings, Word::ForgesTitle, Address::Forges);
-    w.text(b, Word::ForgeOnForgesTail, &[]);
-    b.close();
-    b.close();
 }
 pub(crate) fn adopt(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings) {
     if let Some(project) = root.pages().project() {
@@ -629,27 +714,31 @@ pub(crate) fn welcome_line(b: &mut Builder, root: &Domain, w: &Words, row: &Row)
         b.style(look::FLOW_DONE);
     }
     b.name(&line);
+    if done {
+        b.text(Run::Plain, "✓ ".as_bytes());
+    }
     b.text(Run::Plain, &line);
     b.close();
     if !done {
-        each_step(b, w, row);
+        each_step(b, root, w, row);
     }
 }
-pub(crate) fn each_step(b: &mut Builder, w: &Words, row: &Row) {
+pub(crate) fn each_step(b: &mut Builder, root: &Domain, w: &Words, row: &Row) {
     b.open(Role::Disclosure);
     b.name(&w.say(Word::ForgeProgress, &[]));
-    progress(b, w, row);
+    progress_in(b, Some(root), w, row);
     b.close();
 }
 
 fn setup_fields(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, number: u16) {
-    for (field, word) in [
-        (SetupField::Organization, Word::SetupOrganization),
-        (SetupField::Repository, Word::SetupRepository),
-        (SetupField::Project, Word::SetupNew),
-    ] {
+    b.open(Role::Slot);
+    for (field, word) in
+        [(SetupField::Organization, Word::SetupOrganization), (SetupField::Repository, Word::SetupRepository)]
+    {
         setup_field(b, root, w, bindings, field, word, number);
     }
+    b.close();
+    setup_field(b, root, w, bindings, SetupField::Project, Word::SetupNew, number);
 }
 fn setup_field(
     b: &mut Builder,

@@ -580,14 +580,19 @@ and `connect-forge.html`.
   heading "Setting up Forgejo on this machine", its first repository's
   line, "ORG/NAME, into PROJECT", then its steps as a list, each with
   its state in words, "done", "under way" or none for one to come:
-  "Fetching Forgejo and its runner", "Preparing Forgejo: its database,
-  temper’s admin and your account", "Starting Forgejo and its runner",
-  and "Connecting, and making ORG/NAME" ("Connecting" while the row has
-  no first repository). The box's step names the one under way (fetch,
-  prepare, run; none named yet, the first), and connecting the last;
-  then "You may leave this page: the steps go on, and the banner says
-  where they are." Set up failed, in the list's place: "Set up failed:
-  WHY", the row's words, and "Set up again", which sends `SetUp` with
+  "Fetching Forgejo and its runner" ("Fetched Forgejo and its runner"
+  once done), "Preparing: its database, temper’s admin, your account",
+  "Starting Forgejo and its runner", "Connecting as temper", and
+  "Making ORG/NAME, and adopting it into PROJECT". The box's step
+  names the one under way (fetch, prepare or run); none named yet, no
+  individual step is marked. Connecting is the fourth, making and
+  adopting the fifth, done only once the first repository is adopted
+  into its project. Before the target is known, the fifth reads
+  "Making the first repository, and adopting it into its project".
+  GitHub rows never list Forgejo's steps. The versions and the
+  person's login stay off until the row carries them. Then "You may
+  leave this page: the steps go on, and the banner says where they
+  are." Set up failed, in the list's place: "Set up failed: WHY", the row's words, and "Set up again", which sends `SetUp` with
   the same fields. While a `SetUp` is pending its button is disabled;
   refused, its refusal shows under it in the set up's words
   (`README.md`, 4.6).
