@@ -57,7 +57,7 @@ pub(crate) fn main(
         b.close();
         let panel = temper_client_domain::forge::change::for_task(root.forge().panel(), task.chip.task);
         let change = super::change::shown(panel);
-        header(b, task, root.pages().me(root.client()), words, bindings, panel);
+        header(b, task, root.pages().me(root.client()), root.forge().demo(), words, bindings, panel);
         if let Some(change) = change {
             // Word capacity prices the full pull address and label; Limits::of
             // guarantees at least this text bound for every view preset.
@@ -251,6 +251,7 @@ pub(crate) fn header(
     b: &mut Builder,
     task: &c::Task,
     me: Option<&c::Me>,
+    demo: Option<&temper_client_domain::forge::Demo>,
     words: &Words,
     bindings: &mut Bindings,
     panel: Option<&temper_client_domain::forge::panel::Panel>,
@@ -284,18 +285,11 @@ pub(crate) fn header(
         executor(b, task.chip.executor, words);
         b.close();
     }
-    let mut named = false;
-    if let Some(me) = me {
-        for project in &me.projects {
-            if project.project == task.project {
-                text(b, Role::Paragraph, project.name.bytes());
-                named = true;
-            }
-        }
-    }
-    if !named {
-        text(b, Role::Paragraph, &words.say(Word::Project, &[Hole::Number(u64::from(task.project))]));
-    }
+    let project = match super::project_name(me, demo, task.project, words) {
+        Some(name) => name,
+        None => words.say(Word::Project, &[Hole::Number(u64::from(task.project))]),
+    };
+    text(b, Role::Paragraph, &project);
     if let Some(panel) = panel {
         if let Some(word) = temper_client_domain::forge::change::unavailable(&panel.state) {
             text(b, Role::Paragraph, &super::change::say(words, word, &[]));

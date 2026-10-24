@@ -12,6 +12,44 @@ const PARTY: u64 = 73;
 const ONE: u32 = 1;
 const NO_ROWS: u32 = 0;
 const HEADINGS: u32 = 5;
+#[test]
+fn the_task_header_names_the_demo_project_playground() {
+    let (mut root, _, watch, _, _) = fixtures::root_at_with_demo(
+        temper_client_domain::Address::Task { task: TASK, filter: PlanFilter::All },
+        &fixtures::domain_limits(),
+        b"Project 1",
+        Some((fixtures::PROJECT, true)),
+    );
+    let mut task = f::document();
+    task.chip.task = TASK;
+    task.project = fixtures::PROJECT;
+    task.priority = Some(PRIORITY);
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("task watch"),
+                    event: c::WatchEvent::Delivered(c::Delivery::Task(Box::new(task))),
+                },
+            },
+        },
+    );
+    for words in [fixtures::words(), fixtures::browser_words()] {
+        let mut view = fixtures::view_of(words);
+        let tree = fixtures::build(&mut view, &root);
+        let mut heading = None;
+        for (index, node) in tree.nodes().iter().enumerate() {
+            if node.styles.as_slice().contains(&look::TASK_HEADING) {
+                heading = Some(index);
+                break;
+            }
+        }
+        let heading = heading.expect("task header");
+        assert!(skein_lib::bytes::find(&fixtures::node_text(tree, heading), b"Playground").is_some());
+        assert!(skein_lib::bytes::find(&fixtures::node_text(tree, heading), b"Project 1").is_none());
+    }
+}
 fn page(executor: c::Executor, priority: Option<u32>) -> crate::View {
     let root = f::root(executor, priority);
     let mut view = fixtures::view();
@@ -452,6 +490,7 @@ fn header(task: &c::Task, me: Option<&c::Me>) -> Tree {
         &mut builder,
         task,
         me,
+        None,
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
         None,
@@ -1551,6 +1590,7 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
                 &mut builder,
                 &task,
                 Some(&me),
+                None,
                 &words,
                 &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
                 None,
@@ -1570,6 +1610,7 @@ fn the_header_says_its_exact_wait_and_goal_priority_in_both_shells() {
                 &mut builder,
                 &task,
                 Some(&me),
+                None,
                 &words,
                 &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
                 None,

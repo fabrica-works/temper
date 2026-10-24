@@ -13,11 +13,12 @@ fn the_frame_carries_its_tokens() {
 fn the_looks_names_pass_skeins_check() {
     assert!(skein_ui::look::check(&[NAMES]).is_none());
 }
-const FLOW_NAMES: [(skein_ui::Style, &[u8]); 4] = [
+const FLOW_NAMES: [(skein_ui::Style, &[u8]); 5] = [
     (FLOW_PRIMARY, b"temper-flow-primary"),
     (FLOW_FAILED, b"temper-flow-failed"),
     (FLOW_PAIR, b"temper-flow-pair"),
     (WELCOME_INTRO, b"temper-welcome-intro"),
+    (PROJECT_EMPTY, b"temper-project-empty"),
 ];
 #[test]
 fn each_style_or_region_is_named_under_temper() {
@@ -299,6 +300,7 @@ fn the_task_tokens_stay_on_their_roles() {
     crate::pages::task::header(
         &mut builder,
         &task,
+        None,
         None,
         &fixtures::words(),
         &mut crate::frame::Bindings::new(fixtures::tree_limits().bindings),
