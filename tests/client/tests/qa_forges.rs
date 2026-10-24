@@ -88,6 +88,7 @@ fn configured_accounts(owner: bool, under_box: bool, rows: &[forge::Configured; 
             .collect();
         store.seed(Box::new([]), accounts);
     }
+    let mut limits = front.engine.env.limits;
     let configs = std::array::from_fn(|_| {
         let mut config = walking::config(f::SEED);
         config.core.connectors = Box::new([temper_client_protocol_wire::FORGE]);
@@ -102,9 +103,11 @@ fn configured_accounts(owner: bool, under_box: bool, rows: &[forge::Configured; 
             .collect();
         config.forges = Box::new((*rows).clone());
         config.under_box = under_box;
+        if rows.iter().any(|row| row.admin_connect) {
+            temper_client_world::front::first_run_projects(&mut config, &mut limits);
+        }
         config
     });
-    let limits = front.engine.env.limits;
     front.engine = Driver::configured(store, configs, &limits);
     front.engine.settle();
     world
@@ -437,21 +440,156 @@ fn github_details_offer_only_the_app_of_ones_own_with_a_masked_key() {
     );
 }
 
-#[test]
-fn elsewhere_details_keep_configuration_and_restart_instructions() {
-    let mut world = world();
-    let client = open(&mut world, flow(Some(Choice::Elsewhere)));
-    let words = text(&world, client);
-    for expected in [
-        "application.forges",
-        "application.identities",
-        "application.setup",
-        "forge.example",
-        "Restart temper box, then connect it from this page.",
-        "Connecting a Forgejo elsewhere from temper is not available yet.",
-    ] {
-        assert!(words.contains(expected), "missing {expected}: {words}");
+const ADMIN_TOKEN: &[u8] = b"admin-token-placeholder-0123";
+fn admin_world() -> Pages {
+    // The original deployment's durable store is cold-restored with the new
+    // configuration, as after changing temper.json and restarting.
+    let mut world = configured_accounts(
+        true,
+        false,
+        &[
+            forge::Configured {
+                admin_connect: true,
+                web: Some(b"https://git.example.org".as_slice().into()),
+                read_only: false,
+                number: OWNED,
+                kind: forge::Kind::Forgejo,
+                mode: forge::Mode::Managed,
+                asked: false,
+            },
+            forge::Configured {
+                admin_connect: false,
+                web: None,
+                read_only: false,
+                number: GITHUB,
+                kind: forge::Kind::GitHub,
+                mode: forge::Mode::Connected,
+                asked: false,
+            },
+        ],
+        false,
+    );
+    world.front().engine.forge =
+        Some(temper_engine_domain_world::forge_stand::ForgeStand::with(&[(b"work", b"hello", 42)]));
+    world
+}
+fn admin_input(world: &mut Pages, client: ClientId, field: &[u8], value: &[u8]) {
+    let id = node(world, client, Role::TextField, field).id;
+    world.act(client, id, Act::Input { value: value.into() });
+    pending(world);
+}
+fn admin_private(world: &mut Pages, client: ClientId) {
+    let tree = world.tree(client);
+    for node in tree.nodes() {
+        for value in [node.name.as_deref(), node.description.as_deref(), node.value.as_ref().map(|v| v.text.as_ref())]
+            .into_iter()
+            .flatten()
+        {
+            assert!(skein_lib::bytes::find(value, ADMIN_TOKEN).is_none());
+        }
+        for run in &node.text {
+            assert!(skein_lib::bytes::find(&run.text, ADMIN_TOKEN).is_none());
+        }
     }
+    let engine = &world.front().engine;
+    // Includes durable notes and all engine answers and output logs retained
+    // by the fake driver; no real token, forge or process participates.
+    for captured in [
+        format!("{:?}", engine.store.rows),
+        format!("{:?}", engine.transactions),
+        format!("{:?}", engine.delivered),
+        format!("{:?}", engine.immediate),
+    ] {
+        assert!(skein_lib::bytes::find(captured.as_bytes(), ADMIN_TOKEN).is_none());
+    }
+}
+#[test]
+fn elsewhere_welcome_after_restart_connects_retries_and_opens_its_new_project() {
+    let mut world = admin_world();
+    let client = open(&mut world, Address::Welcome { step: Step::Forge { forge: None } });
+    follow(
+        &mut world,
+        client,
+        vec![
+            see(Role::Region, b"GitHub"),
+            see(Role::Region, b"Forgejo at https://git.example.org"),
+            see(Role::Region, b"A Forgejo elsewhere"),
+        ],
+    );
+    let names = world
+        .tree(client)
+        .nodes()
+        .iter()
+        .filter(|n| n.role == Role::Region)
+        .filter_map(|n| n.name.as_deref())
+        .collect::<Vec<_>>();
+    assert!(
+        names.iter().position(|n| *n == b"GitHub").expect("GitHub card")
+            < names.iter().position(|n| *n == b"Forgejo at https://git.example.org").expect("configured admin card")
+    );
+    assert!(
+        names.iter().position(|n| *n == b"Forgejo at https://git.example.org").expect("configured admin card")
+            < names.iter().position(|n| *n == b"A Forgejo elsewhere").expect("add another forge card")
+    );
+    let link = node(&world, client, Role::Link, b"Connect as its admin").id;
+    world.act(client, link, Act::Press);
+    follow(&mut world, client, vec![see(Role::TextField, "The site admin’s token".as_bytes())]);
+    admin_input(&mut world, client, b"Runner label", b"linux-arm");
+    admin_input(&mut world, client, "The site admin’s token".as_bytes(), ADMIN_TOKEN);
+    admin_private(&mut world, client);
+    press_pending(&mut world, client, b"Connect as its admin");
+    follow(&mut world, client, vec![see(Role::Heading { level: 2 }, b"Connecting forge 1 as its admin.")]);
+    admin_private(&mut world, client);
+    let (_, request) = *world.front().admin_connects.last().expect("admin Connect sent");
+    world.front().engine.send(engine::Event::Forge(Box::new(forge::Event::ConnectEnded {
+        forge: OWNED,
+        request,
+        connected: false,
+        why: Some(b"NotAdmin".as_slice().into()),
+        stop: Some(forge::AdminStop::NotAdmin),
+    })));
+    follow(
+        &mut world,
+        client,
+        vec![see(Role::TextField, "The site admin’s token".as_bytes()), see(Role::Button, b"Connect as its admin")],
+    );
+    assert!(text(&world, client).contains("temper kept nothing of the token."));
+    assert_eq!(
+        node(&world, client, Role::TextField, b"Runner label").value.as_ref().expect("field value").text.as_ref(),
+        b"linux-arm"
+    );
+    assert_eq!(
+        node(&world, client, Role::TextField, "The site admin’s token".as_bytes())
+            .value
+            .as_ref()
+            .expect("field value")
+            .text
+            .as_ref(),
+        b""
+    );
+    admin_private(&mut world, client);
+    admin_input(&mut world, client, "The site admin’s token".as_bytes(), ADMIN_TOKEN);
+    press_pending(&mut world, client, b"Connect as its admin");
+    follow(&mut world, client, vec![see(Role::Heading { level: 2 }, b"Connecting forge 1 as its admin.")]);
+    let (_, request) = *world.front().admin_connects.last().expect("admin Connect sent");
+    assert_eq!(world.front().admin_connects.len(), 2);
+    world.front().engine.send(engine::Event::Forge(Box::new(forge::Event::FirstMade { forge: OWNED, id: 42 })));
+    connection(&mut world, OWNED, connected());
+    world.front().engine.send(engine::Event::Forge(Box::new(forge::Event::ConnectEnded {
+        forge: OWNED,
+        request,
+        connected: true,
+        why: None,
+        stop: None,
+    })));
+    follow(&mut world, client, vec![see(Role::Link, b"Open hello")]);
+    assert!(text(&world, client).contains("runners labelled linux-arm"));
+    admin_private(&mut world, client);
+    let open = node(&world, client, Role::Link, b"Open hello").id;
+    world.act(client, open, Act::Press);
+    follow(&mut world, client, vec![see(Role::Heading { level: 1 }, b"Chats")]);
+    admin_private(&mut world, client);
+    assert!(world.front().engine_adopted(OWNED, 42));
 }
 
 #[test]

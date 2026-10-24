@@ -134,6 +134,7 @@ pub(crate) fn body(
                     if let Some(row) = connect::row(number, root.forges(), root.forge().demo()) {
                         match row.kind {
                             Kind::GitHub => github(b, root, w, forge, row),
+                            Kind::Forgejo if row.admin => admin_details(b, root, w, forge, row),
                             Kind::Forgejo => here(b, root, w, forge, row),
                         }
                     }
@@ -153,7 +154,14 @@ pub(crate) fn welcome(
     choice: Option<Choice>,
 ) {
     if let Some(row) = personal(root) {
-        if row.kind == Kind::GitHub
+        if row.admin {
+            match connect::step(Some(Choice::Forge(row.number)), root.forges(), root.forge().demo()) {
+                Shown::Details(_) => admin_details(b, root, w, forge, row),
+                Shown::Ready(_) => ready_card(b, root, w, bindings, forge, row),
+                Shown::SettingUp(_) => setting_up(b, root, w, forge, row),
+                Shown::Choose => {}
+            }
+        } else if row.kind == Kind::GitHub
             && let Connection::Connected { .. } = row.connection
         {
             if forge::forges::accepted(row) {
@@ -174,6 +182,22 @@ fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, fo
     b.open(Role::Slot);
     b.style(look::WELCOME_CHOICES);
     for choice in &connect::choices(root.forges(), root.forge().demo()) {
+        if let Choice::Forge(number) = *choice
+            && let Some(row) = connect::row(number, root.forges(), root.forge().demo())
+            && row.admin
+        {
+            flow::choice(
+                b,
+                &admin_host(w, row),
+                &w.say(Word::AdminCard, &[]),
+                b"",
+                Control::Link {
+                    name: &w.say(Word::AdminTitle, &[]),
+                    to: bindings.insert(Act::Go { address: place.address(Some(*choice)) }),
+                },
+            );
+            continue;
+        }
         let (heading, words, note, action) = match *choice {
             Choice::Elsewhere => {
                 (Word::ForgeElsewhere, Word::ForgeElsewhereDescription, Word::ForgeElsewhereTime, Word::ForgeShowHow)
@@ -373,7 +397,7 @@ fn elsewhere(b: &mut Builder, root: &Domain, w: &Words) {
         };
         code(b, &w.say(snippet, holes));
     }
-    for word in [Word::ForgeBotOnly, Word::ForgeRestart, Word::ForgeElsewhereUnavailable] {
+    for word in [Word::ForgeBotOnly, Word::ForgeRestart] {
         text(b, w, Role::Paragraph, word);
     }
     b.close();
@@ -522,6 +546,19 @@ fn mark(current: usize, index: usize) -> Mark {
     }
 }
 pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
+    if row.admin {
+        flow::card(b, &w.say(Word::AdminConnecting, &[Hole::Number(u64::from(row.number))]));
+        let repository = match &row.first {
+            Some(first) => forge::words::full_name(&first.org, &first.repository),
+            None => {
+                let draft = root.forge().admin_form();
+                forge::words::full_name(&draft.fields[0], &draft.fields[1])
+            }
+        };
+        crate::cards::text(b, Role::Paragraph, &w.say(Word::AdminMaking, &[Hole::Name(repository)]));
+        b.close();
+        return;
+    }
     if row.kind == Kind::GitHub {
         if forge::forges::slug(row).is_some() {
             flow::card(b, &w.say(Word::ForgeInstallTitle, &[]));
@@ -565,6 +602,10 @@ pub(crate) fn ready_card(
     forge: &mut ForgeBindings,
     row: &Row,
 ) {
+    if row.admin {
+        admin_ready(b, root, w, bindings, row);
+        return;
+    }
     if let Some(first) = &row.first {
         let repository = forge::words::full_name(&first.org, &first.repository);
         let project = project_name(root, w, &first.project);
@@ -1165,4 +1206,188 @@ fn github_repository_address(web: &[u8], owner: &[u8], name: &[u8]) -> Box<[u8]>
         }
     }
     address.finish()
+}
+
+fn admin_host(w: &Words, row: &Row) -> Box<[u8]> {
+    let host = match &row.web {
+        Some(web) => copy_of(web),
+        None => {
+            let number = skein_lib::Decimal::of(u64::from(row.number));
+            let mut out = skein_lib::Writer::new(number.as_bytes().len().checked_add(6).expect("host fits"));
+            out.put(b"forge ").expect("prefix fits");
+            out.put(number.as_bytes()).expect("number fits");
+            out.finish()
+        }
+    };
+    w.say(Word::AdminHost, &[Hole::Name(host)])
+}
+fn admin_details(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
+    flow::card(b, &w.say(Word::AdminTitle, &[]));
+    admin_stop(b, w, row);
+    if let Some(pending) = root.forge().admin()
+        && pending.forge == row.number
+        && let Some(answer) = &pending.answer
+        && *answer != forge::github::Answer::Connecting
+    {
+        if let Some(line) = forge::words::app_refusal(answer.clone(), row.number) {
+            crate::cards::text(b, Role::Alert, &line);
+        }
+        text(b, w, Role::Paragraph, Word::AdminKept);
+    }
+    text(b, w, Role::Paragraph, Word::AdminDescription);
+    let draft = root.forge().admin_form();
+    b.open(Role::TextField);
+    b.name(&w.say(Word::AdminToken, &[]));
+    b.entry(skein_ui::EntryKind::Secret);
+    b.value(b"", draft.token_written);
+    b.bind(bindings.insert(Meaning::AdminToken));
+    if draft.checked && !draft.has_token() {
+        b.state(State::Invalid);
+    }
+    b.close();
+    if draft.checked && draft.too_long {
+        text(b, w, Role::Alert, Word::AdminTooLong);
+    } else if draft.checked && !draft.has_token() {
+        text(b, w, Role::Alert, Word::SetupRequired);
+    }
+    text(b, w, Role::Heading { level: 3 }, Word::AdminFirst);
+    for (field, word) in [
+        (forge::admin::Field::Organization, Word::SetupOrganization),
+        (forge::admin::Field::Repository, Word::SetupRepository),
+        (forge::admin::Field::Project, Word::SetupNew),
+        (forge::admin::Field::Label, Word::AdminLabel),
+    ] {
+        let index = field.index();
+        let label = field == forge::admin::Field::Label;
+        let invalid =
+            if label { !draft.valid_label() } else { draft.fields.get(index).expect("four fields").is_empty() };
+        b.open(Role::TextField);
+        b.name(&w.say(word, &[]));
+        b.value(draft.fields.get(index).expect("four fields"), *draft.written.get(index).expect("four writes"));
+        b.bind(bindings.insert(Meaning::AdminField(field)));
+        if draft.checked && invalid {
+            b.state(State::Invalid);
+        }
+        b.close();
+        if draft.checked && invalid {
+            text(b, w, Role::Alert, if label { Word::AdminLabelInvalid } else { Word::SetupRequired });
+        }
+    }
+    text(b, w, Role::Paragraph, Word::AdminLabelHint);
+    flow::control(
+        b,
+        Control::PrimaryButton {
+            name: &w.say(Word::AdminTitle, &[]),
+            to: bindings.insert(Meaning::ConnectAdmin(row.number)),
+        },
+    );
+    b.close();
+}
+fn admin_stage(stage: forge::forges::SetupStage) -> &'static [u8] {
+    use forge::forges::SetupStage;
+    match stage {
+        SetupStage::Admin => b"checking the admin's token",
+        SetupStage::Bot => b"making the bot",
+        SetupStage::Token => b"making the bot's token",
+        SetupStage::Org => b"making the organization",
+        SetupStage::Repository => b"making the repository",
+        SetupStage::File => b"adding the starter workflow",
+        SetupStage::App => b"making the App",
+        SetupStage::Installation => b"installing the App",
+        SetupStage::State => b"saving the state",
+    }
+}
+fn admin_stop(b: &mut Builder, w: &Words, row: &Row) {
+    use forge::forges::AdminStop;
+    if let Some(first) = &row.first
+        && let FirstState::Failed { step } = first.state
+    {
+        let why = match &row.ended {
+            Some(why) => copy_of(why),
+            None => copy_of(b"Forgejo stopped the request"),
+        };
+        let step = match step {
+            forge::forges::CreateStep::Admin => b"checking the admin's token".as_slice(),
+            forge::forges::CreateStep::Org => b"its organization",
+            forge::forges::CreateStep::Repository => b"its repository",
+            forge::forges::CreateStep::File => b"its starter workflow",
+        };
+        crate::cards::text(
+            b,
+            Role::Alert,
+            &w.say(
+                Word::AdminFirstFailed,
+                &[
+                    Hole::Name(forge::words::full_name(&first.org, &first.repository)),
+                    Hole::Name(copy_of(step)),
+                    Hole::Name(why),
+                ],
+            ),
+        );
+    } else if let Some(stop) = row.ended_stop {
+        match stop {
+            AdminStop::NotAdmin => text(b, w, Role::Alert, Word::AdminNotAdmin),
+            AdminStop::Refused { status: 401, .. } => text(b, w, Role::Alert, Word::AdminUnauthorized),
+            AdminStop::Refused { status: 403, stage } => {
+                crate::cards::text(
+                    b,
+                    Role::Alert,
+                    &w.say(Word::AdminScope, &[Hole::Name(copy_of(admin_stage(stage)))]),
+                );
+            }
+            AdminStop::Unmarked => text(b, w, Role::Alert, Word::AdminUnmarked),
+            AdminStop::Refused { .. } | AdminStop::Other => {
+                if let Some(line) = &row.ended {
+                    crate::cards::text(b, Role::Alert, line);
+                }
+            }
+        }
+    } else {
+        return;
+    }
+    text(b, w, Role::Paragraph, Word::AdminKept);
+}
+fn admin_ready(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, row: &Row) {
+    let heading = if let Connection::Connected { id, login } = &row.connection {
+        let login = forge::words::lossy(login);
+        let id = skein_lib::Decimal::of(*id);
+        let parts = [b"Connected as ".as_slice(), &login, b" (id ", id.as_bytes(), b"), managed."];
+        let mut size = 0_usize;
+        for part in parts {
+            size = size.checked_add(part.len()).expect("heading fits");
+        }
+        let mut heading = skein_lib::Writer::new(size);
+        for part in parts {
+            heading.put(part).expect("measured heading");
+        }
+        heading.finish()
+    } else {
+        Box::default()
+    };
+    flow::card(b, &heading);
+    if let Some(first) = &row.first {
+        let repository = forge::words::full_name(&first.org, &first.repository);
+        let project = project_name(root, w, &first.project);
+        crate::cards::text(
+            b,
+            Role::Paragraph,
+            &w.say(
+                Word::AdminReady,
+                &[Hole::Name(repository.clone()), Hole::Name(project.clone()), Hole::Name(first.label.clone())],
+            ),
+        );
+        let open = w.say(Word::SetupOpen, &[Hole::Name(project)]);
+        if let Some(project) = adopted_project(root, row) {
+            flow::control(b, Control::PrimaryLink { name: &open, to: bindings.insert(Act::OpenProject { project }) });
+        } else {
+            flow::control(b, Control::PrimaryDisabled { name: &open });
+        }
+        if let Some(web) = &row.web {
+            b.open(Role::Link);
+            b.name(&w.say(Word::AdminRepository, &[Hole::Name(repository)]));
+            b.external(&github_repository_address(web, &first.org, &first.repository));
+            b.close();
+        }
+    }
+    b.close();
 }

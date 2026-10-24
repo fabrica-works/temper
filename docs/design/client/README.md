@@ -1358,9 +1358,16 @@ for its kind, its user's login and its installations. Its nodes:
   named one (fetch, prepare or run); set up failed, with why (text of
   at most 256 bytes, the box's line bound); connecting; connected, with
   the user's id (u64) and login (a byte string bounded as `Adopt`'s);
-  or stopped, with the component's reason; its first repository,
-  `first`: none, or the set up's org, name and `SetUpProject` with its
-  state, `FirstState`: making; made, with the repository's id (u64);
+  or stopped, with the component's reason;
+  `admin`, whether the configured string-managed form takes a site
+  admin's token (the legacy managed object does not); `ended_stop`, none
+  or `AdminStop`: not admin, refused with status (u16) and `SetupStage`
+  (admin, bot, token, org, repository, file, app, installation or state),
+  unmarked, or other. The diagnostic `ended` stays separate; the client
+  selects its stop's words from this typed fact, never its text;
+  its first repository, `first`: none, or the set up's org, name, runner
+  label (at most 64 bytes) and `SetUpProject` with its state, `FirstState`:
+  making; made, with the repository's id (u64);
   or failed, with its step, `CreateStep`: admin, org, repository (its
   bot's access with it) or file (`../protocol/setup.md`, 6.7); its
   installations, `installations`, on GitHub, at most
@@ -3375,7 +3382,7 @@ does for the client:
   | `Connect { forge, how: GitHubManifest { back? } }` | none | the setup's host's `Manifest` run, for the person's own account, always (`forge.md`, 9.1), ending `Done(Manifest { state, target, manifest })`, from which temper renders the manifest's page (`forge.md`, 9.1); the page and `back` held with the state | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
   | `Connect { forge, how: GitHubApp { id, key } }` | `key`, the App's private key, PEM as GitHub gives it; `id` rides in the request | `Paste`: the key decoded and matched to the App `id` names, the App's user found, its hook pointed at `https://SLUG.invalid/` (no webhook secret on GitHub: changes are heard from the App's delivery log), its permissions and events checked | connecting |
   | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | one bundle: the API token, the git token and, where the person made hooks to temper's listener, their secret | `Check`: both tokens answer as one user | connecting |
-  | `Connect { forge, how: ForgejoAdmin { first? } }` | the site admin's token | `Reconcile`, then `Create` of `first` when given; the forge becomes managed | connecting |
+  | `Connect { forge, how: ForgejoAdmin { first? } }` | the site admin's token, item 1 of the carried bundle (at most 4 KiB including its six-byte header) | `Reconcile`, then `Create` of `first` when given; the configured string-managed form (`ForgeRow.admin`) offers the client's admin Details, with `first`'s org, repository, new project and runner label | connecting; then the watched row, its typed `ended_stop` on a stop, or `first` made and its adoption on Ready |
   | `Install { forge, back? }` | none | `Install`, GitHub alone; `back` held with the state | a link, the install page for a fresh state |
   | `Replace { forge, value }` | a new App key, or a new API token, git token or both | `Paste` with the kept App id, or `Check` against the kept user: it must answer as the forge's user; the old is erased once the new is kept | connecting |
   | `Forget { forge }` | none | the admin's token erased; a managed forge becomes connected (`../protocol/credentials.md`) | forgotten |

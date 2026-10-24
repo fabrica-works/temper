@@ -363,6 +363,10 @@ fn output_and_memory_bounds_cover_replacement_and_a_full_panel() {
         + u64::from(wire.group_failed_why)
         + forge::forges::worst_case(&limits.forge).unwrap()
         + forge::picker::worst_case(limits.forge).unwrap()
+        // Admin token, four fields and its answer.
+        + 4090 + u64::from(limits.forge.field_bytes) * 3
+        + u64::from(limits.forge.field_bytes.max(wire.first_repository_label))
+        + w::Answer::worst_case_heap(&wire).unwrap()
         // App draft key, answered install link and editable App id.
         + 4097 + 2048 + u64::from(limits.forge.field_bytes)
         + u64::try_from(size_of::<Handle>()).unwrap();

@@ -24,6 +24,7 @@ pub struct Joint {
     pub leaves: Vec<Box<[u8]>>,
     pub refuse_return: bool,
     set_ups: Vec<(u16, Token)>,
+    pub admin_connects: Vec<(u16, Token)>,
     pub demo: Option<temper_client_protocol_wire::v1::DemoAnswer>,
     pub demo_starts: Vec<skein_lib::RequestKey>,
     pub demo_removals: Vec<skein_lib::RequestKey>,
@@ -640,6 +641,7 @@ impl Joint {
             leaves: Vec::new(),
             refuse_return: false,
             set_ups: Vec::new(),
+            admin_connects: Vec::new(),
             demo: None,
             demo_starts: Vec::new(),
             demo_removals: Vec::new(),
@@ -1206,6 +1208,26 @@ impl Joint {
     fn immediate(&mut self) {
         let immediate = std::mem::take(&mut self.engine.immediate);
         for request in immediate {
+            if let engine::Request::Connect {
+                forge,
+                request: attempt,
+                carried,
+                how: temper_engine_domain_forge::How::ForgejoAdmin { .. },
+            } = &request
+            {
+                let value = self.transport.carried().get(&carried.number).expect("admin carrier");
+                assert!(value.expose().starts_with(&[1, 1, 1, 0]), "item-1 bundle");
+                self.admin_connects.push((*forge, *attempt));
+                self.engine.send(engine::Event::Forge(Box::new(temper_engine_domain_forge::Event::ConnectAnswered {
+                    forge: *forge,
+                    request: *attempt,
+                    answer: temper_engine_domain_forge::ConnectAnswer::Connecting,
+                })));
+            }
+            if let engine::Request::EraseCarried { number } = &request {
+                self.transport.unused(*number);
+            }
+
             if let engine::Request::SetUpGroup { forge, request } | engine::Request::SetUp { forge, request, .. } =
                 &request
             {

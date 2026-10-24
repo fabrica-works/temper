@@ -10,6 +10,27 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    AdminTitle,
+    AdminDescription,
+    AdminCard,
+    AdminToken,
+    AdminFirst,
+    AdminLabel,
+    AdminLabelHint,
+    AdminLabelInvalid,
+    AdminTooLong,
+    AdminConnecting,
+    AdminMaking,
+    AdminKept,
+    AdminNotAdmin,
+    AdminUnauthorized,
+    AdminScope,
+    AdminUnmarked,
+    AdminFirstFailed,
+    AdminReady,
+    AdminRepository,
+    AdminHost,
+
     GitHubUnknown,
     GitHubPicker,
     GitHubInstalled,
@@ -129,7 +150,6 @@ pub enum Word {
     ForgeSetupEntry,
     ForgeBotOnly,
     ForgeRestart,
-    ForgeElsewhereUnavailable,
     ForgeSettingUpTitle,
     ForgeFetch,
     ForgeMakingFirst,
@@ -589,9 +609,29 @@ pub enum Word {
 // GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
 // Account moves add four account literals and one task-wait phrase.
 // The Authorize place and page-owned forge sign-in add twelve phrases.
-const PHRASES: u32 = 1080;
-const SEGMENTS: u32 = 1889;
-const ALL: [Word; 535] = [
+const PHRASES: u32 = 1099;
+const SEGMENTS: u32 = 1930;
+const ALL: [Word; 554] = [
+    Word::AdminTitle,
+    Word::AdminDescription,
+    Word::AdminCard,
+    Word::AdminToken,
+    Word::AdminFirst,
+    Word::AdminLabel,
+    Word::AdminLabelHint,
+    Word::AdminLabelInvalid,
+    Word::AdminTooLong,
+    Word::AdminConnecting,
+    Word::AdminMaking,
+    Word::AdminKept,
+    Word::AdminNotAdmin,
+    Word::AdminUnauthorized,
+    Word::AdminScope,
+    Word::AdminUnmarked,
+    Word::AdminFirstFailed,
+    Word::AdminReady,
+    Word::AdminRepository,
+    Word::AdminHost,
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -710,7 +750,6 @@ const ALL: [Word; 535] = [
     Word::ForgeSetupEntry,
     Word::ForgeBotOnly,
     Word::ForgeRestart,
-    Word::ForgeElsewhereUnavailable,
     Word::ForgeSettingUpTitle,
     Word::ForgeFetch,
     Word::ForgeMakingFirst,
@@ -1176,6 +1215,27 @@ impl Word {
             Self::GitHubRule => 1963,
             Self::GitHubDismiss => 1964,
             Self::SetupNew => 1824,
+            Self::AdminTitle => 1980,
+            Self::AdminDescription => 1981,
+            Self::AdminCard => 1982,
+            Self::AdminToken => 1983,
+            Self::AdminFirst => 1984,
+            Self::AdminLabel => 1985,
+            Self::AdminLabelHint => 1986,
+            Self::AdminLabelInvalid => 1987,
+            Self::AdminTooLong => 1988,
+            Self::AdminConnecting => 1989,
+            Self::AdminMaking => 1990,
+            Self::AdminKept => 1991,
+            Self::AdminNotAdmin => 1992,
+            Self::AdminUnauthorized => 1993,
+            Self::AdminScope => 1994,
+            Self::AdminUnmarked => 1995,
+            Self::AdminFirstFailed => 1996,
+            Self::AdminReady => 1997,
+            Self::AdminRepository => 1998,
+            Self::AdminHost => 1999,
+
             Self::SetupAdopt => 1870,
             Self::SetupRequired => 1825,
             Self::SetupInto => 1826,
@@ -1250,7 +1310,6 @@ impl Word {
             Self::ForgeSetupEntry => 1753,
             Self::ForgeBotOnly => 1754,
             Self::ForgeRestart => 1755,
-            Self::ForgeElsewhereUnavailable => 1756,
             Self::ForgeSettingUpTitle => 1757,
             Self::ForgeFetch => 1758,
             Self::ForgeMakingFirst => 1847,
@@ -1702,6 +1761,9 @@ pub struct Words {
 // clock: 256 bytes holds its longest three-sentence explanation whole.
 const REFUSAL_BYTES: u32 = 256;
 fn hole_bytes(word: Word, kind: HoleKind, last: bool, joined: u32) -> Result<u32, Invalid> {
+    if word == Word::AdminHost {
+        return Ok(temper_client_domain::forge::change::ADDRESS_BYTES);
+    }
     if word == Word::SignInForgeAt || word == Word::AuthorizeContinuing || word == Word::SignInSignedOut {
         return Ok(joined.max(300));
     }
@@ -1855,7 +1917,8 @@ impl Words {
             // Whole demo requests keep their supplied bound.
             hole_bytes: joined
                 .max(temper_client_domain::forge::DEMO_FIELD_BYTES)
-                .max(temper_client_domain::forge::DEMO_WHY_BYTES),
+                .max(temper_client_domain::forge::DEMO_WHY_BYTES)
+                .max(temper_client_domain::forge::change::ADDRESS_BYTES),
         };
         let book = Phrasebook::load(shapes.into_boxed(), Box::new([language]), &limits)?;
         Ok(Words { shell, book, language: 0, connector, name_bytes: joined })
@@ -1957,6 +2020,26 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::SetupRepository => (&[b"Repository"], &[]),
         Word::SetupProject => (&[b"Project"], &[]),
         Word::SetupExisting => (&[b"", b", the project you are in"], &[Name]),
+                Word::AdminTitle => (&[b"Connect as its admin"], &[]),
+        Word::AdminDescription => (&[b"Paste a site admin\xe2\x80\x99s token with the scopes write:admin, read:user, write:organization and write:repository. temper keeps it, and uses it only to make its bot and your first repository, and to give the bot access to it. To stop temper using it, delete the token on Forgejo."], &[]),
+        Word::AdminCard => (&[b"temper connects as its site admin, makes its bot and your first repository."], &[]),
+        Word::AdminToken => (&[b"The site admin\xe2\x80\x99s token"], &[]),
+        Word::AdminFirst => (&[b"Your first repository"], &[]),
+        Word::AdminLabel => (&[b"Runner label"], &[]),
+        Word::AdminLabelHint => (&[b"Its CI runs on your forge\xe2\x80\x99s runners with this label. Forgejo\xe2\x80\x99s runner registers as docker unless told otherwise."], &[]),
+        Word::AdminLabelInvalid => (&[b"Letters, digits, dots, dashes and underscores, at most 64."], &[]),
+        Word::AdminTooLong => (&[b"The pasted values are past 4 KiB, the most a request carries."], &[]),
+        Word::AdminConnecting => (&[b"Connecting forge ", b" as its admin."], &[Number]),
+        Word::AdminMaking => (&[b"Making its bot, then ", b"."], &[Name]),
+        Word::AdminKept => (&[b"temper kept nothing of the token."], &[]),
+        Word::AdminNotAdmin => (&[b"The token you gave is not a site admin\xe2\x80\x99s. Paste one a site admin made."], &[]),
+        Word::AdminUnauthorized => (&[b"Forgejo refused the token. Check that it was copied whole, and that it hasn\xe2\x80\x99t been deleted."], &[]),
+        Word::AdminScope => (&[b"The token lacks a scope: ", b" was refused. Make one with write:admin, read:user, write:organization and write:repository."], &[Name]),
+        Word::AdminUnmarked => (&[b"A user temper didn\xe2\x80\x99t make holds the bot\xe2\x80\x99s login, without temper\xe2\x80\x99s mark: add temper:bot to its full name on Forgejo, or change the bot\xe2\x80\x99s login in the configuration."], &[]),
+        Word::AdminFirstFailed => (&[b"temper made its bot, but making ", b" stopped at ", b": ", b". Paste the token again to finish it."], &[Name, Name, Name]),
+        Word::AdminReady => (&[b"Made ", b", and its project ", b". Its CI runs on your forge\xe2\x80\x99s runners labelled ", b"; with none, a change\xe2\x80\x99s checks wait."], &[Name, Name, Name]),
+        Word::AdminRepository => (&[b"Open ", b" on Forgejo \xe2\x86\x97"], &[Name]),
+        Word::AdminHost => (&[b"Forgejo at ", b""], &[Name]),
         Word::SetupNew => (&[b"Into a new project, named"], &[]),
         Word::SetupAdopt => (&[b"Adopt ", b""], &[Name]),
         Word::SetupRequired => (&[b"Required."], &[]),
@@ -2032,7 +2115,6 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ForgeSetupEntry => (&[b"To connect as its admin, add its setup entry to application.setup:"], &[]),
         Word::ForgeBotOnly => (&[b"Without it, temper takes its bot\xe2\x80\x99s tokens only."], &[]),
         Word::ForgeRestart => (&[b"Restart temper box, then connect it from this page."], &[]),
-        Word::ForgeElsewhereUnavailable => (&[b"Connecting a Forgejo elsewhere from temper is not available yet."], &[]),
         Word::ForgeSettingUpTitle => (&[b"Setting up Forgejo on this machine"], &[]),
         Word::ForgeFetched => (&[b"Fetched Forgejo and its runner"], &[]),
         Word::ForgeConnectingAsTemper => (&[b"Connecting as temper"], &[]),

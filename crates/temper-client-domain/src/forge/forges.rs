@@ -306,6 +306,8 @@ pub(crate) fn configure(side: &mut super::Side, limits: super::Limits, out: &mut
         if side.link == Link::SignedOut {
             side.set_up = None;
             side.pickers.clear();
+            side.admin_form = super::admin::Draft::new();
+            side.admin = None;
             side.app_form.clear();
             side.app = None;
         }
@@ -482,6 +484,7 @@ pub(crate) fn told(
         | Told::Kept { .. }
         | Told::Dropped { .. } => return false,
     }
+    super::admin::stopped(side);
     maybe_adopt(side, limits, out);
     side.changed();
     true
