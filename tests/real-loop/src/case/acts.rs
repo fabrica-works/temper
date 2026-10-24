@@ -102,6 +102,23 @@ pub enum Read {
     BatchSubownerEnded,
     BatchOwnerEnded,
     BatchDirectorEnded,
+    RedReviewWriting,
+    RedChangeOpen,
+    RedRepairWriting,
+    RedRepairPending,
+    RedTimerArmed,
+    RedChangePaused,
+    RedDirectorEnded,
+    RedOwnerEnded,
+    RedChangeEnded,
+    RedCoderEnded,
+    RedReviewEnded,
+    RedRepairEnded,
+    RedRepairCoderEnded,
+    RedRepairReviewEnded,
+    RedRootsEnded,
+    RedRootsPending,
+    RedUpdatedReviewEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -826,5 +843,51 @@ pub fn step_6_1() -> Vec<calls::Step> {
     for task in [BATCH_ONE, BATCH_TWO, BATCH_STORY, BATCH_SUBOWNER, BATCH_OWNER, BATCH_DIRECTOR] {
         steps.push(call(D1, argv!["task", number(task), "--activity", "32", "--json"]));
     }
+    steps
+}
+
+// Act 3, step 6.4 (domain/testing.md, 5.3)
+pub const READS_6_4: &[(Read, usize)] = &[
+    (Read::RedReviewWriting, 6), (Read::RedChangeOpen, 7), (Read::RedRootsPending, 8),
+    (Read::RedRepairWriting, 10), (Read::RedRepairPending, 11),
+    (Read::RedTimerArmed, 13), (Read::RedChangePaused, 14),
+    (Read::RedDirectorEnded, 17), (Read::RedOwnerEnded, 18),
+    (Read::RedChangeEnded, 19), (Read::RedCoderEnded, 20),
+    (Read::RedReviewEnded, 21), (Read::RedRepairEnded, 22),
+    (Read::RedRepairCoderEnded, 23), (Read::RedRepairReviewEnded, 24),
+    (Read::RedUpdatedReviewEnded, 25), (Read::RedRootsEnded, 26),
+];
+#[must_use]
+pub fn step_6_4() -> Vec<calls::Step> {
+    use super::*;
+    let mut steps = vec![
+        sign_in(D1),
+        call(D1, argv!["adopt", "--project", number(PROJECT), "--owner", "acme", "--name", "app", "--landing", "main", "--no-home", "--key", "red-kit"]),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "red", RED_PERSON]),
+        call(D1, argv!["wait", "task", number(RED_DIRECTOR), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(RED_OWNER), "--until", "replied"]),
+        calls::until(D1, argv!["task", number(RED_CHANGE), "--json"], Agent::Review.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(RED_REVIEW), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["task", number(RED_CHANGE), "--activity", "32", "--json"]),
+        calls::push(RED_FILE.as_bytes(), RED_BROKEN.as_bytes()),
+        // A ready change, after its gate passes, discovers the red base.
+        calls::release_hold(RED_REVIEW_HOLD),
+        // Until cannot retry an unknown task: first observe the deployment
+        // repair among project roots, then its coder's live delegate card.
+        calls::until(D1, argv!["tasks", "--project", number(PROJECT), "--json"], Agent::RedRepairCoder.cue(), b"\"tasks\""),
+        calls::until(D1, argv!["task", number(RED_REPAIR), "--json"], Agent::RedRepairCoder.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(RED_REPAIR_CODER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["task", number(RED_REPAIR), "--activity", "32", "--json"]),
+        call(D1, argv!["message", number(RED_DIRECTOR), "--key", "red-tip", RED_MESSAGE]),
+        calls::until(D1, argv!["task", number(RED_DIRECTOR), "--activity", "32", "--json"], b"\"kind\":{\"timer\":{", b"\"task\""),
+        call(D1, argv!["task", number(RED_CHANGE), "--activity", "32", "--json"]),
+        calls::release_hold(RED_REPAIR_HOLD),
+        call(D1, argv!["wait", "task", number(RED_REPAIR), "--until", "ended"]),
+        call(D1, argv!["wait", "task", number(RED_DIRECTOR), "--until", "ended"]),
+    ];
+    for task in [RED_DIRECTOR, RED_OWNER, RED_CHANGE, RED_CODER, RED_REVIEW, RED_REPAIR, RED_REPAIR_CODER, RED_REPAIR_REVIEW, RED_UPDATED_REVIEW] {
+        steps.push(call(D1, argv!["task", number(task), "--activity", "32", "--json"]));
+    }
+    steps.push(call(D1, argv!["tasks", "--project", number(PROJECT), "--ended", "--json"]));
     steps
 }
