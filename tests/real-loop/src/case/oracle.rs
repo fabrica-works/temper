@@ -166,6 +166,12 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::BlockerSubowner,
         Agent::BlockerImplementer,
         Agent::BlockerCoder,
+        // Act 3, step 6.5 (domain/testing.md, 5.3)
+        Agent::BudgetDirector,
+        Agent::BudgetOwner,
+        Agent::BudgetSubowner,
+        Agent::BudgetInvestigator,
+        Agent::BudgetAdvisor,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -6501,6 +6507,1093 @@ mod blocker_tests {
             gap.documents.get_mut(&read).expect("doc")["activity"]["rows"][0]["event"]["owner"]["source"]["position"] =
                 json!(99);
             rejects(&gap, BLOCKER_ATTEMPTS);
+        }
+    }
+}
+
+// Act 3, step 6.5 (domain/testing.md, 5.3)
+const BUDGET_MESSAGES: Promise = Promise::Must("the budget question climbs two owners and its answers come down once");
+const BUDGET_INBOX: Promise = Promise::Must("the person's inbox keeps the question until its answer");
+const BUDGET_CHECKPOINT: Promise = Promise::Must("a5 is made after A1 hears the answer");
+const BUDGET_EFFORT: Promise = Promise::Must("a5's effort is raised for its next try");
+const BUDGET_ONESHOT: Promise = Promise::Must("one advisor reads a5's report on the owner's model");
+const BUDGET_RESULT: Promise = Promise::Add("the advisor's report reaches A1 once");
+const BUDGET_ATTEMPTS: Promise = Promise::Add("every attempt ended, none failed");
+
+fn budget_tasks() -> [(Read, u64, u64); 5] {
+    use super::{BUDGET_A5, BUDGET_ADVISOR, BUDGET_DIRECTOR, BUDGET_OWNER, BUDGET_SUBOWNER};
+    [
+        (Read::BudgetDirectorEnded, BUDGET_DIRECTOR, 0),
+        (Read::BudgetOwnerEnded, BUDGET_OWNER, BUDGET_DIRECTOR),
+        (Read::BudgetSubownerEnded, BUDGET_SUBOWNER, BUDGET_OWNER),
+        (Read::BudgetA5Ended, BUDGET_A5, BUDGET_SUBOWNER),
+        (Read::BudgetAdvisorEnded, BUDGET_ADVISOR, BUDGET_SUBOWNER),
+    ]
+}
+
+fn budget_pages(read: Read) -> Vec<Read> {
+    if read == Read::BudgetDirectorEnded {
+        vec![read, Read::BudgetDirectorFirst]
+    } else if read == Read::BudgetOwnerEnded {
+        vec![read, Read::BudgetOwnerFirst]
+    } else if read == Read::BudgetSubownerEnded {
+        vec![read, Read::BudgetSubownerFirst]
+    } else {
+        vec![read]
+    }
+}
+fn budget_rows(observed: &Observed, read: Read) -> Vec<&Value> {
+    budget_pages(read).iter().flat_map(|read| check_activity(observed, *read)).collect()
+}
+fn budget_journal(observed: &Observed, read: Read, task: u64) -> bool {
+    let pages = budget_pages(read);
+    if pages.len() == 1 {
+        return batch_journal(observed, read, task);
+    }
+    let rows = budget_rows(observed, read);
+    // Apply 6.1's attempt rule across complete adjoining cursor pages.
+    plan_attempts(observed, &pages, task, 1)
+        && rows.last().is_some_and(|r| number(r, "/position") == Some(1))
+        && rows.windows(2).all(|pair| {
+            number(pair[0], "/position")
+                .zip(number(pair[1], "/position"))
+                .is_some_and(|(new, old)| new.checked_sub(1) == Some(old))
+        })
+        && rows.iter().enumerate().all(|(at, row)| {
+            let Some(end) = row.pointer("/line/run_ended") else { return true };
+            matches!(end["end"].as_str(), Some("parked" | "finished"))
+                || (end["end"] == "refused"
+                    && number(end, "/spent") == Some(0)
+                    && number(end, "/attempt")
+                        .is_some_and(|attempt| !rows.iter().any(|r| number(r, "/line/turn/attempt") == Some(attempt)))
+                    && rows[..at].iter().any(|r| text(r, "/line/run_ended/end") == "finished"))
+        })
+}
+
+#[must_use]
+pub fn step_6_5(observed: &Observed) -> Vec<Miss> {
+    use super::{A_DEADLINE, A1_DEADLINE, BUDGET_OWNER, PROJECT};
+    let mut misses = Vec::new();
+    for (read, task, parent) in budget_tasks() {
+        let doc = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "6.5",
+            number(doc, "/chip/task") == Some(task)
+                && number(doc, "/project") == Some(PROJECT)
+                && (parent == 0 || number(doc, "/requester/task") == Some(parent))
+                && text(doc, "/chip/phase") == "ended"
+                && doc.pointer("/result/ending/task/done").is_some_and(Value::is_object),
+            BUDGET_CHECKPOINT,
+            &format!("{read:?} must identify done task {task} under {parent}"),
+        );
+        step_check(
+            &mut misses,
+            "6.5",
+            budget_journal(observed, read, task),
+            BUDGET_ATTEMPTS,
+            &format!(
+                "task {task}'s whole ordered journal must end all attempts, allowing only unspent uncommitted rechecks"
+            ),
+        );
+    }
+    let a = task_document(observed, Read::BudgetOwnerEnded);
+    let a1 = task_document(observed, Read::BudgetSubownerEnded);
+    step_check(
+        &mut misses,
+        "6.5",
+        number(a, "/goal") == Some(BUDGET_OWNER)
+            && number(a, "/authority/authority/deadline") == Some(A_DEADLINE)
+            && number(a1, "/authority/authority/deadline") == Some(A1_DEADLINE)
+            && number(a1, "/authority/authority/delegation/depth") == Some(1),
+        BUDGET_CHECKPOINT,
+        "A must be tracked and A1 must carry M1's deadline and depth one",
+    );
+    budget_messages(observed, &mut misses);
+    budget_person_answer(observed, &mut misses);
+    budget_inbox(observed, &mut misses);
+    budget_investigation(observed, &mut misses);
+    budget_effort(observed, &mut misses);
+    budget_advisor(observed, &mut misses);
+    misses
+}
+
+fn budget_messages(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{
+        BUDGET_ANSWER, BUDGET_ANSWER_NUMBER, BUDGET_DIRECTOR, BUDGET_OWNER, BUDGET_PERSON_ANSWER, BUDGET_QUESTION,
+        BUDGET_QUESTION_NUMBER, BUDGET_RELAY_NUMBER, BUDGET_SUBOWNER, BUDGET_UP_QUESTION, BUDGET_UP_QUESTION_NUMBER,
+    };
+    let mut previous = None;
+    for (agent, receiver, by, target, message, question, words, read) in [
+        (
+            Agent::BudgetSubowner,
+            Agent::BudgetOwner,
+            BUDGET_SUBOWNER,
+            BUDGET_OWNER,
+            BUDGET_QUESTION_NUMBER,
+            None,
+            BUDGET_QUESTION,
+            Read::BudgetOwnerEnded,
+        ),
+        (
+            Agent::BudgetOwner,
+            Agent::BudgetDirector,
+            BUDGET_OWNER,
+            BUDGET_DIRECTOR,
+            BUDGET_UP_QUESTION_NUMBER,
+            None,
+            BUDGET_UP_QUESTION,
+            Read::BudgetDirectorEnded,
+        ),
+        (
+            Agent::BudgetDirector,
+            Agent::BudgetOwner,
+            BUDGET_DIRECTOR,
+            BUDGET_OWNER,
+            BUDGET_RELAY_NUMBER,
+            Some(BUDGET_UP_QUESTION_NUMBER),
+            BUDGET_PERSON_ANSWER,
+            Read::BudgetOwnerEnded,
+        ),
+        (
+            Agent::BudgetOwner,
+            Agent::BudgetSubowner,
+            BUDGET_OWNER,
+            BUDGET_SUBOWNER,
+            BUDGET_ANSWER_NUMBER,
+            Some(BUDGET_QUESTION_NUMBER),
+            BUDGET_ANSWER,
+            Read::BudgetSubownerEnded,
+        ),
+    ] {
+        let delivery = blocker_delivery(observed, receiver, words);
+        let ordered = delivery.is_some_and(|at| previous.is_none_or(|before| before < at));
+        previous = delivery;
+        let form = if question.is_some() { "answer" } else { "question" };
+        let tools = plan_tool_results(observed, agent, b"message");
+        let tools: Vec<_> = tools.iter().filter(|(_, args, _)| args["words"] == words).collect();
+        let sent = tools.len() == 1
+            && tools.iter().all(|(_, args, out)| {
+                args["target"] == target
+                    && args["form"] == form
+                    && question.is_none_or(|q| args["question"] == q)
+                    && contains(out, &format!("Message {message} sent"))
+            });
+        let recorded = budget_rows(observed, read)
+            .iter()
+            .filter(|row| {
+                let kind = question
+                    .map_or_else(|| Value::String(form.into()), |q| serde_json::json!({"answer":{"question":q}}));
+                number(row, "/line/words/message") == Some(message)
+                    && number(row, "/line/words/by/task") == Some(by)
+                    && row.pointer("/line/words/kind") == Some(&kind)
+                    && text(row, "/line/words/words") == words
+            })
+            .count()
+            == 1;
+        step_check(
+            misses,
+            "6.5",
+            sent && ordered && recorded && plan_deliveries(observed, receiver, words) == 1,
+            BUDGET_MESSAGES,
+            &format!("message {message} must reach {receiver:?} once in the question/answer chain"),
+        );
+    }
+}
+
+fn budget_person_answer(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{BUDGET_PERSON_ANSWER, BUDGET_PERSON_ANSWER_NUMBER, BUDGET_UP_QUESTION, BUDGET_UP_QUESTION_NUMBER};
+    let question = blocker_delivery(observed, Agent::BudgetDirector, BUDGET_UP_QUESTION);
+    let person = blocker_delivery(observed, Agent::BudgetDirector, BUDGET_PERSON_ANSWER);
+    let relay = blocker_delivery(observed, Agent::BudgetOwner, BUDGET_PERSON_ANSWER);
+    step_check(
+        misses,
+        "6.5",
+        question.zip(person).is_some_and(|(question, person)| question < person)
+            && person.zip(relay).is_some_and(|(person, relay)| person < relay)
+            && plan_deliveries(observed, Agent::BudgetDirector, BUDGET_PERSON_ANSWER) == 1
+            && budget_rows(observed, Read::BudgetDirectorEnded)
+                .iter()
+                .filter(|r| {
+                    number(r, "/line/words/message") == Some(BUDGET_PERSON_ANSWER_NUMBER)
+                        && number(r, "/line/words/by/person") == Some(1)
+                        && number(r, "/line/words/kind/answer/question") == Some(BUDGET_UP_QUESTION_NUMBER)
+                        && text(r, "/line/words/words") == BUDGET_PERSON_ANSWER
+                })
+                .count()
+                == 1,
+        BUDGET_MESSAGES,
+        "the person must wake the chat once after the question and before its relay to A",
+    );
+}
+
+fn budget_inbox(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{BUDGET_DIRECTOR, BUDGET_UP_QUESTION_NUMBER, PROJECT};
+    let rows = document(observed, Read::BudgetAsked).pointer("/needs/rows").and_then(Value::as_array);
+    let ended = document(observed, Read::BudgetInboxAnswered).pointer("/needs/rows").and_then(Value::as_array);
+    // The identified reads are the acts' JSON documents. Its command order
+    // proves the first inbox read precedes answer and the final read follows.
+    let commands: Vec<_> = observed.commands.iter().map(String::as_str).collect();
+    step_check(
+        misses,
+        "6.5",
+        rows.is_some_and(|rows| {
+            rows.len() == 1
+                && rows[0]["reply"].is_null()
+                && number(&rows[0], "/task/live/task") == Some(BUDGET_DIRECTOR)
+                && number(&rows[0], "/project") == Some(PROJECT)
+                && number(&rows[0], "/object/question/message") == Some(BUDGET_UP_QUESTION_NUMBER)
+        }) && document(observed, Read::BudgetAsked)["needs"]["cut"] == false
+            && document(observed, Read::BudgetInboxAnswered)["needs"]["cut"] == false
+            && ended.is_some_and(Vec::is_empty)
+            && commands
+                .iter()
+                .position(|c| *c == "inbox")
+                .zip(commands.iter().position(|c| *c == "answer"))
+                .is_some_and(|(read, answer)| read < answer)
+            && commands
+                .iter()
+                .position(|c| *c == "answer")
+                .zip(commands.iter().rposition(|c| *c == "inbox"))
+                .is_some_and(|(answer, read)| answer < read)
+            && commands.iter().filter(|c| **c == "answer").count() == 1,
+        BUDGET_INBOX,
+        "the read before ctl answer must hold A's sole question, absent in the final inbox read",
+    );
+}
+
+fn budget_investigation(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{BUDGET_A5, BUDGET_ANSWER, BUDGET_MEDIUM_NUMBER, DEFAULT_MODEL_NUMBER};
+    let answer = blocker_delivery(observed, Agent::BudgetSubowner, BUDGET_ANSWER);
+    let delegates = plan_tool_results(observed, Agent::BudgetSubowner, b"delegate");
+    step_check(
+        misses,
+        "6.5",
+        delegates.len() == 2
+            && delegates.iter().filter(|(_, _, out)| contains(out, &format!("Delegated tasks: {BUDGET_A5}"))).count()
+                == 1
+            && delegates.iter().any(|(at, args, out)| {
+                answer.is_some_and(|answer| answer < *at)
+                && contains(out, &format!("Delegated tasks: {BUDGET_A5}"))
+                && args["batch"].as_array().is_some_and(|batch| {
+                    batch.len() == 1
+                        && batch[0]["llm"]
+                            == serde_json::json!({"main":{"model":DEFAULT_MODEL_NUMBER,"effort":BUDGET_MEDIUM_NUMBER}})
+                })
+            }),
+        BUDGET_CHECKPOINT,
+        "a5's singleton delegation on the default model at medium must follow A1 hearing the answer",
+    );
+}
+
+fn budget_finding(observed: &Observed) -> bool {
+    use super::{BUDGET_A5, BUDGET_FINDING, BUDGET_FINDING_NUMBER};
+    plan_deliveries(observed, Agent::BudgetSubowner, BUDGET_FINDING) == 1
+        && budget_rows(observed, Read::BudgetSubownerEnded)
+            .iter()
+            .filter(|r| {
+                number(r, "/line/words/message") == Some(BUDGET_FINDING_NUMBER)
+                    && number(r, "/line/words/by/task") == Some(BUDGET_A5)
+                    && text(r, "/line/words/kind") == "words"
+                    && text(r, "/line/words/words") == BUDGET_FINDING
+            })
+            .count()
+            == 1
+}
+
+fn budget_effort(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{
+        BUDGET_A5, BUDGET_A5_REPORT, BUDGET_AMENDMENT_NUMBER, BUDGET_HIGH, BUDGET_HIGH_NUMBER, BUDGET_MEDIUM,
+        BUDGET_REASON, BUDGET_REVISION, BUDGET_SUBOWNER, DEFAULT_MODEL, DEFAULT_MODEL_NUMBER,
+    };
+    let medium = task_document(observed, Read::BudgetMedium);
+    let high = task_document(observed, Read::BudgetHigh);
+    let ended = task_document(observed, Read::BudgetA5Ended);
+    let amendments = plan_tool_results(observed, Agent::BudgetSubowner, b"amend");
+    let choices = [
+        (medium, BUDGET_MEDIUM, BUDGET_REVISION - 1),
+        (high, BUDGET_HIGH, BUDGET_REVISION),
+        (ended, BUDGET_HIGH, BUDGET_REVISION),
+    ];
+    step_check(
+        misses,
+        "6.5",
+        budget_finding(observed)
+            && choices.iter().all(|(doc, effort, revision)| {
+                number(doc, "/chip/task") == Some(BUDGET_A5)
+                    && text(doc, "/llm/main/model") == DEFAULT_MODEL
+                    && text(doc, "/llm/main/effort") == *effort
+                    && number(doc, "/spec_revision/value") == Some(*revision)
+            })
+            && text(medium, "/chip/phase") == "idle"
+            && medium["result"].is_null()
+            && amendments.len() == 1
+            && amendments.iter().all(|(_, args, out)| {
+                args["target"] == BUDGET_A5
+                    && args["revision"] == BUDGET_REVISION - 1
+                    && args["amendment"]["llm"]
+                        == serde_json::json!({"main":{"model":DEFAULT_MODEL_NUMBER,"effort":BUDGET_HIGH_NUMBER}})
+                    && args["amendment"]["reason"] == BUDGET_REASON
+                    && contains(out, &format!("Done: task {BUDGET_A5} is at spec revision {BUDGET_REVISION}"))
+            }),
+        BUDGET_EFFORT,
+        "a5 must change from medium to high at the amendment's next spec revision",
+    );
+    let before = check_activity(observed, Read::BudgetMedium);
+    let after = check_activity(observed, Read::BudgetHigh);
+    let reason: Vec<_> =
+        after.iter().filter(|r| number(r, "/line/heard/number") == Some(BUDGET_AMENDMENT_NUMBER)).collect();
+    let running = number(high, "/chip/details/owner/phase/active/running/attempt");
+    step_check(
+        misses,
+        "6.5",
+        batch_journal(observed, Read::BudgetMedium, BUDGET_A5)
+            && batch_writing(observed, Read::BudgetHigh, BUDGET_A5, Read::BudgetA5Ended)
+            && before.iter().all(|row| after.contains(row))
+            && pause_activity(observed, Read::BudgetHigh)["cut"] == false
+            && pause_activity(observed, Read::BudgetHigh)["before"].is_null()
+            && after.iter().all(|r| number(r, "/task") == Some(BUDGET_A5))
+            && after.windows(2).all(|pair| {
+                number(pair[0], "/position")
+                    .zip(number(pair[1], "/position"))
+                    .is_some_and(|(new, old)| new.checked_sub(1) == Some(old))
+            })
+            && after.iter().filter(|r| number(r, "/line/decided/revision") == Some(BUDGET_REVISION)).count() == 1
+            && reason.len() == 1
+            && reason.iter().all(|r| {
+                number(r, "/line/heard/from/task") == Some(BUDGET_SUBOWNER)
+                    && number(r, "/line/heard/kind/amendment/revision") == Some(BUDGET_REVISION)
+                    && text(r, "/line/heard/words") == BUDGET_REASON
+                    && number(r, "/position").is_some_and(|amended| {
+                        before.first().and_then(|r| number(r, "/position")).is_some_and(|read| read < amended)
+                            && after.iter().any(|r| {
+                                number(r, "/line/run_began/attempt") == running
+                                    && running.is_some()
+                                    && number(r, "/position").is_some_and(|began| {
+                                        began > amended
+                                            && after.iter().any(|decision| {
+                                                number(decision, "/line/decided/revision") == Some(BUDGET_REVISION)
+                                                    && number(decision, "/position")
+                                                        .is_some_and(|decided| amended < decided && decided < began)
+                                            })
+                                            && !after.iter().any(|between| {
+                                                between.pointer("/line/run_began").is_some()
+                                                    && number(between, "/position")
+                                                        .is_some_and(|at| amended < at && at < began)
+                                            })
+                                    })
+                            })
+                    })
+            })
+            && plan_deliveries(observed, Agent::BudgetInvestigator, BUDGET_REASON) == 1
+            && text(ended, "/result/value/report/bytes") == BUDGET_A5_REPORT,
+        BUDGET_EFFORT,
+        "the next a5 run after the amendment must hear its reason once and report none again",
+    );
+}
+
+fn budget_report(observed: &Observed, task: u64, message: u64, words: &str) -> bool {
+    budget_rows(observed, Read::BudgetSubownerEnded)
+        .iter()
+        .filter(|r| {
+            number(r, "/line/heard/number") == Some(message)
+                && number(r, "/line/heard/from/task") == Some(task)
+                && text(r, "/line/heard/kind/result") == "report"
+                && text(r, "/line/heard/words") == words
+        })
+        .count()
+        == 1
+}
+
+fn budget_advisor(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{
+        BUDGET_A5, BUDGET_A5_REPORT, BUDGET_A5_REPORT_NUMBER, BUDGET_ADVISOR, BUDGET_ADVISOR_REPORT,
+        BUDGET_ADVISOR_REPORT_NUMBER, BUDGET_ADVISOR_SPEC, OWNER_EFFORT_NUMBER, OWNER_MODEL, OWNER_MODEL_NUMBER,
+    };
+    let report_at = blocker_delivery(observed, Agent::BudgetSubowner, BUDGET_A5_REPORT);
+    let delegated = plan_tool_results(observed, Agent::BudgetSubowner, b"delegate");
+    let advisor = task_document(observed, Read::BudgetAdvisorEnded);
+    let queries: Vec<_> = observed.told.iter().filter(|t| t.agent == Agent::BudgetAdvisor).collect();
+    let rows = check_activity(observed, Read::BudgetAdvisorEnded);
+    step_check(
+        misses,
+        "6.5",
+        budget_report(observed, BUDGET_A5, BUDGET_A5_REPORT_NUMBER, BUDGET_A5_REPORT)
+            && plan_deliveries(observed, Agent::BudgetSubowner, BUDGET_A5_REPORT) == 1
+            && delegated
+                .iter()
+                .filter(|(_, _, out)| contains(out, &format!("Delegated tasks: {BUDGET_ADVISOR}")))
+                .count()
+                == 1
+            && delegated.iter().any(|(at, args, out)| {
+                report_at.is_some_and(|report| report < *at)
+                    && contains(out, &format!("Delegated tasks: {BUDGET_ADVISOR}"))
+                    && args["batch"].as_array().is_some_and(|batch| {
+                        batch.len() == 1
+                            && batch[0]["spec"]["words"] == BUDGET_ADVISOR_SPEC
+                            && batch[0]["llm"]
+                                == serde_json::json!({"main":{"model":OWNER_MODEL_NUMBER,"effort":OWNER_EFFORT_NUMBER}})
+                    })
+            })
+            && text(advisor, "/spec/specification/words/bytes") == BUDGET_ADVISOR_SPEC
+            && text(advisor, "/llm/main/model") == OWNER_MODEL
+            && text(advisor, "/result/value/report/bytes") == BUDGET_ADVISOR_REPORT
+            && queries.len() == 1
+            && queries.iter().all(|t| {
+                t.model.as_ref() == OWNER_MODEL.as_bytes() && contains(&t.system, BUDGET_A5_REPORT) && plan_fresh(t)
+            })
+            && rows.iter().filter(|r| r.pointer("/line/run_began").is_some()).count() == 1
+            && rows.iter().filter(|r| text(r, "/line/run_ended/end") == "finished").count() == 1
+            && rows.iter().filter(|r| r.pointer("/line/turn").is_some()).count() == 1,
+        BUDGET_ONESHOT,
+        "after a5 reports, one advisor must read its report/evidence on owner and end on its first turn and attempt",
+    );
+    step_check(
+        misses,
+        "6.5",
+        budget_report(observed, BUDGET_ADVISOR, BUDGET_ADVISOR_REPORT_NUMBER, BUDGET_ADVISOR_REPORT)
+            && plan_deliveries(observed, Agent::BudgetSubowner, BUDGET_ADVISOR_REPORT) == 1
+            && report_at
+                .zip(blocker_delivery(observed, Agent::BudgetSubowner, BUDGET_ADVISOR_REPORT))
+                .is_some_and(|(a5, advisor)| a5 < advisor),
+        BUDGET_RESULT,
+        "A1 must hear the advisor's cause once, after a5's report",
+    );
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::batch_tests::{input, journal, told, tool};
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+    use skein_fake_llm_domain::api::{Part, Role};
+
+    fn met() -> Observed {
+        let mut observed = Observed {
+            documents: BTreeMap::new(),
+            told: Vec::new(),
+            commands: vec![
+                "sign-in", "chat", "wait", "wait", "wait", "inbox", "answer", "task", "task", "wait", "task", "task",
+                "task", "task", "task", "task", "task", "inbox",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+            kit: Kit { main: BTreeMap::new(), pulls: Vec::new(), merged_green: false },
+        };
+        budget_documents(&mut observed);
+        investigation_documents(&mut observed);
+        budget_queries(&mut observed);
+        for (latest, earlier, _) in [
+            (Read::BudgetDirectorEnded, Read::BudgetDirectorFirst, BUDGET_DIRECTOR),
+            (Read::BudgetOwnerEnded, Read::BudgetOwnerFirst, BUDGET_OWNER),
+            (Read::BudgetSubownerEnded, Read::BudgetSubownerFirst, BUDGET_SUBOWNER),
+        ] {
+            let page = &mut observed.documents.get_mut(&latest).expect("latest")["activity"];
+            let rows = page["rows"].as_array_mut().expect("rows");
+            let older = rows.split_off(3);
+            page["before"] = json!({"value":"older"});
+            observed
+                .documents
+                .insert(earlier, json!({"rows":older,"cut":false,"before":null,"after":{"value":"newer"}}));
+        }
+        observed
+    }
+
+    fn budget_documents(observed: &mut Observed) {
+        for (read, task, parent) in budget_tasks() {
+            observed.documents.insert(read,json!({"task":{
+                "chip":{"task":task,"phase":"ended"},"project":PROJECT,"requester":{"task":parent},"goal":BUDGET_OWNER,
+                "authority":{"authority":{"deadline":if task == BUDGET_OWNER {A_DEADLINE} else {A1_DEADLINE},"delegation":{"depth":1}}},
+                "result":{"ending":{"task":{"done":{}}}}
+            },"activity":journal(task,&[
+                json!({"run_began":{"attempt":1}}), json!({"turn":{"attempt":1}}),
+                json!({"run_ended":{"attempt":1,"end":"finished","spent":1}})
+            ])}));
+        }
+        let mut lines = BTreeMap::new();
+        for (read, task, _) in budget_tasks() {
+            lines.insert(read, (task, vec![json!({"run_began":{"attempt":1}}), json!({"turn":{"attempt":1}})]));
+        }
+        for (read, message, by, kind, words) in [
+            (
+                Read::BudgetOwnerEnded,
+                BUDGET_QUESTION_NUMBER,
+                json!({"task":BUDGET_SUBOWNER}),
+                json!("question"),
+                BUDGET_QUESTION,
+            ),
+            (
+                Read::BudgetDirectorEnded,
+                BUDGET_UP_QUESTION_NUMBER,
+                json!({"task":BUDGET_OWNER}),
+                json!("question"),
+                BUDGET_UP_QUESTION,
+            ),
+            (
+                Read::BudgetOwnerEnded,
+                BUDGET_RELAY_NUMBER,
+                json!({"task":BUDGET_DIRECTOR}),
+                json!({"answer":{"question":BUDGET_UP_QUESTION_NUMBER}}),
+                BUDGET_PERSON_ANSWER,
+            ),
+            (
+                Read::BudgetSubownerEnded,
+                BUDGET_ANSWER_NUMBER,
+                json!({"task":BUDGET_OWNER}),
+                json!({"answer":{"question":BUDGET_QUESTION_NUMBER}}),
+                BUDGET_ANSWER,
+            ),
+        ] {
+            lines
+                .get_mut(&read)
+                .expect("task")
+                .1
+                .push(json!({"words":{"message":message,"by":by,"kind":kind,"words":words}}));
+        }
+        lines.get_mut(&Read::BudgetDirectorEnded).expect("director").1.push(json!({"words":{"message":BUDGET_PERSON_ANSWER_NUMBER,"by":{"person":1},"kind":{"answer":{"question":BUDGET_UP_QUESTION_NUMBER}},"words":BUDGET_PERSON_ANSWER}}));
+        lines.get_mut(&Read::BudgetSubownerEnded).expect("A1").1.push(json!({"words":{"message":BUDGET_FINDING_NUMBER,"by":{"task":BUDGET_A5},"kind":"words","words":BUDGET_FINDING}}));
+        for (task, message, words) in [
+            (BUDGET_A5, BUDGET_A5_REPORT_NUMBER, BUDGET_A5_REPORT),
+            (BUDGET_ADVISOR, BUDGET_ADVISOR_REPORT_NUMBER, BUDGET_ADVISOR_REPORT),
+        ] {
+            lines.get_mut(&Read::BudgetSubownerEnded).expect("A1").1.push(
+                json!({"heard":{"number":message,"from":{"task":task},"kind":{"result":"report"},"words":words}}),
+            );
+        }
+        for (read, (task, mut rows)) in lines {
+            rows.push(json!({"run_ended":{"attempt":1,"end":"finished","spent":1}}));
+            observed.documents.get_mut(&read).expect("doc")["activity"] = journal(task, &rows);
+        }
+        observed.documents.insert(Read::BudgetAsked,json!({"needs":{"cut":false,"rows":[{"task":{"live":{"task":BUDGET_DIRECTOR}},"project":PROJECT,"object":{"question":{"message":BUDGET_UP_QUESTION_NUMBER}},"reply":null}]}}));
+        observed.documents.insert(Read::BudgetInboxAnswered, json!({"needs":{"cut":false,"rows":[]}}));
+    }
+
+    fn investigation_documents(observed: &mut Observed) {
+        let before = vec![
+            json!({"run_began":{"attempt":1}}),
+            json!({"turn":{"attempt":1}}),
+            json!({"run_ended":{"attempt":1,"end":"parked","spent":1}}),
+        ];
+        let mut high = before.clone();
+        high.extend([
+            json!({"heard":{"number":BUDGET_AMENDMENT_NUMBER,"from":{"task":BUDGET_SUBOWNER},"kind":{"amendment":{"revision":BUDGET_REVISION}},"words":BUDGET_REASON}}),
+            json!({"decided":{"revision":BUDGET_REVISION}}),
+            json!({"run_began":{"attempt":2,"why":{"message":{"message":BUDGET_AMENDMENT_NUMBER}}}}),
+        ]);
+        for (read, effort, revision, phase, rows) in [
+            (Read::BudgetMedium, BUDGET_MEDIUM, BUDGET_REVISION - 1, "idle", &before),
+            (Read::BudgetHigh, BUDGET_HIGH, BUDGET_REVISION, "running", &high),
+        ] {
+            observed.documents.insert(read,json!({"task":{"chip":{"task":BUDGET_A5,"phase":phase,"details":{"owner":{"phase":{"active":{"running":{"attempt":2}}},"details":{"observation":{"work":"writing"}}}}},"llm":{"main":{"model":DEFAULT_MODEL,"effort":effort}},"spec_revision":{"value":revision},"result":null},"activity":journal(BUDGET_A5,rows)}));
+        }
+        high.extend([
+            json!({"turn":{"attempt":2,"read":BUDGET_AMENDMENT_NUMBER}}),
+            json!({"run_ended":{"attempt":2,"end":"finished","spent":1}}),
+        ]);
+        let a5 = observed.documents.get_mut(&Read::BudgetA5Ended).expect("a5");
+        a5["activity"] = journal(BUDGET_A5, &high);
+        a5["task"]["llm"] = json!({"main":{"model":DEFAULT_MODEL,"effort":BUDGET_HIGH}});
+        a5["task"]["spec_revision"] = json!({"value":BUDGET_REVISION});
+        a5["task"]["result"]["value"] = json!({"report":{"bytes":BUDGET_A5_REPORT}});
+        let advisor = observed.documents.get_mut(&Read::BudgetAdvisorEnded).expect("advisor");
+        advisor["task"]["spec"] = json!({"specification":{"words":{"bytes":BUDGET_ADVISOR_SPEC}}});
+        advisor["task"]["llm"] = json!({"main":{"model":OWNER_MODEL,"effort":OWNER_EFFORT}});
+        advisor["task"]["result"]["value"] = json!({"report":{"bytes":BUDGET_ADVISOR_REPORT}});
+    }
+
+    fn budget_queries(observed: &mut Observed) {
+        let exchange = |id, name, args: Value, output: String| tool(id, name, &args, &output).to_vec();
+        observed.told = vec![
+            told(
+                Agent::BudgetSubowner,
+                &exchange(
+                    "q",
+                    "message",
+                    json!({"target":BUDGET_OWNER,"form":"question","words":BUDGET_QUESTION}),
+                    format!("Message {BUDGET_QUESTION_NUMBER} sent"),
+                ),
+            ),
+            told(Agent::BudgetOwner, &[input(BUDGET_QUESTION)]),
+            told(
+                Agent::BudgetOwner,
+                &exchange(
+                    "up",
+                    "message",
+                    json!({"target":BUDGET_DIRECTOR,"form":"question","words":BUDGET_UP_QUESTION}),
+                    format!("Message {BUDGET_UP_QUESTION_NUMBER} sent"),
+                ),
+            ),
+            told(Agent::BudgetDirector, &[input(BUDGET_UP_QUESTION)]),
+            told(Agent::BudgetOwner, &[input(BUDGET_PERSON_ANSWER)]),
+            told(
+                Agent::BudgetOwner,
+                &exchange(
+                    "answer",
+                    "message",
+                    json!({"target":BUDGET_SUBOWNER,"form":"answer","question":BUDGET_QUESTION_NUMBER,"words":BUDGET_ANSWER}),
+                    format!("Message {BUDGET_ANSWER_NUMBER} sent"),
+                ),
+            ),
+            told(Agent::BudgetSubowner, &[input(BUDGET_ANSWER)]),
+            told(
+                Agent::BudgetSubowner,
+                &exchange(
+                    "a5",
+                    "delegate",
+                    json!({"batch":[{"llm":{"main":{"model":DEFAULT_MODEL_NUMBER,"effort":BUDGET_MEDIUM_NUMBER}}}]}),
+                    format!("Delegated tasks: {BUDGET_A5}"),
+                ),
+            ),
+            told(
+                Agent::BudgetSubowner,
+                &exchange(
+                    "raise",
+                    "amend",
+                    json!({"target":BUDGET_A5,"revision":BUDGET_REVISION-1,"amendment":{"llm":{"main":{"model":DEFAULT_MODEL_NUMBER,"effort":BUDGET_HIGH_NUMBER}},"reason":BUDGET_REASON}}),
+                    format!("Done: task {BUDGET_A5} is at spec revision {BUDGET_REVISION}"),
+                ),
+            ),
+            told(Agent::BudgetInvestigator, &[input(BUDGET_REASON)]),
+            told(Agent::BudgetSubowner, &[input(BUDGET_A5_REPORT)]),
+            told(
+                Agent::BudgetSubowner,
+                &exchange(
+                    "advisor",
+                    "delegate",
+                    json!({"batch":[{"spec":{"words":BUDGET_ADVISOR_SPEC},"llm":{"main":{"model":OWNER_MODEL_NUMBER,"effort":OWNER_EFFORT_NUMBER}}}]}),
+                    format!("Delegated tasks: {BUDGET_ADVISOR}"),
+                ),
+            ),
+            Told::new(BUDGET_ADVISOR_SPEC.as_bytes(), OWNER_MODEL.as_bytes(), None, &[input("Begin")])
+                .expect("advisor"),
+            told(Agent::BudgetSubowner, &[input(BUDGET_ADVISOR_REPORT)]),
+        ];
+        let mut finding = vec![input(BUDGET_FINDING)];
+        finding.extend(observed.told[8].history.iter().cloned());
+        observed.told[8].history = finding.into();
+        let mut relay = vec![input(BUDGET_PERSON_ANSWER)];
+        relay.extend(tool("relay","message",&json!({"target":BUDGET_OWNER,"form":"answer","question":BUDGET_UP_QUESTION_NUMBER,"words":BUDGET_PERSON_ANSWER}),&format!("Message {BUDGET_RELAY_NUMBER} sent")));
+        observed.told.insert(4, told(Agent::BudgetDirector, &relay));
+    }
+
+    fn rejects(observed: &Observed, promise: Promise) {
+        let misses = step_6_5(observed);
+        assert!(
+            misses.iter().any(|m| m.step == "6.5" && m.promise == promise),
+            "expected {promise:?}; got {}",
+            misses.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n")
+        );
+    }
+    fn changed_tool(observed: &mut Observed, at: usize, path: &str) {
+        let Part::ToolCall { arguments, .. } = observed.told[at]
+            .history
+            .iter_mut()
+            .flat_map(|m| &mut m.parts)
+            .find(|p| matches!(p, Part::ToolCall { .. }))
+            .expect("tool")
+        else {
+            unreachable!()
+        };
+        let mut args: Value = serde_json::from_slice(arguments).expect("args");
+        *args.pointer_mut(path).expect("field") = Value::Null;
+        *arguments = serde_json::to_vec(&args).expect("args").into();
+    }
+
+    #[test]
+    fn budget_checkpoint_met() {
+        assert_met(&step_6_5(&met()));
+    }
+
+    #[test]
+    fn each_task_identity_parent_project_and_ending_is_required() {
+        for (read, _, parent) in budget_tasks() {
+            let mut paths =
+                vec!["/task/chip/task", "/task/project", "/task/chip/phase", "/task/result/ending/task/done"];
+            if parent != 0 {
+                paths.push("/task/requester/task");
+            }
+            for path in paths {
+                let mut observed = met();
+                *observed.documents.get_mut(&read).expect("task").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&observed, BUDGET_CHECKPOINT);
+            }
+        }
+        for (read, path) in [
+            (Read::BudgetOwnerEnded, "/task/goal"),
+            (Read::BudgetOwnerEnded, "/task/authority/authority/deadline"),
+            (Read::BudgetSubownerEnded, "/task/authority/authority/deadline"),
+            (Read::BudgetSubownerEnded, "/task/authority/authority/delegation/depth"),
+        ] {
+            let mut observed = met();
+            *observed.documents.get_mut(&read).expect("doc").pointer_mut(path).expect("field") = Value::Null;
+            rejects(&observed, BUDGET_CHECKPOINT);
+        }
+    }
+
+    #[test]
+    fn every_chain_message_must_be_delivered_once_and_in_order() {
+        for at in [1, 3, 4, 5, 7] {
+            let mut missing = met();
+            missing.told.remove(at);
+            rejects(&missing, BUDGET_MESSAGES);
+            let mut duplicated = met();
+            let more = duplicated.told[at].history[0].clone();
+            let mut history = duplicated.told[at].history.to_vec();
+            history.push(more);
+            duplicated.told[at].history = history.into();
+            rejects(&duplicated, BUDGET_MESSAGES);
+        }
+        for (left, right) in [(1, 3), (3, 4), (4, 5), (5, 7)] {
+            let mut observed = met();
+            observed.told.swap(left, right);
+            rejects(&observed, BUDGET_MESSAGES);
+        }
+        for (at, paths) in [
+            (0, vec!["/target", "/form", "/words"]),
+            (2, vec!["/target", "/form", "/words"]),
+            (6, vec!["/target", "/form", "/question", "/words"]),
+        ] {
+            for path in paths {
+                let mut observed = met();
+                changed_tool(&mut observed, at, path);
+                rejects(&observed, BUDGET_MESSAGES);
+            }
+            let mut observed = met();
+            observed.told[at].history = observed.told[at].history[..1].into();
+            rejects(&observed, BUDGET_MESSAGES);
+        }
+        for read in [Read::BudgetOwnerEnded, Read::BudgetDirectorEnded, Read::BudgetSubownerEnded] {
+            let rows = budget_rows(&met(), read)
+                .into_iter()
+                .filter(|r| number(r, "/line/words/message").is_some_and(|message| message <= BUDGET_ANSWER_NUMBER))
+                .cloned()
+                .collect::<Vec<_>>();
+            for row in rows {
+                for field in ["message", "by", "kind", "words"] {
+                    let mut observed = met();
+                    for page in budget_pages(read) {
+                        let doc = observed.documents.get_mut(&page).expect("doc");
+                        let page = if doc.get("activity").is_some() { &mut doc["activity"] } else { doc };
+                        if let Some(changed) = page["rows"]
+                            .as_array_mut()
+                            .expect("rows")
+                            .iter_mut()
+                            .find(|r| r["event"]["owner"]["source"] == row)
+                        {
+                            changed["event"]["owner"]["source"]["line"]["words"][field] = Value::Null;
+                        }
+                    }
+                    rejects(&observed, BUDGET_MESSAGES);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn inbox_question_must_survive_until_the_read_before_the_answer() {
+        for path in ["/needs/rows/0/task/live/task", "/needs/rows/0/project", "/needs/rows/0/object/question/message"] {
+            let mut observed = met();
+            *observed.documents.get_mut(&Read::BudgetAsked).expect("inbox").pointer_mut(path).expect("field") =
+                Value::Null;
+            rejects(&observed, BUDGET_INBOX);
+        }
+        for mutation in 0..7 {
+            let mut observed = met();
+            match mutation {
+                0 => observed.documents.get_mut(&Read::BudgetAsked).expect("inbox")["needs"]["rows"] = json!([]),
+                1 => {
+                    observed.documents.get_mut(&Read::BudgetInboxAnswered).expect("inbox")["needs"]["rows"] =
+                        json!([{}]);
+                }
+                2 => observed.commands.swap(5, 6),
+                3 => observed.commands.push("answer".into()),
+                4 => observed.documents.get_mut(&Read::BudgetAsked).expect("inbox")["needs"]["cut"] = json!(true),
+                5 => {
+                    observed.documents.get_mut(&Read::BudgetInboxAnswered).expect("inbox")["needs"]["cut"] =
+                        json!(true);
+                }
+                6 => {
+                    observed.documents.get_mut(&Read::BudgetAsked).expect("inbox")["needs"]["rows"][0]["reply"] =
+                        json!({"answered":true});
+                }
+                _ => unreachable!(),
+            }
+            rejects(&observed, BUDGET_INBOX);
+        }
+    }
+
+    #[test]
+    fn a5_cannot_be_made_before_a1s_answer_or_on_another_choice() {
+        let mut observed = met();
+        observed.told.swap(7, 8);
+        rejects(&observed, BUDGET_CHECKPOINT);
+        for path in ["/batch/0/llm/main/model", "/batch/0/llm/main/effort"] {
+            let mut observed = met();
+            changed_tool(&mut observed, 8, path);
+            rejects(&observed, BUDGET_CHECKPOINT);
+        }
+        let mut observed = met();
+        observed.told.remove(8);
+        rejects(&observed, BUDGET_CHECKPOINT);
+    }
+
+    #[test]
+    fn medium_high_and_the_successful_amendment_revision_are_required() {
+        for read in [Read::BudgetMedium, Read::BudgetHigh, Read::BudgetA5Ended] {
+            for path in
+                ["/task/chip/task", "/task/llm/main/model", "/task/llm/main/effort", "/task/spec_revision/value"]
+            {
+                let mut observed = met();
+                *observed.documents.get_mut(&read).expect("a5").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&observed, BUDGET_EFFORT);
+            }
+        }
+        for path in
+            ["/target", "/revision", "/amendment/llm/main/model", "/amendment/llm/main/effort", "/amendment/reason"]
+        {
+            let mut observed = met();
+            changed_tool(&mut observed, 9, path);
+            rejects(&observed, BUDGET_EFFORT);
+        }
+        let mut observed = met();
+        observed.told.remove(9);
+        rejects(&observed, BUDGET_EFFORT);
+    }
+
+    #[test]
+    fn the_next_run_must_follow_the_amendment_and_hear_the_reason_once() {
+        for path in [
+            "/task/chip/phase",
+            "/activity/rows/1/event/owner/source/line/decided/revision",
+            "/task/chip/details/owner/phase/active/running/attempt",
+            "/task/chip/details/owner/details/observation/work",
+            "/activity/rows/2/event/owner/source/line/heard/number",
+            "/activity/rows/2/event/owner/source/line/heard/from/task",
+            "/activity/rows/2/event/owner/source/line/heard/kind/amendment/revision",
+            "/activity/rows/2/event/owner/source/line/heard/words",
+        ] {
+            let mut observed = met();
+            *observed.documents.get_mut(&Read::BudgetHigh).expect("a5").pointer_mut(path).expect("field") = Value::Null;
+            rejects(&observed, BUDGET_EFFORT);
+        }
+        let mut observed = met();
+        observed.told.remove(10);
+        rejects(&observed, BUDGET_EFFORT);
+        let mut observed = met();
+        observed.told[10].history = vec![input(BUDGET_REASON), input(BUDGET_REASON)].into();
+        rejects(&observed, BUDGET_EFFORT);
+        let mut observed = met();
+        observed.documents.get_mut(&Read::BudgetHigh).expect("a5")["activity"]["rows"]
+            .as_array_mut()
+            .expect("rows")
+            .swap(0, 1);
+        rejects(&observed, BUDGET_EFFORT);
+    }
+
+    #[test]
+    fn advisor_requires_the_ended_investigations_evidence_owner_model_and_one_attempt() {
+        for path in ["/batch/0/spec/words", "/batch/0/llm/main/model", "/batch/0/llm/main/effort"] {
+            let mut observed = met();
+            changed_tool(&mut observed, 12, path);
+            rejects(&observed, BUDGET_ONESHOT);
+        }
+        for path in ["/task/spec/specification/words/bytes", "/task/llm/main/model", "/task/result/value/report/bytes"]
+        {
+            let mut observed = met();
+            *observed
+                .documents
+                .get_mut(&Read::BudgetAdvisorEnded)
+                .expect("advisor")
+                .pointer_mut(path)
+                .expect("field") = Value::Null;
+            rejects(&observed, BUDGET_ONESHOT);
+        }
+        for mutation in 0..6 {
+            let mut observed = met();
+            match mutation {
+                0 => observed.told.swap(11, 12),
+                1 => observed.told[13].model = DEFAULT_MODEL.as_bytes().into(),
+                2 => observed.told[13].system = Agent::BudgetAdvisor.cue().into(),
+                3 => {
+                    let extra = observed.told[13].clone();
+                    observed.told.push(extra);
+                }
+                4 => observed.told[13].history[0].role = Role::Assistant,
+                5 => {
+                    observed.documents.get_mut(&Read::BudgetAdvisorEnded).expect("advisor")["activity"] = journal(
+                        BUDGET_ADVISOR,
+                        &[
+                            json!({"run_began":{"attempt":1}}),
+                            json!({"turn":{"attempt":1}}),
+                            json!({"run_ended":{"attempt":1,"end":"parked"}}),
+                            json!({"run_began":{"attempt":2}}),
+                            json!({"turn":{"attempt":2}}),
+                            json!({"run_ended":{"attempt":2,"end":"finished"}}),
+                        ],
+                    );
+                }
+                _ => unreachable!(),
+            }
+            rejects(&observed, BUDGET_ONESHOT);
+        }
+    }
+
+    #[test]
+    fn advisor_report_must_be_delivered_once_after_the_investigations_report() {
+        let mut observed = met();
+        observed.told.remove(14);
+        rejects(&observed, BUDGET_RESULT);
+        let mut observed = met();
+        observed.told[14].history = vec![input(BUDGET_ADVISOR_REPORT), input(BUDGET_ADVISOR_REPORT)].into();
+        rejects(&observed, BUDGET_RESULT);
+        let mut observed = met();
+        observed.told.swap(11, 14);
+        rejects(&observed, BUDGET_RESULT);
+    }
+
+    #[test]
+    fn no_failed_unended_or_spent_refused_attempt_or_incomplete_journal_is_hidden() {
+        for (read, task, _) in budget_tasks() {
+            for mutation in 0..7 {
+                let mut observed = met();
+                let page = &mut observed.documents.get_mut(&read).expect("doc")["activity"];
+                match mutation {
+                    0 => {
+                        page["rows"][0]["event"]["owner"]["source"]["line"]["run_ended"]["end"] =
+                            json!({"failed":{"class":"permanent"}});
+                    }
+                    1 => page["rows"][0]["event"]["owner"]["source"]["line"]["run_ended"]["end"] = json!("refused"),
+                    2 => {
+                        page["rows"].as_array_mut().expect("rows").remove(0);
+                    }
+                    3 => page["cut"] = json!(true),
+                    4 => page["after"] = json!(1),
+                    5 => page["rows"][0]["event"]["owner"]["source"]["task"] = json!(task + 99),
+                    6 => {
+                        let duplicate = page["rows"][0].clone();
+                        page["rows"].as_array_mut().expect("rows").push(duplicate);
+                    }
+                    _ => unreachable!(),
+                }
+                rejects(&observed, BUDGET_ATTEMPTS);
+            }
+        }
+    }
+
+    #[test]
+    fn every_identified_read_is_required() {
+        for (read, _) in crate::case::acts::READS_6_5 {
+            let mut observed = met();
+            observed.documents.remove(read);
+            assert!(!step_6_5(&observed).is_empty(), "{read:?}");
+        }
+    }
+    #[test]
+    fn result_messages_require_their_number_sender_kind_and_words() {
+        for (message, promise) in
+            [(BUDGET_A5_REPORT_NUMBER, BUDGET_ONESHOT), (BUDGET_ADVISOR_REPORT_NUMBER, BUDGET_RESULT)]
+        {
+            for field in ["number", "from", "kind", "words"] {
+                let mut observed = met();
+                for read in budget_pages(Read::BudgetSubownerEnded) {
+                    let doc = observed.documents.get_mut(&read).expect("page");
+                    let page = if doc.get("activity").is_some() { &mut doc["activity"] } else { doc };
+                    for row in page["rows"].as_array_mut().expect("rows") {
+                        let heard = &mut row["event"]["owner"]["source"]["line"]["heard"];
+                        if heard["number"] == message {
+                            heard[field] = Value::Null;
+                        }
+                    }
+                }
+                rejects(&observed, promise);
+            }
+        }
+    }
+
+    #[test]
+    fn earlier_pages_cannot_hide_gaps_missing_starts_or_failed_attempts() {
+        for read in [Read::BudgetDirectorFirst, Read::BudgetOwnerFirst, Read::BudgetSubownerFirst] {
+            for mutation in 0..4 {
+                let mut observed = met();
+                let page = observed.documents.get_mut(&read).expect("page");
+                match mutation {
+                    0 => page["cut"] = json!(true),
+                    1 => page["before"] = json!({"value":"another page"}),
+                    2 => {
+                        page["rows"].as_array_mut().expect("rows").pop();
+                    }
+                    3 => page["rows"][0]["event"]["owner"]["source"]["position"] = json!(99),
+                    _ => unreachable!(),
+                }
+                rejects(&observed, BUDGET_ATTEMPTS);
+            }
+        }
+    }
+
+    #[test]
+    fn only_unspent_uncommitted_rechecks_followed_by_a_finished_attempt_are_allowed() {
+        for (read, task, _) in budget_tasks() {
+            let mut accepted = met();
+            let mut lines = vec![
+                json!({"run_began":{"attempt":99}}),
+                json!({"run_ended":{"attempt":99,"end":"refused","spent":0}}),
+            ];
+            lines.extend(budget_rows(&accepted, read).iter().rev().map(|r| r["line"].clone()));
+            let mut page = journal(task, &lines);
+            let pages = budget_pages(read);
+            if pages.len() == 2 {
+                let older = page["rows"].as_array_mut().expect("rows").split_off(3);
+                page["before"] = json!({"value":"older"});
+                accepted
+                    .documents
+                    .insert(pages[1], json!({"rows":older,"cut":false,"before":null,"after":{"value":"newer"}}));
+            }
+            accepted.documents.get_mut(&read).expect("doc")["activity"] = page;
+            assert!(!step_6_5(&accepted).iter().any(|m| m.promise == BUDGET_ATTEMPTS));
+            for mutation in 0..3 {
+                let mut changed = accepted.clone();
+                let last = *pages.last().expect("page");
+                let doc = changed.documents.get_mut(&last).expect("doc");
+                let page = if doc.get("activity").is_some() { &mut doc["activity"] } else { doc };
+                let rows = page["rows"].as_array_mut().expect("rows");
+                let recheck = rows
+                    .iter_mut()
+                    .find(|r| r.pointer("/event/owner/source/line/run_ended/attempt") == Some(&json!(99)))
+                    .expect("recheck");
+                match mutation {
+                    0 => recheck["event"]["owner"]["source"]["line"]["run_ended"]["spent"] = json!(1),
+                    1 => {
+                        recheck["event"]["owner"]["source"]["line"]["run_ended"]["end"] =
+                            json!({"failed":{"class":"transient"}});
+                    }
+                    2 => recheck["event"]["owner"]["source"]["line"]["turn"] = json!({"attempt":99}),
+                    _ => unreachable!(),
+                }
+                rejects(&changed, BUDGET_ATTEMPTS);
+            }
+        }
+    }
+    #[test]
+    fn the_first_finding_requires_its_number_sender_words_and_unique_delivery() {
+        for mutation in 0..5 {
+            let mut observed = met();
+            if mutation == 4 {
+                observed.told[9].history = observed.told[9].history[1..].into();
+            } else {
+                for read in budget_pages(Read::BudgetSubownerEnded) {
+                    let doc = observed.documents.get_mut(&read).expect("page");
+                    let page = if doc.get("activity").is_some() { &mut doc["activity"] } else { doc };
+                    for row in page["rows"].as_array_mut().expect("rows") {
+                        let words = &mut row["event"]["owner"]["source"]["line"]["words"];
+                        if words["message"] == BUDGET_FINDING_NUMBER {
+                            words[["message", "by", "kind", "words"][mutation]] = Value::Null;
+                        }
+                    }
+                }
+            }
+            rejects(&observed, BUDGET_EFFORT);
         }
     }
 }
