@@ -264,7 +264,8 @@ fn check_ci(ran: &Ran) -> (u64, u64) {
         .enumerate()
         .filter_map(|(position, record)| {
             let Observation::Reported { repository, commit, context, state, .. } = record else { return None };
-            (repository.as_ref() == b"acme/app" && context.as_ref() == b"check").then_some((position, *commit, *state))
+            (repository.as_ref() == b"acme/app" && context.as_ref() == b"check" && [h1, h2].contains(commit))
+                .then_some((position, *commit, *state))
         })
         .collect();
     let sequence: Vec<_> = checks.iter().map(|(_, commit, state)| (*commit, *state)).collect();
@@ -290,6 +291,24 @@ fn check_ci(ran: &Ran) -> (u64, u64) {
     assert_eq!(base, b"main", "the change landed on main");
     assert_eq!(head, h2, "the merge used exactly the repaired head H2");
     assert!(checks[3].0 < merged_at, "H2 passed CI before merging");
+    // Three heads retain CI now (forge.rs's statuses sizing for 6.4), so
+    // main's merge commit also reports its own Pending then Passed.
+    let main_checks: Vec<_> = records
+        .iter()
+        .enumerate()
+        .filter_map(|(position, record)| {
+            let Observation::Reported { repository, commit: checked, context, state, .. } = record else {
+                return None;
+            };
+            (repository.as_ref() == b"acme/app" && *checked == commit && context.as_ref() == b"check")
+                .then_some((position, *state))
+        })
+        .collect();
+    assert!(
+        matches!(main_checks.as_slice(), [(pending, api::Check::Pending), (passed, api::Check::Passed)]
+            if merged_at < *pending && pending < passed),
+        "main's merge commit passed CI after the merge: {main_checks:?}"
+    );
     (h1, commit)
 }
 
