@@ -361,6 +361,10 @@ class Sitting:
                             'story.clients': '127.0.0.1:' + str(self.port)}.items():
             template = template.replace('{' + name + '}', value)
         value = json.loads(template.replace('{{', '{').replace('}}', '}').replace('"acme"', json.dumps(OWNER)))
+        # Ready makes a project with policy 1, as a fresh temper init deployment does.
+        value['engine']['policies'] = value['engine']['projects'].copy()
+        # Deployment roster, seeded project 1, and Ready's new project.
+        value['engine']['limits']['overrides']['people.projects'] = 3
         value['application']['forges'][0].update({'git': 'http://' + git, 'web': web})
         if self.mode == 'live':
             value['application']['clients']['bundle'] = str(self.scratch/'bundle')
