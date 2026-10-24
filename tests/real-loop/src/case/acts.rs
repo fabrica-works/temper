@@ -127,6 +127,24 @@ pub enum Read {
     BudgetSubownerFirst,
     BudgetOwnerFirst,
     BudgetDirectorFirst,
+    // 6.4
+    RedReviewWriting,
+    RedChangeOpen,
+    RedRepairWriting,
+    RedRepairPending,
+    RedTimerArmed,
+    RedChangePaused,
+    RedDirectorEnded,
+    RedOwnerEnded,
+    RedChangeEnded,
+    RedCoderEnded,
+    RedReviewEnded,
+    RedRepairEnded,
+    RedRepairCoderEnded,
+    RedRepairReviewEnded,
+    RedRootsEnded,
+    RedRootsPending,
+    RedUpdatedReviewEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -1000,5 +1018,104 @@ pub fn step_6_5() -> Vec<calls::Step> {
     for (task, latest) in [(BUDGET_SUBOWNER, 14), (BUDGET_OWNER, 15), (BUDGET_DIRECTOR, 16)] {
         steps.push(call(D1, argv!["activity", number(task), "--before", calls::activity_before(latest), "--json"]));
     }
+    steps
+}
+
+// Act 3, step 6.4 (domain/testing.md, 5.3)
+pub const READS_6_4: &[(Read, usize)] = &[
+    (Read::RedReviewWriting, 8),
+    (Read::RedChangeOpen, 9),
+    (Read::RedRootsPending, 10),
+    (Read::RedRepairWriting, 12),
+    // Reuse the creation read; the held coder has its separate document.
+    (Read::RedRepairPending, 11),
+    (Read::RedTimerArmed, 14),
+    (Read::RedChangePaused, 15),
+    (Read::RedDirectorEnded, 18),
+    (Read::RedOwnerEnded, 19),
+    (Read::RedChangeEnded, 20),
+    (Read::RedCoderEnded, 21),
+    (Read::RedReviewEnded, 22),
+    // The ended wait already returns the complete procedure document.
+    (Read::RedRepairEnded, 16),
+    (Read::RedRepairCoderEnded, 23),
+    (Read::RedRepairReviewEnded, 24),
+    (Read::RedUpdatedReviewEnded, 25),
+    (Read::RedRootsEnded, 26),
+];
+#[must_use]
+pub fn step_6_4() -> Vec<calls::Step> {
+    use super::{
+        Agent, PROJECT, RED_BROKEN, RED_CHANGE, RED_CODER, RED_DIRECTOR, RED_FILE, RED_MESSAGE, RED_OWNER, RED_PERSON,
+        RED_REPAIR, RED_REPAIR_CODER, RED_REPAIR_HOLD, RED_REPAIR_REVIEW, RED_REVIEW, RED_REVIEW_HOLD,
+        RED_UPDATED_REVIEW,
+    };
+    let mut steps = vec![
+        sign_in(D1),
+        call(
+            D1,
+            argv![
+                "adopt",
+                "--project",
+                number(PROJECT),
+                "--owner",
+                "acme",
+                "--name",
+                "app",
+                "--landing",
+                "main",
+                "--no-home",
+                "--key",
+                "red-kit"
+            ],
+        ),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "red", RED_PERSON]),
+        call(D1, argv!["wait", "task", number(RED_DIRECTOR), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(RED_OWNER), "--until", "replied"]),
+        // The producing procedure parks after making its coder; watch that ending.
+        call(D1, argv!["wait", "task", number(RED_CHANGE), "--until", "phase:idle"]),
+        call(D1, argv!["wait", "task", number(RED_CODER), "--until", "ended"]),
+        // No ctl predicate selects review creation: poll only this later transition.
+        calls::until(D1, argv!["task", number(RED_CHANGE), "--json"], Agent::Review.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(RED_REVIEW), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["task", number(RED_CHANGE), "--json"]),
+        calls::push(RED_FILE.as_bytes(), RED_BROKEN.as_bytes()),
+        // A ready change, after its gate passes, discovers the red base.
+        calls::release_hold(RED_REVIEW_HOLD),
+        // Until cannot retry an unknown task: first observe the deployment
+        // repair among project roots, then its coder's live delegate card.
+        calls::until(
+            D1,
+            argv!["tasks", "--project", number(PROJECT), "--json"],
+            Agent::RedRepairCoder.cue(),
+            b"\"tasks\"",
+        ),
+        calls::until(D1, argv!["task", number(RED_REPAIR), "--json"], Agent::RedRepairCoder.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(RED_REPAIR_CODER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["message", number(RED_DIRECTOR), "--key", "red-tip", RED_MESSAGE]),
+        calls::until(
+            D1,
+            argv!["task", number(RED_DIRECTOR), "--activity", "32", "--json"],
+            b"\"kind\":{\"timer\":{",
+            b"\"task\"",
+        ),
+        call(D1, argv!["task", number(RED_CHANGE), "--json"]),
+        calls::release_hold(RED_REPAIR_HOLD),
+        call(D1, argv!["wait", "task", number(RED_REPAIR), "--until", "ended", "--json"]),
+        call(D1, argv!["wait", "task", number(RED_DIRECTOR), "--until", "ended"]),
+    ];
+    for task in [
+        RED_DIRECTOR,
+        RED_OWNER,
+        RED_CHANGE,
+        RED_CODER,
+        RED_REVIEW,
+        RED_REPAIR_CODER,
+        RED_REPAIR_REVIEW,
+        RED_UPDATED_REVIEW,
+    ] {
+        steps.push(call(D1, argv!["task", number(task), "--activity", "32", "--json"]));
+    }
+    steps.push(call(D1, argv!["tasks", "--project", number(PROJECT), "--ended", "--json"]));
     steps
 }
