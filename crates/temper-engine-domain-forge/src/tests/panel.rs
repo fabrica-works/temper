@@ -256,7 +256,13 @@ fn a_fresh_ci_read_marks_a_changed_verdict_and_restart_forgets_it() {
 }
 #[test]
 fn output_bounds_include_marks_and_shared_demo_answers() {
-    assert_eq!(max_out(&LIMITS), LIMITS.output * 2 + LIMITS.applications + demo_act_bound(&LIMITS).unwrap() * 2);
+    assert_eq!(
+        max_out(&LIMITS),
+        LIMITS.output * 2
+            + LIMITS.applications
+            + demo_act_bound(&LIMITS).unwrap() * 2
+            + skein_forge_client::max_out(&LIMITS.client) * 2
+    );
     assert_eq!(worst_case(&Limits { output: u32::MAX, ..LIMITS }), None);
     assert!(worst_case(&LIMITS).is_some());
 }

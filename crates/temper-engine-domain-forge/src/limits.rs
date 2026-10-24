@@ -88,7 +88,11 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     {
         return None;
     }
-    l.output.checked_mul(2)?.checked_add(l.applications)?.checked_add(demo_act_bound(l)?.checked_mul(2)?)?;
+    l.output
+        .checked_mul(2)?
+        .checked_add(l.applications)?
+        .checked_add(demo_act_bound(l)?.checked_mul(2)?)?
+        .checked_add(skein_forge_client::max_out(&l.client).checked_mul(2)?)?;
     let names =
         u64::from(l.tasks).checked_mul(u64::from(l.resources_per_task))?.checked_mul(u64::from(l.name_bytes))?;
     let goal_tasks = u64::from(l.subscriptions).checked_mul(u64::from(l.issue_policy.plan_items))?.checked_mul(8)?;
@@ -101,6 +105,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
     Map::<Box<[u8]>, Box<[u8]>>::worst_case(l.bindings)?
         .checked_add(u64::from(l.bindings).checked_mul(254 + 255)?)?
         .checked_add(crate::adoption::worst_case(l)?)?
+        .checked_add(retirement_scratch(l)?)?
         .checked_add(Map::<[u8; 16], crate::DemoActKind>::worst_case(demo_act_bound(l)?)?)?
         .checked_add(crate::connect::worst_case(l.applications)?)?
         .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
@@ -249,4 +254,15 @@ pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -
 #[must_use]
 pub const fn demo_act_bound(l: &Limits) -> Option<u32> {
     l.tasks.checked_add(1)
+}
+
+// Retirement owns token lists, then both the deduplicated watch map and its
+// complete replacement list while the child emits its bounded Keep cohort.
+fn retirement_scratch(l: &Limits) -> Option<u64> {
+    skein_lib::List::<skein_lib::Token>::worst_case(l.holds)?
+        .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(l.subscriptions)?)?
+        .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(l.changes)?)?
+        .checked_add(Map::<skein_forge_client::Resource, skein_forge_client::Watch>::worst_case(l.client.resources)?)?
+        .checked_add(skein_lib::List::<skein_forge_client::Watch>::worst_case(l.client.resources)?)?
+        .checked_add(u64::from(l.client.resources).checked_mul(u64::from(l.name_bytes))?.checked_mul(3)?)
 }
