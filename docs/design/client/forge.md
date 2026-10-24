@@ -807,9 +807,12 @@ says:
 - **Owned's Runs line:** Forgejo and its runner on this machine, their
   versions, and CI jobs on this machine as the person. Before set up,
   the card says CI jobs run here unisolated, Forgejo stops with `temper
-  box`, and it is kept in temper's data directory. Until signing in
-  through temper, the card names the `person_password` file's path,
-  never the password (`../protocol/setup.md`, 6.5).
+  box`, and it is kept in temper's data directory. Once set up
+  (connecting, connected or stopped), its First password line names the
+  `person_password` file's path, never the password: "Your first
+  password is in PATH. Forgejo asks you to change it when you sign
+  in." It stays, since temper keeps no record of the first sign-in
+  that uses it (`../protocol/setup.md`, 6.5).
 - **On GitHub, temper's App:** a line labelled "temper’s App", "SLUG ·
   INSTALLATIONS", INSTALLATIONS each installation's words joined by
   ", ", or "installed nowhere yet" with none: its slug, and its installations, each

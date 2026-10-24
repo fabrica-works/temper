@@ -748,8 +748,11 @@ files: at a first preparation, and for a runner older than its pin
   owned, "Site admin, with a token you gave" for managed, and "Its bot's
   tokens, which you gave" for connected. Owned's Runs line names Forgejo
   and its runner on this machine, their versions, and CI jobs running
-  here as the person. Until signing in through temper, the card names
-  the path to `person_password`, never its password. A stopped owned
+  here as the person. Its First password line names the path to
+  `person_password`, never its password, from set up on: the person's
+  first sign-in, through temper too, links their account by it
+  (`sign-in.md`, 9.4), and temper keeps no record of that sign-in by
+  which to drop the line after it. A stopped owned
   forge says "Restart temper box: its preparation mends it". Owned and
   managed offer "New repository", with the set up's organization,
   repository and project fields (section 15).
