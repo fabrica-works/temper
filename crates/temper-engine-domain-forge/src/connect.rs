@@ -11,7 +11,7 @@ pub(crate) struct State {
     pending: Map<Token, Token>,
     running: Map<u16, (Token, Option<Carried>)>,
     reading: Map<u16, Token>,
-    previous: Map<u16, Connection>,
+    previous: Map<u16, (Connection, Option<crate::FailedStep>)>,
 }
 impl State {
     pub(crate) fn new(bound: u32) -> Self {
@@ -37,7 +37,7 @@ pub(crate) fn worst_case(bound: u32) -> Option<u64> {
         .checked_add(Map::<Token, Token>::worst_case(bound)?)?
         .checked_add(Map::<u16, (Token, Option<Carried>)>::worst_case(bound)?)?
         .checked_add(Map::<u16, Token>::worst_case(bound)?)?
-        .checked_add(Map::<u16, Connection>::worst_case(bound)?)?
+        .checked_add(Map::<u16, (Connection, Option<crate::FailedStep>)>::worst_case(bound)?)?
         .checked_add(u64::from(bound).checked_mul(crate::STOPPED_TEXT_BYTES)?)?
         .checked_add(u64::from(bound).checked_mul(
             2048_u64.max(100_u64.checked_mul(u64::try_from(size_of::<crate::Reached>()).ok()?.checked_add(2048)?)?),
@@ -122,10 +122,10 @@ pub(crate) fn start(
             let carried = carried.expect("admitted key");
             d.connect.running.insert(forge, (request, Some(carried))).expect("room checked");
             let kept = match d.connections.get(&forge) {
-                Some((_, kept)) => *kept,
+                Some((_, kept, _)) => *kept,
                 None => None,
             };
-            d.connections.insert(forge, (Connection::Connecting, kept)).expect("configured forge");
+            d.connections.insert(forge, (Connection::Connecting, kept, None)).expect("configured forge");
             out.push(Request::MarkedForges);
             out.push(Request::Connect { forge, request, how, carried });
         }
@@ -203,12 +203,12 @@ fn admin(
     d.ended.remove(&forge);
     d.connect.pending.insert(request, token).expect("room checked");
     d.connect.running.insert(forge, (request, Some(carried))).expect("room checked");
-    d.connect.previous.insert(forge, previous).expect("one previous connection per running connect");
-    let kept = match d.connections.get(&forge) {
-        Some((_, kept)) => *kept,
-        None => None,
+    let (kept, failed) = match d.connections.get(&forge) {
+        Some((_, kept, failed)) => (*kept, *failed),
+        None => (None, None),
     };
-    d.connections.insert(forge, (Connection::Connecting, kept)).expect("configured forge");
+    d.connect.previous.insert(forge, (previous, failed)).expect("one previous connection per running connect");
+    d.connections.insert(forge, (Connection::Connecting, kept, None)).expect("configured forge");
     if let crate::How::ForgejoAdmin { first } = &how {
         d.first.remove(&forge);
         if let Some(first) = first {
@@ -244,11 +244,11 @@ pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: Conn
                 out.push(Request::CarriedUnused { number: carried.number });
             }
             let kept = match d.connections.get(&forge) {
-                Some((_, kept)) => *kept,
+                Some((_, kept, _)) => *kept,
                 None => None,
             };
-            let previous = d.connect.previous.remove(&forge).unwrap_or(Connection::NotConnected);
-            d.connections.insert(forge, (previous, kept)).expect("configured forge");
+            let (previous, failed) = d.connect.previous.remove(&forge).unwrap_or((Connection::NotConnected, None));
+            d.connections.insert(forge, (previous, kept, failed)).expect("configured forge");
             out.push(Request::MarkedForges);
         }
         d.connect.answer(request, token, Answered::Connect(answer), out);
@@ -301,11 +301,11 @@ pub(crate) fn ended(
                 stopped_end(d, forge, &why, out);
             }
             let kept = match d.connections.get(&forge) {
-                Some((_, kept)) => *kept,
+                Some((_, kept, _)) => *kept,
                 None => None,
             };
-            let previous = d.connect.previous.remove(&forge).unwrap_or(Connection::NotConnected);
-            d.connections.insert(forge, (previous, kept)).expect("configured forge");
+            let (previous, failed) = d.connect.previous.remove(&forge).unwrap_or((Connection::NotConnected, None));
+            d.connections.insert(forge, (previous, kept, failed)).expect("configured forge");
             out.push(Request::MarkedForges);
         }
     }

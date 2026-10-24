@@ -725,6 +725,20 @@ fn admin_connect_ends_erase_once_and_restore_the_previous_connection_on_failure(
     }
 }
 #[test]
+fn a_failed_admin_connect_restores_the_failed_setup_with_its_step() {
+    let mut d = admin_domain();
+    outputs(&mut d, Event::Connection { forge: 1, state: Connection::SettingUp { step: Some(SetUpStep::Run) } });
+    let failed = Connection::SetUpFailed { why: b"the box closed the pipe".as_slice().into() };
+    outputs(&mut d, Event::Connection { forge: 1, state: failed.clone() });
+    assert_eq!(d.forges().rows[0].failed, Some(FailedStep::Run));
+    application(&mut d, 1, admin_ask(1, Some(first_ask())), Some(PartyRole::Owner), Some(VALUE));
+    assert_eq!(d.connection(1), Connection::Connecting);
+    assert_eq!(d.forges().rows[0].failed, None);
+    outputs(&mut d, Event::ConnectEnded { forge: 1, request: Token::new(1), connected: false, why: None });
+    assert_eq!(d.connection(1), failed);
+    assert_eq!(d.forges().rows[0].failed, Some(FailedStep::Run));
+}
+#[test]
 fn the_next_admitted_admin_connect_replaces_the_intent_and_clears_the_previous_end() {
     for first in [None, Some(FirstAsk { repository: b"next".as_slice().into(), ..first_ask() })] {
         let mut d = admin_domain();

@@ -599,8 +599,15 @@ and `connect-forge.html`.
   GitHub rows never list Forgejo's steps. The versions and the
   person's login stay off until the row carries them. Then "You may
   leave this page: the steps go on, and the banner says where they
-  are." Set up failed, in the list's place: "Set up failed: WHY", the row's words, and "Set up again", which sends `SetUp` with
-  the same fields. While a `SetUp` is pending its button is disabled;
+  are." A failed setup keeps all five steps: those before the failed
+  step are done, that step is marked failed (✕), and those after it
+  are to come. After the list, "STEP failed: WHY", STEP one of
+  "Fetching", "Preparing", "Starting", "Connecting" or "Making
+  ORG/NAME". The first four read the row's `at`; the fifth reads
+  `first.state`'s failed creation step. With no step named, the list
+  has nothing marked and the line is "Set up failed: WHY". The welcome
+  keeps the same list and failure line. Then "Set up again", which
+  sends `SetUp` with the same fields. While a `SetUp` is pending its button is disabled;
   refused, its refusal shows under it in the set up's words
   (`README.md`, 4.6).
 - **Connecting, on GitHub,** is the App made and installed nowhere:

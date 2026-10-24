@@ -128,9 +128,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         )?
         .checked_add(skein_forge_client::worst_case(&l.client)?)?
         .checked_add(Map::<skein_forge::api::Repository, Repository>::worst_case(l.repositories)?)?
-        .checked_add(Map::<u16, (crate::Connection, Option<(skein_lib::Token, crate::SetUpAnswer)>)>::worst_case(
-            l.client.repositories,
-        )?)?
+        .checked_add(Map::<u16, crate::domain::ConnectionState>::worst_case(l.client.repositories)?)?
         .checked_add(u64::from(l.client.repositories).checked_mul(
             u64::from(l.name_bytes).checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?.max(STOPPED_TEXT_BYTES),
         )?)?
@@ -247,9 +245,7 @@ pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -
         .checked_add(Map::<u16, Box<[u8]>>::worst_case(forges)?)?
         .checked_add(u64::from(forges).checked_mul(u64::try_from(CONNECT_WHY_BYTES).ok()?)?)?
         .checked_add(u64::from(forges).checked_mul(u64::from(name_bytes.max(FIRST_NAME_BYTES)).checked_mul(3)?)?)?
-        .checked_add(Map::<u16, (crate::Connection, Option<(skein_lib::Token, crate::SetUpAnswer)>)>::worst_case(
-            forges,
-        )?)?
+        .checked_add(Map::<u16, crate::domain::ConnectionState>::worst_case(forges)?)?
         .checked_add(u64::from(forges).checked_mul(
             u64::from(name_bytes).checked_add(u64::try_from(BOT_LOGIN_SUFFIX.len()).ok()?)?.max(STOPPED_TEXT_BYTES),
         )?)?

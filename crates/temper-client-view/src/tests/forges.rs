@@ -86,7 +86,8 @@ fn the_playground_forge_has_no_access_line() {
 #[test]
 fn a_forge_row_opened_offers_its_action() {
     let failed = w::Connection::SetUpFailed(
-        w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into() }).unwrap(),
+        w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into(), at: None })
+            .unwrap(),
     );
     let root = root(Address::Forges, failed);
     assert_eq!(action(&root, Role::Button, b"Set up again"), d::Action::Forge(d::forge::Act::SetUp { forge: HERE }));
@@ -229,7 +230,8 @@ fn the_playground_forge_shows_while_the_forge_half_holds() {
 #[test]
 fn set_up_again_waits_for_an_offer() {
     let failed = w::Connection::SetUpFailed(
-        w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into() }).unwrap(),
+        w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into(), at: None })
+            .unwrap(),
     );
     let root = f::forge_root(Address::Forges, cf::rows(failed, w::Offer::NotOffered));
     assert!(f::find(f::page_view(&root).tree(), Role::Button, b"Set up again").is_none());

@@ -115,7 +115,7 @@ fn every_state_renders_as_text_and_structured_json() {
         ),
         (C::SettingUp { step: Some(Step::Run) }, b"Setting up: starting", br#""state":"setting_up","step":"run""#),
         (
-            C::SetUpFailed { why: b"fetch failed".as_slice().into() },
+            C::SetUpFailed { why: b"fetch failed".as_slice().into(), at: None },
             b"Set up failed: fetch failed",
             br#""state":"set_up_failed","why":"fetch failed""#,
         ),
@@ -171,7 +171,7 @@ fn settled_excludes_setting_up_and_connecting_and_connected_names_a_forge() {
     for state in [
         C::NotConnected,
         C::NotSetUp,
-        C::SetUpFailed { why: Box::default() },
+        C::SetUpFailed { why: Box::default(), at: None },
         C::Stopped { reason: Box::default() },
         C::Connected { id: 1, login: Box::default() },
     ] {
@@ -518,7 +518,11 @@ fn setup_failure_names_the_creation_or_box_step_and_exits_one() {
     cases
         .push((
             w::Connection::SetUpFailed(
-                w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"preparing".as_slice().into() }).unwrap(),
+                w::SetUpFailed::new(
+                    &w::CEILINGS,
+                    w::SetUpFailedParts { why: b"preparing".as_slice().into(), at: None },
+                )
+                .unwrap(),
             ),
             None,
             b"Set up failed: preparing".as_slice(),

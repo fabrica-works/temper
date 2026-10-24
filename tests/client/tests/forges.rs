@@ -392,7 +392,10 @@ fn a_closed_box_pipe_fails_the_setup_and_withdraws_its_offer() {
     assert_eq!(printed.status, 0);
     assert!(contains(&printed.stdout, b"Set up failed: the box closed the pipe"));
     let failed = row(&world, FORGE);
-    assert_eq!(failed.connection, d::Connection::SetUpFailed { why: b"the box closed the pipe".as_slice().into() });
+    assert_eq!(
+        failed.connection,
+        d::Connection::SetUpFailed { why: b"the box closed the pipe".as_slice().into(), at: None }
+    );
     assert_eq!(failed.offer, d::Offer::NotUnderTheBox);
     let printed = world.invoke(&[b"forge-setup", b"3"]);
     assert_eq!(printed.status, 2);
@@ -410,7 +413,10 @@ fn a_failed_setup_settles_with_its_why_and_can_be_asked_again() {
     assert_eq!(printed.status, 0);
     assert!(contains(&printed.stdout, b"Set up failed: runner did not start"));
     let failed = row(&world, FORGE);
-    assert_eq!(failed.connection, d::Connection::SetUpFailed { why: b"runner did not start".as_slice().into() });
+    assert_eq!(
+        failed.connection,
+        d::Connection::SetUpFailed { why: b"runner did not start".as_slice().into(), at: None }
+    );
     assert_eq!(failed.offer, d::Offer::Offered);
     world.started();
     assert_eq!(world.box_calls, 2);
