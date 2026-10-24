@@ -1334,6 +1334,130 @@ fn cancelling_a_change_closes_its_pull_before_deleting_its_branch() {
     assert_eq!(world.writes(), 2);
 }
 
+/// A change watches its branch and its pull (domain/forge.md 5.1): the Closed
+/// its own cancellation wrote is no drift (8.6), before or after its outcome.
+fn watched_change(world: &mut World) -> (u64, top::Name) {
+    world.adopt();
+    world.produce(b"temper/51");
+    let pull = world.open_pull(b"temper/51", b"main");
+    let mut row = change_row();
+    row.pull = Some(pull);
+    world.event(top::Event::Change { row });
+    let name = top::Name {
+        forge: REPO.forge,
+        repository: REPO.repository,
+        what: top::What::Branch(Box::new([Box::from(&b"temper"[..]), Box::from(&b"51"[..])])),
+    };
+    let watched = top::Name { forge: REPO.forge, repository: REPO.repository, what: top::What::Pull(pull) };
+    world.event(top::Event::Names { task: 51, resources: Box::new([name.clone(), watched]) });
+    world.event(top::Event::Hold { task: 51, resource: name.clone(), from: None });
+    world.run_for(60);
+    world.take_seen();
+    (pull, name)
+}
+
+#[test]
+fn a_cancelled_change_watching_its_pull_deletes_its_branch_past_its_own_close() {
+    let mut world = World::new(94);
+    let (pull, _) = watched_change(&mut world);
+    world.event(top::Event::Release { task: 51, root: 51, ending: top::ReleaseEnding::Cancelled, entry: 10 });
+    world.event(top::Event::Committed { entry: 10 });
+    // Past the Close's outcome, the pull's keep reads it Closed.
+    world.run_for(60);
+    let Some(top::Stored::Change(row)) = world.stored().get(&top::Key::Change(51)) else { panic!("change kept") };
+    assert_eq!(row.pull, Some(pull));
+    assert!(!world.seen().iter().any(|request| matches!(request, top::Request::Drift { task: 51, .. })));
+    world.event(top::Event::ContinueRelease { task: 51, entry: 11 });
+    assert!(matches!(
+        world.stored().get(&top::Key::Entry(11)),
+        Some(top::Stored::Entry {
+            entry: skein_forge_client::Entry {
+                effect: skein_forge_client::Effect { write: skein_forge::api::Write::DeleteBranch { .. }, .. },
+                ..
+            },
+            held: false,
+        })
+    ));
+    world.event(top::Event::Committed { entry: 11 });
+    world.run_for(5);
+    world.event(top::Event::ContinueRelease { task: 51, entry: 12 });
+    assert!(world.seen().iter().any(|request| matches!(request, top::Request::Released { task: 51 })));
+    assert!(!world.seen().iter().any(|request| matches!(request, top::Request::Drift { task: 51, .. })));
+    assert_eq!(world.writes(), 2);
+}
+
+#[test]
+fn another_partys_close_during_a_cancel_is_taken_as_the_cancels_own() {
+    let mut world = World::new(96);
+    let (pull, _) = watched_change(&mut world);
+    world.event(top::Event::Release { task: 51, root: 51, ending: top::ReleaseEnding::Cancelled, entry: 10 });
+    // The change is ending: a close before temper's own needs no hold.
+    world.close(pull);
+    world.run_for(60);
+    world.event(top::Event::Committed { entry: 10 });
+    world.run_for(60);
+    assert!(!world.seen().iter().any(|request| matches!(request, top::Request::Drift { task: 51, .. })));
+    world.event(top::Event::ContinueRelease { task: 51, entry: 11 });
+    world.event(top::Event::Committed { entry: 11 });
+    world.run_for(5);
+    world.event(top::Event::ContinueRelease { task: 51, entry: 12 });
+    assert!(world.seen().iter().any(|request| matches!(request, top::Request::Released { task: 51 })));
+}
+
+#[test]
+fn a_live_change_watching_its_pull_reports_another_partys_close_as_drift() {
+    let mut world = World::new(95);
+    let (pull, name) = watched_change(&mut world);
+    world.close(pull);
+    world.run_for(60);
+    assert!(world.seen().iter().any(|request| matches!(request,
+        top::Request::Drift { task: 51, resource } if resource == &name)));
+    let Some(top::Stored::Hold(hold)) = world.stored().get(&top::Key::Hold(name)) else { panic!("held change") };
+    assert_eq!(hold.drift.as_ref().expect("closed pull details").change, top::DriftChange::PullClosed { number: pull });
+    assert_eq!(world.writes(), 0);
+}
+
+fn wakes(world: &World) -> usize {
+    world.seen().iter().filter(|request| matches!(request, top::Request::WakeProcedure { task: 51 })).count()
+}
+
+#[test]
+fn a_watched_pulls_unchanged_polls_wake_its_change_no_more() {
+    let mut world = World::new(97);
+    watched_change(&mut world);
+    let calls = world.calls();
+    world.run_for(600);
+    // The keep keeps polling, but the gather has nothing new to read (8.3).
+    assert!(world.calls() > calls, "the pull is polled");
+    assert_eq!(wakes(&world), 0);
+}
+
+#[test]
+fn a_watched_pulls_ci_at_the_same_head_wakes_its_change() {
+    let mut world = World::new(98);
+    watched_change(&mut world);
+    let head = world.branch(b"temper/51");
+    // The fixture's head already passes: a failure is the change in CI.
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Failed);
+    world.run_for(600);
+    assert_eq!(world.branch(b"temper/51"), head);
+    assert!(wakes(&world) >= 1, "CI without a delivery wakes: {:?}", world.seen());
+}
+
+#[test]
+fn a_watched_pulls_mergeable_turning_true_at_the_same_head_wakes_its_change() {
+    let mut world = World::new(99);
+    let (pull, _) = watched_change(&mut world);
+    let head = world.branch(b"temper/51");
+    world.check_pull(pull, skein_lib::Duration::from_secs(120));
+    world.run_for(60);
+    world.take_seen();
+    // The forge finishes checking: mergeable alone changes.
+    world.run_for(120);
+    assert_eq!(world.branch(b"temper/51"), head);
+    assert!(wakes(&world) >= 1, "mergeable without a delivery wakes: {:?}", world.seen());
+}
+
 #[test]
 fn an_external_move_of_a_held_branch_is_reported_as_drift() {
     let mut world = World::new(31);

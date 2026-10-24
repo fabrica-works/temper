@@ -537,6 +537,10 @@ Held by skein's `forge-client.md`, section 3. temper's part:
     its task (section 13);
   - per issue of a live goal: what temper last wrote into it, so an
     unchanged projection is not written again.
+
+  A change watches its branch and its base until its pull is known, then
+  its branch and its pull. A change of the pull it owns wakes the change,
+  as a hint does.
 - **Its capacity:** `forge.client.resources` live resources and
   `forge.client.repositories` repositories. A batch naming resources past
   it is refused.

@@ -29,6 +29,7 @@ pub struct Protocol {
     secrets_kept: bool,
     item_pages: Vec<u64>,
     item_start: u64,
+    request_times: Vec<Wall>,
 }
 impl Protocol {
     #[must_use]
@@ -56,6 +57,11 @@ impl Protocol {
     }
     #[must_use]
     pub fn github_with_checks(seed: u64, checks: raw::Checks) -> Self {
+        Self::github_with_limits(seed, checks, &LIMITS)
+    }
+    /// The same GitHub world with a story's explicit domain limits.
+    #[must_use]
+    pub fn github_with_limits(seed: u64, checks: raw::Checks, limits: &top::Limits) -> Self {
         let joint = Joint::github(
             seed,
             0,
@@ -64,15 +70,18 @@ impl Protocol {
             fixtures::protocol_shared(),
             checks,
         );
-        Self::with(seed, joint, fixtures::GITHUB)
+        Self::with_limits(seed, joint, fixtures::GITHUB, limits)
     }
     fn with(seed: u64, joint: Joint, fixture: fixtures::Fixture) -> Self {
+        Self::with_limits(seed, joint, fixture, &LIMITS)
+    }
+    fn with_limits(seed: u64, joint: Joint, fixture: fixtures::Fixture, limits: &top::Limits) -> Self {
         let mut world = Self {
-            top: Self::top(seed, fixture.writer),
-            env: Env { now: joint.env.now, wall: joint.env.wall, limits: LIMITS },
+            top: Self::top(seed, fixture.writer, limits),
+            env: Env { now: joint.env.now, wall: joint.env.wall, limits: *limits },
             joint,
             fixture,
-            top_out: Queue::with_capacity(top::max_out(&LIMITS)),
+            top_out: Queue::with_capacity(top::max_out(limits)),
             stored: Map::with_capacity(128),
             seen: List::with_capacity(256),
             pending: BTreeMap::new(),
@@ -86,6 +95,7 @@ impl Protocol {
             secrets_kept: true,
             item_pages: Vec::new(),
             item_start: 0,
+            request_times: Vec::new(),
         };
         world.accept_installations();
         world.event(top::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
@@ -97,9 +107,9 @@ impl Protocol {
                 .action(skein_forge_connection::Request::Installations { forge: REPO.forge, accepted: Box::from([1]) });
         }
     }
-    fn top(seed: u64, author: u64) -> top::Domain {
+    fn top(seed: u64, author: u64, limits: &top::Limits) -> top::Domain {
         top::Domain::new(
-            &LIMITS,
+            limits,
             seed,
             skein_forge_client::Config {
                 namespace: Box::from(b"world".as_slice()),
@@ -286,7 +296,7 @@ impl Protocol {
             .expect("fresh component");
         self.joint.replace(component);
         self.accept_installations();
-        self.top = Self::top(self.seed, self.fixture.writer);
+        self.top = Self::top(self.seed, self.fixture.writer, &self.env.limits);
         let records: Vec<_> = self.stored.iter().map(|(_, row)| row.clone()).collect();
         for record in records {
             self.event(top::Event::Restore { record });
@@ -364,6 +374,12 @@ impl Protocol {
         let end = self.env.now.saturating_add(Duration::from_secs(seconds));
         for _ in 0..200_000 {
             self.joint.tick();
+            // Only newly completed request lines: recording remains linear in requests.
+            let complete = self.joint.request_lines()[self.request_times.len()..]
+                .iter()
+                .take_while(|line| line.ends_with(b"\r\n"))
+                .count();
+            self.request_times.resize(self.request_times.len() + complete, self.env.wall);
             self.take_answers();
             if self.top.is_ready() {
                 top::resume(&mut self.top, &self.env, &mut self.top_out);
@@ -543,6 +559,14 @@ impl Protocol {
                 }));
             }
         }
+    }
+    /// Completed HTTP request lines and their world-clock send times; no headers.
+    pub fn requests(&self) -> impl Iterator<Item = (Wall, &[u8])> {
+        self.request_times.iter().copied().zip(self.joint.request_lines().iter().map(Vec::as_slice))
+    }
+    #[must_use]
+    pub fn delivery_hints(&self) -> usize {
+        self.joint.hints.len()
     }
     #[must_use]
     pub fn listing_passes(&self) -> &[u64] {

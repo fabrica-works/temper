@@ -88,17 +88,6 @@ def ask(method, path, body=None):
     return int(status), data
 
 try:
-    path = base + '/git/matching-refs/heads/' + urllib.parse.quote(prefix, safe='/')
-    status, data = ask('GET', path)
-    if status != 200:
-        raise RuntimeError('backstop: cannot list run branches')
-    for row in json.loads(data):
-        name = row['ref'].removeprefix('refs/heads/')
-        if not name.startswith(prefix):
-            raise RuntimeError('backstop: branch outside run')
-        status, _ = ask('DELETE', base + '/git/refs/heads/' + urllib.parse.quote(name, safe='/'))
-        if status not in (204, 404):
-            print('backstop: branch left=' + name, file=sys.stderr)
     query = urllib.parse.urlencode({'state': 'open', 'head': owner + ':' + prefix + '1/c2', 'per_page': 100})
     status, data = ask('GET', base + '/pulls?' + query)
     if status != 200:
@@ -113,6 +102,17 @@ try:
         status, _ = ask('PATCH', base + '/pulls/' + str(number), {'state': 'closed'})
         if status != 200:
             print('backstop: pull left=' + str(number), file=sys.stderr)
+    path = base + '/git/matching-refs/heads/' + urllib.parse.quote(prefix, safe='/')
+    status, data = ask('GET', path)
+    if status != 200:
+        raise RuntimeError('backstop: cannot list run branches')
+    for row in json.loads(data):
+        name = row['ref'].removeprefix('refs/heads/')
+        if not name.startswith(prefix):
+            raise RuntimeError('backstop: branch outside run')
+        status, _ = ask('DELETE', base + '/git/refs/heads/' + urllib.parse.quote(name, safe='/'))
+        if status not in (204, 404):
+            print('backstop: branch left=' + name, file=sys.stderr)
 except (RuntimeError, ValueError, KeyError, TypeError):
     print('backstop: cleanup incomplete; inspect private state=' + str(scratch), file=sys.stderr)
 finally:

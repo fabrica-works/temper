@@ -261,6 +261,10 @@ fn an_unwoken_chain_finishes_with_its_single_decision() {
 }
 
 fn merging_change(protection: Protection, pull_ci: skein_forge::api::Ci) -> Domain {
+    first_change(protection, pull_ci, true)
+}
+
+fn first_change(protection: Protection, pull_ci: skein_forge::api::Ci, mergeable: bool) -> Domain {
     use skein_forge::api::Answer;
     use temper_engine_domain_forge_change as change;
     let mut d = domain();
@@ -282,6 +286,7 @@ fn merging_change(protection: Protection, pull_ci: skein_forge::api::Ci) -> Doma
     fixtures::answer_next(&mut d, Ok(Answer::Commit(fixtures::BASE)));
     let mut pull = fixtures::open_pull();
     pull.ci = pull_ci;
+    pull.mergeable = mergeable;
     fixtures::answer_next(&mut d, Ok(Answer::Pull(pull)));
     d
 }
@@ -346,4 +351,147 @@ fn required_head_checks_ignore_a_failed_non_required_row() {
     lint.check = Check::Failed;
     fixtures::answer(&mut d, call, Ok(Answer::Checks(Box::new([lint, rows[0].clone()]))));
     merge_after_base_reads(&mut d);
+}
+
+fn named_pull_verdict(number: u64) -> Box<[Request]> {
+    use skein_forge::api::{Answer, Ci, Kind, Op, Read, State, Summary};
+    let mut d = domain();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(adopted()) });
+    let mut row = fixtures::opening_row();
+    row.pull = Some(1);
+    outputs(&mut d, Event::Change { row: row.clone() });
+    // Another change in the same repository must not wake with this pull.
+    row.task = LATER_CHANGE;
+    row.change.task = LATER_CHANGE;
+    row.pull = Some(2);
+    row.branch = Box::from(LATER_BRANCH);
+    outputs(&mut d, Event::Change { row });
+    outputs(&mut d, Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic });
+    outputs(
+        &mut d,
+        Event::Names {
+            task: fixtures::CHANGE,
+            resources: Box::new([Name { forge: REPO.forge, repository: REPO.repository, what: What::Pull(number) }]),
+        },
+    );
+    let mut seen = skein_lib::List::with_capacity(max_out(&LIMITS).checked_mul(4).expect("four bounded output passes"));
+    // At most a repository listing, the item, and the pull itself.
+    for _ in 0_u32..3 {
+        let (call, op) = fixtures::next_call(&mut d);
+        if op == Op::Read(Read::Pull { number }) {
+            let mut pull = fixtures::open_pull();
+            pull.number = number;
+            pull.ci = Ci::Passed;
+            for request in fixtures::answer(&mut d, call, Ok(Answer::Pull(pull))) {
+                seen.push(request).expect("four bounded output passes");
+            }
+            for request in ready(&mut d) {
+                seen.push(request).expect("four bounded output passes");
+            }
+            return seen.into_boxed();
+        }
+        let answer = if let Op::Read(Read::Items { .. }) = op {
+            Answer::Items { items: Box::new([]), more: false, now: env().now }
+        } else {
+            let Op::Read(Read::Item { number: read_number, .. }) = op else { panic!("{op:?}") };
+            assert_eq!(read_number, number);
+            Answer::Item {
+                item: Summary {
+                    labels: Box::new([]),
+                    number,
+                    kind: Kind::Pull,
+                    state: State::Open,
+                    author: 7,
+                    key: None,
+                    title: Box::new([]),
+                    body: Box::new([]),
+                    updated: env().now,
+                },
+                comments: Box::new([]),
+                more: false,
+            }
+        };
+        for request in fixtures::answer(&mut d, call, Ok(answer)) {
+            seen.push(request).expect("four bounded output passes");
+        }
+    }
+    panic!("the named pull must be read");
+}
+
+#[test]
+fn a_named_pulls_ci_changed_wakes_only_its_own_change() {
+    let seen = named_pull_verdict(1);
+    let mut wakes = 0_u32;
+    for request in &seen {
+        if let Request::WakeProcedure { task } = request {
+            assert_eq!(*task, fixtures::CHANGE, "CI Changed: {seen:?}");
+            wakes += 1;
+        }
+    }
+    assert_eq!(wakes, 1, "one owning change wakes: {seen:?}");
+}
+
+#[test]
+fn a_named_pulls_changed_without_an_owning_change_wakes_nothing() {
+    let seen = named_pull_verdict(99);
+    for request in &seen {
+        if let Request::WakeProcedure { .. } = request {
+            panic!("unowned Changed: {seen:?}");
+        }
+    }
+}
+
+#[test]
+fn a_settling_change_relies_on_its_own_pull_watch_but_keeps_its_deadline() {
+    use skein_forge::api::{Answer, Ci, Op, Read};
+    use temper_engine_domain_forge_change as change;
+    for (watch, compared, delay) in [
+        (Some(1), true, LIMITS.client.settle),
+        (Some(1), false, LIMITS.client.hinted),
+        (Some(2), true, LIMITS.client.hinted),
+        (None, true, LIMITS.client.hinted),
+    ] {
+        let mut d = first_change(Protection::Absent, Ci::Passed, false);
+        fixtures::answer_next(&mut d, Ok(fixtures::checks(skein_forge::api::Check::Passed)));
+        fixtures::answer_next(
+            &mut d,
+            if compared {
+                Ok(Answer::Compare {
+                    before: fixtures::BASE,
+                    after: fixtures::HEAD,
+                    contains_before: true,
+                    files: Box::new([]),
+                    commits: Box::new([]),
+                })
+            } else {
+                Err(skein_forge::api::Error::Missing)
+            },
+        );
+        let (reviews, op) = fixtures::next_call(&mut d);
+        assert_eq!(op, Op::Read(Read::Reviews { number: 1, page: 1 }));
+        if let Some(number) = watch {
+            outputs(
+                &mut d,
+                Event::Names {
+                    task: fixtures::CHANGE,
+                    resources: Box::new([Name {
+                        forge: REPO.forge,
+                        repository: REPO.repository,
+                        what: What::Pull(number),
+                    }]),
+                },
+            );
+        }
+        let finished = fixtures::answer(&mut d, reviews, Ok(Answer::Reviews { reviews: Box::new([]), more: false }));
+        let until = Wall::from_nanos(env().wall.as_nanos() + delay.as_nanos());
+        assert!(
+            finished.contains(&Request::ChangeDecision {
+                task: fixtures::CHANGE,
+                decision: change::Decision::Wait { until: Some(until) },
+                entry: None,
+                evidence: None,
+            }),
+            "watch {watch:?}, compared {compared}: the pull wake replaces complete gathers, with a deadline: {finished:?}"
+        );
+    }
 }
