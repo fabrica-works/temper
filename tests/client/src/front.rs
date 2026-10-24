@@ -107,6 +107,7 @@ impl Joint {
             config.core.connectors = Box::new([fixtures::FORGE]);
             config.forges = Box::new([forge::Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 number: 1,
                 kind: forge::Kind::GitHub,

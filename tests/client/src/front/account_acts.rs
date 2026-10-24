@@ -163,6 +163,7 @@ fn fixture_root(
             config.core.connectors = Box::new([fixtures::FORGE]);
             config.forges = Box::new([temper_engine_domain_forge::Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 web: None,
                 read_only: false,

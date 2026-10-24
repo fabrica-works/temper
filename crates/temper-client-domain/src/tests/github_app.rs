@@ -229,6 +229,12 @@ fn each_forge_refusal_is_said_in_forge_md_words() {
     }
 }
 
+#[test]
+fn a_first_organization_named_as_the_bot_asks_for_another_name() {
+    let words = forge::words::app_refusal(forge::github::Answer::Refused(w::ForgeRefusal::FirstIsBot), 3).unwrap();
+    assert_eq!(words.as_ref(), b"That organization has the name of temper's bot on this forge, and on Forgejo users and organizations share names: name another organization.");
+}
+
 fn github_row() -> forge::forges::Row {
     forge::forges::Row {
         number: 2,

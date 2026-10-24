@@ -839,6 +839,9 @@ pub fn connect_refusal(why: &temper_client_protocol_wire::v1::ForgeRefusal) -> (
         }
         temper_client_protocol_wire::v1::ForgeRefusal::Busy => (b"busy", b"busy"),
         temper_client_protocol_wire::v1::ForgeRefusal::NoKey => (b"no_key", b"no key"),
+        temper_client_protocol_wire::v1::ForgeRefusal::FirstIsBot => {
+            (b"first_is_bot", b"the organization is the bot's login: name another organization")
+        }
     }
 }
 

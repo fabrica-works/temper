@@ -3737,6 +3737,8 @@ pub enum ForgeRefusal {
     Busy,
     /// `no_key` without a payload.
     NoKey,
+    /// `first_is_bot` without a payload.
+    FirstIsBot,
 }
 
 impl ForgeRefusal {
@@ -7408,7 +7410,7 @@ impl ForgeRefusal {
     #[must_use]
     pub fn measure(&self) -> u32 {
         match self {
-            Self::Role | Self::NoSuchForge | Self::NotTaken | Self::Connected | Self::NotConnected | Self::Busy | Self::NoKey => 1,
+            Self::Role | Self::NoSuchForge | Self::NotTaken | Self::Connected | Self::NotConnected | Self::Busy | Self::NoKey | Self::FirstIsBot => 1,
         }
     }
 
@@ -7422,6 +7424,7 @@ impl ForgeRefusal {
             Self::NotConnected => writer.put(&[4_u8])?,
             Self::Busy => writer.put(&[5_u8])?,
             Self::NoKey => writer.put(&[6_u8])?,
+            Self::FirstIsBot => writer.put(&[7_u8])?,
         }
         Ok(())
     }
@@ -7443,6 +7446,7 @@ impl ForgeRefusal {
             4 => Self::NotConnected,
             5 => Self::Busy,
             6 => Self::NoKey,
+            7 => Self::FirstIsBot,
             _ => return Err(Problem { path: Path::ForgeRefusalTag, reason: skein_codec::Reason::Tag }),
         };
         Ok(value)
@@ -10376,7 +10380,7 @@ mod golden_tests {
         };
         at && past
     }
-    static GOLDEN_0: [Case; 398] = [
+    static GOLDEN_0: [Case; 400] = [
         ("enum_role_owned_smallest", || { let value = Role::Owned; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Role::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_role_owned_full", || { let value = Role::Owned; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Role::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_role_adopted_smallest", || { let value = Role::Adopted; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Role::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -10737,6 +10741,8 @@ mod golden_tests {
         ("enum_forge_refusal_busy_full", || { let value = ForgeRefusal::Busy; let bytes: &[u8] = &[5]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRefusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_forge_refusal_no_key_smallest", || { let value = ForgeRefusal::NoKey; let bytes: &[u8] = &[6]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRefusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_forge_refusal_no_key_full", || { let value = ForgeRefusal::NoKey; let bytes: &[u8] = &[6]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRefusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_forge_refusal_first_is_bot_smallest", || { let value = ForgeRefusal::FirstIsBot; let bytes: &[u8] = &[7]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRefusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_forge_refusal_first_is_bot_full", || { let value = ForgeRefusal::FirstIsBot; let bytes: &[u8] = &[7]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ForgeRefusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_connect_refused_smallest", || { let value = ConnectRefused::new(&CEILINGS, ConnectRefusedParts { why: ForgeRefusal::Role }).expect("golden within ceilings"); let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ConnectRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_connect_refused_full", || { let value = ConnectRefused::new(&CEILINGS, ConnectRefusedParts { why: ForgeRefusal::Role }).expect("golden within ceilings"); let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ConnectRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_link_smallest", || { let value = Link::new(&CEILINGS, LinkParts { address: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Link::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),

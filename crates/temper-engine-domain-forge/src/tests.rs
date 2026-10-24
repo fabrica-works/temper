@@ -1132,28 +1132,32 @@ fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() 
     );
     assert_eq!(restarted.connection(1), Connection::NotConnected, "restored writer is no connection claim");
 }
-const CONFIGURED: [Configured; 2] = [
-    Configured {
-        admin_connect: false,
-        owned: None,
-        web: None,
-        read_only: false,
-        number: 1,
-        kind: Kind::Forgejo,
-        mode: Mode::Owned,
-        asked: true,
-    },
-    Configured {
-        admin_connect: false,
-        owned: None,
-        web: None,
-        read_only: false,
-        number: 2,
-        kind: Kind::GitHub,
-        mode: Mode::Owned,
-        asked: true,
-    },
-];
+fn configured() -> [Configured; 2] {
+    [
+        Configured {
+            admin_connect: false,
+            bot: Box::new([]),
+            owned: None,
+            web: None,
+            read_only: false,
+            number: 1,
+            kind: Kind::Forgejo,
+            mode: Mode::Owned,
+            asked: true,
+        },
+        Configured {
+            admin_connect: false,
+            bot: Box::new([]),
+            owned: None,
+            web: None,
+            read_only: false,
+            number: 2,
+            kind: Kind::GitHub,
+            mode: Mode::Owned,
+            asked: true,
+        },
+    ]
+}
 fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
     Domain::new(
         &LIMITS,
@@ -1207,7 +1211,7 @@ fn setup_rows_and_answers_agree_in_every_connection_state() {
     ];
     for (state, expected) in rows {
         for (under_box, (offer, refusal)) in [true, false].into_iter().zip(expected) {
-            let mut d = setup_domain(&CONFIGURED[..1], under_box);
+            let mut d = setup_domain(&configured()[..1], under_box);
             outputs(&mut d, Event::Connection { forge: 1, state: state.clone() });
             assert_eq!(d.forges().rows.as_ref(), [setup_row(1, Kind::Forgejo, state.clone(), offer)]);
             let request = Token::new(91);
@@ -1241,10 +1245,10 @@ fn setup_rows_and_answers_agree_in_every_connection_state() {
 #[test]
 fn setup_is_not_offered_without_owned_asked_configuration() {
     let rows: [Box<[Configured]>; 5] = [
-        Box::new([Configured { mode: Mode::Connected, ..CONFIGURED[0].clone() }]),
-        Box::new([Configured { mode: Mode::Managed, ..CONFIGURED[0].clone() }]),
-        Box::new([Configured { mode: Mode::Fake, ..CONFIGURED[0].clone() }]),
-        Box::new([Configured { asked: false, ..CONFIGURED[0].clone() }]),
+        Box::new([Configured { mode: Mode::Connected, ..configured()[0].clone() }]),
+        Box::new([Configured { mode: Mode::Managed, ..configured()[0].clone() }]),
+        Box::new([Configured { mode: Mode::Fake, ..configured()[0].clone() }]),
+        Box::new([Configured { asked: false, ..configured()[0].clone() }]),
         Box::new([]),
     ];
     for forges in rows {
@@ -1261,7 +1265,7 @@ fn setup_is_not_offered_without_owned_asked_configuration() {
 }
 #[test]
 fn a_setup_on_another_forge_keeps_the_offer_but_answers_busy() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::SettingUp { step: Some(SetUpStep::Run) } });
     outputs(&mut d, Event::Connection { forge: 2, state: Connection::NotSetUp });
     let token = Token::new(91);
@@ -1274,7 +1278,7 @@ fn a_setup_on_another_forge_keeps_the_offer_but_answers_busy() {
 }
 #[test]
 fn closing_the_box_fails_setup_and_marks_every_offer_unavailable() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::SettingUp { step: Some(SetUpStep::Run) } });
     outputs(&mut d, Event::Connection { forge: 2, state: Connection::NotSetUp });
     assert_eq!(outputs(&mut d, Event::BoxClosed).as_ref(), [Request::MarkedForges]);
@@ -1309,7 +1313,7 @@ fn configured_forges_are_bounded_at_construction() {
     let mut forges = skein_lib::List::with_capacity(LIMITS.client.repositories.checked_add(1).unwrap());
     for number in 0..=count {
         forges
-            .push(Configured { owned: None, number: u16::try_from(number).unwrap(), ..CONFIGURED[0].clone() })
+            .push(Configured { owned: None, number: u16::try_from(number).unwrap(), ..configured()[0].clone() })
             .unwrap();
     }
     Domain::new(&LIMITS, 4, config(), &[], &forges.as_slice()[..count], false).unwrap();
@@ -1390,7 +1394,7 @@ fn setup_application(forge: u16, request: Token, token: Token) -> Event {
 
 #[test]
 fn a_setup_answer_finishes_its_application_without_a_durable_record() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     let request = Token::new(91);
     let token = Token::new(92);
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
@@ -1408,7 +1412,7 @@ fn a_setup_answer_finishes_its_application_without_a_durable_record() {
 
 #[test]
 fn a_connection_change_keeps_the_latest_setup_answer() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     let request = Token::new(91);
     let token = Token::new(92);
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
@@ -1420,7 +1424,7 @@ fn a_connection_change_keeps_the_latest_setup_answer() {
 
 #[test]
 fn setup_flights_refuse_busy_at_the_bound_and_an_answer_frees_room() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
     for number in 1..=u64::from(LIMITS.applications) {
         let request = Token::new(number);
@@ -1455,7 +1459,7 @@ fn setup_flights_refuse_busy_at_the_bound_and_an_answer_frees_room() {
 
 #[test]
 fn a_later_setup_answer_replaces_only_that_forges_previous_token() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     d.connection_limits(2, 1);
     for forge in [1, 2] {
         outputs(&mut d, Event::Connection { forge, state: Connection::NotSetUp });
@@ -1479,7 +1483,7 @@ fn a_later_setup_answer_replaces_only_that_forges_previous_token() {
 
 #[test]
 fn unconfigured_forges_share_one_latest_refusal_beside_the_configured_forges() {
-    let mut d = setup_domain(&CONFIGURED[..1], true);
+    let mut d = setup_domain(&configured()[..1], true);
     d.connection_limits(1, 1);
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
     for forge in [1, 2, 3] {
@@ -1509,7 +1513,7 @@ fn unconfigured_forges_share_one_latest_refusal_beside_the_configured_forges() {
 
 #[test]
 fn the_forges_document_orders_connections_and_every_connection_marks_it() {
-    let mut d = setup_domain(&[CONFIGURED[1].clone(), CONFIGURED[0].clone()], true);
+    let mut d = setup_domain(&[configured()[1].clone(), configured()[0].clone()], true);
     d.connection_limits(2, 1);
     for (forge, state) in [(2, Connection::NotSetUp), (1, Connection::Connecting), (2, Connection::NotSetUp)] {
         assert_eq!(outputs(&mut d, Event::Connection { forge, state }).as_ref(), [Request::MarkedForges]);
@@ -1525,13 +1529,13 @@ fn the_forges_document_orders_connections_and_every_connection_marks_it() {
 
 #[test]
 fn a_configured_forge_without_routing_input_reads_not_connected() {
-    let d = setup_domain(&CONFIGURED[..1], true);
+    let d = setup_domain(&configured()[..1], true);
     assert_eq!(d.forges().rows.as_ref(), [setup_row(1, Kind::Forgejo, Connection::NotConnected, Offer::NotOffered)]);
 }
 
 #[test]
 fn a_new_project_is_admitted_and_retained_until_the_repository_is_made() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
     let request = Token::new(91);
     let token = Token::new(92);
@@ -1588,7 +1592,7 @@ fn setup_names_are_validated_at_admission_on_both_sides_of_the_name_bound() {
                 cases.push(Box::from(name)).unwrap();
             }
             for name in cases.as_slice() {
-                let mut d = setup_domain(&CONFIGURED, true);
+                let mut d = setup_domain(&configured(), true);
                 outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotSetUp });
                 let request = Token::new(91);
                 let token = Token::new(92);
@@ -1650,7 +1654,7 @@ fn setup_names_are_validated_at_admission_on_both_sides_of_the_name_bound() {
 }
 #[test]
 fn admitted_setup_projects_its_fields_as_making_and_the_next_admission_replaces_them() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     for (number, org, repository, project) in
         [(91, b"work".as_slice(), b"hello".as_slice(), 1), (93, b"team", b"widget", 2)]
     {
@@ -1698,7 +1702,7 @@ fn admitted_setup_projects_its_fields_as_making_and_the_next_admission_replaces_
 
 #[test]
 fn first_repository_tells_mark_made_failed_and_retry_and_ignore_absent_intents() {
-    let mut d = setup_domain(&CONFIGURED, true);
+    let mut d = setup_domain(&configured(), true);
     for forge in [1, 99] {
         assert!(outputs(&mut d, Event::FirstMade { forge, id: 42 }).is_empty());
         assert!(outputs(&mut d, Event::FirstFailed { forge, step: CreateStep::File }).is_empty());
@@ -1779,6 +1783,7 @@ fn forges_lists_web_and_only_each_forges_adoptions_for_every_kind() {
         let mut d = setup_domain(
             &[Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 number: 1,
                 kind,
@@ -1803,7 +1808,7 @@ fn forges_lists_web_and_only_each_forges_adoptions_for_every_kind() {
 
 #[test]
 fn forgetting_or_restoring_an_adoption_publishes_the_forges_row() {
-    let mut d = setup_domain(&[Configured { mode: Mode::Connected, ..CONFIGURED[0].clone() }], false);
+    let mut d = setup_domain(&[Configured { mode: Mode::Connected, ..configured()[0].clone() }], false);
     let own = adopted();
     outputs(&mut d, Event::Restore { record: Stored::Repository(own.clone()) });
     let out = outputs(&mut d, Event::ForgetAdoption { repository: own.provider, restore: None });
@@ -1822,8 +1827,8 @@ fn forges_carry_owned_startup_details_for_the_owned_row_alone() {
         password: b"/fake/forge/person_password".as_slice().into(),
     };
     let configs = [
-        Configured { owned: Some(owned.clone()), ..CONFIGURED[0].clone() },
-        Configured { owned: None, mode: Mode::Managed, ..CONFIGURED[1].clone() },
+        Configured { owned: Some(owned.clone()), ..configured()[0].clone() },
+        Configured { owned: None, mode: Mode::Managed, ..configured()[1].clone() },
     ];
     let domain = setup_domain(&configs, true);
     let rows = domain.forges().rows;
@@ -1871,7 +1876,7 @@ fn setup_failures_name_the_held_step_until_state_changes() {
         ),
     ];
     for (index, (events, expected)) in rows.into_iter().enumerate() {
-        let mut d = setup_domain(&CONFIGURED[..1], true);
+        let mut d = setup_domain(&configured()[..1], true);
         for event in events {
             outputs(&mut d, event);
         }

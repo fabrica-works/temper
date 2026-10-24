@@ -101,7 +101,7 @@ record Adopted { forge: u16 repository: u32 owner: bytes 1024 name: bytes 1024 r
 record CoreRefused { refusal: bytes 16777209 }
 enum ForgeReason { no_such_forge, not_found, no_access, refused, in_flight, too_large, unreachable, invalid_answer }
 record ForgeRefused { reason: ForgeReason }
-enum ForgeRefusal { role, no_such_forge, not_taken, connected, not_connected, busy, no_key }
+enum ForgeRefusal { role, no_such_forge, not_taken, connected, not_connected, busy, no_key, first_is_bot }
 record ConnectRefused { why: ForgeRefusal }
 record Link { address: bytes 2048 }
 record Reached { id: u64 owner: Account name: bytes 1024 private: bool }

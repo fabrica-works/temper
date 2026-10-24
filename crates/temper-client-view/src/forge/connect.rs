@@ -1312,7 +1312,18 @@ fn admin_details(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Forge
         b.name(&w.say(word, &[]));
         b.value(draft.fields.get(index).expect("four fields"), *draft.written.get(index).expect("four writes"));
         b.bind(bindings.insert(Meaning::AdminField(field)));
-        if draft.checked && invalid {
+        if (draft.checked && invalid)
+            || (field == forge::admin::Field::Organization
+                && if let Some(pending) = root.forge().admin() {
+                    pending.forge == row.number
+                        && pending.answer
+                            == Some(forge::github::Answer::Refused(
+                                temper_client_protocol_wire::v1::ForgeRefusal::FirstIsBot,
+                            ))
+                } else {
+                    false
+                })
+        {
             b.state(State::Invalid);
         }
         b.close();
