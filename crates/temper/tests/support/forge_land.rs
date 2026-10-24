@@ -666,17 +666,59 @@ pub fn live_deployment(paths: &[PathBuf; 3]) -> std::net::SocketAddr {
         .expect("socket")
 }
 
-/// Select the launcher's store and admit it before starting any process.
+/// Select the launcher's store and admit it before starting any process; a
+/// held account moves into a fresh store only.
 #[must_use]
-pub fn live_store() -> (PathBuf, bool) {
+pub fn live_store(account: bool) -> (PathBuf, bool) {
     let store = std::path::PathBuf::from(
         std::env::var_os("TEMPER_LIVE_STORE").expect("run live through scripts/proof-live.sh forge-land"),
     );
-    let kept = reserve_live_store(&store).unwrap_or_else(|message| {
+    let kept = reserve_live_store(&store).and_then(|kept| {
+        if kept && account { Err("a held account moves into a fresh store only".to_owned()) } else { Ok(kept) }
+    });
+    let kept = kept.unwrap_or_else(|message| {
         super::live::notice(&message);
         panic!("{message}")
     });
     (store, kept)
+}
+
+/// The held record `TEMPER_LIVE_ACCOUNT` names, admitted before any store is.
+#[must_use]
+pub fn live_account() -> Option<PathBuf> {
+    let account = PathBuf::from(std::env::var_os("TEMPER_LIVE_ACCOUNT")?);
+    if let Err(message) = held_account(&account) {
+        super::live::notice(message);
+        panic!("{message}");
+    }
+    Some(account)
+}
+
+/// Admit the held `ChatGPT` record a fresh store's first run moves in: a
+/// regular file only its owner reads, as ctl import's FILE must be. Its words
+/// never name the path, which goes to `import` alone.
+pub fn held_account(file: &std::path::Path) -> Result<(), &'static str> {
+    use std::os::unix::fs::MetadataExt;
+    let metadata = fs::symlink_metadata(file).map_err(|_| "TEMPER_LIVE_ACCOUNT names no file")?;
+    if !metadata.file_type().is_file() {
+        return Err("TEMPER_LIVE_ACCOUNT is not a regular file");
+    }
+    if metadata.mode() & 0o7777 != 0o600 {
+        return Err("TEMPER_LIVE_ACCOUNT is not 0600");
+    }
+    Ok(())
+}
+
+/// A live command as notices and failures print it: an imported record's path
+/// stays out of them, and ctl's own words are all that is said of it.
+#[must_use]
+pub fn printed_command(args: &[String]) -> Vec<String> {
+    match args {
+        [import, _file, rest @ ..] if import == "import" => {
+            [import.clone(), "FILE".into()].into_iter().chain(rest.iter().cloned()).collect()
+        }
+        _ => args.to_vec(),
+    }
 }
 
 /// A unique marker for this live sitting, carried into its README and notice.
@@ -913,7 +955,9 @@ fn oracle_token(paths: &[PathBuf; 3], first: bool) -> String {
 }
 
 /// Commands are admitted one at a time so a failure cannot start the next act.
-fn live_commands(fresh: bool) -> (Vec<Vec<String>>, usize) {
+/// A fresh store's account comes from a person's sign-in, or from a held
+/// record moved in by `import`, as qa-live.md's 0b seed does (4.3).
+fn live_commands(fresh: bool, account: Option<&std::path::Path>) -> (Vec<Vec<String>>, usize) {
     let mut commands = vec![vec!["sign-in", "-"]];
     if fresh {
         commands.extend([vec!["forges"], vec!["forges", "--json"], vec!["forge-setup", "3"]]);
@@ -925,10 +969,16 @@ fn live_commands(fresh: bool) -> (Vec<Vec<String>>, usize) {
         vec!["me", "--json"],
     ]);
     if fresh {
-        commands.extend([
-            vec!["connect", "1", "--key", "connect-plan"],
-            vec!["wait", "accounts", "--until", "settled", "--timeout", "600s", "--json"],
-        ]);
+        commands.extend(match account.map(|file| file.to_str().expect("held account path is UTF-8")) {
+            Some(file) => [
+                vec!["import", file, "--key", "connect-plan"],
+                vec!["wait", "accounts", "--until", "usable", "--timeout", "600s", "--json"],
+            ],
+            None => [
+                vec!["connect", "1", "--key", "connect-plan"],
+                vec!["wait", "accounts", "--until", "settled", "--timeout", "600s", "--json"],
+            ],
+        });
     }
     let account = commands.len();
     commands.push(vec!["accounts", "--json"]);
@@ -940,6 +990,8 @@ pub struct LivePlan<'a> {
     pub client: &'a std::path::Path,
     pub first: bool,
     pub kept: bool,
+    /// The held `ChatGPT` record a fresh store's first run moves in.
+    pub account: Option<&'a std::path::Path>,
     pub address: Option<std::net::SocketAddr>,
     pub tasks: Option<LiveTasks>,
     pub baseline: Option<&'a std::collections::BTreeSet<u64>>,
@@ -1535,7 +1587,9 @@ impl LiveJudge<'_> {
             }
             if self.plan.first && !self.plan.kept && index == self.account_at - 2 {
                 super::live::notice(&String::from_utf8_lossy(&call.stdout));
-                self.signing_until = Some(now.saturating_add(Duration::from_secs(600)));
+                if self.plan.account.is_none() {
+                    self.signing_until = Some(now.saturating_add(Duration::from_secs(600)));
+                }
             }
         }
         if calls.ends().len() > self.checked {
@@ -1607,7 +1661,7 @@ impl LiveJudge<'_> {
                 } else {
                     super::ctl::Call::new(&words)
                 }));
-                self.arguments.push(args);
+                self.arguments.push(printed_command(&args));
             }
         }
         if !self.stopping() && matches!(self.phase, LivePhase::Done) {
@@ -1717,7 +1771,7 @@ pub fn run_live(
     let mut fds = streams.descriptors();
     let root = skein_shell::open_root(plan.client).expect("fresh client root");
     fds.push(root);
-    let (commands, account_at) = live_commands(plan.first && !plan.kept);
+    let (commands, account_at) = live_commands(plan.first && !plan.kept, plan.account);
     let failure = std::cell::Cell::new(None);
     let evidence = std::cell::Cell::new(None);
     let mut world = real::World::new(LiveJudge {

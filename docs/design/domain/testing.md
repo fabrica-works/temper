@@ -1326,7 +1326,11 @@ section 8; testing-strategy.md, 2.9).
   `$HOME/src/rust/tmp/live-store/forge-land`) on pass or failure. A rerun uses the
   kept sign-in without a person and stops when that sign-in is expired or refused.
   It admits the deployment alone and makes its own client roots, so a sitting
-  that failed before its restart leaves a store a rerun can use.
+  that failed before its restart leaves a store a rerun can use. With
+  `TEMPER_LIVE_ACCOUNT` naming a held ChatGPT record, a fresh store's first
+  run moves it in by `temper ctl import FILE --key connect-plan`, which
+  removes FILE, and waits for it usable in place of the person's sign-in, as
+  `qa-live.md`'s 0b seed does (4.3); the script refuses it with a kept store.
 - **Its referee:** the process tier's, without the restart; and the
   completions, counted from the engine's transcripts. Each completion is
   a turn of main's conversation on either backend: on the program

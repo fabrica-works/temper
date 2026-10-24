@@ -37,7 +37,8 @@ fn a_person_asks_chatgpt_to_land_a_change_on_the_owned_forge() {
     let clock = skein_shell::Clock::new();
     let started = clock.now().now;
     let deadline = started.saturating_add(Duration::from_secs(2_400));
-    let (store, kept) = forge_land::live_store();
+    let account = forge_land::live_account();
+    let (store, kept) = forge_land::live_store(account.is_some());
     let scratch = support::Scratch::live();
     let paths = ["config", "data", "cache"].map(|name| store.join(name));
     let address = if kept {
@@ -68,6 +69,7 @@ fn a_person_asks_chatgpt_to_land_a_change_on_the_owned_forge() {
                     client: &client,
                     first,
                     kept,
+                    account: account.as_deref().filter(|_| first),
                     address: previous.as_ref().map(|before| before.address).or(address),
                     tasks: previous.as_ref().map(|before| before.tasks.clone()),
                     baseline: previous.as_ref().map(|before| &before.baseline),

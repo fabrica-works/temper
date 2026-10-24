@@ -23,6 +23,22 @@ if [ "${1-}" = forge-land ]; then
     mkdir -p -- "$store_parent"
     store=$(readlink -f -- "$store")
     export TEMPER_LIVE_STORE=$store
+    if [ -n "${TEMPER_LIVE_ACCOUNT-}" ]; then
+        # A held record moved in by ctl import (qa-live.md, 4.3), which removes it.
+        [ "$rerun" = false ] || { printf '%s\n' 'a held account moves into a fresh store only' >&2; exit 2; }
+        # Its path goes to ctl import alone, never into this script's words.
+        if [ -L "$TEMPER_LIVE_ACCOUNT" ] || [ ! -f "$TEMPER_LIVE_ACCOUNT" ]; then
+            printf '%s\n' 'TEMPER_LIVE_ACCOUNT names no regular file' >&2
+            exit 2
+        fi
+        [ "$(stat -c %a -- "$TEMPER_LIVE_ACCOUNT")" = 600 ] || { printf '%s\n' 'TEMPER_LIVE_ACCOUNT is not 0600' >&2; exit 2; }
+        TEMPER_LIVE_ACCOUNT=$(readlink -f -- "$TEMPER_LIVE_ACCOUNT")
+        export TEMPER_LIVE_ACCOUNT
+        printf '%s\n' 'moving the held ChatGPT account in; needs no person'
+    fi
+elif [ -n "${TEMPER_LIVE_ACCOUNT-}" ]; then
+    printf '%s\n' 'TEMPER_LIVE_ACCOUNT is for forge-land' >&2
+    exit 2
 fi
 export NEXTEST_DOUBLE_SPAWN=0
 heavy cargo nextest run -p temper --profile live --no-run
@@ -125,7 +141,7 @@ trap finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
-if [ "$rerun" = false ]; then
+if [ "$rerun" = false ] && [ -z "${TEMPER_LIVE_ACCOUNT-}" ]; then
     printf '%s\n' 'Approve the printed ChatGPT address in a browser that reaches this machine.' \
         'For a remote browser: ssh -L 1455:127.0.0.1:1455 -L <client port>:127.0.0.1:<client port> HOST'
 fi
