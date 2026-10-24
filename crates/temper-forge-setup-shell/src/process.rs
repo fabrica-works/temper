@@ -74,3 +74,18 @@ pub fn sign_in_key(file: fs::File) -> Result<(), String> {
             },
         )
 }
+
+/// The hidden child command inherits its environment, directory and descriptors.
+/// Terminate lets Forgejo release its database and lets a box stop its steps.
+#[must_use]
+pub fn child(parent: u32, program: &std::ffi::OsStr, arguments: &[std::ffi::OsString]) -> io::Error {
+    let mut command = Command::new(program);
+    command.args(arguments);
+    skein_shell::exec_dying_with_parent(command, parent, skein_io::kernel::Signal::Terminate)
+}
+
+/// Names this parent for the child-side exec's race check.
+#[must_use]
+pub fn id() -> u32 {
+    std::process::id()
+}
