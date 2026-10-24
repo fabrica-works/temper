@@ -316,7 +316,7 @@ keeps (`../protocol/configuration.md`, section 2).
 | `Welcome { step }` | `welcome.html`; the first run's step 0 | the first run's welcome, until the person has chosen: "Try the playground" or "Set up temper", the latter a wizard of Welcome, Forge, Model and Ready, its `step` (5.6; `../draft/first-run.md`, 2.3) | the demo's state (4.8); `accounts`; the `forges` watch, for a person whose role holds the deployment's forges; the forge's, as `ConnectForge` reads it | start the playground; `ConnectForge`'s and `ConnectModel`'s acts |
 | `Accounts` | `accounts.html` | the person's LLM accounts, then, for an owner, the deployment's, each row folded until opened: its LLM provider and display name, its holder, its deciding source's state and its line (5.5, An account's line); opened, that state's words and acts, its sources in order, each with its state in words and, for a program's, on which hosts (5.5), what it pays for, the runs using it and the tasks waiting for it (facts jig gives the deployment's accounts alone for now, so a person's own leave them out: 5.5) and its acts; the checks under way, and how the last ended; then the playground's account, folded, while the demo's model half holds; "+ Connect a model", to `ConnectModel` | `accounts` (jig's `client/domain/contract.md`, 7.1); `me`'s LLM providers | sign in again or add a key from a state's acts, as `ConnectModel`'s ways; sign a source out; add a key to an account; replace a key; remove a source or an account; check a program's login again; move an account, or a source, up or down; resume a limited source |
 | `ConnectModel { way }` | `connect-model.html` | connecting one more LLM account, `way` the way it is at, or none at Choose: Choose, a card for each way its providers offer (5.5, The ways); Signing in, at the provider, for a sign-in, or Details, a way's field, for a key or a program's login; and Ready, the account made, or how the sign-in ended (5.5, A sign-in) | `accounts`; `me`'s LLM providers | sign in with an LLM provider; add a key as an account of its own; declare a program's login |
-| `HowWorkRuns` (designed, not built) | none yet: drawn ahead, on the user's word (5.13) | the settings in the person's words: the newest revision and who decided it; "Tell temper how you work"; pending proposals of settings; roles, ways to start work, rules, running work and history, each row tagged Default, Changed or Added (5.13) | `settings`; each setting shown, `setting` (jig's `client/domain/contract.md`, 5.1 and 6) | start the configuring chat; move a revision's tasks to the newest; propose a reset, a removal or a restore |
+| `HowWorkRuns` (designed, not built) | none yet: the user's, from the branch `configuring-mockups` (5.13) | the settings in the person's words: the newest revision and who decided it; "Tell temper how you work"; pending proposals of settings; roles, ways to start work, rules, running work and history, each row tagged Default, Changed or Added (5.13) | `settings`; each setting shown, `setting` (jig's `client/domain/contract.md`, 5.1 and 6) | start the configuring chat; move a revision's tasks to the newest; propose a reset, a removal or a restore |
 | `Proposal { proposal }` (designed, not built) | none yet (5.13) | a proposal of settings: temper enforces and your agents follow, its effect on running work, the settings folded; withdrawn when stale; accepted (5.13) | the `proposal`; `settings`; each item's setting before | accept, choosing whether running work moves; reject with a reason; change something, in the chat |
 
 - **Words and facts:** a chat's status from jig's facts (jig's
@@ -2826,13 +2826,14 @@ Its rules:
 
 ### 5.13 How work runs, and a proposal of settings
 
-Designed, not built: mission 2 of the configuring plan
-(`../protocol/configuration.md`, section 13; jig's `domain/engine.md`,
-section 17, for the settings, their revisions and their proposals; the
-draft `../draft/configuring.md`, section 5). The user answers the option
-pages (where the page sits, its layout, the card, the review, a stale
-proposal); until then this section takes the options recommended, and
-the mockups join `mockups/` on the user's word, drawn ahead.
+Designed, not built (`../protocol/configuration.md`, section 13; jig's
+`domain/engine.md`, section 17, for the settings, their revisions and
+their proposals; the draft `../draft/configuring.md`, section 5). These
+pages are the user's to make: the user works on them from the mockups
+drawn ahead on temper's branch `configuring-mockups`, and the option
+pages once put to the user are withdrawn. Until the user's pages land,
+this section is the draft they start from; the configuring plan builds
+the settings first for `temper ctl` (its mission 2).
 
 - **Two pages and a card.** `HowWorkRuns`, "How work runs", lists the
   settings in the person's words; `Proposal { proposal }`, under it,
@@ -4125,13 +4126,12 @@ own tests:
   a task query has no revision among its keys (jig's
   `client/domain/contract.md`, 6.1), and nothing says before a move or
   an acceptance how many tasks could not move. Default, asked of jig in
-  the configuring plan's M4 (revisions):
+  the configuring plan's mission 2 (revisions held by tasks, with moves):
   a task query keyed by revision, its live group only (a scan, which
   costs live tasks no more than any key), and a proposal's or a move's
   count of tasks that could not move. Until then "Running work" and the
   review page draw counts alone and say in words which tasks stay.
-- **How work runs' place and look** (5.13). The option pages put to the
-  user where the page sits in the navigation, its layout, the
-  proposal's card, the review page and a stale proposal. Default: the
-  options recommended, as 5.13 has them; the mockups join `mockups/`
-  on the user's word.
+- **How work runs' place and look** (5.13). The user's to make, from
+  the mockups on the branch `configuring-mockups`; the option pages put
+  to the user are withdrawn. Default: 5.13 as drawn, until the user's
+  pages land.

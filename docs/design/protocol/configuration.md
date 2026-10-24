@@ -1139,11 +1139,11 @@ one owned forge, with its own values (setup.md, 8.1).
 - **A charter an application's setting names** (13.2). The forge's
   charter is a number in bytes jig never reads, so jig's check of
   references cannot hold it, and a change that removes that charter is
-  accepted. Default, asked of jig, in the configuring plan's M3 (jig's
-  hook for an application's kinds): an application's kind may declare
-  that its values name a charter, beside the bytes, and jig's one check
-  holds the reference as it holds a template's. Until then, the forge's
-  next change is held, saying its charter is not offered.
+  accepted. Default, asked of jig in the configuring plan's mission 2
+  (jig's hook for an application's kinds): an application's kind may
+  declare that its values name a charter, beside the bytes, and jig's
+  one check holds the reference as it holds a template's. Until then,
+  the forge's next change is held, saying its charter is not offered.
 - **Requirements an application fixes** (13.3). The landing rules'
   two requirements are in jig's rules, which the deployment's owners may
   change, so landing can be left unenforced by a change of rules.
