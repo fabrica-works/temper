@@ -150,7 +150,7 @@ fn github_tokens_use_the_installation_bound_instead_of_forgejos_bound() {
 fn repository_account_absence_is_distinct_from_a_full_width_account() {
     use skein_lib::Writer;
     // A generated schema fixture supplies unrelated fields; only account varies.
-    let bytes = include_bytes!("../../../crates/temper-protocol-worker-wire/golden/v1/record_repository_full.bin");
+    let bytes = include_bytes!("../../../crates/temper-protocol-worker-wire/golden/record_repository_full.bin");
     let original = v1::Repository::decode(&v1::CEILINGS, &mut Reader::new(bytes)).expect("schema fixture");
     for account in [None, Some(1_u64 << 53), Some(u64::MAX)] {
         let value =

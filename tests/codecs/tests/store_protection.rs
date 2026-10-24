@@ -24,7 +24,7 @@ fn protection_fields_have_v10_golden_bytes_and_round_trip() {
         let [answer, repository, application] = protection::rows(protection::rule(flags, bypass));
         let bytes = records::encode(&answer);
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../crates/temper-protocol-store/golden/v10")
+            .join("../../crates/temper-protocol-store/golden")
             .join(format!("protection-{name}.bin"));
         if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
             std::fs::write(&path, &bytes).expect("write protection golden");

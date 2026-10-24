@@ -143,8 +143,10 @@ section 7).
   `protocol/store.md`, 5.1). The schema's limits are made from the
   forge's limits, and checked against the schema's ceilings at start.
 - **`STORE_VERSION`,** temper's store version: one number for all of
-  temper's families. It moves when an encoding of temper's in the store
-  changes, by the rule temper's versions share (`README.md`, section 9).
+  temper's families. Until the first release it stays at its current
+  value while its schema, generated code and one set of golden bytes
+  change in place. It moves at a release, by the rule temper's versions
+  share (`README.md`, section 9; skein's `codec.md`, section 5).
   The routing gives it to jig's component, whose format row records it;
   a store written with another refuses to open, saying so (jig's
   `protocol/store.md`, 5.2 and 5.3).

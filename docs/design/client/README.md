@@ -1203,15 +1203,14 @@ for its kind, its user's login and its installations. Its nodes:
   (`Return`, section 8), 9 since connecting a GitHub App (`Connect`,
   `Install`, `ForgeRefusal`), 10 since the forges row's installations
   and last connect's end, 11 since GitHub's manifest (`Connect`'s
-  `GitHubManifest` and the row's `app`), moved as
-  `../protocol/README.md`, section 9 says: at most once in a plan, at
-  its first landing that changes one of these records, and shared by
-  plans that run at once. A request, an outcome, a read, a subject or a
+  `GitHubManifest` and the row's `app`). It stays at 11 until the first
+  release, as `../protocol/README.md`, section 9 says (skein's
+  `codec.md`, section 5). A request, an outcome, a read, a subject or a
   field added to the family (the FORGE requests of section 8, the
   picker's ids in `Adopt`, the forge's kind in the adopted outcome, the
-  demo's read, a change's panel) changes them, so it is such a move, never a
-  second version served beside the first. The engine serves exactly one
-  version (jig's `protocol/client.md`, section 9): a client of another
+  demo's read, a change's panel) changes its schema, generated code and
+  one set of golden bytes in place. The version moves at a release.
+  The engine serves exactly one version (jig's `protocol/client.md`, section 9): a client of another
   is out of date for the forge (4.4), and its kept adoption is dropped
   as kept work at start (6.6; jig's `protocol/client.md`, section 10).
 - **The request, `Requesting`:** which of the family's requests it is,
