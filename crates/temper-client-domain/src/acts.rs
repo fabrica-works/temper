@@ -29,7 +29,11 @@ pub fn offers(page: &ReadValue) -> &[Offered] {
         ReadValue::OwnerEscalation(v) => v.acts.as_slice(),
         ReadValue::PersonTask(v) => v.acts.as_slice(),
         ReadValue::OwnerPersonTask(v) => v.acts.as_slice(),
-        ReadValue::Tasks(_)
+        ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
+        | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Historical(_)
         | ReadValue::Me(_)
@@ -64,7 +68,11 @@ pub fn revision(page: &ReadValue) -> Option<contract::Revision> {
         },
         ReadValue::PersonTask(v) => Some(v.revision),
         ReadValue::OwnerPersonTask(v) => Some(v.revision),
-        ReadValue::Tasks(_)
+        ReadValue::Settings(_)
+        | ReadValue::Setting(_)
+        | ReadValue::Revision(_)
+        | ReadValue::Revisions(_)
+        | ReadValue::Tasks(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Historical(_)
         | ReadValue::Me(_)

@@ -307,6 +307,7 @@ fn call_of(argv: &[&str]) -> crate::jig::call::Call {
 }
 pub(crate) fn changed_delivery(mut delivery: c::Delivery) -> c::Delivery {
     match &mut delivery {
+        c::Delivery::Settings(_) => unreachable!("temper does not watch settings"),
         c::Delivery::Me(me) => me.needs_total = me.needs_total.checked_add(ONE_NEED).expect("new need"),
         c::Delivery::Inbox(inbox) => {
             inbox.entries = List::with_capacity(EMPTY);

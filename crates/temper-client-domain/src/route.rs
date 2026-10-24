@@ -119,6 +119,7 @@ pub(crate) fn route_client(
     while let Some(request) = child.pop() {
         match request {
             jig_client::Request::Told { told: value } => told(root, env, value, out),
+            jig_client::Request::Authorized(_) => unreachable!("temper starts no OpenID authorization"),
             request @ (jig_client::Request::Save { .. }
             | jig_client::Request::Erase { .. }
             | jig_client::Request::Exchange { .. }

@@ -290,6 +290,7 @@ fn populate_page(
                     out,
                 );
                 let delivery = match subject {
+                    Subject::Settings => unreachable!("temper does not watch settings"),
                     Subject::Me => Some(Delivery::Me(Box::new(jig_client_world::stories::frame(1)))),
                     Subject::Task { .. } => Some(Delivery::Task(Box::new(jig_client_world::stories::task()))),
                     Subject::Deployment => {
@@ -716,6 +717,9 @@ pub fn control_text() -> skein_ui::Tree {
 fn read_value(what: &contract::Read) -> Option<contract::ReadValue> {
     use contract::{Read, ReadValue};
     match what {
+        Read::Settings | Read::Setting(_) | Read::Revision(_) | Read::Revisions(_) => {
+            unreachable!("temper does not read settings")
+        }
         Read::Me => Some(ReadValue::Me(Box::new(jig_client_world::stories::frame(1)))),
         Read::Task { .. } => Some(ReadValue::Task(Box::new(jig_client_world::stories::task()))),
         Read::Project { .. } => Some(ReadValue::Project(Box::new(jig_client_world::stories::project()))),

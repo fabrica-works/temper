@@ -887,6 +887,7 @@ impl World {
             | people::Reply::SignedOut
             | people::Reply::Again(_)
             | people::Reply::Full { .. }
+            | people::Reply::Signer(_)
             | people::Reply::Refused(_)) => panic!("unscripted party reply: {other:?}"),
         };
         self.party.reply(to.raw(), reply);

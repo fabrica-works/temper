@@ -94,6 +94,7 @@ fn first_run_page(address: client::Address, landed: bool) -> skein_ui::Tree {
                     },
             } => {
                 let delivery = match subject {
+                    c::Subject::Settings => unreachable!("temper does not watch settings"),
                     c::Subject::Me => Some(c::Delivery::Me(Box::new(demo_me()))),
                     c::Subject::Task { task } => Some(c::Delivery::Task(Box::new(delegation_task(task, landed)))),
                     c::Subject::Accounts if landed => Some(c::Delivery::OwnerAccounts(Box::new(demo_accounts()))),

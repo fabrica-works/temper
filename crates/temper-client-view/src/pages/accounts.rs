@@ -188,6 +188,7 @@ pub(crate) fn unloaded(b: &mut Builder, w: &Words, at: c::OwnerAccountPlace, why
 }
 fn state(b: &mut Builder, w: &Words, source: &c::OwnerAccountSource) {
     match source.state {
+        c::OwnerAccountState::Moving => unreachable!("an account's move before temper routes it"),
         c::OwnerAccountState::Later { until } => {
             run(b, w, W::Limited);
             if let Some(at) = until {
@@ -284,6 +285,9 @@ fn named_end(b: &mut Builder, w: &Words, rows: &skein_lib::List<c::OwnerAccountL
 fn refused(b: &mut Builder, w: &Words, refusal: c::OwnerAccountRefusal) {
     use c::OwnerAccountRefusal as R;
     let word = match refusal {
+        R::NotSignedIn | R::NotOurs | R::Cancelled | R::Moving => {
+            unreachable!("an account's move before temper routes it")
+        }
         R::NotLimited => W::NotLimited,
         R::Uses => W::UsesRefused,
         R::NotKept { why } => match why {

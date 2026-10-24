@@ -34,6 +34,7 @@ impl<'a> Part<'a> {
     #[must_use]
     pub fn read(value: &'a ReadValue) -> Option<Self> {
         match value {
+            ReadValue::Settings(_) | ReadValue::Setting(_) | ReadValue::Revision(_) | ReadValue::Revisions(_) => None,
             ReadValue::Inbox(value) => Some(Self::InboxPage(value)),
             ReadValue::OwnerInbox(value) => Some(Self::OwnerInboxPage(value)),
             ReadValue::Tasks(value) => Some(Self::TaskPage(value)),
@@ -77,6 +78,7 @@ impl<'a> Part<'a> {
             Delivery::OwnerProject(_)
             | Delivery::OwnerProposal(_)
             | Delivery::Chips(_)
+            | Delivery::Settings(_)
             | Delivery::Deployment(_)
             | Delivery::OwnerDeployment(_)
             | Delivery::OwnerAccounts(_) => None,

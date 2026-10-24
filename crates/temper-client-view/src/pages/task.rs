@@ -879,6 +879,7 @@ pub(crate) fn plan(
             | c::Delivery::Tasks(_)
             | c::Delivery::Run(_)
             | c::Delivery::RunState(_)
+            | c::Delivery::Settings(_)
             | c::Delivery::Deployment(_)
             | c::Delivery::OwnerDeployment(_)
             | c::Delivery::OwnerAccounts(_),
@@ -945,6 +946,7 @@ impl<'a> EndedRows<'a> {
                 | c::Delivery::Tasks(_)
                 | c::Delivery::Run(_)
                 | c::Delivery::RunState(_)
+                | c::Delivery::Settings(_)
                 | c::Delivery::Deployment(_)
                 | c::Delivery::OwnerDeployment(_)
                 | c::Delivery::OwnerAccounts(_),

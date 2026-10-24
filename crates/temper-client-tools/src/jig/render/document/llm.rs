@@ -86,6 +86,7 @@ fn wait(value: c::TaskWaitWhy, out: &mut Encoder) {
 }
 fn source(value: c::TaskSourceState, out: &mut Encoder) {
     match value {
+        c::TaskSourceState::Moving => unreachable!("an account's move before temper routes it"),
         c::TaskSourceState::Asking => out.string(b"asking"),
         c::TaskSourceState::Granted => out.string(b"granted"),
         c::TaskSourceState::Refused => out.string(b"refused"),
@@ -148,6 +149,7 @@ fn optional_number(value: Option<u32>, out: &mut Text) {
 }
 fn source_text(value: c::TaskSourceState, out: &mut Text) {
     match value {
+        c::TaskSourceState::Moving => unreachable!("an account's move before temper routes it"),
         c::TaskSourceState::Later { until } => text_deadline(b"later until ", until, out),
         c::TaskSourceState::Limited { until } => text_deadline(b"limited until ", until, out),
         c::TaskSourceState::Asking => out.put(b"asking"),

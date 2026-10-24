@@ -1096,9 +1096,9 @@ fn key_values_reach_smith_at_their_bound_and_fit_the_workers_memory() {
     const SOURCE: u32 = 17;
     use jig_protocol_accounts::table::{Scheme, Value};
     use smith_host_domain as smith;
-    let key_bytes = jig_client_protocol_wire::v16::CEILINGS.keyed_value_some;
     let mut settings = fixtures::worker_settings();
     settings.jig.limits.token = 1;
+    let key_bytes = settings.jig.limits.token.min(jig_client_protocol_wire::v19::CEILINGS.keyed_value_some);
     let agent = fixtures::worker_agent();
     let limits = fixtures::worker_limits();
     let files = fixtures::worker_files();
