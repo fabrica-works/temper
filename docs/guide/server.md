@@ -216,6 +216,29 @@ temper.example.com {
 A redeploy starts temper from an empty store; Forgejo is kept unless
 you reset it too.
 
+**First, the families.** Until temper's first release, a family keeps
+its version number and its golden bytes change in place (skein's
+`docs/design/codec.md`, section 5): nothing an older build wrote is
+translated. Before a redeploy, list the families whose golden bytes
+differ between the running build's commit and the new one: in temper,
+and, for each of jig, skein and smith whose pin in `Cargo.lock` moved,
+in that repository between its two pins.
+
+```sh
+git diff --stat LIVE NEW -- ':(glob)crates/*/golden*/**'
+```
+
+- **The store's** need nothing: the store starts afresh at each
+  redeploy (step 4).
+- **The clients' and the workers' wires** move with the build: the page
+  is embedded in the binary, and the workers are redeployed from the
+  same one.
+- **The file `temper ctl export` writes** (section 10) is what crosses a
+  redeploy. If its family changed, the import after the start refuses
+  the old file, and an owner signs in to the account again from
+  **Accounts**. Let the refusal stand: an old file is never read as a
+  new one.
+
 1. **Build** at `main` (section 2), and remake both documents from the
    new commit's example (sections 3 and 7).
 2. **Stop** temper's and Forgejo's units on `engine`, and the worker
