@@ -11,9 +11,10 @@ use std::{fs, path::Path};
 #[must_use]
 pub fn llm(config: &Path) -> CtlLlm {
     let config = config.to_path_buf();
-    let [address] = super::free_addresses(&[]);
+    let peer = super::fake_llm(scripts());
+    let address = peer.address();
     CtlLlm {
-        peer: super::fake_llm_at(address, scripts()),
+        peer,
         on_link: Box::new(move || {
             // The box starts on empty directories. Only its generated agent's
             // endpoint moves, before any run: the template and demo stay shipped.

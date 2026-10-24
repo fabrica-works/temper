@@ -20,7 +20,7 @@ pub enum Face {
     /// Shipped issuer and Responses; no auxiliary model processes.
     Live,
     /// Skein's fake issuer and the existing TLS LLM peer playing the plan's scripts.
-    Fake { issuer: oauth::Peer, peer: skein_fake_peers::llm::Peer },
+    Fake { issuer: oauth::Peer, peer: super::llm::Listening },
 }
 
 /// Initialize three fresh private directories, then patch the config for the fakes.
@@ -166,7 +166,7 @@ impl Face {
             Self::Fake { issuer, peer } => FaceProcs {
                 issuer: world.spawn(|| Process::Issuer(Box::new(issuer))),
                 visitor: world.spawn(|| Process::Visitor(Box::default())),
-                peer: world.spawn(|| Process::Peer(Box::new(peer))),
+                peer: peer.spawn(world),
             },
         }
     }
@@ -1694,6 +1694,9 @@ pub fn run_live(
 ) -> Result<super::boxed::CtlOutcome<LiveEvidence>, String> {
     use skein_shell::{Clock, Host};
     use skein_world::end_to_end::{Binary, Command, Expectation, Mode};
+    if let Face::Fake { peer, .. } = &face {
+        peer.configure(&plan.paths[0]);
+    }
     let clock = Clock::new();
     let mut binary = Binary::start_with_tree(
         Command {

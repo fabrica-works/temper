@@ -21,6 +21,7 @@ pub mod forgejo;
 pub mod forgejo_sign_in;
 pub mod live;
 pub mod live_github;
+pub mod llm;
 pub mod person;
 pub mod program_login;
 pub mod relay;
@@ -188,29 +189,23 @@ fn serve_command(directory: &Path) -> Command {
     }
 }
 #[must_use]
-pub fn fake_llm(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
-    fake_llm_at((std::net::Ipv4Addr::LOCALHOST, 34_443).into(), scripts)
-}
-#[must_use]
-/// The fake LLM on a given loopback address, so that two tiers on one machine never share its port.
-pub fn fake_llm_at(
-    address: SocketAddr,
-    scripts: Box<[skein_fake_llm_domain::api::Script]>,
-) -> skein_fake_peers::llm::Peer {
+pub fn fake_llm(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> llm::Listening {
     // The account's API key routes to /v1/responses: the real loop's recipe, on the fixture endpoint's
     // TLS port. smith's configured peer keeps the Codex path, which refuses a key.
     let recipe = temper_real_loop_world::llm::scripted(scripts);
-    skein_fake_peers::llm::Peer::new(
-        address,
-        skein_fake_peers::Transport::Tls,
-        recipe.limits,
-        recipe.config,
-        recipe.credential,
-        recipe.protocol_limits,
-        recipe.domain,
-        recipe.domain_limits,
+    llm::Listening::new(
+        skein_fake_peers::llm::Peer::new(
+            (std::net::Ipv4Addr::LOCALHOST, 0).into(),
+            skein_fake_peers::Transport::Tls,
+            recipe.limits,
+            recipe.config,
+            recipe.credential,
+            recipe.protocol_limits,
+            recipe.domain,
+            recipe.domain_limits,
+        )
+        .expect("configured independent peer"),
     )
-    .expect("configured independent peer")
 }
 #[must_use]
 pub fn printed_link(stdout: &[u8]) -> Option<&[u8]> {
@@ -421,13 +416,11 @@ impl Referee<Process> for Judge {
         self.settled
     }
 }
-fn run_signal(
-    directory: &Path,
-    signal: Signal,
-    deadline: Duration,
-    peer: Option<skein_fake_peers::llm::Peer>,
-) -> Ended {
+fn run_signal(directory: &Path, signal: Signal, deadline: Duration, peer: Option<llm::Listening>) -> Ended {
     let clock = Clock::new();
+    if let Some(peer) = &peer {
+        peer.configure(directory);
+    }
     let mut binary = serve(directory);
     let streams = binary.take_streams().expect("binary pipes");
     let fds = streams.descriptors();
@@ -443,7 +436,7 @@ fn run_signal(
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || Process::Stdout(Box::new(StdoutReader::new(input, output))));
     if let Some(peer) = peer {
-        world.spawn(|| Process::Peer(Box::new(peer)));
+        peer.spawn(&mut world);
     }
     let outcome = world.run(&clock, deadline);
     assert!(outcome.procs.iter().all(Host::is_empty), "all real io settles");
@@ -593,12 +586,7 @@ impl Referee<Process> for ChatJudge<'_> {
     }
 }
 #[must_use]
-pub fn run(
-    directory: &Path,
-    script: person::Script,
-    peer: Option<skein_fake_peers::llm::Peer>,
-    deadline: Duration,
-) -> Seen {
+pub fn run(directory: &Path, script: person::Script, peer: Option<llm::Listening>, deadline: Duration) -> Seen {
     run_story(directory, script, peer, deadline, None, Ending::Stop)
 }
 /// Run the native person's script on the initialized box, including its demo setup.
@@ -631,7 +619,7 @@ pub fn raise_paces(directory: &Path) {
 pub fn run_until_landed(
     directory: &Path,
     script: person::Script,
-    peer: skein_fake_peers::llm::Peer,
+    peer: llm::Listening,
     forge: &forgejo::Throwaway,
 ) -> Seen {
     run_story(directory, script, Some(peer), LANDING, Some(forge), Ending::Crash)
@@ -639,12 +627,15 @@ pub fn run_until_landed(
 fn run_story(
     directory: &Path,
     script: person::Script,
-    peer: Option<skein_fake_peers::llm::Peer>,
+    peer: Option<llm::Listening>,
     deadline: Duration,
     forge: Option<&forgejo::Throwaway>,
     ending: Ending,
 ) -> Seen {
     let clock = Clock::new();
+    if let Some(peer) = &peer {
+        peer.configure(directory);
+    }
     let mut binary = match ending {
         Ending::Stop => serve(directory),
         Ending::Box => sign_in::start(directory),
@@ -674,7 +665,7 @@ fn run_story(
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || Process::Person(Box::new(person::Person::new(root, input, output, script))));
     if let Some(peer) = peer {
-        world.spawn(|| Process::Peer(Box::new(peer)));
+        peer.spawn(&mut world);
     }
     let outcome = world.run(&clock, deadline);
     assert!(outcome.procs.iter().all(Host::is_empty), "all real io settles");

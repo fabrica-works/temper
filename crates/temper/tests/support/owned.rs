@@ -516,7 +516,7 @@ impl Owned {
             forgejo: "127.0.0.1:3000".parse().expect("example Forgejo"),
             clients: "127.0.0.1:7100".parse().expect("example clients"),
             webhooks: "127.0.0.1:7101".parse().expect("example webhooks"),
-            llm: "127.0.0.1:34443".parse().expect("fake peer"),
+            llm: "127.0.0.1:0".parse().expect("fake peer"),
             forgejo_binary: "/opt/forgejo/forgejo".into(),
             runner_binary: "/opt/forgejo/forgejo-runner".into(),
             review: true,

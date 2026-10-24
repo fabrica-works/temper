@@ -47,7 +47,7 @@ pub fn configuration(directory: &Path) -> oauth::Peer {
 /// Point an initialized config directory at the issuer and the existing TLS fake.
 #[must_use]
 pub fn patch_configuration(directory: &Path) -> oauth::Peer {
-    let [address] = super::free_addresses(&["127.0.0.1:34443".parse().expect("LLM address")]);
+    let [address] = super::free_addresses(&[]);
     let origin = format!("http://{address}");
     let path = directory.join("temper.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("init document")).expect("JSON");
@@ -67,13 +67,13 @@ pub fn patch_configuration(directory: &Path) -> oauth::Peer {
     sign_in.as_object_mut().expect("registration").remove("server_name");
     sign_in.as_object_mut().expect("registration").remove("redirect_port");
     let registration = sign_in.clone();
-    value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":"127.0.0.1:34443"});
+    value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":"127.0.0.1:0"});
     value["engine"]["llm"]["endpoints"][0]["server_name"] = "skein.test".into();
     value["engine"]["llm"]["endpoints"][0]["trust"] = serde_json::json!(directory.join("root.der"));
     super::write_private(&path, &serde_json::to_vec(&value).expect("configuration JSON"));
     let agent_path = directory.join("agent.json");
     let mut agent: serde_json::Value = serde_json::from_slice(&fs::read(&agent_path).expect("agent")).expect("JSON");
-    agent["endpoints"][0]["address"] = "127.0.0.1:34443".into();
+    agent["endpoints"][0]["address"] = "127.0.0.1:0".into();
     agent["endpoints"][0]["server_name"] = "skein.test".into();
     agent["endpoints"][0]["trust_der"] = serde_json::json!(directory.join("root.der"));
     super::write_private(&agent_path, &serde_json::to_vec(&agent).expect("agent JSON"));
@@ -476,7 +476,7 @@ fn reasoning_allowance(directory: &Path) -> u64 {
         .expect("reasoning allowance")
 }
 
-fn answer_peer(allowance: u64, exceeded: bool) -> skein_fake_peers::llm::Peer {
+fn answer_peer(allowance: u64, exceeded: bool) -> super::llm::Listening {
     use skein_fake_llm_domain::api::{Finish, Line, Turn};
     // The chat is ended by its requester (domain/agent.md, 4.6): its answer is the
     // turn's text, and the finish only ends the turn.
@@ -508,14 +508,7 @@ fn answer_peer(allowance: u64, exceeded: bool) -> skein_fake_peers::llm::Peer {
 
 /// The existing TLS peer, with the plan bearer and room for the largest scripted item.
 #[must_use]
-pub(super) fn plan_peer(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> skein_fake_peers::llm::Peer {
-    plan_peer_at("127.0.0.1:34443".parse().expect("fake LLM address"), scripts)
-}
-
-pub(super) fn plan_peer_at(
-    address: std::net::SocketAddr,
-    scripts: Box<[skein_fake_llm_domain::api::Script]>,
-) -> skein_fake_peers::llm::Peer {
+pub(super) fn plan_peer(scripts: Box<[skein_fake_llm_domain::api::Script]>) -> super::llm::Listening {
     use skein_fake_llm_domain::api::Line;
     let largest = scripts
         .iter()
@@ -537,17 +530,19 @@ pub(super) fn plan_peer_at(
     // the request line and headers exceed 4096; the next power of two is 8192.
     recipe.protocol_limits.http.head = 8192;
     recipe.credential = skein_llm::Credential::bearer(ACCESS.as_ref().into());
-    skein_fake_peers::llm::Peer::new(
-        address,
-        Transport::Tls,
-        recipe.limits,
-        recipe.config,
-        recipe.credential,
-        recipe.protocol_limits,
-        recipe.domain,
-        recipe.domain_limits,
+    super::llm::Listening::new(
+        skein_fake_peers::llm::Peer::new(
+            (std::net::Ipv4Addr::LOCALHOST, 0).into(),
+            Transport::Tls,
+            recipe.limits,
+            recipe.config,
+            recipe.credential,
+            recipe.protocol_limits,
+            recipe.domain,
+            recipe.domain_limits,
+        )
+        .expect("fake LLM peer"),
     )
-    .expect("fake LLM peer")
 }
 
 pub fn answered(directory: &Path, issuer: oauth::Peer) {
@@ -576,6 +571,7 @@ fn exceeded_hold(ended: &super::Ended, allowance: u64) -> u64 {
 fn plan_chat(directory: &Path, issuer: oauth::Peer, exceeded: bool) {
     let allowance = reasoning_allowance(directory);
     let peer = answer_peer(allowance, exceeded);
+    peer.configure(directory);
     let clock = Clock::new();
     let mut binary = start(directory);
     let streams = binary.take_streams().expect("serve pipes");

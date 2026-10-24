@@ -510,7 +510,7 @@ pub fn run_ctl_with_exits<T>(
 }
 /// An independent fake and a fixture hook after the box has written its files.
 pub struct CtlLlm {
-    pub peer: skein_fake_peers::llm::Peer,
+    pub peer: super::llm::Listening,
     pub on_link: Box<dyn FnOnce()>,
 }
 struct CtlPeers {
@@ -582,6 +582,10 @@ fn run_ctl_peers<T>(
         }
         CtlModel::None => (None, None, None, None),
     };
+    if let Some(super::forge_land::Face::Fake { peer, .. }) = &face {
+        let config = flags.windows(2).find(|pair| pair[0] == "--config").expect("explicit config directory");
+        peer.configure(Path::new(&config[1]));
+    }
     let clock = Clock::new();
     let mut binary = Binary::start_with_tree(
         Command {
@@ -633,7 +637,7 @@ fn run_ctl_peers<T>(
     let face_procs = face.map(|face| face.spawn(&mut world));
 
     if let Some(peer) = peer {
-        world.spawn(|| Process::Peer(Box::new(peer)));
+        peer.spawn(&mut world);
     }
     let ended = world.run(&clock, deadline);
     assert!(ended.procs.iter().all(Host::is_empty), "box, ctl and peer io settles");

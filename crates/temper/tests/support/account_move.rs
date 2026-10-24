@@ -8,7 +8,7 @@ use skein_world::{Referee, real};
 use std::{
     fs,
     io::{Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
+    net::{SocketAddr, TcpStream},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     sync::mpsc,
@@ -339,9 +339,15 @@ fn rotation() -> skein_fake_oauth::Plan {
 }
 
 pub fn run(directory: &Path) {
-    // Hold the draw while configurations choose the issuer's address too.
-    let listener = TcpListener::bind("127.0.0.1:0").expect("story's LLM port");
-    let llm = listener.local_addr().expect("LLM address");
+    let peer = sign_in::plan_peer(Box::new([skein_fake_llm_domain::api::Script {
+        cue: Box::default(),
+        turns: Box::new([skein_fake_llm_domain::api::Turn {
+            lines: Box::new([skein_fake_llm_domain::api::Line::Text { text: super::ANSWER.into() }]),
+            finish: skein_fake_llm_domain::api::Finish::Stop,
+            tokens: 1,
+        }]),
+    }]));
+    let llm = peer.address();
     let a = directory.join("a");
     let b = directory.join("b");
     for deployment in [&a, &b] {
@@ -364,18 +370,6 @@ pub fn run(directory: &Path) {
     for _ in 0..2 {
         issuer.queue(rotation()).expect("rotation plan");
     }
-    let peer = sign_in::plan_peer_at(
-        llm,
-        Box::new([skein_fake_llm_domain::api::Script {
-            cue: Box::default(),
-            turns: Box::new([skein_fake_llm_domain::api::Turn {
-                lines: Box::new([skein_fake_llm_domain::api::Line::Text { text: super::ANSWER.into() }]),
-                finish: skein_fake_llm_domain::api::Finish::Stop,
-                tokens: 1,
-            }]),
-        }]),
-    );
-    drop(listener);
     std::thread::scope(|scope| {
         let (stop, receiver) = mpsc::channel();
         let (ready, listening) = mpsc::channel();
@@ -388,7 +382,7 @@ pub fn run(directory: &Path) {
                 wake: clock.now().now,
             });
             world.spawn(|| Process::Issuer(Box::new(issuer)));
-            world.spawn(|| Process::Peer(Box::new(peer)));
+            peer.spawn(&mut world);
             ready.send(()).expect("peer world ready");
             let outcome = world.run(&clock, WITHIN);
             assert!(outcome.procs.iter().all(Host::is_empty), "peer io drained");
