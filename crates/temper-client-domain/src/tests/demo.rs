@@ -623,6 +623,8 @@ fn forge_document(connected: bool) -> jig_client::Family {
             w::ForgeRow::new(
                 &w::CEILINGS,
                 w::ForgeRowParts {
+                    admin: false,
+                    ended_stop: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,

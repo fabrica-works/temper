@@ -280,6 +280,11 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 .ok()?;
         }
         rows.push(Row {
+            admin: row.admin,
+            ended_stop: match row.ended_stop {
+                Some(stop) => Some(admin_stop(stop)),
+                None => None,
+            },
             web: row.web,
             repositories: repositories.into_boxed(),
             app: match row.app {
@@ -323,6 +328,7 @@ fn first_from(first: w::FirstRepository) -> forge::forges::First {
     use forge::forges::{CreateStep, First, FirstState, SetUpProject};
     let first = first.into_parts();
     First {
+        label: first.label,
         org: first.org,
         repository: first.repository,
         project: match first.project {
@@ -373,4 +379,27 @@ pub fn page(value: w::Page) -> Page {
         .expect("decoded page bound");
     }
     Page { rows: rows.into_boxed(), more: value.more }
+}
+
+fn admin_stop(stop: w::AdminStop) -> forge::forges::AdminStop {
+    use forge::forges::{AdminStop, SetupStage};
+    match stop {
+        w::AdminStop::NotAdmin => AdminStop::NotAdmin,
+        w::AdminStop::Unmarked => AdminStop::Unmarked,
+        w::AdminStop::Other => AdminStop::Other,
+        w::AdminStop::Refused(refused) => AdminStop::Refused {
+            status: refused.status(),
+            stage: match refused.stage() {
+                w::SetupStage::Admin => SetupStage::Admin,
+                w::SetupStage::Bot => SetupStage::Bot,
+                w::SetupStage::Token => SetupStage::Token,
+                w::SetupStage::Org => SetupStage::Org,
+                w::SetupStage::Repository => SetupStage::Repository,
+                w::SetupStage::File => SetupStage::File,
+                w::SetupStage::App => SetupStage::App,
+                w::SetupStage::Installation => SetupStage::Installation,
+                w::SetupStage::State => SetupStage::State,
+            },
+        },
+    }
 }

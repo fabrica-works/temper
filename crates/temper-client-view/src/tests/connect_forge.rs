@@ -17,6 +17,8 @@ pub(super) fn row(
     w::ForgeRow::new(
         &w::CEILINGS,
         w::ForgeRowParts {
+            admin: false,
+            ended_stop: None,
             web: None,
             repositories: List::with_capacity(0),
             app: None,
@@ -487,6 +489,7 @@ pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> Lis
     let first = w::FirstRepository::new(
         &w::CEILINGS,
         w::FirstRepositoryParts {
+            label: Box::from(b"temper-host".as_slice()),
             org: b"work".as_slice().into(),
             repository: b"hello".as_slice().into(),
             project: w::SetUpProject::Existing(
@@ -501,6 +504,8 @@ pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> Lis
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                admin: false,
+                ended_stop: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,

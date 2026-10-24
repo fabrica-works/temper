@@ -231,6 +231,8 @@ fn each_forge_refusal_is_said_in_forge_md_words() {
 
 fn github_row() -> forge::forges::Row {
     forge::forges::Row {
+        admin: false,
+        ended_stop: None,
         web: None,
         repositories: Box::new([]),
         app: None,

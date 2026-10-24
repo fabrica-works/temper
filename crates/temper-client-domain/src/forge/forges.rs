@@ -60,8 +60,28 @@ pub enum FirstState {
     Made { id: u64 },
     Failed { step: CreateStep },
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SetupStage {
+    Admin,
+    Bot,
+    Token,
+    Org,
+    Repository,
+    File,
+    App,
+    Installation,
+    State,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdminStop {
+    NotAdmin,
+    Refused { status: u16, stage: SetupStage },
+    Unmarked,
+    Other,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct First {
+    pub label: Box<[u8]>,
     pub org: Box<[u8]>,
     pub repository: Box<[u8]>,
     pub project: SetUpProject,
@@ -93,6 +113,8 @@ pub struct Adoption {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
+    pub admin: bool,
+    pub ended_stop: Option<AdminStop>,
     pub web: Option<Box<[u8]>>,
     pub repositories: Box<[Adoption]>,
     pub app: Option<AppWay>,

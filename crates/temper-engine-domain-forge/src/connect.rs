@@ -216,6 +216,7 @@ fn admin(
                 .insert(
                     forge,
                     crate::First {
+                        label: first.label.clone(),
                         org: first.org.clone(),
                         repository: first.repository.clone(),
                         project: first.project.clone(),
@@ -268,7 +269,7 @@ pub(crate) fn installed(
         {
             d.connect.running.remove(&forge);
             if let Some(why) = stopped {
-                stopped_end(d, forge, &why, out);
+                stopped_end(d, forge, &why, None, out);
             }
         }
         d.connect.answer(request, token, Answered::Install(answer), out);
@@ -280,6 +281,7 @@ pub(crate) fn ended(
     request: Token,
     connected: bool,
     why: Option<Box<[u8]>>,
+    stop: Option<crate::AdminStop>,
     out: &mut Queue<Request>,
 ) {
     if let Some((held, _)) = d.connect.running.get(&forge)
@@ -298,7 +300,7 @@ pub(crate) fn ended(
         }
         if !connected {
             if let Some(why) = why {
-                stopped_end(d, forge, &why, out);
+                stopped_end(d, forge, &why, if admin { stop } else { None }, out);
             }
             let kept = match d.connections.get(&forge) {
                 Some((_, kept)) => *kept,
@@ -312,7 +314,7 @@ pub(crate) fn ended(
 }
 
 /// Volatile per-forge diagnostics, bounded in bytes without splitting UTF-8 (client/forge.md, 5.4).
-fn stopped_end(d: &mut Domain, forge: u16, why: &[u8], out: &mut Queue<Request>) {
+fn stopped_end(d: &mut Domain, forge: u16, why: &[u8], stop: Option<crate::AdminStop>, out: &mut Queue<Request>) {
     // The host supplies UTF-8. Back over continuation bytes at the cut;
     // text validation belongs to the protocol boundary.
     let mut end = why.len().min(crate::CONNECT_WHY_BYTES);
@@ -323,7 +325,9 @@ fn stopped_end(d: &mut Domain, forge: u16, why: &[u8], out: &mut Queue<Request>)
         }
         end = end.saturating_sub(1);
     }
-    d.ended.insert(forge, Box::from(why.get(..end).expect("bounded reason prefix"))).expect("configured forge ends");
+    d.ended
+        .insert(forge, (Box::from(why.get(..end).expect("bounded reason prefix")), stop))
+        .expect("configured forge ends");
     out.push(Request::MarkedForges);
 }
 

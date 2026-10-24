@@ -996,6 +996,8 @@ impl Joint {
                 w::ForgeRow::new(
                     &w::CEILINGS,
                     w::ForgeRowParts {
+                        admin: false,
+                        ended_stop: None,
                         web: None,
                         repositories: skein_lib::List::with_capacity(0),
                         app: None,

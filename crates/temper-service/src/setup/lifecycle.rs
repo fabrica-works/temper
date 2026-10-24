@@ -389,6 +389,7 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
     finish(engine, token, root::SetupEnd::Done { forge, outcome });
 }
 pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure: reconcile::Failure) {
+    super::public::stopped(engine, token, &failure);
     let run = engine.setup.runs.get(&token).expect("stopped setup run");
     if crate::forge::ended(engine, run.forge) {
         let forge = run.forge;

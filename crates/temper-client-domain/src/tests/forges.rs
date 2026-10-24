@@ -180,6 +180,8 @@ fn every_connection_decodes_into_the_forges_words() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        admin: false,
+                        ended_stop: None,
                         web: Some(b"https://forge.example".as_slice().into()),
                         repositories: {
                             let mut adopted = List::with_capacity(1);
@@ -213,6 +215,8 @@ fn every_connection_decodes_into_the_forges_words() {
             )
             .unwrap();
         let row = Row {
+            admin: false,
+            ended_stop: None,
             web: Some(b"https://forge.example".as_slice().into()),
             repositories: Box::new([forge::forges::Adoption {
                 owner: b"acme".as_slice().into(),
@@ -247,6 +251,8 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
+        admin: false,
+        ended_stop: None,
         web: None,
         repositories: Box::new([]),
         app: None,
@@ -299,6 +305,8 @@ fn an_out_of_order_document_is_refused() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        admin: false,
+                        ended_stop: None,
                         web: None,
                         repositories: List::with_capacity(0),
                         app: None,
@@ -388,6 +396,7 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
             let first = w::FirstRepository::new(
                 &limits(),
                 w::FirstRepositoryParts {
+                    label: Box::from(b"docker_1.x-y".as_slice()),
                     org: b"team".as_slice().into(),
                     repository: b"widget".as_slice().into(),
                     project,
@@ -401,6 +410,8 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     w::ForgeRow::new(
                         &limits(),
                         w::ForgeRowParts {
+                            admin: false,
+                            ended_stop: None,
                             web: None,
                             repositories: List::with_capacity(0),
                             app: None,
@@ -425,6 +436,7 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
             assert_eq!(
                 rows(&record, &fixtures::limits().forge).unwrap()[0].first,
                 Some(First {
+                    label: Box::from(b"docker_1.x-y".as_slice()),
                     org: b"team".as_slice().into(),
                     repository: b"widget".as_slice().into(),
                     project: if new { SetUpProject::New(b"Next".as_slice().into()) } else { SetUpProject::Existing(7) },
@@ -479,6 +491,8 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    admin: false,
+                    ended_stop: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,
@@ -516,4 +530,54 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
         ]
     );
     assert_eq!(rows[0].ended.as_deref(), Some(b"the pasted value changed".as_slice()));
+}
+
+#[test]
+fn admin_form_and_typed_stops_survive_client_decode() {
+    use forge::forges::{AdminStop, SetupStage};
+    let limits = limits();
+    for (stop, expected) in [
+        (None, None),
+        (Some(w::AdminStop::NotAdmin), Some(AdminStop::NotAdmin)),
+        (Some(w::AdminStop::Unmarked), Some(AdminStop::Unmarked)),
+        (Some(w::AdminStop::Other), Some(AdminStop::Other)),
+        (
+            Some(w::AdminStop::Refused(
+                w::AdminRefused::new(&limits, w::AdminRefusedParts { status: 403, stage: w::SetupStage::Repository })
+                    .unwrap(),
+            )),
+            Some(AdminStop::Refused { status: 403, stage: SetupStage::Repository }),
+        ),
+    ] {
+        for admin in [false, true] {
+            let mut forges = List::with_capacity(1);
+            forges
+                .push(
+                    w::ForgeRow::new(
+                        &limits,
+                        w::ForgeRowParts {
+                            admin,
+                            ended_stop: stop.clone(),
+                            web: None,
+                            repositories: List::with_capacity(0),
+                            app: None,
+                            number: 1,
+                            kind: w::Kind::Forgejo,
+                            mode: w::Mode::Managed,
+                            connection: w::Connection::NotConnected,
+                            offer: w::Offer::NotOffered,
+                            first: None,
+                            installations: List::with_capacity(0),
+                            ended: None,
+                        },
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            let bytes = wire::forges(&w::Forges::new(&limits, w::ForgesParts { forges }).unwrap());
+            let rows = family::forges(&bytes, &limits).unwrap();
+            assert_eq!(rows[0].admin, admin);
+            assert_eq!(rows[0].ended_stop, expected);
+        }
+    }
 }

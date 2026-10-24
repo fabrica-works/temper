@@ -728,7 +728,12 @@ fn paste_row(limits: &domain::Limits, request: Token, connected: bool, why: Opti
         &mut out,
     );
     while out.pop().is_some() {}
-    domain::step(&mut forge, &env, domain::Event::ConnectEnded { forge: 1, request, connected, why }, &mut out);
+    domain::step(
+        &mut forge,
+        &env,
+        domain::Event::ConnectEnded { stop: None, forge: 1, request, connected, why },
+        &mut out,
+    );
     forge.forges()
 }
 #[expect(clippy::wildcard_enum_match_arm, reason = "test rejects all unrelated forge events")]
@@ -744,7 +749,7 @@ fn paste_ended(service: &mut crate::Service, connected: bool, pem: &[u8]) -> Opt
         assert!(!contains(text.as_bytes(), pem));
         if let root::Event::Forge(event) = event {
             match *event {
-                domain::Event::ConnectEnded { why, forge: 1, request, connected: actual } => {
+                domain::Event::ConnectEnded { stop: None, why, forge: 1, request, connected: actual } => {
                     assert_eq!((request, actual), (Token::new(90), connected));
                     let rows = paste_row(&engine.env.limits.forge, request, actual, why.clone());
                     assert_eq!(rows.rows[0].ended, why);

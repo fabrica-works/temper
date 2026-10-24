@@ -55,6 +55,7 @@ fn first(state: v1::FirstState) -> v1::FirstRepository {
     v1::FirstRepository::new(
         &v1::CEILINGS,
         v1::FirstRepositoryParts {
+            label: Box::from(b"temper-host".as_slice()),
             org: b"work".as_slice().into(),
             repository: b"hello".as_slice().into(),
             project: project(),
@@ -119,6 +120,8 @@ fn setup_and_every_first_repository_state_round_trip_at_version_eleven() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
+                admin: false,
+                ended_stop: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,
@@ -178,6 +181,7 @@ fn first_repository_names_are_bounded_at_construction_and_decode() {
         }
         for field in 0..2 {
             let parts = v1::FirstRepositoryParts {
+                label: Box::from(b"temper-host".as_slice()),
                 org: if field == 0 { name.clone() } else { b"o".as_slice().into() },
                 repository: if field == 1 { name.clone() } else { b"r".as_slice().into() },
                 project: project(),
@@ -209,6 +213,7 @@ fn first_repository_names_are_bounded_at_construction_and_decode() {
             };
             assert_eq!(v1::SetUp::new(&v1::CEILINGS, parts).is_ok(), size == 1024);
             let parts = v1::FirstRepositoryParts {
+                label: Box::from(b"temper-host".as_slice()),
                 org: if org { name.clone() } else { b"o".as_slice().into() },
                 repository: if org { b"r".as_slice().into() } else { name.clone() },
                 project: project(),

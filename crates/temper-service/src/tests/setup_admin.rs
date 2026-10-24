@@ -212,6 +212,8 @@ fn admin_paste_reconciles_creates_with_its_label_then_keeps_and_restarts_from_re
         })
     );
     assert_eq!(engine.domain.forges().rows[0].first.as_ref().unwrap().state, domain::FirstState::Made { id: 1 });
+    assert!(engine.domain.forges().rows[0].admin);
+    assert_eq!(engine.domain.forges().rows[0].first.as_ref().unwrap().label.as_ref(), b"docker_1.x-y");
     let head = forge.git.branch(b"work/hello", b"main").unwrap();
     let object = forge.git.object(head).unwrap();
     assert!(contains(object.tree.get(temper_forge_setup::STARTER_PATH).unwrap(), b"runs-on: docker_1.x-y\n"));
@@ -272,6 +274,10 @@ fn refused_admin_token_erases_without_keeping_it() {
     ask(&mut service, bundle(1, ADMIN), None);
     settle(&mut service, &mut forge);
     erased(&mut service, false);
+    assert_eq!(
+        service.engine.as_ref().unwrap().domain.forges().rows[0].ended_stop,
+        Some(domain::AdminStop::Refused { status: 401, stage: domain::SetupStage::Admin })
+    );
     assert!(contains(
         service.engine.as_ref().unwrap().domain.forges().rows[0].ended.as_ref().unwrap(),
         b"Refused(401)"
@@ -284,6 +290,7 @@ fn not_admin_erases_without_keeping_the_token() {
     ask(&mut service, bundle(1, ADMIN), None);
     settle(&mut service, &mut forge);
     erased(&mut service, false);
+    assert_eq!(service.engine.as_ref().unwrap().domain.forges().rows[0].ended_stop, Some(domain::AdminStop::NotAdmin));
     assert!(contains(service.engine.as_ref().unwrap().domain.forges().rows[0].ended.as_ref().unwrap(), b"NotAdmin"));
 }
 #[test]
@@ -293,6 +300,7 @@ fn unmarked_bot_erases_without_keeping_the_token() {
     ask(&mut service, bundle(1, ADMIN), None);
     settle(&mut service, &mut forge);
     erased(&mut service, false);
+    assert_eq!(service.engine.as_ref().unwrap().domain.forges().rows[0].ended_stop, Some(domain::AdminStop::Unmarked));
     assert!(contains(service.engine.as_ref().unwrap().domain.forges().rows[0].ended.as_ref().unwrap(), b"Unmarked"));
 }
 #[test]
@@ -303,6 +311,10 @@ fn create_file_stop_marks_first_failed_and_erases_without_keeping_the_token() {
     ask(&mut service, bundle(1, ADMIN), Some(first(b"docker")));
     settle(&mut service, &mut forge);
     erased(&mut service, false);
+    assert_eq!(
+        service.engine.as_ref().unwrap().domain.forges().rows[0].ended_stop,
+        Some(domain::AdminStop::Refused { status: 413, stage: domain::SetupStage::File })
+    );
     assert_eq!(
         service.engine.as_ref().unwrap().domain.forges().rows[0].first.as_ref().unwrap().state,
         domain::FirstState::Failed { step: domain::CreateStep::File }
@@ -689,4 +701,29 @@ fn string_managed_serves_no_listener_even_when_owned_forges_have_webhooks() {
     assert!(given.org_owner.is_none());
     assert!(!engine.setup.waiting_for_webhooks);
     assert!(!engine.setup.lifecycle.local(1).unwrap().webhooks);
+}
+
+#[test]
+fn admin_scope_refusals_reach_the_row_at_the_failed_stage() {
+    for (scopes, missing_bot, stage) in [
+        (b"read:issue".as_slice(), false, domain::SetupStage::Admin),
+        (b"read:user".as_slice(), true, domain::SetupStage::Bot),
+    ] {
+        let mut forge = forge(true, true, false);
+        let setup = forge.service.setup_mut();
+        setup.revoke(ADMIN);
+        let user = setup.find(b"elsewhere-owner").unwrap().id;
+        setup.token(user, b"limited", &[scopes], Secret::new(ADMIN.into()));
+        let mut service = service(&forge);
+        if missing_bot {
+            forge.service.setup_mut().delete_account(b"temper");
+        }
+        ask(&mut service, bundle(1, ADMIN), None);
+        settle(&mut service, &mut forge);
+        erased(&mut service, false);
+        assert_eq!(
+            service.engine.as_ref().unwrap().domain.forges().rows[0].ended_stop,
+            Some(domain::AdminStop::Refused { status: 403, stage })
+        );
+    }
 }

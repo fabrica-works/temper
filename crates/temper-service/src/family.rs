@@ -714,6 +714,11 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                 w::ForgeRow::new(
                     limits,
                     w::ForgeRowParts {
+                        admin: row.admin,
+                        ended_stop: match row.ended_stop {
+                            Some(stop) => Some(admin_stop(stop, limits)?),
+                            None => None,
+                        },
                         web: row.web,
                         repositories,
                         app: match row.app {
@@ -812,7 +817,7 @@ fn first_repository(first: forge::First, limits: &w::Limits) -> Option<w::FirstR
     };
     w::FirstRepository::new(
         limits,
-        w::FirstRepositoryParts { org: first.org, repository: first.repository, project, state },
+        w::FirstRepositoryParts { org: first.org, repository: first.repository, project, state, label: first.label },
     )
     .ok()
 }
@@ -835,4 +840,32 @@ pub(crate) fn return_path(path: &[u8]) -> bool {
         }
     }
     true
+}
+
+fn admin_stop(stop: forge::AdminStop, limits: &w::Limits) -> Option<w::AdminStop> {
+    Some(match stop {
+        forge::AdminStop::NotAdmin => w::AdminStop::NotAdmin,
+        forge::AdminStop::Unmarked => w::AdminStop::Unmarked,
+        forge::AdminStop::Other => w::AdminStop::Other,
+        forge::AdminStop::Refused { status, stage } => w::AdminStop::Refused(
+            w::AdminRefused::new(
+                limits,
+                w::AdminRefusedParts {
+                    status,
+                    stage: match stage {
+                        forge::SetupStage::Admin => w::SetupStage::Admin,
+                        forge::SetupStage::Bot => w::SetupStage::Bot,
+                        forge::SetupStage::Token => w::SetupStage::Token,
+                        forge::SetupStage::Org => w::SetupStage::Org,
+                        forge::SetupStage::Repository => w::SetupStage::Repository,
+                        forge::SetupStage::File => w::SetupStage::File,
+                        forge::SetupStage::App => w::SetupStage::App,
+                        forge::SetupStage::Installation => w::SetupStage::Installation,
+                        forge::SetupStage::State => w::SetupStage::State,
+                    },
+                },
+            )
+            .ok()?,
+        ),
+    })
 }

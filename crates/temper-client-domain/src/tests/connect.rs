@@ -14,6 +14,8 @@ use temper_client_protocol_wire::{self as wire, v1 as w};
 const HERE: u16 = 3;
 fn row(number: u16, kind: Kind, mode: Mode, connection: C, offer: Offer) -> Row {
     Row {
+        admin: false,
+        ended_stop: None,
         web: None,
         repositories: Box::new([]),
         app: None,
@@ -418,6 +420,7 @@ fn reply(root: &mut crate::Domain, attempt: Token, outcome: w::Outcome) -> Queue
 }
 fn first(state: forges::FirstState) -> forges::First {
     forges::First {
+        label: Box::from(b"temper-host".as_slice()),
         org: b"work".as_slice().into(),
         repository: b"hello".as_slice().into(),
         project: forges::SetUpProject::Existing(1),
@@ -438,6 +441,7 @@ fn deliver_first(
     let first = w::FirstRepository::new(
         &w::CEILINGS,
         w::FirstRepositoryParts {
+            label: Box::from(b"temper-host".as_slice()),
             org: b"work".as_slice().into(),
             repository: b"hello".as_slice().into(),
             project: w::SetUpProject::Existing(
@@ -460,6 +464,8 @@ fn deliver_first_record(
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                admin: false,
+                ended_stop: None,
                 web: None,
                 repositories: List::with_capacity(0),
                 app: None,
@@ -700,6 +706,7 @@ fn set_up_again_on_another_client_uses_the_rows_fields() {
     let value = w::FirstRepository::new(
         &w::CEILINGS,
         w::FirstRepositoryParts {
+            label: Box::from(b"temper-host".as_slice()),
             org: b"team".as_slice().into(),
             repository: b"widget".as_slice().into(),
             project: w::SetUpProject::Existing(
@@ -968,6 +975,8 @@ fn deliver_picker(root: &mut crate::Domain, watch: Token, changed: bool) -> Queu
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                admin: false,
+                ended_stop: None,
                 number: 2,
                 kind: w::Kind::Github,
                 mode: w::Mode::Connected,

@@ -110,7 +110,7 @@ pub struct Domain {
     pub(crate) demo_answers: Map<Token, crate::StartAnswer>,
     pub(crate) connections: Map<u16, (crate::Connection, Option<(Token, crate::SetUpAnswer)>)>,
     pub(crate) first: Map<u16, crate::First>,
-    pub(crate) ended: Map<u16, Box<[u8]>>,
+    pub(crate) ended: Map<u16, (Box<[u8]>, Option<crate::AdminStop>)>,
     pub(crate) apps: Map<u16, crate::AppWay>,
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,
     setup_pending: Map<Token, Token>,
@@ -228,6 +228,10 @@ impl Domain {
                         .expect("bounded adopted repositories");
                 }
             }
+            let (ended, ended_stop) = match self.ended.get(forge) {
+                Some((why, stop)) => (Some(why.clone()), *stop),
+                None => (None, None),
+            };
             rows.push(crate::Row {
                 web: config.web.clone(),
                 repositories: repositories.into_boxed(),
@@ -238,7 +242,9 @@ impl Domain {
                 offer: self.offer(*forge),
                 first: self.first.get(forge).cloned(),
                 installations: installations.into_boxed(),
-                ended: self.ended.get(forge).cloned(),
+                ended,
+                ended_stop,
+                admin: config.admin_connect,
                 app: match self.connection(*forge) {
                     crate::Connection::Connected { .. } if config.kind == crate::Kind::GitHub => {
                         self.apps.get(forge).copied()
@@ -1014,8 +1020,8 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
         Event::InstallAnswered { forge, request, answer, stopped } => {
             crate::connect::installed(d, forge, request, answer, stopped, out);
         }
-        Event::ConnectEnded { forge, request, connected, why } => {
-            crate::connect::ended(d, forge, request, connected, why, out);
+        Event::ConnectEnded { forge, request, connected, why, stop } => {
+            crate::connect::ended(d, forge, request, connected, why, stop, out);
         }
         Event::SetUpAnswered { forge, request, answer } => {
             if d.demo_pending.contains_key(&request) {
@@ -1136,6 +1142,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                                 .insert(
                                     forge,
                                     crate::First {
+                                        label: Box::from(b"temper-host".as_slice()),
                                         org: org.clone(),
                                         repository: repository.clone(),
                                         project,

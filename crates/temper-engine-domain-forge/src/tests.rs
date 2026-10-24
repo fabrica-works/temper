@@ -1168,6 +1168,8 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
     Row {
+        admin: false,
+        ended_stop: None,
         web: None,
         repositories: Box::new([]),
         app: None,
@@ -1650,6 +1652,7 @@ fn admitted_setup_projects_its_fields_as_making_and_the_next_admission_replaces_
         let request = Token::new(number);
         let token = Token::new(number + 1);
         let first = First {
+            label: Box::from(b"temper-host".as_slice()),
             org: org.into(),
             repository: repository.into(),
             project: SetUpProject::Existing(project),
