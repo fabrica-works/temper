@@ -29,7 +29,7 @@ impl Operation {
         let (word, task): (&[u8], Option<u64>) = match ask {
             Ask::Family { .. } => (b"adopt", None),
             Ask::Jig(ask) => match ask.as_ref() {
-                c::Ask::ChangeSettings(_) => unreachable!("the tools do not request settings"),
+                c::Ask::ChangeSettings(_) => (b"change-settings", None),
                 c::Ask::Create { .. } | c::Ask::Propose { action: c::ProposeAction::Batch { .. }, .. } => {
                     (b"chat", None)
                 }
@@ -252,10 +252,14 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
         )) => {
             sign_out(operation, *confirmed, failed_hosts, me, limits, out);
         }
+        c::Answer::Done(c::Outcome::SettingsChanged(changed)) => {
+            out.put(b"revision ");
+            out.number(u64::from(changed.revision));
+        }
         c::Answer::Done(done) => {
             out.put(b"done: ");
             let task = match done {
-                c::Outcome::SettingsChanged(_) => unreachable!("the tools do not request settings"),
+                c::Outcome::SettingsChanged(_) => unreachable!("settings answer handled above"),
                 c::Outcome::Made { what: c::Made::Tasks { tasks } } => tasks.get(0).copied(),
                 c::Outcome::Owner(c::OwnerOutcome::Created { first, .. }) => Some(*first),
                 c::Outcome::Owner(_)
@@ -272,24 +276,7 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
             }
             out.put(operation.word);
         }
-        c::Answer::Refused { refusal, .. } => {
-            out.put(operation.word);
-            out.put(b": ");
-            acts::refusal(refusal, &document::phrasebook(limits.text), out);
-            if let c::Refusal::Moved { .. } = refusal
-                && let Some(task) = operation.task
-            {
-                out.put(b"\nread again: task ");
-                out.number(task);
-            }
-            if let c::Refusal::Authority { proposable: Some(true), .. } = refusal {
-                out.put(b"\npropose instead: ");
-                match &operation.retry {
-                    Some(call) => out.put(call),
-                    None => out.put(operation.word),
-                }
-            }
-        }
+        c::Answer::Refused { refusal, .. } => refused_text(operation, refusal, limits, out),
     }
     out.put(b"\n");
 }
@@ -324,6 +311,13 @@ fn encode(
     me: Option<&c::Me>,
     limits: &Limits,
 ) {
+    if !kept && let Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::SettingsChanged(changed)))) = outcome {
+        out.object_start();
+        out.key(b"revision");
+        out.unsigned(u64::from(changed.revision));
+        out.object_end();
+        return;
+    }
     out.object_start();
     out.key(b"operation");
     out.string(operation.word);
@@ -570,5 +564,24 @@ fn moved_in(account: u32, renewed: bool, out: &mut Text) {
     out.number(u64::from(account));
     if renewed {
         out.put(b", renewed");
+    }
+}
+
+fn refused_text(operation: &Operation, refusal: &c::Refusal, limits: &Limits, out: &mut Text) {
+    out.put(operation.word);
+    out.put(b": ");
+    acts::refusal(refusal, &document::phrasebook(limits.text), out);
+    if let c::Refusal::Moved { .. } = refusal
+        && let Some(task) = operation.task
+    {
+        out.put(b"\nread again: task ");
+        out.number(task);
+    }
+    if let c::Refusal::Authority { proposable: Some(true), .. } = refusal {
+        out.put(b"\npropose instead: ");
+        match &operation.retry {
+            Some(call) => out.put(call),
+            None => out.put(operation.word),
+        }
     }
 }
