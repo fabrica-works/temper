@@ -99,6 +99,7 @@ fn limits_take_each_bound_from_its_source_field() {
             new_project_name: 16,
             first_repository_org: 16,
             first_repository_repository: 16,
+            first_repository_label: 64,
             adopt_owner: 16,
             adopt_name: 16,
             adopt_prefix: 16,
@@ -321,18 +322,20 @@ fn forges_rows(numbers: &[u16], connection: &v1::Connection) -> v1::Forges {
                 v1::ForgeRow::new(
                     &limits,
                     v1::ForgeRowParts {
-                        owned: None,
-                        web: None,
-                        repositories: List::with_capacity(0),
-                        app: None,
-                        installations: List::with_capacity(0),
-                        ended: None,
-                        first: None,
                         number: *number,
                         kind: v1::Kind::Forgejo,
                         mode: v1::Mode::Owned,
                         connection: connection.clone(),
                         offer: v1::Offer::Offered,
+                        first: None,
+                        installations: List::with_capacity(0),
+                        ended: None,
+                        app: None,
+                        web: None,
+                        repositories: List::with_capacity(0),
+                        owned: None,
+                        admin: false,
+                        ended_stop: None,
                     },
                 )
                 .expect("row"),
@@ -350,18 +353,20 @@ fn each_forge_offer_round_trips() {
         let row = v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
-                owned: None,
-                web: None,
-                repositories: List::with_capacity(0),
-                app: None,
-                installations: List::with_capacity(0),
-                ended: None,
-                first: None,
                 number,
                 kind: v1::Kind::Forgejo,
                 mode: v1::Mode::Owned,
                 connection: v1::Connection::NotSetUp,
                 offer,
+                first: None,
+                installations: List::with_capacity(0),
+                ended: None,
+                app: None,
+                web: None,
+                repositories: List::with_capacity(0),
+                owned: None,
+                admin: false,
+                ended_stop: None,
             },
         )
         .expect("forge row");
@@ -441,18 +446,20 @@ fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
-                owned: None,
-                web: None,
-                repositories: List::with_capacity(0),
-                app: None,
-                installations: List::with_capacity(0),
-                ended: None,
-                first: None,
                 number: 1,
                 kind: v1::Kind::Github,
                 mode: v1::Mode::Connected,
                 connection,
                 offer: v1::Offer::NotOffered,
+                first: None,
+                installations: List::with_capacity(0),
+                ended: None,
+                app: None,
+                web: None,
+                repositories: List::with_capacity(0),
+                owned: None,
+                admin: false,
+                ended_stop: None,
             },
         )
         .expect("schema row");
@@ -478,18 +485,20 @@ fn forges_refuse_seventeen_rows_unsorted_rows_and_duplicate_numbers() {
         v1::ForgeRow::new(
             &limits,
             v1::ForgeRowParts {
-                owned: None,
-                web: None,
-                repositories: List::with_capacity(0),
-                app: None,
-                installations: List::with_capacity(0),
-                ended: None,
-                first: None,
                 number: 17,
                 kind: v1::Kind::Github,
                 mode: v1::Mode::Fake,
                 connection: v1::Connection::NotSetUp,
                 offer: v1::Offer::NotOffered,
+                first: None,
+                installations: List::with_capacity(0),
+                ended: None,
+                app: None,
+                web: None,
+                repositories: List::with_capacity(0),
+                owned: None,
+                admin: false,
+                ended_stop: None,
             },
         )
         .expect("row"),
@@ -540,18 +549,20 @@ fn forge_login_and_stop_reason_round_trip_at_schema_ceilings() {
                     let row = v1::ForgeRow::new(
                         &limits,
                         v1::ForgeRowParts {
-                            owned: None,
-                            web: None,
-                            repositories: List::with_capacity(0),
-                            app: None,
-                            installations: List::with_capacity(0),
-                            ended: None,
-                            first: None,
                             number: u16::MAX,
                             kind: kind.clone(),
                             mode: mode.clone(),
                             connection,
                             offer: v1::Offer::NotOffered,
+                            first: None,
+                            installations: List::with_capacity(0),
+                            ended: None,
+                            app: None,
+                            web: None,
+                            repositories: List::with_capacity(0),
+                            owned: None,
+                            admin: false,
+                            ended_stop: None,
                         },
                     )
                     .expect("forge row");
@@ -740,10 +751,6 @@ fn installation_row(count: u32, why_bytes: usize) -> v1::ForgeRowParts {
             .unwrap();
     }
     v1::ForgeRowParts {
-        owned: None,
-        web: None,
-        repositories: List::with_capacity(0),
-        app: None,
         number: 1,
         kind: v1::Kind::Github,
         mode: v1::Mode::Connected,
@@ -754,12 +761,19 @@ fn installation_row(count: u32, why_bytes: usize) -> v1::ForgeRowParts {
         ended: Some(
             v1::ConnectStopped::new(&v1::CEILINGS, v1::ConnectStoppedParts { why: filled(why_bytes) }).unwrap(),
         ),
+        app: None,
+        web: None,
+        repositories: List::with_capacity(0),
+        owned: None,
+        admin: false,
+        ended_stop: None,
     }
 }
 // Encode the fields explicitly to feed invalid lengths to the receiving boundary.
 fn installation_row_bytes(parts: v1::ForgeRowParts, why: &[u8]) -> Box<[u8]> {
-    // Number (2), four enum tags, first tag, list length (4), end tag, why length (4), app tag, web tag, repositories length (4), owned tag.
-    let mut size = why.len().checked_add(23).unwrap();
+    // Number (2), four enum tags, first tag, list length (4), end tag, why length (4),
+    // app tag, web tag, repositories length (4), owned tag, admin bool, typed stop tag.
+    let mut size = why.len().checked_add(25).unwrap();
     for installation in &parts.installations {
         size = size.checked_add(usize::try_from(installation.measure()).unwrap()).unwrap();
     }
@@ -781,6 +795,7 @@ fn installation_row_bytes(parts: v1::ForgeRowParts, why: &[u8]) -> Box<[u8]> {
     writer.put(&[0]).unwrap(); // no web address
     writer.put(&0_u32.to_be_bytes()).unwrap(); // no adoptions
     writer.put(&[0]).unwrap(); // no owned details
+    writer.put(&[0, 0]).unwrap(); // admin false, no typed stop
     writer.finish()
 }
 #[test]
@@ -834,3 +849,63 @@ fn manifest_connects_and_app_ways_round_trip() {
 }
 
 mod forgejo_admin;
+
+#[test]
+fn admin_rows_round_trip_the_form_stop_and_first_label() {
+    let limits = v1::CEILINGS;
+    let mut stops = List::with_capacity(13);
+    for stop in [None, Some(v1::AdminStop::NotAdmin), Some(v1::AdminStop::Unmarked), Some(v1::AdminStop::Other)] {
+        stops.push(stop).unwrap();
+    }
+    for stage in [
+        v1::SetupStage::Admin,
+        v1::SetupStage::Bot,
+        v1::SetupStage::Token,
+        v1::SetupStage::Org,
+        v1::SetupStage::Repository,
+        v1::SetupStage::File,
+        v1::SetupStage::App,
+        v1::SetupStage::Installation,
+        v1::SetupStage::State,
+    ] {
+        stops
+            .push(Some(v1::AdminStop::Refused(
+                v1::AdminRefused::new(&limits, v1::AdminRefusedParts { status: 403, stage }).unwrap(),
+            )))
+            .unwrap();
+    }
+    for stop in stops.into_boxed() {
+        for admin in [false, true] {
+            let mut parts = installation_row(0, 0);
+            parts.admin = admin;
+            parts.ended_stop = stop.clone();
+            parts.first = Some(first_with_label(filled(64)).unwrap());
+            let row = v1::ForgeRow::new(&limits, parts).unwrap();
+            let mut writer = skein_lib::Writer::new(usize::try_from(row.measure()).unwrap());
+            row.encode(&mut writer).unwrap();
+            assert_eq!(v1::ForgeRow::decode(&limits, &mut Reader::new(&writer.finish())), Ok(row));
+        }
+    }
+}
+fn first_with_label(label: Box<[u8]>) -> Result<v1::FirstRepository, v1::Problem> {
+    v1::FirstRepository::new(
+        &v1::CEILINGS,
+        v1::FirstRepositoryParts {
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+            project: v1::SetUpProject::Existing(
+                v1::ExistingProject::new(&v1::CEILINGS, v1::ExistingProjectParts { project: 1 }).unwrap(),
+            ),
+            state: v1::FirstState::Making,
+            label,
+        },
+    )
+}
+#[test]
+fn first_label_accepts_64_bytes_and_refuses_one_more() {
+    first_with_label(filled(64)).unwrap();
+    assert_eq!(
+        first_with_label(filled(65)),
+        Err(v1::Problem { path: v1::Path::FirstRepositoryLabel, reason: skein_codec::Reason::Bound })
+    );
+}

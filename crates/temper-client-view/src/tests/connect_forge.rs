@@ -17,18 +17,20 @@ pub(super) fn row(
     w::ForgeRow::new(
         &w::CEILINGS,
         w::ForgeRowParts {
-            owned: None,
-            web: None,
-            repositories: List::with_capacity(0),
-            app: None,
-            installations: List::with_capacity(0),
-            ended: None,
-            first: None,
             number,
             kind,
             mode,
             connection,
             offer,
+            first: None,
+            installations: List::with_capacity(0),
+            ended: None,
+            app: None,
+            web: None,
+            repositories: List::with_capacity(0),
+            owned: None,
+            admin: false,
+            ended_stop: None,
         },
     )
     .unwrap()
@@ -220,7 +222,6 @@ fn elsewhere_details_give_the_next_unused_number() {
             "\"mode\": \"managed\"",
             "Without it, temper takes its bot’s tokens only.",
             "Restart temper box, then connect it from this page.",
-            "Connecting a Forgejo elsewhere from temper is not available yet.",
         ],
     );
 }
@@ -494,6 +495,7 @@ pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> Lis
                 w::ExistingProject::new(&w::CEILINGS, w::ExistingProjectParts { project: f::PROJECT }).unwrap(),
             ),
             state,
+            label: Box::from(b"temper-host".as_slice()),
         },
     )
     .unwrap();
@@ -502,18 +504,20 @@ pub(super) fn first_rows(connection: w::Connection, state: w::FirstState) -> Lis
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
-                owned: None,
-                web: None,
-                repositories: List::with_capacity(0),
-                app: None,
-                installations: List::with_capacity(0),
-                ended: None,
                 number: HERE,
                 kind: w::Kind::Forgejo,
                 mode: w::Mode::Owned,
                 connection,
                 offer: w::Offer::Offered,
                 first: Some(first),
+                installations: List::with_capacity(0),
+                ended: None,
+                app: None,
+                web: None,
+                repositories: List::with_capacity(0),
+                owned: None,
+                admin: false,
+                ended_stop: None,
             },
         )
         .unwrap(),
@@ -1666,4 +1670,241 @@ fn publish_first_adoption(root: &mut d::Domain, watch: skein_lib::Token) {
     let mut rows = List::with_capacity(1);
     rows.push(w::ForgeRow::new(&w::CEILINGS, parts).unwrap()).unwrap();
     deliver(root, watch, rows);
+}
+
+const ADMIN_TOKEN: &[u8] = b"admin-token-placeholder-0123";
+fn admin_row(
+    connection: w::Connection,
+    stop: Option<w::AdminStop>,
+    first: Option<w::FirstRepository>,
+    web: bool,
+) -> w::ForgeRow {
+    let mut parts = row(HERE, w::Kind::Forgejo, w::Mode::Managed, connection, w::Offer::NotOffered).into_parts();
+    parts.admin = true;
+    parts.ended_stop = stop;
+    parts.first = first;
+    parts.ended = Some(
+        w::ConnectStopped::new(&w::CEILINGS, w::ConnectStoppedParts { why: b"Forgejo answered 500".as_slice().into() })
+            .unwrap(),
+    );
+    if web {
+        parts.web = Some(b"https://git.example.org".as_slice().into());
+    }
+    w::ForgeRow::new(&w::CEILINGS, parts).unwrap()
+}
+fn admin_root(choice: Option<Choice>, row: w::ForgeRow) -> d::Domain {
+    let mut rows = List::with_capacity(1);
+    rows.push(row).unwrap();
+    f::forge_root(Address::ConnectForge { forge: choice }, rows)
+}
+fn admin_input(root: &mut d::Domain, name: &[u8], value: &[u8]) {
+    let mut view = f::page_view(root);
+    let id = node(view.tree(), Role::TextField, name);
+    let event = crate::event(&mut view, id, Act::Input { value: value.into() }).unwrap();
+    f::root_event(root, event);
+}
+fn admin_send(root: &mut d::Domain) {
+    let action = press(root, Role::Button, b"Connect as its admin");
+    f::root_event(root, d::Event::Act { action });
+}
+fn no_admin_token(tree: &skein_ui::Tree) {
+    for node in tree.nodes() {
+        for value in [node.name.as_deref(), node.description.as_deref(), node.value.as_ref().map(|v| v.text.as_ref())]
+            .into_iter()
+            .flatten()
+        {
+            assert!(skein_lib::bytes::find(value, ADMIN_TOKEN).is_none());
+        }
+        for run in &node.text {
+            assert!(skein_lib::bytes::find(&run.text, ADMIN_TOKEN).is_none());
+        }
+    }
+}
+#[test]
+fn the_admin_card_names_the_configured_host_or_forge_number() {
+    for (web, heading) in [(true, b"Forgejo at https://git.example.org".as_slice()), (false, b"Forgejo at forge 3")] {
+        let root = admin_root(None, admin_row(w::Connection::NotConnected, None, None, web));
+        let view = f::page_view(&root);
+        words_in_order(
+            view.tree(),
+            &[
+                core::str::from_utf8(heading).unwrap(),
+                "temper connects as its site admin, makes its bot and your first repository.",
+                "Connect as its admin",
+                "A Forgejo elsewhere",
+            ],
+        );
+    }
+}
+#[test]
+fn admin_details_keep_the_token_out_of_actions_and_rendered_pages() {
+    let mut root = admin_root(Some(Choice::Forge(HERE)), admin_row(w::Connection::NotConnected, None, None, true));
+    let mut before = f::page_view(&root);
+    let field = node(before.tree(), Role::TextField, "The site admin’s token".as_bytes());
+    assert!(crate::act(&mut before, field, Act::Input { value: ADMIN_TOKEN.into() }).is_none());
+    admin_input(&mut root, "The site admin’s token".as_bytes(), ADMIN_TOKEN);
+    let view = f::page_view(&root);
+    let field = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|n| n.id == node(view.tree(), Role::TextField, "The site admin’s token".as_bytes()))
+        .unwrap();
+    assert_eq!(field.entry, Some(skein_ui::EntryKind::Secret));
+    no_admin_token(view.tree());
+    for name in [b"Organization".as_slice(), b"Repository", b"Into a new project, named", b"Runner label"] {
+        node(view.tree(), Role::TextField, name);
+    }
+    admin_send(&mut root);
+    assert!(!root.forge().admin_form().has_token());
+    no_admin_token(f::page_view(&root).tree());
+}
+#[test]
+fn admin_local_refusals_mark_the_field_and_say_why() {
+    for (field, value, refusal) in [
+        ("The site admin’s token", b"".as_slice(), "Required."),
+        ("The site admin’s token", &[b'x'; 4091], "The pasted values are past 4 KiB, the most a request carries."),
+        ("Organization", b"", "Required."),
+        ("Repository", b"", "Required."),
+        ("Into a new project, named", b"", "Required."),
+        ("Runner label", b"a b", "Letters, digits, dots, dashes and underscores, at most 64."),
+    ] {
+        let mut root = admin_root(Some(Choice::Forge(HERE)), admin_row(w::Connection::NotConnected, None, None, true));
+        admin_input(&mut root, field.as_bytes(), value);
+        admin_send(&mut root);
+        let view = f::page_view(&root);
+        words_in_order(view.tree(), &[refusal]);
+        assert!(
+            view.tree()
+                .nodes()
+                .iter()
+                .find(|n| n.id == node(view.tree(), Role::TextField, field.as_bytes()))
+                .unwrap()
+                .states
+                .as_slice()
+                .contains(&State::Invalid)
+        );
+        no_admin_token(view.tree());
+    }
+}
+#[test]
+fn admin_connecting_names_the_forge_and_first_repository() {
+    let root = admin_root(Some(Choice::Forge(HERE)), admin_row(w::Connection::Connecting, None, None, true));
+    let view = f::page_view(&root);
+    words_in_order(view.tree(), &["Connecting forge 3 as its admin.", "Making its bot, then work/hello."]);
+    assert!(f::find(view.tree(), Role::Button, b"Connect as its admin").is_none());
+}
+#[test]
+fn admin_stops_name_the_reason_and_keep_an_empty_token_field() {
+    let refused = |status, stage| {
+        w::AdminStop::Refused(w::AdminRefused::new(&w::CEILINGS, w::AdminRefusedParts { status, stage }).unwrap())
+    };
+    for (stop, line) in [
+        (w::AdminStop::NotAdmin, "The token you gave is not a site admin’s. Paste one a site admin made."),
+        (
+            refused(401, w::SetupStage::Admin),
+            "Forgejo refused the token. Check that it was copied whole, and that it hasn’t been deleted.",
+        ),
+        (refused(403, w::SetupStage::Bot), "The token lacks a scope: making the bot was refused."),
+        (refused(403, w::SetupStage::Org), "The token lacks a scope: making the organization was refused."),
+        (w::AdminStop::Unmarked, "A user temper didn’t make holds the bot’s login"),
+        (w::AdminStop::Other, "Forgejo answered 500"),
+    ] {
+        let root =
+            admin_root(Some(Choice::Forge(HERE)), admin_row(w::Connection::NotConnected, Some(stop), None, true));
+        let view = f::page_view(&root);
+        words_in_order(view.tree(), &[line, "temper kept nothing of the token."]);
+        node(view.tree(), Role::TextField, "The site admin’s token".as_bytes());
+        no_admin_token(view.tree());
+    }
+}
+fn admin_first(state: w::FirstState) -> w::FirstRepository {
+    w::FirstRepository::new(
+        &w::CEILINGS,
+        w::FirstRepositoryParts {
+            org: b"work".as_slice().into(),
+            repository: b"hello".as_slice().into(),
+            project: w::SetUpProject::New(
+                w::NewProject::new(&w::CEILINGS, w::NewProjectParts { name: b"hello".as_slice().into() }).unwrap(),
+            ),
+            state,
+            label: b"linux-arm".as_slice().into(),
+        },
+    )
+    .unwrap()
+}
+#[test]
+fn each_admin_create_step_returns_to_details_with_its_repository() {
+    for (step, words) in [
+        (w::CreateStep::Admin, "checking the admin's token"),
+        (w::CreateStep::Org, "its organization"),
+        (w::CreateStep::Repository, "its repository"),
+        (w::CreateStep::File, "its starter workflow"),
+    ] {
+        let first = admin_first(w::FirstState::Failed(
+            w::CreateFailed::new(&w::CEILINGS, w::CreateFailedParts { step }).unwrap(),
+        ));
+        let root = admin_root(Some(Choice::Forge(HERE)), admin_row(connected(), None, Some(first), true));
+        let view = f::page_view(&root);
+        words_in_order(
+            view.tree(),
+            &[
+                "temper made its bot, but making work/hello stopped at",
+                words,
+                "Forgejo answered 500. Paste the token again to finish it.",
+                "temper kept nothing of the token.",
+            ],
+        );
+        node(view.tree(), Role::Button, b"Connect as its admin");
+        no_admin_token(view.tree());
+    }
+}
+#[test]
+fn admin_ready_uses_the_durable_label_and_repository_link() {
+    let mut parts = admin_row(connected(), None, Some(admin_first(made())), true).into_parts();
+    parts.repositories = List::with_capacity(1);
+    parts
+        .repositories
+        .push(
+            w::Adoption::new(
+                &w::CEILINGS,
+                w::AdoptionParts { owner: b"work".as_slice().into(), name: b"hello".as_slice().into(), project: 7 },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let root = admin_root(Some(Choice::Forge(HERE)), w::ForgeRow::new(&w::CEILINGS, parts).unwrap());
+    let view = f::page_view(&root);
+    words_in_order(
+        view.tree(),
+        &[
+            "Connected as temper (id 42), managed.",
+            "Made work/hello, and its project hello. Its CI runs on your forge’s runners labelled linux-arm; with none, a change’s checks wait.",
+            "Open hello",
+            "Open work/hello on Forgejo",
+        ],
+    );
+    let link = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|n| n.id == node(view.tree(), Role::Link, "Open work/hello on Forgejo ↗".as_bytes()))
+        .unwrap();
+    assert_eq!(link.external.as_deref(), Some(b"https://git.example.org/work/hello".as_slice()));
+    assert_eq!(press(&root, Role::Link, b"Open hello"), d::Action::Pages(pages::Act::OpenProject { project: 7 }));
+}
+
+#[test]
+fn the_admin_card_keeps_the_whole_configured_web_address() {
+    let mut parts = admin_row(w::Connection::NotConnected, None, None, false).into_parts();
+    parts.web = Some(Box::from([b'a'; 2048].as_slice()));
+    let root = admin_root(None, w::ForgeRow::new(&w::CEILINGS, parts).unwrap());
+    let domain = f::limits();
+    let words = f::words();
+    let limits = crate::Limits::of(&domain, &words).unwrap();
+    let mut view = crate::View::new(&limits, &domain, words, f::FORGE);
+    f::build(&mut view, &root);
+    let mut heading = b"Forgejo at ".to_vec();
+    heading.extend_from_slice(&[b'a'; 2048]);
+    node(view.tree(), Role::Heading { level: 2 }, &heading);
 }

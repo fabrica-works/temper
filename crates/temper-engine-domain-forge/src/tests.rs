@@ -1170,18 +1170,20 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
     Row {
-        owned: None,
-        web: None,
-        repositories: Box::new([]),
-        app: None,
-        installations: Box::new([]),
-        ended: None,
-        first: None,
         number,
         kind,
         mode: Mode::Owned,
         connection,
         offer,
+        first: None,
+        installations: Box::new([]),
+        ended: None,
+        app: None,
+        web: None,
+        repositories: Box::new([]),
+        owned: None,
+        admin: false,
+        ended_stop: None,
     }
 }
 #[test]
@@ -1659,6 +1661,7 @@ fn admitted_setup_projects_its_fields_as_making_and_the_next_admission_replaces_
             repository: repository.into(),
             project: SetUpProject::Existing(project),
             state: FirstState::Making,
+            label: Box::from(b"temper-host".as_slice()),
         };
         let ask = Ask::SetUp {
             forge: 1,

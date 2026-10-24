@@ -33,7 +33,7 @@ pub const SET_UP: Tool = Tool {
 };
 pub const CONNECT: Tool = Tool {
     name: b"forge-connect",
-    line: b"Connect GitHub through a manifest or an existing App",
+    line: b"Connect GitHub or Forgejo as its admin",
     result: b"forge-connect",
     forms: &[
         &[
@@ -60,14 +60,28 @@ pub const CONNECT: Tool = Tool {
         ],
         &[
             positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
+            positional(b"way", b"forgejo", Kind::Word { set: &[b"forgejo"] }, Required, b"Not offered yet"),
+            positional(b"file", b"FILE", Kind::Literal, Required, b"Not offered yet; no file is read"),
+        ],
+        &[
+            positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
             positional(
                 b"way",
-                b"forgejo|forgejo-admin",
-                Kind::Word { set: &[b"forgejo", b"forgejo-admin"] },
+                b"forgejo-admin",
+                Kind::Word { set: &[b"forgejo-admin"] },
                 Required,
-                b"Not offered yet",
+                b"A Forgejo site admin",
             ),
-            positional(b"file", b"FILE", Kind::Literal, Required, b"Not offered yet; no file is read"),
+            positional(b"file", b"FILE", Kind::File, Required, b"Private admin token file; at most 4090 bytes"),
+            flag(b"first", b"ORG/NAME", Kind::Literal, Optional, b"Make the first repository"),
+            flag(
+                b"project",
+                b"P",
+                Kind::Project { empty: false },
+                Optional,
+                b"Project name or number; default a new project named NAME",
+            ),
+            flag(b"label", b"L", Kind::Literal, Optional, b"Runner label; default docker"),
         ],
     ],
     keyed: Keyed::Required,
@@ -284,7 +298,7 @@ fn send(state: &mut Forges, client: &Client, env: &Env<Limits>, called: Called, 
         return;
     }
     if connection::owns(&called.call) {
-        connection::send(state, env, called, out);
+        connection::send(state, client, env, called, out);
         return;
     }
     if called.value.is_some() || jig::argv::check(crate::table::TOOLS, &called.call, &env.limits.tools).is_err() {

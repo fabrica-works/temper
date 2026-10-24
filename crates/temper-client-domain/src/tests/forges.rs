@@ -208,7 +208,15 @@ fn every_connection_decodes_into_the_forges_words() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
-                        owned: fixture_wire_owned(m),
+                        number,
+                        kind,
+                        mode,
+                        connection,
+                        offer,
+                        first: None,
+                        installations: List::with_capacity(0),
+                        ended: None,
+                        app: None,
                         web: Some(b"https://forge.example".as_slice().into()),
                         repositories: {
                             let mut adopted = List::with_capacity(1);
@@ -227,37 +235,33 @@ fn every_connection_decodes_into_the_forges_words() {
                                 .unwrap();
                             adopted
                         },
-                        app: None,
-                        installations: List::with_capacity(0),
-                        ended: None,
-                        first: None,
-                        number,
-                        kind,
-                        mode,
-                        connection,
-                        offer,
+                        owned: fixture_wire_owned(m),
+                        admin: false,
+                        ended_stop: None,
                     },
                 )
                 .unwrap(),
             )
             .unwrap();
         let row = Row {
-            owned: fixture_owned(m),
+            number,
+            kind: k,
+            mode: m,
+            connection: state,
+            offer: o,
+            first: None,
+            installations: Box::new([]),
+            ended: None,
+            app: None,
             web: Some(b"https://forge.example".as_slice().into()),
             repositories: Box::new([forge::forges::Adoption {
                 owner: b"acme".as_slice().into(),
                 name: b"app".as_slice().into(),
                 project: 7,
             }]),
-            app: None,
-            installations: Box::new([]),
-            ended: None,
-            first: None,
-            number,
-            kind: k,
-            mode: m,
-            offer: o,
-            connection: state,
+            owned: fixture_owned(m),
+            admin: false,
+            ended_stop: None,
         };
         assert_eq!(words::forge_connection(&row).as_ref(), words);
         expected.push(row).unwrap();
@@ -277,18 +281,20 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
-        owned: None,
-        web: None,
-        repositories: Box::new([]),
-        app: None,
-        installations: Box::new([]),
-        ended: None,
-        first: None,
         number: 3,
         kind: Kind::Forgejo,
         mode: Mode::Owned,
         connection: Connection::NotSetUp,
         offer: Offer::Offered,
+        first: None,
+        installations: Box::new([]),
+        ended: None,
+        app: None,
+        web: None,
+        repositories: Box::new([]),
+        owned: None,
+        admin: false,
+        ended_stop: None,
     };
     assert_eq!(words::forge_set_up_action(&row), Some(b"Set up a Forgejo here".as_slice()));
     row.offer = Offer::NotUnderTheBox;
@@ -330,18 +336,20 @@ fn an_out_of_order_document_is_refused() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
-                        owned: None,
-                        web: None,
-                        repositories: List::with_capacity(0),
-                        app: None,
-                        installations: List::with_capacity(0),
-                        ended: None,
-                        first: None,
                         number,
                         kind: w::Kind::Forgejo,
                         mode: w::Mode::Owned,
                         connection: w::Connection::NotSetUp,
                         offer: w::Offer::Offered,
+                        first: None,
+                        installations: List::with_capacity(0),
+                        ended: None,
+                        app: None,
+                        web: None,
+                        repositories: List::with_capacity(0),
+                        owned: None,
+                        admin: false,
+                        ended_stop: None,
                     },
                 )
                 .unwrap(),
@@ -424,6 +432,7 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     repository: b"widget".as_slice().into(),
                     project,
                     state: wire_state.clone(),
+                    label: Box::from(b"docker_1.x-y".as_slice()),
                 },
             )
             .unwrap();
@@ -433,18 +442,20 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     w::ForgeRow::new(
                         &limits(),
                         w::ForgeRowParts {
-                            owned: None,
-                            web: None,
-                            repositories: List::with_capacity(0),
-                            app: None,
-                            installations: List::with_capacity(0),
-                            ended: None,
                             number: 3,
                             kind: w::Kind::Forgejo,
                             mode: w::Mode::Owned,
                             connection: w::Connection::Connecting,
                             offer: w::Offer::NotOffered,
                             first: Some(first),
+                            installations: List::with_capacity(0),
+                            ended: None,
+                            app: None,
+                            web: None,
+                            repositories: List::with_capacity(0),
+                            owned: None,
+                            admin: false,
+                            ended_stop: None,
                         },
                     )
                     .unwrap(),
@@ -461,7 +472,8 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     org: b"team".as_slice().into(),
                     repository: b"widget".as_slice().into(),
                     project: if new { SetUpProject::New(b"Next".as_slice().into()) } else { SetUpProject::Existing(7) },
-                    state
+                    state,
+                    label: Box::from(b"docker_1.x-y".as_slice()),
                 })
             );
         }
@@ -512,10 +524,6 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
-                    owned: None,
-                    web: None,
-                    repositories: List::with_capacity(0),
-                    app: None,
                     number: 1,
                     kind: w::Kind::Github,
                     mode: w::Mode::Connected,
@@ -530,6 +538,12 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
                         )
                         .unwrap(),
                     ),
+                    app: None,
+                    web: None,
+                    repositories: List::with_capacity(0),
+                    owned: None,
+                    admin: false,
+                    ended_stop: None,
                 },
             )
             .unwrap(),
@@ -550,4 +564,55 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
         ]
     );
     assert_eq!(rows[0].ended.as_deref(), Some(b"the pasted value changed".as_slice()));
+}
+
+#[test]
+fn admin_form_and_typed_stops_survive_client_decode() {
+    use forge::forges::{AdminStop, SetupStage};
+    let limits = limits();
+    for (stop, expected) in [
+        (None, None),
+        (Some(w::AdminStop::NotAdmin), Some(AdminStop::NotAdmin)),
+        (Some(w::AdminStop::Unmarked), Some(AdminStop::Unmarked)),
+        (Some(w::AdminStop::Other), Some(AdminStop::Other)),
+        (
+            Some(w::AdminStop::Refused(
+                w::AdminRefused::new(&limits, w::AdminRefusedParts { status: 403, stage: w::SetupStage::Repository })
+                    .unwrap(),
+            )),
+            Some(AdminStop::Refused { status: 403, stage: SetupStage::Repository }),
+        ),
+    ] {
+        for admin in [false, true] {
+            let mut forges = List::with_capacity(1);
+            forges
+                .push(
+                    w::ForgeRow::new(
+                        &limits,
+                        w::ForgeRowParts {
+                            number: 1,
+                            kind: w::Kind::Forgejo,
+                            mode: w::Mode::Managed,
+                            connection: w::Connection::NotConnected,
+                            offer: w::Offer::NotOffered,
+                            first: None,
+                            installations: List::with_capacity(0),
+                            ended: None,
+                            app: None,
+                            web: None,
+                            repositories: List::with_capacity(0),
+                            owned: None,
+                            admin,
+                            ended_stop: stop.clone(),
+                        },
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            let bytes = wire::forges(&w::Forges::new(&limits, w::ForgesParts { forges }).unwrap());
+            let rows = family::forges(&bytes, &limits).unwrap();
+            assert_eq!(rows[0].admin, admin);
+            assert_eq!(rows[0].ended_stop, expected);
+        }
+    }
 }

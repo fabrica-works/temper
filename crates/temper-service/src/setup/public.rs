@@ -13,7 +13,8 @@ use temper_engine_domain_forge as domain;
 pub(super) enum Caller {
     Manifest { forge: u16, request: Token, back: Option<Box<[u8]>> },
     Redirect { forge: u16, call: Token, back: Option<Box<[u8]>> },
-    Connect { forge: u16, request: Token, number: u64, pasted: Option<Pasted> },
+    // Admin runs start with Other for local failures; skein failures replace it.
+    Connect { forge: u16, request: Token, number: u64, pasted: Option<Pasted>, stop: Option<domain::AdminStop> },
     Install { forge: u16, request: Token, back: Option<Box<[u8]>> },
     Accept { forge: u16, call: Token, back: Option<Box<[u8]>> },
     Reachable { forge: u16, request: Token },
@@ -78,7 +79,10 @@ pub(crate) fn admin_connect(
     engine
         .setup
         .public
-        .insert(run, Caller::Connect { forge, request, number: carried.number, pasted })
+        .insert(
+            run,
+            Caller::Connect { forge, request, number: carried.number, pasted, stop: Some(domain::AdminStop::Other) },
+        )
         .expect("public room checked");
     let first = match first {
         Some(first) => {
@@ -138,7 +142,7 @@ pub(crate) fn connect(engine: &mut Engine, forge: u16, request: Token, app: NonZ
     engine
         .setup
         .public
-        .insert(run, Caller::Connect { forge, request, number: carried.number, pasted })
+        .insert(run, Caller::Connect { forge, request, number: carried.number, pasted, stop: None })
         .expect("public room checked");
     if let Some(reason) = failure {
         super::ended(engine, run, root::SetupEnd::Stopped { forge, reason: Box::from(reason) });
@@ -238,7 +242,10 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
                     domain::ConnectAnswer::Link(manifest_link(engine, forge, state))
                 }
                 root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => {
-                    event(engine, domain::Event::ConnectEnded { forge, request, connected: false, why: stopped });
+                    event(
+                        engine,
+                        domain::Event::ConnectEnded { forge, request, connected: false, why: stopped, stop: None },
+                    );
                     domain::ConnectAnswer::Connecting
                 }
             };
@@ -251,11 +258,20 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
             }
             root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => super::routes::ended(engine, call, forge),
         },
-        Caller::Connect { forge, request, number, pasted } => {
+        Caller::Connect { forge, request, number, pasted, stop } => {
             if done(end) && matches_app(pasted.as_ref()) {
                 engine.setup.pastes.insert(number, forge).expect("one pending connect per forge");
             }
-            event(engine, domain::Event::ConnectEnded { forge, request, connected: done(end), why: stopped });
+            event(
+                engine,
+                domain::Event::ConnectEnded {
+                    forge,
+                    request,
+                    connected: done(end),
+                    why: stopped,
+                    stop: if done(end) { None } else { stop },
+                },
+            );
         }
         Caller::Install { forge, request, back } => {
             let answer = match end {
@@ -358,4 +374,39 @@ pub(super) fn reached(engine: &mut Engine, run: Token, answer: domain::Reachable
         unreachable!("Reachable has its public caller")
     };
     event(engine, domain::Event::ReachableAnswered { forge, request, answer });
+}
+
+/// Preserve structured failures before the diagnostic is formatted or bounded.
+pub(super) fn stopped(engine: &mut Engine, run: Token, failure: &skein_forge_setup::reconcile::Failure) {
+    use skein_forge_setup::reconcile::{Stage, Why};
+    if let Some(Caller::Connect { stop: Some(stop), .. }) = engine.setup.public.get_mut(&run) {
+        *stop = match failure.why {
+            Why::NotAdmin => domain::AdminStop::NotAdmin,
+            Why::Refused(status) => domain::AdminStop::Refused {
+                status,
+                stage: match failure.step {
+                    Stage::Admin => domain::SetupStage::Admin,
+                    Stage::Bot => domain::SetupStage::Bot,
+                    Stage::Token => domain::SetupStage::Token,
+                    Stage::Org => domain::SetupStage::Org,
+                    Stage::Repository => domain::SetupStage::Repository,
+                    Stage::File => domain::SetupStage::File,
+                    Stage::App => domain::SetupStage::App,
+                    Stage::Installation => domain::SetupStage::Installation,
+                    Stage::State => domain::SetupStage::State,
+                },
+            },
+            Why::Unmarked => domain::AdminStop::Unmarked,
+            Why::Missing
+            | Why::BotIsAdmin
+            | Why::OtherUser
+            | Why::OtherApp
+            | Why::Unknown
+            | Why::Busy
+            | Why::Crowded
+            | Why::Down
+            | Why::Unexpected
+            | Why::KeyForm => domain::AdminStop::Other,
+        };
+    }
 }

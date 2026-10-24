@@ -488,6 +488,11 @@ and `connect-forge.html`.
     your own, run by temper box. No account needed: temper makes your
     first repository, and you start in it." · "Here · about a minute",
     or, not under the box, "Needs four commands and a restart";
+  - *Forgejo at HOST,* a configured Forgejo whose `admin` is true and
+    which is not connected: "temper connects as its site admin, makes
+    its bot and your first repository." and "Connect as its admin".
+    HOST is `row.web` when present, otherwise "forge N". The legacy
+    managed object configuration has `admin` false and offers no card;
   - *A Forgejo elsewhere,* always: "Your own Forgejo server. temper
     connects as its admin, or with its bot’s tokens." · "Needs a change
     to temper’s configuration and a restart".
@@ -578,11 +583,55 @@ and `connect-forge.html`.
     it, temper takes its bot’s tokens only."; then "Restart temper box,
     then connect it from this page." These words stay: a Forgejo
     elsewhere is added by hand and a restart (`../draft/first-run.md`,
-    section 4). Until a request carries a pasted value (the FORGE
-    requests' `Connect` of a Forgejo, `README.md`, section 8), it ends
-    "Connecting a Forgejo elsewhere from temper is not available
-    yet.", and a configured Forgejo not owned and not connected is not
-    a card of its own.
+    section 4).
+  - *A configured admin Forgejo:* "Connect as its admin", then "Paste a
+    site admin’s token with the scopes write:admin, read:user,
+    write:organization and write:repository. temper keeps it, and uses it
+    only to make its bot and your first repository, and to give the bot
+    access to it. To stop temper using it, delete the token on Forgejo."
+    "The site admin’s token" is a password field, passed straight to a
+    `Secret`, outside text actions. "Your first repository" has
+    "Organization" (`work`), "Repository" (`hello`), "Into a new project,
+    named" (following Repository until edited), and "Runner label"
+    (`docker`). Its hint is "Its CI runs on your forge’s runners with this
+    label. Forgejo’s runner registers as docker unless told otherwise."
+    The button "Connect as its admin" sends `Connect { forge, how:
+    ForgejoAdmin { first: Some(FirstAsk) } }`, with the four fields and
+    the token carried as item 1, a single-item bundle with its six-byte
+    header, at most 4 KiB. No RSA armour restoration applies. Sending
+    empties the token field; a stop empties it again and keeps the other
+    fields. Before sending: an empty token or name, "Required."; a bundle
+    past its bound, "The pasted values are past 4 KiB, the most a request
+    carries."; a label outside `[A-Za-z0-9._-]{1,64}`, "Letters, digits,
+    dots, dashes and underscores, at most 64." Sign-out erases the draft.
+- **Connecting, as a Forgejo's admin,** says "Connecting forge F as its
+  admin." and "Making its bot, then ORG/NAME." The welcome keeps Forge
+  highlighted. A stop returns to Details with its token empty and the
+  other fields kept. `ended_stop` selects the words; `ended` is a
+  diagnostic, never parsed to decide the stop:
+  - `NotAdmin`: "The token you gave is not a site admin’s. Paste one a
+    site admin made.";
+  - refused 401: "Forgejo refused the token. Check that it was copied
+    whole, and that it hasn’t been deleted.";
+  - refused 403: "The token lacks a scope: STAGE was refused. Make one
+    with write:admin, read:user, write:organization and write:repository."
+    STAGE names the actual operation, for example "making the bot";
+  - `Unmarked`: "A user temper didn’t make holds the bot’s login, without
+    temper’s mark: add temper:bot to its full name on Forgejo, or change
+    the bot’s login in the configuration.";
+  - another stop: the `ended` line.
+  A failed `first` names ORG/NAME and its failed step (admin, organization,
+  repository or starter workflow), with the diagnostic and "Paste the
+  token again to finish it." Every stop says "temper kept nothing of the
+  token." No "Set up again" action is offered.
+- **Ready, on that Forgejo,** says "Connected as LOGIN (id ID), managed."
+  and "Made ORG/NAME, and its project PROJECT. Its CI runs on your forge’s
+  runners labelled LABEL; with none, a change’s checks wait." LABEL is
+  `first.label`, including after reload. "Open PROJECT" waits for the
+  existing keyed project creation and adoption, once; a repeated row
+  starts neither twice. With `row.web`, "Open ORG/NAME on Forgejo ↗"
+  links to the repository. After reload, the durable adoption supplies
+  the project for Open.
 - **Setting up** shows the set up as its row says it: the level-2
   heading "Setting up Forgejo on this machine", its first repository's
   line, "ORG/NAME, into PROJECT", then its steps as a list, each with

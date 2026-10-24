@@ -10,6 +10,9 @@ pub enum Meaning {
     Home,
     Ci,
     Adopt,
+    AdminToken,
+    AdminField(forge::admin::Field),
+    ConnectAdmin(u16),
     AppId,
     AppKey,
     ConnectApp(u16),
@@ -59,6 +62,9 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
             (Meaning::PickerName(forge), Act::Input { value }) => {
                 Some(Action::Forge(forge::Act::Picker { forge, act: forge::picker::Act::Write(value) }))
             }
+            (Meaning::AdminField(field), Act::Input { value }) => {
+                Some(Action::Forge(forge::Act::AdminWrite { field, text: value }))
+            }
             (Meaning::AppId, Act::Input { value }) => Some(Action::Forge(forge::Act::AppWrite { text: value })),
             (Meaning::SetupField(field), Act::Input { value }) => {
                 Some(Action::Forge(forge::Act::SetupWrite { field, text: value }))
@@ -78,6 +84,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Home => Action::Forge(forge::Act::Home),
                 Meaning::Ci => Action::Forge(forge::Act::Ci),
                 Meaning::SetUp(forge) => Action::Forge(forge::Act::SetUp { forge }),
+                Meaning::ConnectAdmin(forge) => Action::Forge(forge::Act::ConnectAdmin { forge }),
                 Meaning::ConnectApp(forge) => Action::Forge(forge::Act::ConnectApp { forge }),
                 Meaning::ConnectManifest { forge, back } => Action::Forge(forge::Act::ConnectManifest {
                     forge,
@@ -90,6 +97,8 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                 Meaning::Picker { forge, act } => Action::Forge(forge::Act::Picker { forge, act }),
                 Meaning::StartIn(forge) => Action::Forge(forge::Act::StartIn { forge }),
                 Meaning::PickerName(_)
+                | Meaning::AdminField(_)
+                | Meaning::AdminToken
                 | Meaning::AppId
                 | Meaning::AppKey
                 | Meaning::Field(_)
@@ -141,10 +150,13 @@ pub fn worst_case(capacity: u32) -> Option<u64> {
 #[must_use]
 pub fn event(bindings: &Bindings, token: Token, act: Act) -> Option<temper_client_domain::Event> {
     for entry in &bindings.entries {
-        if entry.token == token && entry.meaning == Meaning::AppKey {
+        if entry.token == token && (entry.meaning == Meaning::AppKey || entry.meaning == Meaning::AdminToken) {
             if let Act::Input { value } = act {
-                return Some(temper_client_domain::Event::Forge(forge::Event::AppKey {
-                    value: skein_lib::Secret::new(value),
+                let value = skein_lib::Secret::new(value);
+                return Some(temper_client_domain::Event::Forge(if entry.meaning == Meaning::AdminToken {
+                    forge::Event::AdminToken { value }
+                } else {
+                    forge::Event::AppKey { value }
                 }));
             }
             return None;

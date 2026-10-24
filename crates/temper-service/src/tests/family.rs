@@ -895,70 +895,75 @@ fn setup_outcomes_use_the_family_answer_including_unknown() {
         assert_eq!(w::Answer::decode(&w::CEILINGS, &mut Reader::new(&bytes)).unwrap().into_parts().outcome, expected);
     }
 }
+fn forge_row(
+    number: u16,
+    kind: forge::Kind,
+    mode: forge::Mode,
+    connection: forge::Connection,
+    offer: forge::Offer,
+) -> forge::Row {
+    forge::Row {
+        number,
+        kind,
+        mode,
+        connection,
+        offer,
+        first: None,
+        installations: Box::new([]),
+        ended: None,
+        app: None,
+        web: None,
+        repositories: Box::new([]),
+        owned: None,
+        admin: false,
+        ended_stop: None,
+    }
+}
 #[test]
 fn forges_encode_the_domains_rows_without_settings() {
     let value = forge::Forges {
         rows: Box::new([
             forge::Row {
-                owned: Some(forge::Owned {
-                    forgejo: b"17.0.0".as_slice().into(),
-                    runner: Some(b"13.2.0".as_slice().into()),
-                    password: b"/fake/forge/person_password".as_slice().into(),
-                }),
-                web: None,
-                repositories: Box::new([]),
-                app: None,
-                installations: Box::new([]),
-                ended: None,
-                first: None,
                 number: 1,
                 kind: forge::Kind::Forgejo,
                 mode: forge::Mode::Owned,
                 connection: forge::Connection::SettingUp { step: Some(forge::SetUpStep::Prepare) },
                 offer: forge::Offer::Offered,
-            },
-            forge::Row {
-                owned: None,
-                web: None,
-                repositories: Box::new([]),
-                app: None,
+                first: None,
                 installations: Box::new([]),
                 ended: None,
-                first: None,
-                number: 2,
-                kind: forge::Kind::GitHub,
-                mode: forge::Mode::Connected,
-                connection: forge::Connection::NotConnected,
-                offer: forge::Offer::NotOffered,
-            },
-            forge::Row {
-                owned: None,
+                app: None,
                 web: None,
                 repositories: Box::new([]),
-                app: None,
-                installations: Box::new([]),
-                ended: None,
-                first: None,
-                number: 3,
-                kind: forge::Kind::Forgejo,
-                mode: forge::Mode::Managed,
-                connection: forge::Connection::NotSetUp,
-                offer: forge::Offer::NotUnderTheBox,
+                owned: Some(forge::Owned {
+                    forgejo: b"17.0.0".as_slice().into(),
+                    runner: Some(b"13.2.0".as_slice().into()),
+                    password: b"/fake/forge/person_password".as_slice().into(),
+                }),
+                admin: false,
+                ended_stop: None,
             },
-            forge::Row {
-                owned: None,
-                web: None,
-                repositories: Box::new([]),
-                app: None,
-                installations: Box::new([]),
-                ended: None,
-                first: None,
-                number: 4,
-                kind: forge::Kind::Forgejo,
-                mode: forge::Mode::Fake,
-                connection: forge::Connection::Connecting,
-                offer: forge::Offer::NotOffered,
-            },
+            forge_row(
+                2,
+                forge::Kind::GitHub,
+                forge::Mode::Connected,
+                forge::Connection::NotConnected,
+                forge::Offer::NotOffered,
+            ),
+            forge_row(
+                3,
+                forge::Kind::Forgejo,
+                forge::Mode::Managed,
+                forge::Connection::NotSetUp,
+                forge::Offer::NotUnderTheBox,
+            ),
+            forge_row(
+                4,
+                forge::Kind::Forgejo,
+                forge::Mode::Fake,
+                forge::Connection::Connecting,
+                forge::Offer::NotOffered,
+            ),
         ]),
     };
     let bytes = family::forges(value, &w::CEILINGS).unwrap();
@@ -993,6 +998,17 @@ fn expected_forge_row(
     w::ForgeRow::new(
         &w::CEILINGS,
         w::ForgeRowParts {
+            number,
+            kind,
+            mode,
+            connection,
+            offer,
+            first: None,
+            installations: List::with_capacity(0),
+            ended: None,
+            app: None,
+            web: None,
+            repositories: List::with_capacity(0),
             owned: if number == 1 {
                 Some(
                     w::OwnedForge::new(
@@ -1008,17 +1024,8 @@ fn expected_forge_row(
             } else {
                 None
             },
-            web: None,
-            repositories: List::with_capacity(0),
-            app: None,
-            installations: List::with_capacity(0),
-            ended: None,
-            first: None,
-            number,
-            kind,
-            mode,
-            connection,
-            offer,
+            admin: false,
+            ended_stop: None,
         },
     )
     .unwrap()
@@ -1117,21 +1124,24 @@ fn setup_projects_and_first_repository_states_translate_without_losing_fields() 
                 repository: b"widget".as_slice().into(),
                 project: project.clone(),
                 state,
+                label: Box::from(b"temper-host".as_slice()),
             };
             let value = forge::Forges {
                 rows: Box::new([forge::Row {
-                    owned: None,
-                    web: None,
-                    repositories: Box::new([]),
-                    app: None,
-                    installations: Box::new([]),
-                    ended: None,
                     number: 3,
                     kind: forge::Kind::Forgejo,
                     mode: forge::Mode::Owned,
                     connection: forge::Connection::Connecting,
                     offer: forge::Offer::NotOffered,
                     first: Some(first),
+                    installations: Box::new([]),
+                    ended: None,
+                    app: None,
+                    web: None,
+                    repositories: Box::new([]),
+                    owned: None,
+                    admin: false,
+                    ended_stop: None,
                 }]),
             };
             let bytes = family::forges(value, &w::CEILINGS).unwrap();
@@ -1397,10 +1407,6 @@ fn installations_and_the_last_connect_end_encode_unchanged() {
     let bytes = family::forges(
         forge::Forges {
             rows: Box::new([forge::Row {
-                owned: None,
-                web: None,
-                repositories: Box::new([]),
-                app: None,
                 number: 1,
                 kind: forge::Kind::GitHub,
                 mode: forge::Mode::Connected,
@@ -1419,6 +1425,12 @@ fn installations_and_the_last_connect_end_encode_unchanged() {
                     (22, forge::Installation { account: None, suspended: false, stray: true }),
                 ]),
                 ended: Some(Box::from(b"the pasted value changed".as_slice())),
+                app: None,
+                web: None,
+                repositories: Box::new([]),
+                owned: None,
+                admin: true,
+                ended_stop: Some(forge::AdminStop::Refused { status: 403, stage: forge::SetupStage::Token }),
             }]),
         },
         &w::CEILINGS,
@@ -1426,6 +1438,14 @@ fn installations_and_the_last_connect_end_encode_unchanged() {
     .unwrap();
     let rows = wire::decode_forges(&bytes, &w::CEILINGS).unwrap().into_parts().forges;
     let row = rows.get(0).unwrap();
+    assert!(row.admin());
+    assert_eq!(
+        row.ended_stop(),
+        &Some(w::AdminStop::Refused(
+            w::AdminRefused::new(&w::CEILINGS, w::AdminRefusedParts { status: 403, stage: w::SetupStage::Token })
+                .unwrap()
+        ))
+    );
     let installation = row.installations().get(0).unwrap();
     assert_eq!((installation.id(), installation.suspended(), installation.stray()), (11, true, false));
     let account = installation.account().as_ref().unwrap();
@@ -1460,6 +1480,17 @@ fn owned_details_fit_their_bounds_and_an_overlong_field_drops_only_the_details()
     ] {
         let value = forge::Forges {
             rows: Box::new([forge::Row {
+                number: 1,
+                kind: forge::Kind::Forgejo,
+                mode: forge::Mode::Owned,
+                connection: forge::Connection::Connecting,
+                offer: forge::Offer::NotOffered,
+                first: None,
+                installations: Box::new([]),
+                ended: None,
+                app: None,
+                web: None,
+                repositories: Box::new([]),
                 owned: Some(forge::Owned {
                     forgejo: Box::from(&[b'v'; 65][..forgejo]),
                     runner: match runner {
@@ -1468,17 +1499,8 @@ fn owned_details_fit_their_bounds_and_an_overlong_field_drops_only_the_details()
                     },
                     password: Box::from(&[b'/'; 513][..password]),
                 }),
-                web: None,
-                repositories: Box::new([]),
-                app: None,
-                installations: Box::new([]),
-                ended: None,
-                first: None,
-                number: 1,
-                kind: forge::Kind::Forgejo,
-                mode: forge::Mode::Owned,
-                connection: forge::Connection::Connecting,
-                offer: forge::Offer::NotOffered,
+                admin: false,
+                ended_stop: None,
             }]),
         };
         let bytes = family::forges(value, &w::CEILINGS).expect("the row is still available");

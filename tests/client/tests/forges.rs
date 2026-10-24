@@ -438,7 +438,8 @@ fn setup_fields_reach_the_engine_and_unknown_project_names_are_admitted() {
             org: b"team".as_slice().into(),
             repository: b"widget".as_slice().into(),
             project: d::SetUpProject::Existing(1),
-            state: d::FirstState::Making
+            state: d::FirstState::Making,
+            label: Box::from(b"temper-host".as_slice()),
         })
     );
     world.engine.send(engine::Event::Forge(Box::new(forge::Event::BoxClosed)));

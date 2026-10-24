@@ -280,29 +280,6 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 .ok()?;
         }
         rows.push(Row {
-            owned: match row.owned {
-                Some(owned) => {
-                    let owned = owned.into_parts();
-                    Some(forge::forges::Owned {
-                        forgejo: owned.forgejo,
-                        runner: owned.runner,
-                        password: owned.password,
-                    })
-                }
-                None => None,
-            },
-            web: row.web,
-            repositories: repositories.into_boxed(),
-            app: match row.app {
-                Some(w::AppWay::Manifest) => Some(super::forges::AppWay::Manifest),
-                Some(w::AppWay::Pasted) => Some(super::forges::AppWay::Pasted),
-                None => None,
-            },
-            installations: installations.into_boxed(),
-            ended: match row.ended {
-                Some(ended) => Some(ended.into_parts().why),
-                None => None,
-            },
             number: row.number,
             kind: match row.kind {
                 w::Kind::Forgejo => Kind::Forgejo,
@@ -314,6 +291,7 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 w::Mode::Owned => Mode::Owned,
                 w::Mode::Fake => Mode::Fake,
             },
+            connection,
             offer: match row.offer {
                 w::Offer::NotOffered => Offer::NotOffered,
                 w::Offer::NotUnderTheBox => Offer::NotUnderTheBox,
@@ -323,11 +301,36 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 Some(first) => Some(first_from(first)),
                 None => None,
             },
-            connection,
+            installations: installations.into_boxed(),
+            ended: match row.ended {
+                Some(ended) => Some(ended.into_parts().why),
+                None => None,
+            },
+            app: match row.app {
+                Some(w::AppWay::Manifest) => Some(super::forges::AppWay::Manifest),
+                Some(w::AppWay::Pasted) => Some(super::forges::AppWay::Pasted),
+                None => None,
+            },
+            web: row.web,
+            repositories: repositories.into_boxed(),
+            owned: match row.owned {
+                Some(owned) => Some(owned_from(owned)),
+                None => None,
+            },
+            admin: row.admin,
+            ended_stop: match row.ended_stop {
+                Some(stop) => Some(admin_stop(stop)),
+                None => None,
+            },
         })
         .ok()?;
     }
     Some(rows.into_boxed())
+}
+
+fn owned_from(owned: w::OwnedForge) -> forge::forges::Owned {
+    let owned = owned.into_parts();
+    forge::forges::Owned { forgejo: owned.forgejo, runner: owned.runner, password: owned.password }
 }
 
 fn first_from(first: w::FirstRepository) -> forge::forges::First {
@@ -352,6 +355,7 @@ fn first_from(first: w::FirstRepository) -> forge::forges::First {
                 },
             },
         },
+        label: first.label,
     }
 }
 
@@ -384,4 +388,27 @@ pub fn page(value: w::Page) -> Page {
         .expect("decoded page bound");
     }
     Page { rows: rows.into_boxed(), more: value.more }
+}
+
+fn admin_stop(stop: w::AdminStop) -> forge::forges::AdminStop {
+    use forge::forges::{AdminStop, SetupStage};
+    match stop {
+        w::AdminStop::NotAdmin => AdminStop::NotAdmin,
+        w::AdminStop::Unmarked => AdminStop::Unmarked,
+        w::AdminStop::Other => AdminStop::Other,
+        w::AdminStop::Refused(refused) => AdminStop::Refused {
+            status: refused.status(),
+            stage: match refused.stage() {
+                w::SetupStage::Admin => SetupStage::Admin,
+                w::SetupStage::Bot => SetupStage::Bot,
+                w::SetupStage::Token => SetupStage::Token,
+                w::SetupStage::Org => SetupStage::Org,
+                w::SetupStage::Repository => SetupStage::Repository,
+                w::SetupStage::File => SetupStage::File,
+                w::SetupStage::App => SetupStage::App,
+                w::SetupStage::Installation => SetupStage::Installation,
+                w::SetupStage::State => SetupStage::State,
+            },
+        },
+    }
 }

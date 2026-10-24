@@ -3,7 +3,7 @@ use super::{CONNECT, Forges, INSTALL, domain, finish, number_arg};
 use crate::{
     jig::{
         self,
-        call::number,
+        call::{Project, Value, number, value},
         render::{self, Text},
         runner::{Called, Out},
     },
@@ -22,15 +22,24 @@ pub(super) struct Pending {
     forge: u16,
     install: bool,
     manifest: bool,
+    first: bool,
     called: Option<Called>,
 }
 pub(super) fn owns(call: &jig::call::Call) -> bool {
     let name = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name;
     name == CONNECT.name || name == INSTALL.name
 }
-fn request(forge: u16, app: Option<u64>, manifest: bool, limits: &Limits) -> Option<Ask> {
+fn request(
+    forge: u16,
+    app: Option<u64>,
+    manifest: bool,
+    admin: Option<w::ForgejoAdmin>,
+    limits: &Limits,
+) -> Option<Ask> {
     let bounds = temper_client_domain::forge::wire_limits(&limits.domain.forge)?;
-    let request = if manifest {
+    let request = if let Some(admin) = admin {
+        w::Request::Connect(w::Connect::new(&bounds, w::ConnectParts { forge, how: w::How::ForgejoAdmin(admin) }).ok()?)
+    } else if manifest {
         w::Request::Connect(
             w::Connect::new(
                 &bounds,
@@ -64,21 +73,121 @@ fn request(forge: u16, app: Option<u64>, manifest: bool, limits: &Limits) -> Opt
         record: Family { family: wire::FORGE, version: wire::CLIENT_VERSION, bytes: wire::requesting(&record) },
     })
 }
+// The bundle's item is AdminToken (1), not AppKey (11). Preserve every byte.
+fn admin_token(token: &[u8]) -> Option<skein_lib::Secret> {
+    if token.is_empty() || token.len() > 4090 {
+        return None;
+    }
+    let mut out = skein_lib::Writer::new(token.len().checked_add(6)?);
+    out.put(&[1, 1, 1, 0]).ok()?;
+    out.put(&u16::try_from(token.len()).ok()?.to_le_bytes()).ok()?;
+    out.put(token).ok()?;
+    Some(skein_lib::Secret::new(out.finish()))
+}
+fn admin_how(
+    call: &jig::call::Call,
+    client: &jig_client::Client,
+    limits: &Limits,
+) -> Result<w::ForgejoAdmin, &'static [u8]> {
+    let invalid = b"invalid first repository, project or runner label".as_slice();
+    let bounds = temper_client_domain::forge::wire_limits(&limits.domain.forge).ok_or(invalid)?;
+    let first = match value(call, 3) {
+        None => {
+            if value(call, 4).is_some() || value(call, 5).is_some() {
+                return Err(b"--project and --label require --first");
+            }
+            None
+        }
+        Some(Value::Text(name)) => {
+            let mut split = None;
+            for (at, byte) in name.iter().enumerate() {
+                if *byte == b'/' {
+                    split = Some(at);
+                    break;
+                }
+            }
+            let split = split.ok_or(invalid)?;
+            let org = name.get(..split).ok_or(invalid)?;
+            let repository = name.get(split..).ok_or(invalid)?.strip_prefix(b"/").ok_or(invalid)?;
+            if org.is_empty() || repository.is_empty() || repository.contains(&b'/') {
+                return Err(invalid);
+            }
+            let label = match value(call, 5) {
+                Some(Value::Text(label)) => label.as_ref(),
+                _ => b"docker",
+            };
+            if label.is_empty() || label.len() > 64 {
+                return Err(invalid);
+            }
+            for byte in label {
+                if !byte.is_ascii_alphanumeric() && !b"._-".contains(byte) {
+                    return Err(invalid);
+                }
+            }
+            let project = match value(call, 4) {
+                Some(Value::Project(Project::Number(project))) => w::SetUpProject::Existing(
+                    w::ExistingProject::new(&bounds, w::ExistingProjectParts { project: *project })
+                        .ok()
+                        .ok_or(invalid)?,
+                ),
+                Some(Value::Project(Project::Name(name))) => {
+                    let mut found = None;
+                    if let Some(me) = crate::forge::me(client) {
+                        for project in &me.projects {
+                            if project.name.bytes() == name.as_ref() {
+                                found = Some(project.project);
+                                break;
+                            }
+                        }
+                    }
+                    match found {
+                        Some(project) => w::SetUpProject::Existing(
+                            w::ExistingProject::new(&bounds, w::ExistingProjectParts { project })
+                                .ok()
+                                .ok_or(invalid)?,
+                        ),
+                        None => w::SetUpProject::New(
+                            w::NewProject::new(&bounds, w::NewProjectParts { name: name.clone() })
+                                .ok()
+                                .ok_or(invalid)?,
+                        ),
+                    }
+                }
+                _ => w::SetUpProject::New(
+                    w::NewProject::new(&bounds, w::NewProjectParts { name: repository.into() }).ok().ok_or(invalid)?,
+                ),
+            };
+            Some(
+                w::FirstAsk::new(
+                    &bounds,
+                    w::FirstAskParts { org: org.into(), repository: repository.into(), project, label: label.into() },
+                )
+                .ok()
+                .ok_or(invalid)?,
+            )
+        }
+        _ => return Err(invalid),
+    };
+    w::ForgejoAdmin::new(&bounds, w::ForgejoAdminParts { first }).ok().ok_or(invalid)
+}
 #[expect(clippy::manual_map, reason = "the domain matches without closures")]
-pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, out: &mut Queue<Out>) {
+pub(super) fn send(
+    state: &mut Forges,
+    client: &jig_client::Client,
+    env: &Env<Limits>,
+    mut called: Called,
+    out: &mut Queue<Out>,
+) {
     if jig::argv::check(crate::table::TOOLS, &called.call, &env.limits.tools).is_err() {
         let printed = render::failure(b"invalid forge call", called.json, 1);
         finish(called, printed, out);
         return;
     }
     if crate::table::TOOLS.get(usize::from(called.call.tool)).expect("parsed tool").name == CONNECT.name
-        && called.call.form > 1
+        && called.call.form == 2
     {
-        let printed = render::failure(
-            b"forgejo and forgejo-admin are not offered yet; use forge-connect F github --key NAME",
-            called.json,
-            2,
-        );
+        let printed =
+            render::failure(b"forgejo is not offered yet; use forge-connect F github --key NAME", called.json, 2);
         finish(called, printed, out);
         return;
     }
@@ -86,6 +195,20 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
     let manifest = !install && called.call.form == 1;
     let forge = u16::try_from(number_arg(&called.call)).expect("checked forge number");
     let app = if install { None } else { number(&called.call, 2) };
+    let admin = !install && called.call.form == 3;
+    let first = admin && value(&called.call, 3).is_some();
+    let admin_how = if admin {
+        match admin_how(&called.call, client, &env.limits) {
+            Ok(how) => Some(how),
+            Err(why) => {
+                let printed = render::failure(why, called.json, 1);
+                finish(called, printed, out);
+                return;
+            }
+        }
+    } else {
+        None
+    };
     let value = called.value.take();
     if value.is_some() != (!install && !manifest) {
         let printed =
@@ -93,7 +216,7 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
         finish(called, printed, out);
         return;
     }
-    let Some(request) = request(forge, app, manifest, &env.limits) else {
+    let Some(request) = request(forge, app, manifest, admin_how, &env.limits) else {
         let printed = render::failure(b"forge request encoding failed", called.json, 1);
         finish(called, printed, out);
         return;
@@ -105,8 +228,9 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
     };
     let event = match value {
         Some(pem) => {
-            let Some(value) = domain::pasted_app_key(pem.expose()) else {
-                let printed = render::failure(b"App key file must contain 1 to 4090 bytes", called.json, 1);
+            let bundled = if admin { admin_token(pem.expose()) } else { domain::pasted_app_key(pem.expose()) };
+            let Some(value) = bundled else {
+                let printed = render::failure(b"credential file must contain 1 to 4090 bytes", called.json, 1);
                 finish(called, printed, out);
                 return;
             };
@@ -114,7 +238,7 @@ pub(super) fn send(state: &mut Forges, env: &Env<Limits>, mut called: Called, ou
         }
         None => Event::Send { key, name, request },
     };
-    state.connections.insert(key, Pending { forge, install, manifest, called: Some(called) });
+    state.connections.insert(key, Pending { forge, install, manifest, first, called: Some(called) });
     out.push(Out::Client { event });
 }
 pub(super) fn told(state: &mut Forges, env: &Env<Limits>, told: &Told, out: &mut Queue<Out>) -> bool {
@@ -138,7 +262,7 @@ pub(super) fn told(state: &mut Forges, env: &Env<Limits>, told: &Told, out: &mut
                     return false;
                 }
             };
-            state.connections.insert(*key, Pending { forge, install, manifest, called: None });
+            state.connections.insert(*key, Pending { forge, install, manifest, first: false, called: None });
             true
         }
         Told::Answered { key, outcome } => {
@@ -206,7 +330,10 @@ fn answer(value: &Answered, limits: &Limits) -> Option<Answer> {
         | w::Outcome::StartFailed(_) => None,
     }
 }
-fn text(forge: u16, install: bool, manifest: bool, answer: &Answer, kept: bool, limits: &Limits, out: &mut Text) {
+fn text(pending: &Pending, answer: &Answer, kept: bool, limits: &Limits, out: &mut Text) {
+    let forge = pending.forge;
+    let install = pending.install;
+    let manifest = pending.manifest;
     if kept {
         out.put(if install { b"kept: forge-install " } else { b"kept: forge-connect " });
     }
@@ -217,6 +344,11 @@ fn text(forge: u16, install: bool, manifest: bool, answer: &Answer, kept: bool, 
                 out.put(b"temper ctl DIRECTORY wait forges --until connected:");
                 out.number(u64::from(forge));
                 out.put(b"\n");
+                if pending.first {
+                    out.put(b"temper ctl DIRECTORY wait forges --until made:");
+                    out.number(u64::from(forge));
+                    out.put(b"\n");
+                }
             }
         }
         Answer::Link(address) => {
@@ -290,7 +422,7 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
         Outcome::Unknown => Some(Answer::Unknown),
         Outcome::Held | Outcome::Limit | Outcome::Unconfirmed | Outcome::NotKept | Outcome::Unsent | Outcome::Lost => {
             let mut operation = render::outcome::Operation::of(
-                &request(forge, None, pending.manifest, limits).expect("checked forge limits"),
+                &request(forge, None, pending.manifest, None, limits).expect("checked forge limits"),
             );
             operation.word = if install { b"forge-install" } else { b"forge-connect" };
             if !install
@@ -331,9 +463,9 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
         if kept { render::outcome::newline(&bytes) } else { bytes }
     } else {
         let mut measure = Text::measure();
-        text(forge, install, pending.manifest, &answer, kept, limits, &mut measure);
+        text(pending, &answer, kept, limits, &mut measure);
         let mut out = Text::writing_exact(measure);
-        text(forge, install, pending.manifest, &answer, kept, limits, &mut out);
+        text(pending, &answer, kept, limits, &mut out);
         out.finish()
     };
     if bytes.len() > usize::try_from(limits.tools.text).expect("text fits") {

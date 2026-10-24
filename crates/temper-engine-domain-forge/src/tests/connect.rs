@@ -134,8 +134,10 @@ fn admitted_connect_marks_connecting_answers_then_erases_once_at_its_end() {
             Some(Answered::Connect(ConnectAnswer::Refused(ForgeRefusal::Busy)))
         );
         assert_eq!(out.iter().filter(|r| if let Request::CarriedUnused { .. } = r { true } else { false }).count(), 1);
-        let out =
-            outputs(&mut d, Event::ConnectEnded { why: None, forge: 1, request: Token::new(1), connected: success });
+        let out = outputs(
+            &mut d,
+            Event::ConnectEnded { stop: None, why: None, forge: 1, request: Token::new(1), connected: success },
+        );
         assert_eq!(
             out.iter()
                 .filter(|r| if let Request::EraseCarried { number } = r { *number == VALUE.number } else { false })
@@ -143,8 +145,11 @@ fn admitted_connect_marks_connecting_answers_then_erases_once_at_its_end() {
             1
         );
         assert!(
-            outputs(&mut d, Event::ConnectEnded { why: None, forge: 1, request: Token::new(1), connected: success })
-                .is_empty()
+            outputs(
+                &mut d,
+                Event::ConnectEnded { stop: None, why: None, forge: 1, request: Token::new(1), connected: success }
+            )
+            .is_empty()
         );
         if !success {
             assert_eq!(d.connection(1), Connection::NotConnected);
@@ -228,7 +233,13 @@ fn stopped_connect() -> Domain {
     application(&mut d, 1, connect(1), Some(PartyRole::Owner), Some(VALUE));
     outputs(
         &mut d,
-        Event::ConnectEnded { forge: 1, request: Token::new(1), connected: false, why: Some(Box::from(STOP_REASON)) },
+        Event::ConnectEnded {
+            stop: None,
+            forge: 1,
+            request: Token::new(1),
+            connected: false,
+            why: Some(Box::from(STOP_REASON)),
+        },
     );
     d
 }
@@ -286,7 +297,13 @@ fn connect_end_reasons_are_bounded_without_splitting_utf8() {
     application(&mut d, 1, connect(1), Some(PartyRole::Owner), Some(VALUE));
     let out = outputs(
         &mut d,
-        Event::ConnectEnded { forge: 1, request: Token::new(1), connected: false, why: Some(reason.finish()) },
+        Event::ConnectEnded {
+            stop: None,
+            forge: 1,
+            request: Token::new(1),
+            connected: false,
+            why: Some(reason.finish()),
+        },
     );
     assert_eq!(d.forges().rows[0].ended.as_deref(), Some([b'x'; CONNECT_WHY_BYTES - 1].as_slice()));
     assert!(out.contains(&Request::MarkedForges));
@@ -445,7 +462,10 @@ fn app_way_is_volatile_and_only_shown_for_connected_github() {
     assert_eq!(d.forges().rows[0].app, None);
     let mut pasted = github(Kind::GitHub, Mode::Connected);
     application(&mut pasted, 1, connect(1), Some(PartyRole::Owner), Some(VALUE));
-    outputs(&mut pasted, Event::ConnectEnded { forge: 1, request: Token::new(1), connected: true, why: None });
+    outputs(
+        &mut pasted,
+        Event::ConnectEnded { stop: None, forge: 1, request: Token::new(1), connected: true, why: None },
+    );
     outputs(&mut pasted, Event::Connection { forge: 1, state: connected.clone() });
     assert_eq!(pasted.forges().rows[0].app, Some(AppWay::Pasted));
     let mut made = github(Kind::GitHub, Mode::Connected);
@@ -679,6 +699,7 @@ fn admitted_admin_connect_marks_connecting_and_keeps_the_first_repository_intent
     for first in [None, Some(first_ask())] {
         let mut d = admin_domain();
         let out = application(&mut d, 1, admin_ask(1, first.clone()), Some(PartyRole::Owner), Some(VALUE));
+        assert!(d.forges().rows[0].admin);
         assert_eq!(d.connection(1), Connection::Connecting);
         assert!(out.contains(&Request::Connect {
             forge: 1,
@@ -692,7 +713,8 @@ fn admitted_admin_connect_marks_connecting_and_keeps_the_first_repository_intent
                 org: first.org,
                 repository: first.repository,
                 project: first.project,
-                state: FirstState::Making
+                state: FirstState::Making,
+                label: first.label,
             })
         );
         assert!(!out.contains(&Request::CarriedUnused { number: VALUE.number }));
@@ -719,10 +741,22 @@ fn admin_connect_ends_erase_once_and_restore_the_previous_connection_on_failure(
                 outputs(&mut d, Event::FirstFailed { forge: 1, step: CreateStep::File });
                 Some(Box::from(b"making work/hello: File (Refused)".as_slice()))
             };
-            let event = Event::ConnectEnded { forge: 1, request: Token::new(1), connected: success, why: why.clone() };
+            let event = Event::ConnectEnded {
+                stop: None,
+                forge: 1,
+                request: Token::new(1),
+                connected: success,
+                why: why.clone(),
+            };
             let out = outputs(
                 &mut d,
-                Event::ConnectEnded { forge: 1, request: Token::new(1), connected: success, why: why.clone() },
+                Event::ConnectEnded {
+                    stop: None,
+                    forge: 1,
+                    request: Token::new(1),
+                    connected: success,
+                    why: why.clone(),
+                },
             );
             assert_eq!(out.iter().filter(|r| **r == Request::EraseCarried { number: VALUE.number }).count(), 1);
             assert!(outputs(&mut d, event).is_empty());
@@ -744,6 +778,7 @@ fn the_next_admitted_admin_connect_replaces_the_intent_and_clears_the_previous_e
         outputs(
             &mut d,
             Event::ConnectEnded {
+                stop: Some(AdminStop::Refused { status: 403, stage: SetupStage::Bot }),
                 forge: 1,
                 request: Token::new(1),
                 connected: false,
@@ -753,9 +788,11 @@ fn the_next_admitted_admin_connect_replaces_the_intent_and_clears_the_previous_e
         refused(&mut d, admin_ask(1, None), None, Some(VALUE), ForgeRefusal::Role);
         assert_eq!(d.forges().rows[0].first.as_ref().unwrap().repository.as_ref(), b"hello");
         assert_eq!(d.forges().rows[0].ended.as_deref(), Some(STOP_REASON));
+        assert_eq!(d.forges().rows[0].ended_stop, Some(AdminStop::Refused { status: 403, stage: SetupStage::Bot }));
         application(&mut d, 2, admin_ask(1, first.clone()), Some(PartyRole::Owner), Some(VALUE));
         assert_eq!(d.forges().rows[0].first.as_ref().map(|f| &f.repository), first.as_ref().map(|f| &f.repository));
         assert_eq!(d.forges().rows[0].ended, None);
+        assert_eq!(d.forges().rows[0].ended_stop, None);
     }
 }
 #[test]
@@ -775,7 +812,49 @@ fn a_service_refusal_restores_the_admin_connects_previous_connection_and_release
     assert!(out.contains(&Request::CarriedUnused { number: VALUE.number }));
     assert_eq!(d.connection(1), previous);
     assert!(
-        outputs(&mut d, Event::ConnectEnded { forge: 1, request: Token::new(1), connected: false, why: None })
-            .is_empty()
+        outputs(
+            &mut d,
+            Event::ConnectEnded { stop: None, forge: 1, request: Token::new(1), connected: false, why: None }
+        )
+        .is_empty()
     );
+}
+
+#[test]
+fn configured_admin_form_reaches_the_row() {
+    let mut d = admin_domain();
+    for admin in [false, true] {
+        d.configured.get_mut(&1).unwrap().admin_connect = admin;
+        assert_eq!(d.forges().rows[0].admin, admin);
+    }
+}
+#[test]
+fn typed_admin_stops_survive_a_cut_diagnostic_and_clear_on_connection() {
+    for stop in [
+        AdminStop::NotAdmin,
+        AdminStop::Unmarked,
+        AdminStop::Other,
+        AdminStop::Refused { status: 401, stage: SetupStage::Admin },
+        AdminStop::Refused { status: 403, stage: SetupStage::Repository },
+    ] {
+        let mut d = admin_domain();
+        application(&mut d, 1, admin_ask(1, None), Some(PartyRole::Owner), Some(VALUE));
+        let event = || Event::ConnectEnded {
+            forge: 1,
+            request: Token::new(1),
+            connected: false,
+            why: Some(Box::new([b'x'; CONNECT_WHY_BYTES + 1])),
+            stop: Some(stop),
+        };
+        outputs(&mut d, event());
+        assert!(outputs(&mut d, event()).is_empty());
+        assert_eq!(d.forges().rows[0].ended.as_ref().unwrap().len(), CONNECT_WHY_BYTES);
+        assert_eq!(d.forges().rows[0].ended_stop, Some(stop));
+        outputs(
+            &mut d,
+            Event::Connection { forge: 1, state: Connection::Connected { id: 9, login: b"bot".as_slice().into() } },
+        );
+        assert_eq!(d.forges().rows[0].ended, None);
+        assert_eq!(d.forges().rows[0].ended_stop, None);
+    }
 }
