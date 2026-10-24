@@ -1,5 +1,5 @@
 //! Calls share an asker and partition their local numbers (tools contract, 4).
-use crate::jig::{call::Call, render, wait};
+use crate::jig::{call::Call, render, rows, wait};
 use alloc::{boxed::Box, collections::BTreeMap};
 use jig_client::{
     Asker, Client, Event, Handle, Latest, State, Told, Watchable,
@@ -117,7 +117,7 @@ impl Runner {
     }
 }
 pub fn call(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, called: Called, out: &mut Queue<Out>) {
-    let importing = called.call.tool == crate::jig::rows::IMPORT_AT;
+    let importing = called.call.tool == rows::IMPORT_AT;
     let bound = if importing { crate::jig::call::MOVED_BYTES } else { crate::jig::call::KEY_BYTES };
     if let Some(value) = &called.value
         && (value.is_empty() || value.len() > usize::try_from(bound).expect("value bound"))
@@ -162,10 +162,8 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
                 render::me(me, called.json, &env.limits, runner.parts.expect("host supplies part vocabulary"));
             finish(called, printed, out);
         }
-        1..=7 | 22 | 23 | 25 | 27..=30 | 33 | crate::jig::rows::EXPORT_AT => {
-            reads::start(runner, client, env, called, out)
-        }
-        24 | 26 | 32 | crate::jig::rows::IMPORT_AT => accounts::start(runner, client, env, called, out),
+        1..=7 | 22 | 23 | 25 | 27..=30 | 33 | rows::EXPORT_AT => reads::start(runner, client, env, called, out),
+        24 | 26 | 32 | rows::IMPORT_AT => accounts::start(runner, client, env, called, out),
         8..=15 | 31 => acts::start(runner, client, env, called, out),
         16 => wait::start(runner, client, env, called, out),
         _ => {
@@ -225,7 +223,7 @@ pub fn told(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>,
     }
 }
 pub(crate) fn finish(called: Called, mut printed: Printed, out: &mut Queue<Out>) {
-    if called.call.tool == crate::jig::rows::EXPORT_AT {
+    if called.call.tool == rows::EXPORT_AT {
         printed.file = FileEnd::Remove;
     }
     out.push(Out::Printed { number: called.number, printed });
