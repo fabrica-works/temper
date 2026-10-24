@@ -319,6 +319,15 @@ directory of its own, `0700`, made empty each time (`DIR`):
    `/var/lib/temper/data/secrets/`, which the reset keeps: it prints
    `moved out: account N to FILE`, FILE `0600`, and the running engine
    has let the account go. Stop then, with nothing in between.
+
+   Read `accounts --json` once before the redeploy begins, too: it is
+   the dry run. Only an account with a granted `sign_in` source crosses.
+   A connect not finished is a row of `signing` (its `source`, no
+   number), and an account whose sign-in is not granted stays behind
+   too. If the account you expect is not there granted, finish its
+   sign-in from **Accounts** first. Don't wait for `temper ctl DIR wait
+   accounts --until settled`: a connect in progress keeps the accounts
+   unsettled until it ends.
 3. **After the start,** sign in again by the new engine's link (step
    1), then `temper ctl DIR import FILE --key NAME`, NAME a word of `a`
    to `z`, `0` to `9` and `-`: it prints `moved in: account N` and
