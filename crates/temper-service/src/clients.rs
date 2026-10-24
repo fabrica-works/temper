@@ -417,6 +417,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         for _ in 0..self.demo_ready.len() {
             if events.room() == 0 || (self.starting.is_some() && self.early.room() == 0) {
@@ -442,6 +443,13 @@ impl Clients {
                 kit::Request::Link { secret } => {
                     self.secret = Some(secret);
                     self.print_link();
+                }
+                kit::Request::TakeMoved { exchange, source } => {
+                    let record = match accounts {
+                        Some(accounts) => accounts.take_moved(source),
+                        None => None,
+                    };
+                    self.down(kit::Event::MovedTaken { exchange, record });
                 }
                 kit::Request::Secrets(value) => self.secrets.push(value),
                 kit::Request::Core(value) => match translation::to_root(*value) {
@@ -487,8 +495,6 @@ impl Clients {
                 kit::Request::Redeemed { .. } | kit::Request::Claimed { .. } => {
                     unreachable!("temper configures no OpenID provider")
                 }
-                // Transitional: T1b (accounts-move M4) routes TakeMoved with the accounts' take_moved.
-                kit::Request::TakeMoved { .. } => unreachable!("an account's move before temper routes it"),
                 kit::Request::Closed => self.component_closed = true,
             }
         }
@@ -507,6 +513,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         self.clock(now, wall);
         if let Some(settings) = self.initial.take() {
@@ -522,15 +529,15 @@ impl Clients {
         let server_pending = self.server.advance(&mut self.server_out);
         self.server_requests();
         self.google_advance(events);
-        self.endings_step(events, forges, demo);
-        self.advance(events, forges, demo);
+        self.endings_step(events, forges, demo, accounts);
+        self.advance(events, forges, demo, accounts);
         if self.closed {
             return;
         }
         if !self.component_closed {
             self.component.fire(&self.env, &mut self.out);
         }
-        self.advance(events, forges, demo);
+        self.advance(events, forges, demo, accounts);
         self.pending = server_pending || !self.server_out.is_empty();
         let mount_pending = self.mount.up(&self.mount_env, &mut self.mount_out);
         self.pending |= mount_pending;
@@ -549,7 +556,7 @@ impl Clients {
             self.pending |= self.component.up(&self.env, &mut self.out);
         }
 
-        self.advance(events, forges, demo);
+        self.advance(events, forges, demo, accounts);
     }
 }
 #[must_use]
@@ -690,6 +697,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         for _ in 0..self.endings.len().checked_mul(self.writes).expect("bounded sign-in endings") {
             if !self.room(1) || events.room() < kit::MAX_OUT_DOWN {
@@ -710,7 +718,7 @@ impl Clients {
                 self.endings.remove(&number);
             }
             self.down(kit::Event::SignInEnded { sign_in });
-            self.advance(events, forges, demo);
+            self.advance(events, forges, demo, accounts);
         }
     }
 }

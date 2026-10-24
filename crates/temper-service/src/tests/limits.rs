@@ -137,8 +137,9 @@ fn the_wire_admits_a_moved_file_and_temper_values_stay_at_their_bound() {
     settings.records_only = Box::new([1]);
     settings.forges[0].api_token = None;
     for bytes in [value, value + 1] {
-        settings.setup[0].handover =
-            Some(skein_lib::Secret::new(vec![b'x'; usize::try_from(bytes).unwrap()].into_boxed_slice()));
+        let mut handover = skein_lib::bytes::zeroed(usize::try_from(bytes).unwrap());
+        handover.fill(b'x');
+        settings.setup[0].handover = Some(skein_lib::Secret::new(handover));
         let (mut forges, _) = crate::forge::prepare(&settings, fixtures::forge_runtime()).unwrap();
         let result = crate::setup::prepare(&settings, &mut forges, &fixtures::seeds().crypto, 2, false);
         if bytes == value {

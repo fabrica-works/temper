@@ -245,7 +245,14 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     if let Some(demo) = &mut engine.demo {
         demo.state = engine.domain.demo_state();
     }
-    engine.clients.iterate(now, wall, &mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+    engine.clients.iterate(
+        now,
+        wall,
+        &mut engine.events,
+        &engine.workers.forges,
+        engine.demo.as_ref(),
+        &mut engine.accounts,
+    );
     clients_pass(engine);
     for _ in 0..engine.clients.early.len() {
         // A not-ready key returns its carried value before replying.
@@ -310,11 +317,11 @@ pub(crate) fn iterate(engine: &mut Engine, now: Time, wall: Wall) {
     clients_pass(engine);
 }
 fn clients_pass(engine: &mut Engine) {
-    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
     if engine.end.is_none() {
         engine.clients.secrets_step(&mut engine.store);
     }
-    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
 }
 fn release(engine: &mut Engine) {
     engine.ready = true;

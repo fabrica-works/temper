@@ -21,11 +21,13 @@ pub fn status(b: &mut Builder, words: &Words, word: P, holes: &[Hole]) {
 }
 pub fn refusal(b: &mut Builder, words: &Words, value: &c::Refusal) {
     let hole = match value {
-        c::Refusal::Stale(_) | c::Refusal::Full(_) | c::Refusal::AccountMove { .. } => None,
         c::Refusal::Account { account, .. } => Some(Hole::Number(u64::from(*account))),
         c::Refusal::Taken { by } => Some(Hole::Number(*by)),
         c::Refusal::Llm { model, .. } => Some(Hole::Name(words.model_name(model.bytes()))),
-        c::Refusal::NoEscalationHolder
+        c::Refusal::Stale(_)
+        | c::Refusal::Full(_)
+        | c::Refusal::AccountMove { .. }
+        | c::Refusal::NoEscalationHolder
         | c::Refusal::NameTaken
         | c::Refusal::Malformed { .. }
         | c::Refusal::Role { .. }
@@ -75,10 +77,9 @@ pub fn progress(b: &mut Builder, words: &Words, value: jig_client::Progress) {
 pub fn outcome(b: &mut Builder, words: &Words, value: &c::Outcome) {
     // The outcome names the engine's answer; it is never inferred from local state.
     let phrase = match value {
-        c::Outcome::SettingsChanged(_) => P::Applied,
         c::Outcome::Owner(value) => return owner_outcome(b, words, value),
         c::Outcome::Decided { how, .. } | c::Outcome::DecidedFirst { how, .. } => return decided(b, words, how),
-        c::Outcome::Made { .. } | c::Outcome::Changed => P::Applied,
+        c::Outcome::SettingsChanged(_) | c::Outcome::Made { .. } | c::Outcome::Changed => P::Applied,
         c::Outcome::Proposed { .. } => P::ProposeInstead,
     };
     status(b, words, phrase, &[]);
@@ -100,7 +101,6 @@ fn decided(b: &mut Builder, words: &Words, how: &c::Decision) {
 fn owner_outcome(b: &mut Builder, words: &Words, value: &c::OwnerOutcome) {
     use c::OwnerOutcome as O;
     let word = match value {
-        O::AccountMovedIn { .. } => P::Applied,
         O::Cancelled { .. } => P::Cancelled,
         O::Released { .. } => P::Released,
         O::PersonTaken { .. } => P::Taken,
@@ -117,7 +117,8 @@ fn owner_outcome(b: &mut Builder, words: &Words, value: &c::OwnerOutcome) {
             c::OwnerEscalationChoice::Rejected => P::LeftHeld,
             c::OwnerEscalationChoice::Passed => P::ProposeInstead,
         },
-        O::Created { .. }
+        O::AccountMovedIn { .. }
+        | O::Created { .. }
         | O::Compound { .. }
         | O::MarkedSeen { .. }
         | O::NoteEdited { .. }
