@@ -191,12 +191,12 @@ pub fn up(routes: &mut Routes, event: store::Event, into: &mut Queue<Up>) {
             routes.pending.remove(&owner);
             stop(routes, into);
         }
-        store::Event::Site { owner, of, key, site, at, patcher } => {
-            into.push(Up::Ask(dispatch(owner, of, key, site, at, patcher)));
+        store::Event::Site { owner, of, site, patcher, .. } => {
+            into.push(Up::Ask(dispatch(owner, of, site, patcher)));
         }
-        store::Event::Patched { .. } => {}
         store::Event::OpenRefused { .. } => stop(routes, into),
-        store::Event::Opened { .. }
+        store::Event::Patched { .. }
+        | store::Event::Opened { .. }
         | store::Event::Kept { .. }
         | store::Event::Carried { .. }
         | store::Event::Stale { .. }
@@ -344,9 +344,7 @@ pub(crate) fn worst_case(limits: &engine::Limits, key: u32, payload: u64) -> Opt
 fn dispatch(
     owner: Token,
     of: store::Owner,
-    _key: Box<[u8]>,
     site: skein_codec::patch::Site,
-    _at: skein_codec::value::Node,
     patcher: Box<skein_codec::patch::Patcher>,
 ) -> store::Request {
     let result = match of {

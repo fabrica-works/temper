@@ -873,12 +873,11 @@ fn proposal_reads_use_one_exact_read_and_keep_not_served_and_role_statuses() {
         c::Read::Proposal { proposal: c::ProposalKey { proposer: c::Proposer::Party(73), number: 7 } }
     );
     assert_eq!(root.watches.len(), 1);
-    for page in [
-        jig_client::Readout::NotServed { family: None, served: None },
-        jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Refused)),
+    for (page, status) in [
+        (jig_client::Readout::NotServed { family: None, served: None }, 1),
+        (jig_client::Readout::Jig(c::ReadResult::None(c::ReadNone::Refused)), 2),
     ] {
         let (mut root, call) = fixtures::read_call(&["proposal", "p73/7"]);
-        let status = if matches!(page, jig_client::Readout::Jig(_)) { 2 } else { 1 };
         root.serve_readout(call, page);
         assert_eq!(root.answer(call).expect("terminal read").status, status);
     }

@@ -201,13 +201,8 @@ pub(super) fn encode(value: &c::ReadValue, out: &mut Encoder, budget: &mut Cut) 
 fn holder(holder: c::OwnerHistoryHolder, out: &mut Encoder, budget: &mut Cut) {
     out.object_start();
     match holder {
-        c::OwnerHistoryHolder::Task(n) | c::OwnerHistoryHolder::Person(n) => {
-            out.key(if matches!(holder, c::OwnerHistoryHolder::Task(_)) { b"task" } else { b"person" });
-            out.object_start();
-            out.key(b"value");
-            out.unsigned(n);
-            out.object_end();
-        }
+        c::OwnerHistoryHolder::Task(n) => holder_number(b"task", n, out),
+        c::OwnerHistoryHolder::Person(n) => holder_number(b"person", n, out),
         c::OwnerHistoryHolder::Policy { project, kind } => {
             out.key(b"policy");
             out.object_start();
@@ -220,6 +215,14 @@ fn holder(holder: c::OwnerHistoryHolder, out: &mut Encoder, budget: &mut Cut) {
     }
     out.object_end();
 }
+fn holder_number(kind: &[u8], n: u64, out: &mut Encoder) {
+    out.key(kind);
+    out.object_start();
+    out.key(b"value");
+    out.unsigned(n);
+    out.object_end();
+}
+
 fn encode_settings(s: &c::OwnerProposalActionSettings, out: &mut Encoder) {
     out.object_start();
     out.key(b"settings");
@@ -266,15 +269,8 @@ fn encode_review(review: &c::SettingsReview, out: &mut Encoder) {
         encode_review_value(&item.now, out);
         out.key(b"origin");
         match &item.origin {
-            c::SettingOrigin::Default(r) | c::SettingOrigin::Change(r) => {
-                out.object_start();
-                out.key(if matches!(item.origin, c::SettingOrigin::Default(_)) { b"default" } else { b"change" });
-                out.object_start();
-                out.key(b"revision");
-                out.unsigned(u64::from(r.revision));
-                out.object_end();
-                out.object_end();
-            }
+            c::SettingOrigin::Default(r) => origin_revision(b"default", r.revision, out),
+            c::SettingOrigin::Change(r) => origin_revision(b"change", r.revision, out),
             c::SettingOrigin::NotOffered => out.string(b"not_offered"),
         }
         out.key(b"would_be");
@@ -286,6 +282,16 @@ fn encode_review(review: &c::SettingsReview, out: &mut Encoder) {
     out.boolean(review.cut);
     out.object_end();
 }
+fn origin_revision(kind: &[u8], revision: u32, out: &mut Encoder) {
+    out.object_start();
+    out.key(kind);
+    out.object_start();
+    out.key(b"revision");
+    out.unsigned(u64::from(revision));
+    out.object_end();
+    out.object_end();
+}
+
 fn encode_review_value(value: &c::ReviewValue, out: &mut Encoder) {
     match value {
         c::ReviewValue::Value(set) => {

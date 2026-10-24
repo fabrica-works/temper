@@ -193,7 +193,7 @@ fn temper_ctl_reads_the_deployments_settings_as_text_and_json() {
     }
     steps.extend([Step::Run(Call::new(&["revisions"])), Step::Run(Call::new(&["revisions", "--json"]))]);
     let seen = support::ctl::run(Story::new(scratch.path(), steps));
-    let [signed, settings, settings_json, setting, setting_json, revision, revision_json, revisions, revisions_json] =
+    let [signed, settings, settings_json, setting, setting_json, revision, revision_json, history_text, history_json] =
         seen.calls.as_slice()
     else {
         panic!("sign-in and eight settings reads")
@@ -218,9 +218,9 @@ fn temper_ctl_reads_the_deployments_settings_as_text_and_json() {
     assert!(revision_text.starts_with(&format!("revision {newest}, against revision ")), "{revision_text}");
     assert!(revision_text.contains(" UTC, by the first start"), "{revision_text}");
     assert_eq!(support::ctl::json(revision_json)["head"]["number"], newest);
-    let history = support::ctl::json(revisions_json);
+    let history = support::ctl::json(history_json);
     assert_eq!(history["rows"][0]["head"]["number"], newest);
-    assert!(String::from_utf8_lossy(&revisions.stdout).starts_with(&format!("revision {newest},")));
+    assert!(String::from_utf8_lossy(&history_text.stdout).starts_with(&format!("revision {newest},")));
     eprintln!("ctl settings reads story: {:?}", clock.now().now.saturating_since(began));
     scratch.remove();
 }

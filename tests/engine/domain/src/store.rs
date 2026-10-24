@@ -385,7 +385,6 @@ impl Store {
         match event {
             Event::Opened { last, .. } => self.applied = last,
             Event::Patched { .. } => {}
-            event @ Event::Site { .. } => self.route(event, requests),
             Event::Committed { number, .. } => {
                 let writes = self.inflight.remove(&number).expect("root commit");
                 for write in &writes {
@@ -432,7 +431,8 @@ impl Store {
                 self.failed = true;
                 self.route(event, requests);
             }
-            event @ (Event::Restored { .. }
+            event @ (Event::Site { .. }
+            | Event::Restored { .. }
             | Event::Loaded { .. }
             | Event::Read { .. }
             | Event::Got { .. }

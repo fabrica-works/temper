@@ -7,8 +7,8 @@ fn batch(page: &c::ReadValue) -> Option<&skein_lib::List<c::ProposedTask>> {
     match page {
         c::ReadValue::OwnerProposal(proposal) => match &proposal.action {
             c::OwnerProposalAction::Batch(tasks) => Some(tasks),
-            c::OwnerProposalAction::Settings(_) => None,
-            c::OwnerProposalAction::Effect { .. }
+            c::OwnerProposalAction::Settings(_)
+            | c::OwnerProposalAction::Effect { .. }
             | c::OwnerProposalAction::ProcedureEffect { .. }
             | c::OwnerProposalAction::Amend { .. }
             | c::OwnerProposalAction::Widen { .. }

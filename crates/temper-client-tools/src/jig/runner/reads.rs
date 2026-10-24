@@ -200,7 +200,7 @@ pub(super) fn changed(runner: &mut Runner, client: &Client, env: &Env<Limits>, h
     let bit = 1u8.checked_shl(local).expect("fixed watch slot");
     if reading.pending & bit != 0
         && let Some(document) = client.document(handle)
-        && matches!(document.state, jig_client::State::Live | jig_client::State::Ended)
+        && (document.state == jig_client::State::Live || document.state == jig_client::State::Ended)
         && let Some(Latest::Jig(delivery)) = document.latest
     {
         reading.pending &= !bit;

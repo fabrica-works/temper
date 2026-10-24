@@ -175,7 +175,7 @@ fn run(runner: &mut Runner, client: &Client, env: &Env<crate::jig::Limits>, call
         }
         24 | 26 | 32 | rows::IMPORT_AT => accounts::start(runner, client, env, called, out),
         8..=15 | 31 | rows::CHANGE_SETTINGS_AT | rows::PROPOSE_SETTINGS_AT => {
-            acts::start(runner, client, env, called, out)
+            acts::start(runner, client, env, called, out);
         }
         16 => wait::start(runner, client, env, called, out),
         _ => {

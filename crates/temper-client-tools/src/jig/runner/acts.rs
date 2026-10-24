@@ -28,7 +28,9 @@ pub(crate) fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
     }
 }
 pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
-    if matches!(called.call.tool, crate::jig::rows::CHANGE_SETTINGS_AT | crate::jig::rows::PROPOSE_SETTINGS_AT) {
+    if called.call.tool == crate::jig::rows::CHANGE_SETTINGS_AT
+        || called.call.tool == crate::jig::rows::PROPOSE_SETTINGS_AT
+    {
         let request = match crate::jig::settings_file::request(&called.call, &env.limits) {
             Ok(ask) => {
                 let ask = if called.call.tool == crate::jig::rows::PROPOSE_SETTINGS_AT {
@@ -299,27 +301,7 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
                 words: words(call, 2, limits)?,
             },
         },
-        12 => {
-            let on = if call.form == 0 {
-                let Some(Value::Proposal(proposal)) = value(call, 0) else { unreachable!("proposal form") };
-                c::DecideOn::Proposal {
-                    proposal: *proposal,
-                    decision: decision(call, limits)?,
-                    running: match value(call, 3) {
-                        Some(Value::Word(0)) => Some(c::Running::Stays),
-                        Some(Value::Word(1)) => Some(c::Running::Moves),
-                        Some(_) | None => None,
-                    },
-                }
-            } else {
-                c::DecideOn::Escalation {
-                    task,
-                    revision: c::Revision { value: number(call, 1).expect("hold") },
-                    decision: decision(call, limits)?,
-                }
-            };
-            c::Ask::Decide { project, on }
-        }
+        12 => c::Ask::Decide { project, on: decide(call, task, limits)? },
         13 => c::Ask::Release {
             project,
             task,
@@ -340,6 +322,27 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
     };
     Ok((Request::Ask(ask), to))
 }
+fn decide(call: &Call, task: u64, limits: &Limits) -> Result<c::DecideOn, Failed> {
+    Ok(if call.form == 0 {
+        let Some(Value::Proposal(proposal)) = value(call, 0) else { unreachable!("proposal form") };
+        c::DecideOn::Proposal {
+            proposal: *proposal,
+            decision: decision(call, limits)?,
+            running: match value(call, 3) {
+                Some(Value::Word(0)) => Some(c::Running::Stays),
+                Some(Value::Word(1)) => Some(c::Running::Moves),
+                Some(_) | None => None,
+            },
+        }
+    } else {
+        c::DecideOn::Escalation {
+            task,
+            revision: c::Revision { value: number(call, 1).expect("hold") },
+            decision: decision(call, limits)?,
+        }
+    })
+}
+
 fn chip_project(chip: &c::Chip) -> Option<u32> {
     match chip.details.as_ref() {
         c::ChipPhase::Owner { details, .. } => Some(details.project),
@@ -519,10 +522,10 @@ fn send(
         operation.file = Some(file.clone());
     }
     operation.account = account;
-    if !matches!(
-        called.call.tool,
-        crate::jig::rows::EXPORT_AT | crate::jig::rows::CHANGE_SETTINGS_AT | crate::jig::rows::PROPOSE_SETTINGS_AT
-    ) {
+    if called.call.tool != crate::jig::rows::EXPORT_AT
+        && called.call.tool != crate::jig::rows::CHANGE_SETTINGS_AT
+        && called.call.tool != crate::jig::rows::PROPOSE_SETTINGS_AT
+    {
         operation.retry = Some(render::outcome::retry(&called.call));
     }
     if called.call.tool == 26 || called.call.tool == 27 || called.call.tool == crate::jig::rows::IMPORT_AT {

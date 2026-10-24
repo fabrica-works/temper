@@ -381,64 +381,12 @@ pub(crate) fn answer(engine: &mut Engine) {
             break;
         }
         let event = engine.store.above.pop().expect("store terminals");
-        #[expect(clippy::match_same_arms, reason = "each store refusal keeps its own startup stop line")]
         match event {
             jig_protocol_store::Event::Opened { installation, .. } => {
                 engine.store.opened = true;
                 engine.store.installation = installation;
             }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Format { .. },
-                ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Deployment, ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Numbers { .. },
-                ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused { why: why @ jig_protocol_store::OpenRefusal::Failed, .. } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::OlderBuild { .. },
-                ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Generations { .. },
-                ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Ahead { .. }, ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Patch { .. }, ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Set { .. }, ..
-            } => {
-                stop::open(engine, &why);
-            }
-            jig_protocol_store::Event::OpenRefused {
-                why: why @ jig_protocol_store::OpenRefusal::Check { .. }, ..
-            } => {
-                stop::open(engine, &why);
-            }
+            jig_protocol_store::Event::OpenRefused { why, .. } => open_refused(engine, why),
             jig_protocol_store::Event::Patched { of, patch, counts, .. } => {
                 engine.notes.try_push(crate::Note::Patched { of, patch, counts }).expect("patch progress note room");
             }
@@ -493,6 +441,10 @@ pub(crate) fn answer(engine: &mut Engine) {
             return;
         }
     }
+    answer_routed(engine);
+}
+
+fn answer_routed(engine: &mut Engine) {
     for _ in 0..engine.store.routed.len() {
         match engine.store.routed.pop().expect("store routing") {
             Up::Root(event) => {
@@ -520,6 +472,23 @@ pub(crate) fn answer(engine: &mut Engine) {
         if engine.end.is_some() {
             break;
         }
+    }
+}
+
+fn open_refused(engine: &mut Engine, why: jig_protocol_store::OpenRefusal) {
+    use jig_protocol_store::OpenRefusal;
+    #[expect(clippy::match_same_arms, reason = "each store refusal keeps its own startup stop line")]
+    match why {
+        why @ OpenRefusal::Format { .. } => stop::open(engine, &why),
+        why @ OpenRefusal::Deployment => stop::open(engine, &why),
+        why @ OpenRefusal::Numbers { .. } => stop::open(engine, &why),
+        why @ OpenRefusal::Failed => stop::open(engine, &why),
+        why @ OpenRefusal::OlderBuild { .. } => stop::open(engine, &why),
+        why @ OpenRefusal::Generations { .. } => stop::open(engine, &why),
+        why @ OpenRefusal::Ahead { .. } => stop::open(engine, &why),
+        why @ OpenRefusal::Patch { .. } => stop::open(engine, &why),
+        why @ OpenRefusal::Set { .. } => stop::open(engine, &why),
+        why @ OpenRefusal::Check { .. } => stop::open(engine, &why),
     }
 }
 
