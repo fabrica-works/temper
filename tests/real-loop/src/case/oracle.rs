@@ -161,6 +161,11 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::BatchTwo,
         Agent::BatchThree,
         Agent::BatchStory,
+        Agent::BlockerDirector,
+        Agent::BlockerOwner,
+        Agent::BlockerSubowner,
+        Agent::BlockerImplementer,
+        Agent::BlockerCoder,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -5228,10 +5233,10 @@ mod batch_tests {
     use serde_json::json;
     use skein_fake_llm_domain::api::{Message, Part, Role};
 
-    fn input(words: &str) -> Message {
+    pub(super) fn input(words: &str) -> Message {
         Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
     }
-    fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
+    pub(super) fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
         [
             Message {
                 role: Role::Assistant,
@@ -5251,10 +5256,10 @@ mod batch_tests {
             },
         ]
     }
-    fn told(agent: Agent, history: &[Message]) -> Told {
+    pub(super) fn told(agent: Agent, history: &[Message]) -> Told {
         Told::new(agent.cue(), b"fake", None, history).expect("agent cue")
     }
-    fn journal(task: u64, lines: &[Value]) -> Value {
+    pub(super) fn journal(task: u64, lines: &[Value]) -> Value {
         let rows: Vec<_> = lines
             .iter()
             .enumerate()
@@ -5614,6 +5619,888 @@ mod batch_tests {
             let mut changed = passing.clone();
             changed.documents.get_mut(&read).expect("task")["activity"]["cut"] = json!(true);
             rejects(&changed, BATCH_ATTEMPTS);
+        }
+    }
+}
+
+// Act 3, step 6.2 (domain/testing.md, 5.3)
+const BLOCKER_MESSAGES: Promise = Promise::Must("two questions and two answers, up then down");
+const BLOCKER_CHECKPOINT: Promise = Promise::Must("e1 waits for A1's answer before delegation");
+const BLOCKER_DEPENDENCY: Promise = Promise::Must("a dependency added to a live task");
+const BLOCKER_KEPT: Promise = Promise::Add("a3 kept pending e1, then told its landing once");
+const BLOCKER_LANDING: Promise = Promise::Must("e1 lands green changing B's fake");
+const BLOCKER_ATTEMPTS: Promise = Promise::Add("every attempt ended, none failed");
+
+fn blocker_tasks() -> [(Read, u64, u64); 7] {
+    use super::{
+        BLOCKER_A3, BLOCKER_CODER, BLOCKER_DIRECTOR, BLOCKER_E1, BLOCKER_OWNER, BLOCKER_REVIEWER, BLOCKER_SUBOWNER,
+    };
+    [
+        (Read::BlockerDirectorEnded, BLOCKER_DIRECTOR, 0),
+        (Read::BlockerOwnerEnded, BLOCKER_OWNER, BLOCKER_DIRECTOR),
+        (Read::BlockerSubownerEnded, BLOCKER_SUBOWNER, BLOCKER_OWNER),
+        (Read::BlockerA3Ended, BLOCKER_A3, BLOCKER_SUBOWNER),
+        (Read::BlockerE1Ended, BLOCKER_E1, BLOCKER_SUBOWNER),
+        (Read::BlockerCoderEnded, BLOCKER_CODER, BLOCKER_E1),
+        (Read::BlockerReviewerEnded, BLOCKER_REVIEWER, BLOCKER_E1),
+    ]
+}
+
+struct BlockerExchange {
+    sender: Agent,
+    receiver: Agent,
+    by: u64,
+    target: u64,
+    message: u64,
+    question: Option<u64>,
+    words: &'static str,
+    read: Read,
+}
+fn blocker_exchanges() -> [BlockerExchange; 5] {
+    use super::{
+        Agent, BLOCKER_A3, BLOCKER_ANSWER, BLOCKER_ANSWER_NUMBER, BLOCKER_DIRECTOR, BLOCKER_FINDING,
+        BLOCKER_FINDING_NUMBER, BLOCKER_OWNER, BLOCKER_QUESTION, BLOCKER_QUESTION_NUMBER, BLOCKER_SUBOWNER,
+        BLOCKER_UP_ANSWER, BLOCKER_UP_ANSWER_NUMBER, BLOCKER_UP_QUESTION, BLOCKER_UP_QUESTION_NUMBER,
+    };
+    [
+        BlockerExchange {
+            sender: Agent::BlockerImplementer,
+            receiver: Agent::BlockerSubowner,
+            by: BLOCKER_A3,
+            target: BLOCKER_SUBOWNER,
+            message: BLOCKER_FINDING_NUMBER,
+            question: None,
+            words: BLOCKER_FINDING,
+            read: Read::BlockerSubownerEnded,
+        },
+        BlockerExchange {
+            sender: Agent::BlockerSubowner,
+            receiver: Agent::BlockerOwner,
+            by: BLOCKER_SUBOWNER,
+            target: BLOCKER_OWNER,
+            message: BLOCKER_QUESTION_NUMBER,
+            question: None,
+            words: BLOCKER_QUESTION,
+            read: Read::BlockerOwnerEnded,
+        },
+        BlockerExchange {
+            sender: Agent::BlockerOwner,
+            receiver: Agent::BlockerDirector,
+            by: BLOCKER_OWNER,
+            target: BLOCKER_DIRECTOR,
+            message: BLOCKER_UP_QUESTION_NUMBER,
+            question: None,
+            words: BLOCKER_UP_QUESTION,
+            read: Read::BlockerDirectorEnded,
+        },
+        BlockerExchange {
+            sender: Agent::BlockerDirector,
+            receiver: Agent::BlockerOwner,
+            by: BLOCKER_DIRECTOR,
+            target: BLOCKER_OWNER,
+            message: BLOCKER_UP_ANSWER_NUMBER,
+            question: Some(BLOCKER_UP_QUESTION_NUMBER),
+            words: BLOCKER_UP_ANSWER,
+            read: Read::BlockerOwnerEnded,
+        },
+        BlockerExchange {
+            sender: Agent::BlockerOwner,
+            receiver: Agent::BlockerSubowner,
+            by: BLOCKER_OWNER,
+            target: BLOCKER_SUBOWNER,
+            message: BLOCKER_ANSWER_NUMBER,
+            question: Some(BLOCKER_QUESTION_NUMBER),
+            words: BLOCKER_ANSWER,
+            read: Read::BlockerSubownerEnded,
+        },
+    ]
+}
+fn blocker_delivery(observed: &Observed, agent: Agent, words: &str) -> Option<usize> {
+    observed.told.iter().position(|t| t.agent == agent && user_words(t).any(|w| contains(w, words)))
+}
+fn blocker_messages(observed: &Observed) -> bool {
+    let mut previous = None;
+    blocker_exchanges().iter().enumerate().all(|(at, exchange)| {
+        let form = if exchange.question.is_some() {
+            "answer"
+        } else if at == 0 {
+            "words"
+        } else {
+            "question"
+        };
+        let tools = plan_tool_results(observed, exchange.sender, b"message");
+        let tools: Vec<_> = tools.iter().filter(|(_, args, _)| args["words"] == exchange.words).collect();
+        let delivered = blocker_delivery(observed, exchange.receiver, exchange.words);
+        let ordered = delivered.is_some_and(|delivery| previous.is_none_or(|before| before < delivery));
+        previous = delivered;
+        tools.len() == 1
+            && tools.iter().all(|(_, args, out)| {
+                args["target"] == exchange.target
+                    && args["form"] == form
+                    && exchange.question.is_none_or(|q| args["question"] == q)
+                    && contains(out, &format!("Message {} sent", exchange.message))
+            })
+            && plan_deliveries(observed, exchange.receiver, exchange.words) == 1
+            && ordered
+            && check_activity(observed, exchange.read)
+                .iter()
+                .filter(|row| {
+                    let kind = row.pointer("/line/words/kind");
+                    number(row, "/line/words/message") == Some(exchange.message)
+                        && number(row, "/line/words/by/task") == Some(exchange.by)
+                        && text(row, "/line/words/words") == exchange.words
+                        && kind
+                            == Some(&exchange.question.map_or_else(
+                                || Value::String(form.into()),
+                                |q| serde_json::json!({"answer":{"question":q}}),
+                            ))
+                })
+                .count()
+                == 1
+    })
+}
+fn blocker_dependency(observed: &Observed, read: Read, pending: bool) -> bool {
+    use super::{BLOCKER_E1, BLOCKER_SUBOWNER};
+    task_document(observed, read)["dependency_facts"].as_array().is_some_and(|facts| {
+        facts.len() == 1
+            && facts[0]["number"] == BLOCKER_E1
+            && facts[0]["pending"] == pending
+            && number(&facts[0], "/added/by/task") == Some(BLOCKER_SUBOWNER)
+            && number(&facts[0], "/added/at").is_some()
+    })
+}
+
+#[must_use]
+pub fn step_6_2(observed: &Observed) -> Vec<Miss> {
+    use super::{BLOCKER_A3, BLOCKER_ANSWER, BLOCKER_E1, BLOCKER_E1_SPEC, BLOCKER_REASON, BLOCKER_REVISION};
+    let mut misses = Vec::new();
+    blocker_identities(observed, &mut misses);
+    let a3 = task_document(observed, Read::BlockerA3Ended);
+    step_check(
+        &mut misses,
+        "6.2",
+        blocker_messages(observed),
+        BLOCKER_MESSAGES,
+        "the finding and four numbered question/answer messages must each be told once, in order",
+    );
+    let delegates = plan_tool_results(observed, Agent::BlockerSubowner, b"delegate");
+    let answer_at = blocker_delivery(observed, Agent::BlockerSubowner, BLOCKER_ANSWER);
+    step_check(
+        &mut misses,
+        "6.2",
+        delegates.len() == 2
+            && delegates
+                .iter()
+                .filter(|(_, args, _)| {
+                    args.pointer("/batch/0/executor/kind") == Some(&Value::String("procedure".into()))
+                })
+                .count()
+                == 1
+            && delegates.iter().any(|(at, args, out)| {
+                answer_at.is_some_and(|answer| *at > answer)
+                    && contains(out, &format!("Delegated tasks: {BLOCKER_E1}"))
+                    && args["batch"].as_array().is_some_and(|batch| {
+                        batch.len() == 1
+                            && batch[0]["executor"] == serde_json::json!({"kind":"procedure","connector":1,"code":2})
+                            && batch[0]["spec"]["words"] == BLOCKER_E1_SPEC
+                    })
+            })
+            && text(task_document(observed, Read::BlockerE1Ended), "/spec/specification/words/bytes")
+                == BLOCKER_E1_SPEC,
+        BLOCKER_CHECKPOINT,
+        "A1 must delegate the singleton e1 change in a turn after receiving A's answer",
+    );
+    let amendments = plan_tool_results(observed, Agent::BlockerSubowner, b"amend");
+    let kept = task_document(observed, Read::BlockerKept);
+    step_check(
+        &mut misses,
+        "6.2",
+        amendments.len() == 1
+            && amendments.iter().all(|(_, args, out)| {
+                args["target"] == BLOCKER_A3
+                    && args["revision"] == BLOCKER_REVISION - 1
+                    && args["amendment"]["dependencies"] == serde_json::json!([BLOCKER_E1])
+                    && args["amendment"]["reason"] == BLOCKER_REASON
+                    && contains(out, &format!("Done: task {BLOCKER_A3} is at spec revision {BLOCKER_REVISION}"))
+            })
+            && blocker_dependency(observed, Read::BlockerKept, true)
+            && blocker_dependency(observed, Read::BlockerA3Ended, false)
+            && kept["dependency_facts"][0]["keeps"] == true
+            && number(kept, "/spec_revision/value") == Some(BLOCKER_REVISION)
+            && number(a3, "/spec_revision/value") == Some(BLOCKER_REVISION)
+            && plan_deliveries(observed, Agent::BlockerImplementer, BLOCKER_REASON) == 1
+            && blocker_live_amendment(observed),
+        BLOCKER_DEPENDENCY,
+        "A1's successful amendment of live a3 must add e1 alone at the fresh spec revision",
+    );
+    blocker_kept(observed, &mut misses);
+    blocker_landing(observed, &mut misses);
+    misses
+}
+
+fn blocker_identities(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{A_DEADLINE, A1_DEADLINE, BLOCKER_E1, BLOCKER_OWNER, PROJECT};
+    for (read, task, parent) in blocker_tasks() {
+        let doc = task_document(observed, read);
+        step_check(
+            misses,
+            "6.2",
+            number(doc, "/chip/task") == Some(task)
+                && number(doc, "/project") == Some(PROJECT)
+                && (parent == 0 || number(doc, "/requester/task") == Some(parent))
+                && text(doc, "/chip/phase") == "ended"
+                && doc.pointer("/result/ending/task/done").is_some_and(Value::is_object),
+            BLOCKER_DEPENDENCY,
+            &format!("{read:?} must identify done task {task} under {parent}"),
+        );
+        if task != BLOCKER_E1 {
+            step_check(
+                misses,
+                "6.2",
+                batch_journal(observed, read, task),
+                BLOCKER_ATTEMPTS,
+                &format!(
+                    "task {task}'s complete journal must end every attempt, allowing only bounded zero-spend rechecks"
+                ),
+            );
+        }
+    }
+    let a = task_document(observed, Read::BlockerOwnerEnded);
+    let a1 = task_document(observed, Read::BlockerSubownerEnded);
+    let a3 = task_document(observed, Read::BlockerA3Ended);
+    step_check(
+        misses,
+        "6.2",
+        number(a, "/goal") == Some(BLOCKER_OWNER)
+            && number(a, "/authority/authority/deadline") == Some(A_DEADLINE)
+            && number(a, "/authority/authority/delegation/depth") == Some(4)
+            && number(a1, "/authority/authority/deadline") == Some(A1_DEADLINE)
+            && number(a1, "/authority/authority/delegation/depth") == Some(3)
+            && number(a3, "/authority/authority/delegation/depth") == Some(0),
+        BLOCKER_DEPENDENCY,
+        "A must be tracked, with A1's deadline and the least depths for the change tree",
+    );
+}
+
+fn blocker_kept(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{Agent, BLOCKER_A3, BLOCKER_A3_REPORT, BLOCKER_E1, BLOCKER_REVIEWER};
+    let kept = task_document(observed, Read::BlockerKept);
+    let pending = task_document(observed, Read::BlockerPending);
+    let before = check_activity(observed, Read::BlockerKept);
+    let after = check_activity(observed, Read::BlockerA3Ended);
+    let kept_row = before.iter().find(|r| r.pointer("/line/kept").is_some());
+    let met = format!("T{BLOCKER_E1} is done; the task can go on");
+    step_check(
+        misses,
+        "6.2",
+        number(kept, "/chip/task") == Some(BLOCKER_A3)
+            && text(kept, "/chip/phase") == "idle"
+            && kept.get("result") == Some(&Value::Null)
+            && kept.pointer("/waits_on/dependencies/pending") == Some(&serde_json::json!([BLOCKER_E1]))
+            && number(pending, "/chip/task") == Some(BLOCKER_E1)
+            && text(pending, "/chip/phase") == "idle"
+            && pending.get("result") == Some(&Value::Null)
+            && batch_writing(observed, Read::BlockerReviewWriting, BLOCKER_REVIEWER, Read::BlockerReviewerEnded)
+            && kept_row.is_some_and(|row| {
+                row.pointer("/line/kept/pending") == Some(&serde_json::json!([BLOCKER_E1]))
+                    && number(row, "/line/kept/attempt").is_some_and(|attempt| {
+                        before.iter().any(|r| {
+                            number(r, "/line/run_ended/attempt") == Some(attempt)
+                                && text(r, "/line/run_ended/end") == "parked"
+                        })
+                    })
+                    && number(row, "/position").is_some_and(|position| {
+                        !before.iter().any(|r| {
+                            r.pointer("/line/run_began").is_some()
+                                && number(r, "/position").is_some_and(|p| p > position)
+                        }) && after.iter().any(|r| {
+                            r.pointer("/line/run_began").is_some()
+                                && number(r, "/position").is_some_and(|p| p > position)
+                        })
+                    })
+            })
+            && before.iter().all(|row| after.contains(row))
+            && plan_deliveries(observed, Agent::BlockerImplementer, &met) == 1
+            && blocker_resumed(observed)
+            && text(task_document(observed, Read::BlockerA3Ended), "/result/value/report/bytes") == BLOCKER_A3_REPORT,
+        BLOCKER_KEPT,
+        "a3's saved done run must be kept across the pending held review, then resume on one identified Met notice",
+    );
+}
+// The kept read is a prefix of the final source journal. The held review
+// remains pending through that read and is released afterwards by the acts.
+// Met after that prefix, followed by its resumed run, orders the query after
+// the read without comparing clocks or positions belonging to different tasks.
+fn blocker_live_amendment(observed: &Observed) -> bool {
+    use super::{BLOCKER_AMENDMENT_NUMBER, BLOCKER_REASON, BLOCKER_REVISION, BLOCKER_SUBOWNER};
+    let rows = check_activity(observed, Read::BlockerKept);
+    let amendment = rows.iter().find(|r| number(r, "/line/heard/number") == Some(BLOCKER_AMENDMENT_NUMBER));
+    amendment.is_some_and(|row| {
+        number(row, "/line/heard/from/task") == Some(BLOCKER_SUBOWNER)
+            && number(row, "/line/heard/kind/amendment/revision") == Some(BLOCKER_REVISION)
+            && text(row, "/line/heard/words") == BLOCKER_REASON
+            && row.pointer("/line/heard/eligible") == Some(&Value::Bool(true))
+            && number(row, "/position").is_some_and(|at| {
+                rows.iter().any(|r| {
+                    number(r, "/line/kept/attempt").is_some_and(|attempt| {
+                        rows.iter().any(|r| {
+                            number(r, "/line/run_began/attempt") == Some(attempt)
+                                && number(r, "/position").is_some_and(|begin| begin < at)
+                        }) && rows.iter().any(|r| {
+                            number(r, "/line/turn/attempt") == Some(attempt)
+                                && number(r, "/line/turn/read") == Some(BLOCKER_AMENDMENT_NUMBER)
+                                && number(r, "/position").is_some_and(|turn| turn > at)
+                        })
+                    })
+                })
+            })
+    })
+}
+fn blocker_resumed(observed: &Observed) -> bool {
+    use super::{BLOCKER_E1, BLOCKER_KEPT_REPORT, BLOCKER_REASON};
+    use skein_fake_llm_domain::api::Part;
+    let before = check_activity(observed, Read::BlockerKept);
+    let after = check_activity(observed, Read::BlockerA3Ended);
+    let met_rows: Vec<_> = after.iter().filter(|r| r.pointer("/line/heard/kind/met").is_some()).collect();
+    let met = format!("T{BLOCKER_E1} is done; the task can go on");
+    let reason_at = blocker_delivery(observed, Agent::BlockerImplementer, BLOCKER_REASON);
+    let met_at = blocker_delivery(observed, Agent::BlockerImplementer, &met);
+    met_rows.len() == 1
+        && met_rows.iter().all(|row| {
+            number(row, "/line/heard/from/task") == Some(BLOCKER_E1)
+                && number(row, "/line/heard/kind/met/dependency") == Some(BLOCKER_E1)
+                && row.pointer("/line/heard/kind/met/removed") == Some(&Value::Bool(false))
+                && number(row, "/position")
+                    .zip(before.first().and_then(|r| number(r, "/position")))
+                    .is_some_and(|(met, read)| met > read)
+                && number(row, "/line/heard/number").is_some_and(|message| {
+                    after.iter().any(|r| {
+                        number(r, "/line/run_began/why/message/message") == Some(message)
+                            && r.pointer("/line/run_began/resumed") == Some(&Value::Bool(true))
+                            && number(r, "/position").zip(number(row, "/position")).is_some_and(|(run, met)| run > met)
+                    })
+                })
+        })
+        && reason_at.zip(met_at).is_some_and(|(reason, met)| reason < met)
+        && met_at.is_some_and(|at| {
+            observed.told[at].history.iter().flat_map(|m| &m.parts).any(|p| {
+                if let Part::ToolCall { name, arguments, .. } = p
+                    && name.as_ref() == b"finish"
+                    && let Ok(args) = serde_json::from_slice::<Value>(arguments)
+                {
+                    args["form"] == "report" && args["text"] == BLOCKER_KEPT_REPORT
+                } else {
+                    false
+                }
+            })
+        })
+}
+fn blocker_landing(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{BLOCKER_DIRECTOR, BLOCKER_E1, BLOCKER_FILE, BLOCKER_FIXED, BLOCKER_PULL};
+    let e1 = task_document(observed, Read::BlockerE1Ended);
+    step_check(
+        misses,
+        "6.2",
+        observed.kit.merged_green
+            && observed.kit.main.get(BLOCKER_FILE.as_bytes()).is_some_and(|v| v == BLOCKER_FIXED.as_bytes())
+            && number(e1, "/result/ending/task/done/change/kind") == Some(1)
+            && number(e1, "/result/value/change/part/connector") == Some(1)
+            && text(e1, "/result/value/change/part/kind") == "result"
+            && observed.kit.pulls.len() == 1
+            && observed.kit.pulls.iter().all(|pull| {
+                pull.number == BLOCKER_PULL
+                    && pull.branch == format!("temper/{BLOCKER_DIRECTOR}/c{BLOCKER_E1}").as_bytes()
+                    && pull.merged
+                    && pull.pushed == Some(pull.opened)
+                    && pull.merged_head == pull.pushed
+                    && pull
+                        .landed
+                        .is_some_and(|commit| text(e1, "/result/value/change/words/bytes") == direction_commit(commit))
+            }),
+        BLOCKER_LANDING,
+        "e1's only pull must merge its green pushed head and leave B's fixed file on kit main",
+    );
+}
+
+#[cfg(test)]
+mod blocker_tests {
+    use super::batch_tests::{input, journal, told, tool};
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+    use skein_fake_llm_domain::api::{Message, Part};
+
+    fn documents() -> BTreeMap<Read, Value> {
+        let mut documents = BTreeMap::new();
+        let mut lines = BTreeMap::<Read, Vec<Value>>::new();
+        for (read, task, parent) in blocker_tasks() {
+            documents.insert(
+                read,
+                json!({"task":{
+                    "chip":{"task":task,"phase":"ended"},"project":PROJECT,"requester":{"task":parent},
+                    "goal":BLOCKER_OWNER,"authority":{"authority":{
+                        "deadline":if task == BLOCKER_OWNER {A_DEADLINE} else {A1_DEADLINE},
+                        "delegation":{"depth":match task { BLOCKER_OWNER => 4, BLOCKER_SUBOWNER => 3, _ => 0 }}
+                    }},"result":{"ending":{"task":{"done":{}}}}
+                }}),
+            );
+            lines.insert(read, vec![json!({"run_began":{"attempt":1}})]);
+        }
+        for exchange in blocker_exchanges() {
+            let kind = exchange.question.map_or_else(
+                || json!(if exchange.message == BLOCKER_FINDING_NUMBER { "words" } else { "question" }),
+                |q| json!({"answer":{"question":q}}),
+            );
+            lines.get_mut(&exchange.read).expect("lines").push(json!({"words":{
+                "message":exchange.message,"by":{"task":exchange.by},"kind":kind,"words":exchange.words}}));
+        }
+        for (read, task, _) in blocker_tasks() {
+            let rows = lines.get_mut(&read).expect("lines");
+            rows.push(json!({"run_ended":{"attempt":1,"end":"finished","spent":1}}));
+            documents.get_mut(&read).expect("task")["activity"] = journal(task, rows);
+        }
+        let kept_lines = [
+            json!({"run_began":{"attempt":1}}),
+            json!({"heard":{"number":BLOCKER_AMENDMENT_NUMBER,"from":{"task":BLOCKER_SUBOWNER},
+                "kind":{"amendment":{"revision":BLOCKER_REVISION}},"words":BLOCKER_REASON,"eligible":true}}),
+            json!({"turn":{"attempt":1,"read":BLOCKER_AMENDMENT_NUMBER}}),
+            json!({"run_ended":{"attempt":1,"end":"parked","spent":1}}),
+            json!({"kept":{"attempt":1,"pending":[BLOCKER_E1]}}),
+        ];
+        let mut ended_lines = kept_lines.to_vec();
+        ended_lines.extend([
+            json!({"heard":{"number":42,"from":{"task":BLOCKER_E1},
+            "kind":{"met":{"dependency":BLOCKER_E1,"removed":false}},"words":""}}),
+            json!({"run_began":{"attempt":2,"resumed":true,"why":{"message":{"message":42}}}}),
+            json!({"run_ended":{"attempt":2,"end":"finished","spent":1}}),
+        ]);
+        documents.get_mut(&Read::BlockerA3Ended).expect("a3")["activity"] = journal(BLOCKER_A3, &ended_lines);
+        documents.get_mut(&Read::BlockerA3Ended).expect("a3")["task"]["result"]["value"] =
+            json!({"report":{"bytes":BLOCKER_A3_REPORT}});
+        let mut kept = documents[&Read::BlockerA3Ended].clone();
+        kept["task"]["chip"]["phase"] = json!("idle");
+        kept["task"]["result"] = Value::Null;
+        kept["task"]["waits_on"] = json!({"dependencies":{"pending":[BLOCKER_E1],"count":1}});
+        kept["activity"] = journal(BLOCKER_A3, &kept_lines);
+        documents.insert(Read::BlockerKept, kept);
+        for (read, pending) in [(Read::BlockerKept, true), (Read::BlockerA3Ended, false)] {
+            let task = &mut documents.get_mut(&read).expect("a3")["task"];
+            task["spec_revision"] = json!({"value":BLOCKER_REVISION});
+            task["dependency_facts"] = json!([{"number":BLOCKER_E1,"pending":pending,"keeps":pending,
+                "added":{"at":1,"by":{"task":BLOCKER_SUBOWNER}}}]);
+        }
+        documents
+            .insert(Read::BlockerPending, json!({"task":{"chip":{"task":BLOCKER_E1,"phase":"idle"},"result":null}}));
+        documents.insert(Read::BlockerReviewWriting, json!({"task":{"chip":{"task":BLOCKER_REVIEWER,"phase":"running",
+            "details":{"owner":{"phase":{"active":{"running":{"attempt":1}}},"details":{"observation":{"work":"writing"}}}}}}}));
+        let e1 = &mut documents.get_mut(&Read::BlockerE1Ended).expect("e1")["task"];
+        e1["spec"] = json!({"specification":{"words":{"bytes":BLOCKER_E1_SPEC}}});
+        e1["result"] = json!({"ending":{"task":{"done":{"change":{"kind":1}}}},
+            "value":{"change":{"part":{"connector":1,"kind":"result"},"words":{"bytes":direction_commit(9)}}}});
+        documents
+    }
+    fn queries() -> Vec<Told> {
+        let mut histories = BTreeMap::<u64, Vec<Message>>::new();
+        let mut queries = Vec::new();
+        let history = histories.entry(BLOCKER_SUBOWNER).or_default();
+        history.extend(tool("a3", "delegate", &json!({"batch":[{}]}), &format!("Delegated tasks: {BLOCKER_A3}")));
+        queries.push(told(Agent::BlockerSubowner, history));
+        for exchange in blocker_exchanges() {
+            let form = if exchange.question.is_some() {
+                "answer"
+            } else if exchange.message == BLOCKER_FINDING_NUMBER {
+                "words"
+            } else {
+                "question"
+            };
+            let history = histories.entry(exchange.by).or_default();
+            history.extend(tool(
+                &format!("message{}", exchange.message),
+                "message",
+                &json!({"target":exchange.target,"form":form,"question":exchange.question,"words":exchange.words}),
+                &format!("Message {} sent", exchange.message),
+            ));
+            queries.push(told(exchange.sender, history));
+            let history = histories.entry(exchange.target).or_default();
+            history.push(input(exchange.words));
+            queries.push(told(exchange.receiver, history));
+        }
+        let history = histories.entry(BLOCKER_SUBOWNER).or_default();
+        history.extend(tool(
+            "e1",
+            "delegate",
+            &json!({"batch":[{"executor":{"kind":"procedure","connector":1,"code":2},
+            "spec":{"words":BLOCKER_E1_SPEC}}]}),
+            &format!("Delegated tasks: {BLOCKER_E1}"),
+        ));
+        queries.push(told(Agent::BlockerSubowner, history));
+        history.extend(tool(
+            "amend",
+            "amend",
+            &json!({"target":BLOCKER_A3,"revision":BLOCKER_REVISION-1,
+            "amendment":{"dependencies":[BLOCKER_E1],"reason":BLOCKER_REASON}}),
+            &format!("Done: task {BLOCKER_A3} is at spec revision {BLOCKER_REVISION}"),
+        ));
+        queries.push(told(Agent::BlockerSubowner, history));
+        let history = histories.entry(BLOCKER_A3).or_default();
+        history.push(input(BLOCKER_REASON));
+        queries.push(told(Agent::BlockerImplementer, history));
+        history.extend(tool("kept", "finish", &json!({"form":"report","text":BLOCKER_KEPT_REPORT}), "accepted"));
+        history.push(input(&format!("T{BLOCKER_E1} is done; the task can go on")));
+        queries.push(told(Agent::BlockerImplementer, history));
+        queries
+    }
+    fn met() -> Observed {
+        Observed {
+            documents: documents(),
+            told: queries(),
+            commands: Vec::new(),
+            kit: Kit {
+                main: BTreeMap::from([(BLOCKER_FILE.as_bytes().into(), BLOCKER_FIXED.as_bytes().into())]),
+                merged_green: true,
+                pulls: vec![Pull {
+                    number: BLOCKER_PULL,
+                    branch: format!("temper/{BLOCKER_DIRECTOR}/c{BLOCKER_E1}").into_bytes(),
+                    opened: 8,
+                    pushed: Some(8),
+                    merged_head: Some(8),
+                    landed: Some(9),
+                    merged: true,
+                    closed: false,
+                    deleted: None,
+                }],
+            },
+        }
+    }
+    fn rejects(observed: &Observed, promise: Promise) {
+        let misses = step_6_2(observed);
+        assert!(
+            misses.iter().any(|miss| miss.step == "6.2" && miss.promise == promise),
+            "mutation must fail {promise:?}; misses: {}",
+            misses.iter().map(ToString::to_string).collect::<Vec<_>>().join("; ")
+        );
+    }
+    #[test]
+    fn blocker_observation_meets_the_step() {
+        assert_met(&step_6_2(&met()));
+    }
+
+    #[test]
+    fn each_task_identity_and_ending_is_required() {
+        for (read, _, parent) in blocker_tasks() {
+            for path in [
+                "/task/chip/task",
+                "/task/project",
+                "/task/requester/task",
+                "/task/chip/phase",
+                "/task/result/ending/task/done",
+            ] {
+                if parent == 0 && path == "/task/requester/task" {
+                    continue;
+                }
+                let mut changed = met();
+                *changed.documents.get_mut(&read).expect("doc").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&changed, BLOCKER_DEPENDENCY);
+            }
+        }
+        for (read, path) in [
+            (Read::BlockerOwnerEnded, "/task/goal"),
+            (Read::BlockerOwnerEnded, "/task/authority/authority/deadline"),
+            (Read::BlockerOwnerEnded, "/task/authority/authority/delegation/depth"),
+            (Read::BlockerSubownerEnded, "/task/authority/authority/deadline"),
+            (Read::BlockerSubownerEnded, "/task/authority/authority/delegation/depth"),
+            (Read::BlockerA3Ended, "/task/authority/authority/delegation/depth"),
+        ] {
+            let mut changed = met();
+            *changed.documents.get_mut(&read).expect("doc").pointer_mut(path).expect("field") = Value::Null;
+            rejects(&changed, BLOCKER_DEPENDENCY);
+        }
+    }
+    fn mutate_tool(observed: &mut Observed, id: &[u8], field: Option<&str>) {
+        let mut edits = 0;
+        for query in &mut observed.told {
+            for message in &mut query.history {
+                for part in &mut message.parts {
+                    match part {
+                        Part::ToolCall { id: name, arguments, .. } if name.as_ref() == id && field.is_some() => {
+                            let mut args: Value = serde_json::from_slice(arguments).expect("args");
+                            args[field.expect("field")] = Value::Null;
+                            *arguments = serde_json::to_vec(&args).expect("args").into();
+                            edits += 1;
+                        }
+                        Part::ToolOutput { id: name, output, .. } if name.as_ref() == id && field.is_none() => {
+                            *output = b"Refused".as_slice().into();
+                            edits += 1;
+                        }
+                        Part::Opaque { .. } | Part::Text { .. } | Part::ToolCall { .. } | Part::ToolOutput { .. } => {}
+                    }
+                }
+            }
+        }
+        assert!(edits > 0);
+    }
+    #[test]
+    fn every_exchange_requires_its_numbered_call_and_unique_ordered_delivery() {
+        for exchange in blocker_exchanges() {
+            let id = format!("message{}", exchange.message);
+            for field in [Some("target"), Some("form"), Some("words"), None] {
+                let mut changed = met();
+                mutate_tool(&mut changed, id.as_bytes(), field);
+                rejects(&changed, BLOCKER_MESSAGES);
+            }
+            if exchange.question.is_some() {
+                let mut changed = met();
+                mutate_tool(&mut changed, id.as_bytes(), Some("question"));
+                rejects(&changed, BLOCKER_MESSAGES);
+            }
+            for field in ["message", "by", "kind", "words"] {
+                let mut changed = met();
+                for row in changed.documents.get_mut(&exchange.read).expect("doc")["activity"]["rows"]
+                    .as_array_mut()
+                    .expect("rows")
+                {
+                    if row.pointer("/event/owner/source/line/words/message") == Some(&json!(exchange.message)) {
+                        row["event"]["owner"]["source"]["line"]["words"][field] = Value::Null;
+                    }
+                }
+                rejects(&changed, BLOCKER_MESSAGES);
+            }
+            let mut duplicate = met();
+            duplicate.told.push(told(exchange.receiver, &[input(exchange.words)]));
+            rejects(&duplicate, BLOCKER_MESSAGES);
+            let mut missing = met();
+            missing
+                .told
+                .retain(|t| !(t.agent == exchange.receiver && user_words(t).any(|w| contains(w, exchange.words))));
+            rejects(&missing, BLOCKER_MESSAGES);
+        }
+        let mut reversed = met();
+        reversed.told.reverse();
+        rejects(&reversed, BLOCKER_MESSAGES);
+    }
+    #[test]
+    fn e1_requires_the_answer_checkpoint() {
+        for field in [Some("batch"), None] {
+            let mut changed = met();
+            mutate_tool(&mut changed, b"e1", field);
+            rejects(&changed, BLOCKER_CHECKPOINT);
+        }
+        let mut early = met();
+        let at = early
+            .told
+            .iter()
+            .position(|t| {
+                t.history
+                    .iter()
+                    .flat_map(|m| &m.parts)
+                    .any(|p| matches!(p,Part::ToolOutput {id,..} if id.as_ref()==b"e1"))
+            })
+            .expect("e1 query");
+        let query = early.told.remove(at);
+        early.told.insert(0, query);
+        rejects(&early, BLOCKER_CHECKPOINT);
+        let mut wrong = met();
+        wrong.documents.get_mut(&Read::BlockerE1Ended).expect("e1")["task"]["spec"] = Value::Null;
+        rejects(&wrong, BLOCKER_CHECKPOINT);
+    }
+    #[test]
+    fn live_amendment_and_its_visible_dependency_are_required() {
+        for field in [Some("target"), Some("revision"), Some("amendment"), None] {
+            let mut changed = met();
+            mutate_tool(&mut changed, b"amend", field);
+            rejects(&changed, BLOCKER_DEPENDENCY);
+        }
+        for read in [Read::BlockerKept, Read::BlockerA3Ended] {
+            for path in [
+                "/task/dependency_facts/0/number",
+                "/task/dependency_facts/0/pending",
+                "/task/dependency_facts/0/added/by/task",
+                "/task/dependency_facts/0/added/at",
+                "/task/spec_revision/value",
+            ] {
+                let mut changed = met();
+                *changed.documents.get_mut(&read).expect("doc").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&changed, BLOCKER_DEPENDENCY);
+            }
+            let mut extra = met();
+            extra.documents.get_mut(&read).expect("doc")["task"]["dependency_facts"]
+                .as_array_mut()
+                .expect("facts")
+                .push(json!({"number":BLOCKER_OWNER}));
+            rejects(&extra, BLOCKER_DEPENDENCY);
+        }
+        let mut changed = met();
+        changed.documents.get_mut(&Read::BlockerKept).expect("kept")["task"]["dependency_facts"][0]["keeps"] =
+            json!(false);
+        rejects(&changed, BLOCKER_DEPENDENCY);
+        let mut changed = met();
+        changed
+            .told
+            .retain(|t| !(t.agent == Agent::BlockerImplementer && user_words(t).any(|w| contains(w, BLOCKER_REASON))));
+        rejects(&changed, BLOCKER_DEPENDENCY);
+    }
+    #[test]
+    fn kept_read_requires_the_saved_attempt_pending_review_and_later_met() {
+        for (read, path, value) in [
+            (Read::BlockerKept, "/task/chip/task", Value::Null),
+            (Read::BlockerKept, "/task/chip/phase", json!("ended")),
+            (Read::BlockerKept, "/task/result", json!({})),
+            (Read::BlockerKept, "/task/waits_on", Value::Null),
+            (Read::BlockerPending, "/task/chip/task", Value::Null),
+            (Read::BlockerPending, "/task/chip/phase", json!("ended")),
+            (Read::BlockerPending, "/task/result", json!({})),
+            (Read::BlockerReviewWriting, "/task/chip/task", Value::Null),
+            (Read::BlockerReviewWriting, "/task/chip/phase", json!("ended")),
+            (Read::BlockerReviewWriting, "/task/chip/details/owner/details/observation/work", Value::Null),
+            (Read::BlockerReviewWriting, "/task/chip/details/owner/phase/active/running/attempt", json!(99)),
+            (Read::BlockerA3Ended, "/task/result/value/report/bytes", Value::Null),
+            (Read::BlockerKept, "/activity/rows/0/event/owner/source/line/kept/pending", json!([])),
+            (Read::BlockerKept, "/activity/rows/0/event/owner/source/line/kept/attempt", json!(99)),
+            (Read::BlockerKept, "/activity/rows/1/event/owner/source/line/run_ended/end", json!("finished")),
+        ] {
+            let mut changed = met();
+            *changed.documents.get_mut(&read).expect("doc").pointer_mut(path).expect("field") = value;
+            rejects(&changed, BLOCKER_KEPT);
+        }
+        let met_words = format!("T{BLOCKER_E1} is done; the task can go on");
+        let mut missing = met();
+        missing.told.pop();
+        rejects(&missing, BLOCKER_KEPT);
+        let mut duplicate = met();
+        duplicate.told.push(told(Agent::BlockerImplementer, &[input(&met_words)]));
+        rejects(&duplicate, BLOCKER_KEPT);
+        let mut no_resume = met();
+        no_resume.documents.get_mut(&Read::BlockerA3Ended).expect("a3")["activity"] = journal(BLOCKER_A3, &[]);
+        rejects(&no_resume, BLOCKER_KEPT);
+    }
+    #[test]
+    fn amendment_must_reach_the_kept_attempt_and_met_must_start_a_later_saved_run() {
+        for path in [
+            "/activity/rows/3/event/owner/source/line/heard/number",
+            "/activity/rows/3/event/owner/source/line/heard/from/task",
+            "/activity/rows/3/event/owner/source/line/heard/kind/amendment/revision",
+            "/activity/rows/3/event/owner/source/line/heard/words",
+            "/activity/rows/3/event/owner/source/line/heard/eligible",
+            "/activity/rows/2/event/owner/source/line/turn/attempt",
+            "/activity/rows/2/event/owner/source/line/turn/read",
+            "/activity/rows/4/event/owner/source/line/run_began/attempt",
+        ] {
+            let mut changed = met();
+            *changed.documents.get_mut(&Read::BlockerKept).expect("kept").pointer_mut(path).expect("field") =
+                Value::Null;
+            rejects(&changed, BLOCKER_DEPENDENCY);
+        }
+        for path in [
+            "/activity/rows/2/event/owner/source/line/heard/number",
+            "/activity/rows/2/event/owner/source/line/heard/from/task",
+            "/activity/rows/2/event/owner/source/line/heard/kind/met/dependency",
+            "/activity/rows/2/event/owner/source/line/heard/kind/met/removed",
+            "/activity/rows/2/event/owner/source/position",
+            "/activity/rows/1/event/owner/source/line/run_began/resumed",
+            "/activity/rows/1/event/owner/source/line/run_began/why/message/message",
+            "/activity/rows/1/event/owner/source/position",
+        ] {
+            let mut changed = met();
+            *changed.documents.get_mut(&Read::BlockerA3Ended).expect("a3").pointer_mut(path).expect("field") =
+                Value::Null;
+            rejects(&changed, BLOCKER_KEPT);
+        }
+        let mut removed = met();
+        removed.documents.get_mut(&Read::BlockerA3Ended).expect("a3")["activity"]["rows"][2]["event"]["owner"]["source"]
+            ["line"]["heard"]["kind"]["met"]["removed"] = json!(true);
+        rejects(&removed, BLOCKER_KEPT);
+        let mut duplicate = met();
+        let rows = duplicate.documents.get_mut(&Read::BlockerA3Ended).expect("a3")["activity"]["rows"]
+            .as_array_mut()
+            .expect("rows");
+        rows.push(rows[2].clone());
+        rejects(&duplicate, BLOCKER_KEPT);
+        for field in ["form", "text"] {
+            let mut changed = met();
+            mutate_tool(&mut changed, b"kept", Some(field));
+            rejects(&changed, BLOCKER_KEPT);
+        }
+    }
+    #[test]
+    fn landing_requires_the_fixed_file_and_green_merge_at_the_pushed_head() {
+        for mutation in 0..10 {
+            let mut changed = met();
+            match mutation {
+                0 => changed.kit.merged_green = false,
+                1 => {
+                    changed.kit.main.insert(BLOCKER_FILE.as_bytes().into(), BLOCKER_WRONG.as_bytes().into());
+                }
+                2 => changed.kit.pulls.clear(),
+                3 => changed.kit.pulls[0].number += 1,
+                4 => changed.kit.pulls[0].branch = b"wrong".to_vec(),
+                5 => changed.kit.pulls[0].merged = false,
+                6 => changed.kit.pulls[0].pushed = None,
+                7 => changed.kit.pulls[0].merged_head = Some(7),
+                8 => changed.kit.pulls[0].landed = None,
+                _ => changed.kit.pulls[0].landed = Some(10),
+            }
+            rejects(&changed, BLOCKER_LANDING);
+        }
+        for path in [
+            "/task/result/ending/task/done/change/kind",
+            "/task/result/value/change/part/connector",
+            "/task/result/value/change/part/kind",
+            "/task/result/value/change/words/bytes",
+        ] {
+            let mut changed = met();
+            *changed.documents.get_mut(&Read::BlockerE1Ended).expect("e1").pointer_mut(path).expect("field") =
+                Value::Null;
+            rejects(&changed, BLOCKER_LANDING);
+        }
+    }
+    #[test]
+    fn every_agents_attempts_must_end_and_rechecks_must_be_unspent_and_uncommitted() {
+        for (read, task, _) in blocker_tasks() {
+            if task == BLOCKER_E1 {
+                continue;
+            }
+            for end in [json!("refused"), json!({"failed":{}}), Value::Null] {
+                let mut changed = met();
+                changed.documents.get_mut(&read).expect("doc")["activity"] = journal(
+                    task,
+                    &[json!({"run_began":{"attempt":1}}), json!({"run_ended":{"attempt":1,"end":end,"spent":1}})],
+                );
+                rejects(&changed, BLOCKER_ATTEMPTS);
+            }
+            let mut accepted = met();
+            let mut lines =
+                vec![json!({"run_began":{"attempt":8}}), json!({"run_ended":{"attempt":8,"end":"refused","spent":0}})];
+            lines.extend(check_activity(&accepted, read).iter().rev().map(|row| row["line"].clone()));
+            accepted.documents.get_mut(&read).expect("doc")["activity"] = journal(task, &lines);
+            if task == BLOCKER_A3 {
+                let mut before = lines[..2].to_vec();
+                before.extend(check_activity(&met(), Read::BlockerKept).iter().rev().map(|r| r["line"].clone()));
+                accepted.documents.get_mut(&Read::BlockerKept).expect("kept")["activity"] = journal(task, &before);
+            }
+            assert_met(&step_6_2(&accepted));
+            for mutation in 0..4 {
+                let mut changed = accepted.clone();
+                let mut bad = lines.clone();
+                match mutation {
+                    0 => bad[1]["run_ended"]["spent"] = json!(1),
+                    1 => bad.truncate(2),
+                    2 => bad.insert(1, json!({"turn":{"attempt":8,"turn":1}})),
+                    _ => {
+                        bad.last_mut().expect("end")["run_ended"]["attempt"] = json!(99);
+                    }
+                }
+                changed.documents.get_mut(&read).expect("doc")["activity"] = journal(task, &bad);
+                rejects(&changed, BLOCKER_ATTEMPTS);
+            }
+            for field in ["cut", "before", "after"] {
+                let mut changed = met();
+                changed.documents.get_mut(&read).expect("doc")["activity"][field] = json!(true);
+                rejects(&changed, BLOCKER_ATTEMPTS);
+            }
+            let mut gap = met();
+            gap.documents.get_mut(&read).expect("doc")["activity"]["rows"][0]["event"]["owner"]["source"]["position"] =
+                json!(99);
+            rejects(&gap, BLOCKER_ATTEMPTS);
         }
     }
 }

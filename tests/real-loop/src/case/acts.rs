@@ -102,6 +102,16 @@ pub enum Read {
     BatchSubownerEnded,
     BatchOwnerEnded,
     BatchDirectorEnded,
+    BlockerKept,
+    BlockerPending,
+    BlockerReviewWriting,
+    BlockerA3Ended,
+    BlockerE1Ended,
+    BlockerCoderEnded,
+    BlockerReviewerEnded,
+    BlockerSubownerEnded,
+    BlockerOwnerEnded,
+    BlockerDirectorEnded,
 }
 // Provisioning's key call does not count as a story act. The director's
 // ended wait starts first; its delegates' ended documents are read before
@@ -824,6 +834,81 @@ pub fn step_6_1() -> Vec<calls::Step> {
         call(D1, argv!["wait", "task", number(BATCH_DIRECTOR), "--until", "ended"]),
     ]);
     for task in [BATCH_ONE, BATCH_TWO, BATCH_STORY, BATCH_SUBOWNER, BATCH_OWNER, BATCH_DIRECTOR] {
+        steps.push(call(D1, argv!["task", number(task), "--activity", "32", "--json"]));
+    }
+    steps
+}
+
+// Act 3, step 6.2 (domain/testing.md, 5.3)
+pub const READS_6_2: &[(Read, usize)] = &[
+    (Read::BlockerKept, 6),
+    (Read::BlockerReviewWriting, 10),
+    (Read::BlockerPending, 11),
+    (Read::BlockerA3Ended, 13),
+    (Read::BlockerE1Ended, 14),
+    (Read::BlockerCoderEnded, 15),
+    (Read::BlockerReviewerEnded, 16),
+    (Read::BlockerSubownerEnded, 17),
+    (Read::BlockerOwnerEnded, 18),
+    (Read::BlockerDirectorEnded, 19),
+];
+
+#[must_use]
+pub fn step_6_2() -> Vec<calls::Step> {
+    use super::{
+        Agent, BLOCKER_A3, BLOCKER_CODER, BLOCKER_DIRECTOR, BLOCKER_E1, BLOCKER_OWNER, BLOCKER_PERSON,
+        BLOCKER_REVIEW_HOLD, BLOCKER_REVIEWER, BLOCKER_SUBOWNER, PROJECT,
+    };
+    let mut steps = vec![
+        sign_in(D1),
+        call(
+            D1,
+            argv![
+                "adopt",
+                "--project",
+                number(PROJECT),
+                "--owner",
+                "acme",
+                "--name",
+                "app",
+                "--landing",
+                "main",
+                "--no-home",
+                "--key",
+                "adopt-kit"
+            ],
+        ),
+        call(D1, argv!["chat", "--project", number(PROJECT), "--key", "blocker", BLOCKER_PERSON]),
+        call(D1, argv!["wait", "task", number(BLOCKER_DIRECTOR), "--until", "replied"]),
+        call(D1, argv!["wait", "task", number(BLOCKER_OWNER), "--until", "replied"]),
+        calls::until(
+            D1,
+            argv!["task", number(BLOCKER_SUBOWNER), "--json"],
+            Agent::BlockerImplementer.cue(),
+            b"\"task\"",
+        ),
+        // The kept activity field is emitted when the done run saves its
+        // state for pending dependencies; waits_on alone can precede it.
+        calls::until(
+            D1,
+            argv!["task", number(BLOCKER_A3), "--activity", "32", "--json"],
+            b"\"kept\":{\"attempt\":",
+            b"\"task\"",
+        ),
+        // A nonempty delegate list proves the coder exists. If coding
+        // already ended, the held review keeps that list nonempty. Wait
+        // on the coder's ending instead of polling e1 throughout coding.
+        calls::until(D1, argv!["task", number(BLOCKER_E1), "--json"], b"\"delegates\":[{", b"\"task\""),
+        call(D1, argv!["wait", "task", number(BLOCKER_CODER), "--until", "ended"]),
+        calls::until(D1, argv!["task", number(BLOCKER_E1), "--json"], Agent::Review.cue(), b"\"task\""),
+        calls::until(D1, argv!["task", number(BLOCKER_REVIEWER), "--json"], b"\"work\":\"writing\"", b"\"task\""),
+        call(D1, argv!["task", number(BLOCKER_E1), "--json"]),
+        calls::release_hold(BLOCKER_REVIEW_HOLD),
+        call(D1, argv!["wait", "task", number(BLOCKER_DIRECTOR), "--until", "ended"]),
+    ];
+    for task in
+        [BLOCKER_A3, BLOCKER_E1, BLOCKER_CODER, BLOCKER_REVIEWER, BLOCKER_SUBOWNER, BLOCKER_OWNER, BLOCKER_DIRECTOR]
+    {
         steps.push(call(D1, argv!["task", number(task), "--activity", "32", "--json"]));
     }
     steps
