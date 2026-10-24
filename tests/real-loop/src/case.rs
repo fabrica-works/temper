@@ -135,6 +135,11 @@ pub enum Agent {
     BudgetSubowner,
     BudgetInvestigator,
     BudgetAdvisor,
+    // 6.4
+    RedDirector,
+    RedOwner,
+    RedCoder,
+    RedRepairCoder,
 }
 impl Agent {
     #[must_use]
@@ -151,6 +156,11 @@ impl Agent {
             Self::BudgetSubowner => b"@case_budget_subowner",
             Self::BudgetInvestigator => b"@case_budget_investigator",
             Self::BudgetAdvisor => b"@case_budget_advisor",
+            // 6.4
+            Self::RedDirector => b"@case_red_director",
+            Self::RedOwner => b"@case_red_owner",
+            Self::RedCoder => b"@case_red_coder",
+            Self::RedRepairCoder => b"Repair landing branch CI",
             Self::BatchDirector => b"@case_batch_director",
             Self::BatchOwner => b"@case_batch_owner",
             Self::BatchSubowner => b"@case_batch_subowner",
@@ -981,5 +991,93 @@ pub fn fixture_6_5() -> forge::Fixture {
             landing::admit(value);
         },
         ..fixture()
+    }
+}
+
+// Act 3, step 6.4 (domain/testing.md, 5.3)
+pub const RED_DIRECTOR: u64 = 1;
+pub const RED_OWNER: u64 = 2;
+pub const RED_CHANGE: u64 = 3;
+pub const RED_CODER: u64 = 4;
+pub const RED_REVIEW: u64 = 5;
+pub const RED_REPAIR: u64 = 6;
+pub const RED_REPAIR_CODER: u64 = 7;
+pub const RED_REPAIR_REVIEW: u64 = 8;
+pub const RED_UPDATED_REVIEW: u64 = 9;
+pub const RED_FIRST_HEAD: u64 = 2;
+pub const RED_UPDATED_HEAD: u64 = 6;
+pub const RED_A4_PULL: u64 = 1;
+pub const RED_REPAIR_PULL: u64 = 2;
+pub const RED_TIMER: u64 = 6;
+pub const RED_PERSON_MESSAGE: u64 = 5;
+pub const RED_REVISION: u64 = 0;
+pub const RED_TIMER_AT: u64 = 4_102_444_800_000_000_000;
+pub const RED_PERSON: &str = "@case_red_director Delegate A1 to own a4 and report its landing.";
+pub const RED_OWNER_SPEC: &str = "@case_red_owner Own a4 as a goal; delegate its change and report.";
+pub const RED_CHANGE_SPEC: &str = "@case_red_coder Write a4 in docs/a4.md, leaving the CI cue in docs/story.md green.";
+pub const RED_MESSAGE: &str = "Kit's tip is red. Rule that a4 fixes it or an interim fix lands within ninety minutes.";
+pub const RED_RULE: &str = "a4 fixes it or an interim fix lands within ninety minutes.";
+pub const RED_OWNER_REPORT: &str = "A1 reports a4 landed after the deployment repair.";
+pub const RED_REPORT: &str = "The interim repair and a4 landed; the timer is removed.";
+pub const RED_FILE: &str = "docs/story.md";
+pub const RED_GREEN: &str = "# Story green";
+pub const RED_BASE: &str = "# Story green\n\nBase story.\n";
+pub const RED_BROKEN: &str = "# Story red\n\nBase story.\n";
+pub const RED_A4_FILE: &str = "docs/a4.md";
+pub const RED_A4: &str = "# A4\n\nA4's story.\n";
+pub const RED_REVIEW_HOLD: &[u8] = b"case-6-4-review";
+pub const RED_REPAIR_HOLD: &[u8] = b"case-6-4-repair";
+
+#[must_use]
+pub fn fixture_6_4() -> forge::Fixture {
+    forge::Fixture {
+        setup: || {
+            let mut setup = (fixture().setup)();
+            let mut tree = setup.tree.into_vec();
+            tree.push(api::File { path: RED_FILE.as_bytes().into(), content: RED_BASE.as_bytes().into() });
+            setup.tree = tree.into();
+            setup.checks.cue =
+                Some(api::Cue::File { path: RED_FILE.as_bytes().into(), green: RED_GREEN.as_bytes().into() });
+            setup
+        },
+        configure: |value, agent, forge| {
+            (fixture().configure)(value, agent, forge);
+            // Small admits both trees without a profile change. Draft overrides:
+            // calls_per_response 2 and hub.run_calls 2 pair each coder
+            // write with finish in one completion; fleet.calls 3 matches PAUSE_WORKERS;
+            // hub.accounts 2 carries LLM/git; documents.lines 3 exposes a4's
+            // resource, base and path. The director's allowance is 30 (its
+            // ten-unit admission plus A1's 20); A1 reserves its ten plus a4's
+            // ten. The role's spend is likewise 30. Tools 423 = 391 | 32
+            // adds subscribe/unsubscribe. Listing polls 20001 ms sit just
+            // beyond PATIENCE, since adoption/hooks supply each change (5.4).
+            // Role period_spend 30 funds the chat pool; project period_spend
+            // 36 leaves repair_seed six outside it (three held the coder
+            // for budget). Inherited eight live task slots admit the trees;
+            // a4 allows three delegates, A1 four, including exact-head
+            // re-review. The inherited repairs bound is 3. Forge statuses
+            // 3 (State::new) retain the open head, red tip and repair head.
+            // Minimum spend sizing remains to be rechecked after batching.
+            agent["profile"]["declared"]["calls_per_response"] = 2.into();
+            value["workers"][0]["limits"]["overrides"]["hub.run_calls"] = 2.into();
+            value["workers"][0]["limits"]["overrides"]["hub.accounts"] = 2.into();
+            value["engine"]["limits"]["overrides"]["fleet.calls"] = PAUSE_WORKERS.len().into();
+            value["engine"]["limits"]["overrides"]["documents.lines"] = 3.into();
+            value["engine"]["templates"][0]["budget"] = json!({"as_allowed":30});
+            let tools = 391 | 32;
+            value["engine"]["rules"]["ceiling"]["tools"] = tools.into();
+            for project in value["engine"]["projects"].as_array_mut().expect("projects") {
+                project["policy"]["ceiling"]["tools"] = tools.into();
+                project["policy"]["roles"][0]["authority"]["tools"] = tools.into();
+                project["policy"]["roles"][0]["authority"]["budget"]["spend"] = 30.into();
+                project["policy"]["roles"][0]["period_spend"] = 30.into();
+                project["policy"]["period_spend"] = 36.into();
+            }
+            let story_ms = crate::PATIENCE.as_nanos().div_euclid(1_000_000);
+            for name in ["poll_ms", "poll_max_ms"] {
+                value["application"]["limits"]["overrides"][format!("forge.client.{name}")] = (story_ms + 1).into();
+            }
+            landing::admit(value);
+        },
     }
 }
