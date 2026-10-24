@@ -171,7 +171,7 @@ pub(crate) fn worst_case(
     host.checked_add(responses)?
         .checked_add(handovers)?
         // Pending/active intent names and the Create plan clone coexist.
-        .checked_add(u64::from(l.forges).checked_mul(name.checked_mul(4)?)?)?
+        .checked_add(u64::from(l.forges).checked_mul(name.checked_mul(4)?.checked_add(64)?)?)?
         .checked_add(local_bytes.checked_mul(3)?)?
         // Token, encoded identity, and copied parts overlap during the records handoff.
         .checked_add(u64::from(config.limits.records.value_bytes).checked_mul(4)?)?
@@ -652,7 +652,7 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
             break;
         }
         let event = engine.setup.above.pop().expect("host output count");
-        if engine.setup.closing && event != host::Event::Closed {
+        if (engine.setup.closing || engine.end.is_some()) && event != host::Event::Closed {
             continue;
         }
         match event {
@@ -702,6 +702,7 @@ pub(crate) fn answer(engine: &mut crate::engine::Engine, event: StoreEvent) {
             lifecycle::kept(engine, write.purpose);
         }
     } else {
+        lifecycle::writes_failed(engine);
         crate::stop::unavailable(engine, b"forge records");
     }
 }
@@ -782,18 +783,22 @@ fn read_item(
     forge: u16,
     item: skein_forge_setup::item::Item,
 ) -> Option<Secret> {
+    if let Some(public::Caller::Connect { pasted, .. }) = engine.setup.public.get(&run) {
+        match pasted {
+            Some(public::Pasted::App(value)) if item == skein_forge_setup::item::Item::Pasted => {
+                return Some(value.clone());
+            }
+            Some(public::Pasted::Admin(value)) if item == skein_forge_setup::item::Item::AdminToken => {
+                return Some(value.clone());
+            }
+            Some(public::Pasted::App(_) | public::Pasted::Admin(_)) | None => {}
+        }
+        if item == skein_forge_setup::item::Item::AdminToken {
+            return None; // A caller's admin read never falls back to records or adoptions.
+        }
+    }
     if item == skein_forge_setup::item::Item::Pasted {
-        return match engine.setup.public.get(&run) {
-            Some(public::Caller::Connect { pem, .. }) => pem.clone(),
-            Some(
-                public::Caller::Reachable { .. }
-                | public::Caller::Install { .. }
-                | public::Caller::Accept { .. }
-                | public::Caller::Manifest { .. }
-                | public::Caller::Redirect { .. },
-            )
-            | None => None,
-        };
+        return None;
     }
     let item = item_record(item).expect("record item");
     let files = match engine.setup.lifecycle.adoptions.get(&forge) {

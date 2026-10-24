@@ -109,7 +109,9 @@ fn forgejo(
         if setup.entry.forge != source.number {
             continue;
         }
-        let listener = if config.records_only.contains(&source.number) || source.webhook_secret.is_some() {
+        let listener = if !admin_connect(&setup.entry.mode)
+            && (config.records_only.contains(&source.number) || source.webhook_secret.is_some())
+        {
             match &config.webhooks {
                 Some(hooks) => match hooks.listener {
                     skein_io::Addr::Ip(address) => Some(address),
@@ -277,6 +279,11 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer, unde
         let login = &setup.entry.bot.login;
         let local = super::lifecycle::Local {
             first: None,
+            source: if admin_connect(&setup.entry.mode) {
+                super::lifecycle::Source::Managed
+            } else {
+                super::lifecycle::Source::Prepared
+            },
             repositories: match &setup.entry.mode {
                 Mode::Fake(fake) => u64::try_from(fake.repositories.len()).expect("checked repositories"),
                 Mode::Owned(_) | Mode::Managed { .. } => 0,
@@ -299,7 +306,7 @@ fn local_starts(config: &crate::settings::Engine, layer: &mut super::Layer, unde
                 limits.repositories = own.forge.client.repositories;
                 limits
             },
-            webhooks: config.webhooks.is_some(),
+            webhooks: config.webhooks.is_some() && !admin_connect(&setup.entry.mode),
             bot_login: login.clone(),
             identity: crate::settings::Identity {
                 number: identity.number,
@@ -488,5 +495,12 @@ fn github_member(place: github::given::Place) -> &'static [u8] {
         | Place::RedirectUrl
         | Place::SetupUrl
         | Place::Code => b"setup",
+    }
+}
+
+fn admin_connect(mode: &Mode) -> bool {
+    match mode {
+        Mode::Managed { admin_token: None } => true,
+        Mode::Managed { admin_token: Some(_) } | Mode::Owned(_) | Mode::Fake(_) => false,
     }
 }

@@ -8,11 +8,11 @@ use skein_forge_machine_world::{
 };
 use skein_lib::stream::Down;
 
-struct Forge {
-    service: fake::Service,
+pub(super) struct Forge {
+    pub(super) service: fake::Service,
     env: Env<fake::Limits>,
-    git: git::Domain,
-    config: git::Config,
+    pub(super) git: git::Domain,
+    pub(super) config: git::Config,
     socket: Option<(Token, bool)>,
     server: Option<fake::Server>,
     pipe: Pipe,
@@ -21,7 +21,7 @@ struct Forge {
     requests: List<Box<[u8]>>,
 }
 impl Forge {
-    fn new(refuse_file: bool) -> Self {
+    pub(super) fn new(refuse_file: bool) -> Self {
         let limits = forge_fixtures::fake_limits();
         let config = fake::Config {
             hooks: None,
@@ -97,7 +97,7 @@ impl Forge {
             self.requests.push(Box::from(line.as_slice())).unwrap();
         }
     }
-    fn turn_io(&mut self, engine: &mut crate::engine::Engine) {
+    pub(super) fn turn_io(&mut self, engine: &mut crate::engine::Engine) {
         for setup in [true, false] {
             let io = if setup { &mut engine.setup.io } else { &mut engine.forge.io };
             let mut pending = List::with_capacity(32);
@@ -148,7 +148,7 @@ impl Forge {
             }
         }
     }
-    fn turn_server(&mut self, engine: &mut crate::engine::Engine) {
+    pub(super) fn turn_server(&mut self, engine: &mut crate::engine::Engine) {
         if let Some(server) = &mut self.server {
             fake::resume_with_domain(
                 server,
@@ -329,7 +329,7 @@ fn reconcile_then_create_then_connect_makes_the_first_repository_and_bot_workflo
     assert_eq!(object.tree.get(b"README.md".as_slice()).unwrap().as_ref(), b"# hello\n");
     assert_eq!(
         object.tree.get(temper_forge_setup::STARTER_PATH).unwrap().as_ref(),
-        temper_forge_setup::STARTER_WORKFLOW
+        temper_forge_setup::starter_workflow(b"temper-host").unwrap().as_ref()
     );
     assert_eq!(object.author.as_ref().unwrap().name.as_ref(), b"temper");
     assert_eq!(object.author, object.committer);
@@ -379,7 +379,7 @@ fn a_file_stop_names_the_step_and_a_second_ask_finishes_once() {
     assert_eq!(forge.git.object(head).unwrap().parent, Some(readme));
     assert_eq!(
         forge.git.object(head).unwrap().tree.get(temper_forge_setup::STARTER_PATH).unwrap().as_ref(),
-        temper_forge_setup::STARTER_WORKFLOW
+        temper_forge_setup::starter_workflow(b"temper-host").unwrap().as_ref()
     );
 }
 
