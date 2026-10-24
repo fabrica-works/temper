@@ -149,11 +149,12 @@ impl Driver {
                         self.fail_archive_once = false;
                         self.events.push_back(engine::Event::Store(engine::StoreInput::Unloaded { owner }));
                     } else {
+                        let texts = transcript_texts(&range, &rows);
                         self.events.push_back(engine::Event::Store(engine::StoreInput::Loaded {
                             owner,
                             rows,
                             next,
-                            texts: None,
+                            texts,
                         }));
                     }
                 }
@@ -422,4 +423,25 @@ pub fn say_ask(sign_in: u64, task: u64, key: u8) -> engine::Event {
         key: [key; 16],
         ask: people::Ask::Say { project: 1, task, words: Box::from([key]) },
     })
+}
+
+/// The service renders a transcript window's turns as text (temper-service
+/// store/ranges.rs); this world's turns are text already, so each turn's
+/// rendering is its own bytes' end within the tail.
+fn transcript_texts(range: &temper_engine_domain::Range, rows: &[Record]) -> Option<engine::TranscriptTexts> {
+    if !matches!(range, temper_engine_domain::Range::Core(temper_engine_domain::CoreRange::TaskTranscript { .. })) {
+        return None;
+    }
+    let tail = usize::try_from(engine::TRANSCRIPT_TAIL_BYTES).expect("tail fits usize");
+    Some(
+        rows.iter()
+            .map(|row| {
+                let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(turn))) = row else {
+                    return None;
+                };
+                let start = turn.transcript.len().saturating_sub(tail);
+                Some(Box::from(&turn.transcript[start..]))
+            })
+            .collect(),
+    )
 }

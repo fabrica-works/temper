@@ -3063,6 +3063,7 @@ dependencies = [
  "jig-protocol-engine-clients-http",
  "jig-protocol-engine-workers",
  "jig-protocol-store",
+ "jig-protocol-transcript",
  "jig-protocol-worker-link",
  "jig-protocol-worker-wire",
  "skein-channel",
