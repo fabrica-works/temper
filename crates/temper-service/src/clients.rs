@@ -937,6 +937,10 @@ fn client_settings(
         stream: seeds.seed,
         models: config::clients::models(&config.llm),
         key_bytes: config.limits.driver.client.document.token_bytes.min(config.limits.clients.wire.keyed_value_some),
-        moved_bytes: jig_protocol_accounts::moved::bound(&config.limits.driver.client.document),
+        moved_bytes: moved_bytes(&config.limits),
     }
+}
+
+pub(crate) fn moved_bytes(limits: &config::Limits) -> u64 {
+    jig_protocol_accounts::moved::bound(&limits.driver.client.document)
 }

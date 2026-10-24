@@ -60,6 +60,14 @@ pub struct Routes {
 pub struct Records {
     pub value_bytes: u32,
 }
+
+/// Admit a moved file on jig's wire; setup still checks temper's values against
+/// records.value_bytes (protocol/configuration.md, 7; jig's protocol/client.md, 5).
+pub(crate) fn client_value_bytes(jig: &jig_protocol_config::Limits, own: &Limits) -> u32 {
+    let value = u64::from(own.records.value_bytes).max(crate::clients::moved_bytes(jig));
+    u32::try_from(u64::from(jig.clients.wire.keyed_value_some).min(value)).expect("bounded by the wire ceiling")
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Forges {
     pub installations: u32,
