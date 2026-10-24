@@ -1074,9 +1074,14 @@ fn github_choices(
             w.refusal(b, refusal.refusal(), w.name_bytes);
             b.close();
         }
+        Some(Answer::NoAccess) => text(b, w, Role::Alert, Word::GitHubReadNoAccess),
+        Some(Answer::NotFound) => text(b, w, Role::Alert, Word::GitHubReadNotFound),
         Some(answer) => {
             if let Some(words) = forge::words::app_refusal(answer.clone(), row.number) {
                 crate::cards::text(b, Role::Alert, &words);
+            }
+            if picker.retry_exhausted() {
+                text(b, w, Role::Paragraph, Word::GitHubReadReload);
             }
         }
     }
