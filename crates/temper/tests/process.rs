@@ -191,10 +191,7 @@ fn temper_ctl_reads_the_deployments_settings_as_text_and_json() {
             Call::new(&arguments)
         })));
     }
-    steps.extend([
-        Step::Run(Call::new(&["revisions"])),
-        Step::Run(Call::new(&["revisions", "--json"])),
-    ]);
+    steps.extend([Step::Run(Call::new(&["revisions"])), Step::Run(Call::new(&["revisions", "--json"]))]);
     let seen = support::ctl::run(Story::new(scratch.path(), steps));
     let [signed, settings, settings_json, setting, setting_json, revision, revision_json, revisions, revisions_json] =
         seen.calls.as_slice()
@@ -249,16 +246,13 @@ fn temper_ctl_an_owner_changes_settings_and_a_stale_change_names_the_newest_revi
                 support::ctl::charter_change_file(&change_file, &calls[3], instructions);
                 support::ctl::settings_change(&calls[2], &change_file, "owner-settings")
             })),
-            Step::Then(Box::new(move |calls| {
-                support::ctl::settings_change(&calls[2], &stale_file, "stale-settings")
-            })),
+            Step::Then(Box::new(move |calls| support::ctl::settings_change(&calls[2], &stale_file, "stale-settings"))),
             Step::Run(Call::new(&["settings"])),
             Step::Run(Call::new(&["settings", "--json"])),
             Step::Run(Call::new(&["setting", "charter", "1", "--json"])),
         ],
     ));
-    let [signed, me, before, original, changed, stale, settings, settings_json, setting] = seen.calls.as_slice()
-    else {
+    let [signed, me, before, original, changed, stale, settings, settings_json, setting] = seen.calls.as_slice() else {
         panic!("owner read, change, stale refusal and read back")
     };
     for call in [signed, me, before, original, changed, settings, settings_json, setting] {
@@ -272,7 +266,10 @@ fn temper_ctl_an_owner_changes_settings_and_a_stale_change_names_the_newest_revi
     assert_eq!(changed.stdout, format!("revision {newest}\n").as_bytes());
     assert_eq!(stale.exit, Some(Exit::Code(2)));
     assert!(stale.stdout.is_empty());
-    assert_eq!(stale.stderr, format!("change-settings: stale; newest revision {newest}; read settings again\n").as_bytes());
+    assert_eq!(
+        stale.stderr,
+        format!("change-settings: stale; newest revision {newest}; read settings again\n").as_bytes()
+    );
     let settings_text = String::from_utf8_lossy(&settings.stdout);
     assert!(settings_text.contains(&format!("changed in revision {newest}")), "{settings_text}");
     let inventory = support::ctl::json(settings_json);
