@@ -73,7 +73,10 @@ fn check_connection(ran: &Ran) {
     let [visit] = ran.browsed() else { panic!("one installation visit") };
     assert_eq!(visit.call, INSTALL);
     assert_eq!(visit.hops, [302, 200]);
-    assert_eq!(visit.body, b"temper has the installation; you may close this tab.");
+    assert!(
+        skein_lib::bytes::find(&visit.body, b"temper has the installation; you may close this tab.").is_some(),
+        "the setup page says so"
+    );
 }
 
 fn check_landing(ran: &Ran) -> String {

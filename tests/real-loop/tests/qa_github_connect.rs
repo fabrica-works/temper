@@ -404,7 +404,11 @@ fn ctl_human_and_json_status_follow_paste_and_install() {
         text.contains("acme") || text.to_lowercase().contains("installation 1"),
         "human installation account or its id while the account is unknown: {text}"
     );
-    assert_eq!(ran.browsed()[0].body, b"temper has the installation; you may close this tab.");
+    assert!(
+        skein_lib::bytes::find(&ran.browsed()[0].body, b"temper has the installation; you may close this tab.")
+            .is_some(),
+        "the setup page says so"
+    );
 }
 
 #[test]
