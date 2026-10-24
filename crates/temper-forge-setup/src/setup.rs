@@ -69,7 +69,7 @@ pub struct Fake {
 /// A person's Forgejo or one temper runs.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Mode {
-    Managed { admin_token: Box<[u8]> },
+    Managed { admin_token: Option<Box<[u8]>> },
     Owned(Owned),
     Fake(Fake),
 }
@@ -105,21 +105,24 @@ impl Setup {
         {
             for (index, entry) in setup.entries.iter_mut().enumerate() {
                 let p = p.child(config::Segment::Index(u32::try_from(index).expect("bounded entries")));
-                resolve_path(
-                    directories,
-                    config::Directory::Data,
-                    &mut entry.directory,
-                    p.member(b"directory"),
-                    &mut ps,
-                );
+                if !entry.directory.is_empty() {
+                    resolve_path(
+                        directories,
+                        config::Directory::Data,
+                        &mut entry.directory,
+                        p.member(b"directory"),
+                        &mut ps,
+                    );
+                }
                 match &mut entry.mode {
-                    Mode::Managed { admin_token } => resolve_path(
+                    Mode::Managed { admin_token: Some(admin_token) } => resolve_path(
                         directories,
                         config::Directory::Data,
                         admin_token,
                         p.member(b"mode").member(b"managed").member(b"admin_token"),
                         &mut ps,
                     ),
+                    Mode::Managed { admin_token: None } => {}
                     Mode::Fake(fake) => resolve_path(
                         directories,
                         config::Directory::Data,
@@ -412,6 +415,13 @@ fn fake(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Fa
     Some(Fake { listen, git, owner, repositories: repositories.into_boxed() })
 }
 fn mode(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mode> {
+    if let Ok(value) = read::text(d, at, 4096) {
+        if value.as_ref() == b"managed" {
+            return Some(Mode::Managed { admin_token: None });
+        }
+        ps.push(p.clone(), config::What::Form);
+        return None;
+    }
     let mut o = object(d, at, p, ps)?;
     let managed = o.member(d, b"managed");
     let owned_at = o.member(d, b"owned");
@@ -431,7 +441,7 @@ fn mode(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mo
         o.finish(d, &p, ps);
         let admin_token = admin_token?;
         valid(path(&admin_token), p.member(b"admin_token"), ps);
-        Some(Mode::Managed { admin_token })
+        Some(Mode::Managed { admin_token: Some(admin_token) })
     } else if let Some(at) = owned_at {
         Some(Mode::Owned(owned(d, at, &p.member(b"owned"), ps)?))
     } else {
@@ -441,7 +451,7 @@ fn mode(d: &Document, at: u32, p: &Path, ps: &mut config::Problems) -> Option<Mo
 fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Problems) -> Option<Entry> {
     let mut o = object(d, at, p, ps)?;
     let forge_at = o.required(d, b"forge", p, ps);
-    let directory = text(d, &mut o, b"directory", p, ps);
+    let directory_at = o.member(d, b"directory");
     let bot_at = o.required(d, b"bot", p, ps);
     let mode_at = o.required(d, b"mode", p, ps);
     let start_at = o.member(d, b"start");
@@ -449,14 +459,35 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
         Some(at) => mode(d, at, &p.member(b"mode"), ps),
         None => None,
     };
+    let directory = if let Some(Mode::Managed { admin_token: None }) = &mode {
+        valid(directory_at.is_none(), p.member(b"directory"), ps);
+        Some(Box::<[u8]>::default())
+    } else {
+        match directory_at {
+            Some(at) => match read::text(d, at, 4096) {
+                Ok(value) => {
+                    valid(path(&value) && !value.ends_with(b"/"), p.member(b"directory"), ps);
+                    Some(value)
+                }
+                Err(what) => {
+                    ps.push(p.member(b"directory"), what);
+                    None
+                }
+            },
+            None => {
+                ps.push(p.member(b"directory"), config::What::Missing);
+                None
+            }
+        }
+    };
     let orgs: Option<Box<[Box<[u8]>]>> = match &mode {
-        Some(Mode::Fake(_)) => {
+        Some(Mode::Fake(_) | Mode::Managed { admin_token: None }) => {
             valid(o.member(d, b"orgs").is_none(), p.member(b"orgs"), ps);
             Some(Box::new([]))
         }
         Some(Mode::Owned(_)) => Some(Box::new([])),
         // Only a managed entry names orgs (protocol/setup.md, 8).
-        Some(Mode::Managed { .. }) => {
+        Some(Mode::Managed { admin_token: Some(_) }) => {
             let at = o.required(d, b"orgs", p, ps);
             match at {
                 Some(at) => strings(d, at, limits.orgs, true, &p.member(b"orgs"), ps),
@@ -499,7 +530,6 @@ fn entry(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Prob
         }
     };
     let directory = directory?;
-    valid(path(&directory) && !directory.ends_with(b"/"), p.member(b"directory"), ps);
     Some(Entry { forge, directory, bot: account(d, bot_at?, &p.member(b"bot"), ps)?, orgs: orgs?, mode, asked })
 }
 fn list(d: &Document, at: u32, limits: &Limits, p: &Path, ps: &mut config::Problems) -> Option<Setup> {
@@ -545,7 +575,8 @@ impl Entry {
             bytes = bytes.checked_add(org.len())?;
         }
         match &self.mode {
-            Mode::Managed { admin_token } => bytes = bytes.checked_add(admin_token.len())?,
+            Mode::Managed { admin_token: Some(admin_token) } => bytes = bytes.checked_add(admin_token.len())?,
+            Mode::Managed { admin_token: None } => {}
             Mode::Owned(o) => {
                 bytes = bytes
                     .checked_add(o.forgejo.len())?

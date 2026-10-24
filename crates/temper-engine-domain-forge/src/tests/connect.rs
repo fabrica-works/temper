@@ -581,3 +581,14 @@ fn read_only_app_refuses_a_manifest_but_accepts_a_paste() {
             .any(|r| if let Request::Connect { .. } = r { true } else { false })
     );
 }
+
+#[test]
+fn forgejo_admin_is_not_taken_and_its_carried_value_is_unused() {
+    refused(
+        &mut github(Kind::Forgejo, Mode::Managed),
+        Ask::Connect { forge: 1, how: How::ForgejoAdmin { first: None } },
+        Some(PartyRole::Owner),
+        Some(VALUE),
+        ForgeRefusal::NotTaken,
+    );
+}
