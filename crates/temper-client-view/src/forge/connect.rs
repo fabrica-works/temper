@@ -888,20 +888,26 @@ fn setup_field(
 }
 pub(crate) fn project_name(root: &Domain, w: &Words, project: &SetUpProject) -> Box<[u8]> {
     match project {
-        SetUpProject::Existing(project) => match crate::pages::project_name(root.pages(), root.client(), *project) {
-            Some(name) => copy_of(name),
-            None => w.say(Word::Project, &[Hole::Number(u64::from(*project))]),
-        },
+        SetUpProject::Existing(project) => {
+            match crate::pages::project_name(root.pages().me(root.client()), root.forge().demo(), *project, w) {
+                Some(name) => name,
+                None => w.say(Word::Project, &[Hole::Number(u64::from(*project))]),
+            }
+        }
         SetUpProject::New(name) => {
             if let Some(last) = root.forge().set_up()
                 && let Some(starting) = &last.starting
                 && last.project == *project
             {
                 if starting.value.adoption.project != 0
-                    && let Some(name) =
-                        crate::pages::project_name(root.pages(), root.client(), starting.value.adoption.project)
+                    && let Some(name) = crate::pages::project_name(
+                        root.pages().me(root.client()),
+                        root.forge().demo(),
+                        starting.value.adoption.project,
+                        w,
+                    )
                 {
-                    return copy_of(name);
+                    return name;
                 }
                 return starting.value.name.clone();
             }

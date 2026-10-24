@@ -60,13 +60,25 @@ impl View {
     }
     fn adoption_main(&mut self, b: &mut Builder, root: &Domain) {
         let Some(form) = root.forge().form() else { return };
-        let project = crate::pages::project_name(root.pages(), root.client(), form.project);
+        let project = crate::pages::project_name(
+            root.pages().me(root.client()),
+            root.forge().demo(),
+            form.project,
+            &self.forge_words,
+        );
         b.open(Role::Main);
         b.style(crate::look::MAIN);
         b.style(crate::look::PAGE);
         b.open(Role::Slot);
         b.style(crate::look::ADOPTION_PAGE);
-        forge::page::page(b, form, project, &self.forge_words, &mut self.forge, self.limits.tree.text_per_node);
+        forge::page::page(
+            b,
+            form,
+            project.as_deref(),
+            &self.forge_words,
+            &mut self.forge,
+            self.limits.tree.text_per_node,
+        );
         b.close();
         b.close();
     }

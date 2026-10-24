@@ -35,6 +35,58 @@ fn the_project_chosen_is_the_first_of_me_at_start() {
     assert_eq!(root.pages().project(), Some(fixtures::PROJECT));
 }
 #[test]
+fn the_running_demo_project_button_is_named_playground() {
+    let root = fixtures::demo_root(
+        temper_client_domain::Address::Chats { filter: ChatsFilter::All, start: false },
+        fixtures::PROJECT,
+        true,
+    );
+    for words in [fixtures::words(), fixtures::browser_words()] {
+        let mut view = fixtures::view_of(words);
+        fixtures::build(&mut view, &root);
+        let button = fixtures::find(view.tree(), Role::Button, b"Playground").expect("demo project");
+        assert_eq!(
+            crate::act(&mut view, button, Act::Press),
+            Some(Action::Pages(pages::Act::Project { project: fixtures::PROJECT }))
+        );
+        assert!(fixtures::find(view.tree(), Role::Button, b"Shop").is_none());
+        assert!(fixtures::find(view.tree(), Role::Paragraph, b"No project yet").is_none());
+    }
+}
+#[test]
+fn a_navigation_without_projects_says_no_project_yet() {
+    let (mut root, watch) = fixtures::root_with_watch(None);
+    let mut me = root.pages().me(root.client()).unwrap().clone();
+    me.projects.clear();
+    fixtures::root_event(
+        &mut root,
+        temper_client_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(Box::new(
+                        me,
+                    ))),
+                },
+            },
+        },
+    );
+    for words in [fixtures::words(), fixtures::browser_words()] {
+        let mut view = fixtures::view_of(words);
+        let tree = fixtures::build(&mut view, &root);
+        let mut label = None;
+        for node in tree.nodes() {
+            if node.role == Role::Paragraph && node.name.as_deref() == Some(b"No project yet") {
+                label = Some(node);
+                break;
+            }
+        }
+        let label = label.expect("empty project label");
+        assert_eq!(label.styles.as_slice(), [crate::look::PROJECT_EMPTY]);
+        assert!(label.binding.is_none());
+    }
+}
+#[test]
 fn no_project_chosen_offers_no_adoption_link() {
     let view = fixtures::built();
     assert!(fixtures::find(view.tree(), Role::Link, b"Adopt a repository").is_none());

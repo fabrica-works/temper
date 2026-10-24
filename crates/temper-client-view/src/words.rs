@@ -10,6 +10,7 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    NoProjectYet,
     AdminTitle,
     AdminDescription,
     AdminCard,
@@ -619,9 +620,10 @@ pub enum Word {
 // The Authorize place and page-owned forge sign-in add twelve phrases.
 // The owned row's Runs and first-password lines add two words and three phrases.
 // A failed setup's step adds five phrases.
-const PHRASES: u32 = 1109;
-const SEGMENTS: u32 = 1958;
-const ALL: [Word; 561] = [
+const PHRASES: u32 = 1110;
+const SEGMENTS: u32 = 1959;
+const ALL: [Word; 562] = [
+    Word::NoProjectYet,
     Word::AdminTitle,
     Word::AdminDescription,
     Word::AdminCard,
@@ -1188,6 +1190,7 @@ impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::NoProjectYet => 1949,
             Self::YourForgesTitle => 1819,
             Self::YourForges => 1800,
             Self::ForgesDescription => 1801,
@@ -2016,6 +2019,7 @@ const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::NoProjectYet => (&[b"No project yet"], &[]),
         Word::YourForgesTitle => (&[b"Your forges"], &[]),
         Word::YourForges => (&[b"Your forges ", b""], &[Number]),
         Word::ForgesDescription => (&[b"Each forge temper is connected to, or setting up. Add one to bring its repositories to temper."], &[]),
