@@ -261,10 +261,14 @@ impl ScenarioApplication for Temper {
                     world.drain()?;
                     ask(world, NEW_DECISION_CALLER, crate::chat(&world.peers, &world.store, 1, b"new decision caller"));
                     world.drain()?;
-                    if world.peers.assignments.len() < 3 {
-                        world.advance(7_000_000_000);
+                    for _ in 0..16 {
+                        if world.peers.assignments.len() >= 3 {
+                            break;
+                        }
+                        world.advance(1_000_000_000);
                         world.drain()?;
                     }
+                    check(world.peers.assignments.len() >= 3, "new decision caller was not assigned")?;
                 }
                 if matches!(world.peers.scenario, Some(Scenario::OtherHand | Scenario::ChangedJudge)) {
                     change(world, completion)?;
