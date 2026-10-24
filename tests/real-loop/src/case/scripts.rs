@@ -1067,3 +1067,180 @@ pub fn step_6_1_rules() -> Box<[Box<[Rule]>]> {
         Box::new([]),
     ])
 }
+
+// Act 3, step 6.2 (domain/testing.md, 5.3)
+fn blocker_owner(forge: SocketAddr, agent: Agent, spend: u64, tasks: u32, depth: u32, deadline: u64) -> Value {
+    let mut member = batch_member(agent, spend, tasks, depth, deadline);
+    member["authority"]["tools"] = 7.into();
+    member["authority"]["grants"] = grants(forge, &[2, 3, 4, 10, 11, 12]);
+    member["authority"]["delegation"]["kinds"] =
+        json!([{"kind":"agent","number":1},{"kind":"agent","number":2},{"kind":"procedure","number":2}]);
+    member
+}
+
+#[must_use]
+pub fn step_6_2(forge: SocketAddr) -> Box<[Script]> {
+    use super::{
+        Agent, BLOCKER_A3, BLOCKER_A3_REPORT, BLOCKER_ANSWER, BLOCKER_DIRECTOR, BLOCKER_DIRECTOR_REPORT, BLOCKER_E1,
+        BLOCKER_FINDING, BLOCKER_KEPT_REPORT, BLOCKER_OWNER, BLOCKER_OWNER_REPORT, BLOCKER_QUESTION,
+        BLOCKER_QUESTION_NUMBER, BLOCKER_REASON, BLOCKER_REVIEW_HOLD, BLOCKER_REVISION, BLOCKER_SUBOWNER,
+        BLOCKER_SUBOWNER_REPORT, BLOCKER_UP_ANSWER, BLOCKER_UP_QUESTION, BLOCKER_UP_QUESTION_NUMBER, REVIEWED,
+    };
+    let [owner, subowner, a3, e1] = blocker_members(forge);
+    Box::new([
+        Script {
+            cue: Agent::BlockerDirector.cue().into(),
+            turns: Box::new([
+                then_wait(call(b"delegate", &json!({"batch":[owner]})), "A owns the blocker."),
+                then_wait(
+                    call(
+                        b"message",
+                        &json!({"target":BLOCKER_OWNER,"form":"answer",
+                "question":BLOCKER_UP_QUESTION_NUMBER,"words":BLOCKER_UP_ANSWER}),
+                    ),
+                    "A has the director's answer.",
+                ),
+                report(BLOCKER_DIRECTOR_REPORT),
+                wait("A is still working."),
+            ]),
+        },
+        Script {
+            cue: Agent::BlockerOwner.cue().into(),
+            turns: Box::new([
+                then_wait(call(b"delegate", &json!({"batch":[subowner]})), "A1 owns the blocker."),
+                then_wait(
+                    call(
+                        b"message",
+                        &json!({"target":BLOCKER_DIRECTOR,"form":"question",
+                "words":BLOCKER_UP_QUESTION}),
+                    ),
+                    "The director's decision waits.",
+                ),
+                then_wait(
+                    call(
+                        b"message",
+                        &json!({"target":BLOCKER_SUBOWNER,"form":"answer",
+                "question":BLOCKER_QUESTION_NUMBER,"words":BLOCKER_ANSWER}),
+                    ),
+                    "A1 has the answer.",
+                ),
+                report(BLOCKER_OWNER_REPORT),
+                wait("A1 is still working."),
+            ]),
+        },
+        Script {
+            cue: Agent::BlockerSubowner.cue().into(),
+            turns: Box::new([
+                then_wait(call(b"delegate", &json!({"batch":[a3]})), "a3 implements."),
+                then_wait(
+                    call(
+                        b"message",
+                        &json!({"target":BLOCKER_OWNER,"form":"question",
+                "words":BLOCKER_QUESTION}),
+                    ),
+                    "The stopped owner's API needs direction.",
+                ),
+                call(b"delegate", &json!({"batch":[e1]})),
+                then_wait(
+                    call(
+                        b"amend",
+                        &json!({"target":BLOCKER_A3,"revision":BLOCKER_REVISION-1,
+                "amendment":{"dependencies":[BLOCKER_E1],"reason":BLOCKER_REASON}}),
+                    ),
+                    "e1 keeps a3 pending.",
+                ),
+                report(BLOCKER_SUBOWNER_REPORT),
+                wait("a3 is still working."),
+            ]),
+        },
+        Script {
+            cue: Agent::BlockerImplementer.cue().into(),
+            turns: Box::new([
+                then_wait(
+                    call(
+                        b"message",
+                        &json!({"target":BLOCKER_SUBOWNER,"form":"words",
+                "words":BLOCKER_FINDING}),
+                    ),
+                    "a3 awaits the blocker decision.",
+                ),
+                report(BLOCKER_KEPT_REPORT),
+                report(BLOCKER_A3_REPORT),
+                wait("a3 awaits e1."),
+            ]),
+        },
+        blocker_coder(),
+        Script {
+            cue: format!("[Requested by task {BLOCKER_E1}]").into_bytes().into(),
+            turns: Box::new([direction_held(
+                BLOCKER_REVIEW_HOLD,
+                call(b"finish", &json!({"form":"verdict","label":"1","text":REVIEWED,"fields":{},"items":[]})),
+            )]),
+        },
+    ])
+}
+
+#[must_use]
+pub fn step_6_2_rules() -> Box<[Box<[Rule]>]> {
+    use super::{
+        BLOCKER_A3_REPORT, BLOCKER_ANSWER, BLOCKER_E1, BLOCKER_FINDING, BLOCKER_OWNER_REPORT, BLOCKER_QUESTION,
+        BLOCKER_REASON, BLOCKER_SUBOWNER_REPORT, BLOCKER_UP_ANSWER, BLOCKER_UP_QUESTION,
+    };
+    let table = |entries: &[(&str, u32)]| -> Box<[Rule]> {
+        entries.iter().map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn: *turn }).collect()
+    };
+    Box::new([
+        table(&[(BLOCKER_OWNER_REPORT, 2), (CROSSED, 2), (BLOCKER_UP_QUESTION, 1), (BEGIN, 0), ("", 3)]),
+        table(&[
+            (BLOCKER_SUBOWNER_REPORT, 3),
+            (CROSSED, 3),
+            (BLOCKER_UP_ANSWER, 2),
+            (BLOCKER_QUESTION, 1),
+            (BEGIN, 0),
+            ("", 4),
+        ]),
+        table(&[
+            (BLOCKER_A3_REPORT, 4),
+            (CROSSED, 4),
+            (&format!("{DELEGATED}{BLOCKER_E1}"), 3),
+            (BLOCKER_ANSWER, 2),
+            (BLOCKER_FINDING, 1),
+            (BEGIN, 0),
+            ("", 5),
+        ]),
+        table(&[
+            (&format!("T{BLOCKER_E1} is done; the task can go on"), 2),
+            (BLOCKER_REASON, 1),
+            (CROSSED, 2),
+            (BEGIN, 0),
+            ("", 3),
+        ]),
+        Box::new([]),
+        Box::new([]),
+    ])
+}
+
+fn blocker_coder() -> Script {
+    use super::{BLOCKER_FILE, BLOCKER_FIXED, BLOCKER_WRONG};
+    Script {
+        cue: Agent::BlockerCoder.cue().into(),
+        turns: Box::new([
+            call(b"read", &json!({"path":BLOCKER_FILE})),
+            call(b"edit", &json!({"path":BLOCKER_FILE,"edits":[{"old":BLOCKER_WRONG,"new":BLOCKER_FIXED}]})),
+            call(b"finish", &json!({"form":"change","fields":{"title":"e1","body":"Fix B's six public signatures."}})),
+        ]),
+    }
+}
+
+fn blocker_members(forge: SocketAddr) -> [Value; 4] {
+    use super::{A_DEADLINE, A1_DEADLINE, BLOCKER_E1_SPEC, BLOCKER_FILE};
+    let mut owner = blocker_owner(forge, Agent::BlockerOwner, 42, 5, 4, A_DEADLINE);
+    owner["tracked"] = json!({"priority":1});
+    let subowner = blocker_owner(forge, Agent::BlockerSubowner, 32, 4, 3, A1_DEADLINE);
+    let mut a3 = batch_member(Agent::BlockerImplementer, 10, 0, 0, A1_DEADLINE);
+    a3["authority"]["tools"] = 2.into();
+    a3["executor"]["charter"] = 2.into();
+    let mut e1 = direction_change(forge, BLOCKER_E1_SPEC, BLOCKER_FILE, 2);
+    e1["authority"]["budget"]["deadline"] = A1_DEADLINE.into();
+    [owner, subowner, a3, e1]
+}
