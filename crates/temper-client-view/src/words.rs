@@ -10,6 +10,9 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    GitHubReadNoAccess,
+    GitHubReadNotFound,
+    GitHubReadReload,
     GitHubUnknown,
     GitHubPicker,
     GitHubInstalled,
@@ -589,9 +592,13 @@ pub enum Word {
 // GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
 // Account moves add four account literals and one task-wait phrase.
 // The Authorize place and page-owned forge sign-in add twelve phrases.
-const PHRASES: u32 = 1080;
-const SEGMENTS: u32 = 1889;
-const ALL: [Word; 535] = [
+// Ready's refused read and exhausted busy rereads add three phrases.
+const PHRASES: u32 = 1083;
+const SEGMENTS: u32 = 1892;
+const ALL: [Word; 538] = [
+    Word::GitHubReadNoAccess,
+    Word::GitHubReadNotFound,
+    Word::GitHubReadReload,
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -1160,6 +1167,9 @@ impl Word {
             Self::SetupProject => 1822,
             Self::SetupExisting => 1823,
             Self::GitHubUnknown => 1965,
+            Self::GitHubReadNoAccess => 1966,
+            Self::GitHubReadNotFound => 1967,
+            Self::GitHubReadReload => 1968,
             Self::GitHubPicker => 1950,
             Self::GitHubInstalled => 1951,
             Self::GitHubReading => 1952,
@@ -1921,6 +1931,9 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::NoForges => (&[b"No forge of yours yet."], &[]),
         Word::ForgeSummary => (&[b"forge ", b" \xc2\xb7 ", b""], &[Number, Name]),
         Word::GitHubUnknown => (&[b"It is not known whether the project was made."], &[]),
+        Word::GitHubReadNoAccess => (&[b"GitHub refused temper's read of the App's repositories: the App may be suspended. See Forges."], &[]),
+        Word::GitHubReadNotFound => (&[b"GitHub no longer has this installation: install the App again."], &[]),
+        Word::GitHubReadReload => (&[b"Reload this page to try again."], &[]),
         Word::GitHubPicker => (&[b"Choose a repository to start in"], &[]),
         Word::GitHubInstalled => (&[b"", b" is installed on ", b"."], &[Name, Name]),
         Word::GitHubReading => (&[b"Reading GitHub's repositories\xe2\x80\xa6"], &[]),
