@@ -1,6 +1,6 @@
 #!/bin/sh
 # qa.md, 6.2. Trusted prefix: TEMPER CLIENT_DIRECTORY PUBLIC_ORIGIN.
-# The attended host supplies http://HOST:PORT/, with no credential.
+# The runner supplies http://HOST:PORT/, with no credential.
 # Shell builtins only until exec; never interpret a driver's words as code.
 set -f
 refuse() { printf 'ctl: refused: %s\n' "$1" >&2; exit 1; }

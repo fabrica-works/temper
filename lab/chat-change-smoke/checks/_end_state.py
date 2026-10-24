@@ -1,8 +1,8 @@
 """Private pure decoding and judgment for qa.md, 8.4; no IO.
 
 The observation projection reads the landed skein writer's JSON lines.
-The host must supply an owner-confirmed flush/stop boundary and
-complete objects from the private git `objects` route.
+The live collection supplies the checkpoint prefix and complete objects
+from the private git `objects` route after the story has ended.
 """
 
 import base64
@@ -61,7 +61,7 @@ def _observation_number(text):
 
 
 def _project_observations(data: bytes | None) -> dict:
-    """Pure end-state inputs for _judge; neither EOF nor a checkpoint proves flush.
+    """Pure end-state inputs from the prefix through the last checkpoint.
 
     Source: skein fbc771fde2a784d3b95e7a03460c4ccc56829c9d,
     crates/skein-fake-forge-protocol/src/observations{.rs,/read.rs,/writer.rs},
@@ -69,8 +69,22 @@ def _project_observations(data: bytes | None) -> dict:
     other official tags are ignored, without decoding their content or judging
     promises. Content is base64, names UTF-8, numbers full u64 JSON integers.
     """
-    complete = data is not None and data.endswith(b"\n")
-    checkpoint = False
+    lines = (data or b"").split(b"\n")[:-1]
+    boundary = None
+    # A concurrent drain can be part-written after the last whole checkpoint.
+    # Locate that checkpoint first, then validate every line before it.
+    for index in range(len(lines) - 1, -1, -1):
+        try:
+            record = json.loads(lines[index].decode("utf-8"), object_pairs_hook=_observation_members,
+                                parse_int=_observation_number, parse_float=int, parse_constant=int)
+            if (type(record) is dict and set(record) == {"observations_lost"}
+                    and type(record["observations_lost"]) is int
+                    and 0 <= record["observations_lost"] < 1 << 64):
+                boundary = index
+                break
+        except (ValueError, UnicodeError, RecursionError):
+            continue
+    complete = boundary is not None
     losses = []
     merged = moved = None
     tags = {
@@ -85,8 +99,7 @@ def _project_observations(data: bytes | None) -> dict:
         "merged": {"observation", "repository", "number", "base", "head", "commit", "by"},
     }
     try:
-        for line in (data or b"").split(b"\n")[:-1]:
-            checkpoint = False
+        for line in lines[:boundary + 1] if boundary is not None else ():
             # Explicit UTF-8 avoids json.loads(bytes)' UTF-16/32 auto-detection.
             # int rejects fractional/exponent numbers and non-JSON constants.
             record = json.loads(line.decode("utf-8"), object_pairs_hook=_observation_members,
@@ -98,7 +111,6 @@ def _project_observations(data: bytes | None) -> dict:
                 if set(record) != {"observations_lost"} or type(loss) is not int or not 0 <= loss < 1 << 64:
                     raise ValueError("unknown loss")
                 losses.append(loss)
-                checkpoint = True
                 continue
             tag = record.get("observation")
             repository = record.get("repository")
@@ -129,7 +141,7 @@ def _project_observations(data: bytes | None) -> dict:
                     moved = record["to"] if tag == "moved" else None
     except (ValueError, UnicodeError, RecursionError):
         complete = False
-    return dict(complete_lines=complete and checkpoint, loss_counts=tuple(losses),
+    return dict(complete_lines=complete, loss_counts=tuple(losses),
                 last_merged=merged, last_moved=moved)
 
 
@@ -190,7 +202,6 @@ def _tree_valid(tree: Mapping[bytes, bytes] | None) -> bool:
 def _judge(
     *,
     complete_lines: bool | None,
-    flushed: bool | None,
     loss_counts: Sequence[int] | None,
     last_merged: int | None,
     last_moved: int | None,
@@ -201,14 +212,13 @@ def _judge(
 
     Unavailable trees/objects must stay `None`, never filled with
     empty maps on read errors. Empty trees here mean known empty trees.
-    `flushed` means the owner's complete pre-stop boundary was obtained;
-    an EOF alone cannot establish it. Loss zero must be explicit.
+    The collection runs after the story; its last checkpoint bounds the
+    projection. Loss zero must be explicit.
     """
     if loss_counts is not None and any(type(n) is int and n > 0 for n in loss_counts):
         return _Verdict(_Status.UNDECIDED, reason="observations lost")
     if (
         complete_lines is not True
-        or flushed is not True
         or not loss_counts
         or any(type(n) is not int or n != 0 for n in loss_counts)
     ):

@@ -219,6 +219,7 @@ class AssemblyTests(unittest.TestCase):
                                    *process['argv'], '--seed', '{seed.llm}']
             elif process['name'] == 'engine':
                 process['ready'].remove(dict(stream='stdout', prefix='http://', capture='link'))
+                process['bootstrap'] = dict(stream='stdout', action='sign-in')
         self.assertEqual(smoke, canonical)
 
     def test_runtime_llm_changes_only_notice_result_wake_after_rendering(self):
@@ -290,7 +291,7 @@ class AssemblyTests(unittest.TestCase):
             self.assertEqual(process['env'], {})
         self.assertEqual(names, {'forge', 'llm', 'engine', 'w1', 'w2'})
 
-    def test_s_seed_private_signin_and_host_check_inputs(self):
+    def test_s_seed_private_signin_and_runner_check_inputs(self):
         exp = read(SMOKE / 'experiment.json')
         self.assertEqual(exp['format'], 'lab-experiment/1')
         self.assertIsNone(exp['driver'])
@@ -300,21 +301,39 @@ class AssemblyTests(unittest.TestCase):
                          ['sign-in', 'add-key', 'usable', 'forge', 'adopt', 'story'])
         self.assertEqual(exp['actions'][0]['argv'][-2:], ['sign-in', '-'])
         self.assertFalse(any('stdin' in a for a in exp['actions']))
+        self.assertNotIn('await', exp['actions'][0])
+        engine = next(p for p in exp['processes'] if p['name'] == 'engine')
+        self.assertEqual(engine['bootstrap'], dict(stream='stdout', action='sign-in'))
+        self.assertFalse(any(r['stream'] == 'stdout' for r in engine['ready']))
         for process in exp['processes']:
             self.assertFalse(any(r['capture'] == 'link' for r in process['ready']))
         for action in exp['actions'][2:4]:
             self.assertEqual(action['argv'][-2:], ['--timeout', '200'])
         self.assertEqual(exp['actions'][-1]['argv'][-1], 'http://{proc.engine.ready.clients}/')
         self.assertIn('STORY_SECONDS = 220', (SMOKE / 'smoke/_story.py').read_text())
-        self.assertEqual([c['name'] for c in exp['collect']], ['observations', 'store'])
+        self.assertEqual(exp['collect'], [
+            dict(name='forge', argv=['{experiment}/checks/end-state', 'collect',
+                '{proc.forge.dir}/observations.jsonl', '{proc.forge.ready.address}', '{collect.dir}'],
+                env={'PATH': '/usr/bin:/bin'}, scan=[]),
+            dict(name='observations', cluster='stopped', argv=['/bin/cp', '--',
+                '{proc.forge.dir}/observations.jsonl', '{collect.dir}/observations.jsonl'], env={}, scan=[]),
+            dict(name='store', cluster='stopped', argv=['/bin/cp', '-R', '--',
+                '{proc.engine.dir}/data/state/store/.', '{collect.dir}/.'], env={}, scan=[]),
+        ])
+        self.assertEqual([c['name'] for c in exp['checks']], ['end-state', 'promises'])
         end = next(c for c in exp['checks'] if c['name'] == 'end-state')
         self.assertEqual(end['argv'], ['{experiment}/checks/end-state',
-            '{collected.observations}/observations.jsonl', '{proc.forge.ready.address}'])
+            'judge', '{collected.forge}'])
+        self.assertNotIn('cluster', end)
         promises = next(c for c in exp['checks'] if c['name'] == 'promises')
+        self.assertEqual(promises['cluster'], 'stopped')
         self.assertEqual(promises['argv'][-3:], ['1', '{collected.observations}/observations.jsonl',
                                               '{collected.store}'])
         # No credential template anywhere in the executable assembly.
         text = (SMOKE / 'experiment.json').read_text()
         self.assertNotIn('ready.link', text)
+        self.assertNotIn('host', text.lower())
+        for filename in ('host', 'host.py', '_host_native.py', '_host_output.py'):
+            self.assertFalse((SMOKE / filename).exists())
         self.assertNotIn('secret=', text)
         self.assertNotIn('--boundary', ' '.join(end['argv']))

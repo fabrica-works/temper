@@ -1,6 +1,6 @@
 # QA in the lab
 
-2026-10-20, with director decision 253, revised 2026-10-23. temper's
+2026-10-20, with director decision 253, revised 2026-10-24. temper's
 binding to skein's lab (skein's `lab.md`): the experiments temper keeps
 in `lab/`, the cluster, seed, charter, tool and checks each runs with,
 what the fakes' scripts must say, the cost classes they name, and the
@@ -80,7 +80,10 @@ its adopted decisions, are section 11.
 
 - **H's files:** `experiment.json` (skein's `lab.md`, 4.1), `charter.md`
   (6.1), the templates of 4.4, `tools/ctl` (6.2), `checks/end-state`
-  (8.4) and `NOTICE` (3.3). S adds `smoke/story` (5.2).
+  (8.4), `NOTICE` (3.3) and `smoke/_runtime_llm.py`, the llm process's
+  adapter, which keeps the NOTICE root chat open after its delegate
+  settles; S's, H's and P's copies are one file's bytes. S adds
+  `smoke/story` (5.2).
 - **P is H with a fault:** its files are H's, byte for byte, but
   `experiment.json`, which differs by its `faults` and `planted` alone;
   its `name` is H's. So P with `faults` and `planted` cleared has H's tree and digest
@@ -140,26 +143,17 @@ forge    temper fake forge; ready "listening " → address
   `listening webhooks` on stderr. Reconcile registers the actual bound
   webhook endpoint; no fixed endpoint, socket probe or experiment poll
   substitutes for that handoff. Workers print their linked lines.
-- **A private bootstrap for S:** the engine's sign-in link on stdout goes
-  directly to the seed client's stdin. It is never a file, readiness
-  capture, command argument, event or transcript. Only the public client
-  origin is kept and passed to the ctl wrapper. A spent link remains a
-  credential for this rule.
-  The canonical native process harness retains an in-memory stdout link
-  capture for its chat clients. S explicitly removes that declaration and
-  uses its attended pipe; the page copies retain their current bootstrap
-  contract pending their owners' private-bootstrap work.
-- **S has an attended host** beside `lab/chat-change-smoke/`, while
-  skein's runner lacks private bootstrap and stopped collection. It
-  keeps the lab's subject, key, run, evidence and verdict records and
-  native contained process trees. It owns the stream handling that
-  removes the private link before any persistence. It does not use
-  the runner's runtime for a linked run. The runner's driver and
-  campaign execution for H and P remain a separate prerequisite. S requires
-  every service's requested graceful stop to exit zero; nonzero exits and
-  unexpected signals fail even with empty trees and successful checks.
-  Existing panic, survivor and forced-stop bound observations retain their
-  classifications and the existing stop allowances.
+- **A private bootstrap:** the engine's stdout is the runner's private
+  bootstrap channel for the `sign-in` seed action (skein's `lab.md`, 4.3):
+  the sign-in link goes directly to that action's stdin and is never a
+  file, readiness capture, command argument, event or transcript. Only
+  the public client origin is kept and passed to the ctl wrapper. A
+  spent link remains a credential for this rule. The canonical cluster's
+  in-memory stdout link capture is the native process harness's; S, H
+  and P replace it with the bootstrap.
+- **S, H and P run on skein's runner,** as every experiment does: its
+  containment, records, stopped collection and checks. A requested stop
+  must exit zero, as for every experiment (skein's `lab.md`, 7.1).
 
 ### 4.2 Its processes
 
@@ -331,11 +325,14 @@ End with the lab's report: done only if you saw the change landed.
 
 ```
 {"name": "ctl",
- "argv": ["/bin/sh", "{experiment}/tools/ctl", "{artifact.temper}", "{dir.client}", "http://{proc.engine.ready.clients}/"],
+ "argv": ["/usr/bin/dash", "{experiment}/tools/ctl", "{artifact.temper}", "{dir.client}", "http://{proc.engine.ready.clients}/"],
  "env": {}, "writes": ["{dir.client}"], "reads": ["{experiment}/tools/ctl", "{artifact.temper}"]}
 ```
 
-`tools/ctl` is POSIX sh, with the shell's builtins alone, then `exec`.
+The tool's executable is named by its resolved path, as the runner
+mounts it (skein's `scripts/lab/README.md`): `/usr/bin/dash` is this host's
+`/bin/sh`. `tools/ctl` is POSIX sh, with the shell's builtins alone,
+then `exec`.
 For each call it checks, in order:
 
 1. **The tool is area 1's** (`client/tools.md`, 5.5): the reads `me`,
@@ -447,19 +444,19 @@ discounted (skein's `lab.md`, 9.4). The experiment adds no generic check.
 
 ### 8.2 Collection
 
-The attended host keeps the completed story command and a causally confirmed
-observation flush boundary while the fake is running. It retains the complete
-checkpoint prefix with explicit cumulative loss count, including zero, and
-reads the objects needed by the live end-state check. EOF alone establishes
-no boundary. A missing boundary is undecided, never declared confirmed.
-
-After the live evidence and object responses are retained, the host stops
-processes in reverse start order and confirms each exit and empty process
-tree. Only then does it copy the engine's `data/state/store` to evidence and
-run the promises check. A copy failure leaves that check unjudged; the live
-store is never opened by the checker. Raw observations, object requests and
-responses, boundary evidence, check output and process outcomes are retained
-with the run (skein's `lab.md`, 4.5).
+- **`forge`, live,** once the story (S) or the drive (H, P) has ended:
+  `checks/end-state collect` copies the forge's observations, and, when
+  they name a landing C, reads C and its first parent P by `objects`
+  (7.2), keeping each request and response, into its directory. The
+  fake writes and flushes before it replies, so the stream's prefix up
+  to its last checkpoint holds every landing temper saw: that prefix is
+  the boundary, and what follows it is a flush still being written.
+- **`observations`, stopped,** the fake's file at rest, its last line a
+  checkpoint, then **`store`, stopped,** the engine's `data/state/store`
+  copied once every exit is confirmed (skein's `lab.md`, 4.5), so that
+  what the promises compare with the copy was collected no later than
+  it. A copy cut short leaves `promises` unjudged; no checker opens the
+  live store.
 
 ### 8.3 The forge's promises
 
@@ -490,11 +487,9 @@ Loss or unknown completeness never gives a pass. Status 2 with a
 
 ### 8.4 The story's end
 
-`end-state` reads the collected observations and forge address. The attended
-host supplies the existing helper's confirmed/unknown boundary, one absolute
-monotonic command deadline, fresh evidence directory and result path
-(`lab/chat-change-smoke/checks/README.md`). NOTICE is the file beside the
-helper. Its results follow skein's `lab.md`, 7.2:
+`end-state judge` reads the `forge` collection alone: no network, no
+clock. NOTICE is the file beside the helper. Its results follow skein's
+`lab.md`, 7.2:
 
 The helper is Python 3.11+ standard library only, under the same
 "for now" as the runner (decision 253). It is lab tooling beside the
@@ -502,8 +497,8 @@ experiments in `temper/lab/`, never product code or a test in temper's
 worlds. Its future application home is Rust. The lab's key records its
 interpreter and executable identity (skein's `lab.md`, 2.3).
 
-1. **The stream:** complete lines and a complete flush boundary with
-   explicit loss count 0. Undecided, `observations missing`, when it
+1. **The stream:** the prefix up to the last checkpoint, its lines
+   complete, every checkpoint's loss count 0. Undecided, `observations missing`, when it
    cannot be read or completeness is unknown; `observations lost`,
    when a line counts any loss.
 2. **Landed:** the last `Merged` of `fake/widget` into `main`, at commit
@@ -579,7 +574,7 @@ interpreter and executable identity (skein's `lab.md`, 2.3).
 
 | Step | Key | Paid driver runs | Then |
 |---|---|---|---|
-| 1. smoke | S, `temper-m1-calibration` | 0: three seeds, attended | pass, or its cause fixed and S judged again |
+| 1. smoke | S, `temper-m1-calibration` | 0: three seeds, on the runner | pass, or its cause fixed and S judged again |
 | 2. calibration | H, `temper-m1-calibration` | 1 | usage measured; if unusable, report before any replacement calibration |
 | 3. class | | 0 | `temper-m1` set and reported |
 | 4. healthy | H, `temper-m1` | 3, by `lab judge` | verdict pass |

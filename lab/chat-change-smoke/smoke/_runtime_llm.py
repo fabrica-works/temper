@@ -1,7 +1,9 @@
-"""S-only adapter: patch the rendered NOTICE root's result wake before exec.
+"""Adapt the cluster's NOTICE root for S, H and P before exec.
+
+Keep the root chat open after its delegate settles.
 
 The canonical template and all finite coding/review scripts stay untouched.
-Python is the same lab-tooling exception as the attended S host.
+Python is the approved temporary lab-tooling exception.
 """
 import json
 import os
