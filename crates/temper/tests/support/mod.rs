@@ -1,4 +1,5 @@
 //! Shared configuration fixtures for startup and the process tier.
+pub mod account_move;
 pub mod boxed;
 pub mod case;
 pub mod cluster;
