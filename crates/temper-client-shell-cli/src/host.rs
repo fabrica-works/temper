@@ -73,6 +73,10 @@ pub struct OneShot {
     status: Option<u8>,
     closed: bool,
     memory: u64,
+    move_file: Option<Box<[u8]>>,
+    exporting: bool,
+    file_end: Option<temper_client_tools::jig::FileEnd>,
+    recording: Option<u32>,
 }
 impl OneShot {
     /// # Errors
@@ -114,10 +118,30 @@ impl OneShot {
             + Queue::<jig_client::Request>::worst_case(request_room).expect("ordered store writes")
             + u64::from(request_room) * u64::from(limits.connections.body_bytes) // Queued store records.
             + limits.root.tools.ask_bytes * 256 // Input and the JSON parser's per-byte token/document scratch.
-            + u64::from(limits.root.tools.rows) * (u64::from(temper_client_tools::limits::KEY_BYTES) + u64::try_from(size_of::<Option<skein_lib::Secret>>()).expect("secret holder"))
-            + 2 * (u64::from(temper_client_tools::limits::KEY_BYTES) + 2) // Key file buffer and its bounded read.
+            + u64::from(limits.root.tools.rows) * (u64::from(temper_client_tools::limits::MOVED_BYTES) + u64::try_from(size_of::<Option<skein_lib::Secret>>()).expect("secret holder"))
+            + 2 * (u64::from(temper_client_tools::limits::MOVED_BYTES) + 2) // Key or moved-record file buffer and its bounded read.
             + 8192; // Output lines and DIRECTORY's bounded path.
+        let (exporting, move_file) = match &call.parsed {
+            Parsed::Call { call, .. }
+                if call.tool == temper_client_tools::jig::rows::EXPORT_AT
+                    || call.tool == temper_client_tools::jig::rows::IMPORT_AT =>
+            {
+                let index = usize::from(call.tool == temper_client_tools::jig::rows::EXPORT_AT);
+                let Some(Some(temper_client_tools::jig::call::Values::One(
+                    temper_client_tools::jig::call::Value::File(file),
+                ))) = call.values.get(index)
+                else {
+                    unreachable!("move file")
+                };
+                (call.tool == temper_client_tools::jig::rows::EXPORT_AT, Some(file.clone()))
+            }
+            Parsed::Call { .. } | Parsed::File { .. } => (false, None),
+        };
         let mut host = Self {
+            exporting,
+            move_file,
+            file_end: None,
+            recording: None,
             directory: Directory::new(
                 startup.parent,
                 startup.file_parent,
@@ -174,6 +198,15 @@ impl OneShot {
         self.finish(1, false);
     }
     fn finish(&mut self, status: u8, signal: bool) {
+        if self.status.is_some() {
+            return;
+        }
+        if self.move_file.is_some() {
+            let end = self.file_end.unwrap_or_else(|| {
+                if self.exporting { self.root.file_end(1) } else { temper_client_tools::jig::FileEnd::Keep }
+            });
+            self.directory.end_record(end);
+        }
         self.status = Some(status);
         self.value = None;
         self.until = None;
@@ -364,6 +397,7 @@ impl OneShot {
             if self.recovery.admits(self.root.kept())
                 && let Some(printed) = self.recovery.printed.take()
             {
+                self.file_end = Some(printed.file);
                 self.output.push(false, printed.stdout);
                 self.output.push(true, printed.stderr);
                 self.finish(printed.status, false);
@@ -436,7 +470,12 @@ impl OneShot {
                         );
                     }
                 }
+                root::Request::Record { number, record } => {
+                    self.recording = Some(number);
+                    self.directory.write_record(&record);
+                }
                 root::Request::Printed { printed, .. } => {
+                    self.file_end = Some(printed.file);
                     if self.class == Class::Act && printed.status == 0 {
                         self.recovery.printed = Some(printed);
                         continue;
@@ -638,6 +677,23 @@ impl Host for OneShot {
         if !self.preparing || self.status.is_some() {
             self.directory.progress(now);
         }
+        if let Some(result) = self.directory.recorded.take() {
+            let number = self.recording.take().expect("record acknowledgment");
+            if self.status.is_none() {
+                self.root.recorded(&self.root_env, number, result, &mut self.requests);
+            }
+        }
+        if let Some(why) = self.directory.not_removed.take()
+            && !self.exporting
+        {
+            let mut line = b"temper ctl: ".to_vec();
+            line.extend_from_slice(self.move_file.as_deref().expect("import file"));
+            line.extend_from_slice(b" not removed: ");
+            line.extend_from_slice(&why);
+            line.extend_from_slice(b"; its record is spent\n");
+            self.output.push(true, line.into_boxed_slice());
+            self.status = Some(1);
+        }
         if let Some(error) = self.directory.error.take() {
             if let Some(Parsed::Call { call, json }) = self.call.take() {
                 if arguments::key_file(&call).is_some() {
@@ -663,7 +719,7 @@ impl Host for OneShot {
         for request in self.output.requests() {
             self.request(request);
         }
-        if self.status.is_some() && self.output.is_empty() && !self.closed {
+        if self.status.is_some() && self.output.is_empty() && self.directory.is_empty() && !self.closed {
             for request in self.output.close(false) {
                 self.request(request);
             }

@@ -114,6 +114,10 @@ fn draw(
     let title =
         heading(w, row.account, provider, name, display, holder, plan, sources, accounts::current_me(root.client()));
     let deciding = sources.get(0);
+    let mut moving = false;
+    for source in sources {
+        moving |= source.state == c::OwnerAccountState::Moving;
+    }
     let pays = pays(w, plan, uses, bindings.counts().uses);
     let use_line: Box<[u8]> = match row.holder {
         c::AccountHolder::Own => Box::new([]),
@@ -142,7 +146,9 @@ fn draw(
         return;
     };
     let busy = page.request.busy(root.client());
-    if let Some(source) = deciding {
+    if moving {
+        text(b, w, Role::Paragraph, W::Moving);
+    } else if let Some(source) = deciding {
         notice(b, root, w, bindings, row, provider, name, source, sources, manage, busy);
     }
     b.open(Role::List);
@@ -164,6 +170,10 @@ fn draw(
         super::fact(b, w, W::Source, u64::from(source.number));
         if source.kind == c::OwnerAccountKind::Program {
             program_hosts(b, root, w, source, false, bindings.counts());
+        }
+        if moving {
+            b.close();
+            continue;
         }
         match source.kind {
             c::OwnerAccountKind::Key => {
@@ -197,36 +207,38 @@ fn draw(
         pair(b, w, W::UsedBy, &chips(w, runs, waiting));
         pair(b, w, W::WaitingFor, &chips(w, waiting, None));
     }
-    let mut has_key = false;
-    for source in sources {
-        has_key |= source.kind == c::OwnerAccountKind::Key;
-    }
-    if !has_key && provider.is_some() {
-        key_for(b, w, bindings, W::AddApiKey, row, None, busy);
-    }
-    usage(b, w, manage);
-    button(b, root, w, bindings, W::RemoveAccount, row, Operation::RemoveAccount, busy);
-    ranks(b, root, w, bindings, row, None, place, busy);
-    if let Some((target, source)) = page.key_for
-        && target == row
-    {
-        key_field(b, w, bindings, &page.request, busy);
-        let operation = match (source, provider) {
-            (Some(source), _) => Some(Operation::ReplaceKey { source }),
-            (None, Some(provider)) => Some(Operation::AddKey { provider }),
-            (None, None) => None,
-        };
-        if let Some(operation) = operation {
-            button(
-                b,
-                root,
-                w,
-                bindings,
-                if source.is_some() { W::ReplaceKey } else { W::AddKey },
-                row,
-                operation,
-                busy,
-            );
+    if !moving {
+        let mut has_key = false;
+        for source in sources {
+            has_key |= source.kind == c::OwnerAccountKind::Key;
+        }
+        if !has_key && provider.is_some() {
+            key_for(b, w, bindings, W::AddApiKey, row, None, busy);
+        }
+        usage(b, w, manage);
+        button(b, root, w, bindings, W::RemoveAccount, row, Operation::RemoveAccount, busy);
+        ranks(b, root, w, bindings, row, None, place, busy);
+        if let Some((target, source)) = page.key_for
+            && target == row
+        {
+            key_field(b, w, bindings, &page.request, busy);
+            let operation = match (source, provider) {
+                (Some(source), _) => Some(Operation::ReplaceKey { source }),
+                (None, Some(provider)) => Some(Operation::AddKey { provider }),
+                (None, None) => None,
+            };
+            if let Some(operation) = operation {
+                button(
+                    b,
+                    root,
+                    w,
+                    bindings,
+                    if source.is_some() { W::ReplaceKey } else { W::AddKey },
+                    row,
+                    operation,
+                    busy,
+                );
+            }
         }
     }
     if page.request_row == Some(row) || (page.request.broken.is_some() && editing(page, row)) {
@@ -238,13 +250,17 @@ fn draw(
             && let Some(provider) = provider
         {
             super::super::connect_model::sign_in_end(b, root, w, Way::SignIn { provider, plan }, &last.end);
-            signin(b, root, w, bindings, row, Some(provider), busy);
+            if !moving {
+                signin(b, root, w, bindings, row, Some(provider), busy);
+            }
         }
-        if let Some((_, ask)) = &page.request.confirm {
+        if !moving && let Some((_, ask)) = &page.request.confirm {
             confirmation(b, root, w, page, ask);
             super::control(b, w, bindings, W::Confirm, Meaning::Action(Act::Confirm), busy, false);
         }
-        super::control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false, false);
+        if !moving {
+            super::control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false, false);
+        }
     }
     if let Some(doc) = accounts::document(root.client())
         && row.holder == c::AccountHolder::Own
@@ -275,7 +291,7 @@ fn draw(
             }
         }
     }
-    if editing(page, row) && page.request_row != Some(row) {
+    if !moving && editing(page, row) && page.request_row != Some(row) {
         super::control(b, w, bindings, W::Cancel, Meaning::Action(Act::Cancel), false, false);
     }
     if cut || display.cut {
@@ -287,10 +303,11 @@ fn summary_state(w: &Words, source: Option<&c::OwnerAccountSource>) -> Box<[u8]>
     let word = match source {
         None => W::Unknown,
         Some(source) => {
-            if source.spent_until.is_some() {
+            if source.spent_until.is_some() && source.state != c::OwnerAccountState::Moving {
                 W::Limited
             } else {
                 match source.state {
+                    c::OwnerAccountState::Moving => W::Moving,
                     c::OwnerAccountState::Granted if source.usable => W::Ready,
                     c::OwnerAccountState::Granted => W::Granted,
                     c::OwnerAccountState::Later { .. } => W::Limited,
@@ -546,7 +563,8 @@ fn notice(
                 signin(b, root, w, bindings, row, provider, busy);
             }
             c::OwnerAccountState::Misconfigured => text(b, w, Role::Paragraph, W::MisconfiguredPlan),
-            c::OwnerAccountState::Asking
+            c::OwnerAccountState::Moving
+            | c::OwnerAccountState::Asking
             | c::OwnerAccountState::Granted
             | c::OwnerAccountState::Later { .. }
             | c::OwnerAccountState::Unloaded { .. }

@@ -297,8 +297,8 @@ fn a_known_reset_shows_its_utc_moment() {
 fn model_words() -> crate::words::Words {
     crate::words::Words::english(fixtures::FORGE, 128, crate::words::Shell::Terminal).unwrap()
 }
-const NAME_BYTES: u32 = jig_client_protocol_wire::v16::CEILINGS.me_model_name;
-const EFFORT_BYTES: u32 = jig_client_protocol_wire::v16::CEILINGS.me_model_efforts_item;
+const NAME_BYTES: u32 = jig_client_protocol_wire::v19::CEILINGS.me_model_name;
+const EFFORT_BYTES: u32 = jig_client_protocol_wire::v19::CEILINGS.me_model_efforts_item;
 const CUT_MARK: &[u8] = "…".as_bytes();
 fn shown_bytes() -> usize {
     usize::try_from(crate::choice::MODEL_SHOWN).unwrap()
@@ -578,6 +578,32 @@ fn a_waiting_account_shows_its_display() {
     );
     b.close();
     assert!(String::from_utf8(fixtures::text(&b.finish()).into_vec()).unwrap().contains("Waiting account: Personal"));
+}
+
+#[test]
+fn a_task_waiting_on_a_moving_account_says_why() {
+    let root = named_account();
+    let mut b = Builder::new(&fixtures::tree_limits());
+    b.open(Role::Page);
+    crate::choice::waiting(
+        &mut b,
+        &root,
+        Some(c::TaskRunWait::Account {
+            account: Some(3),
+            source: Some(8),
+            why: c::TaskWaitWhy::Source(c::TaskSourceState::Moving),
+        }),
+        &fixtures::words(),
+        &mut crate::frame::Bindings::new(32),
+        &mut crate::words::Times::new(fixtures::NOW),
+    );
+    b.close();
+    let tree = b.finish();
+    assert!(
+        fixtures::find(&tree, Role::Paragraph, b"Waiting because the account is moving to another deployment")
+            .is_some()
+    );
+    assert!(!tree.nodes().iter().any(|node| node.role == Role::Button || node.role == Role::Link));
 }
 
 #[test]
@@ -1029,6 +1055,19 @@ fn a_held_pin_stays_pinned_while_fresh_selection_passes_to_the_next_account() {
             let root = line_facts(Some(readiness(c::Readiness::Usable)), rows.clone(), pin, None, None, true);
             assert_eq!(using_text(&root), expected);
         }
+    }
+}
+#[test]
+fn a_moving_source_is_held_even_if_supplied_as_usable() {
+    let mut moving = account(3, c::OwnerAccountKind::SignIn, None);
+    moving.sources.get_mut(1).unwrap().state = c::OwnerAccountState::Moving;
+    assert!(moving.sources.get(1).unwrap().usable);
+    let rows = accounts(&[moving, account(7, c::OwnerAccountKind::Key, None)]);
+    for (pin, expected) in
+        [(Some(3), "chosen · needs an account"), (None, "Using your Supplied Provider API key · chosen")]
+    {
+        let root = line_facts(Some(readiness(c::Readiness::Usable)), rows.clone(), pin, None, None, true);
+        assert_eq!(using_text(&root), expected);
     }
 }
 #[test]

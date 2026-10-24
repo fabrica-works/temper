@@ -100,6 +100,7 @@ pub(crate) fn main(
                 | c::Delivery::Tasks(_)
                 | c::Delivery::Run(_)
                 | c::Delivery::RunState(_)
+                | c::Delivery::Settings(_)
                 | c::Delivery::Deployment(_)
                 | c::Delivery::OwnerDeployment(_)
                 | c::Delivery::OwnerAccounts(_) => false,

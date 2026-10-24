@@ -63,6 +63,25 @@ pub(super) fn encode_recipient(value: &jig_client::contract::Recipient, out: &mu
 #[expect(clippy::too_many_lines, reason = "one exhaustive encoding of jig's refusal vocabulary")]
 pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut Encoder, budget: &mut super::Cut) {
     match value {
+        jig_client::contract::Refusal::Stale(_) | jig_client::contract::Refusal::Full(_) => {
+            unreachable!("the tools do not request settings")
+        }
+        jig_client::contract::Refusal::AccountMove { why } => {
+            use jig_client::contract::AccountMoveWhy;
+            out.object_start();
+            out.key(b"account_move");
+            out.object_start();
+            out.key(b"why");
+            out.string(match why {
+                AccountMoveWhy::NotSignedIn => b"not_signed_in",
+                AccountMoveWhy::NotOurs => b"not_ours",
+                AccountMoveWhy::Held => b"held",
+                AccountMoveWhy::Cancelled => b"cancelled",
+                AccountMoveWhy::Moving => b"moving",
+            });
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::Refusal::NoEscalationHolder => out.string(b"no_escalation_holder"),
         jig_client::contract::Refusal::Malformed { at, why } => {
             out.object_start();

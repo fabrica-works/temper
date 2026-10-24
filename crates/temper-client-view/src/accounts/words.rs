@@ -204,6 +204,10 @@ pub(crate) enum Word {
     MadePlan,
     NavNeeds,
     NavLimited,
+    Moving,
+    NotSignedIn,
+    NotOurs,
+    MoveCancelled,
 }
 const ROWS: &[(Word, &[u8])] = &[
     (Word::UnusableOn, b"Can't be used on "),
@@ -382,6 +386,10 @@ const ROWS: &[(Word, &[u8])] = &[
     (Word::KeyWayOnly, b"Use an API key"),
     (Word::NavNeeds, b"an account needs you"),
     (Word::NavLimited, b"an account is limited"),
+    (Word::Moving, b"Moving to another deployment"),
+    (Word::NotSignedIn, b"Not signed in"),
+    (Word::NotOurs, b"Not this application's record"),
+    (Word::MoveCancelled, b"The move was cancelled"),
 ];
 // Both names are borrowed; no configured name is replaced by a guessed brand.
 pub(crate) fn provider_words(name: &[u8]) -> (&[u8], &[u8]) {
@@ -645,7 +653,8 @@ pub(crate) fn mark(root: &temper_client_domain::Domain) -> Option<Mark> {
                 return Some(Mark::Needs);
             }
             OwnerAccountState::Later { .. } => limited = true,
-            OwnerAccountState::Asking
+            OwnerAccountState::Moving
+            | OwnerAccountState::Asking
             | OwnerAccountState::Granted
             | OwnerAccountState::Cancelled
             | OwnerAccountState::Closing => {}

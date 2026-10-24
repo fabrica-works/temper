@@ -63,6 +63,21 @@ fn account_digests_distinguish_changes_to_all_projected_account_facts() {
     }
 }
 #[test]
+fn a_moving_source_and_a_refused_move_print_their_names() {
+    let mut value = f::accounts();
+    value.accounts.get_mut(0).expect("account").sources.get_mut(0).expect("source").state =
+        c::OwnerAccountState::Moving;
+    value.last_end = Some(c::OwnerAccountLastEnd {
+        source: f::SOURCE,
+        end: c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::NotOurs },
+    });
+    let printed = f::account_read(&mut f::account_root(false), value, None);
+    assert_eq!(printed.status, 0, "{printed:?}");
+    for fact in [b"\"kind\":\"moving\"".as_slice(), b"\"refused\":\"not_ours\""] {
+        assert!(f::json_has(&printed, fact), "{fact:?}");
+    }
+}
+#[test]
 fn models_group_only_project_authorized_models_without_guessing_provider_readiness() {
     let mut root = f::account_root(false);
     let mut me = f::me(f::PARTY);

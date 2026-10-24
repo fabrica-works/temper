@@ -60,7 +60,7 @@ pub fn file_root(parsed: &Parsed) -> Option<Box<[u8]>> {
 #[must_use]
 pub fn class(call: &Call) -> Class {
     let tool = TOOLS.get(usize::from(call.tool)).expect("parsed tool");
-    if tool.keyed != Keyed::Never {
+    if tool.keyed != Keyed::Never || tool.name == rows::EXPORT.name {
         Class::Act
     } else if tool.name == rows::SIGN_IN.name {
         Class::SignIn
@@ -80,7 +80,9 @@ pub fn class(call: &Call) -> Class {
 /// Key files have a separate purpose and never feed the ordinary text input.
 pub(crate) fn key_file(call: &Call) -> Option<&[u8]> {
     let name = TOOLS.get(usize::from(call.tool))?.name;
-    let index = if name == b"forge-connect" && call.form == 0 {
+    let index = if name == rows::IMPORT.name {
+        0
+    } else if name == b"forge-connect" && call.form == 0 {
         3
     } else if name == rows::ADD_KEY.name || name == rows::REPLACE_KEY.name {
         1
@@ -116,5 +118,11 @@ pub fn text_files(parsed: &Parsed) -> Vec<(u8, Box<[u8]>)> {
 
 /// PEM has six bytes of carried-bundle framing within jig's 4096-byte bound.
 pub(crate) fn key_bytes(call: &Call) -> u32 {
-    if TOOLS[usize::from(call.tool)].name == b"forge-connect" { 4090 } else { temper_client_tools::limits::KEY_BYTES }
+    if call.tool == temper_client_tools::jig::rows::IMPORT_AT {
+        temper_client_tools::limits::MOVED_BYTES
+    } else if TOOLS[usize::from(call.tool)].name == b"forge-connect" {
+        4090
+    } else {
+        temper_client_tools::limits::KEY_BYTES
+    }
 }

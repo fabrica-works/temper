@@ -114,6 +114,7 @@ impl Harness {
                 crate::jig::runner::Out::Kept { line } => self.kept_lines.push(line).expect("kept line"),
                 crate::jig::runner::Out::Progress { line } => self.progress.push(line).expect("bounded progress lines"),
                 crate::jig::runner::Out::Client { .. }
+                | crate::jig::runner::Out::Record { .. }
                 | crate::jig::runner::Out::Ready
                 | crate::jig::runner::Out::DraftAmendment { .. } => panic!("answer output"),
             }
@@ -178,7 +179,7 @@ pub(crate) fn adoption_prefix_restore() -> List<skein_lib::RequestRecord<client:
 }
 pub(crate) fn core_key_conflict() -> w::Outcome {
     let limits = forge::wire_limits(&limits_root().domain.forge).expect("forge limits");
-    let refusal = jig_client_protocol_wire::v16::Refusal::KeyConflict;
+    let refusal = jig_client_protocol_wire::v19::Refusal::KeyConflict;
     let mut bytes = skein_lib::Writer::new(usize::try_from(refusal.measure()).expect("refusal bytes"));
     refusal.encode(&mut bytes).expect("refusal encoding");
     w::Outcome::CoreRefused(

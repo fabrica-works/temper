@@ -42,6 +42,18 @@ pub(super) fn encode_created_given(
 
 pub(super) fn encode_made(value: &jig_client::contract::Made, out: &mut Encoder, budget: &mut super::Cut) {
     match value {
+        jig_client::contract::Made::MovingOut { account, number, .. } => {
+            // A moved record is never part of a printed answer.
+            out.object_start();
+            out.key(b"moving_out");
+            out.object_start();
+            out.key(b"account");
+            out.unsigned(u64::from(*account));
+            out.key(b"number");
+            out.unsigned(u64::from(*number));
+            out.object_end();
+            out.object_end();
+        }
         jig_client::contract::Made::Tasks { tasks } => {
             out.object_start();
             out.key(b"tasks");
@@ -125,6 +137,7 @@ pub(super) fn encode_note_scope(value: &jig_client::contract::NoteScope, out: &m
 
 pub(super) fn encode_outcome(value: &jig_client::contract::Outcome, out: &mut Encoder, budget: &mut super::Cut) {
     match value {
+        jig_client::contract::Outcome::SettingsChanged(_) => unreachable!("the tools do not request settings"),
         jig_client::contract::Outcome::Owner(field_0) => {
             out.object_start();
             out.key(b"owner");
@@ -197,6 +210,9 @@ pub(super) fn encode_owner_outcome(
     budget: &mut super::Cut,
 ) {
     match value {
+        jig_client::contract::OwnerOutcome::AccountMovedIn { account, renewed } => {
+            encode_moved_in(*account, *renewed, out);
+        }
         jig_client::contract::OwnerOutcome::AccountKeyKept { source } => {
             out.object_start();
             out.key(b"account_key_kept");
@@ -655,4 +671,16 @@ fn encode_failed_hosts(hosts: &[jig_client::contract::AccountHostFailure], out: 
         out.object_end();
     }
     out.array_end();
+}
+
+fn encode_moved_in(account: u32, renewed: bool, out: &mut Encoder) {
+    out.object_start();
+    out.key(b"account_moved_in");
+    out.object_start();
+    out.key(b"account");
+    out.unsigned(u64::from(account));
+    out.key(b"renewed");
+    out.boolean(renewed);
+    out.object_end();
+    out.object_end();
 }

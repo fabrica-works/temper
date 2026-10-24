@@ -286,7 +286,7 @@ mod memory_literal;
 // The four Access phrases and their segments add 688 B.
 // GitHub's Ready picker, its retained page and start, and the adopted card add 11,408,928 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-const WEB_BYTES: u64 = 332256299877;
+const WEB_BYTES: u64 = 332257621255;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn the_web_preset_has_a_literal_price() {
@@ -310,12 +310,12 @@ fn encoded(size: u32, write: impl FnOnce(&mut skein_lib::Writer) -> Result<(), s
     write(&mut writer).expect("measured fixture");
     writer.finish()
 }
-fn owned(record: Box<[u8]>) -> jig_client_protocol_wire::v16::Owned {
-    use jig_client_protocol_wire::{VERSION, v16 as w};
+fn owned(record: Box<[u8]>) -> jig_client_protocol_wire::v19::Owned {
+    use jig_client_protocol_wire::{VERSION, v19 as w};
     w::Owned::new(&w::CEILINGS, w::OwnedParts { owner: w::Owner::Jig, version: VERSION, record })
         .expect("fixture envelope")
 }
-fn streamed(host: &mut Host, event: &jig_client_protocol_wire::v16::StreamEvent) {
+fn streamed(host: &mut Host, event: &jig_client_protocol_wire::v19::StreamEvent) {
     use skein_lib::base64::{self, Alphabet};
     let bytes = encoded(event.measure(), |writer| event.encode(writer));
     let size = base64::encoded_len(Alphabet::Standard, u32::try_from(bytes.len()).expect("fixture fits"))
@@ -329,7 +329,7 @@ fn streamed(host: &mut Host, event: &jig_client_protocol_wire::v16::StreamEvent)
 }
 #[test]
 fn the_first_task_activity_answer_survives_transport_sign_in() {
-    use jig_client_protocol_wire::{VERSION, v16 as w};
+    use jig_client_protocol_wire::{VERSION, v19 as w};
     use skein_lib::{Duration, Reader};
     // task_record's chip is task 9; the answer carries one committed run marker.
     const TASK_PATH: &[u8] = b"/tasks/9";

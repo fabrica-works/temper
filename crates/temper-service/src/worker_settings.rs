@@ -153,8 +153,11 @@ pub(crate) fn grant_bytes(credential: u32, identity: u32) -> Option<u32> {
     Some(credential.max(u32::try_from(smith_host_domain::SourceName::BYTES).ok()?).max(identity))
 }
 
+/// A lent credential's bound: a key's is jig's key bound, the token bound capped by the client wire's
+/// (jig-protocol-config's `key_bytes`), so the token bound covers both. The wire's own ceiling also covers a
+/// moved account's file, which no worker is lent (protocol/credentials.md, 3).
 pub(crate) fn credential_bytes(token: u32) -> u32 {
-    token.max(jig_client_protocol_wire::v16::CEILINGS.keyed_value_some)
+    token
 }
 
 /// One retained declaration per recognized adapter, with each path at smith's bound.

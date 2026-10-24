@@ -1,6 +1,6 @@
 //! Sparse entrance facts without invented names, words or bounds (jig's
 //! client/domain/contract.md, 4).
-use jig_client_protocol_wire::v16 as w;
+use jig_client_protocol_wire::v19 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
 #[expect(
@@ -106,6 +106,18 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::Provider => w::Refusal::Provider,
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
+        p::Refusal::AccountMove { why } => w::Refusal::AccountMove(w::RefusalAccountMove::new(
+            limits,
+            w::RefusalAccountMoveParts {
+                why: match why {
+                    p::AccountMoveWhy::NotSignedIn => w::AccountMoveWhy::NotSignedIn,
+                    p::AccountMoveWhy::NotOurs => w::AccountMoveWhy::NotOurs,
+                    p::AccountMoveWhy::Held => w::AccountMoveWhy::Held,
+                    p::AccountMoveWhy::Cancelled => w::AccountMoveWhy::Cancelled,
+                    p::AccountMoveWhy::Moving => w::AccountMoveWhy::Moving,
+                },
+            },
+        )?),
         // As jig's entrance facts: only a made or amended task's refusal names a model, by the
         // configured models, which a fact here has none of.
         p::Refusal::Llm { .. } => {

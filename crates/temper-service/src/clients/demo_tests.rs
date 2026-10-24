@@ -23,7 +23,7 @@ fn start_demo_reads_each_time_and_carries_the_key_before_admission() {
     let engine = service.engine.as_mut().unwrap();
     engine.clients.starting = None;
     enqueue(&mut engine.clients);
-    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
     assert!(engine.events.is_empty());
     let read = service.take_handover_read().unwrap();
     assert!(read.path.ends_with(b"demo/llm.key"));
@@ -37,7 +37,7 @@ fn start_demo_reads_each_time_and_carries_the_key_before_admission() {
     while let Some(answer) = store.above.pop() {
         engine.clients.secret_answer(answer);
     }
-    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
     let Some(root::Event::Party(root::PartyInput::Application {
         request: root::Application::Forge(temper_engine_domain_forge::Ask::StartDemo),
         carried: Some(carried),
@@ -49,7 +49,7 @@ fn start_demo_reads_each_time_and_carries_the_key_before_admission() {
     assert_ne!(carried.number, 0);
     assert_eq!(carried.digest, skein_lib::sha256::digest(b"test-key\n"));
     enqueue(&mut engine.clients);
-    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+    engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
     let next = engine.clients.demo_read().unwrap();
     assert_eq!(next.path, read.path);
     assert_ne!(next.run, read.run);
@@ -67,11 +67,11 @@ fn unreadable_empty_and_oversize_demo_keys_carry_nothing() {
         let engine = service.engine.as_mut().unwrap();
         engine.clients.starting = None;
         enqueue(&mut engine.clients);
-        engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+        engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
         let read = service.take_handover_read().unwrap();
         service.handover_read(read.forge, read.run, answer);
         let engine = service.engine.as_mut().unwrap();
-        engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+        engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
         let Some(root::Event::Party(root::PartyInput::Application {
             request: root::Application::Forge(temper_engine_domain_forge::Ask::StartDemo),
             carried: None,
@@ -90,7 +90,7 @@ fn parked_demo_starts_are_bounded() {
     let engine = service.engine.as_mut().unwrap();
     for _ in 0..=DEMO_STARTS {
         enqueue(&mut engine.clients);
-        engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref());
+        engine.clients.advance(&mut engine.events, &engine.workers.forges, engine.demo.as_ref(), &mut engine.accounts);
     }
     assert_eq!(engine.clients.demo_starts.len(), DEMO_STARTS);
     assert_eq!(engine.clients.demo_reads.len(), DEMO_STARTS);

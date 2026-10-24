@@ -161,7 +161,7 @@ pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
                         }
                         c::Subject::Tree { task, window } => Some(plan_tree(w, task, window, then)),
                         c::Subject::Deployment => Some(c::Delivery::OwnerDeployment(Box::new(deployment(w)))),
-                        c::Subject::Chips { .. } | c::Subject::Run { .. } => None,
+                        c::Subject::Settings | c::Subject::Chips { .. } | c::Subject::Run { .. } => None,
                     };
                     if let Some(document) = document {
                         deliver(&mut root, watch, document, &mut out);
@@ -688,7 +688,11 @@ fn read_value(w: World, what: &c::Read, then: Then) -> Option<c::ReadValue> {
             acts: offers(&[c::ActKind::Answer]),
             ending: None,
         }))),
-        c::Read::Me
+        c::Read::Settings
+        | c::Read::Setting(_)
+        | c::Read::Revision(_)
+        | c::Read::Revisions(_)
+        | c::Read::Me
         | c::Read::Turn { .. }
         | c::Read::Escalation { .. }
         | c::Read::PersonTask { .. }

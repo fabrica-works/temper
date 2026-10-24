@@ -10,6 +10,8 @@ use skein_io::{
     kernel::{Complete, Fd, Submit},
 };
 use skein_lib::{Env, List, Map, Queue, Time, Token, Wall};
+pub(crate) const ACCOUNT_APPLICATION: &[u8] = b"temper";
+
 /// The engine root, its protocol children and the kernel queues.
 #[expect(missing_debug_implementations, reason = "the service owns account token records")]
 pub struct Service {
@@ -106,7 +108,7 @@ impl Service {
         let (mut forge_settings, forge_roots, forge_owned) = forges;
         let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
         settings.jig.limits.clients.wire.keyed_value_some =
-            settings.jig.limits.clients.wire.keyed_value_some.min(settings.limits.records.value_bytes);
+            limits::client_value_bytes(&settings.jig.limits, &settings.limits);
         read_charters(&mut settings)?;
         let store_limits = store::limits(&limits, &settings.jig.limits.core, &limits.forge, &settings.jig.limits.store)
             .ok_or(start_problem(b"limits", What::Bound))?;
@@ -621,7 +623,7 @@ fn accounts_driver(
     if settings.jig.llm.providers.is_empty() {
         return Ok(None);
     }
-    Ok(Some(accounts::Accounts::new(&settings.jig, seeds, runtime, room, secrets)?))
+    Ok(Some(accounts::Accounts::new(ACCOUNT_APPLICATION.into(), &settings.jig, seeds, runtime, room, secrets)?))
 }
 fn read_charters(settings: &mut settings::Engine) -> Result<(), Problems> {
     for charter in &mut settings.jig.charters {

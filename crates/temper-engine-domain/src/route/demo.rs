@@ -150,7 +150,8 @@ pub(crate) fn reply(
         | people::Reply::SignedOut
         | people::Reply::Again(_)
         | people::Reply::Full { .. }
-        | people::Reply::Refused(_) => false,
+        | people::Reply::Refused(_)
+        | people::Reply::Signer(_) => false,
     };
     if phase == Phase::Account && kept {
         domain.demo_start.as_mut().expect("active start").phase = Phase::Connecting;
@@ -362,7 +363,9 @@ pub(crate) fn end_acted(
         | people::Outcome::AccountSignedOut { .. }
         | people::Outcome::AccountKeyKept { .. }
         | people::Outcome::AccountProgramDeclared { .. }
-        | people::Outcome::AccountChanged => unreachable!("close or remove account answer"),
+        | people::Outcome::AccountChanged
+        | people::Outcome::AccountMovingOut { .. }
+        | people::Outcome::AccountMovedIn { .. } => unreachable!("close or remove account answer"),
     };
     if let Some(why) = why {
         let line = end_note(row.act, why.as_bytes());
@@ -395,6 +398,7 @@ fn refusal_name(why: &people::Refusal) -> &'static str {
         Refusal::KeyConflict => "KeyConflict",
         Refusal::NoEscalationHolder => "NoEscalationHolder",
         Refusal::Llm { .. } => "Llm",
+        Refusal::AccountMove { .. } => "AccountMove",
     }
 }
 

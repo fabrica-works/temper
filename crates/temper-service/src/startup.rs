@@ -242,7 +242,7 @@ fn engine_limits(
     jig: &mut config::Limits,
     own: &crate::limits::Limits,
 ) -> Result<temper_engine_domain::Limits, Problems> {
-    jig.clients.wire.keyed_value_some = jig.clients.wire.keyed_value_some.min(own.records.value_bytes);
+    jig.clients.wire.keyed_value_some = crate::limits::client_value_bytes(jig, own);
     crate::limits::engine(jig, own)
         .ok_or(problem(Path::root().member(b"engine").member(b"limits"), What::Jig(config::What::Bound)))
 }
@@ -302,6 +302,12 @@ fn load(
     let engine = match engine_at {
         Some(at) => match config::engine(&document, at, directories) {
             Ok(mut engine) => {
+                if engine.clients.provider.is_some() {
+                    problems.push(
+                        root.member(b"engine").member(b"clients").member(b"provider"),
+                        What::Jig(config::What::Form),
+                    );
+                }
                 engine.limits.clients.watches_per_stream = temper_engine_domain::WATCHES_PER_STREAM;
                 Some(engine)
             }

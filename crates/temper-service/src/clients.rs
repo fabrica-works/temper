@@ -199,25 +199,17 @@ impl Clients {
                 last: temper_client_protocol_wire::CLIENT_VERSION,
             })
             .or(Err(invalid(What::Bound)))?;
-        let settings = kit::Settings {
-            link,
-            deployment_provider,
-            heartbeat: config.clients.heartbeat,
-            rows: config.limits.core.documents.rows,
-            served,
-            providers,
-            seed: seeds.crypto.clone(),
-            stream: seeds.seed,
-            models: config::clients::models(&config.llm),
-        };
+        let initial =
+            client_settings(config, seeds, link.clone(), served.clone(), providers.clone(), deployment_provider);
+        let settings = client_settings(config, seeds, link, served, providers, deployment_provider);
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
         let mut out = Queue::with_capacity(room);
-        let component = kit::Component::new(settings.clone(), &env, &mut out).or(Err(invalid(What::Bound)))?;
+        let component = kit::Component::new(settings, &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
             listening: None,
             public: clients.public.clone(),
             component,
-            initial: Some(settings),
+            initial: Some(initial),
             server: crate::server::Server::new(*listener, &crate::limits::server(&config.limits)),
             mount: http::Mount::new(http_settings(clients.public.as_ref()), &config.limits.clients_http),
             mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
@@ -425,6 +417,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         for _ in 0..self.demo_ready.len() {
             if events.room() == 0 || (self.starting.is_some() && self.early.room() == 0) {
@@ -450,6 +443,13 @@ impl Clients {
                 kit::Request::Link { secret } => {
                     self.secret = Some(secret);
                     self.print_link();
+                }
+                kit::Request::TakeMoved { exchange, source } => {
+                    let record = match accounts {
+                        Some(accounts) => accounts.take_moved(source),
+                        None => None,
+                    };
+                    self.down(kit::Event::MovedTaken { exchange, record });
                 }
                 kit::Request::Secrets(value) => self.secrets.push(value),
                 kit::Request::Core(value) => match translation::to_root(*value) {
@@ -492,6 +492,9 @@ impl Clients {
                     self.google_minted(exchange, Some((credential, expires)));
                 }
                 kit::Request::MintRefused { exchange, .. } => self.google_minted(exchange, None),
+                kit::Request::Redeemed { .. } | kit::Request::Claimed { .. } => {
+                    unreachable!("temper configures no OpenID provider")
+                }
                 kit::Request::Closed => self.component_closed = true,
             }
         }
@@ -510,6 +513,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         self.clock(now, wall);
         if let Some(settings) = self.initial.take() {
@@ -525,15 +529,15 @@ impl Clients {
         let server_pending = self.server.advance(&mut self.server_out);
         self.server_requests();
         self.google_advance(events);
-        self.endings_step(events, forges, demo);
-        self.advance(events, forges, demo);
+        self.endings_step(events, forges, demo, accounts);
+        self.advance(events, forges, demo, accounts);
         if self.closed {
             return;
         }
         if !self.component_closed {
             self.component.fire(&self.env, &mut self.out);
         }
-        self.advance(events, forges, demo);
+        self.advance(events, forges, demo, accounts);
         self.pending = server_pending || !self.server_out.is_empty();
         let mount_pending = self.mount.up(&self.mount_env, &mut self.mount_out);
         self.pending |= mount_pending;
@@ -552,7 +556,7 @@ impl Clients {
             self.pending |= self.component.up(&self.env, &mut self.out);
         }
 
-        self.advance(events, forges, demo);
+        self.advance(events, forges, demo, accounts);
     }
 }
 #[must_use]
@@ -693,6 +697,7 @@ impl Clients {
         events: &mut Queue<root::Event>,
         forges: &[crate::settings::Forge],
         demo: Option<&crate::settings::Demo>,
+        accounts: &mut Option<crate::accounts::Accounts>,
     ) {
         for _ in 0..self.endings.len().checked_mul(self.writes).expect("bounded sign-in endings") {
             if !self.room(1) || events.room() < kit::MAX_OUT_DOWN {
@@ -713,7 +718,7 @@ impl Clients {
                 self.endings.remove(&number);
             }
             self.down(kit::Event::SignInEnded { sign_in });
-            self.advance(events, forges, demo);
+            self.advance(events, forges, demo, accounts);
         }
     }
 }
@@ -917,4 +922,33 @@ fn event_owner(event: &io::Event) -> Option<Token> {
         | io::Event::Closed { owner } => Some(*owner),
         io::Event::Resized | io::Event::Shutdown { .. } => None,
     }
+}
+
+fn client_settings(
+    config: &config::Engine,
+    seeds: &Seeds,
+    link: Option<people::Identity>,
+    served: List<kit::Served>,
+    providers: List<u16>,
+    deployment_provider: u16,
+) -> kit::Settings {
+    kit::Settings {
+        provider: None,
+        addresses: Box::new([]),
+        link,
+        deployment_provider,
+        heartbeat: config.clients.heartbeat,
+        rows: config.limits.core.documents.rows,
+        served,
+        providers,
+        seed: seeds.crypto.clone(),
+        stream: seeds.seed,
+        models: config::clients::models(&config.llm),
+        key_bytes: config.limits.driver.client.document.token_bytes.min(config.limits.clients.wire.keyed_value_some),
+        moved_bytes: moved_bytes(&config.limits),
+    }
+}
+
+pub(crate) fn moved_bytes(limits: &config::Limits) -> u64 {
+    jig_protocol_accounts::moved::bound(&limits.driver.client.document)
 }

@@ -209,7 +209,7 @@ pub(crate) fn act_text(bytes: &[u8]) -> c::Text {
 }
 pub(crate) fn encoded(ask: &client::Ask) -> Box<[u8]> {
     let client::Ask::Jig(ask) = ask else { panic!("jig ask") };
-    let wire = jig_client_protocol_link::translate::asks::ask(ask, &jig_client_protocol_wire::v16::CEILINGS)
+    let wire = jig_client_protocol_link::translate::asks::ask(ask, &jig_client_protocol_wire::v19::CEILINGS)
         .expect("wire ask");
     let mut out = skein_lib::Writer::new(usize::try_from(wire.measure()).expect("wire bytes fit"));
     wire.encode(&mut out).expect("measured ask");
@@ -279,6 +279,7 @@ impl Harness {
                 crate::jig::runner::Out::Kept { line } => self.kept_lines.push(line).expect("recovery output"),
                 crate::jig::runner::Out::Progress { line } => self.progress.push(line).expect("bounded progress lines"),
                 crate::jig::runner::Out::Client { .. }
+                | crate::jig::runner::Out::Record { .. }
                 | crate::jig::runner::Out::Ready
                 | crate::jig::runner::Out::DraftAmendment { .. } => panic!("answer output"),
             }

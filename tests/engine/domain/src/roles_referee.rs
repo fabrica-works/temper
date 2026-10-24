@@ -365,6 +365,7 @@ impl Referee {
             key: obligation.key,
         })));
         match reply {
+            people::Reply::Signer(_) => unreachable!("the referee does not query signers"),
             people::Reply::Again(_) | people::Reply::Outcome(people::Outcome::Again(_)) => {
                 if rows.contains_key(&answer_key) {
                     return Err("retryable role refusal consumed an answered key");

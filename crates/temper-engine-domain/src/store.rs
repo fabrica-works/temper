@@ -602,7 +602,10 @@ pub fn record_bytes(record: &Record) -> Option<u64> {
                             | AccountChange::Resume { .. }
                             | AccountChange::Remove { .. }
                             | AccountChange::MoveAccount { .. }
-                            | AccountChange::MoveSource { .. } => Some(0),
+                            | AccountChange::MoveSource { .. }
+                            | AccountChange::MoveOut { .. }
+                            | AccountChange::Written { .. }
+                            | AccountChange::MoveIn { .. } => Some(0),
                         }
                     }
                     jig_domain_people::Ask::Compound { operations, .. } => people_bytes::compound(operations),
@@ -901,6 +904,8 @@ pub(crate) fn program_answer_bytes(outcome: &jig_domain_people::Outcome) -> Opti
         | Outcome::AccountSignInStarted { .. }
         | Outcome::AccountKeyKept { .. }
         | Outcome::AccountChanged
+        | Outcome::AccountMovingOut { .. }
+        | Outcome::AccountMovedIn { .. }
         | Outcome::Refused(_) => Some(0),
     }
 }

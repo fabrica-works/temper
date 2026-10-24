@@ -317,8 +317,15 @@ fn registered() -> (config::Engine, AccountsRuntime) {
     (config, AccountsRuntime { providers, trust_roots: 0, trust_root_bytes: 0 })
 }
 fn host(config: &config::Engine, runtime: AccountsRuntime) -> Accounts {
-    Accounts::new(config, &fixtures::seeds(), Some(runtime), 64, &config.limits.store.secrets)
-        .expect("public registration fits")
+    Accounts::new(
+        crate::system::ACCOUNT_APPLICATION.into(),
+        config,
+        &fixtures::seeds(),
+        Some(runtime),
+        64,
+        &config.limits.store.secrets,
+    )
+    .expect("public registration fits")
 }
 #[test]
 fn dynamic_sources_use_provider_templates_and_restore_their_kept_records() {
@@ -384,17 +391,27 @@ fn dynamic_sources_use_provider_templates_and_restore_their_kept_records() {
 #[test]
 fn missing_registration_runtime_is_refused_before_start() {
     let (config, _) = registered();
-    assert!(Accounts::new(&config, &fixtures::seeds(), None, 64, &config.limits.store.secrets).is_err());
+    assert!(
+        Accounts::new(
+            crate::system::ACCOUNT_APPLICATION.into(),
+            &config,
+            &fixtures::seeds(),
+            None,
+            64,
+            &config.limits.store.secrets
+        )
+        .is_err()
+    );
 }
 #[test]
 fn overflowing_account_bounds_are_refused_before_start() {
-    const LAST_ACCOUNT_COUNT: u32 = 536_848_049;
+    const LAST_ACCOUNT_COUNT: u32 = 390_439_395;
     let (config, _) = registered();
     let mut overflow = config.limits.driver;
     overflow.accounts = u32::MAX;
     overflow.client.document.record_bytes = u32::MAX;
     // Under the record ceiling and 64 queue slots this is the final account count
-    // whose driver records, tree nodes and queued payloads fit in u64.
+    // whose driver records, moves, tree nodes and queued payloads fit in u64.
     overflow.accounts = LAST_ACCOUNT_COUNT;
     assert!(worst_case(&overflow, 64, config.limits.store.secrets.page.rows).is_some());
     overflow.accounts = LAST_ACCOUNT_COUNT + 1;
@@ -447,4 +464,172 @@ fn a_restored_sign_ins_metadata_leaves_its_grant_a_bearer() {
         engine.values.accounts.value(SOURCE, saved.generation, Time::from_nanos(1)).expect("restored sign-in lent");
     let table::Scheme::Bearer = &value.scheme else { panic!("the sign-in lends a bearer") };
     assert_eq!(value.token.expose(), saved.access_token.as_ref());
+}
+
+fn pump_move_events(accounts: &mut Accounts, engine: &mut crate::engine::Engine) -> Queue<root::Event> {
+    let mut events = Queue::with_capacity(64);
+    for _ in 0_u32..32 {
+        while let Some(event) = engine.store.above.pop() {
+            engine.store.sources.push(event);
+        }
+        accounts.iterate(Time::from_nanos(1), Wall::from_nanos(1), &mut engine.values, &mut events, &mut engine.store);
+    }
+    events
+}
+
+fn moved_answer(engine: &mut crate::engine::Engine, bearer: &[u8], attempt: u8) -> Secret {
+    use crate::tests::fixtures::http as peer;
+    use jig_client_protocol_wire::v19 as w;
+    use skein_lib::{Reader, Writer};
+    let limits = engine.clients.env.limits.wire;
+    let change = w::AccountChange::MoveOut(
+        w::AccountChangeMoveOut::new(&limits, w::AccountChangeMoveOutParts { account: 19 }).unwrap(),
+    );
+    let ask = w::Ask::AccountChange(
+        w::AskAccountChange::new(&limits, w::AskAccountChangeParts { holder: w::AccountHolder::Own, change }).unwrap(),
+    );
+    let mut bytes = Writer::new(usize::try_from(ask.measure()).unwrap());
+    ask.encode(&mut bytes).unwrap();
+    let keyed = w::Keyed::new(
+        &limits,
+        w::KeyedParts { key: [attempt; 16], owner: w::Owner::Jig, version: 19, request: bytes.finish(), value: None },
+    )
+    .unwrap();
+    let mut bytes = Writer::new(usize::try_from(keyed.measure()).unwrap());
+    keyed.encode(&mut bytes).unwrap();
+    let mut call = peer::Peer::new(engine, b"POST", b"/jig/v1/request", &bytes.finish(), Some(bearer));
+    call.pump(engine, false);
+    let Some(root::Event::Party(root::PartyInput::Ask { reply_to, .. })) = engine.events.pop() else {
+        panic!("move-out ask reaches the root")
+    };
+    engine.clients.down(jig_protocol_engine_clients::Event::Reply {
+        to: reply_to,
+        reply: jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::AccountMovingOut {
+            account: 19,
+            number: 23,
+            source: 71,
+        }),
+    });
+    call.pump(engine, false);
+    let at = bytes::find(call.received(), b"\r\n\r\n").unwrap().checked_add(4).unwrap();
+    let w::KeyedAnswer::FinalAnswer(answer) =
+        w::KeyedAnswer::decode(&limits, &mut Reader::new(&call.received()[at..])).unwrap()
+    else {
+        panic!("terminal move-out answer")
+    };
+    let w::Final::Done(done) = w::Final::decode(&limits, &mut Reader::new(answer.record())).unwrap() else {
+        panic!("move-out done")
+    };
+    let w::Outcome::Made(made) = done.outcome() else { panic!("made") };
+    let w::Made::MovingOut(moving) = made.what() else { panic!("moving out") };
+    assert_eq!((moving.account(), moving.number()), (19, 23));
+    moving.record().clone()
+}
+
+#[test]
+fn a_move_out_answers_with_its_record_once_and_a_move_in_is_adopted() {
+    use crate::tests::fixtures::http as peer;
+    use jig_client_protocol_wire::v19 as w;
+
+    let mut service = fixtures::ready();
+    let link = service.links().pop().expect("sign-in link");
+    let engine = service.engine.as_mut().expect("engine");
+    let body = peer::link_body(engine, &link);
+    let mut login = peer::Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
+    login.pump(engine, true);
+    let w::SignInAnswer::SignedIn(answer) = login.sign_in_answer(engine) else { panic!("signed in") };
+    let bearer = peer::bearer(answer.token().as_ref().expect("credential").expose());
+
+    let (config, runtime) = registered();
+    let mut accounts = host(&config, runtime);
+    let document = config.limits.driver.client.document;
+    let mut saved = record(71, &document);
+    saved.subject = Some(bytes::copy_of(b"owner-subject"));
+    saved.expires_at = Wall::from_nanos(Duration::from_secs(3_600).as_nanos());
+    let encoded = oauth::encode_record(&saved, &document).expect("record fits");
+    let _kept = engine.store.secrets(
+        Token::new(123),
+        store::Secrets::Replace {
+            owner: store::SecretOwner::Source,
+            number: 71,
+            value: Secret::new(encoded),
+            replaces: None,
+        },
+    );
+    while engine.store.above.pop().is_some() {}
+    accounts.request(domain::Request::Signing(domain::Signing::Restore {
+        source: 71,
+        provider: 3,
+        kind: domain::Kind::SignIn,
+    }));
+    accounts.request(domain::Request::Signing(domain::Signing::Restored));
+    pump_accounts(&mut accounts, engine);
+    accounts.request(domain::Request::Signing(domain::Signing::Withdraw {
+        source: 71,
+        display: bytes::copy_of(b"moved account"),
+    }));
+    let mut events = pump_move_events(&mut accounts, engine);
+    let mut withdrawn = false;
+    while let Some(event) = events.pop() {
+        if let root::Event::Account(domain::Event::Withdrawn { source: 71, readable: true }) = event {
+            withdrawn = true;
+        }
+    }
+    assert!(withdrawn, "the driver removal and store read reach the child");
+    engine.accounts = Some(accounts);
+    let mut file = None;
+    for attempt in 0_u8..2 {
+        let moved_record = moved_answer(engine, &bearer, attempt);
+        if attempt == 0 {
+            let moved = jig_protocol_accounts::moved::decode(moved_record.expose(), &document).expect("moved file");
+            assert_eq!(moved.application.as_ref(), crate::system::ACCOUNT_APPLICATION);
+            assert_eq!(moved.record.refresh_token, saved.refresh_token);
+            file = Some(moved_record);
+        } else {
+            assert!(moved_record.expose().is_empty(), "the second exchange has no file");
+        }
+    }
+    adopt_moved_record(engine, file.expect("first moved record"), &document, saved.refresh_token.as_deref().unwrap());
+}
+
+fn adopt_moved_record(
+    engine: &mut crate::engine::Engine,
+    file: Secret,
+    document: &oauth::Limits,
+    refresh_token: &[u8],
+) {
+    let carried = carry_llm_key(engine, file.expose());
+    let mut accounts = engine.accounts.take().unwrap();
+    accounts.request(domain::Request::Signing(domain::Signing::Open { source: 72, carried }));
+    let mut events = pump_move_events(&mut accounts, engine);
+    let mut opened = false;
+    while let Some(event) = events.pop() {
+        if let root::Event::Account(domain::Event::Opened { source: 72, provider: 3, .. }) = event {
+            opened = true;
+        }
+    }
+    assert!(opened, "the carried file is read and opened");
+    accounts.request(domain::Request::Signing(domain::Signing::Adopt { source: 72, carried }));
+    events = pump_move_events(&mut accounts, engine);
+    let mut adopted = false;
+    while let Some(event) = events.pop() {
+        if let root::Event::Account(domain::Event::Adopted { source: 72, kept: true }) = event {
+            adopted = true;
+        }
+    }
+    assert!(adopted, "adoption is acknowledged by the store");
+    let Some(store::Event::Secret { value: Some(value), .. }) =
+        engine.store.secrets(Token::new(123), store::Secrets::Get { owner: store::SecretOwner::Source, number: 72 })
+    else {
+        panic!("adopted source record")
+    };
+    let adopted = oauth::decode_record(value.expose(), document).expect("adopted record");
+    assert_eq!(adopted.key, 72);
+    assert_eq!(adopted.refresh_token.as_deref(), Some(refresh_token));
+    let Some(store::Event::Secret { value: None, .. }) = engine
+        .store
+        .secrets(Token::new(123), store::Secrets::Get { owner: store::SecretOwner::Application, number: carried })
+    else {
+        panic!("adoption consumes the carried file")
+    };
 }
