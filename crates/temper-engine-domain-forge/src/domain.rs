@@ -947,12 +947,14 @@ impl Domain {
     }
 }
 
-/// Maximum requests from one top step, including one child burst.
+/// Maximum requests from one top step, including retirement's child burst.
 #[must_use]
 pub const fn max_out(l: &Limits) -> u32 {
     // At most one panel mark accompanies each previously bounded output:
     // a saved change, or a read completion whose CI verdict changed.
-    // A demo start can also finish every bounded waiting application together.
+    // Connection and Restored use the second output cohort for retirement's
+    // Keep instead of panel marks (limits.rs). A demo start can also finish
+    // every bounded waiting application together.
     l.output
         .saturating_mul(2)
         .saturating_add(l.applications)
@@ -1043,6 +1045,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
                 crate::Connection::Connected { id, .. } => {
                     d.ended.remove(&forge);
                     crate::demo::connected(d, forge, out);
+                    retire_ended(d, env, out);
                     assert!(
                         writer(d, env, skein_forge_client::Writer { forge, author: *id }, out),
                         "same forge writer"
@@ -1603,6 +1606,9 @@ fn names(d: &mut Domain, env: &Env<Limits>, task: u64, resources: Box<[Name]>, o
     for (other_task, row) in &d.names {
         if *other_task != task {
             for name in row {
+                if d.forge_ended(name.forge) {
+                    continue;
+                }
                 let Some(resource) = to_client(name, &env.limits) else {
                     emit(out, Request::Refused { task });
                     return;
@@ -1619,6 +1625,9 @@ fn names(d: &mut Domain, env: &Env<Limits>, task: u64, resources: Box<[Name]>, o
         if !valid_name(d, &env.limits, name) {
             emit(out, Request::Refused { task });
             return;
+        }
+        if d.forge_ended(name.forge) {
+            continue;
         }
         let Some(resource) = to_client(name, &env.limits) else {
             emit(out, Request::Refused { task });
@@ -1670,6 +1679,9 @@ fn unnamed(d: &mut Domain, env: &Env<Limits>, task: u64, out: &mut Queue<Request
             continue;
         }
         for name in row {
+            if d.forge_ended(name.forge) {
+                continue;
+            }
             let Some(resource) = to_client(name, &env.limits) else { continue };
             let mut present = false;
             for watch in &list {
@@ -1843,6 +1855,9 @@ fn answered(
 fn lost(d: &mut Domain, env: &Env<Limits>, task: u64, attempt: u64, out: &mut Queue<Request>) {
     let mut names = List::with_capacity(env.limits.holds);
     for (name, row) in &d.holds {
+        if d.forge_ended(name.forge) {
+            continue;
+        }
         if row.writer == Some(Writer::Run { task, attempt }) || row.writer == Some(Writer::Lost { task, attempt }) {
             names.push(name.clone()).expect("list sized to holds");
         }
@@ -3089,6 +3104,11 @@ fn continue_release(d: &mut Domain, env: &Env<Limits>, task: u64, entry: u64, ou
             }
         }
         if let Some((name, writer)) = selected {
+            if d.forge_ended(name.forge) {
+                d.holds.remove(&name);
+                emit(out, Request::Erase { key: Key::Hold(name) });
+                continue;
+            }
             if let Some(Writer::Lost { task: lost_task, attempt }) = writer {
                 for (_, pending) in &d.lost {
                     if pending.name == name && pending.task == lost_task && pending.attempt == attempt {
@@ -3592,6 +3612,9 @@ fn ci_refresh(
     head: skein_forge::api::Commit,
     out: &mut Queue<Request>,
 ) {
+    if d.forge_ended(repository.forge) {
+        return;
+    }
     for (_, pending) in &d.pending_ci {
         if pending.repository == repository && pending.head == head {
             return;
@@ -4146,6 +4169,7 @@ fn restore(d: &mut Domain, env: &Env<Limits>, record: Stored) {
 
 fn restored(d: &mut Domain, env: &Env<Limits>, clock: skein_forge_client::RecoveryClock, out: &mut Queue<Request>) {
     child(d, env, skein_forge_client::Event::Restored { clock }, out);
+    retire_ended(d, env, out);
     crate::demo::restart(d, out);
     // The client's transient watcher flags are rebuilt from the connector's
     // durable writers before any fresh background read can classify a push.
@@ -4214,6 +4238,62 @@ fn read_afresh(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         ci_refresh(d, env, *repository, *head, out);
     }
     child(d, env, skein_forge_client::Event::ReadAfresh, out);
+}
+
+// A permanently retired forge has no future observation to await. Its
+// historical rows stay; its live watches and local release gates do not.
+fn retire_ended(d: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    if d.demo_state != Some(crate::DemoState::Ended) {
+        return;
+    }
+    let mut removed = List::with_capacity(env.limits.holds);
+    for (owner, pending) in &d.lost {
+        if d.forge_ended(pending.name.forge) {
+            removed.push(*owner).expect("bounded lost reads");
+        }
+    }
+    for owner in removed.into_boxed() {
+        d.lost.remove(&owner);
+    }
+    let mut ci = List::with_capacity(env.limits.subscriptions);
+    for (owner, pending) in &d.pending_ci {
+        if d.forge_ended(pending.repository.forge) {
+            ci.push(*owner).expect("bounded CI reads");
+        }
+    }
+    for owner in ci.into_boxed() {
+        d.pending_ci.remove(&owner);
+    }
+    let mut files = List::with_capacity(env.limits.changes);
+    for (owner, pending) in &d.goal_file_reads {
+        if d.forge_ended(pending.repository.forge) {
+            files.push(*owner).expect("bounded goal file reads");
+        }
+    }
+    for owner in files.into_boxed() {
+        d.goal_file_reads.remove(&owner);
+    }
+    let mut watches = Map::with_capacity(env.limits.client.resources);
+    for (_, names) in &d.names {
+        for name in names {
+            if d.forge_ended(name.forge) {
+                continue;
+            }
+            let Some(resource) = to_client(name, &env.limits) else { continue };
+            if watches.contains_key(&resource) {
+                continue;
+            }
+            let participating = participating(d, &resource);
+            watches
+                .insert(resource.clone(), skein_forge_client::Watch { resource, participating })
+                .expect("existing bounded watch set");
+        }
+    }
+    let mut list = List::with_capacity(env.limits.client.resources);
+    for (_, watch) in &watches {
+        list.push(watch.clone()).expect("bounded watches");
+    }
+    child(d, env, skein_forge_client::Event::Keep { owner: Token::new(u64::MAX), watches: list.into_boxed() }, out);
 }
 
 fn read_afresh_complete(d: &mut Domain, out: &mut Queue<Request>) {

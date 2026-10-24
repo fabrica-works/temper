@@ -26,7 +26,7 @@ enum Stage {
 #[derive(Debug)]
 pub(crate) struct Pending {
     task: u64,
-    repository: skein_forge::api::Repository,
+    pub(crate) repository: skein_forge::api::Repository,
     pull: u64,
     head: skein_forge::api::Commit,
     stage: Stage,
@@ -109,6 +109,9 @@ pub(crate) fn head_changed(d: &Domain, task: u64, out: &mut Queue<Request>) {
 
 pub(crate) fn refresh(d: &mut Domain, env: &Env<Limits>, task: u64, out: &mut Queue<Request>) {
     let Some(row) = d.changes.get(&task) else { return };
+    if d.forge_ended(row.repository.forge) {
+        return;
+    }
     let Some(head) = row.change.last_head else { return };
     let repository = row.repository;
     let pull = row.pull;
