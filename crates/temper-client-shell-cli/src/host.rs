@@ -122,7 +122,10 @@ impl OneShot {
             + 2 * (u64::from(temper_client_tools::limits::MOVED_BYTES) + 2) // Key or moved-record file buffer and its bounded read.
             + 8192; // Output lines and DIRECTORY's bounded path.
         let (exporting, move_file) = match &call.parsed {
-            Parsed::Call { call, .. } if call.tool == temper_client_tools::jig::rows::EXPORT_AT || call.tool == temper_client_tools::jig::rows::IMPORT_AT => {
+            Parsed::Call { call, .. }
+                if call.tool == temper_client_tools::jig::rows::EXPORT_AT
+                    || call.tool == temper_client_tools::jig::rows::IMPORT_AT =>
+            {
                 let index = usize::from(call.tool == temper_client_tools::jig::rows::EXPORT_AT);
                 let Some(Some(temper_client_tools::jig::call::Values::One(
                     temper_client_tools::jig::call::Value::File(file),

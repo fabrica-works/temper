@@ -577,7 +577,9 @@ fn close(call: &Call, document: &c::ReadValue, me: &c::Me, project: u32, limits:
 
 fn draw_name(runner: &mut Runner, called: &mut Called) {
     // Tool 33 draws a key because check_program requires one even when verify omits --key.
-    if (called.value.is_some() || called.call.tool == 33 || called.call.tool == crate::jig::rows::EXPORT_AT) && called.call.key.is_none() {
+    if (called.value.is_some() || called.call.tool == 33 || called.call.tool == crate::jig::rows::EXPORT_AT)
+        && called.call.key.is_none()
+    {
         let mut bytes = [0; 32];
         for chunk in bytes.chunks_mut(16) {
             let hex = crate::jig::digest::Digest::from_bytes(runner.names.next_u64().to_le_bytes()).hex();

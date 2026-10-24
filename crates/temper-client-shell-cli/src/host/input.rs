@@ -91,8 +91,11 @@ impl OneShot {
                 Err(_) => self.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]"),
             },
             Parsed::Call { call, json } if arguments::key_file(&call).is_some() => {
-                let stripped =
-                    if call.tool == temper_client_tools::jig::rows::IMPORT_AT { bytes.as_ref() } else { bytes.strip_suffix(b"\n").unwrap_or(&bytes) };
+                let stripped = if call.tool == temper_client_tools::jig::rows::IMPORT_AT {
+                    bytes.as_ref()
+                } else {
+                    bytes.strip_suffix(b"\n").unwrap_or(&bytes)
+                };
                 if stripped.is_empty() || stripped.len() > arguments::key_bytes(&call) as usize {
                     self.key_file_fail(
                         &call,
@@ -106,7 +109,10 @@ impl OneShot {
                     );
                     return;
                 }
-                if call.tool == temper_client_tools::jig::rows::IMPORT_AT && stripped.len() >= 6 && stripped[..4] == jig_protocol_accounts::moved::MAGIC {
+                if call.tool == temper_client_tools::jig::rows::IMPORT_AT
+                    && stripped.len() >= 6
+                    && stripped[..4] == jig_protocol_accounts::moved::MAGIC
+                {
                     let version = u16::from_be_bytes([stripped[4], stripped[5]]);
                     let reads = jig_protocol_accounts::moved::VERSION;
                     if version > reads {
@@ -160,7 +166,9 @@ impl OneShot {
         match &self.call {
             Some(Parsed::File { file: Source::Path(_), .. }) => true,
             Some(Parsed::Call { call, .. }) => {
-                call.tool == temper_client_tools::jig::rows::EXPORT_AT || arguments::key_file(call).is_some() || text_file(call).is_some()
+                call.tool == temper_client_tools::jig::rows::EXPORT_AT
+                    || arguments::key_file(call).is_some()
+                    || text_file(call).is_some()
             }
             _ => false,
         }

@@ -729,7 +729,7 @@ mod memory_literal;
 // GitHub's Ready picker and adopted card words add 2,976 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 #[cfg(target_pointer_width = "64")]
-const ACCOUNT_BYTES: u64 = 11526793890;
+const ACCOUNT_BYTES: u64 = 11526795986;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

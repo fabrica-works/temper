@@ -234,5 +234,5 @@ fn print(pending: &Pending, outcome: &Outcome, structured: bool, limits: &Limits
         text(pending, &page, &mut out);
         out.finish()
     };
-    jig::Printed { status: 0, stdout: bytes, stderr: Box::default() }
+    jig::Printed { file: jig::FileEnd::Keep, status: 0, stdout: bytes, stderr: Box::default() }
 }

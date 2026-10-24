@@ -89,7 +89,7 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 .expect("bounded calls");
             if active >= usize::try_from(env.limits.tools.rows).expect("rows fit") {
                 let mut printed = jig::render::failure(b"call limit", json, 1);
-                if call.tool == crate::jig::rows::EXPORT_AT {
+                if call.tool == jig::rows::EXPORT_AT {
                     printed.file = jig::FileEnd::Remove;
                 }
                 out.push(Request::Printed { number, printed });
@@ -107,7 +107,7 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 }
             } else {
                 let mut printed = jig::render::failure(b"call number exhausted", json, 1);
-                if call.tool == crate::jig::rows::EXPORT_AT {
+                if call.tool == jig::rows::EXPORT_AT {
                     printed.file = jig::FileEnd::Remove;
                 }
                 out.push(Request::Printed { number, printed });
