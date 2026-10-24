@@ -3022,10 +3022,13 @@ listener's (`../client/forge.md`, the browser's steps).
    `forge-setup.md`, 5.1), `target` always `Personal`, for a fresh
    state, ending `Done(Manifest { state, target, manifest })`; temper
    renders the page from them (client/forge.md, 9.1) and holds it and
-   `back` with the state. The link is
-   `http://<listener>/forges/<n>/github/manifest?state=<s>`: a
-   browser's tab goes to it, as a sign-in's does, and comes back to
-   `back` at the end; the terminal prints it and never opens it.
+   `back` with the state. With `back`, the link is a path on the
+   page's own origin, `/forges/<n>/github/manifest?state=<s>`: the
+   browser goes to it in the page's own tab, as a sign-in's does,
+   and comes back to `back` at the end. Without `back`, the link is
+   the whole address on the clients' listener,
+   `http://<listener>/forges/<n>/github/manifest?state=<s>`; the
+   terminal prints it and never opens it.
 2. **The manifest's page** posts the manifest to
    `<web>/settings/apps/new?state=<s>` as it loads, by one inline
    script its policy allows by hash, and shows its button where the

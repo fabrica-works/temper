@@ -92,9 +92,10 @@ pub(crate) fn manifest(engine: &mut Engine, forge: u16, request: Token, back: Op
     engine.setup.public.insert(run, Caller::Manifest { forge, request, back }).expect("public room checked");
     stage(engine, run, host::Plan::Manifest { forge, target: skein_forge_setup::github::manifest::Target::Personal });
 }
-fn manifest_link(engine: &Engine, forge: u16, state: &[u8]) -> Box<[u8]> {
+fn manifest_link(engine: &Engine, forge: u16, state: &[u8], page: bool) -> Box<[u8]> {
     let number = skein_lib::Decimal::of(u64::from(forge));
-    let parts = [engine.setup.listener.as_ref(), b"forges/", number.as_bytes(), b"/github/manifest?state=", state];
+    let prefix = if page { b"/".as_slice() } else { engine.setup.listener.as_ref() };
+    let parts = [prefix, b"forges/", number.as_bytes(), b"/github/manifest?state=", state];
     let mut size = 0_usize;
     for part in parts {
         size = size.checked_add(part.len()).expect("bounded manifest link");
@@ -158,8 +159,9 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
         Caller::Manifest { forge, request, back } => {
             let answer = match end {
                 root::SetupEnd::Done { outcome: root::SetupOutcome::Manifest { state }, .. } => {
+                    let page = back.is_some();
                     hold(engine, forge, state.clone(), back);
-                    domain::ConnectAnswer::Link(manifest_link(engine, forge, state))
+                    domain::ConnectAnswer::Link(manifest_link(engine, forge, state, page))
                 }
                 root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => {
                     event(engine, domain::Event::ConnectEnded { forge, request, connected: false, why: stopped });

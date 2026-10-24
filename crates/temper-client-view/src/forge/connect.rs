@@ -307,7 +307,10 @@ pub(crate) fn app_control(
             w.refusal(b, refusal.refusal(), w.name_bytes);
             b.close();
         }
-        if let forge::github::Answer::Link(address) = answer {
+        // A path's departure is never refused, so only a whole address needs a link meanwhile.
+        if let forge::github::Answer::Link(address) = answer
+            && !address.starts_with(b"/")
+        {
             b.open(Role::Link);
             b.name(&name);
             b.text(Run::Plain, &name);

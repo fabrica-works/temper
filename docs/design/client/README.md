@@ -684,8 +684,9 @@ keeps (`../protocol/configuration.md`, section 2).
   an install's link is where the page's own tab goes, as a sign-in's
   address is (`ConnectModel`, The tab's departure), the request naming
   the page's address as its `back` (section 8); GitHub's last step
-  sends the tab back there (`forge.md`, 9.1), and the page shows the
-  link as an external link meanwhile (6.5). How a
+  sends the tab back there (`forge.md`, 9.1), and the page shows a
+  whole address's link as an external link meanwhile (6.5); a
+  connect's path (section 8) leaves at once, and none is drawn. How a
   connect ends is read on the page, never assumed from its answer.
 - **The welcome** (`welcome.html`) is one page, `Welcome { step }`, its
   step Welcome, Forge, Model or Ready, at `/welcome` and
@@ -3372,7 +3373,7 @@ does for the client:
 
   | Request | The value it carries | What the engine does | Its outcome |
   |---|---|---|---|
-  | `Connect { forge, how: GitHubManifest { back? } }` | none | the setup's host's `Manifest` run, for the person's own account, always (`forge.md`, 9.1), ending `Done(Manifest { state, target, manifest })`, from which temper renders the manifest's page (`forge.md`, 9.1); the page and `back` held with the state | a link, the manifest's page on the clients' listener for a fresh state (the routes, above) |
+  | `Connect { forge, how: GitHubManifest { back? } }` | none | the setup's host's `Manifest` run, for the person's own account, always (`forge.md`, 9.1), ending `Done(Manifest { state, target, manifest })`, from which temper renders the manifest's page (`forge.md`, 9.1); the page and `back` held with the state | a link to the manifest's page for a fresh state (the routes, above): with `back`, a path on the page's own origin, `/forges/N/github/manifest?state=S`; without it, the terminal's whole address on the clients' listener |
   | `Connect { forge, how: GitHubApp { id, key } }` | `key`, the App's private key, PEM as GitHub gives it; `id` rides in the request | `Paste`: the key decoded and matched to the App `id` names, the App's user found, its hook pointed at `https://SLUG.invalid/` (no webhook secret on GitHub: changes are heard from the App's delivery log), its permissions and events checked | connecting |
   | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | one bundle: the API token, the git token and, where the person made hooks to temper's listener, their secret | `Check`: both tokens answer as one user | connecting |
   | `Connect { forge, how: ForgejoAdmin { first? } }` | the site admin's token | `Reconcile`, then `Create` of `first` when given; the forge becomes managed | connecting |
