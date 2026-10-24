@@ -714,7 +714,7 @@ mod memory_literal;
 // The demo start's words, full failure text and retry nodes (1,724,026 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 #[cfg(target_pointer_width = "64")]
-const ACCOUNT_BYTES: u64 = 11526790226;
+const ACCOUNT_BYTES: u64 = 11526791462;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {

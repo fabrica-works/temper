@@ -42,7 +42,7 @@ pub(super) fn encode_created_given(
 
 pub(super) fn encode_made(value: &jig_client::contract::Made, out: &mut Encoder, budget: &mut super::Cut) {
     match value {
-        jig_client::contract::Made::MovingOut { .. } => unreachable!("an account's move before temper routes it"),
+        jig_client::contract::Made::MovingOut { .. } => unreachable!("the engine does not render account moves"),
         jig_client::contract::Made::Tasks { tasks } => {
             out.object_start();
             out.key(b"tasks");
@@ -126,7 +126,7 @@ pub(super) fn encode_note_scope(value: &jig_client::contract::NoteScope, out: &m
 
 pub(super) fn encode_outcome(value: &jig_client::contract::Outcome, out: &mut Encoder, budget: &mut super::Cut) {
     match value {
-        jig_client::contract::Outcome::SettingsChanged(_) => unreachable!("temper does not request settings"),
+        jig_client::contract::Outcome::SettingsChanged(_) => unreachable!("the engine does not request settings"),
         jig_client::contract::Outcome::Owner(field_0) => {
             out.object_start();
             out.key(b"owner");
@@ -200,7 +200,7 @@ pub(super) fn encode_owner_outcome(
 ) {
     match value {
         jig_client::contract::OwnerOutcome::AccountMovedIn { .. } => {
-            unreachable!("an account's move before temper routes it")
+            unreachable!("the engine does not render account moves")
         }
         jig_client::contract::OwnerOutcome::AccountKeyKept { source } => {
             out.object_start();

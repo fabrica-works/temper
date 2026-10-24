@@ -65,7 +65,7 @@ pub(super) fn encode_refusal(value: &jig_client::contract::Refusal, out: &mut En
     match value {
         jig_client::contract::Refusal::Stale(_)
         | jig_client::contract::Refusal::Full(_)
-        | jig_client::contract::Refusal::AccountMove { .. } => unreachable!("temper does not request settings"),
+        | jig_client::contract::Refusal::AccountMove { .. } => unreachable!("the engine does not request settings"),
         jig_client::contract::Refusal::NoEscalationHolder => out.string(b"no_escalation_holder"),
         jig_client::contract::Refusal::Malformed { at, why } => {
             out.object_start();
