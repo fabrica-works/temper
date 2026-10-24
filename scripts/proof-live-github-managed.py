@@ -680,10 +680,10 @@ class Sitting:
             adopted = json.loads(self.ctl('adopt', '--project', '1', '--forge', '1', '--owner', OWNER,
                                           '--name', NAME, '--landing', 'main', '--key', 'managed-adopt', '--json'))
             require('adopted' in adopted)
-        else:
-            # Owner confirms the UI has reached the adopted card; a blank line has no authority value.
-            self.mark('after the adopted card appears, press Enter here')
-            require(sys.stdin.readline() == '\n')
+        # Owner confirms the UI has reached the adopted card; a blank line has no authority value.
+        # The dry run reads it too, so every prompt of the sitting has been answered once before.
+        self.mark('after the adopted card appears, press Enter here')
+        require(sys.stdin.readline() == '\n')
         self.mark('repository adopted from Ready')
         require(self.evidence.stat().st_mode & 0o777 == 0o600)
         self.mark('redacted conversion retained: ' + str(self.evidence))
@@ -692,9 +692,9 @@ class Sitting:
         if self.mode == 'fake':
             self.planted_refusals()
         self.cleanup_remote()
+        self.mark('delete this run\'s GitHub App, then press Enter here')
+        require(sys.stdin.readline() == '\n')
         if self.mode == 'live':
-            self.mark('delete this run\'s GitHub App, then press Enter here')
-            require(sys.stdin.readline() == '\n')
             until = time.monotonic() + 120
             while True:
                 status, _, _ = self.http(self.api, 'GET', '/app', authorization=self.jwt())
