@@ -3851,7 +3851,11 @@ fn pull_changed(
                     before: row.base.clone(),
                     after: pull.base.clone(),
                 })
-            } else if pull.state == skein_forge::api::State::Closed && pull.merged.is_none() {
+            } else if pull.state == skein_forge::api::State::Closed
+                && pull.merged.is_none()
+                // A cancelled change's release closes its own pull (8.6): no drift.
+                && !d.releases.get(&row.task).is_some_and(|release| release.ending == ReleaseEnding::Cancelled)
+            {
                 Some(crate::DriftChange::PullClosed { number: pull.number })
             } else {
                 None
