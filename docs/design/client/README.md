@@ -757,8 +757,11 @@ keeps (`../protocol/configuration.md`, section 2).
     "the new project NAME" for a new one. A GitHub forge with none
     adopted yet reads "GitHub · no repository chosen yet", as a forge
     connected with no first repository reads "FORGE · no repository
-    chosen yet"; a set up or a first repository that failed reads as
-    under way, its CONNECTION or its steps saying so. The line is one
+    chosen yet"; a set up or a first repository that failed keeps all
+    five steps, with its failed step marked ✕, preceding steps done
+    and later steps to come, followed by "STEP failed: WHY"
+    (`forge.md`, 5.4). With no failed step named, nothing is marked and
+    the line is "Set up failed: WHY". The line is one
     paragraph, from the facts Ready reads on the forge's row (the
     person's forge, its connection and its first repository, or the
     set up's request until the row names it), and every line but the
@@ -1355,7 +1358,8 @@ for its kind, its user's login and its installations. Its nodes:
   order: its number (u16); its kind (Forgejo or GitHub); its mode
   (connected, managed, owned or fake); and its connection: not
   connected; not set up; setting up, with its step when the box has
-  named one (fetch, prepare or run); set up failed, with why (text of
+  named one (fetch, prepare or run); set up failed, with its optional step (fetch, prepare, run or connect)
+  and why (text of
   at most 256 bytes, the box's line bound); connecting; connected, with
   the user's id (u64) and login (a byte string bounded as `Adopt`'s);
   or stopped, with the component's reason; its first repository,

@@ -259,11 +259,12 @@ fn setting_up_marks_the_rows_step() {
 #[test]
 fn set_up_failed_offers_set_up_again() {
     let root = here(w::Connection::SetUpFailed(
-        w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into() }).unwrap(),
+        w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into(), at: None })
+            .unwrap(),
     ));
     let view = f::page_view(&root);
     node(view.tree(), Role::Alert, b"Set up failed: fetch failed");
-    assert!(f::find(view.tree(), Role::List, b"Each step").is_none());
+    assert!(f::find(view.tree(), Role::List, b"Each step").is_some());
     assert_eq!(press(&root, Role::Button, b"Set up again"), d::Action::Forge(d::forge::Act::SetUp { forge: HERE }));
 }
 #[test]
@@ -726,10 +727,10 @@ fn a_refused_adoption_says_its_outcome() {
 #[test]
 fn a_failed_first_repository_says_its_step_with_set_up_again() {
     for (step, expected) in [
-        (w::CreateStep::Admin, b"Set up failed: checking the admin's token".as_slice()),
-        (w::CreateStep::Org, b"Set up failed: making the organization"),
-        (w::CreateStep::Repository, b"Set up failed: making the repository"),
-        (w::CreateStep::File, b"Set up failed: adding the starter workflow"),
+        (w::CreateStep::Admin, b"Making work/hello failed: checking the admin's token".as_slice()),
+        (w::CreateStep::Org, b"Making work/hello failed: making the organization"),
+        (w::CreateStep::Repository, b"Making work/hello failed: making the repository"),
+        (w::CreateStep::File, b"Making work/hello failed: adding the starter workflow"),
     ] {
         for address in
             [Address::ConnectForge { forge: Some(Choice::Forge(HERE)) }, Address::Welcome { step: Step::Ready }]
@@ -747,7 +748,7 @@ fn a_failed_first_repository_says_its_step_with_set_up_again() {
             node(view.tree(), Role::Alert, expected);
             node(view.tree(), Role::Button, b"Set up again");
             if let Address::ConnectForge { .. } = root.pages().address() {
-                assert!(f::find(view.tree(), Role::List, b"Each step").is_none());
+                assert!(f::find(view.tree(), Role::List, b"Each step").is_some());
             } else {
                 node(view.tree(), Role::Disclosure, b"Each step");
             }
@@ -1666,4 +1667,113 @@ fn publish_first_adoption(root: &mut d::Domain, watch: skein_lib::Token) {
     let mut rows = List::with_capacity(1);
     rows.push(w::ForgeRow::new(&w::CEILINGS, parts).unwrap()).unwrap();
     deliver(root, watch, rows);
+}
+
+// The mockup's failed frame, and each other step of the same five-step flow.
+pub(super) fn failure_cases() -> [(List<w::ForgeRow>, Option<usize>, &'static str); 6] {
+    let rows = |at| {
+        first_rows(
+            w::Connection::SetUpFailed(
+                w::SetUpFailed::new(
+                    &w::CEILINGS,
+                    w::SetUpFailedParts {
+                        why: "its port, 127.0.0.1:8368, is taken by another program. temper box’s output has the rest."
+                            .as_bytes()
+                            .into(),
+                        at,
+                    },
+                )
+                .unwrap(),
+            ),
+            w::FirstState::Making,
+        )
+    };
+    [
+        (
+            rows(Some(w::FailedStep::Fetch)),
+            Some(0),
+            "Fetching failed: its port, 127.0.0.1:8368, is taken by another program. temper box’s output has the rest.",
+        ),
+        (
+            rows(Some(w::FailedStep::Prepare)),
+            Some(1),
+            "Preparing failed: its port, 127.0.0.1:8368, is taken by another program. temper box’s output has the rest.",
+        ),
+        (
+            rows(Some(w::FailedStep::Run)),
+            Some(2),
+            "Starting failed: its port, 127.0.0.1:8368, is taken by another program. temper box’s output has the rest.",
+        ),
+        (
+            rows(Some(w::FailedStep::Connect)),
+            Some(3),
+            "Connecting failed: its port, 127.0.0.1:8368, is taken by another program. temper box’s output has the rest.",
+        ),
+        (
+            first_rows(
+                connected(),
+                w::FirstState::Failed(
+                    w::CreateFailed::new(&w::CEILINGS, w::CreateFailedParts { step: w::CreateStep::File }).unwrap(),
+                ),
+            ),
+            Some(4),
+            "Making work/hello failed: adding the starter workflow",
+        ),
+        (
+            rows(None),
+            None,
+            "Set up failed: its port, 127.0.0.1:8368, is taken by another program. temper box’s output has the rest.",
+        ),
+    ]
+}
+pub(super) fn failed_progress(tree: &skein_ui::Tree, failed: Option<usize>, why: &str) {
+    let list = node(tree, Role::List, b"Each step");
+    let start = tree.nodes().iter().position(|n| n.id == list).unwrap();
+    let end = start.checked_add(usize::try_from(tree.nodes()[start].size).unwrap()).unwrap();
+    let items: Vec<_> = tree.nodes()[start..end].iter().filter(|n| n.role == Role::Item).collect();
+    assert_eq!(items.len(), 5);
+    let labels = [
+        if failed > Some(0) { "Fetched Forgejo and its runner" } else { "Fetching Forgejo and its runner" },
+        "Preparing: its database, temper’s admin, your account",
+        "Starting Forgejo and its runner",
+        "Connecting as temper",
+        "Making work/hello, and adopting it into Shop",
+    ];
+    for (index, (item, label)) in items.iter().zip(labels).enumerate() {
+        let item_index = tree.nodes().iter().position(|n| n.id == item.id).unwrap();
+        assert!(f::node_text(tree, item_index).starts_with(label.as_bytes()), "step {index}: {label}");
+        assert_eq!(item.styles.as_slice().contains(&crate::look::FLOW_FAILED), failed == Some(index));
+        assert_eq!(item.styles.as_slice().contains(&crate::look::FLOW_DONE), failed.is_some_and(|at| index < at));
+        assert!(!item.states.as_slice().contains(&State::Current));
+    }
+    let alert = node(tree, Role::Alert, why.as_bytes());
+    assert!(tree.nodes().iter().position(|n| n.id == alert).unwrap() >= end);
+    assert_eq!(
+        tree.nodes()[start..end]
+            .iter()
+            .filter(|n| n.role == Role::Status && n.name.as_deref() == Some(b"failed"))
+            .count(),
+        usize::from(failed.is_some())
+    );
+}
+#[test]
+fn failed_setup_keeps_all_steps_and_marks_only_its_failure() {
+    for (rows, failed, why) in failure_cases() {
+        let root = f::forge_root(Address::ConnectForge { forge: Some(Choice::Forge(HERE)) }, rows);
+        let view = f::page_view(&root);
+        failed_progress(view.tree(), failed, why);
+    }
+}
+
+#[test]
+fn setup_failure_words_keep_the_full_bounded_reason() {
+    let words = f::words();
+    let bound = usize::try_from(temper_client_protocol_wire::SET_UP_WHY_BYTES).unwrap();
+    for (bytes, reason) in [([b'x'].repeat(bound), "x".repeat(bound)), ([0xff].repeat(bound), "�".repeat(bound))] {
+        let shown = d::forge::words::lossy(&bytes);
+        let text = words.say(crate::words::Word::ForgePrepareFailed, &[skein_ui::phrases::Hole::Name(shown)]);
+        let mut expected = String::from("Preparing failed: ");
+        expected.push_str(&reason);
+        assert_eq!(text.as_ref(), expected.as_bytes());
+    }
 }

@@ -1181,6 +1181,7 @@ fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> R
         kind,
         mode: Mode::Owned,
         connection,
+        failed: None,
         offer,
     }
 }
@@ -1278,12 +1279,15 @@ fn closing_the_box_fails_setup_and_marks_every_offer_unavailable() {
     assert_eq!(
         d.forges().rows.as_ref(),
         [
-            setup_row(
-                1,
-                Kind::Forgejo,
-                Connection::SetUpFailed { why: b"the box closed the pipe".as_slice().into() },
-                Offer::NotUnderTheBox
-            ),
+            Row {
+                failed: Some(FailedStep::Run),
+                ..setup_row(
+                    1,
+                    Kind::Forgejo,
+                    Connection::SetUpFailed { why: b"the box closed the pipe".as_slice().into() },
+                    Offer::NotUnderTheBox
+                )
+            },
             setup_row(2, Kind::GitHub, Connection::NotSetUp, Offer::NotUnderTheBox),
         ]
     );
@@ -1822,4 +1826,52 @@ fn forges_carry_owned_startup_details_for_the_owned_row_alone() {
     let rows = domain.forges().rows;
     assert_eq!(rows[0].owned, Some(owned));
     assert_eq!(rows[1].owned, None);
+}
+
+#[test]
+fn setup_failures_name_the_held_step_until_state_changes() {
+    let tell = |state| Event::Connection { forge: 1, state };
+    let failure = Connection::SetUpFailed { why: b"stopped".as_slice().into() };
+    let fetch = Connection::SettingUp { step: Some(SetUpStep::Fetch) };
+    let prepare = Connection::SettingUp { step: Some(SetUpStep::Prepare) };
+    let run = Connection::SettingUp { step: Some(SetUpStep::Run) };
+    let connected = Connection::Connected { id: 7, login: b"temper".as_slice().into() };
+    let stopped = Connection::Stopped { reason: b"stopped".as_slice().into() };
+    let rows: [(Box<[Event]>, Option<FailedStep>); 22] = [
+        (Box::new([tell(Connection::NotConnected), tell(failure.clone())]), None),
+        (Box::new([tell(Connection::NotSetUp), tell(failure.clone())]), None),
+        (Box::new([tell(Connection::SettingUp { step: None }), tell(failure.clone())]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone())]), Some(FailedStep::Fetch)),
+        (Box::new([tell(prepare.clone()), tell(failure.clone())]), Some(FailedStep::Prepare)),
+        (Box::new([tell(run.clone()), tell(failure.clone())]), Some(FailedStep::Run)),
+        (Box::new([tell(Connection::Connecting), tell(failure.clone())]), Some(FailedStep::Connect)),
+        (Box::new([tell(connected.clone()), tell(failure.clone())]), None),
+        (Box::new([tell(stopped.clone()), tell(failure.clone())]), None),
+        (Box::new([tell(failure.clone()), tell(failure.clone())]), None),
+        (Box::new([tell(run.clone()), Event::BoxClosed]), Some(FailedStep::Run)),
+        (
+            Box::new([tell(prepare.clone()), tell(failure.clone()), Event::BoxClosed, tell(failure.clone())]),
+            Some(FailedStep::Prepare),
+        ),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(Connection::NotConnected)]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(Connection::NotSetUp)]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(Connection::SettingUp { step: None })]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(prepare.clone())]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(run.clone())]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(Connection::Connecting)]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(connected)]), None),
+        (Box::new([tell(fetch.clone()), tell(failure.clone()), tell(stopped)]), None),
+        (Box::new([tell(prepare), tell(failure.clone()), tell(run), tell(failure.clone())]), Some(FailedStep::Run)),
+        (
+            Box::new([tell(fetch), tell(failure.clone()), tell(Connection::Connecting), tell(failure)]),
+            Some(FailedStep::Connect),
+        ),
+    ];
+    for (index, (events, expected)) in rows.into_iter().enumerate() {
+        let mut d = setup_domain(&CONFIGURED[..1], true);
+        for event in events {
+            outputs(&mut d, event);
+        }
+        assert_eq!(d.forges().rows[0].failed, expected, "row {index}");
+    }
 }

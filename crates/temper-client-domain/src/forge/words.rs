@@ -976,7 +976,7 @@ pub fn forge_connection(row: &super::forges::Row) -> Box<[u8]> {
             Some(Step::Run) => b"Setting up: starting".as_slice(),
             None => b"Setting up".as_slice(),
         }),
-        C::SetUpFailed { why } => join_words(&[b"Set up failed: ", &lossy(why)]),
+        C::SetUpFailed { why, .. } => join_words(&[b"Set up failed: ", &lossy(why)]),
         C::Connecting => Box::from(b"Connecting".as_slice()),
         C::Connected { .. } if row.kind == super::forges::Kind::GitHub && !super::forges::accepted(row) => {
             Box::from(b"Connecting: installed nowhere yet".as_slice())

@@ -3,6 +3,15 @@ use super::{family, wire_limits};
 use alloc::boxed::Box;
 use jig_client::{Answered, Ask, Family, Watchable, contract as c};
 use temper_client_protocol_wire::{self as wire, v1 as w};
+/// The longest setup reason rendered with one replacement per invalid byte.
+pub const FAILURE_BYTES: u32 = wire::SET_UP_WHY_BYTES.checked_mul(3).expect("reason text fits");
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailedStep {
+    Fetch,
+    Prepare,
+    Run,
+    Connect,
+}
 
 /// The wire bounds the session's forge rows.
 pub const ROWS: u32 = wire::FORGES;
@@ -36,7 +45,7 @@ pub enum Connection {
     NotConnected,
     NotSetUp,
     SettingUp { step: Option<Step> },
-    SetUpFailed { why: Box<[u8]> },
+    SetUpFailed { why: Box<[u8]>, at: Option<FailedStep> },
     Connecting,
     Connected { id: u64, login: Box<[u8]> },
     Stopped { reason: Box<[u8]> },

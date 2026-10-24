@@ -750,7 +750,7 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                             Some(first) => Some(first_repository(first, limits)?),
                             None => None,
                         },
-                        connection: connection(row.connection, limits)?,
+                        connection: connection(row.connection, row.failed, limits)?,
                         offer: match row.offer {
                             forge::Offer::NotOffered => w::Offer::NotOffered,
                             forge::Offer::NotUnderTheBox => w::Offer::NotUnderTheBox,
@@ -764,7 +764,11 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
     }
     Some(wire::forges(&w::Forges::new(limits, w::ForgesParts { forges }).ok()?))
 }
-fn connection(value: forge::Connection, limits: &w::Limits) -> Option<w::Connection> {
+fn connection(
+    value: forge::Connection,
+    failed: Option<forge::FailedStep>,
+    limits: &w::Limits,
+) -> Option<w::Connection> {
     Some(match value {
         forge::Connection::NotConnected => w::Connection::NotConnected,
         forge::Connection::NotSetUp => w::Connection::NotSetUp,
@@ -782,9 +786,22 @@ fn connection(value: forge::Connection, limits: &w::Limits) -> Option<w::Connect
             )
             .ok()?,
         ),
-        forge::Connection::SetUpFailed { why } => {
-            w::Connection::SetUpFailed(w::SetUpFailed::new(limits, w::SetUpFailedParts { why }).ok()?)
-        }
+        forge::Connection::SetUpFailed { why } => w::Connection::SetUpFailed(
+            w::SetUpFailed::new(
+                limits,
+                w::SetUpFailedParts {
+                    why,
+                    at: match failed {
+                        Some(forge::FailedStep::Fetch) => Some(w::FailedStep::Fetch),
+                        Some(forge::FailedStep::Prepare) => Some(w::FailedStep::Prepare),
+                        Some(forge::FailedStep::Run) => Some(w::FailedStep::Run),
+                        Some(forge::FailedStep::Connect) => Some(w::FailedStep::Connect),
+                        None => None,
+                    },
+                },
+            )
+            .ok()?,
+        ),
         forge::Connection::Connecting => w::Connection::Connecting,
         forge::Connection::Connected { id, login } => {
             w::Connection::Connected(w::Connected::new(limits, w::ConnectedParts { id, login }).ok()?)

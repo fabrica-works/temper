@@ -230,30 +230,12 @@ pub fn set_up_answer(record: &jig_client::Family, limits: &w::Limits) -> Option<
 #[must_use]
 #[expect(clippy::manual_map, reason = "the translation uses explicit matches (programming-model.md, 10)")]
 pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Row]>> {
-    use forge::forges::{Account, Connection as C, Installation, Kind, Mode, Offer, Row, Step};
+    use forge::forges::{Account, Installation, Kind, Mode, Offer, Row};
     let record = wire::decode_forges(bytes, limits)?.into_parts();
     let mut rows = List::with_capacity(record.forges.len());
     for row in record.forges.into_boxed() {
         let row = row.into_parts();
-        let connection = match row.connection {
-            w::Connection::NotConnected => C::NotConnected,
-            w::Connection::NotSetUp => C::NotSetUp,
-            w::Connection::SettingUp(value) => C::SettingUp {
-                step: match value.into_parts().step {
-                    Some(w::SetUpStep::Fetch) => Some(Step::Fetch),
-                    Some(w::SetUpStep::Prepare) => Some(Step::Prepare),
-                    Some(w::SetUpStep::Run) => Some(Step::Run),
-                    None => None,
-                },
-            },
-            w::Connection::SetUpFailed(value) => C::SetUpFailed { why: value.into_parts().why },
-            w::Connection::Connecting => C::Connecting,
-            w::Connection::Connected(value) => {
-                let value = value.into_parts();
-                C::Connected { id: value.id, login: value.login }
-            }
-            w::Connection::Stopped(value) => C::Stopped { reason: value.into_parts().reason },
-        };
+        let connection = connection_from(row.connection);
         let mut installations = List::with_capacity(row.installations.len());
         for installation in row.installations.into_boxed() {
             let installation = installation.into_parts();
@@ -328,6 +310,41 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
         .ok()?;
     }
     Some(rows.into_boxed())
+}
+
+fn connection_from(connection: w::Connection) -> forge::forges::Connection {
+    use forge::forges::{Connection as C, Step};
+    match connection {
+        w::Connection::NotConnected => C::NotConnected,
+        w::Connection::NotSetUp => C::NotSetUp,
+        w::Connection::SettingUp(value) => C::SettingUp {
+            step: match value.into_parts().step {
+                Some(w::SetUpStep::Fetch) => Some(Step::Fetch),
+                Some(w::SetUpStep::Prepare) => Some(Step::Prepare),
+                Some(w::SetUpStep::Run) => Some(Step::Run),
+                None => None,
+            },
+        },
+        w::Connection::SetUpFailed(value) => {
+            let value = value.into_parts();
+            C::SetUpFailed {
+                why: value.why,
+                at: match value.at {
+                    Some(w::FailedStep::Fetch) => Some(forge::forges::FailedStep::Fetch),
+                    Some(w::FailedStep::Prepare) => Some(forge::forges::FailedStep::Prepare),
+                    Some(w::FailedStep::Run) => Some(forge::forges::FailedStep::Run),
+                    Some(w::FailedStep::Connect) => Some(forge::forges::FailedStep::Connect),
+                    None => None,
+                },
+            }
+        }
+        w::Connection::Connecting => C::Connecting,
+        w::Connection::Connected(value) => {
+            let value = value.into_parts();
+            C::Connected { id: value.id, login: value.login }
+        }
+        w::Connection::Stopped(value) => C::Stopped { reason: value.into_parts().reason },
+    }
 }
 
 fn first_from(first: w::FirstRepository) -> forge::forges::First {

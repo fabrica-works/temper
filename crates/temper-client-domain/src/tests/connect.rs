@@ -37,7 +37,7 @@ fn the_flow_shows_the_step_its_row_is_at() {
         (C::NotSetUp, Shown::Details(Choice::Forge(HERE))),
         (C::SettingUp { step: None }, Shown::SettingUp(HERE)),
         (C::SettingUp { step: Some(forges::Step::Prepare) }, Shown::SettingUp(HERE)),
-        (C::SetUpFailed { why: b"fetch failed".as_slice().into() }, Shown::SettingUp(HERE)),
+        (C::SetUpFailed { why: b"fetch failed".as_slice().into(), at: None }, Shown::SettingUp(HERE)),
         (C::Connecting, Shown::SettingUp(HERE)),
         (C::Connected { id: 1, login: b"bot".as_slice().into() }, Shown::Ready(HERE)),
         (C::Stopped { reason: b"stopped".as_slice().into() }, Shown::Choose),
@@ -314,7 +314,7 @@ fn the_forges_page_lists_the_persons_forges_not_fakes_or_the_demos() {
         C::NotConnected,
         C::NotSetUp,
         C::SettingUp { step: None },
-        C::SetUpFailed { why: Box::default() },
+        C::SetUpFailed { why: Box::default(), at: None },
         C::Connecting,
         C::Connected { id: 42, login: Box::default() },
         C::Stopped { reason: Box::default() },
@@ -357,7 +357,7 @@ fn the_dot_is_red_for_a_forge_that_needs_the_person_else_amber_while_one_sets_up
         (C::Connected { id: 42, login: Box::default() }, Dot::None),
         (C::Connecting, Dot::Amber),
         (C::SettingUp { step: None }, Dot::Amber),
-        (C::SetUpFailed { why: Box::default() }, Dot::Red),
+        (C::SetUpFailed { why: Box::default(), at: None }, Dot::Red),
         (C::Stopped { reason: Box::default() }, Dot::Red),
     ] {
         assert_eq!(listed::dot(&rows(connection), None), expected);

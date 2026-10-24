@@ -376,8 +376,8 @@ fn each_forge_offer_round_trips() {
 #[test]
 fn each_forge_connection_round_trips_at_its_bounds() {
     let limits = fixtures::limits();
-    let failed =
-        v1::SetUpFailed::new(&limits, v1::SetUpFailedParts { why: fixtures::field_bytes(256) }).expect("why at bound");
+    let failed = v1::SetUpFailed::new(&limits, v1::SetUpFailedParts { why: fixtures::field_bytes(256), at: None })
+        .expect("why at bound");
     let connected = v1::Connected::new(&limits, v1::ConnectedParts { id: u64::MAX, login: fixtures::field_bytes(16) })
         .expect("login at bound");
     let stopped =
@@ -414,7 +414,7 @@ fn forge_fields_refuse_one_past_their_bounds_on_construction_and_decode() {
         v1::Problem { path: v1::Path::SetUpFailedWhy, reason: skein_codec::Reason::Bound }
     );
     assert_eq!(
-        v1::SetUpFailed::new(&limits, v1::SetUpFailedParts { why: fixtures::field_bytes(257) })
+        v1::SetUpFailed::new(&limits, v1::SetUpFailedParts { why: fixtures::field_bytes(257), at: None })
             .expect_err("past bound"),
         v1::Problem { path: v1::Path::SetUpFailedWhy, reason: skein_codec::Reason::Bound }
     );
@@ -834,3 +834,24 @@ fn manifest_connects_and_app_ways_round_trip() {
 }
 
 mod forgejo_admin;
+
+#[test]
+fn setup_failure_round_trips_each_step_and_none() {
+    let limits = fixtures::limits();
+    for at in [
+        None,
+        Some(v1::FailedStep::Fetch),
+        Some(v1::FailedStep::Prepare),
+        Some(v1::FailedStep::Run),
+        Some(v1::FailedStep::Connect),
+    ] {
+        let value =
+            v1::SetUpFailed::new(&limits, v1::SetUpFailedParts { why: b"stopped".as_slice().into(), at }).unwrap();
+        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).unwrap());
+        value.encode(&mut writer).unwrap();
+        let bytes = writer.finish();
+        let mut reader = Reader::new(&bytes);
+        assert_eq!(v1::SetUpFailed::decode(&limits, &mut reader).unwrap(), value);
+        assert!(reader.is_empty());
+    }
+}

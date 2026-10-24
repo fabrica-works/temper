@@ -293,6 +293,18 @@ fn forges(world: World) -> Box<[u8]> {
         )
         .expect("forge row");
         let connection = match step {
+            9 => w::Connection::SetUpFailed(
+                w::SetUpFailed::new(
+                    &limits,
+                    w::SetUpFailedParts {
+                        why: "its port, 127.0.0.1:8368, is taken by another program. temper box’s output has the rest."
+                            .as_bytes()
+                            .into(),
+                        at: Some(w::FailedStep::Prepare),
+                    },
+                )
+                .expect("failed preparation"),
+            ),
             6 => w::Connection::SettingUp(
                 w::SettingUp::new(&limits, w::SettingUpParts { step: Some(w::SetUpStep::Prepare) }).expect("preparing"),
             ),
@@ -317,7 +329,7 @@ fn forges(world: World) -> Box<[u8]> {
                     offer: w::Offer::Offered,
                     installations: List::with_capacity(0),
                     ended: None,
-                    first: if step == 6 || step == 7 {
+                    first: if step == 6 || step == 7 || step == 9 {
                         Some(
                             w::FirstRepository::new(
                                 &limits,
@@ -1833,10 +1845,14 @@ fn accounts(w: World, then: Then) -> c::OwnerAccounts {
                 place: 1,
                 uses: None,
                 plan: false,
-                provider: Some(if matches!(w, FirstRun { step: 5..=7 }) { 18 } else { 17 }),
-                provider_name: Some(doc(if matches!(w, FirstRun { step: 5..=7 }) { "OpenAI" } else { "Playground" })),
+                provider: Some(if matches!(w, FirstRun { step: 5..=7 | 9 }) { 18 } else { 17 }),
+                provider_name: Some(doc(if matches!(w, FirstRun { step: 5..=7 | 9 }) {
+                    "OpenAI"
+                } else {
+                    "Playground"
+                })),
                 manage_usage: None,
-                display: doc(if matches!(w, FirstRun { step: 5..=7 }) { "ChatGPT" } else { "Scripted model" }),
+                display: doc(if matches!(w, FirstRun { step: 5..=7 | 9 }) { "ChatGPT" } else { "Scripted model" }),
                 holder: c::OwnerAccountHolder::Party(73),
                 sources,
                 cut: false,
@@ -2361,7 +2377,7 @@ pub(super) fn now(w: World) -> Wall {
             3 => 4,
             4 => 6,
             5 => 15,
-            6 => 16,
+            6 | 9 => 16,
             7 | 8 => 19,
             _ => unreachable!("mockup first-run step"),
         },

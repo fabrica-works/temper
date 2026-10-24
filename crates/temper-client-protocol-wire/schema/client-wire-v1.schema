@@ -41,7 +41,8 @@ enum Kind { forgejo, github }
 enum Mode { connected, managed, owned, fake }
 enum SetUpStep { fetch, prepare, run }
 record SettingUp { step: option SetUpStep }
-record SetUpFailed { why: bytes 256 }
+enum FailedStep { fetch, prepare, run, connect }
+record SetUpFailed { why: bytes 256 at: option FailedStep }
 record Connected { id: u64 login: bytes 1024 }
 record Stopped { reason: bytes 1024 }
 enum Connection { not_connected, not_set_up, setting_up: SettingUp, set_up_failed: SetUpFailed, connecting, connected: Connected, stopped: Stopped }

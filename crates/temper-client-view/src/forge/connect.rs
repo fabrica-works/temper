@@ -164,6 +164,9 @@ pub(crate) fn welcome(
         } else {
             status(b, root, w, row, false);
             first_line(b, root, w, row);
+            if connect::failed(row) {
+                progress_in(b, Some(root), w, row);
+            }
             link(b, w, bindings, Word::ForgeView, Address::ConnectForge { forge: Some(Choice::Forge(row.number)) });
         }
     } else {
@@ -434,20 +437,33 @@ pub(crate) fn progress_in(b: &mut Builder, root: Option<&Domain>, w: &Words, row
         );
         return;
     }
-    let current = match row.connection {
-        Connection::SettingUp { step: Some(forge::forges::Step::Fetch) } => Some(0),
-        Connection::SettingUp { step: Some(forge::forges::Step::Prepare) } => Some(1),
-        Connection::SettingUp { step: Some(forge::forges::Step::Run) } => Some(2),
-        Connection::Connecting => Some(3),
-        Connection::Connected { .. } => Some(match root {
-            Some(root) if adopted_project(root, row).is_some() => 5,
-            Some(_) | None => 4,
-        }),
-        Connection::SettingUp { step: None }
-        | Connection::NotConnected
-        | Connection::NotSetUp
-        | Connection::SetUpFailed { .. }
-        | Connection::Stopped { .. } => None,
+    let failed = connect::failed_step(row);
+    let failed_index = match failed {
+        Some(connect::FailedStep::Fetch) => Some(0),
+        Some(connect::FailedStep::Prepare) => Some(1),
+        Some(connect::FailedStep::Run) => Some(2),
+        Some(connect::FailedStep::Connect) => Some(3),
+        Some(connect::FailedStep::Repository) => Some(4),
+        None => None,
+    };
+    let current = if connect::failed(row) {
+        failed_index
+    } else {
+        match row.connection {
+            Connection::SettingUp { step: Some(forge::forges::Step::Fetch) } => Some(0),
+            Connection::SettingUp { step: Some(forge::forges::Step::Prepare) } => Some(1),
+            Connection::SettingUp { step: Some(forge::forges::Step::Run) } => Some(2),
+            Connection::Connecting => Some(3),
+            Connection::Connected { .. } => Some(match root {
+                Some(root) if adopted_project(root, row).is_some() => 5,
+                Some(_) | None => 4,
+            }),
+            Connection::SettingUp { step: None }
+            | Connection::NotConnected
+            | Connection::NotSetUp
+            | Connection::SetUpFailed { .. }
+            | Connection::Stopped { .. } => None,
+        }
     };
     let fetch = w.say(if current > Some(0) { Word::ForgeFetched } else { Word::ForgeFetch }, &[]);
     let prepare = w.say(Word::ForgePrepare, &[]);
@@ -476,13 +492,6 @@ pub(crate) fn progress_in(b: &mut Builder, root: Option<&Domain>, w: &Words, row
         }
         None => w.say(Word::ForgeMakingFirst, &[]),
     };
-    let (making, last_mark) = match &row.first {
-        Some(first) => match first.state {
-            FirstState::Failed { .. } => (forge::words::first_repository(first), Mark::Failed),
-            FirstState::Making | FirstState::Made { .. } => (making, stage_mark(current, 4)),
-        },
-        None => (making, stage_mark(current, 4)),
-    };
     if current.is_none()
         && let Connection::SettingUp { step: None } = row.connection
     {
@@ -493,15 +502,21 @@ pub(crate) fn progress_in(b: &mut Builder, root: Option<&Domain>, w: &Words, row
         w,
         &w.say(Word::ForgeProgress, &[]),
         &[
-            (&fetch, stage_mark(current, 0)),
-            (&prepare, stage_mark(current, 1)),
-            (&run, stage_mark(current, 2)),
-            (&connecting, stage_mark(current, 3)),
-            (&making, last_mark),
+            (&fetch, stage_mark(current, failed_index, 0)),
+            (&prepare, stage_mark(current, failed_index, 1)),
+            (&run, stage_mark(current, failed_index, 2)),
+            (&connecting, stage_mark(current, failed_index, 3)),
+            (&making, stage_mark(current, failed_index, 4)),
         ],
     );
+    if connect::failed(row) {
+        failure(b, w, row);
+    }
 }
-fn stage_mark(current: Option<usize>, index: usize) -> Mark {
+fn stage_mark(current: Option<usize>, failed: Option<usize>, index: usize) -> Mark {
+    if failed == Some(index) {
+        return Mark::Failed;
+    }
     match current {
         Some(current) => mark(current, index),
         None => Mark::ToCome,
@@ -548,11 +563,10 @@ pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &m
     }
     flow::card(b, &w.say(Word::ForgeSettingUpTitle, &[]));
     first_line(b, root, w, row);
+    progress_in(b, Some(root), w, row);
     if connect::failed(row) {
-        crate::cards::text(b, Role::Alert, &forge::words::forge_connection(row));
         setup_control(b, root, w, bindings, row.number, Word::ForgeAgain);
     } else {
-        progress_in(b, Some(root), w, row);
         text(b, w, Role::Paragraph, Word::ForgeLeave);
     }
     b.close();
@@ -672,7 +686,6 @@ pub(crate) fn adopted_project(root: &Domain, row: &Row) -> Option<u32> {
 /// Refusals remain actionable from the welcome's checklist as well as `ConnectForge`'s card.
 pub(crate) fn setup_ending(b: &mut Builder, root: &Domain, w: &Words, forge: &mut ForgeBindings, row: &Row) {
     if connect::failed(row) {
-        crate::cards::text(b, Role::Alert, &forge::words::forge_connection(row));
         setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
     }
     if let Some(first) = &row.first {
@@ -1165,4 +1178,32 @@ fn github_repository_address(web: &[u8], owner: &[u8], name: &[u8]) -> Box<[u8]>
         }
     }
     address.finish()
+}
+
+fn failure(b: &mut Builder, w: &Words, row: &Row) {
+    let word = match connect::failed_step(row) {
+        Some(connect::FailedStep::Repository) => {
+            crate::cards::text(
+                b,
+                Role::Alert,
+                &forge::words::first_repository(row.first.as_ref().expect("failed first repository")),
+            );
+            return;
+        }
+        Some(connect::FailedStep::Fetch) => Word::ForgeFetchFailed,
+        Some(connect::FailedStep::Prepare) => Word::ForgePrepareFailed,
+        Some(connect::FailedStep::Run) => Word::ForgeRunFailed,
+        Some(connect::FailedStep::Connect) => Word::ForgeConnectFailed,
+        None => Word::ForgeSetupFailed,
+    };
+    let why = match &row.connection {
+        Connection::SetUpFailed { why, .. } => forge::words::lossy(why),
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::Connecting
+        | Connection::Connected { .. }
+        | Connection::Stopped { .. } => return,
+    };
+    crate::cards::text(b, Role::Alert, &w.say(word, &[Hole::Name(why)]));
 }
