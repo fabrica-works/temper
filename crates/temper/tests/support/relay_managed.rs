@@ -7,12 +7,16 @@ use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
     fs::{File, OpenOptions},
-    io::{self, Write},
+    io::{self, Read, Seek, Write},
     net::{SocketAddr, TcpListener},
     os::unix::fs::OpenOptionsExt,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
+    time::Duration,
 };
 
 const REPO: &str = "/repos/freeekanayaka/temper-probe-2";
@@ -31,6 +35,26 @@ struct State {
     pulls: BTreeSet<u64>,
     commits: BTreeSet<u64>,
     count: usize,
+    secrets: Vec<(&'static str, Vec<u8>)>,
+}
+
+fn keep_secret(secrets: &mut Vec<(&'static str, Vec<u8>)>, field: &'static str, bytes: &[u8]) {
+    if !bytes.is_empty() && !secrets.iter().any(|(name, known)| *name == field && known == bytes) {
+        secrets.push((field, bytes.to_vec()));
+    }
+}
+
+fn secret_hit<'a>(bytes: &[u8], secrets: &'a [(&'static str, Vec<u8>)]) -> Option<&'a str> {
+    secrets.iter().find_map(|(field, secret)| {
+        (!secret.is_empty() && bytes.windows(secret.len()).any(|part| part == secret)).then_some(*field)
+    })
+}
+
+fn keep_text(secrets: &mut Vec<(&'static str, Vec<u8>)>, field: &'static str, text: &str) {
+    keep_secret(secrets, field, text.as_bytes());
+    // JSON journals escape multiline PEMs. Check their serialized bytes as well.
+    let encoded = serde_json::to_vec(text).expect("JSON string");
+    keep_secret(secrets, field, &encoded[1..encoded.len() - 1]);
 }
 struct Shared {
     fake: bool,
@@ -41,6 +65,19 @@ struct Shared {
     evidence: Mutex<File>,
 }
 impl State {
+    fn remember_auth(&mut self, auth: &str) -> io::Result<()> {
+        if let Some(token) = auth.strip_prefix("Bearer ").or_else(|| auth.strip_prefix("token ")) {
+            let field = if token.split('.').count() == 3 { "JWT" } else { "installation_token" };
+            keep_text(&mut self.secrets, field, token);
+        } else if let Some(encoded) = auth.strip_prefix("Basic ") {
+            let decoded = skein_lib::base64::decode(skein_lib::base64::Alphabet::Standard, encoded.as_bytes(), 8192)
+                .map_err(|_| invalid())?;
+            if let Some(token) = decoded.as_ref().strip_prefix(b"x-access-token:") {
+                keep_secret(&mut self.secrets, "installation_token", token);
+            }
+        }
+        Ok(())
+    }
     fn jwt(&self, authorization: &str) -> bool {
         let Some(encoded) = authorization.strip_prefix("Bearer ").and_then(|s| s.split('.').nth(1)) else {
             return false;
@@ -118,6 +155,7 @@ impl Shared {
         let body = request.body()?;
         let auth = request.header("authorization")?.unwrap_or("");
         let mut state = self.state.lock().map_err(|_| invalid())?;
+        state.remember_auth(auth)?;
         if state.count >= 400 {
             return Ok(false);
         }
@@ -228,6 +266,19 @@ impl Shared {
             state.commits.insert(value["commit"].as_u64().ok_or_else(invalid)?);
         }
         if method == "POST" && path.starts_with("/app-manifests/") {
+            for field in ["pem", "webhook_secret", "client_secret", "client_id"] {
+                if let Some(text) = value[field].as_str() {
+                    keep_text(&mut state.secrets, field, text);
+                    if field == "pem" {
+                        let encoded: String = text.lines().filter(|line| !line.starts_with("-----")).collect();
+                        let der =
+                            skein_lib::base64::decode(skein_lib::base64::Alphabet::Standard, encoded.as_bytes(), 65536)
+                                .map_err(|_| invalid())?;
+                        keep_secret(&mut state.secrets, "App_key_DER", der.as_ref());
+                        keep_text(&mut state.secrets, "App_key_base64", &encoded);
+                    }
+                }
+            }
             if value["owner"]["login"] != "freeekanayaka" {
                 return Err(invalid());
             }
@@ -247,7 +298,9 @@ impl Shared {
             state.installations.insert(value["id"].as_u64().ok_or_else(invalid)?);
         }
         if method == "POST" && path.ends_with("/access_tokens") {
-            state.tokens.push(value["token"].as_str().ok_or_else(invalid)?.into());
+            let token = value["token"].as_str().ok_or_else(invalid)?;
+            keep_text(&mut state.secrets, "installation_token", token);
+            state.tokens.push(token.into());
         }
         if method == "GET" && path == "/installation/repositories" {
             state.checked = false;
@@ -305,11 +358,44 @@ impl Shared {
         let mut journal = self.journal.lock().map_err(|_| invalid())?;
         serde_json::to_writer(
             &mut *journal,
-            &json!({"listener":if git {"git"} else {"api"}, "method":method, "path":path, "status":answer.status()?, "refused":!accepted || answer.status()? == 403}),
+            &json!({"listener":if git {"git"} else {"api"}, "method":method, "path":path, "status":answer.status()?, "refused":!accepted || answer.status()? == 403,
+                "request_body_bytes":request.body()?.len(), "response_body_bytes":answer.body()?.len(),
+                "upstream_request_bytes":if accepted { request.upstream_bytes(git)? } else { 0 }}),
         )?;
         journal.write_all(b"\n")?;
         journal.flush()?;
         answer.send(&mut socket, method)
+    }
+
+    fn scan(&self, extra: &Value) -> io::Result<()> {
+        let mut state = self.state.lock().map_err(|_| invalid())?;
+        for field in ["App_key_DER", "App_key_base64", "JWT", "installation_token"] {
+            if let Some(values) = extra[field].as_array() {
+                for value in values {
+                    let text = value.as_str().ok_or_else(invalid)?;
+                    if field == "App_key_DER" {
+                        let bytes =
+                            skein_lib::base64::decode(skein_lib::base64::Alphabet::Standard, text.as_bytes(), 65536)
+                                .map_err(|_| invalid())?;
+                        keep_secret(&mut state.secrets, field, bytes.as_ref());
+                    } else {
+                        keep_text(&mut state.secrets, field, text);
+                    }
+                }
+            }
+        }
+        for file in [&self.journal, &self.evidence] {
+            let mut file = file.lock().map_err(|_| invalid())?;
+            file.flush()?;
+            file.rewind()?;
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes)?;
+            if let Some(field) = secret_hit(&bytes, &state.secrets) {
+                eprintln!("secret bytes found: {field}");
+                return Err(invalid());
+            }
+        }
+        Ok(())
     }
 }
 /// Each node keeps its JSON type. Only the owner's explicit allowlist keeps values.
@@ -363,34 +449,74 @@ pub fn run() -> io::Result<()> {
         guard: Guard { owner: "freeekanayaka".into(), repository: "temper-probe-2".into(), installation: 0, prefix },
         state: Mutex::new(State::default()),
         journal: Mutex::new(
-            OpenOptions::new().create_new(true).write(true).mode(0o600).open(directory.join("relay.jsonl"))?,
+            OpenOptions::new()
+                .create_new(true)
+                .read(true)
+                .write(true)
+                .mode(0o600)
+                .open(directory.join("relay.jsonl"))?,
         ),
-        evidence: Mutex::new(OpenOptions::new().create_new(true).write(true).mode(0o600).open(evidence)?),
+        evidence: Mutex::new(OpenOptions::new().create_new(true).read(true).write(true).mode(0o600).open(evidence)?),
     });
     let api = TcpListener::bind("127.0.0.1:0")?;
     let git = TcpListener::bind("127.0.0.1:0")?;
     let addresses = json!({"api":api.local_addr()?.to_string(), "git":git.local_addr()?.to_string()});
     super::write_private(&directory.join("relay-ready.json"), &serde_json::to_vec(&addresses)?);
+    let stopping = Arc::new(AtomicBool::new(false));
+    let mut listeners = Vec::new();
     for (listener, git) in [(api, false), (git, true)] {
+        listener.set_nonblocking(true)?;
         let shared = shared.clone();
-        thread::spawn(move || {
-            for socket in listener.incoming().flatten() {
+        let stopping = stopping.clone();
+        listeners.push(thread::spawn(move || {
+            let mut workers = Vec::new();
+            while !stopping.load(Ordering::Acquire) {
+                let socket = match listener.accept() {
+                    Ok((socket, _)) => socket,
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(20));
+                        continue;
+                    }
+                    Err(_) => break,
+                };
                 let shared = shared.clone();
-                thread::spawn(move || {
+                workers.push(thread::spawn(move || {
                     if shared.serve(socket, git).is_err() {
                         // Neither errors nor request dumps can expose keys, JWTs, codes or bodies.
                         if let Ok(mut journal) = shared.journal.lock() {
                             let _ = journal.write_all(b"{\"error\":\"transport or framing failed\"}\n");
                         }
                     }
-                });
+                }));
             }
-        });
+            for worker in workers {
+                worker.join().map_err(|_| invalid())?;
+            }
+            Ok::<(), io::Error>(())
+        }));
     }
-    // The script owns this child and terminates it before removing scratch.
-    loop {
-        thread::park();
+    // The owner sends additional in-memory credentials through this private pipe.
+    // Stop admission and drain every worker before reading either artifact.
+    let mut command = String::new();
+    io::stdin().read_line(&mut command)?;
+    stopping.store(true, Ordering::Release);
+    for listener in listeners {
+        listener.join().map_err(|_| invalid())??;
     }
+    let extra: Value = serde_json::from_str(&command).map_err(|_| invalid())?;
+    shared.scan(&extra)?;
+    println!("no secret bytes in the relay log or the record");
+    Ok(())
+}
+
+#[test]
+fn secret_scan_finds_a_planted_journal_secret() {
+    let mut secrets = Vec::new();
+    keep_text(&mut secrets, "installation_token", "planted-private-token");
+    assert_eq!(secret_hit(b"{\"path\":\"/planted-private-token\"}\n", &secrets), Some("installation_token"));
+    assert_eq!(secret_hit(b"{\"path\":\"/app\",\"status\":200}\n", &secrets), None);
+    keep_text(&mut secrets, "pem", "PRIVATE\nPEM\n");
+    assert_eq!(secret_hit(br#"{"path":"PRIVATE\nPEM\n"}"#, &secrets), Some("pem"));
 }
 
 #[test]
