@@ -122,6 +122,7 @@ pub fn request(
     key: [u8; 16],
     scope: jig_client::contract::Scope,
     ask: &jig_client::Family,
+    carried: Option<jig_domain_core::Carried>,
 ) -> engine::Event {
     use temper_client_protocol_wire::{self as w, v1};
     assert_eq!(w::owner(ask.family), Some(w::Owner::Forge));
@@ -129,8 +130,13 @@ pub fn request(
     let limits = forge::wire_limits(&crate::app::limits().forge).expect("wire bounds");
     let mut reader = skein_lib::Reader::new(&ask.bytes);
     let a = (match v1::Requesting::decode(&limits, &mut reader).expect("whole adoption bytes").into_parts().request {
-        v1::Request::Reachable(_) | v1::Request::Connect(_) | v1::Request::Install(_) | v1::Request::StartDemo => {
+        v1::Request::Reachable(_) | v1::Request::Install(_) | v1::Request::StartDemo => {
             panic!("client sends no demo start yet")
+        }
+        v1::Request::Connect(connect) => {
+            assert_eq!(scope, jig_client::contract::Scope::Deployment);
+            assert!(reader.is_empty(), "whole admin request");
+            return admin_request(transport, who, attempt, key, ask, connect, carried);
         }
         v1::Request::Adopt(adopt) => adopt,
         v1::Request::Return(returning) => {
@@ -198,6 +204,49 @@ pub fn request(
             &value,
             crate::fixtures::FORGE_HOST,
         ))),
+    })
+}
+fn admin_request(
+    transport: &mut Transport,
+    who: ClientId,
+    attempt: Token,
+    key: [u8; 16],
+    ask: &jig_client::Family,
+    connect: temper_client_protocol_wire::v1::Connect,
+    carried: Option<jig_domain_core::Carried>,
+) -> engine::Event {
+    use temper_client_protocol_wire::v1;
+    let connect = connect.into_parts();
+    let v1::How::ForgejoAdmin(admin) = connect.how else { panic!("admin fixture") };
+    let first = admin.into_parts().first.map(|first| {
+        let first = first.into_parts();
+        owner::FirstAsk {
+            org: first.org,
+            repository: first.repository,
+            label: first.label,
+            project: match first.project {
+                v1::SetUpProject::New(project) => owner::SetUpProject::New(project.into_parts().name),
+                v1::SetUpProject::Existing(project) => owner::SetUpProject::Existing(project.project()),
+            },
+        }
+    });
+    let reply_to = transport.reply_to(Reply::Keyed {
+        client: who,
+        attempt,
+        key,
+        owner: KeyedOwner::Application { connector: crate::fixtures::FORGE },
+    });
+    engine::Event::Party(PartyInput::Application {
+        scope: jig_domain_people::ApplicationScope::Deployment,
+        reply_to,
+        sign_in: transport.sign_in(who).expect("authenticated admin"),
+        key,
+        digest: skein_lib::sha256::digest(&ask.bytes),
+        carried,
+        request: engine::Application::Forge(owner::Ask::Connect {
+            forge: connect.forge,
+            how: owner::How::ForgejoAdmin { first },
+        }),
     })
 }
 /// Open only the forge's whole, project-scoped change subject (client/forge.md, 9.2).
@@ -667,7 +716,7 @@ mod watch_tests {
         let limits = forge::wire_limits(&crate::app::limits().forge).expect("wire bounds");
         let record = forge::family::request(&adoption, &limits).expect("request envelope");
         let mut transport = transport();
-        let event = super::request(&mut transport, CLIENT, NATIVE, [5; 16], c::Scope::Project(7), &record);
+        let event = super::request(&mut transport, CLIENT, NATIVE, [5; 16], c::Scope::Project(7), &record, None);
         let engine::Event::Party(PartyInput::Application { request, .. }) = event else { panic!("root adoption") };
         assert_eq!(
             request,

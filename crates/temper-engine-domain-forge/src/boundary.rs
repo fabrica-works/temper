@@ -317,12 +317,32 @@ pub enum FirstState {
     Made { id: u64 },
     Failed { step: CreateStep },
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SetupStage {
+    Admin,
+    Bot,
+    Token,
+    Org,
+    Repository,
+    File,
+    App,
+    Installation,
+    State,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdminStop {
+    NotAdmin,
+    Refused { status: u16, stage: SetupStage },
+    Unmarked,
+    Other,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct First {
     pub org: Box<[u8]>,
     pub repository: Box<[u8]>,
     pub project: SetUpProject,
     pub state: FirstState,
+    pub label: Box<[u8]>,
 }
 
 /// A repository already adopted on this forge (client/README.md, 4.6).
@@ -336,9 +356,6 @@ pub struct AdoptedRow {
 /// One configured forge, including its connection, offer and first repository.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Row {
-    pub owned: Option<Owned>,
-    pub web: Option<Box<[u8]>>,
-    pub repositories: Box<[AdoptedRow]>,
     pub number: u16,
     pub kind: Kind,
     pub mode: Mode,
@@ -349,6 +366,11 @@ pub struct Row {
     pub installations: Box<[(u64, Installation)]>,
     pub ended: Option<Box<[u8]>>,
     pub app: Option<AppWay>,
+    pub web: Option<Box<[u8]>>,
+    pub repositories: Box<[AdoptedRow]>,
+    pub owned: Option<Owned>,
+    pub admin: bool,
+    pub ended_stop: Option<AdminStop>,
 }
 /// The deployment's forges, ordered by number (domain/forge.md, 4.1).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -837,6 +859,7 @@ pub enum Event {
         stopped: Option<Box<[u8]>>,
     },
     ConnectEnded {
+        stop: Option<AdminStop>,
         forge: u16,
         request: Token,
         connected: bool,

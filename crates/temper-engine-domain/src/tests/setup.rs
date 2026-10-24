@@ -200,19 +200,21 @@ fn the_deployment_owner_watches_forges_again_after_a_connection_changes() {
             watcher: WATCHER,
             forges: forge::Forges {
                 rows: Box::new([forge::Row {
-                    owned: None,
-                    failed: Some(forge::FailedStep::Prepare),
-                    web: None,
-                    repositories: Box::new([]),
-                    app: None,
-                    installations: Box::new([]),
-                    ended: None,
-                    first: None,
                     number: 1,
                     kind: forge::Kind::Forgejo,
                     mode: forge::Mode::Owned,
                     connection: forge::Connection::SetUpFailed { why: b"the box closed the pipe".as_slice().into() },
+                    failed: Some(forge::FailedStep::Prepare),
                     offer: forge::Offer::NotUnderTheBox,
+                    first: None,
+                    installations: Box::new([]),
+                    ended: None,
+                    app: None,
+                    web: None,
+                    repositories: Box::new([]),
+                    owned: None,
+                    admin: false,
+                    ended_stop: None,
                 }])
             },
         }))]
@@ -238,19 +240,21 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
 
 fn row(connection: forge::Connection) -> forge::Row {
     forge::Row {
-        owned: None,
-        failed: None,
-        web: None,
-        repositories: Box::new([]),
-        app: None,
-        installations: Box::new([]),
-        ended: None,
-        first: None,
         number: 1,
         kind: forge::Kind::Forgejo,
         mode: forge::Mode::Owned,
         connection,
+        failed: None,
         offer: forge::Offer::Offered,
+        first: None,
+        installations: Box::new([]),
+        ended: None,
+        app: None,
+        web: None,
+        repositories: Box::new([]),
+        owned: None,
+        admin: false,
+        ended_stop: None,
     }
 }
 
@@ -310,7 +314,13 @@ fn public_connect_preserves_the_admitted_owner_and_carry_then_root_orders_its_er
     crate::try_step(
         &mut domain,
         &env,
-        Event::Forge(Box::new(forge::Event::ConnectEnded { why: None, forge: 1, request, connected: false })),
+        Event::Forge(Box::new(forge::Event::ConnectEnded {
+            stop: None,
+            why: None,
+            forge: 1,
+            request,
+            connected: false,
+        })),
     )
     .unwrap();
     assert_eq!(settle(&mut domain, &env).as_ref(), [Request::EraseCarried { number: carried.number }]);
@@ -632,6 +642,7 @@ fn admin_connect_routes_the_whole_how_and_erases_at_both_ends() {
                     repository: first.repository,
                     project: first.project,
                     state: forge::FirstState::Making,
+                    label: first.label,
                 })
             );
             let request = *request;
@@ -668,7 +679,13 @@ fn admin_connect_routes_the_whole_how_and_erases_at_both_ends() {
             crate::try_step(
                 &mut domain,
                 &env,
-                Event::Forge(Box::new(forge::Event::ConnectEnded { forge: 1, request, connected, why: why.clone() })),
+                Event::Forge(Box::new(forge::Event::ConnectEnded {
+                    stop: None,
+                    forge: 1,
+                    request,
+                    connected,
+                    why: why.clone(),
+                })),
             )
             .unwrap();
             assert_eq!(settle(&mut domain, &env).as_ref(), [Request::EraseCarried { number: carried.number }]);

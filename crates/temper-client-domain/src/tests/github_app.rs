@@ -231,10 +231,6 @@ fn each_forge_refusal_is_said_in_forge_md_words() {
 
 fn github_row() -> forge::forges::Row {
     forge::forges::Row {
-        owned: None,
-        web: None,
-        repositories: Box::new([]),
-        app: None,
         number: 2,
         kind: forge::forges::Kind::GitHub,
         mode: forge::forges::Mode::Connected,
@@ -243,6 +239,12 @@ fn github_row() -> forge::forges::Row {
         first: None,
         installations: Box::new([]),
         ended: None,
+        app: None,
+        web: None,
+        repositories: Box::new([]),
+        owned: None,
+        admin: false,
+        ended_stop: None,
     }
 }
 #[test]

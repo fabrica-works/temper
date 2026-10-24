@@ -14,10 +14,6 @@ use temper_client_protocol_wire::{self as wire, v1 as w};
 const HERE: u16 = 3;
 fn row(number: u16, kind: Kind, mode: Mode, connection: C, offer: Offer) -> Row {
     Row {
-        owned: None,
-        web: None,
-        repositories: Box::new([]),
-        app: None,
         number,
         kind,
         mode,
@@ -26,6 +22,12 @@ fn row(number: u16, kind: Kind, mode: Mode, connection: C, offer: Offer) -> Row 
         first: None,
         installations: Box::new([]),
         ended: None,
+        app: None,
+        web: None,
+        repositories: Box::new([]),
+        owned: None,
+        admin: false,
+        ended_stop: None,
     }
 }
 fn rows(connection: C) -> State {
@@ -423,6 +425,7 @@ fn first(state: forges::FirstState) -> forges::First {
         repository: b"hello".as_slice().into(),
         project: forges::SetUpProject::Existing(1),
         state,
+        label: Box::from(b"temper-host".as_slice()),
     }
 }
 fn with_first(connection: C, state: forges::FirstState) -> State {
@@ -445,6 +448,7 @@ fn deliver_first(
                 w::ExistingProject::new(&w::CEILINGS, w::ExistingProjectParts { project: 1 }).unwrap(),
             ),
             state,
+            label: Box::from(b"temper-host".as_slice()),
         },
     )
     .unwrap();
@@ -461,18 +465,20 @@ fn deliver_first_record(
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
-                owned: None,
-                web: None,
-                repositories: List::with_capacity(0),
-                app: None,
-                installations: List::with_capacity(0),
-                ended: None,
                 number: HERE,
                 kind: w::Kind::Forgejo,
                 mode: w::Mode::Owned,
-                offer: w::Offer::Offered,
                 connection,
+                offer: w::Offer::Offered,
                 first: Some(first),
+                installations: List::with_capacity(0),
+                ended: None,
+                app: None,
+                web: None,
+                repositories: List::with_capacity(0),
+                owned: None,
+                admin: false,
+                ended_stop: None,
             },
         )
         .unwrap(),
@@ -710,6 +716,7 @@ fn set_up_again_on_another_client_uses_the_rows_fields() {
             state: w::FirstState::Failed(
                 w::CreateFailed::new(&w::CEILINGS, w::CreateFailedParts { step: w::CreateStep::File }).unwrap(),
             ),
+            label: Box::from(b"temper-host".as_slice()),
         },
     )
     .unwrap();
@@ -970,18 +977,20 @@ fn deliver_picker(root: &mut crate::Domain, watch: Token, changed: bool) -> Queu
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
-                owned: None,
                 number: 2,
                 kind: w::Kind::Github,
                 mode: w::Mode::Connected,
                 connection: connected(),
                 offer: w::Offer::NotOffered,
+                first: None,
+                installations,
+                ended: None,
+                app: None,
                 web: None,
                 repositories: List::with_capacity(0),
-                app: None,
-                first: None,
-                ended: None,
-                installations,
+                owned: None,
+                admin: false,
+                ended_stop: None,
             },
         )
         .unwrap(),

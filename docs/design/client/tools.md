@@ -648,7 +648,7 @@ area lands with its stories (section 11).
    | `forge-connect F github` | starts GitHub's manifest flow, the App made under the person's own account and installed on any account GitHub offers them: prints the link to open in a browser, the manifest's page on the clients' listener, and the call that follows it, `wait forges --until settled`; exits 0 once the request is durable | `Connect { forge, how: GitHubManifest { back: none } }` | yes |
    | `forge-connect F github-app ID FILE` | connects an App of the person's own: ID its id, FILE its private key, PEM as GitHub gives it; no webhook secret, since temper points the App's hook at `https://SLUG.invalid/`; then `wait forges --until settled` | `Connect { forge, how: GitHubApp { id, key } }` | yes |
    | `forge-connect F forgejo FILE` | connects a Forgejo through its bot's tokens, FILE a tokens file (below) naming `api`, `git` and, where the person made hooks to temper's listener, `webhook_secret`; then `wait forges --until settled` | `Connect { forge, how: ForgejoTokens { api, git, webhook_secret? } }` | yes |
-   | `forge-connect F forgejo-admin FILE` | connects a Forgejo as its site admin, FILE the admin's token; temper makes its bot, and the forge becomes managed; then `wait forges --until settled` | `Connect { forge, how: ForgejoAdmin { admin_token } }` | yes |
+   | `forge-connect F forgejo-admin FILE [--first ORG/NAME [--project P] [--label L]]` | connects a Forgejo as its site admin, FILE the admin's token; temper makes its bot, and the forge becomes managed; with `--first`, makes ORG/NAME with the starter workflow, project P a number or name as for `forge-setup`, default a new project named NAME, runner label L default `docker`; prints `connecting`, then `wait forges --until connected:F` and, with `--first`, `wait forges --until made:F` | `Connect { forge, how: ForgejoAdmin { first? } }`, token carried as AdminToken | yes |
    | `forge-install F` | prints a fresh link to install temper's App on another account, GitHub alone; the installation shows on `forges` once the person's browser comes back | `Install { forge, back: none }` | |
    | `forge-replace F FILE` | replaces what a person pasted: on GitHub, FILE the App's new key; on a connected Forgejo, a tokens file naming `api`, `git` or both; it must answer as the forge's user, and the old is erased once the new is kept | `Replace { forge, value }` | |
    | `forge-forget F` | erases a managed forge's admin's token; the forge is connected, its bot and tokens kept | `Forget { forge }` | |
@@ -683,7 +683,13 @@ area lands with its stories (section 11).
    - **A pasted value is read from FILE,** never an argument, never
      typed and never printed: a private file, as area 5's key is (the
      user's own, no group or other bits, not reached through a link),
-     within the bound of section 12. A key's file and an admin's
+     within the bound of section 12. Group or other permissions are refused
+     before reading, naming the file and its mode in octal. An admin's
+     token is item 1, with six bytes of framing within 4096 bytes; it
+     is never restored as an RSA key or replayed from a carried request.
+     `--project` and `--label` require `--first`; ORG and NAME are
+     nonempty within the wire's bounds, and L is 1 to 64 letters,
+     digits, dots, dashes or underscores. A key's file and an admin's
      token's are their bytes, less a final newline. A tokens file is
      one item a line, `NAME VALUE`, NAME one of `api`, `git` and
      `webhook_secret`, each at most once, VALUE its bytes to the line's
@@ -1417,9 +1423,11 @@ person clicks it, and no story calls github.com:
   installation of selected repositories, and the next `repositories F`
   lists it.
 - **Forgejo connected, managed and owned** from the tools:
-  `forge-connect F forgejo FILE` and `forge-connect F forgejo-admin
-  FILE`, each followed by `wait forges --until settled`, and an owned
-  forge's `repositories`.
+  `forge-connect F forgejo-admin FILE --key NAME`, with and without
+  `--first work/hello --project P --label docker`, followed by
+  `wait forges --until connected:F` and, with `--first`,
+  `wait forges --until made:F`, and an owned forge's `repositories`.
+  Plain `forgejo FILE` stays unoffered.
 - **No secret kept:** after each, no pasted value, key, token or secret
   in a root, a fact, a record but the secrets' store's, a request or an
   answer, nor in DIRECTORY's store.

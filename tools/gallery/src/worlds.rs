@@ -249,11 +249,6 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
-                    owned: None,
-                    web: None,
-                    repositories: List::with_capacity(0),
-                    app: None,
-                    first: None,
                     number: FORGE,
                     kind: w::Kind::Forgejo,
                     mode: w::Mode::Fake,
@@ -262,8 +257,15 @@ fn forges(world: World) -> Box<[u8]> {
                             .expect("demo login"),
                     ),
                     offer: w::Offer::NotOffered,
+                    first: None,
                     installations: List::with_capacity(0),
                     ended: None,
+                    app: None,
+                    web: None,
+                    repositories: List::with_capacity(0),
+                    owned: None,
+                    admin: false,
+                    ended_stop: None,
                 },
             )
             .expect("demo forge"),
@@ -275,10 +277,6 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
-                    owned: None,
-                    web: None,
-                    repositories: List::with_capacity(0),
-                    app: None,
                     number: 2,
                     kind: w::Kind::Github,
                     mode: w::Mode::Managed,
@@ -287,6 +285,12 @@ fn forges(world: World) -> Box<[u8]> {
                     first: None,
                     installations: List::with_capacity(0),
                     ended: None,
+                    app: None,
+                    web: None,
+                    repositories: List::with_capacity(0),
+                    owned: None,
+                    admin: false,
+                    ended_stop: None,
                 },
             )
             .expect("GitHub choice"),
@@ -318,17 +322,11 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
-                    owned: None,
-                    web: None,
-                    repositories: List::with_capacity(0),
-                    app: None,
                     number: 3,
                     kind: w::Kind::Forgejo,
                     mode: w::Mode::Owned,
                     connection,
                     offer: w::Offer::Offered,
-                    installations: List::with_capacity(0),
-                    ended: None,
                     first: if step == 6 || step == 7 || step == 9 {
                         Some(
                             w::FirstRepository::new(
@@ -347,6 +345,7 @@ fn forges(world: World) -> Box<[u8]> {
                                     } else {
                                         w::FirstState::Making
                                     },
+                                    label: b"temper-host".as_slice().into(),
                                 },
                             )
                             .expect("first repository"),
@@ -354,6 +353,14 @@ fn forges(world: World) -> Box<[u8]> {
                     } else {
                         None
                     },
+                    installations: List::with_capacity(0),
+                    ended: None,
+                    app: None,
+                    web: None,
+                    repositories: List::with_capacity(0),
+                    owned: None,
+                    admin: false,
+                    ended_stop: None,
                 },
             )
             .expect("owned Forgejo"),

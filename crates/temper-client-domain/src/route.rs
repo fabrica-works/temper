@@ -261,6 +261,7 @@ fn playground(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 fn forge_forges(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
     let consumed = forge::picker::told(&mut root.forge, &root.client, told, env.limits.forge)
+        || forge::admin::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child)
         || forge::github::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child)
         || forge::forges::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child);
     if consumed

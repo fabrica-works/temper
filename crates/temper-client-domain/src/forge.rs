@@ -1,6 +1,7 @@
 //! The forge's adoption form, demo read, panel watch and receiving state.
 use alloc::boxed::Box;
 use skein_lib::{Env, Queue, Time};
+pub mod admin;
 pub mod change;
 pub mod connect;
 pub mod demo;
@@ -26,6 +27,7 @@ pub struct Limits {
 #[derive(Debug)]
 pub enum Event {
     Act { act: Act },
+    AdminToken { value: skein_lib::Secret },
     AppKey { value: skein_lib::Secret },
     Panel { subject: Option<panel::Subject> },
     Watched { handle: jig_client::Handle, watched: panel::Watched },
@@ -50,6 +52,8 @@ pub struct Side {
     set_up: Option<Box<forges::SetUp>>,
     setup_form: forges::Draft,
     pickers: skein_lib::List<picker::Picker>,
+    admin_form: admin::Draft,
+    admin: Option<admin::Pending>,
     app_form: github::Draft,
     app: Option<github::Pending>,
     panel: Option<panel::Panel>,
@@ -73,6 +77,8 @@ impl Side {
             set_up: None,
             setup_form: forges::Draft::new(),
             pickers: skein_lib::List::with_capacity(forges::ROWS),
+            admin_form: admin::Draft::new(),
+            admin: None,
             app_form: github::Draft::new(),
             app: None,
             panel: None,
@@ -141,6 +147,14 @@ impl Side {
         &self.setup_form
     }
     #[must_use]
+    pub const fn admin_form(&self) -> &admin::Draft {
+        &self.admin_form
+    }
+    #[must_use]
+    pub const fn admin(&self) -> Option<&admin::Pending> {
+        self.admin.as_ref()
+    }
+    #[must_use]
     pub const fn app_form(&self) -> &github::Draft {
         &self.app_form
     }
@@ -158,6 +172,7 @@ impl Side {
 }
 pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::AdminToken { value } => admin::token(side, value),
         Event::AppKey { value } => github::key(side, value),
         Event::Panel { subject } => panel::subject(side, env.limits, subject, out),
         Event::Watched { handle, watched } => panel::watched(side, handle, watched, out),
@@ -232,6 +247,8 @@ fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::Picker { forge, act } => picker::act(side, limits, forge, act, out),
         Act::Go { address } => out.push(Request::Show { address }),
+        Act::AdminWrite { field, text } => admin::write(side, limits, field, text),
+        Act::ConnectAdmin { forge } => admin::send(side, limits, forge, out),
         Act::AppWrite { text } => github::write(side, text, limits),
         Act::ConnectManifest { forge, back } => github::manifest(side, limits, forge, back, out),
         Act::ConnectApp { forge } => github::send(side, limits, forge, None, out),
@@ -324,6 +341,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(forges::worst_case(limits)?)?
         .checked_add(picker::worst_case(*limits)?)?
         .checked_add(4097 + 2048)?
+        .checked_add(4090)?
+        .checked_add(u64::from(limits.field_bytes).checked_mul(3)?)?
+        .checked_add(u64::from(limits.field_bytes.max(wire.first_repository_label)))?
+        .checked_add(temper_client_protocol_wire::v1::Answer::worst_case_heap(&wire)?)?
         .checked_add(u64::from(limits.field_bytes))?
         .checked_add(temper_client_protocol_wire::v1::Answer::worst_case_heap(&wire)?)?
         .checked_add(temper_client_protocol_wire::v1::DemoAnswer::worst_case_heap(&wire)?)?
