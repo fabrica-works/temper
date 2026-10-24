@@ -52,7 +52,7 @@ draft to landed change.
 
 Before changing code, read [`AGENTS.md`](AGENTS.md) and
 [`docs/development/workflow.md`](docs/development/workflow.md). `main`
-moves only through skein's `land`, which runs the gate,
+moves only through agents' `land`, which runs the gate,
 `scripts/check.sh`.
 
 ## The family

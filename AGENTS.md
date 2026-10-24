@@ -3,7 +3,7 @@
 - Before merging anything to main, run the checks in
   `docs/development/workflow.md`; main moves only when they all pass. A
   change to Markdown files only skips them (same document).
-- **A plan's run lands through skein's `land`,** which runs those checks,
+- **A plan's run lands through agents' `land`,** which runs those checks,
   `scripts/check.sh`, as its gate and pushes to `origin`'s `main`
   (workflow.md, section 1). A change to Markdown files only lands with
   `land --docs`. Outside a run, push only when the user asks.

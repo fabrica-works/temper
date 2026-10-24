@@ -32,7 +32,7 @@ them. Nothing here is adopted.
   baseline, dev.fabrig.ai's history resets when a format changes
   (section 6).
 - **A person configures temper by talking to it:** they describe their
-  workflow, as skein's `owners.md` and `director.md` describe ours, and
+  workflow, as agents' `roles/owners.md` and `roles/director.md` describe ours, and
   an agent proposes how temper will run it. Settings live in the store,
   never in the configuration document; new work follows a change while
   running work keeps what it started under, as `configuring.md` designs
@@ -222,8 +222,8 @@ read-only; `~/src/rust/tmp/roadmap-3/store-upgrades.md`). In short:
 Designed in `configuring.md`, from a session with the user on
 2026-10-23. In short:
 
-- **A person describes how they work,** as skein's `owners.md` and
-  `director.md` describe ours, and an agent proposes how temper will
+- **A person describes how they work,** as agents' `roles/owners.md` and
+  `roles/director.md` describe ours, and an agent proposes how temper will
   run it; an owner accepts, on a page in plain words.
 - **Structure becomes settings; rules stay text** that runs read, so
   most changes to a process need no configuring.

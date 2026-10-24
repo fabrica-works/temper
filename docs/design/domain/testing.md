@@ -2116,7 +2116,7 @@ by the commands in `docs/development/workflow.md`. In temper:
   under the nextest profiles `process` and `live` by
   `scripts/proof-one-process.sh` and `scripts/proof-live.sh`. The gate
   never runs them; `scripts/after-landing.sh` runs the process tier
-  after each landing (skein's `owners.md`, 4.5).
+  after each landing (agents' `roles/owners.md`, 4.5).
 
 A fuzzy test lives in its world's crate, beside the focused ones, and
 uses that world: a world's settings, random ones included, are the
@@ -2202,7 +2202,7 @@ and one smoke above:
   its document makes the change it needs. Their times do not change.
 - **Its QA:** mission 2 changes the facts of the forge's world and the
   engine's domain world (how a merge is judged), so their `qa_*`
-  profiles run before it lands (skein's `owners.md`).
+  profiles run before it lands (agents' `roles/owners.md`).
 - **Measured** at mission 2's base and end, by 6.1's rule. Should the
   smoke miss its 2 s, or the real loop pass its 15 s (13 s before the user's
   increase of 10-24), the plan goes to the user with its numbers; no story

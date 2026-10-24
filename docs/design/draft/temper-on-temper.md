@@ -1,7 +1,7 @@
 # Temper on temper
 
-Draft, 2026-10-21. Can the owners' process (skein's
-`docs/foundation/owners.md`) be encoded in temper, so that from the same
+Draft, 2026-10-21. Can the owners' process (agents'
+`roles/owners.md`) be encoded in temper, so that from the same
 inputs and the same environment temper runs the same execution, or a
 better one? This draft records a session with the user on 2026-10-20
 and 2026-10-21, the session `qa-loop.md` leaves to one of its own. The

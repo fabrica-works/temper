@@ -1,4 +1,4 @@
-//! QA pass 2 (skein's docs/foundation/owners.md, 4.6): the browser shell, milestone 1, as Chromium shows it
+//! QA pass 2 (agents' roles/owners.md, 4.6): the browser shell, milestone 1, as Chromium shows it
 //! against `temper serve` (docs/design/client/browser.md). Each test is a person's script; the harness fails
 //! it on a policy violation, an exception or a native dialog. Run by `--profile qa`, which the gate does not.
 use skein_browser::boundary::Key;

@@ -1,7 +1,7 @@
 #!/bin/sh
-# The tiers the gate leaves out that main must keep green: skein's `land`
+# The tiers the gate leaves out that main must keep green: agents' `land`
 # runs this after each code landing, through heavy --gate, and a failure
-# goes to the director (skein's owners.md, 4.5). Process and full QA run
+# goes to the director (agents' roles/owners.md, 4.5). Process and full QA run
 # independently on this checkout; the outer runner owns queueing and cleanup.
 set -eu
 umask 077

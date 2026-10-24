@@ -16,9 +16,9 @@ cargo nextest run --workspace
 cargo nextest run --workspace --profile fuzzy
 ```
 
-`scripts/check.sh` runs the four, in this order; skein's `land` runs it
-as the gate of a plan's run (skein's `docs/foundation/development.md`,
-section 9), which lands by pushing instead of merging by hand.
+`scripts/check.sh` runs the four, in this order; agents' `land` runs it
+as the gate of a plan's run (agents' `roles/owners.md`, 4.4),
+which lands by pushing instead of merging by hand.
 
 **The browser in the binary is a person's build.** `scripts/check.sh`
 exports `TEMPER_BUNDLE=none`, so the gate builds `temper` without its

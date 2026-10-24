@@ -12,8 +12,8 @@ an owner splits it. Nothing here is adopted.
 ## 1. In one page
 
 - **The person never learns the words.** They describe how they work,
-  in their own words or by pointing at a document, as skein's
-  `owners.md` and `director.md` describe ours. temper answers with a
+  in their own words or by pointing at a document, as agents'
+  `roles/owners.md` and `roles/director.md` describe ours. temper answers with a
   proposal, "here is how I'll run that", in their words with the
   settings underneath (section 5).
 - **Structure becomes settings; rules stay text** (section 2). What
