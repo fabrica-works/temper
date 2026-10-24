@@ -47,6 +47,8 @@ struct World {
     period: Option<u64>,
     fail_job_reads: bool,
     slow_brief_reads: bool,
+    /// A branch whose reads take twenty seconds, each decided when it is sent.
+    slow_branch: Option<Box<[u8]>>,
     owner_gate: bool,
     held_reads: Option<Vec<engine::Request>>,
     merges: u32,
@@ -399,6 +401,7 @@ impl World {
             period: None,
             fail_job_reads: false,
             slow_brief_reads: false,
+            slow_branch: None,
             owner_gate,
             held_reads: None,
             merges: 0,
@@ -570,8 +573,11 @@ impl World {
                     } else {
                         panic!("unknown test repository {repository:?}");
                     };
-                    let slow = self.slow_brief_reads
-                        && matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Job { .. }));
+                    let slow = (self.slow_brief_reads
+                        && matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Job { .. })))
+                        || matches!((&op, &self.slow_branch),
+                            (skein_forge::api::Op::Read(skein_forge::api::Read::Branch { branch }), Some(slow))
+                                if branch == slow);
                     let raw = translate::op(&op, &self.env.limits.forge.client);
                     self.pending.insert(call, op);
                     let mut limits = self.fake_env.limits;
@@ -1357,6 +1363,91 @@ fn a_change_whose_ci_takes_minutes_lands_without_being_held() {
     assert!(world.store.rows.values().any(|stored| matches!(stored,
         Record::Forge { row, .. } if matches!(row.as_ref(), forge_top::Stored::Change(change)
             if matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. })))));
+}
+
+#[test]
+fn a_branch_read_sent_before_the_push_and_answered_missing_after_it_does_not_hold_the_change() {
+    let (mut world, _chat, producer, branch) =
+        change_world_in(World::configured(true, true), paths::Change { no_ci: false, owner_gate: false, tracked: false });
+    world.slow_branch = Some(branch.clone());
+    let in_flight = |world: &World| {
+        world.pending.values().any(|op| {
+            matches!(op, skein_forge::api::Op::Read(skein_forge::api::Read::Branch { branch: read })
+                if *read == branch)
+        })
+    };
+    // The keep's read of the named branch is decided before the push, so it
+    // answers the branch missing after the run's own push has been heard.
+    for ticks in 0.. {
+        if in_flight(&world) {
+            break;
+        }
+        assert!(ticks < 3000, "the keep reads the change's branch before its push");
+        world.tick();
+    }
+    assert!(matches!(
+        world.external(2, raw::Op::Git(raw::Git::Create { branch: branch.clone(), commit: 1 })),
+        raw::Answer::Branch(raw::Created::Created)
+    ));
+    let head = fake::advance(&mut world.fake, &world.fake_env, b"org/repo", &branch, b"file", b"fixed", 1)
+        .expect("producer pushed its branch");
+    let event = world.protocol.answer(
+        Token::new(7),
+        producer.task,
+        producer.attempt,
+        5,
+        tasks::End::Finished {
+            result: tasks::TaskResult::Change {
+                connector: 0,
+                kind: 2,
+                resource: temper_engine_domain_forge::tag(forge_world::REPO.forge, forge_world::REPO.repository),
+                words: Box::from(&b"pushed"[..]),
+            },
+            cancel_delegates: false,
+        },
+        engine::Parts {
+            saved: None,
+            pushed: Box::new([forge_top::Pushed {
+                tag: forge_top::tag(forge_world::REPO.forge, forge_world::REPO.repository),
+                commit: translate::commit(head.clone()),
+            }]),
+            preparation: None,
+        },
+    );
+    world.send(event);
+    while in_flight(&world) {
+        world.tick();
+    }
+    world.slow_branch = None;
+    world.external(
+        1,
+        raw::Op::Write(raw::Write::Status {
+            commit: head,
+            context: Box::from(&b"build"[..]),
+            state: raw::Check::Passed,
+        }),
+    );
+    for _ in 0..600 {
+        world.tick();
+    }
+    let change = world
+        .store
+        .rows
+        .values()
+        .find_map(|stored| match stored {
+            Record::Forge { row, .. } => match row.as_ref() {
+                forge_top::Stored::Change(change) => Some(change),
+                _ => None,
+            },
+            Record::Core(_) => None,
+        })
+        .expect("the change is durable");
+    assert!(
+        matches!(change.change.state, temper_engine_domain_forge_change::State::Landed { .. }),
+        "a read older than the run's own push cannot hold its change: {:?}",
+        change.change.state
+    );
+    assert_eq!(world.merges, 1);
 }
 
 #[test]
