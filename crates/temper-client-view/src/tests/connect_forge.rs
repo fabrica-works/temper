@@ -1723,7 +1723,7 @@ fn github_adopt_refusals_keep_the_picker_and_success_keeps_the_findings_until_re
                 &[
                     "acme/first is ready",
                     "In the new project Shop, on GitHub.",
-                    "temper may: read; push; open pull requests; land; review; set statuses; comment; create issues; create and delete branches.",
+                    "temper may: read; push; open pull requests; land; review; comment; create issues; create and delete branches.",
                     "Commit statuses stay temper's own: GitHub's rules cannot require them.",
                     "The branch has no rules.",
                 ],

@@ -1158,9 +1158,12 @@ fn github_adopted(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bind
     if let Some(picker) = root.forge().picker(row.number)
         && let Some(adoption) = &picker.adoption
         && adoption.value.project == adopted.project
-        && let Some(answer @ forge::Answer::Adopted(found)) = &adoption.outcome
+        && let Some(forge::Answer::Adopted(found)) = &adoption.outcome
     {
-        adoption_outcome(b, w, &adoption.value, answer);
+        // GitHub's App reads commit statuses; the generic adoption kinds also serve Forgejo.
+        let mut shown = found.clone();
+        shown.kinds.status = false;
+        adoption_outcome(b, w, &adoption.value, &forge::Answer::Adopted(shown));
         text(b, w, Role::Paragraph, Word::GitHubStatuses);
         match &found.protection {
             forge::Protection::Unknown => {}
