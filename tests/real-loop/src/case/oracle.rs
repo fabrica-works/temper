@@ -34,6 +34,8 @@ pub struct Told {
 }
 #[derive(Clone)]
 pub struct Kit {
+    /// Forge records in their observed order, including the person's main push.
+    pub records: Vec<skein_fake_forge_domain::Observation>,
     pub main: BTreeMap<Vec<u8>, Vec<u8>>,
     pub merged_green: bool,
     pub pulls: Vec<Pull>,
@@ -105,6 +107,7 @@ impl Observed {
             commands: Vec::new(),
             told,
             kit: Kit {
+                records: ran.forge().observations().to_vec(),
                 pulls: pull_digest(ran.forge().observations()),
                 main: ran.forge().main().clone(),
                 merged_green: ran.forge().merged_green(),
@@ -180,6 +183,11 @@ fn cued(system: &[u8]) -> Option<Agent> {
         Agent::BudgetSubowner,
         Agent::BudgetInvestigator,
         Agent::BudgetAdvisor,
+        // 6.4
+        Agent::RedDirector,
+        Agent::RedOwner,
+        Agent::RedCoder,
+        Agent::RedRepairCoder,
     ] {
         for (at, word) in system.windows(agent.cue().len()).enumerate() {
             if word == agent.cue() {
@@ -533,7 +541,7 @@ mod tests {
                     credential: Some(0),
                 },
             ],
-            kit: Kit { pulls: Vec::new(), main, merged_green: true },
+            kit: Kit { records: Vec::new(), pulls: Vec::new(), main, merged_green: true },
         }
     }
 
@@ -799,7 +807,7 @@ mod account_tests {
             ]),
             commands: Vec::new(),
             told: vec![told(Agent::A, HELD_A_SPEC, 0), told(Agent::A, HELD_A_SPEC, 1)],
-            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
+            kit: Kit { records: Vec::new(), pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
         }
     }
     #[test]
@@ -1117,7 +1125,7 @@ mod pace_tests {
                 told(Agent::Survey, "Begin", DEFAULT_MODEL, 1),
                 told(Agent::Director, &format!("Note 1 revision 1: {PACE_NOTE}\n{PACE_ANSWER}\n"), DEFAULT_MODEL, 0),
             ],
-            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
+            kit: Kit { records: Vec::new(), pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
         }
     }
     #[test]
@@ -1471,7 +1479,7 @@ mod restart_tests {
         Observed {
             documents,
             commands: Vec::new(),
-            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
+            kit: Kit { records: Vec::new(), pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
             told: vec![
                 told(
                     Agent::Hang,
@@ -1878,6 +1886,7 @@ mod rules_tests {
             ],
             commands: Vec::new(),
             kit: Kit {
+                records: Vec::new(),
                 pulls: Vec::new(),
                 main: BTreeMap::from([(RULES_FILE.as_bytes().to_vec(), NEW_RULES.as_bytes().to_vec())]),
                 merged_green: false,
@@ -2197,7 +2206,7 @@ mod shape_tests {
                 told(Agent::Mover, NEW_BRIEF, &[user(NEW_BRIEF), user("Continue")]),
             ],
             commands: Vec::new(),
-            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
+            kit: Kit { records: Vec::new(), pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
         }
     }
     fn rejects(observed: &Observed, promise: Promise, what: &str) {
@@ -2657,6 +2666,7 @@ mod pause_tests {
                 told(Agent::Pause, BOWNER_REPORT.into()),
             ],
             kit: Kit {
+                records: Vec::new(),
                 pulls: Vec::new(),
                 main: BTreeMap::from([(H1_DOC.as_bytes().to_vec(), H1_WORDS.as_bytes().to_vec())]),
                 merged_green: true,
@@ -3184,7 +3194,7 @@ mod plan_tests {
         Observed {
             documents,
             commands: Vec::new(),
-            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: true },
+            kit: Kit { records: Vec::new(), pulls: Vec::new(), main: BTreeMap::new(), merged_green: true },
             told: vec![
                 noted,
                 told(Agent::Planner, &opening),
@@ -3724,7 +3734,7 @@ mod misread_tests {
                 recalled,
                 told(Agent::Misread, &next),
             ],
-            kit: Kit { pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
+            kit: Kit { records: Vec::new(), pulls: Vec::new(), main: BTreeMap::new(), merged_green: false },
         }
     }
     #[test]
@@ -4543,6 +4553,7 @@ mod direction_tests {
                 told(Agent::OverlapOwner, &[input("Begin B's work."), input(&news)]),
             ],
             kit: Kit {
+                records: Vec::new(),
                 main: BTreeMap::from([(B_FILE.as_bytes().to_vec(), STORY_WORDS.as_bytes().to_vec())]),
                 merged_green: true,
                 pulls: vec![
@@ -5412,7 +5423,7 @@ mod batch_tests {
             documents,
             told: queries,
             commands: Vec::new(),
-            kit: Kit { main: BTreeMap::new(), merged_green: false, pulls: Vec::new() },
+            kit: Kit { records: Vec::new(), main: BTreeMap::new(), merged_green: false, pulls: Vec::new() },
         }
     }
     fn rejects(observed: &Observed, promise: Promise) {
@@ -6240,6 +6251,7 @@ mod blocker_tests {
             told: queries(),
             commands: Vec::new(),
             kit: Kit {
+                records: Vec::new(),
                 main: BTreeMap::from([(BLOCKER_FILE.as_bytes().into(), BLOCKER_FIXED.as_bytes().into())]),
                 merged_green: true,
                 pulls: vec![Pull {
@@ -7058,7 +7070,7 @@ mod budget_tests {
             .into_iter()
             .map(str::to_owned)
             .collect(),
-            kit: Kit { main: BTreeMap::new(), pulls: Vec::new(), merged_green: false },
+            kit: Kit { records: Vec::new(), main: BTreeMap::new(), pulls: Vec::new(), merged_green: false },
         };
         budget_documents(&mut observed);
         investigation_documents(&mut observed);
@@ -7672,6 +7684,898 @@ mod budget_tests {
                 }
             }
             rejects(&observed, BUDGET_EFFORT);
+        }
+    }
+}
+
+// Act 3, step 6.4 (domain/testing.md, 5.3)
+const RED_ORDER: Promise = Promise::Add("nothing lands on a red main before its repair");
+const RED_DEPLOYMENT: Promise = Promise::Must("one deployment-requested landing-branch repair");
+const RED_LANDING: Promise = Promise::Must("a4 lands with green CI after the repair");
+const RED_RESULT: Promise = Promise::Must("A1 hears a4's merged ending once");
+const RED_INTERIM: Promise = Promise::Must("the director arms and removes its interim timer");
+const RED_ATTEMPTS: Promise = Promise::Add("every attempt ended, none failed");
+
+fn red_tasks() -> [(Read, u64, u64); 9] {
+    use super::{
+        RED_CHANGE, RED_CODER, RED_DIRECTOR, RED_OWNER, RED_REPAIR, RED_REPAIR_CODER, RED_REPAIR_REVIEW, RED_REVIEW,
+        RED_UPDATED_REVIEW,
+    };
+    [
+        (Read::RedDirectorEnded, RED_DIRECTOR, 0),
+        (Read::RedOwnerEnded, RED_OWNER, RED_DIRECTOR),
+        (Read::RedChangeEnded, RED_CHANGE, RED_OWNER),
+        (Read::RedCoderEnded, RED_CODER, RED_CHANGE),
+        (Read::RedReviewEnded, RED_REVIEW, RED_CHANGE),
+        (Read::RedRepairEnded, RED_REPAIR, 0),
+        (Read::RedRepairCoderEnded, RED_REPAIR_CODER, RED_REPAIR),
+        (Read::RedRepairReviewEnded, RED_REPAIR_REVIEW, RED_REPAIR),
+        (Read::RedUpdatedReviewEnded, RED_UPDATED_REVIEW, RED_CHANGE),
+    ]
+}
+
+// The armed read already owns the journal's prefix. Union its overlap with
+// the ended page instead of issuing another ctl activity-page read.
+fn red_director_done(observed: &Observed) -> bool {
+    use super::RED_DIRECTOR;
+    let reads = [Read::RedDirectorEnded, Read::RedTimerArmed];
+    let mut rows = BTreeMap::new();
+    for read in reads {
+        if pause_activity(observed, read)["cut"] != false {
+            return false;
+        }
+        for row in check_activity(observed, read) {
+            let Some(position) = number(row, "/position") else { return false };
+            if number(row, "/task") != Some(RED_DIRECTOR) {
+                return false;
+            }
+            if let Some(previous) = rows.insert(position, row)
+                && previous != row
+            {
+                return false;
+            }
+        }
+    }
+    let mut open = None;
+    let mut attempts = BTreeSet::new();
+    for (at, (position, row)) in rows.iter().enumerate() {
+        if *position != u64::try_from(at).expect("journal position") + 1 {
+            return false;
+        }
+        if let Some(began) = row.pointer("/line/run_began") {
+            if open.is_some() {
+                return false;
+            }
+            open = number(began, "/attempt");
+            if !open.is_some_and(|attempt| attempts.insert(attempt)) {
+                return false;
+            }
+        }
+        if let Some(end) = row.pointer("/line/run_ended") {
+            let attempt = number(end, "/attempt");
+            if open.is_none() || open.take() != attempt {
+                return false;
+            }
+            let recheck = end["end"] == "refused"
+                && number(end, "/spent") == Some(0)
+                && !rows.values().any(|row| number(row, "/line/turn/attempt") == attempt)
+                && rows.range((position + 1)..).any(|(_, row)| text(row, "/line/run_ended/end") == "finished");
+            if !matches!(end["end"].as_str(), Some("parked" | "finished")) && !recheck {
+                return false;
+            }
+        }
+    }
+    let doc = task_document(observed, Read::RedDirectorEnded);
+    open.is_none()
+        && !attempts.is_empty()
+        && doc.pointer("/result/ending/task/done").is_some_and(Value::is_object)
+        && pause_activity(observed, Read::RedTimerArmed)["before"] == Value::Null
+        && pause_activity(observed, Read::RedDirectorEnded)["after"] == Value::Null
+        && rows.last_key_value().is_some_and(|(last, _)| number(doc, "/activity") == Some(*last))
+}
+
+#[must_use]
+pub fn step_6_4(observed: &Observed) -> Vec<Miss> {
+    use super::{Agent, PROJECT, RED_CHANGE, RED_DIRECTOR, RED_OWNER, RED_REPAIR, RED_REVISION};
+    let mut misses = Vec::new();
+    for (read, task, parent) in red_tasks() {
+        let doc = task_document(observed, read);
+        step_check(
+            &mut misses,
+            "6.4",
+            number(doc, "/chip/task") == Some(task)
+                && number(doc, "/project") == Some(PROJECT)
+                && number(doc, "/spec_revision/value") == Some(RED_REVISION)
+                && text(doc, "/chip/phase") == "ended"
+                && (parent == 0 || number(doc, "/requester/task") == Some(parent)),
+            RED_DEPLOYMENT,
+            &format!("{read:?} identifies ended task {task} under {parent}"),
+        );
+        if task != RED_CHANGE && task != RED_REPAIR {
+            step_check(
+                &mut misses,
+                "6.4",
+                if task == RED_DIRECTOR { red_director_done(observed) } else { batch_done(observed, read, task) },
+                RED_ATTEMPTS,
+                &format!(
+                    "task {task}'s complete journal ends every admitted attempt and permits only bounded placement rechecks"
+                ),
+            );
+        }
+    }
+    red_landings(observed, &mut misses);
+    red_repair(observed, &mut misses);
+    red_timer(observed, &mut misses);
+    let change = task_document(observed, Read::RedChangeEnded);
+    let merge = text(change, "/result/value/change/words/bytes");
+    let result = format!("Result from task {RED_CHANGE}:");
+    step_check(
+        &mut misses,
+        "6.4",
+        !merge.is_empty()
+            && plan_deliveries(observed, Agent::RedOwner, &result) == 1
+            && observed
+                .told
+                .iter()
+                .filter(|t| t.agent == Agent::RedOwner)
+                .any(|t| user_words(t).any(|words| contains(words, &result) && contains(words, &merge)))
+            && number(task_document(observed, Read::RedOwnerEnded), "/goal") == Some(RED_OWNER),
+        RED_RESULT,
+        "tracked A1 must hear a4's actual merge result exactly once, after that merge",
+    );
+    misses
+}
+
+fn red_landings(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{
+        RED_A4, RED_A4_FILE, RED_A4_PULL, RED_BASE, RED_CHANGE, RED_DIRECTOR, RED_FILE, RED_FIRST_HEAD, RED_REPAIR,
+        RED_REPAIR_PULL, RED_UPDATED_HEAD,
+    };
+    use skein_fake_forge_domain::{Observation, api};
+    let records = &observed.kit.records;
+    let pushes: Vec<_> = records
+        .iter()
+        .enumerate()
+        .filter_map(|(at, record)| {
+            let Observation::Moved { repository, branch, to, by, .. } = record else { return None };
+            (repository.as_ref() == b"acme/app" && branch.as_ref() == b"main" && *by == crate::forge::OTHER)
+                .then_some((at, *to))
+        })
+        .collect();
+    let merges: Vec<_> = records
+        .iter()
+        .enumerate()
+        .filter_map(|(at, record)| {
+            let Observation::Merged { repository, base, number, head, commit, .. } = record else { return None };
+            Some((at, repository.as_ref(), base.as_ref(), *number, *head, *commit))
+        })
+        .collect();
+    let green = |at: usize, head: u64| {
+        records[..at].iter().rev().find_map(|record| {
+            let Observation::Reported { repository, commit, context, state, .. } = record else { return None };
+            (repository.as_ref() == b"acme/app" && *commit == head && context.as_ref() == b"check").then_some(*state)
+        }) == Some(api::Check::Passed)
+    };
+    let pull_for = |task: u64, root: u64| {
+        observed.kit.pulls.iter().find(|pull| pull.branch == format!("temper/{root}/c{task}").as_bytes())
+    };
+    let repair = pull_for(RED_REPAIR, RED_REPAIR);
+    let a4 = pull_for(RED_CHANGE, RED_DIRECTOR);
+    let opened_before_push = a4.is_some_and(|pull| {
+        pushes.first().is_some_and(|(pushed, _)| {
+            records[..*pushed].iter().any(|record| {
+                matches!(record,
+            Observation::Opened { number, branches: Some(_), .. } if *number == pull.number)
+            })
+        })
+    });
+    step_check(
+        misses,
+        "6.4",
+        pushes.len() == 1
+            && merges.len() == 2
+            && opened_before_push
+            && pushes.first().zip(merges.first()).is_some_and(|((pushed, red), first)| {
+                *pushed < first.0
+                    && records[*pushed..first.0].iter().any(|record| {
+                        matches!(record,
+                Observation::Reported { commit, state: api::Check::Failed, .. } if commit == red)
+                    })
+            })
+            && repair.is_some_and(|pull| {
+                pull.number == RED_REPAIR_PULL
+                    && merges.first().is_some_and(|m| m.3 == pull.number && pull.landed == Some(m.5))
+            })
+            && a4.is_some_and(|pull| {
+                pull.number == RED_A4_PULL
+                    && merges.get(1).is_some_and(|m| m.3 == pull.number && pull.landed == Some(m.5))
+            }),
+        RED_ORDER,
+        "the person's failed main push must precede exactly two forge-ordered merges: repair, then a4",
+    );
+    step_check(
+        misses,
+        "6.4",
+        merges.len() == 2
+            && observed.kit.pulls.len() == 2
+            && observed.kit.merged_green
+            && a4.is_some_and(|pull| pull.opened == RED_FIRST_HEAD && pull.merged_head == Some(RED_UPDATED_HEAD))
+            && merges.iter().all(|m| m.1 == b"acme/app" && m.2 == b"main" && green(m.0, m.4))
+            && [(repair, Read::RedRepairEnded), (a4, Read::RedChangeEnded)].iter().all(|(pull, read)| {
+                pull.is_some_and(|pull| {
+                    pull.merged
+                        && pull.landed.is_some_and(|commit| {
+                            text(task_document(observed, *read), "/result/value/change/words/bytes")
+                                == direction_commit(commit)
+                        })
+                })
+            }),
+        RED_LANDING,
+        "each merge must use its green head and identify its task's result",
+    );
+    step_check(
+        misses,
+        "6.4",
+        observed.kit.main.get(RED_FILE.as_bytes()).is_some_and(|bytes| bytes == RED_BASE.as_bytes())
+            && observed.kit.main.get(RED_A4_FILE.as_bytes()).is_some_and(|bytes| bytes == RED_A4.as_bytes()),
+        RED_LANDING,
+        "main holds the repair and a4's story files",
+    );
+}
+
+fn red_repair(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{Agent, PROJECT, RED_CHANGE, RED_REPAIR, RED_REPAIR_CODER, RED_REVIEW};
+    let repair = task_document(observed, Read::RedRepairPending);
+    let final_repair = task_document(observed, Read::RedRepairEnded);
+    let agents = [Agent::RedDirector, Agent::RedOwner, Agent::RedCoder, Agent::RedRepairCoder, Agent::Review];
+    let delegates: Vec<_> =
+        agents.into_iter().flat_map(|agent| plan_tool_results(observed, agent, b"delegate")).collect();
+    let paused = task_document(observed, Read::RedChangePaused);
+    let opened = task_document(observed, Read::RedChangeOpen);
+    let roots = document(observed, Read::RedRootsEnded);
+    let pending = document(observed, Read::RedRootsPending);
+    step_check(
+        misses,
+        "6.4",
+        pending.pointer("/tasks/more") == Some(&Value::Bool(false))
+            && pending.pointer("/tasks/rows").and_then(Value::as_array).is_some_and(|rows| {
+                let repairs: Vec<_> =
+                    rows.iter().filter(|row| row.pointer("/requester/deployment").is_some()).collect();
+                repairs.len() == 1
+                    && number(repairs[0], "/chip/task") == Some(RED_REPAIR)
+                    && number(repairs[0], "/requester/deployment/project") == Some(PROJECT)
+            }),
+        RED_DEPLOYMENT,
+        "one deployment repair among the pending roots",
+    );
+    step_check(
+        misses,
+        "6.4",
+        roots.get("live").and_then(Value::as_array).is_some_and(Vec::is_empty)
+            && roots.get("live_after") == Some(&Value::Null)
+            && roots.pointer("/ended/rows/after") == Some(&Value::Null)
+            && roots.pointer("/ended/rows/rows").and_then(Value::as_array).is_some_and(Vec::is_empty),
+        RED_DEPLOYMENT,
+        "no live or ended roots after",
+    );
+    step_check(
+        misses,
+        "6.4",
+        [repair, final_repair].iter().all(|doc| {
+            number(doc, "/chip/task") == Some(RED_REPAIR)
+                && number(doc, "/project") == Some(PROJECT)
+                && doc.pointer("/requester/task").is_none()
+                && number(doc, "/requester/deployment/project") == Some(PROJECT)
+                && text(doc, "/spec/specification/words/bytes") == "Repair landing branch CI"
+        }),
+        RED_DEPLOYMENT,
+        "the repair's documents name the deployment and its words",
+    );
+    step_check(
+        misses,
+        "6.4",
+        delegates.len() == 2
+            && delegates.iter().all(|(_, args, output)| {
+                !contains(output, &format!("Delegated tasks: {RED_REPAIR}"))
+                    && args["batch"].as_array().is_some_and(|batch| {
+                        batch.len() == 1 && batch[0]["spec"]["words"] != "Repair landing branch CI"
+                    })
+            }),
+        RED_DEPLOYMENT,
+        "two agent delegations, none making the repair",
+    );
+    step_check(
+        misses,
+        "6.4",
+        batch_writing(observed, Read::RedRepairWriting, RED_REPAIR_CODER, Read::RedRepairCoderEnded),
+        RED_DEPLOYMENT,
+        "the repair coder writing",
+    );
+    step_check(
+        misses,
+        "6.4",
+        batch_writing(observed, Read::RedReviewWriting, RED_REVIEW, Read::RedReviewEnded),
+        RED_DEPLOYMENT,
+        "the review writing",
+    );
+    for (doc, what) in
+        [(opened, "a4 idle with no result at its open read"), (paused, "a4 idle with no result at its paused read")]
+    {
+        step_check(
+            misses,
+            "6.4",
+            number(doc, "/chip/task") == Some(RED_CHANGE)
+                && number(doc, "/project") == Some(PROJECT)
+                && text(doc, "/chip/phase") == "idle"
+                && doc.get("result") == Some(&Value::Null),
+            RED_DEPLOYMENT,
+            what,
+        );
+    }
+}
+
+// A subscribe and wait can share a completion. Its acknowledgement then
+// first appears in the query carrying A1's report: order the actual messages
+// within that query, retaining the call identity and the successful reply.
+fn red_timer_ack_before_report(told: &Told) -> bool {
+    use skein_fake_llm_domain::api::{Part, Role};
+    let mut subscriptions = BTreeSet::new();
+    let mut acknowledged = false;
+    for message in &told.history {
+        for part in &message.parts {
+            match part {
+                Part::ToolCall { id, name, .. } if message.role == Role::Assistant && name.as_ref() == b"subscribe" => {
+                    subscriptions.insert(id.as_ref());
+                }
+                Part::Text { text } if message.role == Role::User && contains(text, super::RED_OWNER_REPORT) => {
+                    return acknowledged;
+                }
+                Part::ToolOutput { id, output, .. } if message.role == Role::User => {
+                    if contains(output, super::RED_OWNER_REPORT) {
+                        return acknowledged;
+                    }
+                    if subscriptions.contains(id.as_ref())
+                        && contains(output, &format!("Subscription {} added", super::RED_TIMER))
+                    {
+                        acknowledged = true;
+                    }
+                }
+                Part::Opaque { .. } | Part::Text { .. } | Part::ToolCall { .. } | Part::ToolOutput { .. } => {}
+            }
+        }
+    }
+    false
+}
+
+fn red_timer(observed: &Observed, misses: &mut Vec<Miss>) {
+    use super::{Agent, RED_DIRECTOR, RED_MESSAGE, RED_OWNER_REPORT, RED_PERSON_MESSAGE, RED_TIMER, RED_TIMER_AT};
+    let armed = task_document(observed, Read::RedTimerArmed);
+    let ended = task_document(observed, Read::RedDirectorEnded);
+    let added = plan_tool_results(observed, Agent::RedDirector, b"subscribe");
+    let removed = plan_tool_results(observed, Agent::RedDirector, b"unsubscribe");
+    let subscription = added
+        .first()
+        .and_then(|(_, _, output)| std::str::from_utf8(output).ok())
+        .and_then(|output| output.strip_prefix("Subscription "))
+        .and_then(|tail| tail.split_whitespace().next())
+        .and_then(|number| number.parse::<u64>().ok());
+    let request_at = observed
+        .told
+        .iter()
+        .position(|t| t.agent == Agent::RedDirector && user_words(t).any(|words| contains(words, RED_MESSAGE)));
+    let report_at = observed
+        .told
+        .iter()
+        .position(|t| t.agent == Agent::RedDirector && user_words(t).any(|words| contains(words, RED_OWNER_REPORT)));
+    step_check(
+        misses,
+        "6.4",
+        check_activity(observed, Read::RedTimerArmed)
+            .iter()
+            .filter(|row| {
+                number(row, "/line/words/message") == Some(RED_PERSON_MESSAGE)
+                    && text(row, "/line/words/words") == RED_MESSAGE
+            })
+            .count()
+            == 1
+            && plan_deliveries(observed, Agent::RedDirector, RED_MESSAGE) == 1
+            && plan_deliveries(observed, Agent::RedDirector, RED_OWNER_REPORT) == 1
+            && subscription == Some(RED_TIMER)
+            && added.len() == 1
+            && removed.len() == 1
+            && added.first().zip(removed.first()).is_some_and(|((at, args, _), (later, remove, output))| {
+                request_at.is_some_and(|request| request <= *at)
+                    && report_at.is_some_and(|report| {
+                        report <= *later
+                            && (*at < report || (*at == report && red_timer_ack_before_report(&observed.told[report])))
+                    })
+                    && at < later
+                    && args["kind"] == "timer"
+                    && args["at"] == RED_TIMER_AT
+                    && remove["subscription"].as_u64() == subscription
+                    && contains(output, "Subscription removed")
+            })
+            && number(armed, "/chip/task") == Some(RED_DIRECTOR)
+            && armed.pointer("/subscriptions/entries").and_then(Value::as_array).is_some_and(|entries| {
+                entries.len() == 1
+                    && number(&entries[0], "/number") == subscription
+                    && number(&entries[0], "/kind/timer/at") == Some(RED_TIMER_AT)
+                    && entries[0].pointer("/kind/timer/period") == Some(&Value::Null)
+            })
+            && ended.pointer("/subscriptions/entries").and_then(Value::as_array).is_some_and(Vec::is_empty),
+        RED_INTERIM,
+        "the subscription returned by subscribe must be armed during the pause and removed after A1 reports",
+    );
+}
+
+#[cfg(test)]
+mod red_tests {
+    use super::*;
+    use crate::case::*;
+    use serde_json::json;
+    use skein_fake_forge_domain::{Observation, api};
+    use skein_fake_llm_domain::api::{Message, Part, Role};
+
+    fn input(words: &str) -> Message {
+        Message { role: Role::User, parts: Box::new([Part::Text { text: words.as_bytes().into() }]) }
+    }
+    fn tool(id: &str, name: &str, args: &Value, output: &str) -> [Message; 2] {
+        [
+            Message {
+                role: Role::Assistant,
+                parts: Box::new([Part::ToolCall {
+                    id: id.as_bytes().into(),
+                    name: name.as_bytes().into(),
+                    arguments: serde_json::to_vec(args).expect("args").into(),
+                }]),
+            },
+            Message {
+                role: Role::User,
+                parts: Box::new([Part::ToolOutput {
+                    id: id.as_bytes().into(),
+                    output: output.as_bytes().into(),
+                    is_error: false,
+                }]),
+            },
+        ]
+    }
+    fn told(agent: Agent, history: &[Message]) -> Told {
+        Told::new(agent.cue(), b"fake", None, history).expect("cue")
+    }
+    fn journal(task: u64, lines: &[Value]) -> Value {
+        let rows: Vec<_> = lines
+            .iter()
+            .enumerate()
+            .rev()
+            .map(|(at, line)| json!({"event":{"owner":{"source":{"task":task,"position":at+1,"line":line}}}}))
+            .collect();
+        json!({"rows":rows,"cut":false,"before":null,"after":null})
+    }
+    fn met_documents() -> BTreeMap<Read, Value> {
+        let mut documents = BTreeMap::new();
+        for (read, task, parent) in red_tasks() {
+            documents.insert(read, json!({"task":{
+                "chip":{"task":task,"phase":"ended"},"project":PROJECT,"spec_revision":{"value":RED_REVISION},
+                "requester":if task == RED_REPAIR {json!({"deployment":{"project":PROJECT}})} else {json!({"task":parent})},
+                "goal":RED_OWNER,"spec":{"specification":{"words":{"bytes":"Repair landing branch CI"}}},
+                "subscriptions":{"entries":[]},
+                "result":{"ending":{"task":{"done":{}}},"value":{"change":{"words":{"bytes":direction_commit(if task == RED_REPAIR {5} else {7})}}}}
+            },"activity":journal(task, &[
+                json!({"run_began":{"attempt":1}}),json!({"run_ended":{"attempt":1,"end":"finished","spent":1}})
+            ])}));
+        }
+        for (read, task) in [(Read::RedReviewWriting, RED_REVIEW), (Read::RedRepairWriting, RED_REPAIR_CODER)] {
+            documents.insert(
+                read,
+                json!({"task":{"chip":{"task":task,"phase":"running","details":{"owner":{
+                    "phase":{"active":{"running":{"attempt":1}}},"details":{"observation":{"work":"writing"}}
+                }}}}}),
+            );
+        }
+        for read in [Read::RedChangeOpen, Read::RedChangePaused] {
+            documents.insert(
+                read,
+                json!({"task":{"chip":{"task":RED_CHANGE,"phase":"idle"},"project":PROJECT,"result":null}}),
+            );
+        }
+        documents.insert(Read::RedRepairPending, documents[&Read::RedRepairEnded].clone());
+        documents.insert(
+            Read::RedTimerArmed,
+            json!({"task":{"chip":{"task":RED_DIRECTOR},"subscriptions":{"entries":[
+                {"number":RED_TIMER,"kind":{"timer":{"at":RED_TIMER_AT,"period":null}}}
+            ]}}}),
+        );
+        documents.insert(
+            Read::RedRootsEnded,
+            json!({"live":[],"live_after":null,"ended":{"rows":{
+                "after":null,"rows":[]
+            }}}),
+        );
+        let director_lines = [
+            json!({"run_began":{"attempt":1}}),
+            json!({"words":{"message":RED_PERSON_MESSAGE,"words":RED_MESSAGE}}),
+            json!({"run_ended":{"attempt":1,"end":"finished","spent":1}}),
+        ];
+        documents.get_mut(&Read::RedTimerArmed).expect("timer")["activity"] = journal(RED_DIRECTOR, &director_lines);
+        documents.get_mut(&Read::RedDirectorEnded).expect("director")["activity"] =
+            journal(RED_DIRECTOR, &director_lines);
+        documents.get_mut(&Read::RedDirectorEnded).expect("director")["task"]["activity"] = json!(3);
+        documents.insert(
+            Read::RedRootsPending,
+            json!({"tasks":{"more":false,"rows":[{
+                "chip":{"task":RED_REPAIR},"requester":{"deployment":{"project":PROJECT}}
+            }]}}),
+        );
+        documents
+    }
+    fn met_kit() -> Kit {
+        let repo: Box<[u8]> = b"acme/app".as_slice().into();
+        let mut records = vec![
+            Observation::Moved {
+                repository: repo.clone(),
+                branch: b"main".as_slice().into(),
+                from: Some(1),
+                to: 3,
+                by: crate::forge::OTHER,
+            },
+            Observation::Reported {
+                repository: repo.clone(),
+                commit: 3,
+                context: b"check".as_slice().into(),
+                state: api::Check::Failed,
+                by: 1,
+            },
+            Observation::Reported {
+                repository: repo.clone(),
+                commit: 4,
+                context: b"check".as_slice().into(),
+                state: api::Check::Passed,
+                by: 1,
+            },
+            Observation::Merged {
+                repository: repo.clone(),
+                base: b"main".as_slice().into(),
+                number: RED_REPAIR_PULL,
+                head: 4,
+                commit: 5,
+                by: 1,
+            },
+            Observation::Reported {
+                repository: repo.clone(),
+                commit: 6,
+                context: b"check".as_slice().into(),
+                state: api::Check::Passed,
+                by: 1,
+            },
+            Observation::Merged {
+                repository: repo,
+                base: b"main".as_slice().into(),
+                number: RED_A4_PULL,
+                head: 6,
+                commit: 7,
+                by: 1,
+            },
+        ];
+        records.insert(
+            0,
+            Observation::Opened {
+                repository: b"acme/app".as_slice().into(),
+                number: RED_A4_PULL,
+                kind: api::Kind::Pull,
+                title: Box::new([]),
+                body: Box::new([]),
+                labels: Box::new([]),
+                branches: Some(skein_fake_forge_domain::Branches {
+                    head: format!("temper/{RED_DIRECTOR}/c{RED_CHANGE}").into_bytes().into(),
+                    base: b"main".as_slice().into(),
+                    commit: 2,
+                }),
+                by: 1,
+            },
+        );
+        let pulls = [(RED_CHANGE, RED_DIRECTOR, RED_A4_PULL, 6, 7), (RED_REPAIR, RED_REPAIR, RED_REPAIR_PULL, 4, 5)]
+            .into_iter()
+            .map(|(task, root, number, head, merge)| Pull {
+                number,
+                branch: format!("temper/{root}/c{task}").into_bytes(),
+                opened: if task == RED_CHANGE { RED_FIRST_HEAD } else { head },
+                pushed: Some(head),
+                landed: Some(merge),
+                merged_head: Some(head),
+                merged: true,
+                closed: false,
+                deleted: None,
+            })
+            .collect();
+        Kit {
+            records,
+            pulls,
+            merged_green: true,
+            main: BTreeMap::from([
+                (RED_FILE.as_bytes().to_vec(), RED_BASE.as_bytes().to_vec()),
+                (RED_A4_FILE.as_bytes().to_vec(), RED_A4.as_bytes().to_vec()),
+            ]),
+        }
+    }
+    fn met_queries() -> Vec<Told> {
+        let mut director = Vec::new();
+        director.extend(tool(
+            "owner",
+            "delegate",
+            &json!({"batch":[{"spec":{"words":RED_OWNER_SPEC}}]}),
+            &format!("Delegated tasks: {RED_OWNER}"),
+        ));
+        let mut queries = vec![told(Agent::RedDirector, &director)];
+        director.push(input(RED_MESSAGE));
+        director.extend(tool(
+            "timer",
+            "subscribe",
+            &json!({"kind":"timer","at":RED_TIMER_AT}),
+            &format!("Subscription {RED_TIMER} added"),
+        ));
+        queries.push(told(Agent::RedDirector, &director));
+        director.push(input(RED_OWNER_REPORT));
+        director.extend(tool("remove", "unsubscribe", &json!({"subscription":RED_TIMER}), "Subscription removed"));
+        queries.push(told(Agent::RedDirector, &director));
+        let mut owner = Vec::from(tool(
+            "a4",
+            "delegate",
+            &json!({"batch":[{"spec":{"words":RED_CHANGE_SPEC}}]}),
+            &format!("Delegated tasks: {RED_CHANGE}"),
+        ));
+        queries.push(told(Agent::RedOwner, &owner));
+        owner.push(input(&format!("Result from task {RED_CHANGE}:\n{}", direction_commit(7))));
+        queries.push(told(Agent::RedOwner, &owner));
+        queries
+    }
+    fn met() -> Observed {
+        Observed { documents: met_documents(), told: met_queries(), commands: Vec::new(), kit: met_kit() }
+    }
+    fn rejects(observed: &Observed, promise: Promise) {
+        assert!(
+            step_6_4(observed).iter().any(|miss| miss.step == "6.4" && miss.promise == promise),
+            "mutation must fail {promise:?}"
+        );
+    }
+    #[test]
+    fn red_observation_meets_the_step() {
+        assert_met(&step_6_4(&met()));
+    }
+    #[test]
+    fn missing_reversed_extra_or_premature_merges_fail() {
+        for mutation in 0..6 {
+            let mut bad = met();
+            match mutation {
+                0 => {
+                    bad.kit.records.remove(0);
+                }
+                1 => {
+                    bad.kit.records.swap(4, 6);
+                }
+                2 => {
+                    bad.kit.records.insert(3, bad.kit.records[6].clone());
+                }
+                3 => {
+                    bad.kit.records.swap(1, 4);
+                }
+                4 => {
+                    bad.kit.records.remove(2);
+                }
+                _ => {
+                    bad.kit.pulls[1].landed = Some(99);
+                }
+            }
+            rejects(&bad, RED_ORDER);
+        }
+    }
+    #[test]
+    fn each_head_must_have_passed_ci_before_its_own_merge() {
+        for at in [3, 5] {
+            let mut bad = met();
+            if let Observation::Reported { state, .. } = &mut bad.kit.records[at] {
+                *state = api::Check::Failed;
+            }
+            rejects(&bad, RED_LANDING);
+            let mut bad = met();
+            bad.kit.records.swap(at, at + 1);
+            rejects(&bad, RED_LANDING);
+        }
+        for read in [Read::RedChangeEnded, Read::RedRepairEnded] {
+            let mut bad = met();
+            bad.documents.get_mut(&read).expect("task")["task"]["result"]["value"]["change"]["words"]["bytes"] =
+                json!("wrong commit");
+            rejects(&bad, RED_LANDING);
+        }
+        let mut bad = met();
+        bad.kit.main.clear();
+        rejects(&bad, RED_LANDING);
+    }
+    #[test]
+    fn only_a_deployment_repair_with_no_agent_delegation_is_accepted() {
+        for read in [Read::RedRepairPending, Read::RedRepairEnded] {
+            for requester in [json!({"task":RED_OWNER}), json!({"deployment":{"project":99}}), Value::Null] {
+                let mut bad = met();
+                bad.documents.get_mut(&read).expect("task")["task"]["requester"] = requester;
+                rejects(&bad, RED_DEPLOYMENT);
+            }
+        }
+        let mut bad = met();
+        bad.told.push(told(
+            Agent::RedOwner,
+            &tool(
+                "repair",
+                "delegate",
+                &json!({"batch":[{"spec":{"words":"Repair landing branch CI"}}]}),
+                &format!("Delegated tasks: {RED_REPAIR}"),
+            ),
+        ));
+        rejects(&bad, RED_DEPLOYMENT);
+        let mut bad = met();
+        bad.documents.get_mut(&Read::RedChangePaused).expect("a4")["task"]["chip"]["phase"] = json!("ended");
+        rejects(&bad, RED_DEPLOYMENT);
+    }
+    #[test]
+    fn another_deployment_repair_or_a_partial_task_list_fails() {
+        let mut bad = met();
+        let extra = bad.documents[&Read::RedRootsPending]["tasks"]["rows"][0].clone();
+        bad.documents.get_mut(&Read::RedRootsPending).expect("pending")["tasks"]["rows"]
+            .as_array_mut()
+            .expect("live")
+            .push(extra);
+        rejects(&bad, RED_DEPLOYMENT);
+        let mut bad = met();
+        bad.documents.get_mut(&Read::RedRootsPending).expect("pending")["tasks"]["more"] = json!(true);
+        rejects(&bad, RED_DEPLOYMENT);
+    }
+    #[test]
+    fn a1_must_hear_the_actual_landed_result_once() {
+        let mut bad = met();
+        bad.told.pop();
+        rejects(&bad, RED_RESULT);
+        let mut bad = met();
+        bad.told
+            .push(told(Agent::RedOwner, &[input(&format!("Result from task {RED_CHANGE}:\n{}", direction_commit(7)))]));
+        rejects(&bad, RED_RESULT);
+        let mut bad = met();
+        bad.told.last_mut().expect("result").history.last_mut().expect("message").parts =
+            input("Result from task 3: not a merge").parts;
+        rejects(&bad, RED_RESULT);
+    }
+    #[test]
+    fn a_batched_timer_reply_must_precede_the_report_within_the_same_query() {
+        let mut observed = met();
+        let mut batched = observed.told[2].clone();
+        // The subscription reply and A1's report are now in the same query;
+        // the next query still supplies unsubscribe's successful result.
+        batched.history = batched.history[..6].into();
+        observed.told[1] = batched;
+        assert_met(&step_6_4(&observed));
+        for told in observed.told.iter_mut().filter(|told| told.agent == Agent::RedDirector) {
+            if told.history.len() >= 6 {
+                told.history.swap(4, 5);
+            }
+        }
+        rejects(&observed, RED_INTERIM);
+    }
+
+    #[test]
+    fn timer_requires_its_returned_number_armed_read_and_removal() {
+        for path in [
+            "/task/chip/task",
+            "/task/subscriptions/entries/0/number",
+            "/task/subscriptions/entries/0/kind/timer/at",
+            "/task/subscriptions/entries/0/kind/timer/period",
+        ] {
+            let mut bad = met();
+            *bad.documents.get_mut(&Read::RedTimerArmed).expect("timer").pointer_mut(path).expect("field") = json!(99);
+            rejects(&bad, RED_INTERIM);
+        }
+        let mut bad = met();
+        bad.documents.get_mut(&Read::RedDirectorEnded).expect("director")["task"]["subscriptions"] =
+            bad.documents[&Read::RedTimerArmed]["task"]["subscriptions"].clone();
+        rejects(&bad, RED_INTERIM);
+        let mut bad = met();
+        bad.told.remove(2);
+        rejects(&bad, RED_INTERIM);
+    }
+    #[test]
+    fn each_agents_attempts_must_be_complete_and_without_failure() {
+        for (read, task, _) in red_tasks().into_iter().filter(|(_, task, _)| *task != RED_CHANGE && *task != RED_REPAIR)
+        {
+            for end in [json!({"failed":{}}), json!("refused"), Value::Null] {
+                let mut bad = met();
+                bad.documents.get_mut(&read).expect("task")["activity"] = journal(
+                    task,
+                    &[json!({"run_began":{"attempt":1}}), json!({"run_ended":{"attempt":1,"end":end,"spent":1}})],
+                );
+                rejects(&bad, RED_ATTEMPTS);
+            }
+            let mut bad = met();
+            bad.documents.get_mut(&read).expect("task")["activity"]["cut"] = json!(true);
+            rejects(&bad, RED_ATTEMPTS);
+            let mut bad = met();
+            bad.documents.get_mut(&read).expect("task")["activity"]["rows"].as_array_mut().expect("rows").pop();
+            if task == RED_DIRECTOR {
+                bad.documents.get_mut(&Read::RedTimerArmed).expect("timer")["activity"]["rows"]
+                    .as_array_mut()
+                    .expect("rows")
+                    .pop();
+            }
+            rejects(&bad, RED_ATTEMPTS);
+        }
+    }
+    #[test]
+    fn each_task_identity_and_each_held_checkpoint_is_required() {
+        for (read, _, parent) in red_tasks() {
+            for path in [
+                "/task/chip/task",
+                "/task/project",
+                "/task/spec_revision/value",
+                "/task/chip/phase",
+                "/task/requester/task",
+            ] {
+                if parent == 0 && path == "/task/requester/task" {
+                    continue;
+                }
+                let mut bad = met();
+                *bad.documents.get_mut(&read).expect("task").pointer_mut(path).expect("identity") = Value::Null;
+                rejects(&bad, RED_DEPLOYMENT);
+            }
+        }
+        for read in [Read::RedReviewWriting, Read::RedRepairWriting] {
+            for path in [
+                "/task/chip/task",
+                "/task/chip/phase",
+                "/task/chip/details/owner/details/observation/work",
+                "/task/chip/details/owner/phase/active/running/attempt",
+            ] {
+                let mut bad = met();
+                *bad.documents.get_mut(&read).expect("writing").pointer_mut(path).expect("field") = Value::Null;
+                rejects(&bad, RED_DEPLOYMENT);
+            }
+        }
+        for path in ["/live_after", "/ended/rows/after"] {
+            let mut bad = met();
+            *bad.documents.get_mut(&Read::RedRootsEnded).expect("roots").pointer_mut(path).expect("field") = json!(99);
+            rejects(&bad, RED_DEPLOYMENT);
+        }
+    }
+    #[test]
+    fn only_unspent_uncommitted_rechecks_followed_by_a_finished_attempt_are_allowed() {
+        for (read, task, _) in red_tasks().into_iter().filter(|(_, task, _)| *task != RED_CHANGE && *task != RED_REPAIR)
+        {
+            let mut lines = vec![
+                json!({"run_began":{"attempt":8}}),
+                json!({"run_ended":{"attempt":8,"end":"refused","spent":0}}),
+                json!({"run_began":{"attempt":1}}),
+                json!({"run_ended":{"attempt":1,"end":"finished","spent":1}}),
+            ];
+            if task == RED_DIRECTOR {
+                lines.push(json!({"words":{"message":RED_PERSON_MESSAGE,"words":RED_MESSAGE}}));
+            }
+            let mut accepted = met();
+            accepted.documents.get_mut(&read).expect("task")["activity"] = journal(task, &lines);
+            if task == RED_DIRECTOR {
+                accepted.documents.get_mut(&read).expect("director")["task"]["activity"] = json!(5);
+            }
+            if task == RED_DIRECTOR {
+                accepted.documents.get_mut(&Read::RedTimerArmed).expect("timer")["activity"] = journal(task, &lines);
+            }
+            assert_met(&step_6_4(&accepted));
+            for mutation in 0..3 {
+                let mut bad = accepted.clone();
+                let mut changed = lines.clone();
+                match mutation {
+                    0 => changed[1]["run_ended"]["spent"] = json!(1),
+                    1 => changed.truncate(2),
+                    _ => changed.insert(1, json!({"turn":{"attempt":8,"turn":1}})),
+                }
+                bad.documents.get_mut(&read).expect("task")["activity"] = journal(task, &changed);
+                if task == RED_DIRECTOR {
+                    bad.documents.get_mut(&Read::RedTimerArmed).expect("timer")["activity"] = journal(task, &changed);
+                }
+                rejects(&bad, RED_ATTEMPTS);
+            }
         }
     }
 }
