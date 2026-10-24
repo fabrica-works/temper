@@ -1,7 +1,8 @@
 forge-connect F github-app ID FILE --key NAME
 forge-connect F github --key NAME
-forge-connect F forgejo|forgejo-admin FILE --key NAME
-Connect GitHub through a manifest or an existing App
+forge-connect F forgejo FILE --key NAME
+forge-connect F forgejo-admin FILE [--first ORG/NAME] [--project P] [--label L] --key NAME
+Connect GitHub or Forgejo as its admin
 Result: forge-connect
   forge: Forge number
   way: An existing GitHub App
@@ -12,3 +13,9 @@ Result: forge-connect
   forge: Forge number
   way: Not offered yet
   file: Not offered yet; no file is read
+  forge: Forge number
+  way: A Forgejo site admin
+  file: Private admin token file; at most 4090 bytes
+  first: Make the first repository
+  project: Project name or number; default a new project named NAME
+  label: Runner label; default docker

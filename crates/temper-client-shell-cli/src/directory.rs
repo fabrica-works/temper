@@ -300,7 +300,9 @@ impl Directory {
             }
             file::Event::Opened { .. } => self.stage = Stage::KeyStat,
             file::Event::Stated { stat, .. } => {
-                if stat.kind != skein_io::kernel::Kind::File || stat.owner != self.user || stat.mode & 0o077 != 0 {
+                if stat.mode & 0o077 != 0 {
+                    self.fail(format!("key file mode {:#o} permits group or other access", stat.mode).as_bytes());
+                } else if stat.kind != skein_io::kernel::Kind::File || stat.owner != self.user {
                     self.fail(b"key file must be a private regular file owned by this user");
                 } else if stat.size > u64::from(self.link_max) {
                     self.fail(b"key file is too large");

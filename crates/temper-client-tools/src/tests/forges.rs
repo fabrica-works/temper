@@ -12,6 +12,8 @@ use temper_client_domain::forge::{
 use temper_client_protocol_wire::{self as wire, v1 as w};
 fn row(connection: C) -> Row {
     Row {
+        admin: false,
+        ended_stop: None,
         web: None,
         repositories: Box::new([]),
         installations: Box::new([]),
@@ -36,6 +38,8 @@ fn record_first(connection: w::Connection, first: Option<w::FirstRepository>) ->
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    admin: false,
+                    ended_stop: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,
@@ -388,6 +392,7 @@ fn first_record(state: w::FirstState) -> w::FirstRepository {
     w::FirstRepository::new(
         &w::CEILINGS,
         w::FirstRepositoryParts {
+            label: b"docker".as_slice().into(),
             org: b"work".as_slice().into(),
             repository: b"hello".as_slice().into(),
             project: w::SetUpProject::Existing(
@@ -574,6 +579,7 @@ fn made_wait_requires_the_named_forges_first_repository_to_be_made() {
     assert_eq!(root.closed.len(), 1);
     let mut row = row(C::Connecting);
     row.first = Some(forge::forges::First {
+        label: b"docker".as_slice().into(),
         org: b"work".as_slice().into(),
         repository: b"hello".as_slice().into(),
         project: forge::forges::SetUpProject::Existing(1),
@@ -610,6 +616,7 @@ fn first_repository_text_and_json_name_every_state_and_creation_step() {
     ] {
         let mut row = row(C::Connecting);
         row.first = Some(First {
+            label: b"docker".as_slice().into(),
             org: b"work".as_slice().into(),
             repository: b"hello".as_slice().into(),
             project: SetUpProject::Existing(1),
@@ -766,6 +773,8 @@ fn settled_wait_with_installations(count: u32) {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    admin: false,
+                    ended_stop: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,
@@ -914,6 +923,8 @@ fn human_forges_bounds_the_wire_maximum_installations_with_longest_logins() {
             w::ForgeRow::new(
                 &bounds,
                 w::ForgeRowParts {
+                    admin: false,
+                    ended_stop: None,
                     web: None,
                     repositories: List::with_capacity(0),
                     app: None,

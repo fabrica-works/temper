@@ -167,3 +167,57 @@ fn an_app_key_strips_one_final_lf_and_reserves_six_bytes_for_the_bundle() {
         }
     }
 }
+
+const ADMIN: &[&[u8]] = &[b"forge-connect", b"3", b"forgejo-admin", b"/linked-parent/link-file", b"--key", b"admin"];
+const ADMIN_TOKEN: &[u8] = b"admin-token-placeholder-0123";
+
+fn no_admin_token(f: &fixtures::Frame) {
+    for bytes in [f.stdout(), f.stderr()] {
+        assert!(skein_lib::bytes::find(bytes, ADMIN_TOKEN).is_none());
+    }
+}
+#[test]
+fn an_admin_token_refuses_every_group_or_other_permission_before_reading() {
+    for permission in [0o040, 0o020, 0o010, 0o004, 0o002, 0o001] {
+        let mut f = fixtures::Frame::act(ADMIN);
+        let mode = 0o600 | permission;
+        f.link = ADMIN_TOKEN;
+        f.input_stat = Some(Stat { kind: Kind::File, mode, owner: 7, size: f.link.len() as u64, links: 1 });
+        f.drain();
+        app_file_refused(&f);
+        assert_eq!(f.input_reads, 0);
+        assert!(skein_lib::bytes::find(f.stderr(), format!("{mode:#o}").as_bytes()).is_some());
+        no_admin_token(&f);
+    }
+}
+#[test]
+fn an_admin_token_strips_one_final_lf_and_carries_item_one_without_printing_it() {
+    for file in
+        [ADMIN_TOKEN, b"admin-token-placeholder-0123\n", b"admin-token-placeholder-0123\n\n", APP_BOUND, APP_NEWLINE]
+    {
+        let mut f = fixtures::Frame::act(ADMIN);
+        f.link = file;
+        f.sign_in_then_deliver_me();
+        let token = file.strip_suffix(b"\n").unwrap_or(file);
+        let mut expected = vec![1, 1, 1, 0];
+        expected.extend_from_slice(&u16::try_from(token.len()).expect("bounded token").to_le_bytes());
+        expected.extend_from_slice(token);
+        assert_eq!(f.carried_keys.len(), 1);
+        assert_eq!(f.carried_keys[0].expose(), expected);
+        assert!(expected.len() <= 4096);
+        no_admin_token(&f);
+        if let Some(store) = f.stored(b"store") {
+            assert!(skein_lib::bytes::find(store, token).is_none());
+        }
+    }
+}
+#[test]
+fn an_admin_token_refuses_empty_and_oversized_files_without_printing_them() {
+    for file in [b"".as_slice(), b"\n", APP_OVER] {
+        let mut f = fixtures::Frame::act(ADMIN);
+        f.link = file;
+        f.drain();
+        app_file_refused(&f);
+        no_admin_token(&f);
+    }
+}
