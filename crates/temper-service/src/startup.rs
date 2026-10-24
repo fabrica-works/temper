@@ -633,12 +633,16 @@ fn checked_start(
         Some(_) => Some(agent.ok_or(problem(indexed(0).member(b"agent"), What::Agent))?),
         None => None,
     };
-    // Only the shell's checked local entry enables a file-free Forgejo.
+    // Only a checked local or client-managed entry enables a file-free Forgejo.
     for (index, forge) in parsed.application.forges.iter().enumerate() {
         let admitted = match setup {
-            Some(checked) => {
-                checked.records_only.contains(&forge.number) && checked.setup.entry(forge.number).is_some()
-            }
+            Some(checked) => match checked.setup.entry(forge.number) {
+                Some(entry) => {
+                    checked.records_only.contains(&forge.number)
+                        || entry.mode == (temper_forge_setup::setup::Mode::Managed { admin_token: None })
+                }
+                None => false,
+            },
             None => false,
         };
         if forge.kind == settings::Kind::Forgejo && forge.records_only && !admitted {

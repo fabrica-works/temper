@@ -147,8 +147,8 @@ pub fn steps(setup: &Setup, flags: &[Box<[u8]>]) -> Steps {
     for e in &setup.entries {
         // Local forges reconcile in serve after taking their handover.
         let reconcile = match &e.mode {
-            Mode::Owned(_) | Mode::Fake(_) => false,
-            Mode::Managed { .. } => true,
+            Mode::Owned(_) | Mode::Fake(_) | Mode::Managed { admin_token: None } => false,
+            Mode::Managed { admin_token: Some(_) } => true,
         };
         if !e.asked && reconcile {
             out.push(forge(b"reconcile", flags, e.forge, None)).expect("step capacity");

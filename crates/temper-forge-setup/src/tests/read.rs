@@ -55,7 +55,10 @@ fn a_fake_entry_reads_every_member_and_joins_data_paths() {
 #[test]
 fn a_managed_entry_reads_its_admin_token_file() {
     let setup = fixtures::setup();
-    assert_eq!(setup.entry(1).unwrap().mode, Mode::Managed { admin_token: b"secrets/forgejo-admin".as_slice().into() });
+    assert_eq!(
+        setup.entry(1).unwrap().mode,
+        Mode::Managed { admin_token: Some(b"secrets/forgejo-admin".as_slice().into()) }
+    );
 }
 #[test]
 fn an_owned_entry_reads_a_null_runner_as_none_and_refuses_a_missing_one() {
@@ -300,7 +303,7 @@ fn setup_paths_join_their_kind_keep_absolute_values_and_refuse_escaping_relative
             "runner" => &owned.runner.as_ref().unwrap().binary,
             "admin" => {
                 let Mode::Managed { admin_token } = &setup.entry(1).unwrap().mode else { panic!("managed") };
-                admin_token
+                admin_token.as_ref().unwrap()
             }
             _ => unreachable!(),
         };

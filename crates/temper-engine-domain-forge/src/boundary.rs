@@ -153,9 +153,18 @@ pub enum Ask {
     Install { forge: u16, back: Option<Box<[u8]>> },
     Reachable { forge: u16, installation: Option<u64>, page: u32 },
 }
-/// The public GitHub connect's input; keys remain carried handles.
+/// The first repository requested when connecting a Forgejo (client/README.md, 8).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct FirstAsk {
+    pub org: Box<[u8]>,
+    pub repository: Box<[u8]>,
+    pub project: SetUpProject,
+    pub label: Box<[u8]>,
+}
+/// The public connect's input; credentials remain carried handles.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum How {
+    ForgejoAdmin { first: Option<FirstAsk> },
     GitHubApp { app: core::num::NonZeroU64 },
     GitHubManifest { back: Option<Box<[u8]>> },
 }

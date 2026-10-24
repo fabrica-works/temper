@@ -118,7 +118,12 @@ pub fn values(
         },
         listener,
         word: skein_lib::bytes::copy_of(b"temper"),
-        admin_name: skein_lib::bytes::copy_of(b"temper-admin"),
+        admin_name: skein_lib::bytes::copy_of(match entry.mode {
+            crate::setup::Mode::Managed { admin_token: None } => b"admin",
+            crate::setup::Mode::Managed { admin_token: Some(_) }
+            | crate::setup::Mode::Owned(_)
+            | crate::setup::Mode::Fake(_) => b"temper-admin",
+        }),
         api_name: skein_lib::bytes::copy_of(b"temper-api"),
         git_name: skein_lib::bytes::copy_of(b"temper-git"),
         limits: limits.clone(),

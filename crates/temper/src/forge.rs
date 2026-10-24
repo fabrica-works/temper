@@ -267,25 +267,30 @@ pub fn reconcile_settings(
 ) -> Result<temper_forge_setup_shell::reconcile::Settings, String> {
     use skein_forge_connection::limits;
     let forge = named.forges.iter().find(|forge| forge.number == number).ok_or("the setup has no entry for it")?;
+    let entry = checked.setup.entry(number).ok_or("the setup has no entry for it")?;
+    let directory = super::path(&entry.directory).to_path_buf();
+    let admin_token = match &entry.mode {
+        Mode::Managed { admin_token: Some(admin_token) } => super::path(admin_token).to_path_buf(),
+        Mode::Managed { admin_token: None } => {
+            return Err(format!(
+                "forge {number}'s admin’s token is given from the client: connect it as its admin there"
+            ));
+        }
+        Mode::Owned(_) | Mode::Fake(_) => directory.join("admin_token"),
+    };
     if !matches!(forge.transport, temper_service::startup::Transport::Plaintext) {
         return Err("its transport is TLS, and reconcile speaks plaintext to loopback alone".into());
     }
-    let entry = checked.setup.entry(number).ok_or("the setup has no entry for it")?;
     if forge.records_only && matches!(entry.mode, Mode::Owned(_) | Mode::Fake(_)) {
         return Err(format!("forge {number} starts from its records: `temper serve` takes its handover"));
     }
     // temper-15 removes the legacy command's file-backed entries.
-    let directory = super::path(&entry.directory).to_path_buf();
     if !directory.exists() {
         fs::DirBuilder::new().recursive(true).mode(0o700).create(&directory).map_err(|why| why.to_string())?;
     }
     super::private_root(&directory, skein_shell::effective_user())
         .map_err(|why| format!("{}: {why}", directory.display()))?;
     let address = super::address(&forge.api)?;
-    let admin_token = match &entry.mode {
-        Mode::Managed { admin_token } => super::path(admin_token).to_path_buf(),
-        Mode::Owned(_) | Mode::Fake(_) => directory.join("admin_token"),
-    };
     let mut profile = temper_service::limits::profile(temper_service::limits::Profile::Small);
     for (name, value) in &named.overrides {
         if !name.starts_with(b"setup.") && !name.starts_with(b"box.") {
