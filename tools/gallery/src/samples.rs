@@ -44,7 +44,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 53;
+pub const N: usize = 55;
 #[must_use]
 fn task(task: u64) -> Address {
     Address::Task { task, filter: PlanFilter::All }
@@ -60,12 +60,7 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "inbox-solo", world: Solo, address: Address::Inbox { filter: Filter::ALL }, then: Shown },
         Sample { name: "task-solo-T3", world: Solo, address: task(3), then: Shown },
         Sample { name: "accounts-solo", world: Solo, address: Address::Accounts, then: Shown },
-        Sample {
-            name: "welcome-first-run-0",
-            world: FirstRun { step: 0 },
-            address: Address::Welcome { step: temper_client_domain::Step::Welcome },
-            then: Shown,
-        },
+        welcome_sample("welcome-first-run-0", temper_client_domain::Step::Welcome),
         Sample { name: "chats-first-run-1", world: FirstRun { step: 1 }, address: CHATS, then: Shown },
         Sample {
             name: "connect-forge-first-run-6",
@@ -88,6 +83,8 @@ pub fn samples() -> [Sample; N] {
         welcome_sample("welcome-model-choose", temper_client_domain::Step::Model { way: None }),
         owned_sample("forge-details", 0, false),
         owned_sample("forge-setting-up-middle", 6, false),
+        owned_sample("forge-setup-failed", 9, false),
+        owned_sample("welcome-setup-failed", 9, true),
         owned_sample("welcome-ready-under-way", 6, true),
         owned_sample("welcome-ready-adopted", 8, true),
         Sample { name: "chats-setup-strip", world: Bare, address: CHATS, then: Shown },
@@ -179,6 +176,9 @@ fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: T
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
     match sample.name {
+        "forge-setup-failed" | "welcome-setup-failed" => {
+            return Some("connect-forge.html?world=first-run&step=6&forge=3&bare#other-states".to_owned());
+        }
         "welcome-forge-choose" => return Some("welcome.html?world=first-run&step=0&at=forge&bare".to_owned()),
         "welcome-forge-details" => return Some("welcome.html?world=first-run&step=0&at=forge&forge=3&bare".to_owned()),
         "welcome-model-choose" => return Some("welcome.html?world=first-run&step=0&at=model&bare".to_owned()),

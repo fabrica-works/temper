@@ -246,7 +246,19 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                     None => None,
                 },
             },
-            w::Connection::SetUpFailed(value) => C::SetUpFailed { why: value.into_parts().why },
+            w::Connection::SetUpFailed(value) => {
+                let value = value.into_parts();
+                C::SetUpFailed {
+                    why: value.why,
+                    at: match value.at {
+                        Some(w::FailedStep::Fetch) => Some(forge::forges::FailedStep::Fetch),
+                        Some(w::FailedStep::Prepare) => Some(forge::forges::FailedStep::Prepare),
+                        Some(w::FailedStep::Run) => Some(forge::forges::FailedStep::Run),
+                        Some(w::FailedStep::Connect) => Some(forge::forges::FailedStep::Connect),
+                        None => None,
+                    },
+                }
+            }
             w::Connection::Connecting => C::Connecting,
             w::Connection::Connected(value) => {
                 let value = value.into_parts();

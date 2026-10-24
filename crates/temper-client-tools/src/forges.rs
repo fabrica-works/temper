@@ -673,7 +673,7 @@ fn encode_rows(rows: &[Row], digest: Option<Digest>, out: &mut Encoder) {
                     });
                 }
             }
-            Connection::SetUpFailed { why } => {
+            Connection::SetUpFailed { why, .. } => {
                 out.string(b"set_up_failed");
                 out.key(b"why");
                 out.string(why);

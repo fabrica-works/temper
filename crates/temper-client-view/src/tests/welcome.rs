@@ -94,7 +94,8 @@ fn model_keeps_github_connecting_until_an_installation_is_accepted() {
 fn model_says_which_setup_failed_and_keeps_its_steps() {
     let view = model_view(forge::rows(
         w::Connection::SetUpFailed(
-            w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into() }).unwrap(),
+            w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into(), at: None })
+                .unwrap(),
         ),
         w::Offer::Offered,
     ));
@@ -134,7 +135,7 @@ fn model_names_the_failed_first_repository_step() {
         ));
         line_before_model(view.tree(), connection);
         each_step(view.tree(), true);
-        forge::words_in_order(view.tree(), &[failed, "failed"]);
+        forge::words_in_order(view.tree(), &["failed", failed]);
         node(view.tree(), Role::Status, "failed");
     }
 }
@@ -589,4 +590,14 @@ fn model_choose_excludes_the_playgrounds_provider_before_and_after_retirement() 
     check(&root);
     super::choice::answer_retired_playground(&mut root, read);
     check(&root);
+}
+
+#[test]
+fn welcome_keeps_failed_setup_steps_at_model_forge_and_ready() {
+    for step in [Step::Model { way: None }, Step::Forge { forge: Some(d::Choice::Forge(HERE)) }, Step::Ready] {
+        for (rows, failed, why) in forge::failure_cases() {
+            let view = f::page_view(&f::forge_root(Address::Welcome { step }, rows));
+            forge::failed_progress(view.tree(), failed, why);
+        }
+    }
 }

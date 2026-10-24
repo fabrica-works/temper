@@ -13,6 +13,8 @@ welcome-forge-details
 welcome-model-choose
 forge-details
 forge-setting-up-middle
+forge-setup-failed
+welcome-setup-failed
 welcome-ready-under-way
 welcome-ready-adopted
 chats-setup-strip

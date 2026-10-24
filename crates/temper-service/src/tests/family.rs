@@ -895,11 +895,11 @@ fn setup_outcomes_use_the_family_answer_including_unknown() {
         assert_eq!(w::Answer::decode(&w::CEILINGS, &mut Reader::new(&bytes)).unwrap().into_parts().outcome, expected);
     }
 }
-#[test]
-fn forges_encode_the_domains_rows_without_settings() {
-    let value = forge::Forges {
+fn configured_forge_rows() -> forge::Forges {
+    forge::Forges {
         rows: Box::new([
             forge::Row {
+                failed: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -913,6 +913,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::Offered,
             },
             forge::Row {
+                failed: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -926,6 +927,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotOffered,
             },
             forge::Row {
+                failed: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -939,6 +941,7 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotUnderTheBox,
             },
             forge::Row {
+                failed: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,
@@ -952,7 +955,27 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotOffered,
             },
         ]),
-    };
+    }
+}
+#[test]
+fn forges_encode_the_domains_rows_without_settings() {
+    let value = configured_forge_rows();
+    for (failed, expected) in [
+        (None, None),
+        (Some(forge::FailedStep::Fetch), Some(w::FailedStep::Fetch)),
+        (Some(forge::FailedStep::Prepare), Some(w::FailedStep::Prepare)),
+        (Some(forge::FailedStep::Run), Some(w::FailedStep::Run)),
+        (Some(forge::FailedStep::Connect), Some(w::FailedStep::Connect)),
+    ] {
+        let mut failure = value.clone();
+        failure.rows[0].connection = forge::Connection::SetUpFailed { why: b"stopped".as_slice().into() };
+        failure.rows[0].failed = failed;
+        let bytes = family::forges(failure, &w::CEILINGS).unwrap();
+        let rows = wire::decode_forges(&bytes, &w::CEILINGS).unwrap().into_parts().forges;
+        let w::Connection::SetUpFailed(failure) = rows.get(0).unwrap().connection() else { panic!("setup failure") };
+        assert_eq!(failure.at(), &expected);
+        assert_eq!(failure.why(), b"stopped");
+    }
     let bytes = family::forges(value, &w::CEILINGS).unwrap();
     let rows = temper_client_protocol_wire::decode_forges(&bytes, &w::CEILINGS).unwrap().into_parts().forges;
     let expected = [
@@ -1090,6 +1113,7 @@ fn setup_projects_and_first_repository_states_translate_without_losing_fields() 
             };
             let value = forge::Forges {
                 rows: Box::new([forge::Row {
+                    failed: None,
                     web: None,
                     repositories: Box::new([]),
                     app: None,
@@ -1366,6 +1390,7 @@ fn installations_and_the_last_connect_end_encode_unchanged() {
     let bytes = family::forges(
         forge::Forges {
             rows: Box::new([forge::Row {
+                failed: None,
                 web: None,
                 repositories: Box::new([]),
                 app: None,

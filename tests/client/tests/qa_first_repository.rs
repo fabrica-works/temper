@@ -331,7 +331,7 @@ fn every_create_failure_offers_setup_again_with_the_same_names() {
         setup(&mut world, person);
         send(&mut world, forge::Event::FirstFailed { forge: FORGE, step });
         connection(&mut world, forge::Connection::SetUpFailed { why: why.into() });
-        script(&mut world, person, vec![see(b"Set up failed")]);
+        script(&mut world, person, vec![see(b"Making acme/shop failed")]);
         let page = text(&world, person);
         assert!(
             page.contains(std::str::from_utf8(why).expect("failure words")),

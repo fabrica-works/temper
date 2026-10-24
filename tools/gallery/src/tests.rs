@@ -55,6 +55,24 @@ enum Part {
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
+        name: "forge-setup-failed",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::Status, name: "failed" },
+            Part::Named { role: Role::List, name: "Each step" },
+            Part::Named { role: Role::Button, name: "Set up again" },
+        ],
+    },
+    Holds {
+        name: "welcome-setup-failed",
+        heading: "Almost ready",
+        parts: &[
+            Part::Named { role: Role::Status, name: "failed" },
+            Part::Named { role: Role::List, name: "Each step" },
+            Part::Named { role: Role::Button, name: "Set up again" },
+        ],
+    },
+    Holds {
         name: "welcome-forge-choose",
         heading: "Connect a forge",
         parts: &[
