@@ -1339,7 +1339,9 @@ for its kind, its user's login and its installations. Its nodes:
   forge connected or connecting already, whose key `Replace` replaces;
   `not connected`, an `Install` on a forge with no App; `busy`, a run
   holding the forge, or `setup.runs` full; `no key`, a `Connect` of an
-  App with no carried value. Its carried value, if any, is named unused
+  App with no carried value; `first is bot`, a `ForgejoAdmin` `Connect`
+  whose `first` organization is the bot's login, case-folded
+  (`../protocol/setup.md`, 5.5). Its carried value, if any, is named unused
   (section 8).
 - **The small store's record of a pending request** is `jig-client`'s
   kept request, its request encoded by this crate as the family's bytes

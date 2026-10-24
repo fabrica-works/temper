@@ -1298,6 +1298,15 @@ fn admin_details(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Forge
         text(b, w, Role::Alert, Word::SetupRequired);
     }
     text(b, w, Role::Heading { level: 3 }, Word::AdminFirst);
+    let named_bot = if let Some(pending) = root.forge().admin()
+        && pending.forge == row.number
+        && pending.answer
+            == Some(forge::github::Answer::Refused(temper_client_protocol_wire::v1::ForgeRefusal::FirstIsBot))
+    {
+        true
+    } else {
+        false
+    };
     for (field, word) in [
         (forge::admin::Field::Organization, Word::SetupOrganization),
         (forge::admin::Field::Repository, Word::SetupRepository),
@@ -1312,7 +1321,7 @@ fn admin_details(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Forge
         b.name(&w.say(word, &[]));
         b.value(draft.fields.get(index).expect("four fields"), *draft.written.get(index).expect("four writes"));
         b.bind(bindings.insert(Meaning::AdminField(field)));
-        if draft.checked && invalid {
+        if (draft.checked && invalid) || (field == forge::admin::Field::Organization && named_bot) {
             b.state(State::Invalid);
         }
         b.close();

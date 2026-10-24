@@ -589,6 +589,7 @@ pub fn answer(
                         forge::ForgeRefusal::NotConnected => w::ForgeRefusal::NotConnected,
                         forge::ForgeRefusal::Busy => w::ForgeRefusal::Busy,
                         forge::ForgeRefusal::NoKey => w::ForgeRefusal::NoKey,
+                        forge::ForgeRefusal::FirstIsBot => w::ForgeRefusal::FirstIsBot,
                     },
                 },
             )

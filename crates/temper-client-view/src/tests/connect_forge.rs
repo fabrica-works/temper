@@ -1918,6 +1918,34 @@ fn admin_local_refusals_mark_the_field_and_say_why() {
     }
 }
 #[test]
+fn a_first_organization_named_as_the_bot_marks_the_organization_invalid() {
+    let mut root = admin_root(Some(Choice::Forge(HERE)), admin_row(w::Connection::NotConnected, None, None, true));
+    admin_input(&mut root, "The site admin’s token".as_bytes(), ADMIN_TOKEN);
+    admin_input(&mut root, b"Organization", b"temper-bot");
+    let action = press(&root, Role::Button, b"Connect as its admin");
+    let token = attempt(drive(&mut root, d::Event::Act { action }));
+    answer(
+        &mut root,
+        token,
+        w::Outcome::ConnectRefused(
+            w::ConnectRefused::new(&w::CEILINGS, w::ConnectRefusedParts { why: w::ForgeRefusal::FirstIsBot }).unwrap(),
+        ),
+    );
+    let view = f::page_view(&root);
+    words_in_order(
+        view.tree(),
+        &[
+            "That organization has the name of temper's bot on this forge, and on Forgejo users and organizations share names: name another organization.",
+        ],
+    );
+    assert!(has_state(view.tree(), Role::TextField, b"Organization", State::Invalid));
+    for name in [b"Repository".as_slice(), b"Into a new project, named", b"Runner label"] {
+        assert!(!has_state(view.tree(), Role::TextField, name, State::Invalid));
+    }
+    assert!(!root.forge().admin_form().has_token());
+    no_admin_token(view.tree());
+}
+#[test]
 fn admin_connecting_names_the_forge_and_first_repository() {
     let root = admin_root(Some(Choice::Forge(HERE)), admin_row(w::Connection::Connecting, None, None, true));
     let view = f::page_view(&root);

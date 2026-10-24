@@ -1227,6 +1227,7 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
     for forge in &settings.forges {
         let mut mode = Mode::Connected;
         let mut admin_connect = false;
+        let mut bot: Box<[u8]> = Box::new([]);
         let mut owned = None;
         let mut asked = match &settings.demo {
             Some(demo) => demo.forge == forge.number,
@@ -1234,6 +1235,7 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
         };
         for setup in &settings.setup {
             if setup.entry.forge == forge.number {
+                bot.clone_from(&setup.entry.bot.login);
                 (mode, admin_connect) = match &setup.entry.mode {
                     temper_forge_setup::setup::Mode::Managed { admin_token } => (Mode::Managed, admin_token.is_none()),
                     temper_forge_setup::setup::Mode::Owned(value) => {
@@ -1260,6 +1262,7 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
             settings::Kind::GitHub => Kind::GitHub,
         };
         rows.push(Configured {
+            bot,
             admin_connect,
             owned,
             number: forge.number,

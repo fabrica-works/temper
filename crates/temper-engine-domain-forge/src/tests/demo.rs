@@ -143,6 +143,7 @@ fn configured(under_box: bool) -> Domain {
                 number,
                 Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,

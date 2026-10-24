@@ -455,6 +455,12 @@ otherwise nothing but the setup host runs it or writes what it makes.
   when missing; on a forge with records, the recorded user's login.
   Reconcile uses it only when its full name carries `temper:bot`, or stops `Unmarked`,
   named, and restores the connection's previous state.
+- **A first organization named as the bot** is refused at admission
+  (`FirstIsBot`), before any run or write, and its carried value named
+  unused: a Forgejo user and organization can't share a name, so Create
+  would stop at the organization, and a second paste couldn't help. The
+  check compares `first`'s organization with the setup's `bot.login`,
+  ASCII case-folded, as Forgejo compares names.
 - **A Forgejo with no `setup` entry** refuses it, naming
   `application.setup` (section 16).
 - **"Forget the admin's token"** (`Forget`): the `AdminToken` record is
