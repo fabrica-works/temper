@@ -633,6 +633,26 @@ fn setting_up_names_its_first_repository_and_project() {
     node(view.tree(), Role::Status, b"under way");
 }
 #[test]
+fn setting_up_names_the_demo_project_playground() {
+    let root = f::root_at_with_forges(
+        Address::ConnectForge { forge: Some(Choice::Forge(HERE)) },
+        &f::domain_limits(),
+        b"Project 1",
+        Some((f::PROJECT, true, w::DemoState::Running)),
+        None,
+        Some(first_rows(w::Connection::Connecting, w::FirstState::Making)),
+    )
+    .0;
+    for words in [f::words(), f::browser_words()] {
+        let mut view = f::view_of(words);
+        f::build(&mut view, &root);
+        words_in_order(
+            view.tree(),
+            &["work/hello, into Playground", "Making work/hello, and adopting it into Playground"],
+        );
+    }
+}
+#[test]
 fn setting_up_uses_the_sent_fields_until_the_row_carries_them() {
     let mut root = here(w::Connection::NotSetUp);
     act(&mut root, d::forge::Act::SetUp { forge: HERE });

@@ -111,6 +111,35 @@ pub(crate) fn unavailable_main(builder: &mut Builder, root: &Domain, words: &cra
         words.text(builder, Word::OutOfDateMain, &[]);
     }
 }
+fn project_buttons(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
+    if let Some(me) = root.pages().me(root.client()) {
+        let mut projects = false;
+        for selected in [true, false] {
+            for row in &me.projects {
+                if (Some(row.project) == root.pages().project()) == selected {
+                    let name = crate::pages::project_name(Some(me), root.forge().demo(), row.project, words)
+                        .expect("project from me has a name");
+                    builder.open(Role::Button);
+                    builder.name(&name);
+                    if selected {
+                        builder.state(skein_ui::State::Pressed);
+                    }
+                    builder.bind(bindings.insert(Act::Project { project: row.project }));
+                    builder.close();
+                    projects = true;
+                }
+            }
+        }
+        if !projects {
+            text(
+                builder,
+                Role::Paragraph,
+                &words.say(crate::words::Word::NoProjectYet, &[]),
+                Some(crate::look::PROJECT_EMPTY),
+            );
+        }
+    }
+}
 pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words::Words, bindings: &mut Bindings) {
     let pages = root.pages();
     let me = pages.me(root.client());
@@ -145,22 +174,7 @@ pub(crate) fn banner(builder: &mut Builder, root: &Domain, words: &crate::words:
         builder.close();
         return;
     }
-    if let Some(me) = me {
-        for selected in [true, false] {
-            for row in &me.projects {
-                if (Some(row.project) == pages.project()) == selected {
-                    let name = row.name.bytes();
-                    builder.open(Role::Button);
-                    builder.name(name);
-                    if selected {
-                        builder.state(skein_ui::State::Pressed);
-                    }
-                    builder.bind(bindings.insert(Act::Project { project: row.project }));
-                    builder.close();
-                }
-            }
-        }
-    }
+    project_buttons(builder, root, words, bindings);
     navigation(builder, root, words, bindings);
     builder.open(Role::Slot);
     builder.style(crate::look::CORNER);

@@ -1,7 +1,7 @@
 == T1 · Add CSV export to widget == Live
 temper
 Menu:
-  [1] demo (pressed)
+  [1] Playground (pressed)
   Main navigation:
     [2] Inbox
     [3] Chats (current)
@@ -17,7 +17,7 @@ Playground:
 T1 · Add CSV export to widget:
   * waiting on your words
   0 spent · of 1 · delegates spent 0
-demo · playground/widget on Playground forge
+Playground · playground/widget on Playground forge
 Signed in as the deployment’s owner
 Conversation:
   Today · Thursday 1 January

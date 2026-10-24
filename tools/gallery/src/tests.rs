@@ -101,8 +101,8 @@ const HOLDS: [Holds; samples::N] = [
         heading: "Almost ready",
         parts: &[
             Part::Named { role: Role::Disclosure, name: "Each step" },
-            Part::Named { role: Role::Paragraph, name: "Project Default, with work/hello" },
-            Part::Named { role: Role::Button, name: "Open Default" },
+            Part::Named { role: Role::Paragraph, name: "Project Playground, with work/hello" },
+            Part::Named { role: Role::Button, name: "Open Playground" },
             Part::Named { role: Role::Paragraph, name: "It opens once work/hello is made." },
         ],
     },
@@ -111,8 +111,8 @@ const HOLDS: [Holds; samples::N] = [
         heading: "work/hello is ready",
         parts: &[
             Part::Named { role: Role::Paragraph, name: "Forge: Forgejo on this machine, connected as temper" },
-            Part::Named { role: Role::Paragraph, name: "Project Default, with work/hello" },
-            Part::Named { role: Role::Link, name: "Open Default" },
+            Part::Named { role: Role::Paragraph, name: "Project Playground, with work/hello" },
+            Part::Named { role: Role::Link, name: "Open Playground" },
             Part::Absent { role: Role::Disclosure, name: "Each step" },
         ],
     },
@@ -122,7 +122,7 @@ const HOLDS: [Holds; samples::N] = [
         parts: &[
             Part::Named { role: Role::Heading { level: 2 }, name: "Setting up Forgejo on this machine" },
             Part::Named { role: Role::Status, name: "under way" },
-            Part::Named { role: Role::Paragraph, name: "work/hello, into Default" },
+            Part::Named { role: Role::Paragraph, name: "work/hello, into Playground" },
         ],
     },
     Holds {
@@ -133,7 +133,7 @@ const HOLDS: [Holds; samples::N] = [
             Part::Described {
                 role: Role::Disclosure,
                 name: "Forgejo on this machine",
-                description: "forge 3 · Forgejo · Connected as temper\nwork/hello · project Default",
+                description: "forge 3 · Forgejo · Connected as temper\nwork/hello · project Playground",
             },
             Part::Absent { role: Role::Heading { level: 2 }, name: "The playground" },
         ],

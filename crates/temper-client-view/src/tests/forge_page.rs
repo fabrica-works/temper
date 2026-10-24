@@ -6,6 +6,21 @@ use crate::forge::{
 use skein_ui::{Act, Role, State};
 use temper_client_domain::{Action, forge};
 #[test]
+fn adoption_names_the_demo_project_playground() {
+    let root = fixtures::root_at_with_demo(
+        temper_client_domain::Address::Adopt { project: fixtures::PROJECT },
+        &fixtures::domain_limits(),
+        b"Project 1",
+        Some((fixtures::PROJECT, true)),
+    )
+    .0;
+    for words in [fixtures::words(), fixtures::browser_words()] {
+        let mut view = fixtures::view_of(words);
+        let tree = fixtures::build(&mut view, &root);
+        assert!(has_text(tree, b"Adopt a repository into Playground"));
+    }
+}
+#[test]
 fn the_page_names_every_field_a_person_acts_on() {
     let mut view = fixtures::view();
     let root = fixtures::adoption_root();

@@ -10,6 +10,7 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    NoProjectYet,
     GitHubUnknown,
     GitHubPicker,
     GitHubInstalled,
@@ -589,9 +590,10 @@ pub enum Word {
 // GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
 // Account moves add four account literals and one task-wait phrase.
 // The Authorize place and page-owned forge sign-in add twelve phrases.
-const PHRASES: u32 = 1080;
-const SEGMENTS: u32 = 1889;
-const ALL: [Word; 535] = [
+const PHRASES: u32 = 1081;
+const SEGMENTS: u32 = 1890;
+const ALL: [Word; 536] = [
+    Word::NoProjectYet,
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -1132,6 +1134,7 @@ impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::NoProjectYet => 1949,
             Self::YourForgesTitle => 1819,
             Self::YourForges => 1800,
             Self::ForgesDescription => 1801,
@@ -1914,6 +1917,7 @@ const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::NoProjectYet => (&[b"No project yet"], &[]),
         Word::YourForgesTitle => (&[b"Your forges"], &[]),
         Word::YourForges => (&[b"Your forges ", b""], &[Number]),
         Word::ForgesDescription => (&[b"Each forge temper is connected to, or setting up. Add one to bring its repositories to temper."], &[]),

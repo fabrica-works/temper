@@ -8,6 +8,26 @@ use skein_lib::{List, Wall};
 use skein_ui::Role;
 
 #[test]
+fn the_demo_chat_context_names_its_project_playground() {
+    let root = fixtures::demo_root(temper_client_domain::Address::Chat { task: TASK }, fixtures::PROJECT, true);
+    for words in [fixtures::words(), fixtures::browser_words()] {
+        let mut view = fixtures::view_of(words);
+        let tree = fixtures::build(&mut view, &root);
+        let mut context = None;
+        for (index, node) in tree.nodes().iter().enumerate() {
+            if node.styles.as_slice().contains(&crate::look::CONTEXT) {
+                context = Some(index);
+                break;
+            }
+        }
+        let context = context.expect("chat context");
+        assert!(
+            skein_lib::bytes::find(&fixtures::node_text(tree, context), "Playground · acme/shop".as_bytes()).is_some()
+        );
+    }
+}
+
+#[test]
 fn the_chatbar_region_is_named_by_its_heading() {
     use skein_fake_person::{Face, Find, Found};
 
