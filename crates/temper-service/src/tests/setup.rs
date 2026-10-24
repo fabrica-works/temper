@@ -12,8 +12,21 @@ fn service(states: u32, life: Duration) -> crate::Service {
     service.engine.as_mut().expect("engine").domain = ready.domain;
     service
 }
+// The page owners emit their measured sizes only in the usual figure write mode.
+#[expect(
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    reason = "figure write mode names and writes the measured page sizes"
+)]
+pub(super) fn measure_page(name: &str, bytes: usize) {
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
+        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/q-pages");
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join(format!("{name}.txt")), format!("{bytes}\n")).unwrap();
+    }
+}
 // Token routing observes queued root inputs, so it needs no second service's restarted root.
-fn routing_service(states: u32, life: Duration) -> crate::Service {
+pub(super) fn routing_service(states: u32, life: Duration) -> crate::Service {
     routing_service_at(states, life, None)
 }
 fn routing_service_at(
@@ -1832,31 +1845,6 @@ fn ended_forge_calls_are_answered_locally_at_zero_cost_and_hints_are_dropped() {
     assert!(engine.forge.starts.is_empty());
     assert!(engine.forge.io.is_empty());
 }
-#[test]
-fn the_manifest_form_escapes_its_attributes_and_refuses_a_page_past_its_bound() {
-    let target = b"http://forge.test/settings/apps/new?state=s&x=\"<>";
-    let manifest = br#"{"name":"temper-abc"}"#;
-    let page = routes::form(target, manifest, 4096).expect("form fits");
-    assert!(contains(&page, b"action=\"http://forge.test/settings/apps/new?state=s&amp;x=&quot;&lt;&gt;\""));
-    assert!(contains(&page, b"value=\"{&quot;name&quot;:&quot;temper-abc&quot;}\""));
-    assert!(contains(&page, b"<script>document.forms[0].submit()</script>"));
-    let fits = u32::try_from(page.len()).unwrap();
-    assert!(routes::form(target, manifest, fits).is_some());
-    assert!(routes::form(target, manifest, fits - 1).is_none());
-}
-#[test]
-fn the_manifest_script_hash_matches_the_form_page() {
-    let page = routes::form(b"http://forge.test/settings/apps/new?state=s", b"{}", 4096).unwrap();
-    let start = skein_lib::bytes::find(&page, b"<script>").unwrap().checked_add(b"<script>".len()).unwrap();
-    let end = skein_lib::bytes::find(&page, b"</script>").unwrap();
-    let digest = skein_lib::sha256::digest(page.get(start..end).unwrap());
-    let alphabet = skein_lib::base64::Alphabet::Standard;
-    let size = skein_lib::base64::encoded_len(alphabet, u32::try_from(digest.len()).unwrap()).unwrap();
-    let mut writer = skein_lib::Writer::new(usize::try_from(size).unwrap());
-    skein_lib::base64::encode(alphabet, &digest, &mut writer).unwrap();
-    assert_eq!(writer.finish().as_ref(), MANIFEST_SCRIPT_HASH);
-}
-
 #[test]
 fn github_app_urls_use_the_clients_public_origin() {
     let public = crate::startup::application::Origin {

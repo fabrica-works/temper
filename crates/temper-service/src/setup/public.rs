@@ -203,12 +203,25 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
             event(engine, domain::Event::ReachableAnswered { forge, request, answer });
         }
         Caller::Accept { forge, call, back } => match end {
-            root::SetupEnd::Done { .. } => engine.clients.github_answer(
-                call,
-                if back.is_some() { 303 } else { 200 },
-                back.as_deref(),
-                b"temper has the installation; you may close this tab.",
-            ),
+            root::SetupEnd::Done { .. } => {
+                if let Some(back) = back {
+                    engine.clients.github_answer(
+                        call,
+                        303,
+                        Some(&back),
+                        b"temper has the installation; you may close this tab.",
+                    );
+                } else {
+                    super::routes::page(
+                        &mut engine.clients,
+                        call,
+                        200,
+                        b"GitHub is connected",
+                        b"temper has the installation; you may close this tab.",
+                        b"/forges",
+                    );
+                }
+            }
             root::SetupEnd::Stopped { .. } => super::routes::ended(engine, call, forge),
         },
     }

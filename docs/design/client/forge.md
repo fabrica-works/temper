@@ -991,8 +991,9 @@ manifest from it (`../protocol/forge.md`, the setup's host).
   Forges page. A connect from the terminal names none, and its routes
   answer their pages as before.
 - **The manifest's page's headers:** `Content-Security-Policy:
-  default-src 'none'; form-action WEB; script-src 'sha256-H'`, H the
-  hash of its one inline script, which submits the form unless the
+  default-src 'none'; form-action WEB; script-src 'sha256-H';
+  style-src 'sha256-S'`, H the hash of its one inline script and S
+  its one inline style. The script submits the form unless the
   page was reached through the browser's history (its navigation's
   type `back_forward`), so that back from GitHub's form stops on the
   page rather than posting again; `Cache-Control: no-store` and
@@ -1007,8 +1008,9 @@ manifest from it (`../protocol/forge.md`, the setup's host).
 - **Where GitHub's way can't go on,** the route answers a short page
   of its own, temper's name above one card: its heading, why, and
   "Back to temper", a link, in place of sending the tab back; each with
-  `Cache-Control: no-store` and `Referrer-Policy: no-referrer`, and
-  nothing is kept. The pages:
+  `Content-Security-Policy: default-src 'none'; style-src 'sha256-S'`,
+  S the hash of its one inline style, `Cache-Control: no-store` and
+  `Referrer-Policy: no-referrer`, and nothing is kept. The pages:
   - *Ended:* a state used, unknown or past its life, or a code GitHub
     refuses, is answered `410`: "This link has ended", "It was used
     already, it expired, or temper restarted since. Start again from

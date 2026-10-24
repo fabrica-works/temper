@@ -60,3 +60,39 @@ fn the_manifest_page_posts_itself_to_the_configured_github_web() {
     assert_eq!(layer.installations().iter().count(), 0, "the test stops before create or installation");
     // Reaching the fake's link proves the automatic form post passed the page's CSP.
 }
+
+#[test]
+fn back_from_github_shows_the_manifest_without_posting_again_until_continue() {
+    let (tier, mut github) = Tier::github("github-manifest-history");
+    let mut setup = tier.setup();
+    setup.printed.sent = Sent::Command;
+    setup
+        .expected
+        .push(b"Failed to load resource: the server responded with a status of 400 (Bad Request)".as_slice().into());
+    let see =
+        |role, name: &[u8]| Step::Person(PersonStep::See { find: Find::exactly_named(role, name), within: WITHIN });
+    let mut steps = tier.github_connect();
+    steps.extend([
+        see(Role::Link, b"Create GitHub App"),
+        Step::Back,
+        see(Role::Heading { level: 2 }, "temper’s App, on GitHub".as_bytes()),
+        see(Role::Button, b"Continue to GitHub"),
+        see(Role::Link, b"Back to temper"),
+        Step::Person(PersonStep::Press { find: Find::exactly_named(Role::Button, b"Continue to GitHub") }),
+        see(Role::Link, b"Create GitHub App"),
+    ]);
+    let mut script = Script::new(steps.into_boxed_slice());
+    let outcome =
+        Harness::new(setup).run_lending(&mut [&mut script], &mut [Lent { name: b"github", peer: &mut github }]);
+    assert_eq!(outcome, Outcome::Done);
+    let mut posts = 0;
+    for record in github.observations() {
+        if let skein_fake_peers::forge::Observation::Head { call, .. } = record
+            && call.method == skein_http::Method::Post
+            && call.target.starts_with(b"/settings/apps/new?")
+        {
+            posts += 1;
+        }
+    }
+    assert_eq!(posts, 2, "one automatic post, then one explicitly continued post");
+}
