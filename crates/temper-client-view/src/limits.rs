@@ -192,9 +192,20 @@ fn fold_bytes(receiving: &jig_client::DomainLimits, words: &Words) -> Option<u32
 }
 #[must_use]
 pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words: &Words) -> Option<u64> {
-    skein_ui::worst_case(&limits.tree)?
-        // One transient row/header state can own an observed tool name.
-        .checked_add(u64::from(domain.client.domain.text))?
+    let mut total = 0_u64;
+    for (_, bytes) in memory_terms(limits, domain, words)? {
+        total = total.checked_add(bytes)?;
+    }
+    Some(total)
+}
+/// Tree, page scratch, bindings and words at the view's composition boundary.
+#[must_use]
+pub fn memory_terms(
+    limits: &Limits,
+    domain: &temper_client_domain::Limits,
+    words: &Words,
+) -> Option<[(&'static str, u64); 9]> {
+    let pages = u64::from(domain.client.domain.text)
         .checked_add(skein_lib::List::<u64>::worst_case(domain.client.domain.rows)?)?
         // Plan ordering: task/parent input, sorted task index, child/sibling links,
         // deferred siblings and the resulting depth-first row indices.
@@ -205,24 +216,33 @@ pub fn worst_case(limits: &Limits, domain: &temper_client_domain::Limits, words:
         .checked_add(
             skein_lib::List::<u64>::worst_case(temper_client_domain::pages::delegation::bound(domain))?
                 .checked_mul(2)?,
-        )?
-        .checked_add(crate::forge::bindings::worst_case(limits.tree.bindings)?)?
-        .checked_add(crate::frame::Bindings::worst_case(limits.tree.bindings)?)?
-        .checked_add(crate::accounts::Bindings::worst_case(crate::accounts::binding_capacity(
-            &domain.accounts,
-            domain.client.domain.rows,
-        ))?)?
-        .checked_add(skein_lib::List::<temper_client_domain::Choice>::worst_case(
-            temper_client_domain::forge::forges::ROWS.checked_add(1)?,
-        )?)?
-        // Transient offered ways and account heading fragments, borrowed from admitted documents.
-        .checked_add(skein_lib::List::<temper_client_domain::pages::accounts::Way>::worst_case(
-            domain.client.domain.rows.checked_mul(3)?,
-        )?)?
-        .checked_add(u64::from(limits.tree.text_per_node).checked_mul(4)?)?
-        // A fold's owned name fragments and its joined disclosure name.
-        .checked_add(skein_lib::List::<Box<[u8]>>::worst_case(domain.client.domain.rows)?)?
-        .checked_add(u64::from(limits.tree.text_per_node).checked_mul(2)?)?
-        .checked_add(skein_ui::phrases::worst_case(words.book.limits())?)?
-        .checked_add(u64::from(words.capacity()?))
+        )?;
+    let accounts = skein_lib::List::<temper_client_domain::pages::accounts::Way>::worst_case(
+        domain.client.domain.rows.checked_mul(3)?,
+    )?
+    .checked_add(u64::from(limits.tree.text_per_node).checked_mul(4)?)?;
+    let fold = skein_lib::List::<Box<[u8]>>::worst_case(domain.client.domain.rows)?
+        .checked_add(u64::from(limits.tree.text_per_node).checked_mul(2)?)?;
+    Some([
+        ("ui", skein_ui::worst_case(&limits.tree)?),
+        ("pages", pages),
+        ("forge.bindings", crate::forge::bindings::worst_case(limits.tree.bindings)?),
+        ("frame", crate::frame::Bindings::worst_case(limits.tree.bindings)?),
+        (
+            "accounts.bindings",
+            crate::accounts::Bindings::worst_case(crate::accounts::binding_capacity(
+                &domain.accounts,
+                domain.client.domain.rows,
+            ))?,
+        ),
+        (
+            "choice",
+            skein_lib::List::<temper_client_domain::Choice>::worst_case(
+                temper_client_domain::forge::forges::ROWS.checked_add(1)?,
+            )?,
+        ),
+        ("pages.accounts", accounts),
+        ("pages.chat", fold),
+        ("words", skein_ui::phrases::worst_case(words.book.limits())?.checked_add(u64::from(words.capacity()?))?),
+    ])
 }

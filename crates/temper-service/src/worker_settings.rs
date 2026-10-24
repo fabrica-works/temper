@@ -181,6 +181,14 @@ fn programs_worst_case(programs: &[settings::Program]) -> Option<u64> {
 /// The layer's owned queues, processes, values, root and io, as the reference prices them.
 #[must_use]
 pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own: &limits::Limits) -> Option<u64> {
+    crate::startup::memory_sum(&memory_terms(worker, agent, own)?)
+}
+/// Root, protocol machines, retained values and the worker's routing storage.
+pub(crate) fn memory_terms(
+    worker: &settings::Worker,
+    agent: &settings::Agent,
+    own: &limits::Limits,
+) -> Option<[crate::startup::MemoryTerm; 11]> {
     let prepared = prepare(worker, agent, own).ok()?;
     let jig = &worker.jig;
     let room = prepared.room;
@@ -194,24 +202,7 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
         io::Addr::InProcess(_) => 0,
         io::Addr::Ip(_) => crate::worker::remote_worst_case(u32::try_from(jig.name.len()).ok()?, prepared.lower)?,
     };
-    root::worst_case(&prepared.root)?
-        .checked_add(remote)?
-        .checked_add(programs_worst_case(&agent.programs)?)?
-        .checked_add(crate::program_sources::worst_case(jig.limits.hub.detail_bytes)?)?
-        .checked_add(
-            host::process_worst_case(&agent.limits, agent.host_limits.detail_bytes)?
-                .checked_mul(u64::from(jig.slots))?,
-        )?
-        .checked_add(link::worst_case(&prepared.link)?)?
-        .checked_add(jig_protocol_accounts::table::worst_case(
-            jig.limits.core.accounts.accounts.checked_add(1)?,
-            credential_bytes(jig.limits.token),
-        )?)?
-        .checked_add(crate::identities::identities_worst_case(
-            jig.limits.core.accounts.credentials,
-            payload::largest(&prepared.payload)?.grant,
-        )?)?
-        .checked_add(Queue::<root::Request>::worst_case(room)?)?
+    let routing = Queue::<root::Request>::worst_case(room)?
         .checked_add(Queue::<root::Event>::worst_case(room)?)?
         .checked_add(Queue::<host::ProcessEvent>::worst_case(room)?)?
         .checked_add(Queue::<link::Request>::worst_case(link::MAX_OUT_DOWN)?)?
@@ -222,9 +213,36 @@ pub fn worker_worst_case(worker: &settings::Worker, agent: &settings::Agent, own
         .checked_add(Queue::<io::kernel::Submit>::worst_case(1)?)?
         .checked_add(payload.checked_mul(u64::from(room).checked_mul(3)?)?)?
         .checked_add(command.checked_mul(u64::from(jig.slots).checked_add(1)?)?)?
-        .checked_add(u64::try_from(crate::worker::WORKER_PATH_BYTES).ok()?)?
-        .checked_add(skein_io::worst_case(&jig.limits.io)?)?
-        .checked_add(crate::worker_git::worst_case(own)?)
+        .checked_add(u64::try_from(crate::worker::WORKER_PATH_BYTES).ok()?)?;
+    Some([
+        ("worker", root::worst_case(&prepared.root)?),
+        ("worker.remote", remote),
+        ("worker_settings.programs", programs_worst_case(&agent.programs)?),
+        ("program_sources", crate::program_sources::worst_case(jig.limits.hub.detail_bytes)?),
+        (
+            "host",
+            host::process_worst_case(&agent.limits, agent.host_limits.detail_bytes)?
+                .checked_mul(u64::from(jig.slots))?,
+        ),
+        ("worker.link", link::worst_case(&prepared.link)?),
+        (
+            "values",
+            jig_protocol_accounts::table::worst_case(
+                jig.limits.core.accounts.accounts.checked_add(1)?,
+                credential_bytes(jig.limits.token),
+            )?,
+        ),
+        (
+            "identities",
+            crate::identities::identities_worst_case(
+                jig.limits.core.accounts.credentials,
+                payload::largest(&prepared.payload)?.grant,
+            )?,
+        ),
+        ("worker_settings", routing),
+        ("io", skein_io::worst_case(&jig.limits.io)?),
+        ("worker_git", crate::worker_git::worst_case(own)?),
+    ])
 }
 
 /// The application's payload version is part of every worker's opening.

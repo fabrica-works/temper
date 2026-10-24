@@ -683,53 +683,13 @@ fn only_settled_account_statuses_have_the_done_style() {
     }
 }
 #[cfg(target_pointer_width = "64")]
+#[path = "../../../../testing/memory_figures.rs"]
+mod memory_figures;
+#[cfg(target_pointer_width = "64")]
 #[path = "../../../../testing/memory_literal.rs"]
 mod memory_literal;
-// Base 87c82f753: 4,420,462,083 + 304 added nodes x 574,364 B = 4,595,068,739 B.
-// A chat's 5 delegation cards (client/README.md, 5.7): 5 x (66 markdown + 14)
-// nodes x 574,364 B + 5 x 8 B of carded tasks = 229,745,640 B, so 4,824,814,379 B.
-// Cards remembered across the window: 5 x 8 B = 40 B, so 4,824,814,419 B.
-// The live delegates' trailing region adds 574,364 B, so 4,825,388,783 B.
-// Goal cards add 236 nodes x 574,364 B and 4,736 B for the larger phrasebook,
-// giving 4,960,943,423 B.
-// Plan rows add 32 x 574,364 B, phrases 2,368 B and a tool name 32 B,
-// less 8 B of root stack: +18,382,040 B, giving 4,979,325,463 B.
-// Lower-case phase words add 16 phrases' room, 2,368 B: 4,979,327,831 B.
-// Smaller receiving bounds and the full chat window price each turn's shared budget (client/README.md, 5.4).
-// Agent lineage, taskbar, brief, run and dependencies add 109 nodes x 574,364 B
-// = 62,605,676 B, giving 5,041,933,507 B; its six phrases fit the reserved book.
-// The context line adds one repository/forge text node; chat words use existing phrase room.
-// Your chats adds filter/empty nodes and five phrases to the checked envelope.
-// Procedure goal slot: five added nodes including its paragraph and link text.
-// The chat projection adds seven phrases while retaining the agent's work-line words.
-// Amendment editor: sixteen nodes and eleven phrases; the web root also retains
-// its bounded draft, typed specification and separate amendment outcome.
-// Added dependency marks (client/README.md, 5.8): two nodes per dependency,
-// across two plan rows and the brief: (2 * 2 + 2) * 2 = 12 nodes x 574,364 B.
-// Their five phrases add five entries' room, 740 B.
-// Naming navigation and cards adds two phrases (296 B).
-// A committed turn's own text budget prices both conversation drawings.
-// A task's name over its words in a chat adds one phrase (148 B).
-// The four time forms add 47 phrases x 148 B = 6,956 B.
-// The change panel adds 86 forge phrases (12,728 B); its full address and
-// combined pull/bounds texts fit the existing maximum text envelope.
-// The procedure's ended page and its three phrases move the checked envelope.
-// skein f043ea16: b6ea7b9c's placeholder and completed state; boxed patch attributes, no slotless splice room.
-// The page reserves its patch queue once, at four patches a node.
-// A chat's composer placeholder adds one phrase (148 B).
-// Closed-chat, confirmation and refusal words add 29 phrases (4,292 B).
-// Exceeded adds nine jig phrases: 9 * 148 B = 1,332 B.
-// The flow's three state words (444 B).
-// First-repository setup fields and Ready words add 2,076 B.
-// The Accounts navigation's two state words (296 B).
-// ConnectForge's and the welcome's forge words, and 128 more phrase segments (11,588 B).
-// The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
-// The demo start's words, full failure text and retry nodes (1,724,026 B).
-// The four Access phrases and their segments add 688 B.
-// GitHub's Ready picker and adopted card words add 2,976 B.
-#[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
-#[cfg(target_pointer_width = "64")]
-const ACCOUNT_BYTES: u64 = 11526795986;
+// Tree storage, page scratch, forge/frame/account bindings, choices and words.
+
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -737,10 +697,9 @@ fn account_bounds_have_a_literal_price() {
     let words = fixtures::words();
     let bounds = crate::Limits::of(&domain, &words).unwrap();
     let actual = crate::worst_case(&bounds, &domain, &words).expect("priced fixture");
-    memory_literal::check(
-        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/accounts.rs"),
-        "const ACCOUNT_BYTES: u64 = ",
-        ACCOUNT_BYTES,
+    memory_figures::check(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../temper/tests/figures/memory/client-view"),
+        &crate::limits::memory_terms(&bounds, &domain, &words).expect("view memory terms"),
         actual,
     );
 }
