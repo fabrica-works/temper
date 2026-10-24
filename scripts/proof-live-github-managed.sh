@@ -3,7 +3,7 @@
 set -eu
 umask 077
 cd "$(dirname "$0")/.."
-case ${1:-} in live|fake) mode=$1 ;; *) printf '%s\n' 'usage: proof-live-github-managed.sh {live|fake} [PORT [CONVERSION.json]]' >&2; exit 2 ;; esac
+case ${1:-} in live|fake|fake-wide) mode=$1 ;; *) printf '%s\n' 'usage: proof-live-github-managed.sh {live|fake|fake-wide} [PORT [CONVERSION.json]]' >&2; exit 2 ;; esac
 [ "$#" -le 3 ] || exit 2
 port=${2:-8765}
 case $port in ''|*[!0-9]*) exit 2 ;; esac

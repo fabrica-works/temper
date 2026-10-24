@@ -23,6 +23,18 @@ const REPO: &str = "/repos/freeekanayaka/temper-probe-2";
 fn invalid() -> io::Error {
     io::Error::other("managed relay invalid request or response")
 }
+/// Diagnostic data is fixed vocabulary plus numeric counts, never upstream text.
+#[derive(Debug)]
+struct Refusal {
+    reason: &'static str,
+    rows: Option<usize>,
+    total_count: Option<u64>,
+}
+impl Refusal {
+    fn label(reason: &'static str) -> Self {
+        Self { reason, rows: None, total_count: None }
+    }
+}
 #[derive(Default)]
 struct State {
     converted: bool,
@@ -103,6 +115,27 @@ impl State {
             .strip_prefix("Bearer ")
             .or_else(|| authorization.strip_prefix("token "))
             .is_some_and(|token| self.tokens.iter().any(|known| known == token))
+    }
+    fn learn_repositories(&mut self, value: &Value) -> Result<(), Refusal> {
+        self.checked = false;
+        let rows =
+            value["repositories"].as_array().ok_or_else(|| Refusal::label("learn:installation-repositories-array"))?;
+        if value["total_count"] != 1
+            || rows.len() != 1
+            || rows[0]["owner"]["login"] != "freeekanayaka"
+            || rows[0]["name"] != "temper-probe-2"
+            || rows[0].get("full_name").is_some_and(|name| name != "freeekanayaka/temper-probe-2")
+        {
+            return Err(Refusal {
+                reason: "learn:installation-repositories-not-exactly-probe-2",
+                rows: Some(rows.len()),
+                total_count: value["total_count"].as_u64(),
+            });
+        }
+        self.repository =
+            Some(rows[0]["id"].as_u64().ok_or_else(|| Refusal::label("learn:installation-repository-id"))?);
+        self.checked = true;
+        Ok(())
     }
 }
 fn positive(text: &str) -> Option<u64> {
@@ -240,17 +273,18 @@ impl Shared {
         }
         Ok(method == "DELETE" && path == format!("{REPO}/git/refs/heads/{}managed", self.guard.prefix))
     }
-    fn learn(&self, request: &Request, answer: &Answer) -> io::Result<()> {
-        let (method, target) = request.route()?;
-        let path = target.split('?').next().ok_or_else(invalid)?;
-        if !matches!(answer.status()?, 200 | 201) {
+    fn learn(&self, request: &Request, answer: &Answer) -> Result<(), Refusal> {
+        let (method, target) = request.route().map_err(|_| Refusal::label("learn:request-route"))?;
+        let path = target.split('?').next().ok_or_else(|| Refusal::label("learn:request-path"))?;
+        if !matches!(answer.status().map_err(|_| Refusal::label("learn:response-status"))?, 200 | 201) {
             return Ok(());
         }
-        let value: Value = match serde_json::from_slice(&answer.body()?) {
-            Ok(value) => value,
-            Err(_) => return Ok(()),
-        };
-        let mut state = self.state.lock().map_err(|_| invalid())?;
+        let value: Value =
+            match serde_json::from_slice(&answer.body().map_err(|_| Refusal::label("learn:response-body"))?) {
+                Ok(value) => value,
+                Err(_) => return Ok(()),
+            };
+        let mut state = self.state.lock().map_err(|_| Refusal::label("learn:state-lock"))?;
         if self.fake
             && method == "POST"
             && path == "/.fake/git/clone"
@@ -263,7 +297,7 @@ impl Shared {
             }
         }
         if self.fake && method == "POST" && path == "/.fake/git/commit" {
-            state.commits.insert(value["commit"].as_u64().ok_or_else(invalid)?);
+            state.commits.insert(value["commit"].as_u64().ok_or_else(|| Refusal::label("learn:git-commit-id"))?);
         }
         if method == "POST" && path.starts_with("/app-manifests/") {
             for field in ["pem", "webhook_secret", "client_secret", "client_id"] {
@@ -273,48 +307,37 @@ impl Shared {
                         let encoded: String = text.lines().filter(|line| !line.starts_with("-----")).collect();
                         let der =
                             skein_lib::base64::decode(skein_lib::base64::Alphabet::Standard, encoded.as_bytes(), 65536)
-                                .map_err(|_| invalid())?;
+                                .map_err(|_| Refusal::label("learn:conversion-pem"))?;
                         keep_secret(&mut state.secrets, "App_key_DER", der.as_ref());
                         keep_text(&mut state.secrets, "App_key_base64", &encoded);
                     }
                 }
             }
             if value["owner"]["login"] != "freeekanayaka" {
-                return Err(invalid());
+                return Err(Refusal::label("learn:conversion-owner"));
             }
-            state.app = Some(value["id"].as_u64().ok_or_else(invalid)?);
-            state.slug = value["slug"].as_str().ok_or_else(invalid)?.into();
+            state.app = Some(value["id"].as_u64().ok_or_else(|| Refusal::label("learn:conversion-app-id"))?);
+            state.slug = value["slug"].as_str().ok_or_else(|| Refusal::label("learn:conversion-slug"))?.into();
             let sanitized = redact(&value, "");
-            let mut file = self.evidence.lock().map_err(|_| invalid())?;
-            serde_json::to_writer_pretty(&mut *file, &sanitized)?;
-            file.write_all(b"\n")?;
-            file.sync_all()?;
+            let mut file = self.evidence.lock().map_err(|_| Refusal::label("learn:evidence-lock"))?;
+            serde_json::to_writer_pretty(&mut *file, &sanitized).map_err(|_| Refusal::label("learn:evidence-json"))?;
+            file.write_all(b"\n").map_err(|_| Refusal::label("learn:evidence-write"))?;
+            file.sync_all().map_err(|_| Refusal::label("learn:evidence-sync"))?;
         }
         if method == "GET"
             && installation(path).is_some()
             && value["account"]["login"] == "freeekanayaka"
             && (value.get("app_id").is_none() || value["app_id"].as_u64() == state.app)
         {
-            state.installations.insert(value["id"].as_u64().ok_or_else(invalid)?);
+            state.installations.insert(value["id"].as_u64().ok_or_else(|| Refusal::label("learn:installation-id"))?);
         }
         if method == "POST" && path.ends_with("/access_tokens") {
-            let token = value["token"].as_str().ok_or_else(invalid)?;
+            let token = value["token"].as_str().ok_or_else(|| Refusal::label("learn:installation-token"))?;
             keep_text(&mut state.secrets, "installation_token", token);
             state.tokens.push(token.into());
         }
         if method == "GET" && path == "/installation/repositories" {
-            state.checked = false;
-            let rows = value["repositories"].as_array().ok_or_else(invalid)?;
-            if value["total_count"] != 1
-                || rows.len() != 1
-                || rows[0]["owner"]["login"] != "freeekanayaka"
-                || rows[0]["name"] != "temper-probe-2"
-                || rows[0].get("full_name").is_some_and(|name| name != "freeekanayaka/temper-probe-2")
-            {
-                return Err(invalid());
-            }
-            state.repository = Some(rows[0]["id"].as_u64().ok_or_else(invalid)?);
-            state.checked = true;
+            state.learn_repositories(&value)?;
         }
         if method == "GET"
             && path == format!("{REPO}/pulls")
@@ -325,12 +348,14 @@ impl Shared {
                     && (row["head"]["repo"]["full_name"] == "freeekanayaka/temper-probe-2"
                         || self.fake && row["head"].get("repo").is_none())
                 {
-                    state.pulls.insert(row["number"].as_u64().ok_or_else(invalid)?);
+                    state
+                        .pulls
+                        .insert(row["number"].as_u64().ok_or_else(|| Refusal::label("learn:listed-pull-number"))?);
                 }
             }
         }
         if method == "POST" && path == format!("{REPO}/pulls") {
-            state.pulls.insert(value["number"].as_u64().ok_or_else(invalid)?);
+            state.pulls.insert(value["number"].as_u64().ok_or_else(|| Refusal::label("learn:created-pull-number"))?);
         }
         Ok(())
     }
@@ -338,16 +363,24 @@ impl Shared {
         let request = Request::read(&mut socket)?;
         let (method, target) = request.route()?;
         let accepted = self.allows(&request, git)?;
+        let mut upstream_status = None;
+        let mut refusal = None;
         let answer = if accepted {
             let answer = self.transport.exchange(&request, git)?;
             let status = answer.status()?;
+            upstream_status = Some(status);
             // A redirected client could otherwise leave this private guard entirely.
-            if ((300..400).contains(&status) && status != 304) || self.learn(&request, &answer).is_err() {
+            if (300..400).contains(&status) && status != 304 {
+                refusal = Some(Refusal::label("redirect"));
+                Answer::refuse()
+            } else if let Err(reason) = self.learn(&request, &answer) {
+                refusal = Some(reason);
                 Answer::refuse()
             } else {
                 answer
             }
         } else {
+            refusal = Some(Refusal::label("guard"));
             Answer::refuse()
         };
         let path = if target.starts_with("/app-manifests/") {
@@ -359,6 +392,8 @@ impl Shared {
         serde_json::to_writer(
             &mut *journal,
             &json!({"listener":if git {"git"} else {"api"}, "method":method, "path":path, "status":answer.status()?, "refused":!accepted || answer.status()? == 403,
+                "upstream_status":upstream_status, "reason":refusal.as_ref().map(|r| r.reason),
+                "rows":refusal.as_ref().and_then(|r| r.rows), "total_count":refusal.as_ref().and_then(|r| r.total_count),
                 "request_body_bytes":request.body()?.len(), "response_body_bytes":answer.body()?.len(),
                 "upstream_request_bytes":if accepted { request.upstream_bytes(git)? } else { 0 }}),
         )?;
@@ -484,7 +519,7 @@ pub fn run() -> io::Result<()> {
                     if shared.serve(socket, git).is_err() {
                         // Neither errors nor request dumps can expose keys, JWTs, codes or bodies.
                         if let Ok(mut journal) = shared.journal.lock() {
-                            let _ = journal.write_all(b"{\"error\":\"transport or framing failed\"}\n");
+                            let _ = journal.write_all(b"{\"error\":\"transport or framing failed\",\"upstream_status\":null,\"reason\":null}\n");
                         }
                     }
                 }));
@@ -507,6 +542,84 @@ pub fn run() -> io::Result<()> {
     shared.scan(&extra)?;
     println!("no secret bytes in the relay log or the record");
     Ok(())
+}
+
+#[test]
+fn journal_distinguishes_learn_redirect_guard_and_upstream_refusals() {
+    use std::net::TcpStream;
+    let upstream = TcpListener::bind("127.0.0.1:0").expect("loopback upstream");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("loopback relay");
+    let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!("managed-journal-{}.jsonl", std::process::id()));
+    std::fs::create_dir_all(path.parent().expect("test directory")).expect("test directory");
+    let shared = Shared {
+        fake: true,
+        transport: Transport::new(Some(upstream.local_addr().expect("upstream address"))).expect("transport"),
+        guard: Guard {
+            owner: "freeekanayaka".into(),
+            repository: "temper-probe-2".into(),
+            installation: 0,
+            prefix: "temper/live-test/".into(),
+        },
+        state: Mutex::new(State { tokens: vec!["private-token".into()], ..State::default() }),
+        journal: Mutex::new(
+            OpenOptions::new().create_new(true).read(true).write(true).mode(0o600).open(&path).expect("journal"),
+        ),
+        evidence: Mutex::new(OpenOptions::new().write(true).open("/dev/null").expect("discard evidence")),
+    };
+    let wide = json!({"total_count":2,"repositories":[
+        {"owner":{"login":"private-owner"},"name":"private-name"},
+        {"owner":{"login":"another-private-owner"},"name":"another-private-name"}]})
+    .to_string();
+    for (status, body, reason, count) in [
+        (200, wide.as_str(), Some("learn:installation-repositories-not-exactly-probe-2"), Some(2)),
+        (302, "private-response", Some("redirect"), None),
+        (403, "private-response", None, None),
+        (0, "", Some("guard"), None),
+    ] {
+        thread::scope(|scope| {
+            if status != 0 {
+                let upstream = &upstream;
+                scope.spawn(move || {
+                    let (mut socket, _) = upstream.accept().expect("upstream accepts");
+                    Request::read(&mut socket).expect("forwarded request");
+                    write!(socket, "HTTP/1.1 {status} Answer\r\nContent-Length: {}\r\n\r\n{body}", body.len())
+                        .expect("upstream response");
+                });
+            }
+            scope.spawn(|| {
+                let (socket, _) = listener.accept().expect("relay accepts");
+                shared.serve(socket, false).expect("serve");
+            });
+            let mut client = TcpStream::connect(listener.local_addr().expect("relay address")).expect("client");
+            client.set_read_timeout(Some(Duration::from_secs(2))).expect("timeout");
+            let token = if status == 0 { "unknown-token" } else { "private-token" };
+            write!(client, "GET /installation/repositories?private-query HTTP/1.1\r\nHost: local\r\nAuthorization: Bearer {token}\r\n\r\n").expect("request");
+            let mut response = Vec::new();
+            client.read_to_end(&mut response).expect("response");
+            assert!(response.starts_with(b"HTTP/1.1 403"));
+        });
+        let journal = std::fs::read_to_string(&path).expect("journal");
+        let row: Value = serde_json::from_str(journal.lines().last().expect("row")).expect("JSON row");
+        assert_eq!(row["reason"], json!(reason));
+        assert_eq!(row["upstream_status"], if status == 0 { Value::Null } else { json!(status) });
+        assert_eq!(row["rows"], json!(count));
+        assert_eq!(row["total_count"], json!(count));
+        assert_eq!(row["path"], "/installation/repositories");
+        assert_eq!(row["status"], 403);
+        // All fields beyond the existing route/vocabulary are numbers, booleans or null.
+        for (key, value) in row.as_object().expect("object") {
+            if !matches!(key.as_str(), "listener" | "method" | "path" | "reason") {
+                assert!(value.is_number() || value.is_boolean() || value.is_null());
+            }
+        }
+        for private in
+            ["private-owner", "private-name", "private-response", "private-token", "unknown-token", "private-query"]
+        {
+            assert!(!journal.contains(private));
+        }
+    }
+    drop(shared);
+    std::fs::remove_file(path).expect("remove journal");
 }
 
 #[test]

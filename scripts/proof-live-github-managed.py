@@ -35,6 +35,10 @@ def require(condition):
         raise RuntimeError('sitting condition failed')
 
 
+class InstallationRefused(RuntimeError):
+    """Only the installation-list request received the relay's refusal status."""
+
+
 def private(path, data):
     with open(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), 'wb') as output:
         output.write(data)
@@ -216,8 +220,9 @@ class Sitting:
         # Fail before starting a peer or creating an App if signing support is absent.
         from cryptography.hazmat.primitives.serialization import load_der_private_key
         require(callable(load_der_private_key))
-        require(mode in ('fake', 'live'))
-        self.mode = mode
+        require(mode in ('fake', 'fake-wide', 'live'))
+        self.wide = mode == 'fake-wide'
+        self.mode = 'fake' if self.wide else mode
         self.port = int(port)
         self.root = Path(__file__).resolve().parent.parent
         self.scratch = Path(scratch).resolve(strict=True)
@@ -237,6 +242,8 @@ class Sitting:
         self.secrets = {'App_key_DER': [], 'App_key_base64': [], 'JWT': [], 'installation_token': []}
         self.relay = None
         self.scanned = False
+        self.retained = False
+        self.last_request = None
         self.binary = Path(os.environ['CARGO_TARGET_DIR']) / 'debug/temper'
         artifacts = [json.loads(line) for line in (self.scratch/'build.jsonl').read_text().splitlines()
                      if line.startswith('{')]
@@ -283,6 +290,7 @@ class Sitting:
 
     def http(self, address, method, target, body=b'', authorization=None, media='application/json'):
         self.step = 'HTTP ' + method + ' ' + target.split('?')[0]
+        self.last_request = (address, method, target.split('?')[0])
         require(address in self.allowed and target.startswith('/') and not target.startswith('//'))
         conn = http.client.HTTPConnection(address, timeout=30)
         headers = {'User-Agent': 'temper-managed-sitting', 'Content-Type': media,
@@ -321,6 +329,8 @@ class Sitting:
         status, _, data = self.http(self.api, method, path,
                                    b'' if body is None else json.dumps(body).encode(),
                                    self.jwt() if app else 'Bearer ' + self.token)
+        if status == 403 and method == 'GET' and path.split('?')[0] == '/installation/repositories':
+            raise InstallationRefused('installation repositories refused')
         require(status in (expected if isinstance(expected, tuple) else (expected,)))
         return json.loads(data) if data else None
 
@@ -342,6 +352,7 @@ class Sitting:
         address = fake.line('listening ')
         require(re.fullmatch(r'127\.0\.0\.1:\d+', address))
         self.allowed.add(address)
+        self.fake_address = address
         return address
 
     def configure(self, git, web):
@@ -362,6 +373,7 @@ class Sitting:
         private(directory/'temper.json', json.dumps(value).encode())
         server = self.start([str(self.binary), 'serve', '--config', str(directory),
                              '--data', str(self.scratch/'data'), '--cache', str(self.scratch/'cache')], 'engine')
+        self.engine = server
         link = 'http://' + server.line('http://')
         parts = urlsplit(link)
         require(parts.netloc == '127.0.0.1:' + str(self.port))
@@ -384,7 +396,8 @@ class Sitting:
         create = Form(body).create
         status, headers, _ = self.page('GET', create)
         require(status == 302)
-        status, headers, _ = self.page('GET', headers['Location'] + '&account=' + OWNER + '&repository_ids=1')
+        selected = '1,2' if self.wide else '1'
+        status, headers, _ = self.page('GET', headers['Location'] + '&account=' + OWNER + '&repository_ids=' + selected)
         require(status == 302)
         status, _, body = self.page('GET', headers['Location'])
         require(status == 200 and b'temper has the installation' in body)
@@ -507,6 +520,72 @@ class Sitting:
         self.scanned = True
         self.mark('no secret bytes in the relay log or the record')
 
+    def journal_rows(self):
+        journal = self.scratch/'relay.jsonl'
+        return [json.loads(line) for line in journal.read_bytes().splitlines()] if journal.exists() else []
+
+    def report_refusal(self):
+        rows = [row for row in reversed(self.journal_rows()) if row.get('refused')]
+        row = rows[0] if rows else None
+        if self.last_request is not None:
+            address, method, path = self.last_request
+            if path.startswith('/app-manifests/'):
+                path = '/app-manifests/[code]/conversions'
+            if address in (self.api, getattr(self, 'git', None)):
+                row = next((entry for entry in rows if entry.get('method') == method
+                            and entry.get('path') == path), row)
+        if row is not None:
+            # Only fixed labels and a numeric status can reach the terminal.
+            reason, status = row.get('reason'), row.get('upstream_status')
+            require(reason in (None, 'guard', 'redirect') or
+                    isinstance(reason, str) and re.fullmatch(r'learn:[a-z0-9-]+', reason))
+            require(status is None or type(status) is int and 100 <= status <= 599)
+            print('relay refusal: reason=' + (reason or 'null') + ' upstream_status=' +
+                  ('null' if status is None else str(status)), file=sys.stderr, flush=True)
+        return row
+
+    def retain_journal(self):
+        if self.relay is None or self.retained:
+            return
+        require(self.scanned)
+        destination = self.evidence.parent/('m3-relay-' + self.run + '.jsonl')
+        private(destination, (self.scratch/'relay.jsonl').read_bytes())
+        require(destination.stat().st_mode & 0o777 == 0o600)
+        self.retained = True
+        self.mark('relay journal retained: ' + str(destination))
+
+    def check_wide_refusal(self):
+        row = self.report_refusal()
+        require(row is not None and row['path'] == '/installation/repositories'
+                and row['reason'] == 'learn:installation-repositories-not-exactly-probe-2'
+                and row['status'] == 403 and row['upstream_status'] == 200
+                and row['rows'] == 2 and row['total_count'] == 2)
+        self.engine.stop()
+        # Read both fake repositories directly: the guard correctly refuses access.
+        # A fresh fake starts with main alone and no pull requests in either repo.
+        basic = 'Basic ' + base64.b64encode(('x-access-token:' + self.token).encode()).decode()
+        for name in (NAME, 'temper-probe'):
+            repository = OWNER + '/' + name
+            status, _, data = self.http(self.fake_address, 'POST', '/.fake/git/clone',
+                                        json.dumps({'repository': repository}).encode(), basic)
+            require(status == 200)
+            branches = json.loads(data)['branches']
+            require(len(branches) == 1 and branches[0]['branch'] == 'main')
+            # GitHub's issues listing includes pull requests of every state.
+            status, _, data = self.http(self.fake_address, 'GET', '/repos/' + repository +
+                                        '/issues?state=all&sort=updated&direction=asc&per_page=100&page=1',
+                                        authorization='Bearer ' + self.token)
+            require(status == 200 and json.loads(data) == [])
+        self.scan_secrets()  # Drain the relay before checking the complete write history.
+        rows = self.journal_rows()
+        require(not any(row.get('listener') == 'git' or
+                        row.get('method') in ('POST', 'PATCH', 'PUT', 'DELETE')
+                        and row.get('path', '').startswith(('/repos/', '/repositories/'))
+                        for row in rows))
+        self.mark('fake-wide refused the installation; nothing written to either repository')
+        self.retain_journal()
+        self.mark('fake-wide expected refusal completed')
+
     def push(self):
         if self.mode == 'fake':
             self.push_fake()
@@ -588,7 +667,14 @@ class Sitting:
             self.mark('one-time sign-in: ' + link)
             self.mark('Connect GitHub; create the App; install on freeekanayaka/temper-probe-2 alone; in Ready choose Start here')
         self.step = 'waiting for the exact installation'
-        self.wait_ready()
+        try:
+            self.wait_ready()
+        except InstallationRefused:
+            if not self.wide:
+                raise
+            self.check_wide_refusal()
+            return
+        require(not self.wide)  # A wide installation must never reach adoption or writes.
         self.mark('installation reaches exactly freeekanayaka/temper-probe-2')
         if self.mode == 'fake':
             adopted = json.loads(self.ctl('adopt', '--project', '1', '--forge', '1', '--owner', OWNER,
@@ -621,6 +707,7 @@ class Sitting:
             self.mark('fake has no App-deletion HTTP control; deletion and JWT 401 check skipped')
         self.step = 'scanning relay artifacts for secret bytes'
         self.scan_secrets()
+        self.retain_journal()
         self.mark('managed sitting completed')
 
     def finish(self):
@@ -630,6 +717,7 @@ class Sitting:
         finally:
             try:
                 self.scan_secrets()
+                self.retain_journal()
             finally:
                 for process in reversed(self.processes):
                     process.stop()
@@ -650,6 +738,7 @@ def main():
             print('delete this sitting\'s GitHub App id ' + str(sitting.app_id) + '; conversion evidence remains at ' + str(sitting.evidence), file=sys.stderr)
         if hasattr(sitting, 'last_status'):
             print('last HTTP status: ' + str(sitting.last_status), file=sys.stderr)
+        sitting.report_refusal()
         for process in sitting.processes:
             if process.diagnostics:
                 print('startup fields/categories: ' + ', '.join(sorted(process.diagnostics)), file=sys.stderr)
