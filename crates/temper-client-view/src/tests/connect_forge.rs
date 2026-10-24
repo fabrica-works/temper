@@ -269,7 +269,19 @@ fn set_up_failed_offers_set_up_again() {
         w::SetUpFailed::new(&w::CEILINGS, w::SetUpFailedParts { why: b"fetch failed".as_slice().into() }).unwrap(),
     ));
     let view = f::page_view(&root);
-    node(view.tree(), Role::Alert, b"Set up failed: fetch failed");
+    let reason = node(view.tree(), Role::Alert, b"Set up failed: fetch failed");
+    assert!(view.tree().nodes().iter().find(|n| n.id == reason).unwrap().styles.as_slice().contains(&crate::look::FLOW_FAILED));
+    let retry = node(view.tree(), Role::Button, b"Set up again");
+    assert!(
+        view.tree()
+            .nodes()
+            .iter()
+            .find(|n| n.id == retry)
+            .unwrap()
+            .styles
+            .as_slice()
+            .contains(&crate::look::FLOW_SECONDARY)
+    );
     assert!(f::find(view.tree(), Role::List, b"Each step").is_none());
     assert_eq!(press(&root, Role::Button, b"Set up again"), d::Action::Forge(d::forge::Act::SetUp { forge: HERE }));
 }

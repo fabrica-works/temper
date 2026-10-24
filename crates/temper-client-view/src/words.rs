@@ -10,6 +10,14 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    ModelKeyDescription,
+    ModelKeyField,
+    ModelAddKey,
+    ModelKeyPlaceholder,
+    ModelKeyWarning,
+    ModelSigningIn,
+    ModelOnAccounts,
+
     GitHubUnknown,
     GitHubPicker,
     GitHubInstalled,
@@ -575,9 +583,16 @@ pub enum Word {
 // The browser sign-in heading and Google link add two phrases.
 // GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
 // Account moves add four account literals and one task-wait phrase.
-const PHRASES: u32 = 1068;
-const SEGMENTS: u32 = 1865;
-const ALL: [Word; 523] = [
+const PHRASES: u32 = 1075;
+const SEGMENTS: u32 = 1880;
+const ALL: [Word; 530] = [
+    Word::ModelKeyDescription,
+    Word::ModelKeyField,
+    Word::ModelAddKey,
+    Word::ModelKeyPlaceholder,
+    Word::ModelKeyWarning,
+    Word::ModelSigningIn,
+    Word::ModelOnAccounts,
     Word::GitHubUnknown,
     Word::GitHubPicker,
     Word::GitHubInstalled,
@@ -1106,6 +1121,14 @@ impl Word {
     #[expect(clippy::too_many_lines, reason = "one exhaustive table keeps the frame phrase IDs stable")]
     fn id(self, connector: u16) -> PhraseId {
         let number = match self {
+            Self::ModelKeyDescription => 1917,
+            Self::ModelKeyField => 1918,
+            Self::ModelAddKey => 1919,
+            Self::ModelKeyPlaceholder => 1920,
+            Self::ModelKeyWarning => 1921,
+            Self::ModelSigningIn => 1922,
+            Self::ModelOnAccounts => 1923,
+
             Self::YourForgesTitle => 1819,
             Self::YourForges => 1800,
             Self::ForgesDescription => 1801,
@@ -1873,6 +1896,14 @@ const DEMO_REQUEST: &[&[u8]] = &[b"Try a request in ", b"/", b". Follow the task
 fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [HoleKind]) {
     use HoleKind::{Name, Number};
     match word {
+        Word::ModelKeyDescription => (&[b"From ", b"\xe2\x80\x99s platform, under API keys. What temper\xe2\x80\x99s agents use is billed to the key\xe2\x80\x99s organization."], &[Name]),
+        Word::ModelKeyField => (&[b"API key"], &[]),
+        Word::ModelAddKey => (&[b"Add the key"], &[]),
+        Word::ModelKeyPlaceholder => (&[b"sk-\xe2\x80\xa6"], &[]),
+        Word::ModelKeyWarning => (&[b"A key reads Ready until a run is refused: a wrong key shows only once ", b" refuses a request."], &[Name]),
+        Word::ModelSigningIn => (&[b"Signing in to ", b""], &[Name]),
+        Word::ModelOnAccounts => (&[b"", b" is on the "], &[Name]),
+
         Word::YourForgesTitle => (&[b"Your forges"], &[]),
         Word::YourForges => (&[b"Your forges ", b""], &[Number]),
         Word::ForgesDescription => (&[b"Each forge temper is connected to, or setting up. Add one to bring its repositories to temper."], &[]),

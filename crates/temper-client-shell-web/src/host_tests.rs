@@ -111,7 +111,7 @@ fn the_key_patch_declares_a_secret_entry() {
     host.act(way, Act::Press);
     host.requests();
     let patches = build(&mut host);
-    let key = node(&host, Role::TextField, b"Key (pasted once)");
+    let key = node(&host, Role::TextField, b"API key");
     let made =
         patches
             .iter()
@@ -121,7 +121,7 @@ fn the_key_patch_declares_a_secret_entry() {
             .expect("inserted key field");
     assert_eq!(made.attribute.entry, Some(EntryKind::Secret));
     assert!(made.value.as_ref().expect("empty field").text.is_empty());
-    let patches = input(&mut host, b"Key (pasted once)", KEY);
+    let patches = input(&mut host, b"API key", KEY);
     assert!(!format!("{patches:?} {:?}", host.view).contains("private-host-key"));
 }
 #[test]
@@ -133,9 +133,9 @@ fn sending_a_key_emits_the_empty_value_patch() {
     host.act(way, Act::Press);
     host.requests();
     build(&mut host);
-    input(&mut host, b"Key (pasted once)", KEY);
-    let key = node(&host, Role::TextField, b"Key (pasted once)");
-    send(&mut host, b"Add key");
+    input(&mut host, b"API key", KEY);
+    let key = node(&host, Role::TextField, b"API key");
+    send(&mut host, b"Add the key");
     let patches = build(&mut host);
     assert!(
         patches
@@ -152,8 +152,8 @@ fn a_key_never_reaches_the_small_store_output() {
     host.act(way, Act::Press);
     host.requests();
     build(&mut host);
-    input(&mut host, b"Key (pasted once)", KEY);
-    send(&mut host, b"Add key");
+    input(&mut host, b"API key", KEY);
+    send(&mut host, b"Add the key");
     let requests = host.requests();
     assert!(
         !requests.iter().any(|request| matches!(request, Asked::Save { .. })),

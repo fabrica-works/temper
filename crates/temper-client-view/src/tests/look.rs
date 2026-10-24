@@ -13,7 +13,7 @@ fn the_frame_carries_its_tokens() {
 fn the_looks_names_pass_skeins_check() {
     assert!(skein_ui::look::check(&[NAMES]).is_none());
 }
-const FLOW_NAMES: [(skein_ui::Style, &[u8]); 13] = [
+const FLOW_NAMES: [(skein_ui::Style, &[u8]); 14] = [
     (FLOW_PRIMARY, b"temper-flow-primary"),
     (FLOW_FAILED, b"temper-flow-failed"),
     (FLOW_PAIR, b"temper-flow-pair"),
@@ -27,6 +27,7 @@ const FLOW_NAMES: [(skein_ui::Style, &[u8]); 13] = [
     (FLOW_FACTS, b"temper-flow-facts"),
     (MODEL_CHOICES, b"temper-model-choices"),
     (FLOW_DETAILS, b"temper-flow-details"),
+    (MODEL_KEY, b"temper-model-key"),
 ];
 #[test]
 fn each_style_or_region_is_named_under_temper() {

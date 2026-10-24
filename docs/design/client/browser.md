@@ -384,6 +384,10 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   visually hidden. Back, Later and the playground alternative are quiet
   text controls without underlines; Back and Later are bold terracotta,
   and the playground alternative is plain ink. Each keeps a focus ring.
+  The welcome's Model ways sit directly under its lead, without the
+  standalone page's holder choice or outer Choose card. Inside a way,
+  its single Back returns to Model Choose. The API key details have a
+  420 px maximum width; failure reasons in flow details are red.
 - **The task pages' stylesheet,** `task-pages.css`, comes third, after
   `temper.css`, whose variables and rules it builds on: what the task
   pages add to the look, as `task.html` draws it in the terminal
@@ -900,6 +904,10 @@ view draws, never changing a view to suit a sample.
 | `github-picker` | the installation's reached repositories, ready to adopt |
 | `github-adopted` | the adopted GitHub repository and its primary Open act |
 | `welcome-model-choose` | the welcome's Model choices, with ChatGPT sign-in and an API key |
+| `welcome-model-key-details` | the welcome's API key form, without an unsupported display-name field |
+| `welcome-model-signing-in` | signing in to ChatGPT inside the welcome |
+| `welcome-model-signin-ready` | ChatGPT Ready with the account's address and Accounts-page line |
+| `forge-setup-failed` | the failed setup's reason and neutral retry act |
 | `connect-forge-choose` | `ConnectForge`'s Choose: GitHub, Forgejo here and a Forgejo elsewhere |
 | `chats-setup-strip` | the chats with no demo, no usable account and no forge: the setup strip |
 | `adoption` | the adoption form, empty |

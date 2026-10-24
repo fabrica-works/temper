@@ -277,6 +277,8 @@ pub const FLOW_FACTS: Style = Style { owner: owner(), token: 135 };
 pub const MODEL_CHOICES: Style = Style { owner: owner(), token: 136 };
 /// A connection details card, separate from Model’s outer Choose card.
 pub const FLOW_DETAILS: Style = Style { owner: owner(), token: 137 };
+/// The API key form follows the reference's 420 px maximum.
+pub const MODEL_KEY: Style = Style { owner: owner(), token: 138 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -420,6 +422,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-flow-facts",
         b"temper-model-choices",
         b"temper-flow-details",
+        b"temper-model-key",
     ],
     regions: &[b"temper-link"],
 };

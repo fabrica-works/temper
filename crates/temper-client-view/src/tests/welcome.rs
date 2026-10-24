@@ -586,7 +586,7 @@ fn model_choose_excludes_the_playgrounds_provider_before_and_after_retirement() 
             .filter(|n| n.role == (Role::Heading { level: 2 }))
             .map(|n| n.name.as_deref().unwrap())
             .collect();
-        assert_eq!(headings, [b"Choose".as_slice(), b"ChatGPT", b"An OpenAI API key"]);
+        assert_eq!(headings, [b"ChatGPT".as_slice(), b"An OpenAI API key"]);
         let key = node(tree, Role::Link, "Use an API key");
         assert_eq!(
             crate::act(&mut view, key, Act::Press),
@@ -602,4 +602,100 @@ fn model_choose_excludes_the_playgrounds_provider_before_and_after_retirement() 
     check(&root);
     super::choice::answer_retired_playground(&mut root, read);
     check(&root);
+}
+
+fn model_address(kind: d::WayKind) -> Address {
+    Address::Welcome { step: Step::Model { way: Some(d::ModelWay { provider: 17, kind, source: None }) } }
+}
+fn in_welcome(root: &mut d::Domain, kind: d::WayKind) {
+    f::root_event(root, d::Event::Went { place: d::Place::Address(model_address(kind)) });
+}
+fn model_back(root: &d::Domain) {
+    let view = f::page_view(root);
+    let tree = view.tree();
+    assert_eq!(tree.nodes().iter().filter(|n| n.name.as_deref() == Some("‹ Back".as_bytes())).count(), 1);
+    assert!(f::find(tree, Role::Link, "‹ All ways".as_bytes()).is_none());
+    assert_eq!(
+        press(root, Role::Link, "‹ Back"),
+        d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Model { way: None } } })
+    );
+}
+#[test]
+fn model_choose_has_direct_ways_and_the_persons_default_holder() {
+    use jig_client::contract as c;
+    let mut root = super::connect_model::offered_root();
+    f::root_event(
+        &mut root,
+        d::Event::Went { place: d::Place::Address(Address::Welcome { step: Step::Model { way: None } }) },
+    );
+    let view = f::page_view(&root);
+    let tree = view.tree();
+    for name in ["Use your accounts", "Use deployment accounts"] {
+        assert!(f::find(tree, Role::Button, name.as_bytes()).is_none());
+    }
+    assert!(f::find(tree, Role::Region, b"Choose").is_none());
+    assert_eq!(root.pages().connect_model().unwrap().holder, c::AccountHolder::Own);
+    assert_eq!(tree.nodes().iter().filter(|n| n.styles.as_slice().contains(&crate::look::FLOW_CHOICE)).count(), 2);
+    assert_eq!(
+        press(&root, Role::Link, "‹ Back"),
+        d::Action::Pages(pages::Act::Go { address: Address::Welcome { step: Step::Forge { forge: None } } })
+    );
+}
+#[test]
+fn model_details_and_signing_use_one_back_to_their_choose() {
+    for kind in [d::WayKind::Key, d::WayKind::Program, d::WayKind::SignIn] {
+        let (mut root, _) = super::connect_model::flow_fixture(kind);
+        in_welcome(&mut root, kind);
+        model_back(&root);
+        let view = f::page_view(&root);
+        let tree = view.tree();
+        if kind == d::WayKind::Key {
+            node(tree, Role::Heading { level: 2 }, "An OpenAI API key");
+            let field = node(tree, Role::TextField, "API key");
+            let field = tree.nodes().iter().find(|n| n.id == field).unwrap();
+            assert_eq!(field.placeholder.as_deref(), Some("sk-…".as_bytes()));
+            assert_eq!(field.entry, Some(skein_ui::EntryKind::Secret));
+            assert!(f::find(tree, Role::TextField, b"Name").is_none());
+            node(tree, Role::Button, "Add the key");
+            let words = String::from_utf8(f::text(tree).into_vec()).unwrap();
+            for expected in [
+                "From OpenAI’s platform, under API keys. What temper’s agents use is billed to the key’s organization.",
+                "A pasted value is sent once and shown nowhere, then or after.",
+                "A key reads Ready until a run is refused: a wrong key shows only once OpenAI refuses a request.",
+            ] {
+                assert!(words.contains(expected), "missing {expected}");
+            }
+        } else if kind == d::WayKind::SignIn {
+            node(tree, Role::Heading { level: 2 }, "Signing in to ChatGPT");
+        }
+    }
+}
+#[test]
+fn model_endings_have_their_heading_and_one_back() {
+    use jig_client::contract::{OwnerAccountEnd as E, OwnerAccountFailure as F, OwnerAccountRefusal as R};
+    for (end, heading) in [
+        (E::Made { account: 1, declined: false }, "Signed in to ChatGPT as alice@example.com"),
+        (E::Renewed { account: 1, declined: false }, "Signing in to ChatGPT"),
+        (E::Made { account: 1, declined: true }, "Signing in to ChatGPT"),
+        (E::Renewed { account: 1, declined: true }, "Signing in to ChatGPT"),
+        (E::Refused { refusal: R::Held { provider: 17 } }, "Signing in to ChatGPT"),
+        (E::Failed { failure: F::Misconfigured }, "Signing in to ChatGPT"),
+        (E::Failed { failure: F::SignInAgain }, "Signing in to ChatGPT"),
+        (E::Failed { failure: F::MissingScope { scope: 19 } }, "Signing in to ChatGPT"),
+    ] {
+        let mut root = super::connect_model::ending(end, b"alice@example.com");
+        let standalone = f::page_view(&root);
+        node(standalone.tree(), Role::Heading { level: 2 }, heading);
+        in_welcome(&mut root, d::WayKind::SignIn);
+        model_back(&root);
+        let view = f::page_view(&root);
+        node(view.tree(), Role::Heading { level: 2 }, heading);
+        if heading.starts_with("Signed in") {
+            node(
+                view.tree(),
+                Role::Paragraph,
+                "ChatGPT · alice@example.com is on the Accounts page, with its details.",
+            );
+        }
+    }
 }

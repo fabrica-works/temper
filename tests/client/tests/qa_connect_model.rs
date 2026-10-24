@@ -59,7 +59,7 @@ fn malformed_way_fields_drop_without_refusing_the_page() {
 fn an_unknown_provider_shows_choose() {
     let mut world = world();
     let client = open(&mut world, b"/accounts/connect?provider=999&way=key");
-    follow(&mut world, client, vec![see(Role::Link, b"Use an API key"), gone(Role::Button, b"Add key")]);
+    follow(&mut world, client, vec![see(Role::Link, b"Use an API key"), gone(Role::Button, b"Add the key")]);
 }
 
 // client/README.md 3.5 ConnectModel: deployment choice offers keys alone.
@@ -87,10 +87,10 @@ fn all_ways_returns_key_details_to_choose() {
         &mut world,
         client,
         vec![
-            see(Role::Button, b"Add key"),
+            see(Role::Button, b"Add the key"),
             press(Role::Link, "‹ All ways".as_bytes()),
             see(Role::Link, b"Use an API key"),
-            gone(Role::Button, b"Add key"),
+            gone(Role::Button, b"Add the key"),
         ],
     );
 }
@@ -130,7 +130,7 @@ fn welcome_model_keeps_its_frame_when_opening_key_details() {
         client,
         vec![
             press(Role::Link, b"Use an API key"),
-            see(Role::Button, b"Add key"),
+            see(Role::Button, b"Add the key"),
             see(Role::Link, b"Later"),
             gone(Role::Link, b"Accounts"),
             gone(Role::Status, b"Live"),
@@ -154,7 +154,7 @@ fn leaving_the_flow_drops_a_pasted_key() {
             Step::Go { address: at(way(b"key", None).as_slice()) },
         ],
     );
-    follow(&mut world, client, vec![press(Role::Button, b"Add key")]);
+    follow(&mut world, client, vec![press(Role::Button, b"Add the key")]);
     assert!(
         !world
             .front()
@@ -171,7 +171,7 @@ fn leaving_the_flow_drops_a_pasted_key() {
 fn adding_a_key_reaches_ready() {
     let mut world = world();
     let client = open(&mut world, way(b"key", None).as_slice());
-    follow(&mut world, client, vec![type_key(), press(Role::Button, b"Add key")]);
+    follow(&mut world, client, vec![type_key(), press(Role::Button, b"Add the key")]);
     temper_client_world::front::account_acts::kept(world.front());
     follow(
         &mut world,
@@ -197,7 +197,7 @@ fn deployment_key_choice_opens_details() {
         vec![
             press(Role::Button, b"Use deployment accounts"),
             press(Role::Link, b"Use an API key"),
-            see(Role::Button, b"Add key"),
+            see(Role::Button, b"Add the key"),
         ],
     );
 }
@@ -214,8 +214,8 @@ fn double_pressing_add_key_makes_one_source() {
         .tree(client)
         .nodes()
         .iter()
-        .find(|n| n.role == Role::Button && n.name.as_deref() == Some(b"Add key"))
-        .expect("Add key button")
+        .find(|n| n.role == Role::Button && n.name.as_deref() == Some(b"Add the key"))
+        .expect("Add the key button")
         .id;
     world.act(client, add, skein_ui::Act::Press);
     world.act(client, add, skein_ui::Act::Press);
@@ -244,7 +244,7 @@ fn deployment_choice_is_kept_across_details_and_choose() {
         vec![
             press(Role::Button, b"Use deployment accounts"),
             press(Role::Link, b"Use an API key"),
-            see(Role::Button, b"Add key"),
+            see(Role::Button, b"Add the key"),
             press(Role::Link, "‹ All ways".as_bytes()),
             see(Role::Link, b"Use an API key"),
         ],
@@ -271,8 +271,8 @@ fn all_ways_keeps_the_key_until_the_flow_is_left() {
             press(Role::Link, "‹ All ways".as_bytes()),
             see(Role::Link, b"Use an API key"),
             press(Role::Link, b"Use an API key"),
-            see(Role::Button, b"Add key"),
-            press(Role::Button, b"Add key"),
+            see(Role::Button, b"Add the key"),
+            press(Role::Button, b"Add the key"),
             see(Role::Link, b"Start a chat"),
         ],
     );

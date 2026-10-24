@@ -143,7 +143,7 @@ fn add_model(front: &mut Joint, root: &mut Root) {
         },
     );
     pump(front, root, d::Event::AccountKey { value: skein_lib::Secret::new(b"test-private-key".as_slice().into()) });
-    press(front, root, b"Add key");
+    press(front, root, b"Add the key");
     accounts::kept(front);
     accounts::settle(front, root);
 }

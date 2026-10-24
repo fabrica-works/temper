@@ -44,7 +44,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 57;
+pub const N: usize = 61;
 #[must_use]
 fn task(task: u64) -> Address {
     Address::Task { task, filter: PlanFilter::All }
@@ -81,6 +81,10 @@ pub fn samples() -> [Sample; N] {
             temper_client_domain::Step::Forge { forge: Some(temper_client_domain::Choice::Forge(3)) },
         ),
         welcome_sample("welcome-model-choose", temper_client_domain::Step::Model { way: None }),
+        welcome_model_sample("welcome-model-key-details", temper_client_domain::WayKind::Key, Shown),
+        welcome_model_sample("welcome-model-signing-in", temper_client_domain::WayKind::SignIn, SigningIn),
+        welcome_model_sample("welcome-model-signin-ready", temper_client_domain::WayKind::SignIn, SignInReady),
+        owned_sample("forge-setup-failed", 12, false),
         github_sample("github-app-details", 0),
         github_sample("github-install", 9),
         github_sample("github-picker", 10),
@@ -175,6 +179,13 @@ fn owned_sample(name: &'static str, step: u8, ready: bool) -> Sample {
         then: Then::Shown,
     }
 }
+fn welcome_model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: Then) -> Sample {
+    let mut sample = model_sample(name, kind, then);
+    if let Address::ConnectModel { way } = sample.address {
+        sample.address = Address::Welcome { step: temper_client_domain::Step::Model { way } };
+    }
+    sample
+}
 fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: Then) -> Sample {
     let way = temper_client_domain::ModelWay {
         source: None,
@@ -186,6 +197,15 @@ fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: T
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
     match sample.name {
+        "welcome-model-key-details" => {
+            return Some("welcome.html?world=first-run&step=0&at=model&way=key&bare".to_owned());
+        }
+        "welcome-model-signing-in" | "welcome-model-signin-ready" => {
+            return Some("connect-model.html?world=first-run&step=5&way=chatgpt&bare".to_owned());
+        }
+        "forge-setup-failed" => {
+            return Some("connect-forge.html?world=first-run&step=6&forge=3&bare#other-states-failed".to_owned());
+        }
         "github-app-details" => {
             return Some("connect-forge.html?world=first-run-github&step=1&forge=2&bare".to_owned());
         }
@@ -391,9 +411,10 @@ fn account(root: &mut Domain, then: Then, out: &mut Queue<Request>) {
     step(
         root,
         Event::Went {
-            place: temper_client_domain::Place::Address(Address::ConnectModel {
-                way: Some(temper_client_domain::pages::connect_model::model_way(way)),
-            }),
+            place: temper_client_domain::Place::Address(temper_client_domain::pages::connect_model::address(
+                root.pages().address(),
+                Some(temper_client_domain::pages::connect_model::model_way(way)),
+            )),
         },
         out,
     );

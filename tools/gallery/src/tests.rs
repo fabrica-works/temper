@@ -67,6 +67,29 @@ enum Part {
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
+        name: "welcome-model-key-details",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::TextField, name: "API key" }],
+    },
+    Holds {
+        name: "welcome-model-signing-in",
+        heading: "Connect a model",
+        parts: &[Part::Named { role: Role::Heading { level: 2 }, name: "Signing in to ChatGPT" }],
+    },
+    Holds {
+        name: "welcome-model-signin-ready",
+        heading: "Connect a model",
+        parts: &[Part::Named {
+            role: Role::Paragraph,
+            name: "ChatGPT · pat@example.com is on the Accounts page, with its details.",
+        }],
+    },
+    Holds {
+        name: "forge-setup-failed",
+        heading: "Connect a forge",
+        parts: &[Part::Named { role: Role::Button, name: "Set up again" }],
+    },
+    Holds {
         name: "github-app-details",
         heading: "Connect a forge",
         parts: &[Part::Named { role: Role::Region, name: "An App of your own" }],
@@ -395,7 +418,7 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "connect-model-key-details",
         heading: "Connect a model",
-        parts: &[Part::Named { role: Role::TextField, name: "Key (pasted once)" }],
+        parts: &[Part::Named { role: Role::TextField, name: "API key" }],
     },
     Holds {
         name: "connect-model-program-details",
@@ -410,7 +433,7 @@ const HOLDS: [Holds; samples::N] = [
     Holds {
         name: "connect-model-signin-ready",
         heading: "Connect a model",
-        parts: &[Part::Named { role: Role::Status, name: "Signed in to ChatGPT as pat@example.com" }],
+        parts: &[Part::Named { role: Role::Heading { level: 2 }, name: "Signed in to ChatGPT as pat@example.com" }],
     },
     Holds {
         name: "connect-model-declined",

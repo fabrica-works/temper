@@ -137,6 +137,8 @@ fn the_deployment_holder_offers_keys_only() {
     let mut root = ways_root(providers, false);
     model_action(&mut root, M::Holder { holder: c::AccountHolder::Deployment });
     let names = control_names(&root);
+    assert!(names.contains(&b"Use your accounts".to_vec()));
+    assert!(names.contains(&b"Use deployment accounts".to_vec()));
     assert!(names.contains(&b"Use an OpenAI API key".to_vec()));
     assert!(names.contains(&b"Use an Anthropic API key".to_vec()));
     assert!(!names.contains(&b"Continue with ChatGPT".to_vec()));
@@ -218,7 +220,7 @@ fn answer(root: &mut d::Domain, attempt: skein_lib::Token, outcome: c::OwnerOutc
 fn words(root: &d::Domain) -> String {
     String::from_utf8(fixtures::text(fixtures::page_view(root).tree()).into_vec()).unwrap()
 }
-fn ending(end: c::OwnerAccountEnd, display: &[u8]) -> d::Domain {
+pub(super) fn ending(end: c::OwnerAccountEnd, display: &[u8]) -> d::Domain {
     let (mut root, watch) = flow_fixture(d::WayKind::SignIn);
     let attempt = sent(
         &mut root,
@@ -243,12 +245,12 @@ fn ending(end: c::OwnerAccountEnd, display: &[u8]) -> d::Domain {
 fn a_key_has_details_then_ready_with_its_account_and_chat_link() {
     let (mut root, _) = flow_fixture(d::WayKind::Key);
     let mut view = fixtures::view();
-    assert!(fixtures::find(fixtures::build(&mut view, &root), Role::TextField, b"Key (pasted once)").is_some());
+    assert!(fixtures::find(fixtures::build(&mut view, &root), Role::TextField, b"API key").is_some());
     press(
         &mut view,
         &mut root,
         Role::TextField,
-        b"Key (pasted once)",
+        b"API key",
         Act::Input { value: Box::from(b"private-once".as_slice()) },
     );
     let attempt = sent(&mut root, M::Submit { name: [1; 16] });

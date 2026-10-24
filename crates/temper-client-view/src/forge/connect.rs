@@ -540,6 +540,14 @@ fn mark(current: usize, index: usize) -> Mark {
         core::cmp::Ordering::Greater => Mark::ToCome,
     }
 }
+fn setup_failure(b: &mut Builder, row: &Row) {
+    b.open(Role::Alert);
+    b.style(look::FLOW_FAILED);
+    let words = forge::words::forge_connection(row);
+    b.name(&words);
+    b.text(Run::Plain, &words);
+    b.close();
+}
 pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, row: &Row) {
     if row.kind == Kind::GitHub {
         if forge::forges::slug(row).is_some() {
@@ -568,7 +576,7 @@ pub(crate) fn setting_up(b: &mut Builder, root: &Domain, w: &Words, bindings: &m
     flow::details(b, &w.say(Word::ForgeSettingUpTitle, &[]));
     first_line(b, root, w, row);
     if connect::failed(row) {
-        crate::cards::text(b, Role::Alert, &forge::words::forge_connection(row));
+        setup_failure(b, row);
         setup_control(b, root, w, bindings, row.number, Word::ForgeAgain);
     } else {
         progress_in(b, Some(root), w, row);
@@ -691,7 +699,7 @@ pub(crate) fn adopted_project(root: &Domain, row: &Row) -> Option<u32> {
 /// Refusals remain actionable from the welcome's checklist as well as `ConnectForge`'s card.
 pub(crate) fn setup_ending(b: &mut Builder, root: &Domain, w: &Words, forge: &mut ForgeBindings, row: &Row) {
     if connect::failed(row) {
-        crate::cards::text(b, Role::Alert, &forge::words::forge_connection(row));
+        setup_failure(b, row);
         setup_control(b, root, w, forge, row.number, Word::ForgeAgain);
     }
     if let Some(first) = &row.first {

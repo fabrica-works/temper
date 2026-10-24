@@ -57,10 +57,10 @@ fn the_banner_key_way_opens_details_and_ready_removes_the_banner() {
         &mut front,
         &mut root,
         Role::TextField,
-        b"Key (pasted once)",
+        b"API key",
         skein_ui::Act::Input { value: b"test-private-key".as_slice().into() },
     );
-    press(&mut front, &mut root, Role::Button, b"Add key", skein_ui::Act::Press);
+    press(&mut front, &mut root, Role::Button, b"Add the key", skein_ui::Act::Press);
     accounts::kept(&mut front);
     accounts::settle(&mut front, &mut root);
     assert!(text(&root).contains("Added your Scripted API key"));
@@ -97,12 +97,12 @@ fn a_creation_key_is_absent_from_the_small_store() {
         vec![
             Step::See { find: Find::exactly_named(Role::Link, b"Use an API key"), within: fixtures::WITHIN },
             Step::Press { find: Find::exactly_named(Role::Link, b"Use an API key") },
-            Step::See { find: Find::exactly_named(Role::Button, b"Add key"), within: fixtures::WITHIN },
+            Step::See { find: Find::exactly_named(Role::Button, b"Add the key"), within: fixtures::WITHIN },
             Step::Type {
-                find: Find::exactly_named(Role::TextField, b"Key (pasted once)"),
+                find: Find::exactly_named(Role::TextField, b"API key"),
                 words: b"test-private-key".as_slice().into(),
             },
-            Step::Press { find: Find::exactly_named(Role::Button, b"Add key") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Add the key") },
             Step::See { find: Find::text(b"Added your Scripted API key"), within: fixtures::WITHIN },
         ],
     );

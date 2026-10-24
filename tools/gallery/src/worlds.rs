@@ -302,6 +302,10 @@ fn forges(world: World) -> Box<[u8]> {
             6 => w::Connection::SettingUp(
                 w::SettingUp::new(&limits, w::SettingUpParts { step: Some(w::SetUpStep::Prepare) }).expect("preparing"),
             ),
+            12 => w::Connection::SetUpFailed(
+                w::SetUpFailed::new(&limits, w::SetUpFailedParts { why: b"disk full".as_slice().into() })
+                    .expect("failed setup"),
+            ),
             7 => w::Connection::Connected(
                 w::Connected::new(&limits, w::ConnectedParts { id: 2, login: b"temper".as_slice().into() })
                     .expect("connected"),
@@ -2368,8 +2372,8 @@ pub(super) fn now(w: World) -> Wall {
             5 => 15,
             6 => 16,
             7 | 8 => 19,
-            // Synthetic GitHub frames have no relative timestamps on screen.
-            9..=11 => 0,
+            // Synthetic GitHub and failure frames have no relative timestamps on screen.
+            9..=12 => 0,
             _ => unreachable!("mockup first-run step"),
         },
         Reference | Solo | World::Bare => 0,

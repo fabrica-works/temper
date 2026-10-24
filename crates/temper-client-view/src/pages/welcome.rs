@@ -154,9 +154,9 @@ pub(crate) fn main(
         b.open(Role::Slot);
         b.style(look::WELCOME_FOOT);
         let back = match step {
-            Step::Forge { forge: Some(_) } | Step::Model { .. } => Step::Forge { forge: None },
+            Step::Model { way: Some(_) } | Step::Ready => Step::Model { way: None },
+            Step::Forge { forge: Some(_) } | Step::Model { way: None } => Step::Forge { forge: None },
             Step::Welcome | Step::Forge { forge: None } => Step::Welcome,
-            Step::Ready => Step::Model { way: None },
         };
         go(b, w, bindings, Word::WelcomeBack, back);
         control(

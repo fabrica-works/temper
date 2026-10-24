@@ -11,6 +11,10 @@ connect-forge-choose
 welcome-forge-choose
 welcome-forge-details
 welcome-model-choose
+welcome-model-key-details
+welcome-model-signing-in
+welcome-model-signin-ready
+forge-setup-failed
 github-app-details
 github-install
 github-picker
