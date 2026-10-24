@@ -9,7 +9,10 @@ the kept port `forgejo`, which only Forgejo listens on.
 The one process, `box`, runs `temper box` on rendered files: `temper.json` is
 the document `temper init` writes, shaped to owned forge 1 with
 `"start": "asked"`, the lab's two binaries and port, no demo, ChatGPT's
-provider and model, and clients and webhooks on `127.0.0.1:0`. Nothing is
+provider and model, and clients and webhooks on `127.0.0.1:0`. Every host its documents
+name is `127.0.0.1`: a run with no driver and no held file has loopback alone
+(skein lab.md 5.2), and serve resolves each endpoint's name as it starts, the
+sign-in's among them, though 0a calls none. Nothing is
 fetched, and `temper init` never runs. `TEMPER_ECHO=steps` puts serve's
 listeners on stderr, where readiness captures `serve: listening clients `.
 The box's stdout is serve's sign-in link alone; the runner sends it to the
