@@ -238,15 +238,19 @@ git diff --stat LIVE NEW -- ':(glob)crates/*/golden*/**'
   is embedded in the binary, and the workers are redeployed from the
   same one.
 - **The file `temper ctl export` writes** (section 10) is what crosses a
-  redeploy. If its family changed, the import after the start refuses
-  the old file, and an owner signs in to the account again from
+  redeploy. Its two families have no golden directory: jig's moved
+  form (`crates/jig-protocol-accounts/src/moved.rs`) and skein's OAuth
+  record inside it (`crates/skein-oauth/src/record.rs`), so diff those
+  between the pins too. If either changed, the import after the start
+  refuses the old file, and an owner signs in to the account again from
   **Accounts**. Let the refusal stand: an old file is never read as a
   new one.
 
 1. **Build** at `main` (section 2), and remake both documents from the
    new commit's example (sections 3 and 7).
-2. **Stop** temper's and Forgejo's units on `engine`, and the worker
-   and runner on `worker`.
+2. **Export** the LLM account from the running engine (section 10),
+   then **stop** temper's and Forgejo's units on `engine`, and the
+   worker and runner on `worker`.
 3. **Install** the binary and the documents.
 4. **Reset** what may be lost: on `engine`, everything in `data/` but
    `secrets/` and the forge's directory; on `worker`, everything in the
@@ -255,7 +259,8 @@ git diff --stat LIVE NEW -- ':(glob)crates/*/golden*/**'
    `worker` again.
 5. **Start** Forgejo, then temper; then the worker and the runner. The
    preparation leaves a new handover; the engine takes it over,
-   reconnects to the kept Forgejo and remakes its bot's tokens.
+   reconnects to the kept Forgejo and remakes its bot's tokens. Once
+   temper answers, **import** the account (section 10).
 6. **Check:** both names over HTTPS, the link's route refused from
    outside, Google's start (section 6), the worker linked
    (`journalctl -u` its unit shows `linked`), the runner online in
@@ -263,8 +268,8 @@ git diff --stat LIVE NEW -- ':(glob)crates/*/golden*/**'
 
 What survives: Forgejo and its repositories, the secrets' files, and
 the members, which are configuration. What is lost: the store, so every
-sign-in, chat and task, the members' bindings, and the deployment's LLM
-accounts (section 10).
+sign-in, chat and task, the members' bindings, and every LLM account
+but the signed-in ones exported and imported (section 10).
 
 ## 9. The printed link, for recovery
 
@@ -287,11 +292,52 @@ keeps the store.
 
 ## 10. The LLM account across a redeploy
 
-Not yet: `temper ctl export` and `import`
-(`docs/design/client/tools.md`, 5.5, area 5) are designed, being
-built. Once they are, a redeploy exports the signed-in account from the
-running engine before the stop and imports it after the start, so that
-nobody signs in again. Until then each redeploy loses the deployment's
-accounts, and an owner signs in again from **Accounts**. ChatGPT's
-sign-in returns to `127.0.0.1:1455` on `engine`: from your browser's
-machine, keep `ssh -L 1455:127.0.0.1:1455 engine` open while you sign in.
+The LLM accounts are in the store, which starts afresh at each redeploy
+(section 8). A signed-in account crosses it by `temper ctl`
+(`docs/design/client/tools.md`, 5.5, area 5): exported from the running
+engine last before the stop, imported into the new one once it answers.
+A key's account does not cross: add the key again from **Accounts**.
+Run `temper ctl` on `engine` as temper's user (`sudo -u temper
+/var/lib/temper/bin/temper ctl`, written `temper ctl` below), with a
+directory of its own, `0700`, made empty each time (`DIR`):
+
+1. **Sign in** by the link temper printed (section 9), its origin
+   swapped for the listener's, on stdin, so that it is never an
+   argument or shown:
+
+   ```sh
+   sudo journalctl -u temper -o cat | grep -o 'https://temper.example.com/jig/v1/sign-in/link?[^ ]*' \
+       | tail -1 | sed 's#^https://temper.example.com#http://127.0.0.1:8367#' \
+       | sudo -u temper /var/lib/temper/bin/temper ctl DIR sign-in -
+   ```
+
+   It signs in the first of `engine.owners`. A link spent or expired is
+   refused, and temper prints a fresh one: run it again.
+2. **Before the stop,** `temper ctl DIR accounts --json` names each
+   account and its sources. For each with a granted `sign_in` source,
+   `temper ctl DIR export N FILE`, FILE a new path in
+   `/var/lib/temper/data/secrets/`, which the reset keeps: it prints
+   `moved out: account N to FILE`, FILE `0600`, and the running engine
+   has let the account go. Stop then, with nothing in between.
+3. **After the start,** sign in again by the new engine's link (step
+   1), then `temper ctl DIR import FILE --key NAME`, NAME a word of `a`
+   to `z`, `0` to `9` and `-`: it prints `moved in: account N` and
+   removes FILE. Then `temper ctl DIR sign-out`, and remove `DIR`.
+
+FILE is a credential, the account's only holder between the two steps:
+check it by `stat` alone, and never print it, copy it off `engine` or
+commit it. Nothing here stops a redeploy; each of these ends is said, and
+an owner signs in to the account again from **Accounts**:
+
+- **the running build has no `export`** (`temper ctl help export`
+  fails): nothing crosses;
+- **an export refused or its record lost on its way:** the engine kept
+  the account, and the store loses it; FILE is removed, or, if `temper
+  ctl` kept it, import it;
+- **an import refused** ("not ours", "held", or the file's family
+  changed: section 8): FILE is kept. Leave it as it is, and never edit
+  or translate it.
+
+ChatGPT's sign-in returns to `127.0.0.1:1455` on `engine`: from your
+browser's machine, keep `ssh -L 1455:127.0.0.1:1455 engine` open while
+you sign in.
