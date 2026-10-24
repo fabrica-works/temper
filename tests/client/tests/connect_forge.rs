@@ -251,3 +251,60 @@ fn a_connected_forge_and_usable_model_remove_the_setup_strip_and_dot() {
     assert!(!ready.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&temper_client_view::look::NAV_LIMITED)
         || n.styles.as_slice().contains(&temper_client_view::look::NAV_NEEDS)));
 }
+
+#[test]
+fn github_ready_picks_adopts_into_a_new_project_and_stays_adopted_after_reload() {
+    let (mut front, mut root) = Joint::github_fixture(fixtures::SEED);
+    let mut now = Time::ZERO.saturating_add(Duration::from_secs(1));
+    assert_eq!(front.reachable_reads, [(1, Some(1), 1)]);
+    let mut picker = view(&root);
+    node(&picker, Role::Heading { level: 2 }, b"Choose a repository to start in");
+    let row = node(&picker, Role::Choice, b"acme/second, private");
+    let action = temper_client_view::act(&mut picker, row, skein_ui::Act::Toggle).expect("chosen row");
+    pump(&mut front, &mut root, &mut now, d::Event::Act { action });
+    let mut picker = view(&root);
+    let field = node(&picker, Role::TextField, b"Into a new project, named");
+    assert_eq!(
+        picker
+            .tree()
+            .nodes()
+            .iter()
+            .find(|n| n.id == field)
+            .and_then(|n| n.value.as_ref())
+            .expect("the name field's value")
+            .text
+            .as_ref(),
+        b"second"
+    );
+    let adopt = node(&picker, Role::Button, b"Adopt acme/second");
+    let action = temper_client_view::act(&mut picker, adopt, skein_ui::Act::Press).expect("adopt");
+    pump(&mut front, &mut root, &mut now, d::Event::Act { action });
+    let held = root.person().forge().picker(1).expect("forge 1's picker");
+    assert_eq!(held.starting.as_ref().expect("its start").value.adoption.project, 2);
+    assert_eq!(held.adoption.as_ref().expect("its adoption").value.project, 2);
+    assert!(front.engine_adopted(1, 8));
+    let d::forge::forges::State::Rows(rows) = root.person().forges() else { panic!("forges") };
+    assert_eq!(rows[0].repositories.len(), 1, "the engine must publish its adopted repository on the forge watch");
+    assert_eq!(rows[0].repositories[0].project, 2);
+    let ready = view(&root);
+    node(&ready, Role::Heading { level: 2 }, b"acme/second is ready");
+    node(&ready, Role::Link, b"Open second");
+    let read_count = front.reachable_reads.len();
+    front.reload(CLIENT, now);
+    root = Root::Person(Box::new(d::unlinked(&fixtures::domain_limits(), fixtures::SEED + 1)));
+    accounts::event(
+        &mut front,
+        &mut root,
+        Temper::start(Address::ConnectForge { forge: Some(Choice::Forge(1)) }, Vec::new(), 0),
+    );
+    pump(
+        &mut front,
+        &mut root,
+        &mut now,
+        d::Event::Went { place: d::Place::Address(Address::ConnectForge { forge: Some(Choice::Forge(1)) }) },
+    );
+    let ready = view(&root);
+    node(&ready, Role::Heading { level: 2 }, b"acme/second is ready");
+    node(&ready, Role::Link, b"Open second");
+    assert_eq!(front.reachable_reads.len(), read_count, "reload uses the adoption on the row");
+}

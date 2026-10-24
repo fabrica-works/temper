@@ -81,7 +81,26 @@ pub const INSTALL: Tool = Tool {
     keyed: Keyed::Optional,
     area: 6,
 };
+pub const REPOSITORIES: Tool = Tool {
+    name: b"repositories",
+    line: b"Read one page of reachable repositories",
+    result: b"repositories",
+    forms: &[&[
+        positional(b"forge", b"F", Kind::NumberRange { min: 1, max: 65535 }, Required, b"Forge number"),
+        flag(
+            b"installation",
+            b"I",
+            Kind::NumberRange { min: 1, max: u64::MAX },
+            Optional,
+            b"Accepted GitHub installation id",
+        ),
+        flag(b"page", b"N", Kind::NumberRange { min: 1, max: 4_294_967_295 }, Optional, b"Page number; default 1"),
+    ]],
+    keyed: Keyed::Never,
+    area: 6,
+};
 mod connection;
+mod repositories;
 pub const DEMO_START: Tool = Tool {
     name: b"demo-start",
     line: b"Start the playground; run again to finish what is not done",
@@ -147,6 +166,7 @@ pub(crate) struct Forges {
     starting: BTreeMap<Key, Starting>,
     json: bool,
     connections: BTreeMap<Key, connection::Pending>,
+    pages: BTreeMap<Key, repositories::Pending>,
 }
 #[derive(Debug)]
 struct Intent {
@@ -188,11 +208,14 @@ impl Forges {
             starting: BTreeMap::new(),
             json: false,
             connections: BTreeMap::new(),
+            pages: BTreeMap::new(),
         }
     }
     pub(crate) fn calls(&self) -> usize {
         self.connections
             .len()
+            .checked_add(self.pages.len())
+            .expect("bounded calls")
             .checked_add(self.waiting.len())
             .expect("bounded calls")
             .checked_add(self.pending.len())
@@ -227,6 +250,7 @@ pub(crate) fn owns(call: &jig::call::Call) -> bool {
         || name == DEMO_START.name
         || name == CONNECT.name
         || name == INSTALL.name
+        || name == REPOSITORIES.name
         || (name == WAIT.name && call.form == 1)
 }
 fn live(client: &Client) -> bool {
@@ -255,6 +279,10 @@ pub(crate) fn ready(state: &mut Forges, client: &Client, env: &Env<Limits>, out:
 }
 #[expect(clippy::manual_map, reason = "the domain matches without closures")]
 fn send(state: &mut Forges, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
+    if repositories::owns(&called.call) {
+        repositories::send(state, env, called, out);
+        return;
+    }
     if connection::owns(&called.call) {
         connection::send(state, env, called, out);
         return;
@@ -324,6 +352,9 @@ fn finish(called: Called, printed: jig::Printed, out: &mut Queue<Out>) {
     out.push(Out::Printed { number: called.number, printed });
 }
 pub(crate) fn told(state: &mut Forges, client: &Client, env: &Env<Limits>, told: &Told, out: &mut Queue<Out>) {
+    if repositories::told(state, env, told, out) {
+        return;
+    }
     if connection::told(state, env, told, out) {
         return;
     }
@@ -438,7 +469,8 @@ fn restore(state: &mut Forges, env: &Env<Limits>, key: Key, request: &jig_client
             })
         }
         temper_client_protocol_wire::v1::Request::StartDemo => None,
-        temper_client_protocol_wire::v1::Request::Adopt(_)
+        temper_client_protocol_wire::v1::Request::Reachable(_)
+        | temper_client_protocol_wire::v1::Request::Adopt(_)
         | temper_client_protocol_wire::v1::Request::Return(_)
         | temper_client_protocol_wire::v1::Request::Connect(_)
         | temper_client_protocol_wire::v1::Request::Install(_) => return,

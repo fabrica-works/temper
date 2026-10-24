@@ -105,7 +105,8 @@ pub fn answer(record: &jig_client::Family, limits: &w::Limits, link: &link::Limi
             w::ForgeReason::InvalidAnswer => forge::Reason::InvalidAnswer,
         }),
         w::Outcome::Unknown => forge::Answer::Unknown,
-        w::Outcome::Returning
+        w::Outcome::Page(_)
+        | w::Outcome::Returning
         | w::Outcome::Connecting
         | w::Outcome::Link(_)
         | w::Outcome::ConnectRefused(_)
@@ -213,7 +214,8 @@ pub fn set_up_answer(record: &jig_client::Family, limits: &w::Limits) -> Option<
             w::SetUpRefusal::Invalid => R::Invalid,
         }),
         w::Outcome::Unknown => O::Unknown,
-        w::Outcome::Returning
+        w::Outcome::Page(_)
+        | w::Outcome::Returning
         | w::Outcome::Connecting
         | w::Outcome::Link(_)
         | w::Outcome::ConnectRefused(_)
@@ -270,7 +272,16 @@ pub fn forges(bytes: &[u8], limits: &w::Limits) -> Option<Box<[forge::forges::Ro
                 })
                 .ok()?;
         }
+        let mut repositories = List::with_capacity(row.repositories.len());
+        for adopted in row.repositories.into_boxed() {
+            let adopted = adopted.into_parts();
+            repositories
+                .push(forge::forges::Adoption { owner: adopted.owner, name: adopted.name, project: adopted.project })
+                .ok()?;
+        }
         rows.push(Row {
+            web: row.web,
+            repositories: repositories.into_boxed(),
             app: match row.app {
                 Some(w::AppWay::Manifest) => Some(super::forges::AppWay::Manifest),
                 Some(w::AppWay::Pasted) => Some(super::forges::AppWay::Pasted),
@@ -331,4 +342,35 @@ fn first_from(first: w::FirstRepository) -> forge::forges::First {
             },
         },
     }
+}
+
+/// One fresh picker page; it carries no credentials (client/README.md, 4.6).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Page {
+    pub rows: Box<[Reached]>,
+    pub more: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reached {
+    pub id: u64,
+    pub owner: forge::forges::Account,
+    pub name: Box<[u8]>,
+    pub private: bool,
+}
+#[must_use]
+pub fn page(value: w::Page) -> Page {
+    let value = value.into_parts();
+    let mut rows = List::with_capacity(value.rows.len());
+    for row in value.rows.into_boxed() {
+        let row = row.into_parts();
+        let owner = row.owner.into_parts();
+        rows.push(Reached {
+            id: row.id,
+            owner: forge::forges::Account { id: owner.id, login: owner.login },
+            name: row.name,
+            private: row.private,
+        })
+        .expect("decoded page bound");
+    }
+    Page { rows: rows.into_boxed(), more: value.more }
 }

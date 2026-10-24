@@ -26,6 +26,7 @@ pub(super) enum Kind {
     LocalConnect,
     Adopt,
     Follow,
+    Reachable,
 }
 #[derive(Debug)]
 pub(super) struct Run {
@@ -222,7 +223,7 @@ pub(super) fn kind(plan: &host::Plan) -> Kind {
         host::Plan::Paste { .. } => Kind::Paste,
         host::Plan::TakeOver { .. } => Kind::LocalTakeOver,
         host::Plan::Check { .. } => unreachable!("Check is not staged"),
-        host::Plan::Reachable { .. } => unreachable!("temper-10 stages Reachable"),
+        host::Plan::Reachable { .. } => Kind::Reachable,
     }
 }
 pub(super) fn busy(engine: &crate::engine::Engine, forge: u16) -> bool {
@@ -230,7 +231,7 @@ pub(super) fn busy(engine: &crate::engine::Engine, forge: u16) -> bool {
 }
 fn running(runs: &Map<Token, Run>, forge: u16) -> bool {
     for (_, run) in runs {
-        if run.forge == forge {
+        if run.forge == forge && run.kind != Kind::Reachable {
             return true;
         }
     }
@@ -281,6 +282,10 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
     let (forge, kind) = (run.forge, run.kind);
     if crate::forge::ended(engine, forge) {
         engine.setup.runs.remove(&token);
+        return;
+    }
+    if kind == Kind::Reachable {
+        reached(engine, token, outcome);
         return;
     }
     if kind == Kind::LocalTakeOver {
@@ -374,6 +379,12 @@ pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure:
         engine.setup.runs.remove(&token);
         return;
     }
+    if run.kind == Kind::Reachable {
+        let why = reachable_failure(failure.why);
+        engine.setup.runs.remove(&token);
+        super::public::reached(engine, token, why);
+        return;
+    }
     if run.kind == Kind::LocalCreate {
         create_stopped(engine, token, failure);
         return;
@@ -406,6 +417,29 @@ pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure:
         reason = Box::from(
             b"setup conversion refused (404): the App may exist on GitHub without temper holding its key".as_slice(),
         );
+    }
+    if run.kind == Kind::Paste {
+        match failure.why {
+            reconcile::Why::KeyForm => {
+                reason = Box::from(b"The key isn't a GitHub App private key: paste its .pem file whole.".as_slice());
+            }
+            reconcile::Why::Refused(401) => {
+                reason =
+                    Box::from(b"GitHub refused the App's id and key (401): check both are the same App's.".as_slice());
+            }
+            reconcile::Why::Missing
+            | reconcile::Why::Refused(_)
+            | reconcile::Why::NotAdmin
+            | reconcile::Why::BotIsAdmin
+            | reconcile::Why::Unmarked
+            | reconcile::Why::OtherUser
+            | reconcile::Why::OtherApp
+            | reconcile::Why::Unknown
+            | reconcile::Why::Busy
+            | reconcile::Why::Crowded
+            | reconcile::Why::Down
+            | reconcile::Why::Unexpected => {}
+        }
     }
     finish(engine, token, root::SetupEnd::Stopped { forge: failure.forge, reason });
 }
@@ -1245,4 +1279,54 @@ pub(crate) fn first(engine: &mut crate::engine::Engine, forge: u16, org: Box<[u8
     if let Some(local) = engine.setup.lifecycle.local_mut(forge) {
         local.first = Some(Intent { org, repository });
     }
+}
+
+fn reachable_failure(why: reconcile::Why) -> domain::ReachableAnswer {
+    let reason = match why {
+        reconcile::Why::Busy => return domain::ReachableAnswer::Refused(domain::ForgeRefusal::Busy),
+        reconcile::Why::Missing | reconcile::Why::Refused(404) => domain::AdoptionRefusal::NotFound,
+        reconcile::Why::Refused(401 | 403) | reconcile::Why::NotAdmin => domain::AdoptionRefusal::NoAccess,
+        reconcile::Why::Refused(_) => domain::AdoptionRefusal::Refused,
+        reconcile::Why::Down => domain::AdoptionRefusal::Unreachable,
+        reconcile::Why::BotIsAdmin
+        | reconcile::Why::Unmarked
+        | reconcile::Why::OtherUser
+        | reconcile::Why::OtherApp
+        | reconcile::Why::KeyForm
+        | reconcile::Why::Unknown
+        | reconcile::Why::Crowded
+        | reconcile::Why::Unexpected => domain::AdoptionRefusal::InvalidAnswer,
+    };
+    domain::ReachableAnswer::ForgeRefused(reason)
+}
+
+fn reached(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
+    let reconcile::Outcome::Reachable { rows, more } = outcome else { unreachable!("Reachable returns a page") };
+    engine.setup.runs.remove(&token);
+    let bound = usize::try_from(engine.env.limits.forge.name_bytes).expect("name bound");
+    let mut reached = List::with_capacity(u32::try_from(rows.len()).expect("bounded page"));
+    for row in rows {
+        if row.owner.len() > bound || row.name.len() > bound {
+            super::public::reached(
+                engine,
+                token,
+                domain::ReachableAnswer::ForgeRefused(domain::AdoptionRefusal::TooLarge),
+            );
+            return;
+        }
+        reached
+            .push(domain::Reached {
+                id: row.id,
+                owner_id: row.owner_id,
+                owner: row.owner,
+                name: row.name,
+                private: row.private,
+            })
+            .expect("bounded page");
+    }
+    super::public::reached(
+        engine,
+        token,
+        domain::ReachableAnswer::Page(domain::Page { rows: reached.into_boxed(), more }),
+    );
 }

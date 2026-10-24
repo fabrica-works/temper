@@ -607,6 +607,7 @@ pub(crate) fn stage_now(domain: &mut Domain, out: &mut Queue<Request>) {
             | Request::Party(_)
             | Request::Connect { .. }
             | Request::Manifest { .. }
+            | Request::Reachable { .. }
             | Request::Install { .. }
             | Request::EraseCarried { .. }
             | Request::Setup { .. }

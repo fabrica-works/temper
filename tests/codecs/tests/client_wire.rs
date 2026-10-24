@@ -1,6 +1,6 @@
 //! jig's core refusal remains opaque in the forge family (client/README.md, 4.6).
 use jig_client_protocol_wire as jig;
-use skein_lib::{Reader, Writer};
+use skein_lib::{List, Reader, Writer};
 use temper_client_protocol_wire::v1;
 
 #[test]
@@ -120,6 +120,8 @@ fn setup_and_every_first_repository_state_round_trip_at_version_eleven() {
         let row = v1::ForgeRow::new(
             &v1::CEILINGS,
             v1::ForgeRowParts {
+                web: None,
+                repositories: List::with_capacity(0),
                 app: None,
                 installations: skein_lib::List::with_capacity(0),
                 ended: None,
@@ -282,7 +284,6 @@ fn demo_start_outcomes_round_trip_at_each_boundary() {
 
 #[test]
 fn demo_states_round_trip_at_smallest_and_ceiling() {
-    use skein_lib::List;
     let limits = v1::CEILINGS;
     for state in [v1::DemoState::NotStarted, v1::DemoState::Running] {
         for full in [false, true] {
@@ -319,4 +320,37 @@ fn demo_states_round_trip_at_smallest_and_ceiling() {
         temper_client_protocol_wire::decode_requesting(&temper_client_protocol_wire::requesting(&record), &limits),
         Some(record)
     );
+}
+
+#[test]
+fn reachable_and_page_goldens_round_trip_with_ids_privacy_and_more() {
+    use temper_client_protocol_wire as wire;
+    for bytes in [
+        include_bytes!("../../../crates/temper-client-protocol-wire/golden/v1/enum_request_reachable_smallest.bin")
+            .as_slice(),
+        include_bytes!("../../../crates/temper-client-protocol-wire/golden/v1/enum_request_reachable_full.bin")
+            .as_slice(),
+    ] {
+        let mut reader = Reader::new(bytes);
+        let request = v1::Request::decode(&v1::CEILINGS, &mut reader).expect("reachable golden");
+        assert!(reader.is_empty());
+        let mut writer = Writer::new(bytes.len());
+        request.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+    for bytes in [
+        include_bytes!("../../../crates/temper-client-protocol-wire/golden/v1/enum_outcome_page_smallest.bin")
+            .as_slice(),
+        include_bytes!("../../../crates/temper-client-protocol-wire/golden/v1/enum_outcome_page_full.bin").as_slice(),
+    ] {
+        let mut reader = Reader::new(bytes);
+        let outcome = v1::Outcome::decode(&v1::CEILINGS, &mut reader).expect("page golden");
+        assert!(reader.is_empty());
+        let mut writer = Writer::new(bytes.len());
+        outcome.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+        let answer = v1::Answer::new(&v1::CEILINGS, v1::AnswerParts { outcome }).expect("answer");
+        let encoded = wire::answer(&answer);
+        assert_eq!(v1::Answer::decode(&v1::CEILINGS, &mut Reader::new(&encoded)), Ok(answer));
+    }
 }

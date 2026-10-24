@@ -11,6 +11,7 @@ pub mod github;
 pub mod listed;
 pub(crate) mod me;
 pub mod panel;
+pub mod picker;
 pub mod start;
 mod vocabulary;
 pub mod words;
@@ -48,6 +49,7 @@ pub struct Side {
     forges_open: bool,
     set_up: Option<Box<forges::SetUp>>,
     setup_form: forges::Draft,
+    pickers: skein_lib::List<picker::Picker>,
     app_form: github::Draft,
     app: Option<github::Pending>,
     panel: Option<panel::Panel>,
@@ -70,6 +72,7 @@ impl Side {
             forges_open: false,
             set_up: None,
             setup_form: forges::Draft::new(),
+            pickers: skein_lib::List::with_capacity(forges::ROWS),
             app_form: github::Draft::new(),
             app: None,
             panel: None,
@@ -145,6 +148,10 @@ impl Side {
     pub const fn app(&self) -> Option<&github::Pending> {
         self.app.as_ref()
     }
+    #[must_use]
+    pub fn picker(&self, forge: u16) -> Option<&picker::Picker> {
+        picker::get(self, forge)
+    }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("forge shown count fits");
     }
@@ -173,7 +180,8 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         Event::Act { act } => act_on(side, env.limits, act, out),
         Event::Progress { request, progress } => {
             if progress == skein_lib::RequestProgress::Unknown
-                && forges::adopted(side, env.limits, request, &Answer::Unknown, out)
+                && (picker::adopted(side, request, &Answer::Unknown)
+                    || forges::adopted(side, env.limits, request, &Answer::Unknown, out))
             {
                 return;
             }
@@ -200,7 +208,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             }
         }
         Event::Answered { request, answer } => {
-            if forges::adopted(side, env.limits, request, &answer, out) {
+            if picker::adopted(side, request, &answer) || forges::adopted(side, env.limits, request, &answer, out) {
                 return;
             }
             if let Some(draft) = &mut side.form
@@ -222,6 +230,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
 }
 fn act_on(side: &mut Side, limits: Limits, act: Act, out: &mut Queue<Request>) {
     match act {
+        Act::Picker { forge, act } => picker::act(side, limits, forge, act, out),
         Act::Go { address } => out.push(Request::Show { address }),
         Act::AppWrite { text } => github::write(side, text, limits),
         Act::ConnectManifest { forge, back } => github::manifest(side, limits, forge, back, out),
@@ -300,7 +309,8 @@ pub const fn shown(side: &Side) -> u64 {
 }
 #[must_use]
 pub const fn max_out(_limits: &Limits) -> u32 {
-    4
+    // One completed project per retained picker, plus the shown page's read.
+    forges::ROWS.checked_add(4).expect("forge output fits")
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
@@ -312,6 +322,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(6)?
         .checked_add(u64::from(limits.checks).checked_mul(4)?)?
         .checked_add(forges::worst_case(limits)?)?
+        .checked_add(picker::worst_case(*limits)?)?
         .checked_add(4097 + 2048)?
         .checked_add(u64::from(limits.field_bytes))?
         .checked_add(temper_client_protocol_wire::v1::Answer::worst_case_heap(&wire)?)?

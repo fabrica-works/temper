@@ -151,6 +151,7 @@ pub enum Ask {
     StartDemo,
     Connect { forge: u16, how: How },
     Install { forge: u16, back: Option<Box<[u8]>> },
+    Reachable { forge: u16, installation: Option<u64>, page: u32 },
 }
 /// The public GitHub connect's input; keys remain carried handles.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -172,6 +173,7 @@ pub enum Answered {
     StartDemo(StartAnswer),
     Connect(ConnectAnswer),
     Install(InstallAnswer),
+    Reachable(ReachableAnswer),
 }
 /// Public forge admission refusals (client/README.md, 8).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -195,6 +197,26 @@ pub enum InstallAnswer {
     Link(Box<[u8]>),
     Connecting,
     Refused(ForgeRefusal),
+}
+/// A picker answer lives beside the public links, never in the store.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum ReachableAnswer {
+    Page(Page),
+    Refused(ForgeRefusal),
+    ForgeRefused(AdoptionRefusal),
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Page {
+    pub rows: Box<[Reached]>,
+    pub more: bool,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Reached {
+    pub id: u64,
+    pub owner_id: u64,
+    pub owner: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub private: bool,
 }
 /// The start is answered once both are done, *running*, or at the first that
 /// fails, *start failed*, naming why (protocol/setup.md, 8.4).
@@ -239,8 +261,10 @@ pub enum Mode {
     Fake,
 }
 /// Public startup configuration, without credentials.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Configured {
+    pub web: Option<Box<[u8]>>,
+    pub read_only: bool,
     pub number: u16,
     pub kind: Kind,
     pub mode: Mode,
@@ -281,9 +305,19 @@ pub struct First {
     pub state: FirstState,
 }
 
+/// A repository already adopted on this forge (client/README.md, 4.6).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct AdoptedRow {
+    pub owner: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub project: u32,
+}
+
 /// One configured forge, including its connection, offer and first repository.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Row {
+    pub web: Option<Box<[u8]>>,
+    pub repositories: Box<[AdoptedRow]>,
     pub number: u16,
     pub kind: Kind,
     pub mode: Mode,
@@ -761,6 +795,11 @@ pub enum Event {
         request: Token,
         answer: ConnectAnswer,
     },
+    ReachableAnswered {
+        forge: u16,
+        request: Token,
+        answer: ReachableAnswer,
+    },
     InstallAnswered {
         forge: u16,
         request: Token,
@@ -1080,6 +1119,12 @@ pub enum Request {
         forge: u16,
         request: Token,
         back: Option<Box<[u8]>>,
+    },
+    Reachable {
+        forge: u16,
+        request: Token,
+        installation: Option<u64>,
+        page: u32,
     },
     CarriedUnused {
         number: u64,

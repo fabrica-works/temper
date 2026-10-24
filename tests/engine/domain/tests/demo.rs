@@ -26,8 +26,22 @@ fn config(under_box: bool) -> engine::Config {
         ]),
     }]);
     config.forges = Box::new([
-        forge::Configured { number: 1, kind: forge::Kind::Forgejo, mode: forge::Mode::Fake, asked: true },
-        forge::Configured { number: 2, kind: forge::Kind::Forgejo, mode: forge::Mode::Fake, asked: false },
+        forge::Configured {
+            web: None,
+            read_only: false,
+            number: 1,
+            kind: forge::Kind::Forgejo,
+            mode: forge::Mode::Fake,
+            asked: true,
+        },
+        forge::Configured {
+            web: None,
+            read_only: false,
+            number: 2,
+            kind: forge::Kind::Forgejo,
+            mode: forge::Mode::Fake,
+            asked: false,
+        },
     ]);
     config.demo =
         Some(forge::DemoConfig { provider: 1, adoption: fixtures::adoption(1), deadline: Duration::from_secs(10) });

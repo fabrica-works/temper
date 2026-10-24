@@ -16,6 +16,7 @@ pub(super) enum Caller {
     Connect { forge: u16, request: Token, number: u64, pem: Option<Secret> },
     Install { forge: u16, request: Token, back: Option<Box<[u8]>> },
     Accept { forge: u16, call: Token, back: Option<Box<[u8]>> },
+    Reachable { forge: u16, request: Token },
 }
 pub(super) struct ReturnTo {
     pub(super) forge: u16,
@@ -190,6 +191,17 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
             };
             event(engine, domain::Event::InstallAnswered { forge, request, answer, stopped });
         }
+        Caller::Reachable { forge, request } => {
+            let answer = match end {
+                root::SetupEnd::Stopped { reason, .. } if reason.as_ref() == b"setup host: busy" => {
+                    domain::ReachableAnswer::Refused(domain::ForgeRefusal::Busy)
+                }
+                root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => {
+                    domain::ReachableAnswer::ForgeRefused(domain::AdoptionRefusal::Unreachable)
+                }
+            };
+            event(engine, domain::Event::ReachableAnswered { forge, request, answer });
+        }
         Caller::Accept { forge, call, back } => match end {
             root::SetupEnd::Done { .. } => engine.clients.github_answer(
                 call,
@@ -236,4 +248,38 @@ pub(super) fn take_back(engine: &mut Engine, forge: u16, state: &[u8]) -> Option
         }
     }
     found
+}
+
+pub(crate) fn reachable(engine: &mut Engine, forge: u16, request: Token, installation: Option<u64>, page: u32) {
+    if engine.setup.reading(forge)
+        || engine.setup.runs.len() == engine.setup.env.limits.runs
+        || engine.setup.public.len() == engine.setup.public.capacity()
+    {
+        event(
+            engine,
+            domain::Event::ReachableAnswered {
+                forge,
+                request,
+                answer: domain::ReachableAnswer::Refused(domain::ForgeRefusal::Busy),
+            },
+        );
+        return;
+    }
+    let run = super::lifecycle::next_run(&mut engine.setup.lifecycle);
+    engine.setup.public.insert(run, Caller::Reachable { forge, request }).expect("public room checked");
+    stage(
+        engine,
+        run,
+        host::Plan::Reachable {
+            forge,
+            installation,
+            page: core::num::NonZeroU32::new(page).expect("admitted nonzero page"),
+        },
+    );
+}
+pub(super) fn reached(engine: &mut Engine, run: Token, answer: domain::ReachableAnswer) {
+    let Some(Caller::Reachable { forge, request }) = engine.setup.public.remove(&run) else {
+        unreachable!("Reachable has its public caller")
+    };
+    event(engine, domain::Event::ReachableAnswered { forge, request, answer });
 }

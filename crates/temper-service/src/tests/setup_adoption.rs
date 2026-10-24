@@ -257,7 +257,14 @@ fn old_form_service(hooks: bool) -> crate::Service {
     let config = old_form_configured(hooks);
     assert_eq!(
         crate::startup::application::configured(&config).as_ref(),
-        [domain::Configured { number: 1, kind: domain::Kind::Forgejo, mode: domain::Mode::Fake, asked: false }]
+        [domain::Configured {
+            web: None,
+            read_only: false,
+            number: 1,
+            kind: domain::Kind::Forgejo,
+            mode: domain::Mode::Fake,
+            asked: false
+        }]
     );
     let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
     service.engine.as_mut().expect("engine").store = fixtures::records_store();
@@ -410,7 +417,7 @@ fn old_form_fake_given_uses_the_webhooks_listener_only_with_a_file_secret() {
     }
 }
 #[test]
-fn old_form_owned_gets_forgejo_given_and_managed_stays_unserved_without_start_time_plans() {
+fn old_form_owned_and_managed_serve_reads_without_start_time_writing_plans() {
     for managed in [false, true] {
         let mut config = old_form_configured(false);
         config.setup[0].handover = None;
@@ -422,6 +429,8 @@ fn old_form_owned_gets_forgejo_given_and_managed_stays_unserved_without_start_ti
         assert_eq!(
             crate::startup::application::configured(&config).as_ref(),
             [domain::Configured {
+                web: None,
+                read_only: false,
                 number: 1,
                 kind: domain::Kind::Forgejo,
                 mode: if managed { domain::Mode::Managed } else { domain::Mode::Owned },
@@ -433,13 +442,9 @@ fn old_form_owned_gets_forgejo_given_and_managed_stays_unserved_without_start_ti
         assert!(setup.lifecycle.adoptions.is_empty());
         assert!(setup.runs.is_empty());
         assert!(endpoints.forges.get(0).unwrap().access.is_some());
-        if managed {
-            assert!(setup.served.is_empty());
-            assert_eq!(*setup.unserved.get(&1).unwrap(), b"managed Forgejo setup is not staged yet");
-        } else {
-            let (settings, _) = setup.pending.unwrap();
-            let host::Kind::Forgejo(_) = &settings.forges.get(0).unwrap().kind else { panic!("owned Forgejo Given") };
-        }
+        assert!(setup.served.contains_key(&1));
+        let (settings, _) = setup.pending.unwrap();
+        let host::Kind::Forgejo(_) = &settings.forges.get(0).unwrap().kind else { panic!("Forgejo Given") };
         let mut service = crate::Service::engine(config, &fixtures::seeds(), None, fixtures::forge_runtime()).unwrap();
         service.engine.as_mut().expect("engine").store = fixtures::records_store();
         for _ in 0_u32..8 {

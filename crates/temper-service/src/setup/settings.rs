@@ -33,13 +33,12 @@ pub(super) fn fixed(
         if plaintext && !address.ip().is_loopback() {
             continue;
         }
-        // GitHub and owned/fake Forgejo entries have setup values; managed Forgejo waits for its setup.
+        // Every kind serves picker reads; writing plans use each configured setup entry.
         if source.kind == crate::settings::Kind::Forgejo {
-            if let Some(given) = forgejo(config, source)? {
-                configured
-                    .push(host::Forge { kind: host::Kind::Forgejo(given), address: endpoint.address, transport })
-                    .expect("configured host forges");
-            }
+            let given = forgejo(config, source)?;
+            configured
+                .push(host::Forge { kind: host::Kind::Forgejo(given), address: endpoint.address, transport })
+                .expect("configured host forges");
             continue;
         }
         let url = match &config.clients.public {
@@ -64,7 +63,7 @@ pub(super) fn fixed(
                 name_bytes: own.forge.name_bytes,
                 page_bytes: own.forge_component.body_bytes,
                 installations: own.forges.installations,
-                reachable: pure.reachable,
+                reachable: own.picker.page,
                 // At most one installation per page, plus the terminal empty page.
                 pages: own.forges.installations.checked_add(1).ok_or(problem(b"forges.installations"))?,
                 state_life: own.setup.state_life,
@@ -95,7 +94,7 @@ pub(super) fn fixed(
         chunk: f.chunk,
         string_bytes: f.string_bytes.max(f.key_bytes.checked_mul(2).ok_or(problem(b"forge_component.key_bytes"))?),
         body_bytes: f.body_bytes,
-        inner: f.inner,
+        inner: f.inner.max(own.picker.page),
         target_bytes: f.target_bytes,
         io: config.jig.limits.io,
         tls: f.tls,
@@ -105,39 +104,59 @@ pub(super) fn fixed(
 fn forgejo(
     config: &crate::settings::Engine,
     source: &crate::settings::Forge,
-) -> Result<Option<skein_forge_setup::given::Given>, Problems> {
+) -> Result<skein_forge_setup::given::Given, Problems> {
     for setup in &config.setup {
         if setup.entry.forge != source.number {
             continue;
         }
-        match &setup.entry.mode {
-            Mode::Owned(_) | Mode::Fake(_) => {
-                let listener = if config.records_only.contains(&source.number) || source.webhook_secret.is_some() {
-                    match &config.webhooks {
-                        Some(hooks) => match hooks.listener {
-                            skein_io::Addr::Ip(address) => Some(address),
-                            skein_io::Addr::InProcess(_) => unreachable!("checked webhooks listener"),
-                        },
-                        None => None,
-                    }
-                } else {
-                    None
-                };
-                // The configured fallback is replaced by Listening before the host starts.
-                let mut limits = config.limits.setup.plan();
-                limits.repositories = config.limits.forge.client.repositories;
-                let given = temper_forge_setup::given::values(&setup.entry, listener, &limits);
-                if let Err(refused) = skein_forge_setup::given::check(&given) {
-                    let mut found = Problems::empty();
-                    problems(host::Unusable::Given { forge: source.number, refused }, &mut found);
-                    return Err(found);
-                }
-                return Ok(Some(given));
+        let listener = if config.records_only.contains(&source.number) || source.webhook_secret.is_some() {
+            match &config.webhooks {
+                Some(hooks) => match hooks.listener {
+                    skein_io::Addr::Ip(address) => Some(address),
+                    skein_io::Addr::InProcess(_) => unreachable!("checked webhooks listener"),
+                },
+                None => None,
             }
-            Mode::Managed { .. } => return Ok(None),
+        } else {
+            None
+        };
+        // The configured fallback is replaced by Listening before the host starts.
+        let mut limits = config.limits.setup.plan();
+        limits.repositories = config.limits.forge.client.repositories;
+        limits.reachable = config.limits.picker.page;
+        let given = temper_forge_setup::given::values(&setup.entry, listener, &limits);
+        if let Err(refused) = skein_forge_setup::given::check(&given) {
+            let mut found = Problems::empty();
+            problems(host::Unusable::Given { forge: source.number, refused }, &mut found);
+            return Err(found);
         }
+        return Ok(given);
     }
-    Ok(None)
+    // A connected Forgejo runs only read plans here. The kit requires the writing
+    // plan's names too; use temper's valid constants, never the connected user's login.
+    let mut limits = config.limits.setup.plan();
+    limits.reachable = config.limits.picker.page;
+    limits.repositories = config.limits.forge.client.repositories;
+    let given = skein_forge_setup::given::Given {
+        forge: source.number,
+        bot_login: b"temper".as_slice().into(),
+        bot_email: b"temper@localhost".as_slice().into(),
+        admin_name: b"temper-admin".as_slice().into(),
+        api_name: b"temper-api".as_slice().into(),
+        git_name: b"temper-git".as_slice().into(),
+        orgs: Box::new([]),
+        org_owner: None,
+        adopted: Box::new([]),
+        listener: None,
+        word: b"temper".as_slice().into(),
+        limits,
+    };
+    if let Err(refused) = skein_forge_setup::given::check(&given) {
+        let mut found = Problems::empty();
+        problems(host::Unusable::Given { forge: source.number, refused }, &mut found);
+        return Err(found);
+    }
+    Ok(given)
 }
 pub(crate) fn prepare(
     config: &crate::settings::Engine,
@@ -158,6 +177,13 @@ pub(crate) fn prepare(
         batch,
         own.forge_component.installations,
     );
+    for source in &config.forges {
+        if source.kind == crate::settings::Kind::Forgejo
+            && let Some(token) = &source.api_token
+        {
+            layer.file_api.insert(source.number, token.clone()).expect("configured Forgejo tokens");
+        }
+    }
     // Only Forgejo entries that can make hooks need the bind before starting.
     if let Some((settings, _)) = &layer.pending {
         for forge in &settings.forges {
@@ -341,9 +367,8 @@ fn check(own: &temper_forge_setup::limits::Host) -> Result<(), Problems> {
                 | Place::Repositories
                 | Place::Repository(_)
                 | Place::OrgsLimit
-                | Place::RepositoriesLimit
-                | Place::ReachableLimit
-                | Place::Page => b"setup.orgs",
+                | Place::RepositoriesLimit => b"setup.orgs",
+                Place::ReachableLimit | Place::Page => b"picker.page",
             };
             found.push(limit_path(name), What::Bound);
         }
@@ -423,7 +448,7 @@ pub(crate) fn problems(why: host::Unusable, found: &mut Problems) {
                     }
                     return;
                 }
-                Unusable::Reachable { .. } => &[b"forge_component.inner"],
+                Unusable::Reachable { .. } => &[b"picker.page", b"forge_component.inner"],
                 Unusable::Zero
                 | Unusable::TokenBytes { .. }
                 | Unusable::Documents(_)
@@ -454,15 +479,14 @@ fn github_member(place: github::given::Place) -> &'static [u8] {
         Place::Deadline => b"setup.deadline_ms",
         Place::Backoff => b"setup.backoff_ms",
         Place::BackoffMax => b"setup.backoff_max_ms",
-        Place::Reachable
-        | Place::Word
+        Place::Reachable | Place::Page => b"picker.page",
+        Place::Word
         | Place::Target
         | Place::State
         | Place::Web
         | Place::Url
         | Place::RedirectUrl
         | Place::SetupUrl
-        | Place::Page
         | Place::Code => b"setup",
     }
 }

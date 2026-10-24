@@ -10,16 +10,18 @@ use temper_real_loop_world::{
 const CODER: u64 = 3;
 const CONNECT: usize = 3;
 const SETTLED: usize = 4;
-const UMBRA: usize = 5;
-const CHAT: usize = 7;
+const REPOSITORIES: usize = 5;
+const UMBRA: usize = 6;
+const CHAT: usize = 8;
 const PROCEDURE: u64 = 2;
-const DELIVERED: usize = 10;
+const DELIVERED: usize = 11;
 
 #[test]
 fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token() {
     let mut fixture = github::fixture();
     fixture.connected = false;
     fixture.manifest = true;
+    fixture.unaccepted_after_install = true;
     let ran = run_github(fixture, scripts, || {
         vec![
             sign_in(D1),
@@ -28,6 +30,7 @@ fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token(
             call(D1, argv!["forge-connect", "1", "github", "--key", "github-connect"]),
             browse(CONNECT),
             call(D1, argv!["wait", "forges", "--until", "settled", "--json"]),
+            call(D1, argv!["repositories", "1", "--installation", "1", "--json"]),
             call(
                 D1,
                 argv![
@@ -75,13 +78,12 @@ fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token(
     for (index, result) in ran.calls().iter().enumerate() {
         assert_eq!(result.exit, Some(Exit::Code(if index == UMBRA { 2 } else { 0 })), "call {index}: {result:?}");
     }
-    let refused: Value = serde_json::from_slice(&ran.calls()[UMBRA].stderr).expect("refused adoption JSON");
-    assert_eq!(refused["forge_refused"]["reason"], "no_access", "{refused}");
     let [visit] = ran.browsed() else { panic!("one manifest visit") };
     assert_eq!(visit.call, CONNECT);
     assert_eq!(visit.hops, [200, 200, 302, 302, 200], "manifest, create, redirect, install and setup");
     assert_eq!(visit.body, b"temper has the installation; you may close this tab.");
     let seen = ran.github();
+    reachable_page(&ran);
     assert!(seen.app.is_none(), "no pasted App was prepared");
     let settled: Value = serde_json::from_slice(&ran.calls()[SETTLED].stdout).expect("settled forges JSON");
     let slug = visit.app_slug.as_ref().expect("fake conversion's App slug");
@@ -91,7 +93,7 @@ fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token(
     assert_eq!(forge["state"], "connected");
     assert_eq!(forge["login"], format!("{slug}[bot]"), "connected as the converted App's bot");
     assert_eq!(seen.git_after_call[UMBRA], 0, "no git call before the uninstalled adoption completed");
-    assert_eq!(seen.installations, [(github::INSTALLATION, 10, b"acme".to_vec())], "only acme has an installation");
+    assert!(seen.installations.contains(&(github::INSTALLATION, 10, b"acme".to_vec())), "acme stays installed");
     assert!(seen.minted >= 1, "the secrets scan accompanies real token minting");
     assert!(seen.git_calls.iter().any(|call| !call.writes && call.status == 200), "successful clone/read");
     assert_eq!(seen.git_calls.iter().filter(|call| call.writes).count(), 1, "exactly one push writes");
@@ -118,6 +120,28 @@ fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token(
         [branch.head],
         "the pushed head is the coder's one newly created local commit"
     );
+}
+
+fn reachable_page(ran: &Ran) {
+    let refused: Value = serde_json::from_slice(&ran.calls()[UMBRA].stderr).expect("refused adoption JSON");
+    assert_eq!(refused["forge_refused"]["reason"], "no_access", "{refused}");
+
+    let seen = ran.github();
+    let page: Value = serde_json::from_slice(&ran.calls()[REPOSITORIES].stdout).expect("repositories JSON");
+    let [repository] = page["rows"].as_array().expect("repository rows").as_slice() else {
+        panic!("only acme/app: {page}")
+    };
+    assert_eq!(repository["owner"]["login"], "acme");
+    assert_eq!(repository["owner"]["id"], 10);
+    assert_eq!(repository["name"], "app");
+    assert_eq!(repository["id"], github::REPOSITORY);
+    assert_eq!(repository["private"], true);
+    assert_eq!(page["more"], false);
+    assert!(
+        !seen.app_calls.iter().any(|(_, path)| path.starts_with(b"/app/installations/2/access_tokens")),
+        "umbra's unaccepted installation is never read"
+    );
+    assert_eq!(seen.unaccepted, Some(2), "umbra has a separate, unaccepted installation");
 }
 
 fn scripts(at: std::net::SocketAddr) -> Box<[skein_fake_llm_domain::api::Script]> {

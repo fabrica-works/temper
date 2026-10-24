@@ -109,6 +109,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(5 * 1024)?
         .checked_add(Map::<skein_lib::Token, skein_lib::Token>::worst_case(l.applications)?)?
         .checked_add(Map::<u16, crate::Configured>::worst_case(l.client.repositories)?)?
+        .checked_add(u64::from(l.client.repositories).checked_mul(2048)?)?
         .checked_add(Map::<u16, crate::First>::worst_case(l.client.repositories)?)?
         .checked_add(Map::<u16, crate::AppWay>::worst_case(l.client.repositories)?)?
         .checked_add(Map::<u16, Box<[u8]>>::worst_case(l.client.repositories)?)?

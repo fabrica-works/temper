@@ -13,7 +13,19 @@ use skein_lib::{List, Queue, Token};
 use temper_client_protocol_wire::{self as wire, v1 as w};
 const HERE: u16 = 3;
 fn row(number: u16, kind: Kind, mode: Mode, connection: C, offer: Offer) -> Row {
-    Row { app: None, number, kind, mode, connection, offer, first: None, installations: Box::new([]), ended: None }
+    Row {
+        web: None,
+        repositories: Box::new([]),
+        app: None,
+        number,
+        kind,
+        mode,
+        connection,
+        offer,
+        first: None,
+        installations: Box::new([]),
+        ended: None,
+    }
 }
 fn rows(connection: C) -> State {
     State::Rows(Box::new([row(HERE, Kind::Forgejo, Mode::Owned, connection, Offer::Offered)]))
@@ -448,6 +460,8 @@ fn deliver_first_record(
         w::ForgeRow::new(
             &w::CEILINGS,
             w::ForgeRowParts {
+                web: None,
+                repositories: List::with_capacity(0),
                 app: None,
                 installations: List::with_capacity(0),
                 ended: None,
@@ -770,4 +784,226 @@ fn name_taken_keeps_jigs_refusal_and_a_new_name_uses_a_new_key_before_adopting()
     let (_, key, w::Request::Adopt(adoption)) = sent(out) else { panic!("Adopt after ProjectMade") };
     assert_eq!(key, forge::first_repository_key(HERE, false));
     assert_eq!(adoption.project(), 8);
+}
+
+fn github_picker_rows() -> State {
+    let mut github = row(
+        2,
+        Kind::GitHub,
+        Mode::Connected,
+        C::Connected { id: 9, login: b"app[bot]".as_slice().into() },
+        Offer::NotOffered,
+    );
+    github.installations = Box::new([1, 2].map(|id| forges::Installation {
+        id,
+        account: Some(forges::Account { id, login: b"acme".as_slice().into() }),
+        suspended: false,
+        stray: false,
+    }));
+    State::Rows(Box::new([github]))
+}
+fn picker_opened() -> (crate::Domain, Token, Token, Queue<Request>) {
+    let (mut root, me, watch) = opened(true);
+    deliver_picker(&mut root, watch, false);
+    let out = event(
+        &mut root,
+        Event::Went { place: Place::Address(Address::ConnectForge { forge: Some(Choice::Forge(2)) }) },
+    );
+    (root, me, watch, out)
+}
+fn picker_act(root: &mut crate::Domain, act: forge::picker::Act) -> Queue<Request> {
+    f::form_act(root, forge::Act::Picker { forge: 2, act })
+}
+fn reachable_page() -> w::Outcome {
+    let mut rows = List::with_capacity(2);
+    for (id, name) in [(10, b"first".as_slice()), (20, b"second".as_slice())] {
+        rows.push(
+            w::Reached::new(
+                &w::CEILINGS,
+                w::ReachedParts {
+                    id,
+                    owner: w::Account::new(&w::CEILINGS, w::AccountParts { id: 1, login: b"acme".as_slice().into() })
+                        .unwrap(),
+                    name: name.into(),
+                    private: id == 20,
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    }
+    w::Outcome::Page(w::Page::new(&w::CEILINGS, w::PageParts { rows, more: true }).unwrap())
+}
+fn banner_project(root: &mut crate::Domain, me: Token, name: &[u8]) -> Queue<Request> {
+    let c::WatchEvent::Delivered(c::Delivery::Me(mut frame)) = f::frame(f::PARTY) else { panic!("me") };
+    frame.projects = List::with_capacity(1);
+    frame
+        .projects
+        .push(c::MeProject {
+            project: 7,
+            name: c::DocumentText::complete(c::Text::new(name.into(), 256).unwrap()),
+            role: c::HeldRole::Owner,
+            pool: None,
+            templates: List::with_capacity(0),
+            creating: None,
+            models: List::with_capacity(0),
+        })
+        .unwrap();
+    up(root, Up::Watched { watch: me, event: c::WatchEvent::Delivered(c::Delivery::Me(frame)) })
+}
+#[test]
+fn github_without_an_accepted_installation_is_connecting() {
+    let mut state = github_picker_rows();
+    let State::Rows(rows) = &mut state else { panic!("rows") };
+    rows[0].installations = Box::default();
+    assert_eq!(connect::step(Some(Choice::Forge(2)), &state, None), Shown::SettingUp(2));
+}
+#[test]
+fn ready_reads_pages_and_accounts_with_fresh_keys_and_follows_the_chosen_name_until_written() {
+    use forge::picker::Act;
+    let (mut root, _, _, out) = picker_opened();
+    let (attempt, first_key, w::Request::Reachable(read)) = sent(out) else { panic!("Reachable") };
+    assert_eq!((read.forge(), *read.installation(), read.page()), (2, Some(1), 1));
+    assert!(root.forge().picker(2).unwrap().answer.is_none());
+    reply(&mut root, attempt, reachable_page());
+    assert_eq!(root.forge().picker(2).unwrap().name.as_ref(), b"first");
+    let written = root.forge().picker(2).unwrap().written;
+    picker_act(&mut root, Act::Choose(1));
+    assert_eq!(root.forge().picker(2).unwrap().name.as_ref(), b"second");
+    assert!(root.forge().picker(2).unwrap().written > written);
+    picker_act(&mut root, Act::Write(b"mine".as_slice().into()));
+    picker_act(&mut root, Act::Choose(0));
+    assert_eq!(root.forge().picker(2).unwrap().name.as_ref(), b"mine");
+    let (attempt, next_key, w::Request::Reachable(read)) = sent(picker_act(&mut root, Act::Page(2))) else {
+        panic!("next")
+    };
+    assert_eq!(read.page(), 2);
+    assert_ne!(next_key, first_key);
+    reply(&mut root, attempt, reachable_page());
+    let (_, _, w::Request::Reachable(read)) = sent(picker_act(&mut root, Act::Account(2))) else { panic!("account") };
+    assert_eq!((*read.installation(), read.page()), (Some(2), 1));
+}
+#[test]
+fn ready_makes_a_project_then_adopts_into_it_and_reload_dedup_checks_its_banner_name() {
+    for (banner, retry) in [(b"second".as_slice(), false), (b"old".as_slice(), true)] {
+        let (mut root, me, _, out) = picker_opened();
+        let (attempt, _, _) = sent(out);
+        reply(&mut root, attempt, reachable_page());
+        picker_act(&mut root, forge::picker::Act::Choose(1));
+        let (attempt, key, name) = sent_project(picker_act(&mut root, forge::picker::Act::Adopt));
+        assert_eq!(key, forge::start_project_key(2, 0));
+        assert_eq!(name.as_ref(), b"second");
+        assert!(root.forge().picker(2).unwrap().pending());
+        assert!(picker_act(&mut root, forge::picker::Act::Adopt).is_empty());
+        let out = project_reply(
+            &mut root,
+            attempt,
+            c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::ProjectMade { project: 7 })),
+        );
+        let mut out = out;
+        while let Some(request) = out.pop() {
+            if let Request::Client { request: client::Request::Down { down: Down::Send { .. } } } = request {
+                panic!("wait for the project's banner name");
+            }
+        }
+        let out = banner_project(&mut root, me, banner);
+        if retry {
+            let (_, key, name) = sent_project(out);
+            assert_eq!(key, forge::start_project_key(2, 1));
+            assert_eq!(name.as_ref(), b"second");
+            assert!(root.forge().picker(2).unwrap().adoption.is_none());
+        } else {
+            let (_, key, w::Request::Adopt(adoption)) = sent(out) else { panic!("adopt") };
+            assert_eq!(key, forge::first_repository_key(2, false));
+            assert_eq!(adoption.project(), 7);
+            assert_eq!(
+                (adoption.owner(), adoption.name(), adoption.home()),
+                (b"acme".as_slice(), b"second".as_slice(), true)
+            );
+            assert!(root.forge().set_up().is_none(), "Ready keeps its start in the picker");
+        }
+    }
+}
+#[test]
+fn not_listed_installs_with_back_and_changed_installations_reread_page_one() {
+    let (mut root, _, watch, out) = picker_opened();
+    let (attempt, _, _) = sent(out);
+    reply(&mut root, attempt, reachable_page());
+    let (attempt, _, _) = sent(picker_act(&mut root, forge::picker::Act::Page(2)));
+    reply(&mut root, attempt, reachable_page());
+    let back = b"/forges/connect?forge=2".as_slice();
+    let (_, _, w::Request::Install(install)) =
+        sent(f::form_act(&mut root, forge::Act::Install { forge: 2, back: back.into() }))
+    else {
+        panic!("Install")
+    };
+    assert_eq!(install.back().as_deref(), Some(back));
+    let (_, _, w::Request::Reachable(read)) = sent(deliver_picker(&mut root, watch, true)) else { panic!("reread") };
+    assert_eq!(read.page(), 1);
+}
+
+fn deliver_picker(root: &mut crate::Domain, watch: Token, changed: bool) -> Queue<Request> {
+    let mut installations = List::with_capacity(2);
+    for id in [1, 2] {
+        let login: &[u8] = if changed && id == 2 { b"changed" } else { b"acme" };
+        installations
+            .push(
+                w::Installation::new(
+                    &w::CEILINGS,
+                    w::InstallationParts {
+                        id,
+                        account: Some(
+                            w::Account::new(&w::CEILINGS, w::AccountParts { id, login: login.into() }).unwrap(),
+                        ),
+                        suspended: false,
+                        stray: false,
+                    },
+                )
+                .unwrap(),
+            )
+            .unwrap();
+    }
+    let mut rows = List::with_capacity(1);
+    rows.push(
+        w::ForgeRow::new(
+            &w::CEILINGS,
+            w::ForgeRowParts {
+                number: 2,
+                kind: w::Kind::Github,
+                mode: w::Mode::Connected,
+                connection: connected(),
+                offer: w::Offer::NotOffered,
+                web: None,
+                repositories: List::with_capacity(0),
+                app: None,
+                first: None,
+                ended: None,
+                installations,
+            },
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    up(
+        root,
+        Up::FamilyDelivered {
+            watch,
+            record: client::Family {
+                family: wire::FORGE,
+                version: wire::CLIENT_VERSION,
+                bytes: wire::forges(&w::Forges::new(&w::CEILINGS, w::ForgesParts { forges: rows }).unwrap()),
+            },
+        },
+    )
+}
+
+#[test]
+fn a_picker_read_forgotten_by_a_restarted_service_gets_a_fresh_key() {
+    let (mut root, _, _, out) = picker_opened();
+    let (attempt, first_key, _) = sent(out);
+    let (_, next_key, w::Request::Reachable(read)) = sent(reply(&mut root, attempt, w::Outcome::Unknown)) else {
+        panic!("fresh Reachable after unknown")
+    };
+    assert_ne!(first_key, next_key);
+    assert_eq!(read.page(), 1);
 }

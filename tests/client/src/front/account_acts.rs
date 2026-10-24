@@ -109,6 +109,7 @@ fn demo_providers(config: &mut engine::Config) {
     other.offers = a::Offers { sign_in: true, key: true, programs: Box::new([]) };
     config.core.settings.llm_providers.providers = Box::new([demo, other]);
 }
+#[expect(clippy::too_many_lines, reason = "one complete client fixture with its configured forge fields")]
 fn fixture_root(
     seed: u64,
     tools: bool,
@@ -161,6 +162,8 @@ fn fixture_root(
         if welcome {
             config.core.connectors = Box::new([fixtures::FORGE]);
             config.forges = Box::new([temper_engine_domain_forge::Configured {
+                web: None,
+                read_only: false,
                 number: 1,
                 kind: temper_engine_domain_forge::Kind::Forgejo,
                 mode: if forge_setup {

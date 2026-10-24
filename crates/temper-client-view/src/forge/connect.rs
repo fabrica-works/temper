@@ -80,13 +80,24 @@ pub(crate) fn main(
     let details = w.say(Word::ForgeDetails, &[]);
     let setting = w.say(if connecting { Word::ForgeConnecting } else { Word::ForgeSettingUp }, &[]);
     let ready = w.say(Word::ForgeReady, &[]);
-    let current = match shown {
+    let current: usize = match shown {
         Shown::Choose => 0,
         Shown::Details(_) => 1,
         Shown::SettingUp(_) => 2,
         Shown::Ready(_) => 3,
     };
-    flow::steps(b, w, &[&choose, &details, &setting, &ready], current);
+    let github = match choice {
+        Some(Choice::Forge(number)) => match connect::row(number, root.forges(), root.forge().demo()) {
+            Some(row) => row.kind == Kind::GitHub,
+            None => false,
+        },
+        _ => false,
+    };
+    if github {
+        flow::steps(b, w, &[&choose, &setting, &ready], current.saturating_sub(1));
+    } else {
+        flow::steps(b, w, &[&choose, &details, &setting, &ready], current);
+    }
     match shown {
         Shown::Choose | Shown::Details(_) => body(b, root, w, bindings, forge, choice, Place::Connect),
         Shown::SettingUp(number) => {
@@ -187,7 +198,7 @@ fn choose(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, fo
             text(b, w, Role::Paragraph, words);
             text(b, w, Role::Paragraph, note);
             if let Choice::Forge(number) = *choice {
-                app_control(b, root, w, forge, number, Word::ForgeConnectGitHub, Some(root.pages().address().clone()));
+                app_control(b, root, w, forge, number, Word::ForgeConnectGitHub, Some(place.address(Some(*choice))));
             }
             link(b, w, bindings, Word::ForgeUseApp, place.address(Some(*choice)));
             b.close();
@@ -579,6 +590,12 @@ pub(crate) fn ready_card(
             }
         }
         setup_ending(b, root, w, forge, row);
+    } else if row.kind == Kind::GitHub {
+        if row.repositories.is_empty() {
+            github_picker(b, root, w, forge, row);
+        } else {
+            github_adopted(b, root, w, bindings, row);
+        }
     } else {
         flow::card(b, &w.say(Word::ForgeConnectedTitle, &[Hole::Name(name(w, row, root))]));
         if let Connection::Connected { login, .. } = &row.connection {
@@ -594,12 +611,33 @@ pub(crate) fn ready_card(
     b.close();
     b.close();
 }
-/// Completion requires the originating tab's successful Adopt, rather than a Made row alone.
+/// Completion follows the durable row, including after a reload.
+/// The row's adoptions last after a reload and in other tabs; the originating tab's Adopt answer
+/// counts before the row is next published.
 pub(crate) fn adopted_project(root: &Domain, row: &Row) -> Option<u32> {
-    if let Connection::Connected { .. } = row.connection
-        && let Some(first) = &row.first
-        && let FirstState::Made { .. } = first.state
-        && let Some(last) = root.forge().set_up()
+    match row.connection {
+        Connection::Connected { .. } => {}
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::SetUpFailed { .. }
+        | Connection::Connecting
+        | Connection::Stopped { .. } => return None,
+    }
+    if row.kind == Kind::GitHub {
+        return Some(row.repositories.first()?.project);
+    }
+    let first = row.first.as_ref()?;
+    match first.state {
+        FirstState::Made { .. } => {}
+        FirstState::Making | FirstState::Failed { .. } => return None,
+    }
+    for adoption in &row.repositories {
+        if adoption.owner == first.org && adoption.name == first.repository {
+            return Some(adoption.project);
+        }
+    }
+    if let Some(last) = root.forge().set_up()
         && last.forge == row.number
         && let Some(adoption) = &last.adoption
         && let Some(forge::Answer::Adopted(_)) = &adoption.outcome
@@ -832,4 +870,275 @@ pub(crate) fn app_line(b: &mut Builder, w: &Words, row: &Row) {
         b.close();
         b.close();
     }
+}
+
+fn picker_control(
+    b: &mut Builder,
+    forge: &mut ForgeBindings,
+    number: u16,
+    label: &[u8],
+    act: forge::picker::Act,
+    disabled: bool,
+) {
+    if disabled {
+        flow::control(b, Control::Disabled { name: label });
+    } else {
+        flow::control(b, Control::Button { name: label, to: forge.insert(Meaning::Picker { forge: number, act }) });
+    }
+}
+fn github_picker(b: &mut Builder, root: &Domain, w: &Words, forge: &mut ForgeBindings, row: &Row) {
+    use forge::picker::Act;
+    flow::card(b, &w.say(Word::GitHubPicker, &[]));
+    let picker = root.forge().picker(row.number);
+    let installation = match picker {
+        Some(picker) => forge::picker::installation(&row.installations, Some(picker.installation)),
+        None => forge::picker::installation(&row.installations, None),
+    };
+    if let Some(installation) = installation
+        && let Some(slug) = forge::forges::slug(row)
+    {
+        let account = match &installation.account {
+            Some(account) => copy_of(&account.login),
+            None => Box::from(skein_lib::Decimal::of(installation.id).as_bytes()),
+        };
+        crate::cards::text(
+            b,
+            Role::Paragraph,
+            &w.say(Word::GitHubInstalled, &[Hole::Name(copy_of(slug)), Hole::Name(account)]),
+        );
+    }
+    let Some(picker) = picker else {
+        text(b, w, Role::Status, Word::GitHubReading);
+        return;
+    };
+    let disabled = picker.pending() || root.forge().served() == forge::Served::OutOfDate;
+    github_choices(b, w, forge, row, picker, disabled);
+    b.open(Role::TextField);
+    b.name(&w.say(Word::SetupNew, &[]));
+    b.value(&picker.name, picker.written);
+    b.bind(forge.insert(Meaning::PickerName(row.number)));
+    if disabled {
+        b.state(State::Disabled);
+    }
+    if picker.checked && picker.name.is_empty() {
+        b.state(State::Invalid);
+    }
+    b.close();
+    if picker.checked && picker.name.is_empty() {
+        text(b, w, Role::Alert, Word::SetupRequired);
+    }
+    if let Some(selected) = picker.selected() {
+        let label =
+            w.say(Word::SetupAdopt, &[Hole::Name(forge::words::full_name(&selected.owner.login, &selected.name))]);
+        picker_control(b, forge, row.number, &label, Act::Adopt, disabled);
+    }
+    if let Some(starting) = &picker.starting
+        && let Some(outcome) = &starting.value.outcome
+    {
+        match outcome {
+            jig_client::Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused {
+                refusal,
+                ..
+            })) => {
+                b.open(Role::Alert);
+                w.refusal(b, refusal, w.name_bytes);
+                b.close();
+            }
+            jig_client::Outcome::Answered(_) => {}
+            jig_client::Outcome::NotKept
+            | jig_client::Outcome::Unknown
+            | jig_client::Outcome::Limit
+            | jig_client::Outcome::Unconfirmed
+            | jig_client::Outcome::Held
+            | jig_client::Outcome::Unsent
+            | jig_client::Outcome::Lost => text(b, w, Role::Alert, Word::GitHubUnknown),
+        }
+    }
+    if let Some(adoption) = &picker.adoption
+        && let Some(answer) = &adoption.outcome
+    {
+        adoption_outcome(b, w, &adoption.value, answer);
+    }
+    let label = w.say(Word::GitHubNotListed, &[]);
+    if disabled {
+        flow::control(b, Control::Disabled { name: &label });
+    } else {
+        flow::control(
+            b,
+            Control::Link {
+                name: &label,
+                to: forge.insert(Meaning::Install { forge: row.number, back: root.pages().address().clone() }),
+            },
+        );
+    }
+}
+fn github_choices(
+    b: &mut Builder,
+    w: &Words,
+    forge: &mut ForgeBindings,
+    row: &Row,
+    picker: &forge::picker::Picker,
+    disabled: bool,
+) {
+    use forge::{github::Answer, picker::Act};
+    let mut accepted = 0_u32;
+    for installation in &row.installations {
+        if !installation.suspended && !installation.stray {
+            accepted = accepted.checked_add(1).expect("bounded installations");
+        }
+    }
+    if accepted > 1 {
+        b.open(Role::ChoiceGroup);
+        b.name(&w.say(Word::ForgeAccountLabel, &[]));
+        for installation in &row.installations {
+            if installation.suspended || installation.stray {
+                continue;
+            }
+            let account = match &installation.account {
+                Some(account) => copy_of(&account.login),
+                None => Box::from(skein_lib::Decimal::of(installation.id).as_bytes()),
+            };
+            b.open(Role::Choice);
+            b.name(&account);
+            if installation.id == picker.installation {
+                b.state(State::Selected);
+            }
+            if disabled {
+                b.state(State::Disabled);
+            }
+            b.bind(forge.insert(Meaning::Picker { forge: row.number, act: Act::Account(installation.id) }));
+            b.close();
+        }
+        b.close();
+    }
+    match &picker.answer {
+        None => text(b, w, Role::Status, Word::GitHubReading),
+        Some(Answer::Page(page)) => {
+            if page.rows.is_empty() {
+                text(b, w, Role::Status, Word::GitHubNone);
+            } else {
+                b.open(Role::ChoiceGroup);
+                b.name(&w.say(Word::GitHubRepositories, &[]));
+                for (index, repository) in page.rows.iter().enumerate() {
+                    let name = forge::words::full_name(&repository.owner.login, &repository.name);
+                    let label = if repository.private { w.say(Word::GitHubPrivate, &[Hole::Name(name)]) } else { name };
+                    b.open(Role::Choice);
+                    b.name(&label);
+                    let index = u32::try_from(index).expect("bounded page");
+                    if picker.chosen == index {
+                        b.state(State::Selected);
+                    }
+                    if disabled {
+                        b.state(State::Disabled);
+                    }
+                    b.bind(forge.insert(Meaning::Picker { forge: row.number, act: Act::Choose(index) }));
+                    b.close();
+                }
+                b.close();
+            }
+            if page.more
+                && let Some(next) = picker.page.checked_add(1)
+            {
+                picker_control(b, forge, row.number, &w.say(Word::GitHubNext, &[]), Act::Page(next), disabled);
+            }
+            if picker.page > 1 {
+                picker_control(b, forge, row.number, &w.say(Word::GitHubFirst, &[]), Act::Page(1), disabled);
+            }
+        }
+        Some(Answer::Entrance(refusal)) => {
+            b.open(Role::Alert);
+            w.refusal(b, refusal.refusal(), w.name_bytes);
+            b.close();
+        }
+        Some(answer) => {
+            if let Some(words) = forge::words::app_refusal(answer.clone(), row.number) {
+                crate::cards::text(b, Role::Alert, &words);
+            }
+        }
+    }
+}
+fn github_adopted(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, row: &Row) {
+    let Some(adopted) = row.repositories.first() else { return };
+    let repository = forge::words::full_name(&adopted.owner, &adopted.name);
+    let project = project_name(root, w, &SetUpProject::Existing(adopted.project));
+    flow::card(b, &w.say(Word::SetupReady, &[Hole::Name(repository)]));
+    crate::cards::text(b, Role::Paragraph, &w.say(Word::GitHubInProject, &[Hole::Name(project.clone())]));
+    if let Some(picker) = root.forge().picker(row.number)
+        && let Some(adoption) = &picker.adoption
+        && adoption.value.project == adopted.project
+        && let Some(answer @ forge::Answer::Adopted(found)) = &adoption.outcome
+    {
+        adoption_outcome(b, w, &adoption.value, answer);
+        text(b, w, Role::Paragraph, Word::GitHubStatuses);
+        match &found.protection {
+            forge::Protection::Unknown => {}
+            forge::Protection::Absent => text(b, w, Role::Paragraph, Word::GitHubNoRules),
+            forge::Protection::Rule(rule) => {
+                crate::cards::text(
+                    b,
+                    Role::Paragraph,
+                    &w.say(
+                        Word::GitHubRule,
+                        &[
+                            Hole::Name(rule.branch.clone()),
+                            Hole::Number(u64::from(rule.approvals)),
+                            Hole::Name(forge::words::joined(&rule.contexts, w.name_bytes)),
+                        ],
+                    ),
+                );
+                if rule.dismiss_stale {
+                    text(b, w, Role::Paragraph, Word::GitHubDismiss);
+                }
+            }
+        }
+    }
+    flow::control(
+        b,
+        Control::Link {
+            name: &w.say(Word::SetupOpen, &[Hole::Name(project)]),
+            to: bindings.insert(Act::OpenProject { project: adopted.project }),
+        },
+    );
+    if let Some(web) = &row.web {
+        let address = github_repository_address(web, &adopted.owner, &adopted.name);
+        b.open(Role::Link);
+        b.name(&w.say(Word::GitHubOpen, &[]));
+        b.external(&address);
+        b.close();
+    }
+}
+fn github_repository_address(web: &[u8], owner: &[u8], name: &[u8]) -> Box<[u8]> {
+    let mut web = web;
+    for _ in 0..web.len() {
+        let Some(prefix) = web.strip_suffix(b"/") else { break };
+        web = prefix;
+    }
+    let mut bytes = web.len().checked_add(2).expect("address separators fit");
+    for segment in [owner, name] {
+        for byte in segment {
+            bytes = bytes
+                .checked_add(if byte.is_ascii_alphanumeric() || b"-._~".contains(byte) { 1 } else { 3 })
+                .expect("encoded address fits");
+        }
+    }
+    let mut address = skein_lib::Writer::new(bytes);
+    address.put(web).expect("web capacity");
+    for segment in [owner, name] {
+        address.put(b"/").expect("separator capacity");
+        for byte in segment {
+            if byte.is_ascii_alphanumeric() || b"-._~".contains(byte) {
+                address.put(&[*byte]).expect("plain segment capacity");
+            } else {
+                let hex = b"0123456789ABCDEF";
+                address
+                    .put(&[
+                        b'%',
+                        *hex.get(usize::from(*byte >> 4_u8)).expect("hex digit"),
+                        *hex.get(usize::from(*byte & 15)).expect("hex digit"),
+                    ])
+                    .expect("encoded segment capacity");
+            }
+        }
+    }
+    address.finish()
 }

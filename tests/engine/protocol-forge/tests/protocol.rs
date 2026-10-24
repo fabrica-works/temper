@@ -462,6 +462,7 @@ fn land_change(world: &mut Protocol) -> bool {
                 | top::Request::SetUpGroup { .. }
                 | top::Request::Connect { .. }
                 | top::Request::Manifest { .. }
+                | top::Request::Reachable { .. }
                 | top::Request::Install { .. }
                 | top::Request::CarriedUnused { .. }
                 | top::Request::EraseCarried { .. }

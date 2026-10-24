@@ -78,6 +78,12 @@ pub struct Bounds {
 #[must_use]
 pub fn limits(bounds: &Bounds) -> Option<v1::Limits> {
     let limits = v1::Limits {
+        adoption_owner: bounds.field_bytes,
+        adoption_name: bounds.field_bytes,
+        forge_row_web_some: ADDRESS_BYTES,
+        forge_row_repositories: 16,
+        reached_name: bounds.field_bytes,
+        page_rows: 100,
         install_back_some: 512,
         git_hub_manifest_back_some: 512,
         link_address: ADDRESS_BYTES,
@@ -230,7 +236,9 @@ pub fn decode_requesting(bytes: &[u8], limits: &v1::Limits) -> Option<v1::Reques
             v1::How::GithubApp(app) if app.id() == 0 => return None,
             v1::How::GithubApp(_) | v1::How::GithubManifest(_) => {}
         },
-        v1::Request::Install(_)
+        v1::Request::Reachable(value) if value.page() == 0 => return None,
+        v1::Request::Reachable(_)
+        | v1::Request::Install(_)
         | v1::Request::Return(_)
         | v1::Request::Adopt(_)
         | v1::Request::SetUp(_)

@@ -3486,7 +3486,7 @@ does for the client:
   every other FORGE request's alike, kept under the request's key for
   the retention, as an adoption's is, at the store's tag 15
   (`../protocol/store.md`), a refusal among them. An outcome that
-  carries a link is kept in memory alone, until its state's life ends
+  carries a link or a page is kept in memory alone, until its state's life ends
   (`setup.state_life_ms` after `Done`): the same key sent again while it
   lives answers the same link and starts no run; after its end, or a
   restart, the key is unknown, as one past the retention is. A

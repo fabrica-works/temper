@@ -41,6 +41,9 @@ pub(crate) fn request(engine: &mut Engine, request: root::Request) {
         root::Request::Manifest { forge, request, back } => {
             crate::setup::public::manifest(engine, forge, request, back);
         }
+        root::Request::Reachable { forge, request, installation, page } => {
+            crate::setup::public::reachable(engine, forge, request, installation, page);
+        }
         root::Request::Install { forge, request, back } => crate::setup::public::install(engine, forge, request, back),
         root::Request::EraseCarried { number } => crate::setup::public::erase(engine, number),
         root::Request::Setup { run } => crate::setup::request(engine, run),

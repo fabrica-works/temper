@@ -597,6 +597,7 @@ impl World {
                 | top::Request::SetUpGroup { .. }
                 | top::Request::SetUp { .. }
                 | top::Request::Connect { .. }
+                | top::Request::Reachable { .. }
                 | top::Request::Install { .. }
                 | top::Request::Manifest { .. }
                 | top::Request::CarriedUnused { .. }

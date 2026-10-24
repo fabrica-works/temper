@@ -18,6 +18,8 @@ pub enum Meaning {
     SetUp(u16),
     SetupField(forge::forges::SetupField),
     StartIn(u16),
+    Picker { forge: u16, act: forge::picker::Act },
+    PickerName(u16),
 }
 #[derive(Debug)]
 struct Entry {
@@ -54,6 +56,9 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
             continue;
         }
         return match (entry.meaning.clone(), act) {
+            (Meaning::PickerName(forge), Act::Input { value }) => {
+                Some(Action::Forge(forge::Act::Picker { forge, act: forge::picker::Act::Write(value) }))
+            }
             (Meaning::AppId, Act::Input { value }) => Some(Action::Forge(forge::Act::AppWrite { text: value })),
             (Meaning::SetupField(field), Act::Input { value }) => {
                 Some(Action::Forge(forge::Act::SetupWrite { field, text: value }))
@@ -82,8 +87,13 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                     Action::Forge(forge::Act::Install { forge, back: temper_client_domain::address::print(&back) })
                 }
                 Meaning::Adopt => Action::Forge(forge::Act::Adopt),
+                Meaning::Picker { forge, act } => Action::Forge(forge::Act::Picker { forge, act }),
                 Meaning::StartIn(forge) => Action::Forge(forge::Act::StartIn { forge }),
-                Meaning::AppId | Meaning::AppKey | Meaning::Field(_) | Meaning::SetupField(_) => return None,
+                Meaning::PickerName(_)
+                | Meaning::AppId
+                | Meaning::AppKey
+                | Meaning::Field(_)
+                | Meaning::SetupField(_) => return None,
             }),
             (_, Act::Input { .. } | Act::Submit | Act::Drawing { .. }) => None,
         };

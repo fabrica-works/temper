@@ -45,6 +45,7 @@ PEM is 1 to 4090 bytes after one final newline; the carried bundle is at most 40
 It is sent once, never kept or replayed; use the same --key and file to recover a lost answer.
 Install the connected App on another account by opening the printed address on the engine's machine:
   temper ctl DIRECTORY forge-install 3
+  temper ctl DIRECTORY repositories 3 --page 1
   temper ctl DIRECTORY wait forges --until settled
 The tools print links; they never open a browser. A stopped install prints connecting and exits 1.
 

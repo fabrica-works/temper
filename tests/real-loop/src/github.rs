@@ -33,6 +33,7 @@ pub(crate) fn protocol_limits() -> skein_fake_forge_protocol::Limits {
 }
 
 #[derive(Clone, Copy)]
+#[expect(clippy::struct_excessive_bools, reason = "independent switches select the fake GitHub setup scenario")]
 pub struct Fixture {
     /// Seeded App records and acme installation; false exercises a person connecting.
     pub connected: bool,
@@ -40,6 +41,8 @@ pub struct Fixture {
     pub manifest: bool,
     /// Seed an unaccepted umbra installation before the person's paste.
     pub old_stray: bool,
+    /// Add an unaccepted account once the browser has installed acme.
+    pub unaccepted_after_install: bool,
     /// The person's App hook, which paste and reconcile may need to repair.
     pub pasted_hook: &'static [u8],
     pub config: fn() -> layer::Config,
@@ -51,6 +54,7 @@ pub fn fixture() -> Fixture {
         connected: true,
         manifest: false,
         old_stray: false,
+        unaccepted_after_install: false,
         pasted_hook: b"https://temper-test.invalid/",
         config,
         configure: |_, _, _| {},
@@ -167,6 +171,7 @@ pub struct Seen {
     pub git_calls: Vec<layer::GitCall>,
     /// Total successful mints; the pin exposes no per-installation mint counters.
     pub minted: u64,
+    pub unaccepted: Option<u64>,
     pub installations: Vec<(u64, u64, Vec<u8>)>,
     /// App request methods and targets from the peer's redacted HTTP heads.
     pub app_calls: Vec<(skein_http::Method, Vec<u8>)>,
@@ -178,6 +183,21 @@ pub struct Seen {
     pub pulls: Vec<domain::Observation>,
 }
 impl Seen {
+    pub(crate) fn seed_unaccepted(&mut self, peer: &mut Peer) {
+        if self.unaccepted.is_some() {
+            return;
+        }
+        let layer = peer.github_layer_mut().expect("GitHub layer");
+        if !layer.installations().iter().any(|row| row.account == ACME) {
+            return;
+        }
+        let id = layer
+            .installations_mut()
+            .install(UMBRA, b"umbra", Kind::Organization, Reach::All, Wall::EPOCH)
+            .expect("unaccepted installation beside acme");
+        self.unaccepted = Some(id);
+    }
+
     pub(crate) fn checkpoint(&mut self, peer: &Peer, calls: &[crate::calls::Called]) {
         let count = peer.git_calls().expect("GitHub git records").len();
         assert!(count < GIT_RECORDS, "git record ring never filled");

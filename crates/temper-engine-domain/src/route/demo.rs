@@ -181,7 +181,8 @@ pub(crate) fn adopted(
             | forge::Answered::SetUp(_)
             | forge::Answered::StartDemo(_)
             | forge::Answered::Connect(_)
-            | forge::Answered::Install(_),
+            | forge::Answered::Install(_)
+            | forge::Answered::Reachable(_),
         )
         | None => forge::StartAnswer::Failed(forge::StartFailure::Adoption),
     };

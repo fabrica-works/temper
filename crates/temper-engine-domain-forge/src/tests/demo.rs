@@ -4,7 +4,12 @@ fn configured(under_box: bool) -> Domain {
     let mut d = domain();
     d.under_box = under_box;
     for number in [1, 2] {
-        d.configured.insert(number, Configured { number, kind: Kind::Forgejo, mode: Mode::Fake, asked: true }).unwrap();
+        d.configured
+            .insert(
+                number,
+                Configured { web: None, read_only: false, number, kind: Kind::Forgejo, mode: Mode::Fake, asked: true },
+            )
+            .unwrap();
     }
     d.connection_limits(3, 1);
     d.configure_demo(Some(DemoConfig {

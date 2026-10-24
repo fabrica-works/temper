@@ -115,7 +115,7 @@ pub struct Domain {
     setup_unknown: Option<(Token, crate::SetUpAnswer)>,
     setup_pending: Map<Token, Token>,
     pub(crate) connect: crate::connect::State,
-    installations: Map<(u16, u64), crate::Installation>,
+    pub(crate) installations: Map<(u16, u64), crate::Installation>,
     pub(crate) repositories: Map<skein_forge::api::Repository, Repository>,
     names: Map<u64, Box<[Name]>>,
     holds: Map<Name, Hold>,
@@ -214,7 +214,21 @@ impl Domain {
                     }
                 }
             }
+            let mut repositories = List::with_capacity(self.repositories.len());
+            for (repository, adopted) in &self.repositories {
+                if repository.forge == *forge {
+                    repositories
+                        .push(crate::AdoptedRow {
+                            owner: adopted.owner.clone(),
+                            name: adopted.name.clone(),
+                            project: adopted.project,
+                        })
+                        .expect("bounded adopted repositories");
+                }
+            }
             rows.push(crate::Row {
+                web: config.web.clone(),
+                repositories: repositories.into_boxed(),
                 number: *forge,
                 kind: config.kind,
                 mode: config.mode,
@@ -466,7 +480,7 @@ impl Domain {
         }
         let mut configured = Map::with_capacity(l.client.repositories);
         for forge in forges {
-            if configured.insert(forge.number, *forge).is_err() {
+            if configured.insert(forge.number, forge.clone()).is_err() {
                 return Err(skein_forge::api::Error::TooLarge);
             }
         }
@@ -991,6 +1005,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             }
         }
         Event::ConnectAnswered { forge, request, answer } => crate::connect::connected(d, forge, request, answer, out),
+        Event::ReachableAnswered { forge, request, answer } => crate::connect::reached(d, forge, request, answer, out),
         Event::InstallAnswered { forge, request, answer, stopped } => {
             crate::connect::installed(d, forge, request, answer, stopped, out);
         }
@@ -1070,7 +1085,7 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             out.push(Request::MarkedForges);
         }
         Event::Application { request, token, retention, ask, role, carried } => match ask {
-            ask @ (crate::Ask::Connect { .. } | crate::Ask::Install { .. }) => {
+            ask @ (crate::Ask::Connect { .. } | crate::Ask::Install { .. } | crate::Ask::Reachable { .. }) => {
                 crate::connect::start(d, request, token, ask, role, carried, out);
             }
             crate::Ask::StartDemo => crate::demo::start(d, request, token, out),
@@ -1171,10 +1186,12 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             Some(previous) => {
                 d.repositories.insert(repository, previous.clone()).expect("restores an admitted repository");
                 emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Repository(previous) });
+                emit(out, Request::MarkedForges);
             }
             None => {
                 if d.repositories.remove(&repository).is_some() {
                     emit(out, Request::Erase { key: Key::Repository(repository) });
+                    emit(out, Request::MarkedForges);
                 }
             }
         },

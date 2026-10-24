@@ -253,7 +253,8 @@ fn playground(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 
 fn forge_forges(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
     let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
-    let consumed = forge::github::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child)
+    let consumed = forge::picker::told(&mut root.forge, &root.client, told, env.limits.forge)
+        || forge::github::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child)
         || forge::forges::told(&mut root.forge, &root.client, told, env.limits.forge, &mut child);
     if consumed
         && let jig_client::Told::Answered { .. } = told
@@ -288,4 +289,11 @@ pub(crate) fn demo_progress(root: &mut Domain, env: &Env<Limits>, out: &mut Queu
     forge::demo::progress(&mut root.forge, root.pages.accounts_document(&root.client), &root.client, &mut child);
     route_forge(root, env, &mut child, out);
     demo_facts(root);
+}
+
+/// Ready reads only while its flow is shown; pending starts survive navigation.
+pub(crate) fn picker_progress(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let mut child = Queue::with_capacity(forge::max_out(&env.limits.forge));
+    forge::picker::progress(&mut root.forge, &root.client, root.pages.address(), env.limits.forge, &mut child);
+    route_forge(root, env, &mut child, out);
 }

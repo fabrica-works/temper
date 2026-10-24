@@ -749,6 +749,7 @@ impl World {
                 | engine::Request::SetUpGroup { .. }
                 | engine::Request::Connect { .. }
                 | engine::Request::Manifest { .. }
+                | engine::Request::Reachable { .. }
                 | engine::Request::Install { .. }
                 | engine::Request::EraseCarried { .. }
                 | engine::Request::SetUp { .. }

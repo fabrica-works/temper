@@ -130,7 +130,11 @@ pub(super) fn told(state: &mut Forges, env: &Env<Limits>, told: &Told, out: &mut
                     w::How::GithubManifest(_) => (value.forge(), false, true),
                     w::How::GithubApp(_) => return false,
                 },
-                w::Request::Return(_) | w::Request::Adopt(_) | w::Request::SetUp(_) | w::Request::StartDemo => {
+                w::Request::Reachable(_)
+                | w::Request::Return(_)
+                | w::Request::Adopt(_)
+                | w::Request::SetUp(_)
+                | w::Request::StartDemo => {
                     return false;
                 }
             };
@@ -190,7 +194,8 @@ fn answer(value: &Answered, limits: &Limits) -> Option<Answer> {
         w::Outcome::Link(value) => Some(Answer::Link(value.into_parts().address)),
         w::Outcome::ConnectRefused(value) => Some(Answer::Refused(value.into_parts().why)),
         w::Outcome::Unknown => Some(Answer::Unknown),
-        w::Outcome::Returning
+        w::Outcome::Page(_)
+        | w::Outcome::Returning
         | w::Outcome::Adopted(_)
         | w::Outcome::CoreRefused(_)
         | w::Outcome::ForgeRefused(_)

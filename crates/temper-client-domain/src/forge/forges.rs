@@ -86,7 +86,15 @@ pub enum AppWay {
     Pasted,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Adoption {
+    pub owner: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub project: u32,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
+    pub web: Option<Box<[u8]>>,
+    pub repositories: Box<[Adoption]>,
     pub app: Option<AppWay>,
     pub number: u16,
     pub kind: Kind,
@@ -275,6 +283,7 @@ pub(crate) fn configure(side: &mut super::Side, limits: super::Limits, out: &mut
         side.forges = State::Unknown;
         if side.link == Link::SignedOut {
             side.set_up = None;
+            side.pickers.clear();
             side.app_form.clear();
             side.app = None;
         }
@@ -575,13 +584,13 @@ pub(crate) fn maybe_adopt(side: &mut super::Side, limits: super::Limits, out: &m
                 home: true,
             };
             let forge = last.forge;
-            start_in(side, limits, forge, adoption, name, out);
+            setup_start(side, limits, forge, adoption, name, out);
             return;
         }
     }
 }
 /// The project's number is deliberately absent until jig answers `MakeProject`.
-pub(crate) fn start_in(
+fn setup_start(
     side: &mut super::Side,
     limits: super::Limits,
     forge: u16,
@@ -589,8 +598,21 @@ pub(crate) fn start_in(
     name: Box<[u8]>,
     out: &mut skein_lib::Queue<super::Request>,
 ) {
+    let Some(starting) = start_in(side, limits, forge, adoption, name, out) else { return };
+    side.set_up.as_mut().expect("setup retained").starting = Some(starting);
+    side.changed();
+}
+/// Shared keyed `MakeProject` send; each caller retains its own pending start.
+pub(crate) fn start_in(
+    side: &mut super::Side,
+    limits: super::Limits,
+    forge: u16,
+    adoption: super::Adoption,
+    name: Box<[u8]>,
+    out: &mut skein_lib::Queue<super::Request>,
+) -> Option<FirstProject> {
     let value = super::start::StartIn::new(adoption, name);
-    let Some(ask) = value.ask(&limits) else { return };
+    let ask = value.ask(&limits)?;
     let mut attempt = None;
     for index in 0..side.start_attempts.len() {
         let (number, next) = side.start_attempts.get_mut(index).expect("counted attempts");
@@ -603,9 +625,7 @@ pub(crate) fn start_in(
     let attempt = match attempt {
         Some(attempt) => attempt,
         None => {
-            if side.start_attempts.push((forge, 1)).is_err() {
-                return;
-            }
+            side.start_attempts.push((forge, 1)).ok()?;
             0
         }
     };
@@ -613,9 +633,8 @@ pub(crate) fn start_in(
     // needs start-project-F-N, counting attempts within this client.
     side.serial = side.serial.checked_add(1).expect("forge request serial fits");
     let request = skein_lib::Token::new(side.serial);
-    side.set_up.as_mut().expect("setup retained").starting = Some(FirstProject { request, value });
     out.push(super::Request::Send { request, name: Some(super::start_project_key(forge, attempt)), ask });
-    side.changed();
+    Some(FirstProject { request, value })
 }
 pub(crate) fn retry_start(
     side: &mut super::Side,
@@ -640,7 +659,7 @@ pub(crate) fn retry_start(
     }
     let adoption = starting.value.adoption.clone();
     let name = Box::from(name);
-    start_in(side, limits, forge, adoption, name, out);
+    setup_start(side, limits, forge, adoption, name, out);
 }
 
 fn send_adoption(
@@ -650,19 +669,27 @@ fn send_adoption(
     additional: bool,
     out: &mut skein_lib::Queue<super::Request>,
 ) {
-    let Some(ask) = super::ask(adoption, &limits) else {
-        return;
-    };
+    let pending = adoption_request(side, limits, adoption, additional, out);
+    side.set_up.as_mut().expect("setup retained").adoption = pending;
+    side.changed();
+}
+/// Shared keyed `Adopt` send; the setup and picker retain their own answer.
+pub(crate) fn adoption_request(
+    side: &mut super::Side,
+    limits: super::Limits,
+    adoption: &super::Adoption,
+    additional: bool,
+    out: &mut skein_lib::Queue<super::Request>,
+) -> Option<FirstAdoption> {
+    let ask = super::ask(adoption, &limits)?;
     side.serial = side.serial.checked_add(1).expect("forge request serial fits");
     let request = skein_lib::Token::new(side.serial);
-    side.set_up.as_mut().expect("setup retained").adoption =
-        Some(FirstAdoption { request, additional, value: adoption.clone(), outcome: None });
     out.push(super::Request::Send {
         request,
         name: Some(super::first_repository_key(adoption.forge, additional)),
         ask,
     });
-    side.changed();
+    Some(FirstAdoption { request, additional, value: adoption.clone(), outcome: None })
 }
 pub(crate) fn adopted(
     side: &mut super::Side,

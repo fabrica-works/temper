@@ -305,6 +305,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::SetUpGroup { .. }
         | Request::Connect { .. }
         | Request::Manifest { .. }
+        | Request::Reachable { .. }
         | Request::Install { .. }
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
@@ -369,6 +370,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::SetUpGroup { .. }
         | Request::Connect { .. }
         | Request::Manifest { .. }
+        | Request::Reachable { .. }
         | Request::Install { .. }
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
@@ -433,6 +435,7 @@ fn adoption_reads_permission_before_committing_its_role() {
         | Request::SetUpGroup { .. }
         | Request::Connect { .. }
         | Request::Manifest { .. }
+        | Request::Reachable { .. }
         | Request::Install { .. }
         | Request::CarriedUnused { .. }
         | Request::EraseCarried { .. }
@@ -1130,8 +1133,8 @@ fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() 
     assert_eq!(restarted.connection(1), Connection::NotConnected, "restored writer is no connection claim");
 }
 const CONFIGURED: [Configured; 2] = [
-    Configured { number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true },
-    Configured { number: 2, kind: Kind::GitHub, mode: Mode::Owned, asked: true },
+    Configured { web: None, read_only: false, number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true },
+    Configured { web: None, read_only: false, number: 2, kind: Kind::GitHub, mode: Mode::Owned, asked: true },
 ];
 fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
     Domain::new(
@@ -1149,6 +1152,8 @@ fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
 }
 fn setup_row(number: u16, kind: Kind, connection: Connection, offer: Offer) -> Row {
     Row {
+        web: None,
+        repositories: Box::new([]),
         app: None,
         installations: Box::new([]),
         ended: None,
@@ -1214,10 +1219,10 @@ fn setup_rows_and_answers_agree_in_every_connection_state() {
 #[test]
 fn setup_is_not_offered_without_owned_asked_configuration() {
     let rows: [Box<[Configured]>; 5] = [
-        Box::new([Configured { mode: Mode::Connected, ..CONFIGURED[0] }]),
-        Box::new([Configured { mode: Mode::Managed, ..CONFIGURED[0] }]),
-        Box::new([Configured { mode: Mode::Fake, ..CONFIGURED[0] }]),
-        Box::new([Configured { asked: false, ..CONFIGURED[0] }]),
+        Box::new([Configured { mode: Mode::Connected, ..CONFIGURED[0].clone() }]),
+        Box::new([Configured { mode: Mode::Managed, ..CONFIGURED[0].clone() }]),
+        Box::new([Configured { mode: Mode::Fake, ..CONFIGURED[0].clone() }]),
+        Box::new([Configured { asked: false, ..CONFIGURED[0].clone() }]),
         Box::new([]),
     ];
     for forges in rows {
@@ -1278,7 +1283,7 @@ fn configured_forges_are_bounded_at_construction() {
     let count = usize::try_from(LIMITS.client.repositories).unwrap();
     let mut forges = skein_lib::List::with_capacity(LIMITS.client.repositories.checked_add(1).unwrap());
     for number in 0..=count {
-        forges.push(Configured { number: u16::try_from(number).unwrap(), ..CONFIGURED[0] }).unwrap();
+        forges.push(Configured { number: u16::try_from(number).unwrap(), ..CONFIGURED[0].clone() }).unwrap();
     }
     Domain::new(&LIMITS, 4, config(), &[], &forges.as_slice()[..count], false).unwrap();
     assert_eq!(
@@ -1477,7 +1482,7 @@ fn unconfigured_forges_share_one_latest_refusal_beside_the_configured_forges() {
 
 #[test]
 fn the_forges_document_orders_connections_and_every_connection_marks_it() {
-    let mut d = setup_domain(&[CONFIGURED[1], CONFIGURED[0]], true);
+    let mut d = setup_domain(&[CONFIGURED[1].clone(), CONFIGURED[0].clone()], true);
     d.connection_limits(2, 1);
     for (forge, state) in [(2, Connection::NotSetUp), (1, Connection::Connecting), (2, Connection::NotSetUp)] {
         assert_eq!(outputs(&mut d, Event::Connection { forge, state }).as_ref(), [Request::MarkedForges]);
@@ -1738,4 +1743,43 @@ fn pushed_heads_match_their_own_forge_only() {
         );
     }
     assert!(d.reported_heads(&LIMITS, 9, 1, &[Pushed { tag: 0x0001_0001_0000_0002, commit: [2; 32] }]).is_empty());
+}
+
+#[test]
+fn forges_lists_web_and_only_each_forges_adoptions_for_every_kind() {
+    for kind in [Kind::Forgejo, Kind::GitHub] {
+        let mut d = setup_domain(
+            &[Configured {
+                number: 1,
+                kind,
+                mode: Mode::Connected,
+                asked: false,
+                web: Some(Box::from(b"https://forge.example".as_slice())),
+                read_only: false,
+            }],
+            false,
+        );
+        let own = adopted();
+        outputs(&mut d, Event::Restore { record: Stored::Repository(own.clone()) });
+        let mut elsewhere = own.clone();
+        elsewhere.provider.forge = 2;
+        outputs(&mut d, Event::Restore { record: Stored::Repository(elsewhere) });
+        let rows = d.forges();
+        let [row] = rows.rows.as_ref() else { panic!("one configured forge") };
+        assert_eq!(row.web.as_deref(), Some(b"https://forge.example".as_slice()));
+        assert_eq!(row.repositories.as_ref(), &[AdoptedRow { owner: own.owner, name: own.name, project: own.project }]);
+    }
+}
+
+#[test]
+fn forgetting_or_restoring_an_adoption_publishes_the_forges_row() {
+    let mut d = setup_domain(&[Configured { mode: Mode::Connected, ..CONFIGURED[0].clone() }], false);
+    let own = adopted();
+    outputs(&mut d, Event::Restore { record: Stored::Repository(own.clone()) });
+    let out = outputs(&mut d, Event::ForgetAdoption { repository: own.provider, restore: None });
+    assert!(out.contains(&Request::MarkedForges), "{out:?}");
+    assert!(d.forges().rows[0].repositories.is_empty());
+    let out = outputs(&mut d, Event::ForgetAdoption { repository: own.provider, restore: Some(own.clone()) });
+    assert!(out.contains(&Request::MarkedForges), "{out:?}");
+    assert_eq!(d.forges().rows[0].repositories.len(), 1);
 }

@@ -653,7 +653,7 @@ fn github_cues(
         peer.peer = llm::peer(llm::scripted(scripts(address))).expect("bound GitHub scripts");
     }
     caller.github_app = service.github_seen.app.as_ref().map(|app| app.id);
-    service.github_seen.checkpoint(forge, &caller.calls);
+    service.checkpoint_github(forge, &caller.calls);
     if service.is_empty() {
         service.github_seen.collect(forge, &state.handle);
         forge.shutdown();

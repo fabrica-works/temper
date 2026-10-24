@@ -697,7 +697,14 @@ fn paste_row(limits: &domain::Limits, request: Token, connected: bool, why: Opti
         7,
         skein_forge_client::Config { namespace: Box::from(b"fixture".as_slice()), writers: Box::new([]) },
         &[],
-        &[domain::Configured { number: 1, kind: domain::Kind::GitHub, mode: domain::Mode::Connected, asked: false }],
+        &[domain::Configured {
+            web: None,
+            read_only: false,
+            number: 1,
+            kind: domain::Kind::GitHub,
+            mode: domain::Mode::Connected,
+            asked: false,
+        }],
         false,
     )
     .unwrap();
@@ -1438,4 +1445,35 @@ fn an_install_held_past_the_states_life_answers_busy() {
     let Some((domain::InstallAnswer::Connecting, Some(why))) = install_answer(&mut service) else { panic!("busy") };
     assert_eq!(why.as_ref(), b"setup host: busy");
     assert!(service.engine.as_ref().unwrap().setup.held.is_empty());
+}
+
+#[test]
+fn pasted_app_key_form_and_401_failures_use_the_persons_words() {
+    let mut service = service(8, Duration::from_secs(3600));
+    let pem = b"not a PEM key";
+    let mut bundle = skein_lib::Writer::new(pem.len() + 6);
+    bundle.put(&[1, 1, 11, 0]).unwrap();
+    bundle.put(&u16::try_from(pem.len()).unwrap().to_le_bytes()).unwrap();
+    bundle.put(pem).unwrap();
+    let bundle = Secret::new(bundle.finish());
+    let digest = skein_lib::sha256::digest(bundle.expose());
+    paste_start(&mut service, bundle, digest);
+    for _ in 0_u32..4 {
+        advance(service.engine.as_mut().unwrap());
+    }
+    assert_eq!(
+        paste_ended(&mut service, false, pem).as_deref(),
+        Some(b"The key isn't a GitHub App private key: paste its .pem file whole.".as_slice())
+    );
+    let mut service = super::service(8, Duration::from_secs(3600));
+    let (pem, bundle) = carried_pem();
+    let digest = skein_lib::sha256::digest(bundle.expose());
+    paste_start(&mut service, bundle, digest);
+    let mut face = Face::new();
+    face.sent(&mut service);
+    face.reply_status(&mut service, b"401 Unauthorized", b"{}");
+    assert_eq!(
+        paste_ended(&mut service, false, pem.expose()).as_deref(),
+        Some(b"GitHub refused the App's id and key (401): check both are the same App's.".as_slice())
+    );
 }

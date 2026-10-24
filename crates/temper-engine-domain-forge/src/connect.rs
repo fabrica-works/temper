@@ -10,6 +10,7 @@ pub(crate) struct State {
     pub(crate) answers: Map<Token, Answered>,
     pending: Map<Token, Token>,
     running: Map<u16, (Token, Option<Carried>)>,
+    reading: Map<u16, Token>,
 }
 impl State {
     pub(crate) fn new(bound: u32) -> Self {
@@ -17,6 +18,7 @@ impl State {
             answers: Map::with_capacity(bound),
             pending: Map::with_capacity(bound),
             running: Map::with_capacity(bound),
+            reading: Map::with_capacity(bound),
         }
     }
     fn answer(&mut self, request: Token, token: Token, answer: Answered, out: &mut Queue<Request>) {
@@ -32,7 +34,10 @@ pub(crate) fn worst_case(bound: u32) -> Option<u64> {
     Map::<Token, Answered>::worst_case(bound)?
         .checked_add(Map::<Token, Token>::worst_case(bound)?)?
         .checked_add(Map::<u16, (Token, Option<Carried>)>::worst_case(bound)?)?
-        .checked_add(u64::from(bound).checked_mul(2048)?)
+        .checked_add(Map::<u16, Token>::worst_case(bound)?)?
+        .checked_add(u64::from(bound).checked_mul(
+            2048_u64.max(100_u64.checked_mul(u64::try_from(size_of::<crate::Reached>()).ok()?.checked_add(2048)?)?),
+        )?)
 }
 pub(crate) fn start(
     d: &mut Domain,
@@ -43,11 +48,15 @@ pub(crate) fn start(
     carried: Option<Carried>,
     out: &mut Queue<Request>,
 ) {
+    if let Ask::Reachable { forge, installation, page } = ask {
+        reachable(d, request, token, forge, installation, page, role, carried, out);
+        return;
+    }
     let (forge, install, manifest) = match &ask {
         Ask::Connect { forge, how: crate::How::GitHubApp { .. } } => (*forge, false, false),
         Ask::Connect { forge, how: crate::How::GitHubManifest { .. } } => (*forge, false, true),
         Ask::Install { forge, .. } => (*forge, true, false),
-        Ask::Adopt(_) | Ask::SetUp { .. } | Ask::StartDemo => unreachable!("connect admission"),
+        Ask::Reachable { .. } | Ask::Adopt(_) | Ask::SetUp { .. } | Ask::StartDemo => unreachable!("connect admission"),
     };
     let (connected, connecting) = match d.connection(forge) {
         Connection::Connected { .. } => (true, false),
@@ -63,7 +72,7 @@ pub(crate) fn start(
     } else if !d.configured.contains_key(&forge) {
         Some(ForgeRefusal::NoSuchForge)
     } else if let Some(config) = d.configured.get(&forge)
-        && (config.kind != crate::Kind::GitHub || config.mode == crate::Mode::Fake)
+        && (config.kind != crate::Kind::GitHub || config.mode == crate::Mode::Fake || manifest && config.read_only)
     {
         Some(ForgeRefusal::NotTaken)
     } else if d.connect.running.contains_key(&forge)
@@ -122,7 +131,7 @@ pub(crate) fn start(
             d.connect.running.insert(forge, (request, None)).expect("room checked");
             out.push(Request::Install { forge, request, back });
         }
-        Ask::Adopt(_) | Ask::SetUp { .. } | Ask::StartDemo => unreachable!("connect admission"),
+        Ask::Reachable { .. } | Ask::Adopt(_) | Ask::SetUp { .. } | Ask::StartDemo => unreachable!("connect admission"),
     }
 }
 pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: ConnectAnswer, out: &mut Queue<Request>) {
@@ -216,4 +225,91 @@ fn stopped_end(d: &mut Domain, forge: u16, why: &[u8], out: &mut Queue<Request>)
     }
     d.ended.insert(forge, Box::from(why.get(..end).expect("bounded reason prefix"))).expect("configured forge ends");
     out.push(Request::MarkedForges);
+}
+
+#[expect(clippy::too_many_arguments, reason = "the admitted request and its caller travel together")]
+fn reachable(
+    d: &mut Domain,
+    request: Token,
+    token: Token,
+    forge: u16,
+    installation: Option<u64>,
+    page: u32,
+    role: Option<Role>,
+    carried: Option<Carried>,
+    out: &mut Queue<Request>,
+) {
+    if let Some(value) = carried {
+        out.push(Request::CarriedUnused { number: value.number });
+    }
+    let config = d.configured.get(&forge);
+    let mut selected = installation;
+    let mut accepted = false;
+    if let Some(config) = config {
+        match config.kind {
+            crate::Kind::GitHub => {
+                for ((owner, id), state) in &d.installations {
+                    if *owner == forge
+                        && !state.stray
+                        && !state.suspended
+                        && (selected.is_none() || selected == Some(*id))
+                    {
+                        selected = Some(*id);
+                        accepted = true;
+                        break;
+                    }
+                }
+            }
+            crate::Kind::Forgejo => accepted = installation.is_none(),
+        }
+    }
+    let connected = match d.connection(forge) {
+        Connection::Connected { .. } => true,
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SettingUp { .. }
+        | Connection::SetUpFailed { .. }
+        | Connection::Connecting
+        | Connection::Stopped { .. } => false,
+    };
+    let why = if role != Some(Role::Owner) {
+        Some(ForgeRefusal::Role)
+    } else if config.is_none() {
+        Some(ForgeRefusal::NoSuchForge)
+    } else if config.expect("configured").mode == crate::Mode::Fake || page == 0 {
+        Some(ForgeRefusal::NotTaken)
+    } else if d.connect.reading.contains_key(&forge)
+        || d.connect.reading.len() == d.connect.reading.capacity()
+        || d.connect.pending.len() == d.connect.pending.capacity()
+    {
+        Some(ForgeRefusal::Busy)
+    } else if !connected {
+        Some(ForgeRefusal::NotConnected)
+    } else if !accepted {
+        Some(ForgeRefusal::NotTaken)
+    } else {
+        None
+    };
+    if let Some(why) = why {
+        d.connect.answer(request, token, Answered::Reachable(crate::ReachableAnswer::Refused(why)), out);
+        return;
+    }
+    d.connect.pending.insert(request, token).expect("room checked");
+    d.connect.reading.insert(forge, request).expect("room checked");
+    out.push(Request::Reachable { forge, request, installation: selected, page });
+}
+pub(crate) fn reached(
+    d: &mut Domain,
+    forge: u16,
+    request: Token,
+    answer: crate::ReachableAnswer,
+    out: &mut Queue<Request>,
+) {
+    if d.connect.reading.get(&forge) != Some(&request) {
+        return;
+    }
+    d.connect.reading.remove(&forge);
+    if let Some(token) = d.connect.pending.remove(&request) {
+        d.connect.answer(request, token, Answered::Reachable(answer), out);
+    }
 }

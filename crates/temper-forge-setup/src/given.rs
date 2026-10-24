@@ -44,7 +44,7 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
             what = What::Reason(b"outside its type");
             limits.member(b"setup.backoff_max_ms")
         }
-        Place::ReachableLimit | Place::Page => unreachable!("no picker until temper-10; reachable is fixed nonzero"),
+        Place::ReachableLimit | Place::Page => limits.member(b"picker.page"),
         Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => {
             what = What::Reason(b"outside its type");
             limits.member(b"forge.client.repositories")
@@ -70,9 +70,7 @@ pub fn refusal(index: u32, why: Refused) -> Problems {
         what = What::Against(match other {
             Place::BackoffMax => b"setup.backoff_max_ms",
             Place::Deadline => b"setup.deadline_ms",
-            Place::ReachableLimit | Place::Page => {
-                unreachable!("no picker until temper-10; reachable is fixed nonzero")
-            }
+            Place::ReachableLimit | Place::Page => b"picker.page",
             Place::Repositories | Place::Repository(_) | Place::RepositoriesLimit => b"forge.client.repositories",
             Place::FilesLimit
             | Place::FileBytesLimit

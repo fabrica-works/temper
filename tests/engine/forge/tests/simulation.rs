@@ -781,6 +781,7 @@ fn a_change_produced_opened_checked_queued_and_landed() {
                 | top::Request::SetUpGroup { .. }
                 | top::Request::Connect { .. }
                 | top::Request::Manifest { .. }
+                | top::Request::Reachable { .. }
                 | top::Request::Install { .. }
                 | top::Request::CarriedUnused { .. }
                 | top::Request::EraseCarried { .. }

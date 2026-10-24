@@ -77,6 +77,7 @@ const USAGES: &[&[u8]] = &[
     b"demo-start [--key NAME]\n",
     b"forge-connect F github-app ID FILE --key NAME\nforge-connect F github --key NAME\nforge-connect F forgejo|forgejo-admin FILE --key NAME\n",
     b"forge-install F [--key NAME]\n",
+    b"repositories F [--installation I] [--page N]\n",
 ];
 #[test]
 fn a_tools_usage_reads_as_the_design_writes_it() {

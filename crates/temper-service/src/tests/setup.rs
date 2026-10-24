@@ -644,6 +644,7 @@ fn invalid_host_limits_stop_after_load_and_setup_overrides_are_checked() {
     config.identities[0].author.email = Box::new([]);
     config.forges[0].api_token = None;
     config.limits.forge_component.inner = 13;
+    config.limits.picker.page = 1;
     let (mut endpoints, _) = crate::forge::prepare(&fixtures::engine(), fixtures::forge_runtime()).unwrap();
     service.engine.as_mut().expect("engine").setup =
         prepare(&config, &mut endpoints, &fixtures::seeds().crypto, 2, false).unwrap();
@@ -711,6 +712,9 @@ fn accounted(runs: u32, states: u32, tls: bool) -> u64 {
     required
 }
 
+#[path = "setup_reachable.rs"]
+mod reachable_tests;
+
 #[path = "setup_lifecycle.rs"]
 mod lifecycle_tests;
 
@@ -739,7 +743,7 @@ fn an_unresolved_forge_keeps_its_setup_entry_but_restored_and_asked_connects_nev
     let setup = &service.engine.as_ref().unwrap().setup;
     assert!(setup.served.contains_key(&1), "the held forge still has a setup entry");
     let (settings, _) = setup.pending.as_ref().unwrap();
-    assert_eq!(settings.forges.len(), 1);
+    assert_eq!(settings.forges.len(), 2, "both the held GitHub and connected Forgejo serve picker reads");
     assert_eq!(settings.forges.get(0).unwrap().address, skein_io::Addr::Ip(crate::forge::HELD_ADDRESS));
     lifecycle_tests::app(&mut service);
     let engine = service.engine.as_mut().unwrap();

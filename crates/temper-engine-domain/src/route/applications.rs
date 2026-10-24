@@ -23,7 +23,11 @@ pub(super) fn start(domain: &mut Domain, admission: Admission, request: Applicat
     let Admission { reply_to, sign_in, key, digest, scope, carried } = admission;
     let scope = match &request {
         Application::Forge(
-            forge::Ask::SetUp { .. } | forge::Ask::StartDemo | forge::Ask::Connect { .. } | forge::Ask::Install { .. },
+            forge::Ask::SetUp { .. }
+            | forge::Ask::StartDemo
+            | forge::Ask::Connect { .. }
+            | forge::Ask::Install { .. }
+            | forge::Ask::Reachable { .. },
         ) => people::ApplicationScope::Deployment,
         Application::Forge(forge::Ask::Adopt(_)) => scope,
         Application::Return { .. } => people::ApplicationScope::Own,
@@ -134,6 +138,7 @@ pub(super) fn answer(domain: &Domain, token: Token) -> Option<ApplicationAnswer>
         Some(forge::Answered::SetUp(answer)) => Some(ApplicationAnswer::SetUp(answer)),
         Some(forge::Answered::StartDemo(answer)) => Some(ApplicationAnswer::StartDemo(answer)),
         Some(forge::Answered::Connect(answer)) => Some(ApplicationAnswer::Connect(answer)),
+        Some(forge::Answered::Reachable(answer)) => Some(ApplicationAnswer::Reachable(answer)),
         Some(forge::Answered::Install(answer)) => Some(ApplicationAnswer::Install(answer)),
         None => None,
     }

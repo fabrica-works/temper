@@ -399,3 +399,19 @@ fn installation_capacity_fits_the_client_row_at_64_and_refuses_65() {
         assert_eq!(problems.is_empty(), accepted);
     }
 }
+
+#[test]
+fn picker_page_has_its_own_override_and_startup_bounds() {
+    let mut settings = fixtures::engine();
+    assert_eq!(settings.limits.picker.page, 30);
+    for page in [0_u64, 1, 30, 100, 101] {
+        let mut own = settings.limits;
+        limits::apply(&mut own, b"picker.page", page).unwrap();
+        assert_eq!(u64::from(own.picker.page), page);
+        let mut found = crate::startup::Problems::empty();
+        crate::startup::checks::records(&settings.jig, &own, &[], &mut found);
+        let lines = crate::startup::lines(&found);
+        assert_eq!(skein_lib::bytes::find(&lines, b"picker.page").is_some(), page == 0 || page > 100);
+    }
+    assert_eq!(limits::apply(&mut settings.limits, b"picker.page", u64::MAX), Err(limits::Refused::Range));
+}

@@ -231,6 +231,8 @@ fn each_forge_refusal_is_said_in_forge_md_words() {
 
 fn github_row() -> forge::forges::Row {
     forge::forges::Row {
+        web: None,
+        repositories: Box::new([]),
         app: None,
         number: 2,
         kind: forge::forges::Kind::GitHub,

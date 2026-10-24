@@ -2121,6 +2121,12 @@ pub(crate) fn outputs(
             forge::Request::Manifest { forge, request, back } => {
                 assert!(super::now(domain, Request::Manifest { forge, request, back }), "manifest door");
             }
+            forge::Request::Reachable { forge, request, installation, page } => {
+                assert!(
+                    super::now(domain, Request::Reachable { forge, request, installation, page }),
+                    "reachable door"
+                );
+            }
             forge::Request::Install { forge, request, back } => {
                 assert!(super::now(domain, Request::Install { forge, request, back }), "install door");
             }

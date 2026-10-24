@@ -12,6 +12,8 @@ use temper_client_domain::forge::{
 use temper_client_protocol_wire::{self as wire, v1 as w};
 fn row(connection: C) -> Row {
     Row {
+        web: None,
+        repositories: Box::new([]),
         installations: Box::new([]),
         ended: None,
         first: None,
@@ -34,6 +36,8 @@ fn record_first(connection: w::Connection, first: Option<w::FirstRepository>) ->
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     installations: List::with_capacity(0),
                     ended: None,
@@ -762,6 +766,8 @@ fn settled_wait_with_installations(count: u32) {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     number: 3,
                     kind: w::Kind::Github,
@@ -908,6 +914,8 @@ fn human_forges_bounds_the_wire_maximum_installations_with_longest_logins() {
             w::ForgeRow::new(
                 &bounds,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     number: 3,
                     kind: w::Kind::Github,

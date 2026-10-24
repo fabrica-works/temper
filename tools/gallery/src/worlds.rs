@@ -235,6 +235,7 @@ fn forges_watched(root: &mut Domain, world: World, watch: Token, out: &mut Queue
         out,
     );
 }
+#[expect(clippy::too_many_lines, reason = "complete illustrative forge rows keep their additive fields together")]
 fn forges(world: World) -> Box<[u8]> {
     use temper_client_protocol_wire::{self as wire, v1 as w};
     let limits = temper_client_domain::forge::wire_limits(&limits().forge).expect("wire limits");
@@ -244,6 +245,8 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     first: None,
                     number: FORGE,
@@ -267,6 +270,8 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     number: 2,
                     kind: w::Kind::Github,
@@ -295,6 +300,8 @@ fn forges(world: World) -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     number: 3,
                     kind: w::Kind::Forgejo,

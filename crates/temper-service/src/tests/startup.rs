@@ -1604,14 +1604,14 @@ fn forge_configuration_keeps_kind_mode_and_asked_start() {
         settings.forges[0].kind = source;
         assert_eq!(
             application::configured(&settings).as_ref(),
-            [Configured { number: 1, kind, mode: Mode::Connected, asked: false }]
+            [Configured { web: None, read_only: false, number: 1, kind, mode: Mode::Connected, asked: false }]
         );
     }
     settings.forges[0].kind = settings::Kind::Forgejo;
     settings.setup = Box::new([fixtures::owned_setup(1)]);
     assert_eq!(
         application::configured(&settings).as_ref(),
-        [Configured { number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true }]
+        [Configured { web: None, read_only: false, number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true }]
     );
 }
 

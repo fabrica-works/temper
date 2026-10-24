@@ -49,16 +49,30 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
     configured_with(
         owner,
         under_box,
-        [
-            forge::Configured { number: OWNED, kind: forge::Kind::Forgejo, mode, asked: true },
-            forge::Configured { number: GITHUB, kind: forge::Kind::GitHub, mode: forge::Mode::Connected, asked: false },
+        &[
+            forge::Configured {
+                web: None,
+                read_only: false,
+                number: OWNED,
+                kind: forge::Kind::Forgejo,
+                mode,
+                asked: true,
+            },
+            forge::Configured {
+                web: None,
+                read_only: false,
+                number: GITHUB,
+                kind: forge::Kind::GitHub,
+                mode: forge::Mode::Connected,
+                asked: false,
+            },
         ],
     )
 }
-fn configured_with(owner: bool, under_box: bool, rows: [forge::Configured; 2]) -> Pages {
+fn configured_with(owner: bool, under_box: bool, rows: &[forge::Configured; 2]) -> Pages {
     configured_accounts(owner, under_box, rows, true)
 }
-fn configured_accounts(owner: bool, under_box: bool, rows: [forge::Configured; 2], account: bool) -> Pages {
+fn configured_accounts(owner: bool, under_box: bool, rows: &[forge::Configured; 2], account: bool) -> Pages {
     let mut world = if owner { f::accounts_world(f::SEED) } else { f::world(f::SEED) };
     let front = world.front();
     let mut store = std::mem::replace(&mut front.engine.store, Store::new());
@@ -84,7 +98,7 @@ fn configured_accounts(owner: bool, under_box: bool, rows: [forge::Configured; 2
                 writer
             })
             .collect();
-        config.forges = Box::new(rows);
+        config.forges = Box::new((*rows).clone());
         config.under_box = under_box;
         config
     });
@@ -101,14 +115,18 @@ fn world_for(number: u16) -> Pages {
         REMOTE => configured_with(
             true,
             true,
-            [
+            &[
                 forge::Configured {
+                    web: None,
+                    read_only: false,
                     number: GITHUB,
                     kind: forge::Kind::GitHub,
                     mode: forge::Mode::Connected,
                     asked: false,
                 },
                 forge::Configured {
+                    web: None,
+                    read_only: false,
                     number: REMOTE,
                     kind: forge::Kind::Forgejo,
                     mode: forge::Mode::Managed,
@@ -119,9 +137,23 @@ fn world_for(number: u16) -> Pages {
         FAKE => configured_with(
             true,
             true,
-            [
-                forge::Configured { number: OWNED, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: true },
-                forge::Configured { number: FAKE, kind: forge::Kind::Forgejo, mode: forge::Mode::Fake, asked: false },
+            &[
+                forge::Configured {
+                    web: None,
+                    read_only: false,
+                    number: OWNED,
+                    kind: forge::Kind::Forgejo,
+                    mode: forge::Mode::Owned,
+                    asked: true,
+                },
+                forge::Configured {
+                    web: None,
+                    read_only: false,
+                    number: FAKE,
+                    kind: forge::Kind::Forgejo,
+                    mode: forge::Mode::Fake,
+                    asked: false,
+                },
             ],
         ),
         _ => world(),
@@ -328,9 +360,18 @@ fn unoffered_forge_has_no_owned_choose_card() {
         let mut world = configured_with(
             true,
             true,
-            [
-                forge::Configured { number: OWNED, kind: forge::Kind::Forgejo, mode, asked },
+            &[
                 forge::Configured {
+                    web: None,
+                    read_only: false,
+                    number: OWNED,
+                    kind: forge::Kind::Forgejo,
+                    mode,
+                    asked,
+                },
+                forge::Configured {
+                    web: None,
+                    read_only: false,
                     number: GITHUB,
                     kind: forge::Kind::GitHub,
                     mode: forge::Mode::Connected,
@@ -852,9 +893,18 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
         let mut world = configured_accounts(
             true,
             true,
-            [
-                forge::Configured { number: OWNED, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: true },
+            &[
                 forge::Configured {
+                    web: None,
+                    read_only: false,
+                    number: OWNED,
+                    kind: forge::Kind::Forgejo,
+                    mode: forge::Mode::Owned,
+                    asked: true,
+                },
+                forge::Configured {
+                    web: None,
+                    read_only: false,
                     number: GITHUB,
                     kind: forge::Kind::GitHub,
                     mode: forge::Mode::Connected,

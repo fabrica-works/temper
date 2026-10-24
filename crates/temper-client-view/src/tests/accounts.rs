@@ -713,9 +713,10 @@ mod memory_literal;
 // The Forges page's words, and its rows' nodes in the view's node bound (16,384,799 B).
 // The demo start's words, full failure text and retry nodes (1,724,026 B).
 // The four Access phrases and their segments add 688 B.
+// GitHub's Ready picker and adopted card words add 2,976 B.
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 #[cfg(target_pointer_width = "64")]
-const ACCOUNT_BYTES: u64 = 11526790914;
+const ACCOUNT_BYTES: u64 = 11526793890;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -1295,6 +1296,24 @@ fn only_deployment_rows_show_usage_facts_and_their_use_summary() {
 #[test]
 fn english_phrase_declarations_match_the_vocabulary() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/words.rs");
+    let source = std::fs::read_to_string(&path).unwrap();
+    let variants = source.split("pub enum Word {\n").nth(1).unwrap().split("\n}").next().unwrap();
+    let names: Vec<_> = variants.lines().map(str::trim).filter(|line| line.ends_with(',')).collect();
+    let mut all = format!("const ALL: [Word; {}] = [\n", names.len());
+    for name in names {
+        all.push_str("    Word::");
+        all.push_str(name);
+        all.push('\n');
+    }
+    all.push_str("];");
+    let start = source.find("const ALL: [Word;").unwrap();
+    let end = start + source[start..].find("\n];").unwrap() + 3;
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
+        let updated = format!("{}{}{}", &source[..start], all, &source[end..]);
+        std::fs::write(&path, updated).unwrap();
+    } else {
+        assert_eq!(&source[start..end], all);
+    }
     for (marker, expected, actual) in crate::words::english_declarations() {
         memory_literal::check(&path, marker, expected, actual);
     }

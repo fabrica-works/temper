@@ -28,6 +28,7 @@ pub struct Joint {
     pub demo_starts: Vec<skein_lib::RequestKey>,
     pub demo_removals: Vec<skein_lib::RequestKey>,
     pub demo_reads: usize,
+    pub reachable_reads: Vec<(u16, Option<u64>, u32)>,
     pub demo_outcomes: VecDeque<temper_client_protocol_wire::v1::Outcome>,
     pub answer_runs: bool,
     pub reply_runs: bool,
@@ -93,6 +94,63 @@ pub fn first_run_projects(config: &mut engine::Config, limits: &mut engine::Limi
     config.core.policies.insert(1, policy).expect("first-run policy");
 }
 impl Joint {
+    /// The GitHub first run: real project/adoption engine, fixed reachable page.
+    #[must_use]
+    pub fn github_fixture(seed: u64) -> (Self, crate::app::Root) {
+        use temper_engine_domain_forge as forge;
+        let limits = fixtures::domain_limits();
+        let [(bootstrap, engine_limits), (config, _)] = std::array::from_fn(|_| {
+            let mut config = walking::config(seed);
+            let mut engine_limits = engine_limits();
+            first_run_projects(&mut config, &mut engine_limits);
+            config.core.connectors = Box::new([fixtures::FORGE]);
+            config.forges = Box::new([forge::Configured {
+                number: 1,
+                kind: forge::Kind::GitHub,
+                mode: forge::Mode::Connected,
+                web: Some(b"https://github.test".as_slice().into()),
+                read_only: false,
+                asked: false,
+            }]);
+            (config, engine_limits)
+        });
+        let mut front = Self::with_engine(seed, &limits, Store::new(), [bootstrap, config], &engine_limits, 1);
+        front.engine.forge = Some(temper_engine_domain_world::forge_stand::ForgeStand::with(&[
+            (b"acme", b"shop", 7),
+            (b"acme", b"second", 8),
+        ]));
+        for event in [
+            forge::Event::Connection {
+                forge: 1,
+                state: forge::Connection::Connected { id: 1, login: b"app[bot]".as_slice().into() },
+            },
+            forge::Event::Installation {
+                forge: 1,
+                installation: 1,
+                state: Some(forge::Installation {
+                    account: Some((1, b"acme".as_slice().into())),
+                    stray: false,
+                    suspended: false,
+                }),
+            },
+        ] {
+            front.engine.send(engine::Event::Forge(Box::new(event)));
+        }
+        front.engine.settle();
+        let who = ClientId(0);
+        front.bind(who, fixtures::PARTY);
+        let mut root = crate::app::Root::Person(Box::new(client::unlinked(&limits, seed)));
+        account_acts::event(
+            &mut front,
+            &mut root,
+            <Temper as jig_client_world::harness::App>::start(
+                client::Address::ConnectForge { forge: Some(client::Choice::Forge(1)) },
+                Vec::new(),
+                0,
+            ),
+        );
+        (front, root)
+    }
     /// The next chat run's reply, written in these pieces: the first is sent at the
     /// run's assignment and each later part at one `release_reply` (testing.md 6.3).
     pub fn reply_in_pieces(&mut self, pieces: &'static [&'static [u8]]) {
@@ -585,6 +643,7 @@ impl Joint {
             demo_starts: Vec::new(),
             demo_removals: Vec::new(),
             demo_reads: 0,
+            reachable_reads: Vec::new(),
             demo_outcomes: VecDeque::new(),
             answer_runs: false,
             reply_runs: false,
@@ -661,6 +720,67 @@ impl Joint {
             self.sign_ins += 1;
         }
         self.engine.send(event);
+    }
+    fn reachable(&mut self, who: ClientId, request: &Request) -> bool {
+        use temper_client_protocol_wire::{self as wire, v1 as w};
+        let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family { record, .. }, .. },
+                },
+        } = request
+        else {
+            return false;
+        };
+        if record.family != wire::FORGE {
+            return false;
+        }
+        let Some(request) = wire::decode_requesting(&record.bytes, &w::CEILINGS) else { return false };
+        let w::Request::Reachable(read) = request.request() else { return false };
+        self.reachable_reads.push((read.forge(), *read.installation(), read.page()));
+        let mut rows = skein_lib::List::with_capacity(2);
+        for (id, name) in [(7, b"shop".as_slice()), (8, b"second".as_slice())] {
+            rows.push(
+                w::Reached::new(
+                    &w::CEILINGS,
+                    w::ReachedParts {
+                        id,
+                        owner: w::Account::new(
+                            &w::CEILINGS,
+                            w::AccountParts { id: 1, login: b"acme".as_slice().into() },
+                        )
+                        .expect("fixed owner"),
+                        name: name.into(),
+                        private: id == 8,
+                    },
+                )
+                .expect("fixed row"),
+            )
+            .expect("fixed page");
+        }
+        let outcome =
+            w::Outcome::Page(w::Page::new(&w::CEILINGS, w::PageParts { rows, more: false }).expect("fixed page"));
+        self.callbacks.push((
+            who,
+            RootEvent::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Answer {
+                        attempt: *attempt,
+                        envelope: RequestEnvelope::Final,
+                        why: None,
+                        answer: Some(jig_client::Answered::Family(jig_client::Family {
+                            family: wire::FORGE,
+                            version: wire::CLIENT_VERSION,
+                            bytes: wire::answer(
+                                &w::Answer::new(&w::CEILINGS, w::AnswerParts { outcome }).expect("fixed answer"),
+                            ),
+                        })),
+                    },
+                },
+            }
+            .into(),
+        ));
+        true
     }
     fn start_demo(&mut self, who: ClientId, request: &Request) -> bool {
         // StartDemo is scripted here until the parallel engine task lands.
@@ -811,7 +931,7 @@ impl Joint {
         {
             self.demo_removals.push(*key);
         }
-        if self.start_demo(who, &request) {
+        if self.reachable(who, &request) || self.start_demo(who, &request) {
             return;
         }
         if let Request::Client {
@@ -875,6 +995,8 @@ impl Joint {
                 w::ForgeRow::new(
                     &w::CEILINGS,
                     w::ForgeRowParts {
+                        web: None,
+                        repositories: skein_lib::List::with_capacity(0),
                         app: None,
                         first: None,
                         number: demo.forge(),

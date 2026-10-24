@@ -21,7 +21,8 @@ record GitHubManifest { back: option bytes 512 }
 enum How { github_app: GitHubApp, github_manifest: GitHubManifest }
 record Connect { forge: u16 how: How }
 record Install { forge: u16 back: option bytes 512 }
-enum Request { adopt: Adopt, set_up: SetUp, start_demo, return_: Return, connect: Connect, install: Install }
+record Reachable { forge: u16 installation: option u64 page: u32 }
+enum Request { adopt: Adopt, set_up: SetUp, start_demo, return_: Return, connect: Connect, install: Install, reachable: Reachable }
 versioned record Requesting { request: Request }
 enum SetUpRefusal { not_offered, not_under_the_box, busy, new_project, invalid }
 record SetUpRefused { why: SetUpRefusal }
@@ -54,7 +55,8 @@ record Account { id: u64 login: bytes 1024 }
 record Installation { id: u64 account: option Account suspended: bool stray: bool }
 record ConnectStopped { why: bytes 256 }
 enum AppWay { manifest, pasted }
-record ForgeRow { number: u16 kind: Kind mode: Mode connection: Connection offer: Offer first: option FirstRepository installations: list 64 Installation ended: option ConnectStopped app: option AppWay }
+record Adoption { owner: bytes 1024 name: bytes 1024 project: u32 }
+record ForgeRow { number: u16 kind: Kind mode: Mode connection: Connection offer: Offer first: option FirstRepository installations: list 64 Installation ended: option ConnectStopped app: option AppWay web: option bytes 2048 repositories: list 16 Adoption }
 versioned record Forges { forges: list 16 ForgeRow }
 
 # The family's read name and its demo answer (client/README.md, 4.6).
@@ -95,7 +97,9 @@ record ForgeRefused { reason: ForgeReason }
 enum ForgeRefusal { role, no_such_forge, not_taken, connected, not_connected, busy, no_key }
 record ConnectRefused { why: ForgeRefusal }
 record Link { address: bytes 2048 }
+record Reached { id: u64 owner: Account name: bytes 1024 private: bool }
+record Page { rows: list 100 Reached more: bool }
 # unknown: the outcome's retention ended (02.2's Delivery::Application
 # outcome None; client/README.md, 4.7, "unknown past the retention").
-enum Outcome { adopted: Adopted, core_refused: CoreRefused, forge_refused: ForgeRefused, unknown, setting_up, set_up_refused: SetUpRefused, running, start_refused: StartRefused, start_failed: StartFailed, returning, connecting, link: Link, connect_refused: ConnectRefused }
+enum Outcome { adopted: Adopted, core_refused: CoreRefused, forge_refused: ForgeRefused, unknown, setting_up, set_up_refused: SetUpRefused, running, start_refused: StartRefused, start_failed: StartFailed, returning, connecting, link: Link, connect_refused: ConnectRefused, page: Page }
 versioned record Answer { outcome: Outcome }

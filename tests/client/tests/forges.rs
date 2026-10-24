@@ -27,15 +27,38 @@ fn config(under_box: bool) -> engine::Config {
     config.core.connectors = Box::new([fixtures::FORGE]);
     config.under_box = under_box;
     config.forges = Box::new([
-        forge::Configured { number: FORGE, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: true },
-        forge::Configured { number: OTHER, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: true },
         forge::Configured {
+            web: None,
+            read_only: false,
+            number: FORGE,
+            kind: forge::Kind::Forgejo,
+            mode: forge::Mode::Owned,
+            asked: true,
+        },
+        forge::Configured {
+            web: None,
+            read_only: false,
+            number: OTHER,
+            kind: forge::Kind::Forgejo,
+            mode: forge::Mode::Owned,
+            asked: true,
+        },
+        forge::Configured {
+            web: None,
+            read_only: false,
             number: CONNECTED_MODE,
             kind: forge::Kind::Forgejo,
             mode: forge::Mode::Connected,
             asked: false,
         },
-        forge::Configured { number: AUTOMATIC, kind: forge::Kind::Forgejo, mode: forge::Mode::Owned, asked: false },
+        forge::Configured {
+            web: None,
+            read_only: false,
+            number: AUTOMATIC,
+            kind: forge::Kind::Forgejo,
+            mode: forge::Mode::Owned,
+            asked: false,
+        },
     ]);
     let mut limits = temper_engine_domain_world::fixtures::forge_limits();
     temper_client_world::front::first_run_projects(&mut config, &mut limits);

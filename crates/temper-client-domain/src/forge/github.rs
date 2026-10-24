@@ -49,6 +49,7 @@ impl Draft {
 pub enum Answer {
     Connecting,
     Link(Box<[u8]>),
+    Page(super::family::Page),
     Refused(w::ForgeRefusal),
     Entrance(c::EntranceRefusal),
     Unknown,
@@ -228,7 +229,7 @@ pub(crate) fn told(
     side.changed();
     true
 }
-fn decode(outcome: &Outcome, linking: bool, limits: Limits) -> Option<Answer> {
+pub(crate) fn decode(outcome: &Outcome, linking: bool, limits: Limits) -> Option<Answer> {
     let Outcome::Answered(answer) = outcome else {
         return Some(Answer::Unknown);
     };
@@ -247,6 +248,7 @@ fn decode(outcome: &Outcome, linking: bool, limits: Limits) -> Option<Answer> {
                 w::Outcome::ConnectRefused(refusal) => Some(Answer::Refused(refusal.why().clone())),
                 w::Outcome::Link(link) if linking => Some(Answer::Link(link.into_parts().address)),
                 w::Outcome::Unknown => Some(Answer::Unknown),
+                w::Outcome::Page(page) => Some(Answer::Page(super::family::page(page))),
                 w::Outcome::Adopted(_)
                 | w::Outcome::CoreRefused(_)
                 | w::Outcome::ForgeRefused(_)

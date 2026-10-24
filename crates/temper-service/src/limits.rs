@@ -35,6 +35,11 @@ pub struct SignIn {
     pub url_bytes: u32,
     pub secret_bytes: u32,
 }
+/// Repositories read in one picker page (protocol/configuration.md, 7).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Picker {
+    pub page: u32,
+}
 /// Temper's domain limits, each under its owner's prefix.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -49,6 +54,7 @@ pub struct Limits {
     pub git_component: temper_worker_protocol_git::Limits,
     pub clients: Clients,
     pub sign_in: SignIn,
+    pub picker: Picker,
 }
 /// Forge routes' query bound (protocol/configuration.md, 7).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -307,6 +313,7 @@ pub const SOCKETS: u32 = 64;
 pub fn profile(profile: Profile) -> Limits {
     match profile {
         Profile::Small => Limits {
+            picker: Picker { page: 30 },
             routes: Routes { query_bytes: 2048 },
             setup: temper_forge_setup::limits::host(),
             records: Records { value_bytes: 4096 },

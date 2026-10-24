@@ -474,6 +474,8 @@ fn finish_adoption(d: &mut Domain, owner: Token, pending: PendingAdoption, out: 
     };
     d.repositories.insert(row.provider, row.clone()).expect("adoption capacity checked");
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::Repository(row.clone()) });
+    // The forges row lists its adoptions (client/forge.md, 5.4).
+    emit(out, Request::MarkedForges);
     adopted(d, out, owner, Ok(Adopted { repository: row, collaborators: pending.collaborators.into_boxed() }));
 }
 

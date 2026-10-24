@@ -696,6 +696,7 @@ pub fn resume(journal: &mut Journal, out: &mut Queue<Output>) {
             | crate::Output::Return { .. }
             | crate::Output::Connect { .. }
             | crate::Output::Manifest { .. }
+            | crate::Output::Reachable { .. }
             | crate::Output::Install { .. }
             | crate::Output::EraseCarried { .. }
             | crate::Output::Stop) => out.push(Output::Now(request)),

@@ -89,6 +89,7 @@ fn adopt_sends_one_keyed_request_and_a_second_press_none() {
         temper_client_protocol_wire::v1::Request::Return(_)
         | temper_client_protocol_wire::v1::Request::SetUp(_)
         | temper_client_protocol_wire::v1::Request::StartDemo
+        | temper_client_protocol_wire::v1::Request::Reachable(_)
         | temper_client_protocol_wire::v1::Request::Connect(_)
         | temper_client_protocol_wire::v1::Request::Install(_) => {
             panic!("expected adoption")
@@ -198,6 +199,7 @@ fn an_adoption_is_the_forges_family_bytes_under_its_asker() {
         temper_client_protocol_wire::v1::Request::Return(_)
         | temper_client_protocol_wire::v1::Request::SetUp(_)
         | temper_client_protocol_wire::v1::Request::StartDemo
+        | temper_client_protocol_wire::v1::Request::Reachable(_)
         | temper_client_protocol_wire::v1::Request::Connect(_)
         | temper_client_protocol_wire::v1::Request::Install(_) => {
             panic!("expected adoption")

@@ -16,7 +16,14 @@ fn signed_in(role: Option<people::Role>) -> (Domain, Env<Limits>) {
 }
 fn signed_in_on(role: Option<people::Role>, kind: forge::Kind) -> (Domain, Env<Limits>) {
     let mut config = config(1);
-    config.forges = Box::new([forge::Configured { number: 1, kind, mode: forge::Mode::Owned, asked: true }]);
+    config.forges = Box::new([forge::Configured {
+        web: None,
+        read_only: false,
+        number: 1,
+        kind,
+        mode: forge::Mode::Owned,
+        asked: true,
+    }]);
     config.under_box = true;
     signed_in_root(root_with_config(config), role)
 }
@@ -77,6 +84,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Request]> {
                 | Request::Return { .. }
                 | Request::Connect { .. }
                 | Request::Manifest { .. }
+                | Request::Reachable { .. }
                 | Request::Install { .. }
                 | Request::EraseCarried { .. }
                 | Request::Setup { .. }
@@ -190,6 +198,8 @@ fn the_deployment_owner_watches_forges_again_after_a_connection_changes() {
             watcher: WATCHER,
             forges: forge::Forges {
                 rows: Box::new([forge::Row {
+                    web: None,
+                    repositories: Box::new([]),
                     app: None,
                     installations: Box::new([]),
                     ended: None,
@@ -224,6 +234,8 @@ fn a_party_without_a_deployment_role_cannot_watch_forges_or_ask_the_box() {
 
 fn row(connection: forge::Connection) -> forge::Row {
     forge::Row {
+        web: None,
+        repositories: Box::new([]),
         app: None,
         installations: Box::new([]),
         ended: None,

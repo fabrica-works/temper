@@ -13,7 +13,7 @@ fn github(kind: Kind, mode: Mode) -> Domain {
         4,
         skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
         &[],
-        &[Configured { number: 1, kind, mode, asked: false }],
+        &[Configured { web: None, read_only: false, number: 1, kind, mode, asked: false }],
         false,
     )
     .unwrap()
@@ -42,8 +42,11 @@ fn application(
 }
 fn refused(d: &mut Domain, ask: Ask, role: Option<PartyRole>, carried: Option<Carried>, why: ForgeRefusal) {
     let install = if let Ask::Install { .. } = ask { true } else { false };
+    let reading = if let Ask::Reachable { .. } = ask { true } else { false };
     let out = application(d, 1, ask, role, carried);
-    let expected = if install {
+    let expected = if reading {
+        Answered::Reachable(ReachableAnswer::Refused(why))
+    } else if install {
         Answered::Install(InstallAnswer::Refused(why))
     } else {
         Answered::Connect(ConnectAnswer::Refused(why))
@@ -56,7 +59,15 @@ fn refused(d: &mut Domain, ask: Ask, role: Option<PartyRole>, carried: Option<Ca
         usize::from(carried.is_some())
     );
     assert!(!out.iter().any(|r| {
-        if let Request::Connect { .. } | Request::Manifest { .. } | Request::Install { .. } = r { true } else { false }
+        if let Request::Reachable { .. }
+        | Request::Connect { .. }
+        | Request::Manifest { .. }
+        | Request::Install { .. } = r
+        {
+            true
+        } else {
+            false
+        }
     }));
 }
 #[test]
@@ -280,9 +291,30 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
         skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
         &[],
         &[
-            Configured { number: 1, kind: Kind::GitHub, mode: Mode::Connected, asked: false },
-            Configured { number: 2, kind: Kind::GitHub, mode: Mode::Connected, asked: false },
-            Configured { number: 3, kind: Kind::Forgejo, mode: Mode::Connected, asked: false },
+            Configured {
+                web: None,
+                read_only: false,
+                number: 1,
+                kind: Kind::GitHub,
+                mode: Mode::Connected,
+                asked: false,
+            },
+            Configured {
+                web: None,
+                read_only: false,
+                number: 2,
+                kind: Kind::GitHub,
+                mode: Mode::Connected,
+                asked: false,
+            },
+            Configured {
+                web: None,
+                read_only: false,
+                number: 3,
+                kind: Kind::Forgejo,
+                mode: Mode::Connected,
+                asked: false,
+            },
         ],
         false,
     )
@@ -405,4 +437,147 @@ fn app_way_is_volatile_and_only_shown_for_connected_github() {
     assert_eq!(made.forges().rows[0].app, Some(AppWay::Manifest));
     outputs(&mut made, Event::Connection { forge: 1, state: Connection::NotConnected });
     assert_eq!(made.forges().rows[0].app, None);
+}
+
+fn reachable(installation: Option<u64>) -> Ask {
+    Ask::Reachable { forge: 1, installation, page: 1 }
+}
+fn reachable_domain(kind: Kind, mode: Mode) -> Domain {
+    let mut d = github(kind, mode);
+    outputs(
+        &mut d,
+        Event::Connection { forge: 1, state: Connection::Connected { id: 9, login: b"bot".as_slice().into() } },
+    );
+    outputs(
+        &mut d,
+        Event::Installation {
+            forge: 1,
+            installation: 11,
+            state: Some(Installation {
+                account: Some((10, b"acme".as_slice().into())),
+                suspended: false,
+                stray: false,
+            }),
+        },
+    );
+    d
+}
+#[test]
+fn reachable_requires_the_deployment_owner_a_real_configured_connected_forge_and_accepted_installation() {
+    for role in [None, Some(PartyRole::Member), Some(PartyRole::Maintainer), Some(PartyRole::Observer)] {
+        refused(&mut reachable_domain(Kind::GitHub, Mode::Connected), reachable(None), role, None, ForgeRefusal::Role);
+    }
+    refused(
+        &mut reachable_domain(Kind::GitHub, Mode::Connected),
+        Ask::Reachable { forge: 2, installation: None, page: 1 },
+        Some(PartyRole::Owner),
+        None,
+        ForgeRefusal::NoSuchForge,
+    );
+    for kind in [Kind::GitHub, Kind::Forgejo] {
+        refused(
+            &mut reachable_domain(kind, Mode::Fake),
+            reachable(None),
+            Some(PartyRole::Owner),
+            None,
+            ForgeRefusal::NotTaken,
+        );
+        refused(
+            &mut github(kind, Mode::Connected),
+            reachable(None),
+            Some(PartyRole::Owner),
+            None,
+            ForgeRefusal::NotConnected,
+        );
+    }
+    for (installation, state) in [(Some(12), None), (Some(11), Some((true, false))), (None, Some((false, true)))] {
+        let mut d = reachable_domain(Kind::GitHub, Mode::Connected);
+        if let Some((suspended, stray)) = state {
+            outputs(
+                &mut d,
+                Event::Installation {
+                    forge: 1,
+                    installation: 11,
+                    state: Some(Installation { account: None, suspended, stray }),
+                },
+            );
+        }
+        refused(&mut d, reachable(installation), Some(PartyRole::Owner), None, ForgeRefusal::NotTaken);
+    }
+    let mut d = reachable_domain(Kind::GitHub, Mode::Connected);
+    outputs(&mut d, Event::Installation { forge: 1, installation: 11, state: None });
+    refused(&mut d, reachable(None), Some(PartyRole::Owner), None, ForgeRefusal::NotTaken);
+    refused(
+        &mut reachable_domain(Kind::Forgejo, Mode::Connected),
+        reachable(Some(11)),
+        Some(PartyRole::Owner),
+        None,
+        ForgeRefusal::NotTaken,
+    );
+    for kind in [Kind::Forgejo, Kind::GitHub] {
+        let mut d = reachable_domain(kind, Mode::Connected);
+        assert!(application(&mut d, 1, reachable(None), Some(PartyRole::Owner), None).iter().any(|r| {
+            if let Request::Reachable { installation, page: 1, .. } = r {
+                *installation == if kind == Kind::GitHub { Some(11) } else { None }
+            } else {
+                false
+            }
+        }));
+    }
+}
+#[test]
+fn reachable_runs_beside_a_writer_refuses_a_second_and_keeps_its_page_only_in_memory() {
+    let mut d = reachable_domain(Kind::GitHub, Mode::Connected);
+    assert!(
+        application(&mut d, 1, Ask::Install { forge: 1, back: None }, Some(PartyRole::Owner), None)
+            .iter()
+            .any(|r| if let Request::Install { .. } = r { true } else { false })
+    );
+    assert!(
+        application(&mut d, 2, reachable(None), Some(PartyRole::Owner), None)
+            .iter()
+            .any(|r| if let Request::Reachable { .. } = r { true } else { false })
+    );
+    application(&mut d, 3, reachable(None), Some(PartyRole::Owner), None);
+    assert_eq!(
+        d.application_answer(Token::new(3)),
+        Some(Answered::Reachable(ReachableAnswer::Refused(ForgeRefusal::Busy)))
+    );
+    let page = ReachableAnswer::Page(Page {
+        rows: Box::new([Reached {
+            id: 42,
+            owner_id: 10,
+            owner: b"acme".as_slice().into(),
+            name: b"app".as_slice().into(),
+            private: true,
+        }]),
+        more: true,
+    });
+    let out = outputs(&mut d, Event::ReachableAnswered { forge: 1, request: Token::new(2), answer: page.clone() });
+    assert_eq!(d.application_answer(Token::new(2)), Some(Answered::Reachable(page.clone())));
+    assert_eq!(d.application_answer(Token::new(2)), Some(Answered::Reachable(page)));
+    assert!(out.iter().all(|r| if let Request::Save { .. } = r { false } else { true }));
+    assert_eq!(reachable_domain(Kind::GitHub, Mode::Connected).application_answer(Token::new(2)), None);
+    assert!(
+        application(&mut d, 4, reachable(None), Some(PartyRole::Owner), None)
+            .iter()
+            .any(|r| if let Request::Reachable { .. } = r { true } else { false })
+    );
+}
+#[test]
+fn read_only_app_refuses_a_manifest_but_accepts_a_paste() {
+    let mut d = github(Kind::GitHub, Mode::Connected);
+    d.configured.get_mut(&1).unwrap().read_only = true;
+    refused(
+        &mut d,
+        Ask::Connect { forge: 1, how: How::GitHubManifest { back: None } },
+        Some(PartyRole::Owner),
+        None,
+        ForgeRefusal::NotTaken,
+    );
+    assert!(
+        application(&mut d, 2, connect(1), Some(PartyRole::Owner), Some(VALUE))
+            .iter()
+            .any(|r| if let Request::Connect { .. } = r { true } else { false })
+    );
 }

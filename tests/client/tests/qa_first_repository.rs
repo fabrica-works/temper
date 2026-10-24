@@ -22,6 +22,8 @@ fn configured(under_box: bool) -> ClientWorld {
     let configs = std::array::from_fn(|_| {
         let mut config = walking::config(fixtures::SEED);
         config.forges = Box::new([forge::Configured {
+            web: None,
+            read_only: false,
             number: FORGE,
             kind: forge::Kind::Forgejo,
             mode: forge::Mode::Owned,

@@ -31,6 +31,7 @@ pub(crate) struct Layer {
     public: Map<Token, public::Caller>,
     backs: Queue<public::ReturnTo>,
     pastes: Map<u64, u16>,
+    file_api: Map<u16, Secret>,
     erases: Map<Token, u16>,
     lifecycle: lifecycle::Lifecycle,
     writes: Map<Token, Write>,
@@ -112,9 +113,19 @@ pub(crate) fn worst_case(
     let wanted = skein_forge::github::setup::PERMISSIONS.len().checked_add(skein_forge::github::setup::EVENTS.len())?;
     let lacking = skein_lib::List::<skein_forge_setup::github::Lacking>::worst_case(u32::try_from(wanted).ok()?)?
         .checked_add(diagnostics::worst_case()?)?;
+    // A host page can hold decoder-sized names before the routing checks the wire's bounds.
+    let reachable = u64::from(config.limits.picker.page).checked_mul(
+        u64::try_from(size_of::<skein_forge_setup::reachable::Reached>())
+            .ok()?
+            .checked_add(u64::from(l.string_bytes).checked_mul(2)?)?,
+    )?;
     // Handed-up items, pages/links with state, failure subjects, or missing access.
-    let payload =
-        u64::from(l.body_bytes_in).max(form).max(u64::from(config.limits.records.value_bytes)).max(name).max(lacking);
+    let payload = u64::from(l.body_bytes_in)
+        .max(form)
+        .max(u64::from(config.limits.records.value_bytes))
+        .max(name)
+        .max(lacking)
+        .max(reachable);
     let mut local_bytes = 0_u64;
     for identity in &config.identities {
         if !config.records_only.contains(&identity.forge) {
@@ -193,6 +204,8 @@ pub(crate) fn worst_case(
         .checked_add(4096)?
         .checked_add(Map::<Token, public::Caller>::worst_case(l.runs)?)?
         .checked_add(Map::<u64, u16>::worst_case(l.forges)?)?
+        .checked_add(Map::<u16, Secret>::worst_case(l.forges)?)?
+        .checked_add(u64::from(l.forges).checked_mul(u64::from(l.token_bytes))?)?
         .checked_add(Map::<Token, u16>::worst_case(l.forges)?)?
         .checked_add(u64::from(l.runs).checked_mul(4096 + 512)?)?
         .checked_add(Queue::<public::ReturnTo>::worst_case(l.states)?)?
@@ -277,6 +290,7 @@ impl Layer {
             public: Map::with_capacity(limits.runs),
             backs: Queue::with_capacity(limits.states),
             pastes: Map::with_capacity(limits.forges),
+            file_api: Map::with_capacity(limits.forges),
             erases: Map::with_capacity(limits.forges),
             lifecycle: lifecycle::Lifecycle::new(limits.forges, installations),
             writes: Map::with_capacity(limits.runs.checked_add(limits.forges).expect("setup writes")),
@@ -329,6 +343,7 @@ impl Layer {
         self.held = Queue::with_capacity(self.env.limits.forges);
         self.backs = Queue::with_capacity(self.env.limits.states);
         self.public = Map::with_capacity(self.env.limits.runs);
+        self.file_api = Map::with_capacity(self.env.limits.forges);
         self.staged = Map::with_capacity(self.env.limits.runs);
         if self.component.is_some() {
             self.down(host::Request::Close);
@@ -380,7 +395,15 @@ impl Layer {
             return true;
         }
         for (_, run) in &self.runs {
-            if run.forge == forge {
+            if run.forge == forge && run.kind != Kind::Reachable {
+                return true;
+            }
+        }
+        false
+    }
+    pub(super) fn reading(&self, forge: u16) -> bool {
+        for (_, run) in &self.runs {
+            if run.forge == forge && run.kind == Kind::Reachable {
                 return true;
             }
         }
@@ -393,7 +416,7 @@ impl Layer {
         }
         let mut any = false;
         for (_, run) in &self.runs {
-            if run.forge == forge {
+            if run.forge == forge && run.kind != Kind::Reachable {
                 if !run.internal {
                     return false;
                 }
@@ -486,7 +509,12 @@ pub(crate) fn request(engine: &mut crate::engine::Engine, run: Token) {
         // An Install's link writes nothing: it waits for the engine's own run, never a person's.
         let until = engine.env.now.saturating_add(engine.setup.life);
         engine.setup.held.push(Held { run, forge: number, until });
-    } else if lifecycle::busy(engine, number) || engine.setup.runs.len() == engine.setup.env.limits.runs {
+    } else if (if let host::Plan::Reachable { .. } = &plan {
+        engine.setup.reading(number)
+    } else {
+        lifecycle::busy(engine, number)
+    }) || engine.setup.runs.len() == engine.setup.env.limits.runs
+    {
         ended(
             engine,
             run,
@@ -632,41 +660,8 @@ pub(crate) fn advance(engine: &mut crate::engine::Engine) {
                 let forge = engine.setup.runs.get(&run).expect("live setup run").forge;
                 match need {
                     host::Need::Read(item) => {
-                        if item == skein_forge_setup::item::Item::Pasted {
-                            let value = match engine.setup.public.get(&run) {
-                                Some(public::Caller::Connect { pem, .. }) => pem.clone(),
-                                Some(
-                                    public::Caller::Install { .. }
-                                    | public::Caller::Accept { .. }
-                                    | public::Caller::Manifest { .. }
-                                    | public::Caller::Redirect { .. },
-                                )
-                                | None => None,
-                            };
-                            engine.setup.down(host::Request::Answer { run, answer: host::Answer::Read(value) });
-                            continue;
-                        }
-                        let item = item_record(item).expect("record item");
-                        let files = match engine.setup.lifecycle.adoptions.get(&forge) {
-                            Some(adoption) => adoption.files.as_ref(),
-                            None => None,
-                        };
-                        let value = match (files, item) {
-                            (Some(adoption), Item::AdminToken) => Some(adoption.admin_token.expose()),
-                            (Some(adoption), Item::WebhookSecret) => match &adoption.access.webhook_secret {
-                                Some(secret) => Some(secret.expose()),
-                                None => None,
-                            },
-                            _ => match engine.forge_records.rows.forge(forge) {
-                                Some(rows) => rows.get(item).ok(),
-                                None => None,
-                            },
-                        };
-                        let answer = host::Answer::Read(match value {
-                            Some(bytes) => Some(Secret::new(Box::from(bytes))),
-                            None => None,
-                        });
-                        engine.setup.down(host::Request::Answer { run, answer });
+                        let value = read_item(engine, run, forge, item);
+                        engine.setup.down(host::Request::Answer { run, answer: host::Answer::Read(value) });
                     }
                     host::Need::Write { item, bytes } => {
                         lifecycle::keep(
@@ -769,5 +764,60 @@ fn run_plan(engine: &mut crate::engine::Engine, run: Token, plan: host::Plan) {
         lifecycle::refused(engine, run, number, crate::forge::unreachable_text(&host));
     } else {
         engine.setup.down(host::Request::Run { run, plan });
+    }
+}
+
+/// Connected Forgejo's legacy file input remains a host-local credential.
+fn file_api_token(engine: &crate::engine::Engine, forge: u16) -> Option<&[u8]> {
+    match engine.setup.file_api.get(&forge) {
+        Some(value) => Some(value.expose()),
+        None => None,
+    }
+}
+
+#[expect(clippy::manual_map, reason = "the step subset uses explicit matches")]
+fn read_item(
+    engine: &crate::engine::Engine,
+    run: Token,
+    forge: u16,
+    item: skein_forge_setup::item::Item,
+) -> Option<Secret> {
+    if item == skein_forge_setup::item::Item::Pasted {
+        return match engine.setup.public.get(&run) {
+            Some(public::Caller::Connect { pem, .. }) => pem.clone(),
+            Some(
+                public::Caller::Reachable { .. }
+                | public::Caller::Install { .. }
+                | public::Caller::Accept { .. }
+                | public::Caller::Manifest { .. }
+                | public::Caller::Redirect { .. },
+            )
+            | None => None,
+        };
+    }
+    let item = item_record(item).expect("record item");
+    let files = match engine.setup.lifecycle.adoptions.get(&forge) {
+        Some(adoption) => adoption.files.as_ref(),
+        None => None,
+    };
+    let value = match (files, item) {
+        (Some(adoption), Item::AdminToken) => Some(adoption.admin_token.expose()),
+        (Some(adoption), Item::WebhookSecret) => match &adoption.access.webhook_secret {
+            Some(secret) => Some(secret.expose()),
+            None => None,
+        },
+        _ => match engine.forge_records.rows.forge(forge) {
+            Some(rows) => rows.get(item).ok(),
+            None => None,
+        },
+    };
+    let value = match value {
+        Some(value) => Some(value),
+        None if item == Item::ApiToken => file_api_token(engine, forge),
+        None => None,
+    };
+    match value {
+        Some(bytes) => Some(Secret::new(Box::from(bytes))),
+        None => None,
     }
 }

@@ -323,6 +323,8 @@ fn demo_forges() -> Box<[u8]> {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: skein_lib::List::with_capacity(0),
                     app: None,
                     installations: skein_lib::List::with_capacity(0),
                     ended: None,

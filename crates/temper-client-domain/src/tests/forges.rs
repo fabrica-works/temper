@@ -180,6 +180,24 @@ fn every_connection_decodes_into_the_forges_words() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        web: Some(b"https://forge.example".as_slice().into()),
+                        repositories: {
+                            let mut adopted = List::with_capacity(1);
+                            adopted
+                                .push(
+                                    w::Adoption::new(
+                                        &limits(),
+                                        w::AdoptionParts {
+                                            owner: b"acme".as_slice().into(),
+                                            name: b"app".as_slice().into(),
+                                            project: 7,
+                                        },
+                                    )
+                                    .unwrap(),
+                                )
+                                .unwrap();
+                            adopted
+                        },
                         app: None,
                         installations: List::with_capacity(0),
                         ended: None,
@@ -195,6 +213,12 @@ fn every_connection_decodes_into_the_forges_words() {
             )
             .unwrap();
         let row = Row {
+            web: Some(b"https://forge.example".as_slice().into()),
+            repositories: Box::new([forge::forges::Adoption {
+                owner: b"acme".as_slice().into(),
+                name: b"app".as_slice().into(),
+                project: 7,
+            }]),
             app: None,
             installations: Box::new([]),
             ended: None,
@@ -223,6 +247,8 @@ fn every_connection_decodes_into_the_forges_words() {
 #[test]
 fn the_offer_drives_the_manual_words_and_setup_actions() {
     let mut row = Row {
+        web: None,
+        repositories: Box::new([]),
         app: None,
         installations: Box::new([]),
         ended: None,
@@ -273,6 +299,8 @@ fn an_out_of_order_document_is_refused() {
                 w::ForgeRow::new(
                     &limits(),
                     w::ForgeRowParts {
+                        web: None,
+                        repositories: List::with_capacity(0),
                         app: None,
                         installations: List::with_capacity(0),
                         ended: None,
@@ -373,6 +401,8 @@ fn first_repository_decodes_each_state_project_and_creation_step() {
                     w::ForgeRow::new(
                         &limits(),
                         w::ForgeRowParts {
+                            web: None,
+                            repositories: List::with_capacity(0),
                             app: None,
                             installations: List::with_capacity(0),
                             ended: None,
@@ -449,6 +479,8 @@ fn installation_accounts_flags_and_connect_ends_survive_client_decode() {
             w::ForgeRow::new(
                 &limits,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     number: 1,
                     kind: w::Kind::Github,

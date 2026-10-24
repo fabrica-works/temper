@@ -1014,6 +1014,9 @@ pub fn records(
             b"forge_component.log_catch_up_ms (at most 86400000 ms / 24 h)",
         );
     }
+    if limits.picker.page == 0 || limits.picker.page > 100 {
+        against(problems, b"picker.page", b"picker.page (1 to 100)");
+    }
     if limits.routes.query_bytes == 0 {
         against(problems, b"routes.query_bytes", b"positive query bound");
     }

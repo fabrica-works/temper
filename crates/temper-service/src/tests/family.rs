@@ -900,6 +900,8 @@ fn forges_encode_the_domains_rows_without_settings() {
     let value = forge::Forges {
         rows: Box::new([
             forge::Row {
+                web: None,
+                repositories: Box::new([]),
                 app: None,
                 installations: Box::new([]),
                 ended: None,
@@ -911,6 +913,8 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::Offered,
             },
             forge::Row {
+                web: None,
+                repositories: Box::new([]),
                 app: None,
                 installations: Box::new([]),
                 ended: None,
@@ -922,6 +926,8 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotOffered,
             },
             forge::Row {
+                web: None,
+                repositories: Box::new([]),
                 app: None,
                 installations: Box::new([]),
                 ended: None,
@@ -933,6 +939,8 @@ fn forges_encode_the_domains_rows_without_settings() {
                 offer: forge::Offer::NotUnderTheBox,
             },
             forge::Row {
+                web: None,
+                repositories: Box::new([]),
                 app: None,
                 installations: Box::new([]),
                 ended: None,
@@ -968,6 +976,8 @@ fn forges_encode_the_domains_rows_without_settings() {
             &w::ForgeRow::new(
                 &w::CEILINGS,
                 w::ForgeRowParts {
+                    web: None,
+                    repositories: List::with_capacity(0),
                     app: None,
                     installations: List::with_capacity(0),
                     ended: None,
@@ -1080,6 +1090,8 @@ fn setup_projects_and_first_repository_states_translate_without_losing_fields() 
             };
             let value = forge::Forges {
                 rows: Box::new([forge::Row {
+                    web: None,
+                    repositories: Box::new([]),
                     app: None,
                     installations: Box::new([]),
                     ended: None,
@@ -1354,6 +1366,8 @@ fn installations_and_the_last_connect_end_encode_unchanged() {
     let bytes = family::forges(
         forge::Forges {
             rows: Box::new([forge::Row {
+                web: None,
+                repositories: Box::new([]),
                 app: None,
                 number: 1,
                 kind: forge::Kind::GitHub,

@@ -404,6 +404,7 @@ impl Protocol {
         );
     }
 
+    #[expect(clippy::too_many_lines, reason = "exhaustive routing of the forge outputs")]
     fn take_top(&mut self) {
         let mut calls = List::with_capacity(self.top_out.len());
         let mut restart = None;
@@ -468,6 +469,7 @@ impl Protocol {
                 | top::Request::SetUpGroup { .. }
                 | top::Request::Connect { .. }
                 | top::Request::Manifest { .. }
+                | top::Request::Reachable { .. }
                 | top::Request::Install { .. }
                 | top::Request::CarriedUnused { .. }
                 | top::Request::EraseCarried { .. }

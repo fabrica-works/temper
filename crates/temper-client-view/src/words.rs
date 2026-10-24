@@ -10,6 +10,22 @@ use skein_ui::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
+    GitHubUnknown,
+    GitHubPicker,
+    GitHubInstalled,
+    GitHubReading,
+    GitHubNone,
+    GitHubRepositories,
+    GitHubPrivate,
+    GitHubNext,
+    GitHubFirst,
+    GitHubNotListed,
+    GitHubInProject,
+    GitHubOpen,
+    GitHubStatuses,
+    GitHubNoRules,
+    GitHubRule,
+    GitHubDismiss,
     YourForgesTitle,
     YourForges,
     ForgesDescription,
@@ -556,9 +572,26 @@ pub enum Word {
 // Seven demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
 // The browser sign-in heading and Google link add two phrases.
-const PHRASES: u32 = 1040;
-const SEGMENTS: u32 = 1821;
-const ALL: [Word; 506] = [
+// GitHub's Ready picker and adopted card add sixteen phrases (client/forge.md, 5.4).
+const PHRASES: u32 = 1056;
+const SEGMENTS: u32 = 1851;
+const ALL: [Word; 522] = [
+    Word::GitHubUnknown,
+    Word::GitHubPicker,
+    Word::GitHubInstalled,
+    Word::GitHubReading,
+    Word::GitHubNone,
+    Word::GitHubRepositories,
+    Word::GitHubPrivate,
+    Word::GitHubNext,
+    Word::GitHubFirst,
+    Word::GitHubNotListed,
+    Word::GitHubInProject,
+    Word::GitHubOpen,
+    Word::GitHubStatuses,
+    Word::GitHubNoRules,
+    Word::GitHubRule,
+    Word::GitHubDismiss,
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -1097,6 +1130,22 @@ impl Word {
             Self::SetupRepository => 1821,
             Self::SetupProject => 1822,
             Self::SetupExisting => 1823,
+            Self::GitHubUnknown => 1965,
+            Self::GitHubPicker => 1950,
+            Self::GitHubInstalled => 1951,
+            Self::GitHubReading => 1952,
+            Self::GitHubNone => 1953,
+            Self::GitHubRepositories => 1954,
+            Self::GitHubPrivate => 1955,
+            Self::GitHubNext => 1956,
+            Self::GitHubFirst => 1957,
+            Self::GitHubNotListed => 1958,
+            Self::GitHubInProject => 1959,
+            Self::GitHubOpen => 1960,
+            Self::GitHubStatuses => 1961,
+            Self::GitHubNoRules => 1962,
+            Self::GitHubRule => 1963,
+            Self::GitHubDismiss => 1964,
             Self::SetupNew => 1824,
             Self::SetupAdopt => 1870,
             Self::SetupRequired => 1825,
@@ -1643,8 +1692,14 @@ fn english_language(
     shell: Shell,
     joined: u32,
 ) -> Result<(List<PhraseShape>, Language), Invalid> {
-    let mut shapes = List::with_capacity(PHRASES);
-    let mut phrases = List::with_capacity(PHRASES);
+    // The declaration writer must be able to measure vocabulary growth before
+    // the checked production capacities have been regenerated.
+    #[cfg(test)]
+    let capacity = PHRASES.checked_add(64).expect("declaration headroom");
+    #[cfg(not(test))]
+    let capacity = PHRASES;
+    let mut shapes = List::with_capacity(capacity);
+    let mut phrases = List::with_capacity(capacity);
     for word in ALL {
         let (literals, kinds) = english(word, shell);
         let mut holes = List::with_capacity(4);
@@ -1820,6 +1875,22 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::AddForge => (&[b"+ Add a forge"], &[]),
         Word::NoForges => (&[b"No forge of yours yet."], &[]),
         Word::ForgeSummary => (&[b"forge ", b" \xc2\xb7 ", b""], &[Number, Name]),
+        Word::GitHubUnknown => (&[b"It is not known whether the project was made."], &[]),
+        Word::GitHubPicker => (&[b"Choose a repository to start in"], &[]),
+        Word::GitHubInstalled => (&[b"", b" is installed on ", b"."], &[Name, Name]),
+        Word::GitHubReading => (&[b"Reading GitHub's repositories\xe2\x80\xa6"], &[]),
+        Word::GitHubNone => (&[b"None reachable."], &[]),
+        Word::GitHubRepositories => (&[b"Repositories"], &[]),
+        Word::GitHubPrivate => (&[b"", b", private"], &[Name]),
+        Word::GitHubNext => (&[b"Next"], &[]),
+        Word::GitHubFirst => (&[b"First page"], &[]),
+        Word::GitHubNotListed => (&[b"Not listed? Choose its repositories on GitHub, and GitHub sends you back here."], &[]),
+        Word::GitHubInProject => (&[b"In the new project ", b", on GitHub."], &[Name]),
+        Word::GitHubOpen => (&[b"Open on GitHub \xe2\x86\x97"], &[]),
+        Word::GitHubStatuses => (&[b"Commit statuses stay temper's own: GitHub's rules cannot require them."], &[]),
+        Word::GitHubNoRules => (&[b"The branch has no rules."], &[]),
+        Word::GitHubRule => (&[b"Branch ", b": ", b" approvals; required checks: ", b"."], &[Name, Number, Name]),
+        Word::GitHubDismiss => (&[b"New commits dismiss stale approvals."], &[]),
         Word::ForgeAccountLabel => (&[b"Account"], &[]),
         Word::ForgeAccessLabel => (&[b"Access"], &[]),
         Word::ForgeAccessOwned => (&[b"Site admin, with temper's own token"], &[]),

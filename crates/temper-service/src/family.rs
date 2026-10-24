@@ -109,7 +109,11 @@ pub fn to_root(
                             }
                             forge::Ask::Install { forge: value.forge, back: value.back }
                         }
-                        w::Request::Adopt(_) | w::Request::SetUp(_) | w::Request::Return(_) | w::Request::StartDemo => {
+                        w::Request::Reachable(_)
+                        | w::Request::Adopt(_)
+                        | w::Request::SetUp(_)
+                        | w::Request::Return(_)
+                        | w::Request::StartDemo => {
                             unreachable!("connect or install")
                         }
                     };
@@ -132,6 +136,22 @@ pub fn to_root(
                         digest,
                         carried,
                         request: root::Application::Forge(forge::Ask::StartDemo),
+                    }));
+                }
+                w::Request::Reachable(value) => {
+                    let value = value.into_parts();
+                    return Ok(root::Event::Party(root::PartyInput::Application {
+                        scope,
+                        reply_to,
+                        sign_in,
+                        key,
+                        digest,
+                        carried,
+                        request: root::Application::Forge(forge::Ask::Reachable {
+                            forge: value.forge,
+                            installation: value.installation,
+                            page: value.page,
+                        }),
                     }));
                 }
                 w::Request::Adopt(value) => value,
@@ -433,6 +453,26 @@ pub fn answer(
     jig: &jig_client_protocol_wire::v16::Limits,
 ) -> Option<Box<[u8]>> {
     let outcome = match outcome {
+        Some(root::ApplicationAnswer::Reachable(forge::ReachableAnswer::Page(page))) => {
+            let mut rows = List::with_capacity(limits.page_rows);
+            for row in page.rows {
+                rows.push(
+                    w::Reached::new(
+                        limits,
+                        w::ReachedParts {
+                            id: row.id,
+                            owner: w::Account::new(limits, w::AccountParts { id: row.owner_id, login: row.owner })
+                                .ok()?,
+                            name: row.name,
+                            private: row.private,
+                        },
+                    )
+                    .ok()?,
+                )
+                .ok()?;
+            }
+            w::Outcome::Page(w::Page::new(limits, w::PageParts { rows, more: page.more }).ok()?)
+        }
         Some(root::ApplicationAnswer::Returning) => w::Outcome::Returning,
         Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::Adopted(a))) => {
             w::Outcome::Adopted(
@@ -474,7 +514,10 @@ pub fn answer(
             value.encode(&mut bytes).ok()?;
             w::Outcome::CoreRefused(w::CoreRefused::new(limits, w::CoreRefusedParts { refusal: bytes.finish() }).ok()?)
         }
-        Some(temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::ForgeRefused(reason))) => {
+        Some(
+            temper_engine_domain::ApplicationAnswer::Adopt(forge::ApplicationOutcome::ForgeRefused(reason))
+            | root::ApplicationAnswer::Reachable(forge::ReachableAnswer::ForgeRefused(reason)),
+        ) => {
             w::Outcome::ForgeRefused(
                 w::ForgeRefused::new(
                     limits,
@@ -506,7 +549,8 @@ pub fn answer(
             | root::ApplicationAnswer::Connect(forge::ConnectAnswer::Link(address)),
         ) => w::Outcome::Link(w::Link::new(limits, w::LinkParts { address }).ok()?),
         Some(
-            root::ApplicationAnswer::Connect(forge::ConnectAnswer::Refused(why))
+            root::ApplicationAnswer::Reachable(forge::ReachableAnswer::Refused(why))
+            | root::ApplicationAnswer::Connect(forge::ConnectAnswer::Refused(why))
             | root::ApplicationAnswer::Install(forge::InstallAnswer::Refused(why)),
         ) => w::Outcome::ConnectRefused(
             w::ConnectRefused::new(
@@ -603,6 +647,18 @@ fn protection(value: forge::Protection, limits: &w::Limits) -> Option<w::Protect
 pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
     let mut forges = List::with_capacity(limits.forges_forges);
     for row in value.rows {
+        let mut repositories = List::with_capacity(limits.forge_row_repositories);
+        for adopted in row.repositories {
+            repositories
+                .push(
+                    w::Adoption::new(
+                        limits,
+                        w::AdoptionParts { owner: adopted.owner, name: adopted.name, project: adopted.project },
+                    )
+                    .ok()?,
+                )
+                .ok()?;
+        }
         let mut installations = List::with_capacity(limits.forge_row_installations);
         for (id, installation) in row.installations {
             let account = match installation.account {
@@ -633,6 +689,8 @@ pub fn forges(value: forge::Forges, limits: &w::Limits) -> Option<Box<[u8]>> {
                 w::ForgeRow::new(
                     limits,
                     w::ForgeRowParts {
+                        web: row.web,
+                        repositories,
                         app: match row.app {
                             Some(forge::AppWay::Manifest) => Some(w::AppWay::Manifest),
                             Some(forge::AppWay::Pasted) => Some(w::AppWay::Pasted),

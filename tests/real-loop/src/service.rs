@@ -189,6 +189,18 @@ impl ServiceHost {
                 Some(crate::github::make_app(peer, self.clients.expect("clients"), &self.path, fixture));
         }
     }
+    pub(crate) fn checkpoint_github(
+        &mut self,
+        peer: &mut skein_fake_peers::forge::Peer,
+        calls: &[crate::calls::Called],
+    ) {
+        if let Some(fixture) = self.github
+            && fixture.unaccepted_after_install
+        {
+            self.github_seen.seed_unaccepted(peer);
+        }
+        self.github_seen.checkpoint(peer, calls);
+    }
     fn github_documents(&self, forge: SocketAddr) {
         let Some(fixture) = self.github else { return };
         crate::github::write(&self.path, forge, self.clients.expect("fixed clients"), fixture)

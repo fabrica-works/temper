@@ -1241,7 +1241,15 @@ pub(crate) fn configured(settings: &settings::Engine) -> Box<[temper_engine_doma
             settings::Kind::Forgejo => Kind::Forgejo,
             settings::Kind::GitHub => Kind::GitHub,
         };
-        rows.push(Configured { number: forge.number, kind, mode, asked }).expect("configured forges");
+        rows.push(Configured {
+            number: forge.number,
+            kind,
+            mode,
+            asked,
+            web: forge.web.clone(),
+            read_only: forge.app_read_only,
+        })
+        .expect("configured forges");
     }
     rows.into_boxed()
 }
