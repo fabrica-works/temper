@@ -93,8 +93,8 @@ fn probes(directory: &Path, record: &[u8]) -> Vec<Probe> {
     let mut probes = Vec::new();
     for (name, bytes, mode, words) in [
         ("link", record.to_vec(), 0o600, "record file must not be a link"),
-        ("group", record.to_vec(), 0o640, "record file must be a private regular file owned by this user"),
-        ("other", record.to_vec(), 0o604, "record file must be a private regular file owned by this user"),
+        ("group", record.to_vec(), 0o640, "record file mode 0o640 permits group or other access"),
+        ("other", record.to_vec(), 0o604, "record file mode 0o604 permits group or other access"),
         ("empty", vec![], 0o600, "record file must contain 1 to 131072 bytes"),
         ("over-bound", vec![b'x'; 131_073], 0o600, "record file must contain 1 to 131072 bytes"),
         ("magic", b"NOPE-fake-record\n".to_vec(), 0o600, "import: not ours"),

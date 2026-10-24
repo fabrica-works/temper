@@ -34,7 +34,7 @@ fn refuses_file(case: &str, mode: u32, link: bool) {
     let output = [ended.stdout, ended.stderr].concat();
     assert!(!output.windows(sentinel.len()).any(|part| part == sentinel), "no input echo");
     assert!(
-        String::from_utf8_lossy(&output).to_lowercase().contains(if link { "link" } else { "private" }),
+        String::from_utf8_lossy(&output).to_lowercase().contains(if link { "link" } else { "permits group or other access" }),
         "refusal identifies the private-file requirement: {}",
         String::from_utf8_lossy(&output)
     );
