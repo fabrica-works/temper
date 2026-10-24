@@ -106,7 +106,7 @@ impl Service {
         let (mut forge_settings, forge_roots, forge_owned) = forges;
         let shared = crate::forge::shared(&settings.limits, &settings.jig.limits.io);
         settings.jig.limits.clients.wire.keyed_value_some =
-            settings.jig.limits.clients.wire.keyed_value_some.min(settings.limits.records.value_bytes);
+            limits::client_value_bytes(&settings.jig.limits, &settings.limits);
         read_charters(&mut settings)?;
         let store_limits = store::limits(&limits, &settings.jig.limits.core, &limits.forge, &settings.jig.limits.store)
             .ok_or(start_problem(b"limits", What::Bound))?;
