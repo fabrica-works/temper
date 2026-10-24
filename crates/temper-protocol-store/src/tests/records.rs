@@ -476,6 +476,13 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
             rows.push(p::Refusal::Authority { lacking, proposable }).expect("bounded application cases");
         }
     }
+    application_limit_refusals(&mut rows);
+    application_refusal_lists(&mut rows);
+    application_moved_and_ended(&mut rows);
+    rows.into_boxed()
+}
+fn application_limit_refusals(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
+    use jig_domain_people as p;
     for which in [
         p::LimitKind::Projects,
         p::LimitKind::Words,
@@ -516,9 +523,6 @@ fn application_refusals() -> Box<[jig_domain_people::Refusal]> {
     ] {
         rows.push(p::Refusal::Limit { which }).expect("bounded application cases");
     }
-    application_refusal_lists(&mut rows);
-    application_moved_and_ended(&mut rows);
-    rows.into_boxed()
 }
 fn application_refusal_lists(rows: &mut skein_lib::List<jig_domain_people::Refusal>) {
     use jig_domain_people as p;

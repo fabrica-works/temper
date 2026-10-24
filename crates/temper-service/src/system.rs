@@ -10,6 +10,8 @@ use skein_io::{
     kernel::{Complete, Fd, Submit},
 };
 use skein_lib::{Env, List, Map, Queue, Time, Token, Wall};
+pub(crate) const ACCOUNT_APPLICATION: &[u8] = b"temper";
+
 /// The engine root, its protocol children and the kernel queues.
 #[expect(missing_debug_implementations, reason = "the service owns account token records")]
 pub struct Service {
@@ -621,7 +623,7 @@ fn accounts_driver(
     if settings.jig.llm.providers.is_empty() {
         return Ok(None);
     }
-    Ok(Some(accounts::Accounts::new(&settings.jig, seeds, runtime, room, secrets)?))
+    Ok(Some(accounts::Accounts::new(ACCOUNT_APPLICATION.into(), &settings.jig, seeds, runtime, room, secrets)?))
 }
 fn read_charters(settings: &mut settings::Engine) -> Result<(), Problems> {
     for charter in &mut settings.jig.charters {
