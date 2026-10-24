@@ -17,7 +17,7 @@ pub(super) fn encode_malformed(value: jig_client::contract::Malformed, out: &mut
     let value = &value;
     match value {
         jig_client::contract::Malformed::Settings(_) | jig_client::contract::Malformed::SettingsUnchanged => {
-            unreachable!("temper does not request settings")
+            unreachable!("the engine does not request settings")
         }
         jig_client::contract::Malformed::ProjectMismatch => out.string(b"project_mismatch"),
         jig_client::contract::Malformed::TwoAsAllowed => out.string(b"two_as_allowed"),
