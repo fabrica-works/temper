@@ -2934,7 +2934,7 @@ it checks of this document:
   --until settled`, goes through "Setting up" and "Connecting" to
   "Connected as temper", with no restart, and its first repository made,
   `work/hello`; the call adopts it into the new project `hello`,
-  project 1 (6.7). The
+  project 2, after the demo's project 1 (6.7). The
   workflow's push has run on the owned runner: before the owner's first
   task, the runner's output, which the box gives on its stderr as
   `runner 3: ` lines, says it took a task on `work/hello`, main's
@@ -2945,7 +2945,7 @@ it checks of this document:
   it, its pull's run of the starter workflow passes, and it lands; the
   test reads it all through temper's own reads, with no credential:
   the set up's answer names `work/hello` adopted, owned, on forge 3;
-  the task, given in project 1, runs on and lands into `work/hello`;
+  the task, given in project 2, runs on and lands into `work/hello`;
   the change's checks at its pull's head are the starter workflow's
   run, passed; and the task ends landed. The
   handover file is gone, and
@@ -2957,6 +2957,21 @@ it checks of this document:
   and connects forge 3 from its records (6.5), and the task is found
   landed, its CI at its head unknown until a next step reads it
   (`../domain/forge.md`, 8.8).
+- **The first run whole,** a test of its own: one box on three empty
+  scratch directories, forge 3's binaries placed where its fetch looks,
+  with no restart. The person signs in and starts the playground
+  (`temper ctl DIRECTORY demo-start`), and its chat in project 1 is
+  answered by the scripted model. Then "Set up a Forgejo here",
+  `forge-setup 3` and `wait forges --until settled`: forge 3 reads
+  "Connected as temper", `work/hello` made and adopted into the new
+  project `hello`, project 2. That connect ends the playground at
+  runtime (8.4): the box's stderr says `box: forge 1's group stopped`
+  once, no list shows forge 1, the playground's chat reads cancelled by
+  the deployment, `Ended with the playground`, the deployment holds no
+  account of the demo's provider, and `demo-start` is answered not
+  offered. The owner's first task in project 2 then lands on
+  `work/hello`, read as in the test above. On Linux, Forgejo's step is
+  given the listener the box held from its start (6.4, 7.1).
 
 ## 15. Later
 
