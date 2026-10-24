@@ -456,6 +456,7 @@ fn supplied_source_states_keep_their_words() {
         (S::Misconfigured, b"Check the configuration's registration."),
         (S::Cancelled, b"Cancelled"),
         (S::Closing, b"Closing"),
+        (S::Moving, b"Moving to another deployment"),
         (
             S::Unloaded { at: c::OwnerAccountPlace::File, why: c::OwnerAccountUnread::Stalled },
             b"Cannot load File: Stalled",
@@ -467,6 +468,18 @@ fn supplied_source_states_keep_their_words() {
         let shown = fixtures::text(fixtures::build(&mut view, &root));
         assert!(skein_lib::bytes::find(&shown, expected).is_some(), "{state:?}");
         assert!(skein_lib::bytes::find(&shown, b"Limited until").is_none(), "no invented reset");
+    }
+}
+#[test]
+fn move_refusals_keep_their_words() {
+    use c::{OwnerAccountEnd as E, OwnerAccountRefusal as R};
+    for (refusal, expected) in [
+        (R::NotSignedIn, b"Not signed in".as_slice()),
+        (R::NotOurs, b"Not this application's record"),
+        (R::Cancelled, b"The move was cancelled"),
+        (R::Moving, b"Moving to another deployment"),
+    ] {
+        assert_eq!(sign_in_end_words(document(0), E::Refused { refusal }), expected, "{refusal:?}");
     }
 }
 #[test]
@@ -714,7 +727,7 @@ mod memory_literal;
 // The demo start's words, full failure text and retry nodes (1,724,026 B).
 #[expect(clippy::unreadable_literal, reason = "the drift test regenerates this decimal memory count")]
 #[cfg(target_pointer_width = "64")]
-const ACCOUNT_BYTES: u64 = 11526791462;
+const ACCOUNT_BYTES: u64 = 11526792322;
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn account_bounds_have_a_literal_price() {
@@ -1166,6 +1179,29 @@ fn each_account_state_draws_its_words_and_state_controls() {
             assert!(fixtures::find(tree, Role::Button, act).is_some(), "{state:?}");
         }
     }
+}
+#[test]
+fn a_moving_account_shows_its_state_without_buttons() {
+    let (mut root, watch) = fixtures::account_root();
+    let mut doc = card_document(b"openai", b"alice", c::OwnerAccountKind::SignIn);
+    deliver(&mut root, watch, doc.clone());
+    // An editor opened before the move must not keep its buttons either.
+    action(&mut root, A::KeyFor { row: Row { holder: c::AccountHolder::Own, account: 1 }, source: None });
+    let row = doc.accounts.get_mut(0).unwrap();
+    row.place = 2;
+    let source = row.sources.get_mut(0).unwrap();
+    source.state = c::OwnerAccountState::Moving;
+    source.usable = false;
+    source.place = 2;
+    deliver(&mut root, watch, doc);
+    let mut view = fixtures::view();
+    let tree = fixtures::build(&mut view, &root);
+    let row = tree.nodes().iter().find(|node| node.styles.as_slice().contains(&crate::look::ACCOUNT_ROW)).unwrap();
+    assert!(core::str::from_utf8(row.description.as_ref().unwrap()).unwrap().contains("Moving to another deployment"));
+    let at = tree.nodes().iter().position(|node| node.id == row.id).unwrap();
+    let content = super::inbox::subtree(tree, at);
+    assert!(content.iter().all(|node| node.role != Role::Button));
+    assert!(skein_lib::bytes::find(&fixtures::text(tree), b"Moving to another deployment").is_some());
 }
 #[test]
 fn a_programs_missing_login_names_its_host_command_and_check() {
