@@ -16,6 +16,11 @@ const CHAT: usize = 8;
 const PROCEDURE: u64 = 2;
 const DELIVERED: usize = 11;
 
+fn installed(body: &[u8]) {
+    let said = b"temper has the installation; you may close this tab.";
+    assert!(skein_lib::bytes::find(body, said).is_some(), "the setup page says so");
+}
+
 #[test]
 fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token() {
     let mut fixture = github::fixture();
@@ -81,10 +86,7 @@ fn a_person_connects_their_app_and_a_chats_push_carries_its_installations_token(
     let [visit] = ran.browsed() else { panic!("one manifest visit") };
     assert_eq!(visit.call, CONNECT);
     assert_eq!(visit.hops, [200, 200, 302, 302, 200], "manifest, create, redirect, install and setup");
-    assert!(
-        skein_lib::bytes::find(&visit.body, b"temper has the installation; you may close this tab.").is_some(),
-        "the setup page says so"
-    );
+    installed(&visit.body);
     let seen = ran.github();
     reachable_page(&ran);
     assert!(seen.app.is_none(), "no pasted App was prepared");
