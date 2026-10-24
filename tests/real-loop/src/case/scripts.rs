@@ -1079,32 +1079,47 @@ pub fn step_6_4(forge: SocketAddr) -> Box<[Script]> {
     lines.extend(interim.lines);
     interim.lines = lines.into();
     Box::new([
-        Script { cue: Agent::RedDirector.cue().into(), turns: Box::new([
-            call(b"delegate", &json!({"batch":[owner]})),
-            wait("A1 owns a4."),
-            interim,
-            wait("The interim timer is armed."),
-            call(b"unsubscribe", &json!({"subscription":RED_TIMER})),
-            report(RED_REPORT),
-            wait("A1 is still working."),
-        ]) },
-        Script { cue: Agent::RedOwner.cue().into(), turns: Box::new([
-            call(b"delegate", &json!({"batch":[direction_change(forge, RED_CHANGE_SPEC, RED_A4_FILE, 3)]})),
-            wait("a4 is delegated."),
-            report(RED_OWNER_REPORT),
-            wait("a4 waits for the landing branch repair."),
-        ]) },
-        Script { cue: Agent::RedCoder.cue().into(), turns: Box::new([
-            red_finish_change(call(b"write", &json!({"path":RED_A4_FILE,"content":RED_A4})), "a4", "Preserve green CI."),
-        ]) },
-        Script { cue: red_review_cue(RED_FIRST_HEAD), turns: Box::new([
-            direction_held(RED_REVIEW_HOLD, verdict()),
-        ]) },
-        Script { cue: Agent::RedRepairCoder.cue().into(), turns: Box::new([
-            direction_held(RED_REPAIR_HOLD, red_finish_change(
-                call(b"edit", &json!({"path":RED_FILE,"edits":[{"old":RED_BROKEN,"new":RED_BASE}]})),
-                "Repair kit CI", "Restore the green cue.")),
-        ]) },
+        Script {
+            cue: Agent::RedDirector.cue().into(),
+            turns: Box::new([
+                call(b"delegate", &json!({"batch":[owner]})),
+                wait("A1 owns a4."),
+                interim,
+                wait("The interim timer is armed."),
+                call(b"unsubscribe", &json!({"subscription":RED_TIMER})),
+                report(RED_REPORT),
+                wait("A1 is still working."),
+            ]),
+        },
+        Script {
+            cue: Agent::RedOwner.cue().into(),
+            turns: Box::new([
+                call(b"delegate", &json!({"batch":[direction_change(forge, RED_CHANGE_SPEC, RED_A4_FILE, 3)]})),
+                wait("a4 is delegated."),
+                report(RED_OWNER_REPORT),
+                wait("a4 waits for the landing branch repair."),
+            ]),
+        },
+        Script {
+            cue: Agent::RedCoder.cue().into(),
+            turns: Box::new([red_finish_change(
+                call(b"write", &json!({"path":RED_A4_FILE,"content":RED_A4})),
+                "a4",
+                "Preserve green CI.",
+            )]),
+        },
+        Script { cue: red_review_cue(RED_FIRST_HEAD), turns: Box::new([direction_held(RED_REVIEW_HOLD, verdict())]) },
+        Script {
+            cue: Agent::RedRepairCoder.cue().into(),
+            turns: Box::new([direction_held(
+                RED_REPAIR_HOLD,
+                red_finish_change(
+                    call(b"edit", &json!({"path":RED_FILE,"edits":[{"old":RED_BROKEN,"new":RED_BASE}]})),
+                    "Repair kit CI",
+                    "Restore the green cue.",
+                ),
+            )]),
+        },
         Script { cue: format!("[Requested by task {RED_REPAIR}]").into_bytes().into(), turns: Box::new([verdict()]) },
         Script { cue: red_review_cue(RED_UPDATED_HEAD), turns: Box::new([verdict()]) },
     ])
@@ -1117,16 +1132,30 @@ pub fn step_6_4_rules() -> Box<[Box<[Rule]>]> {
         entries.iter().map(|(cue, turn)| Rule { cue: cue.as_bytes().into(), turn: *turn }).collect()
     };
     Box::new([
-        table(&[("Subscription removed", 5), (RED_OWNER_REPORT, 4), (&format!("Subscription {RED_TIMER} added"), 3), (RED_MESSAGE, 2), (DELEGATED, 1), (BEGIN, 0), ("", 6)]),
+        table(&[
+            ("Subscription removed", 5),
+            (RED_OWNER_REPORT, 4),
+            (&format!("Subscription {RED_TIMER} added"), 3),
+            (RED_MESSAGE, 2),
+            (DELEGATED, 1),
+            (BEGIN, 0),
+            ("", 6),
+        ]),
         table(&[(&format!("Result from task {RED_CHANGE}:"), 2), (CROSSED, 2), (DELEGATED, 1), (BEGIN, 0), ("", 3)]),
-        Box::new([]), Box::new([]), Box::new([]), Box::new([]), Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
+        Box::new([]),
     ])
 }
 
 fn red_review_cue(head: u64) -> Box<[u8]> {
     use std::fmt::Write;
     let mut hex = String::new();
-    for byte in skein_fake_forge_domain::object_bytes(head) { write!(hex, "{byte:02x}").expect("head hex"); }
+    for byte in skein_fake_forge_domain::object_bytes(head) {
+        write!(hex, "{byte:02x}").expect("head hex");
+    }
     format!("Pull request at head {hex}").into_bytes().into()
 }
 

@@ -831,9 +831,8 @@ pub fn fixture_6_4() -> forge::Fixture {
             let mut tree = setup.tree.into_vec();
             tree.push(api::File { path: RED_FILE.as_bytes().into(), content: RED_BASE.as_bytes().into() });
             setup.tree = tree.into();
-            setup.checks.cue = Some(api::Cue::File {
-                path: RED_FILE.as_bytes().into(), green: RED_GREEN.as_bytes().into(),
-            });
+            setup.checks.cue =
+                Some(api::Cue::File { path: RED_FILE.as_bytes().into(), green: RED_GREEN.as_bytes().into() });
             setup
         },
         configure: |value, agent, forge| {

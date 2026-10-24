@@ -2,7 +2,8 @@
 use temper_real_loop_world::{Exit, case, run_cluster_forge};
 
 #[test]
-fn a_red_tip_pauses_kits_queue_for_one_repair_that_lands_before_a4_while_the_directors_interim_timer_waits_without_adopting_a4() {
+fn a_red_tip_pauses_kits_queue_for_one_repair_that_lands_before_a4_while_the_directors_interim_timer_waits_without_adopting_a4()
+ {
     // A1 is delegated directly, tracked as a goal; A is omitted. One
     // repository stands for kit/app until 6.6. The person's red push stands
     // for app's slow tier, and a1/a2's landings are omitted. Adopting a4 is
@@ -30,8 +31,13 @@ fn a_red_tip_pauses_kits_queue_for_one_repair_that_lands_before_a4_while_the_dir
         case::acts::step_6_4,
     );
     for (at, called) in ran.calls().iter().enumerate() {
-        assert_eq!(called.exit, Some(Exit::Code(0)), "call {at}: {}\n{}",
-            String::from_utf8_lossy(&called.stderr), String::from_utf8_lossy(&called.stdout));
+        assert_eq!(
+            called.exit,
+            Some(Exit::Code(0)),
+            "call {at}: {}\n{}",
+            String::from_utf8_lossy(&called.stderr),
+            String::from_utf8_lossy(&called.stdout)
+        );
     }
     let observed = case::oracle::Observed::from_ran(&ran, case::acts::READS_6_4);
     case::oracle::assert_met(&case::oracle::step_6_4(&observed));
