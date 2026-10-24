@@ -29,6 +29,9 @@ pub(super) fn text(
                 | c::ReadValue::Revision(_)
                 | c::ReadValue::Revisions(_)),
             )) => super::settings::text(value, crate::jig::call::number(call, 0), limits, out),
+            Readout::Jig(c::ReadResult::Value(
+                value @ (c::ReadValue::Proposal(_) | c::ReadValue::OwnerProposal(_)),
+            )) => super::proposal::text(value, limits, out),
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => {
                 super::task_text(task, me, book, vocabulary, out);
                 super::subjects::text_digest(b"task", &super::super::Part::Task(task), limits, out);
@@ -115,6 +118,9 @@ pub(super) fn encode(reading: &Reading, limits: &Limits, out: &mut Encoder, budg
                 | c::ReadValue::Revision(_)
                 | c::ReadValue::Revisions(_)),
             )) => super::settings::encode(value, out),
+            Readout::Jig(c::ReadResult::Value(
+                value @ (c::ReadValue::Proposal(_) | c::ReadValue::OwnerProposal(_)),
+            )) => super::proposal::encode(value, out, budget),
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => {
                 if compound {
                     out.key(b"task");

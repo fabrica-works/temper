@@ -28,9 +28,23 @@ pub(crate) fn me<'a>(runner: &Runner, client: &'a Client) -> Option<&'a c::Me> {
     }
 }
 pub(super) fn start(runner: &mut Runner, client: &Client, env: &Env<Limits>, called: Called, out: &mut Queue<Out>) {
-    if called.call.tool == crate::jig::rows::CHANGE_SETTINGS_AT {
+    if matches!(called.call.tool, crate::jig::rows::CHANGE_SETTINGS_AT | crate::jig::rows::PROPOSE_SETTINGS_AT) {
         let request = match crate::jig::settings_file::request(&called.call, &env.limits) {
-            Ok(ask) => Ok((Request::Ask(c::Ask::ChangeSettings(ask)), None)),
+            Ok(ask) => {
+                let ask = if called.call.tool == crate::jig::rows::PROPOSE_SETTINGS_AT {
+                    c::Ask::Propose {
+                        project: 0,
+                        reason: empty(&env.limits),
+                        action: c::ProposeAction::Settings(c::ProposeSettings {
+                            against: ask.against,
+                            items: ask.items,
+                        }),
+                    }
+                } else {
+                    c::Ask::ChangeSettings(ask)
+                };
+                Ok((Request::Ask(ask), None))
+            }
             Err(why) => Err(Failed::Detail(why)),
         };
         prepared(runner, client, env, called, request, out);
@@ -288,7 +302,15 @@ fn build(call: &Call, document: &c::ReadValue, me: &c::Me, limits: &Limits, proj
         12 => {
             let on = if call.form == 0 {
                 let Some(Value::Proposal(proposal)) = value(call, 0) else { unreachable!("proposal form") };
-                c::DecideOn::Proposal { proposal: *proposal, decision: decision(call, limits)?, running: None }
+                c::DecideOn::Proposal {
+                    proposal: *proposal,
+                    decision: decision(call, limits)?,
+                    running: match value(call, 3) {
+                        Some(Value::Word(0)) => Some(c::Running::Stays),
+                        Some(Value::Word(1)) => Some(c::Running::Moves),
+                        Some(_) | None => None,
+                    },
+                }
             } else {
                 c::DecideOn::Escalation {
                     task,
@@ -497,7 +519,10 @@ fn send(
         operation.file = Some(file.clone());
     }
     operation.account = account;
-    if called.call.tool != crate::jig::rows::EXPORT_AT && called.call.tool != crate::jig::rows::CHANGE_SETTINGS_AT {
+    if !matches!(
+        called.call.tool,
+        crate::jig::rows::EXPORT_AT | crate::jig::rows::CHANGE_SETTINGS_AT | crate::jig::rows::PROPOSE_SETTINGS_AT
+    ) {
         operation.retry = Some(render::outcome::retry(&called.call));
     }
     if called.call.tool == 26 || called.call.tool == 27 || called.call.tool == crate::jig::rows::IMPORT_AT {
