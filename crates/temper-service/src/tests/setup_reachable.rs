@@ -260,3 +260,19 @@ fn sent(face: &mut Face, service: &mut crate::Service) {
         engine.workers.forges[0].api_token.is_some()
     );
 }
+
+#[test]
+fn qa_an_account_without_repositories_answers_no_rows_and_no_more() {
+    let mut service = service(8, Duration::from_secs(3600));
+    app(&mut service);
+    accepted(&mut service, &[11]);
+    public::reachable(service.engine.as_mut().unwrap(), 1, Token::new(90), Some(11), 1);
+    let mut face = Face::new();
+    sent(&mut face, &mut service);
+    face.reply(&mut service, br#"{"token":"ghs-fixture","expires_at":"2099-01-01T00:00:00Z"}"#);
+    sent(&mut face, &mut service);
+    face.reply(&mut service, br#"{"total_count":0,"repositories":[]}"#);
+    let domain::ReachableAnswer::Page(page) = reached(&mut service) else { panic!("empty repository page") };
+    assert!(page.rows.is_empty());
+    assert!(!page.more);
+}
