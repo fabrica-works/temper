@@ -97,6 +97,7 @@ pub fn down(routes: &mut Routes, request: engine::StoreRequest) -> Option<store:
             let mut out = List::with_capacity(u32::try_from(writes.len()).ok()?);
             for write in writes {
                 let translated = match write {
+                    engine::Write::CopySettingsRevision(number) => store::Write::CopySettingsRevision(number),
                     engine::Write::Save(engine::Record::Core(row)) => store::Write::Save(row),
                     engine::Write::Erase(engine::Key::Core(key)) => store::Write::Erase(key),
                     engine::Write::Save(engine::Record::Forge { row }) => store::Write::Put {

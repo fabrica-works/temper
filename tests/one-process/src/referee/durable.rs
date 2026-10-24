@@ -123,7 +123,7 @@ impl Store {
         &mut self,
         events: &mut Vec<Observed>,
         limits: &codec::Limits,
-        names: &[Box<[u8]>],
+        names: &[core::settings::ModelName],
         connector: &temper_protocol_store::Bounds,
     ) -> Vec<Commit> {
         let mut committed = Vec::new();
@@ -187,7 +187,7 @@ impl Store {
         &mut self,
         path: &[u8],
         limits: &codec::Limits,
-        names: &[Box<[u8]>],
+        names: &[core::settings::ModelName],
         connector: &temper_protocol_store::Bounds,
     ) -> Vec<Commit> {
         let mut committed = Vec::new();
@@ -209,6 +209,7 @@ impl Store {
     fn apply(&mut self, commit: &Commit, limits: &codec::Limits) {
         for write in &commit.writes {
             match write {
+                root::Write::CopySettingsRevision(_) => super::restart::apply(&mut self.rows, write),
                 root::Write::Save(row) => {
                     self.rows.insert(row.key(), row.clone());
                     if let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = row {
@@ -228,7 +229,7 @@ impl Store {
         number: u64,
         ops: Box<[skein_kv::Op]>,
         limits: &codec::Limits,
-        names: &[Box<[u8]>],
+        names: &[core::settings::ModelName],
         connector: &temper_protocol_store::Bounds,
     ) -> Commit {
         let mut writes = Vec::new();
@@ -237,7 +238,17 @@ impl Store {
                 skein_kv::Op::Put { key, value } => {
                     if let Some(key) = keys::decode(&key) {
                         let row = codec::decode(&key, &value, limits, names).expect("real stored row decodes");
-                        writes.push(root::Write::Save(root::Record::Core(row)));
+                        if let core::Record::Core(core::CoreRecord::Settings(core::settings::Record::Revision {
+                            history: true,
+                            revision,
+                        })) = &row
+                        {
+                            // Jig materializes a held-to-history copy as a KV Put. Retain the
+                            // operation in the oracle, so a dropped copy cannot go unnoticed.
+                            writes.push(root::Write::CopySettingsRevision(revision.head.number));
+                        } else {
+                            writes.push(root::Write::Save(root::Record::Core(row)));
+                        }
                     } else if let Some(keys::Own::Transcript { task }) = keys::decode_own(&key) {
                         let place = codec::component::Transcript::decode(&value).expect("real transcript place");
                         let name = format!("transcripts/{:016x}/{task:016x}", task >> 12).into_bytes();

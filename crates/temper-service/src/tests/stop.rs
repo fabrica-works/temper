@@ -61,6 +61,7 @@ fn version(family: Family) {
     let current =
         jig_protocol_store::format::current(temper_protocol_store::STORE_VERSION, fixtures::seeds().deployment);
     let wanted = match family {
+        Family::Settings => u32::from(current.settings),
         Family::Component => u32::from(current.component),
         Family::Core => u32::from(current.core),
         Family::Tasks => u32::from(current.tasks),

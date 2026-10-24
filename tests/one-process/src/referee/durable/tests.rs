@@ -68,3 +68,43 @@ fn a_repair_snapshot_read_restores_the_durable_rows() {
     assert_eq!(store.recovered, [1].into());
     assert_eq!(store.rows.get(&fixture::row().key()), Some(&fixture::row()));
 }
+
+#[test]
+fn the_durable_observer_retains_a_settings_copy_before_its_erase() {
+    use jig_domain_core::settings as s;
+    let revision = s::Revision {
+        head: s::Head {
+            number: 1,
+            against: 0,
+            at: skein_lib::Wall::EPOCH,
+            by: s::Decider::FirstStart,
+            proposal: None,
+            moved: false,
+        },
+        items: Box::new([]),
+    };
+    let held = core::Record::Core(core::CoreRecord::Settings(s::Record::Revision {
+        history: false,
+        revision: revision.clone(),
+    }));
+    let history = core::Record::Core(core::CoreRecord::Settings(s::Record::Revision { history: true, revision }));
+    let limits = fixtures::codec();
+    let mut store = Store::new();
+    store.rows.insert(root::Key::Core(held.key()), root::Record::Core(held.clone()));
+    let ops = Box::new([
+        skein_kv::Op::Put {
+            key: keys::encode(&history.key(), u32::MAX).expect("history key"),
+            value: codec::encode(&history, &limits, fixtures::store_names())
+                .expect("settings revision fits fixture bounds"),
+        },
+        skein_kv::Op::Erase { key: keys::encode(&held.key(), u32::MAX).expect("held key") },
+    ]);
+    let commit = store.commit(1, ops, &limits, fixtures::store_names(), &fixture::bounds());
+    assert_eq!(
+        commit.writes,
+        vec![root::Write::CopySettingsRevision(1), root::Write::Erase(root::Key::Core(held.key()))]
+    );
+    store.apply(&commit, &limits);
+    assert!(!store.rows.contains_key(&root::Key::Core(held.key())));
+    assert_eq!(store.rows.get(&root::Key::Core(history.key())), Some(&root::Record::Core(history)));
+}

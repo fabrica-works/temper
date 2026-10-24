@@ -651,7 +651,12 @@ pub fn task_budget(front: &mut Joint, task: u64) -> jig_domain_core::documents::
                         None
                     }
                 }
-                reads::Answer::Tasks(_) | reads::Answer::Page(_) | reads::Answer::None(_) => None,
+                reads::Answer::Setting(_)
+                | reads::Answer::Revision(_)
+                | reads::Answer::Revisions(_)
+                | reads::Answer::Tasks(_)
+                | reads::Answer::Page(_)
+                | reads::Answer::None(_) => None,
             }
         })
         .expect("goal budget document")

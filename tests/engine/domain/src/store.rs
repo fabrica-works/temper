@@ -388,6 +388,24 @@ impl Store {
                 let writes = self.inflight.remove(&number).expect("root commit");
                 for write in &writes {
                     match write {
+                        Write::CopySettingsRevision(number) => {
+                            let held = Key::Core(jig_domain_core::Key::Core(jig_domain_core::CoreKey::Settings(
+                                jig_domain_core::settings::Key::Held(*number),
+                            )));
+                            let Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Settings(
+                                jig_domain_core::settings::Record::Revision { revision, .. },
+                            ))) = self.rows.get(&held).expect("held revision precedes its copy")
+                            else {
+                                panic!("held revision shape")
+                            };
+                            let row = Record::Core(jig_domain_core::Record::Core(
+                                jig_domain_core::CoreRecord::Settings(jig_domain_core::settings::Record::Revision {
+                                    history: true,
+                                    revision: revision.clone(),
+                                }),
+                            ));
+                            self.rows.insert(row.key(), row);
+                        }
                         Write::Save(row) => {
                             self.rows.insert(row.key(), row.clone());
                         }
@@ -489,7 +507,8 @@ pub fn widest() -> engine::Limits {
     limits.loads.reply_bytes = 32_768;
     limits.loads.transcript_bytes = 32_768;
     limits.authority.grants = 10;
-    limits.authority.segments = 9;
+    // Settings patterns use jig's eight-segment store ceiling; task scopes retain their own nine.
+    limits.authority.segments = 8;
     limits.authority.segment_bytes = 64;
     limits.authority.executors = 2;
     limits.authority.batch = 2;
@@ -538,6 +557,7 @@ fn component_limits(limits: &engine::Limits) -> Limits {
 pub(crate) fn core_limits(limits: &engine::Limits) -> jig_domain_core::Limits {
     let mut core = jig_protocol_config::profile(jig_protocol_config::Profile::Small).core;
     core.tasks = limits.tasks;
+    core.settings = limits.settings;
     core.authority = limits.authority;
     core.people = limits.people;
     core.fleet = limits.fleet;

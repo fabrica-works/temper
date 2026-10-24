@@ -6,7 +6,6 @@ use crate::{
 };
 use jig_client_world::harness::{App, ClientId, Duty, Front, FrontFault};
 use jig_domain_accounts as a;
-use jig_domain_authority as auth;
 use skein_lib::{Duration, Env, Queue, Wall};
 use temper_engine_domain as engine;
 use temper_engine_domain_world::{store::Store, walking};
@@ -109,7 +108,6 @@ fn demo_providers(config: &mut engine::Config) {
     other.offers = a::Offers { sign_in: true, key: true, programs: Box::new([]) };
     config.core.settings.llm_providers.providers = Box::new([demo, other]);
 }
-#[expect(clippy::too_many_lines, reason = "one complete client fixture with its configured forge fields")]
 fn fixture_root(
     seed: u64,
     tools: bool,
@@ -154,7 +152,7 @@ fn fixture_root(
             model.efforts = Box::new([Box::from(b"high".as_slice())]);
             model.effort = None;
             config.core.settings.models = Box::new([walking::charter().policy.model, model.clone()]);
-            config.core.settings.charters.get_mut(0).expect("fixture charter").policy.alternatives = Box::new([model]);
+            config.core.defaults.charters.get_mut(0).expect("fixture charter").policy.alternatives = Box::new([model]);
             config.core.settings.llm_providers.providers.get_mut(0).expect("fixture provider").models =
                 Box::new([Box::from(b"scripted".as_slice()), Box::from(b"effort-model".as_slice())]);
         }
@@ -187,8 +185,6 @@ fn fixture_root(
         // Each extra grant adds one entry to each of the four fleet routing cohorts.
         engine_limits.journal.writes =
             engine_limits.journal.writes.checked_add((engine_limits.fleet.grants - 2) * 4).expect("grant cohorts fit");
-        let rules = config.core.authority.rules().clone();
-        config.core.authority = auth::Domain::new(rules, engine_limits.authority).expect("account authority bounds");
         if forge == WelcomeForge::Owned {
             super::first_run_projects(&mut config, &mut engine_limits);
         }
