@@ -86,6 +86,10 @@ name = "process"
 path = "tests/process.rs"
 
 [[test]]
+name = "qa_account_move"
+path = "tests/qa_account_move.rs"
+
+[[test]]
 name = "live"
 path = "tests/live.rs"
 
@@ -138,3 +142,7 @@ path = "tests/live_github.rs"
 [[test]]
 name = "relay"
 path = "tests/relay.rs"
+
+[[test]]
+name = "qa_account_file"
+path = "tests/qa_account_file.rs"
