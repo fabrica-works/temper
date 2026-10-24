@@ -258,6 +258,7 @@ fn old_form_service(hooks: bool) -> crate::Service {
     assert_eq!(
         crate::startup::application::configured(&config).as_ref(),
         [domain::Configured {
+            admin_connect: false,
             web: None,
             read_only: false,
             number: 1,
@@ -429,6 +430,7 @@ fn old_form_owned_and_managed_serve_reads_without_start_time_writing_plans() {
         assert_eq!(
             crate::startup::application::configured(&config).as_ref(),
             [domain::Configured {
+                admin_connect: false,
                 web: None,
                 read_only: false,
                 number: 1,

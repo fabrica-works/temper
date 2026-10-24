@@ -10,6 +10,9 @@ mod refusals;
 
 // client/README.md, 4.6: connector documents and their wire share every bound.
 const _: () = {
+    assert!(forge::FIRST_NAME_BYTES == w::CEILINGS.first_ask_org, "first repository org bound");
+    assert!(forge::FIRST_NAME_BYTES == w::CEILINGS.first_ask_repository, "first repository name bound");
+    assert!(forge::FIRST_NAME_BYTES == w::CEILINGS.new_project_name, "first repository project bound");
     assert!(forge::PANEL_AHEAD == wire::TASKS_AHEAD, "panel predecessor bound");
     assert!(forge::PANEL_GATES == wire::GATES, "panel gate bound");
     assert!(forge::PANEL_NAME_BYTES == w::CEILINGS.change_panel_owner, "panel owner bound");

@@ -12,6 +12,9 @@ pub const STOPPED_TEXT_BYTES: u64 = 128;
 /// Last connect diagnostics are at most 256 UTF-8 bytes (client/forge.md, 5.4).
 pub const CONNECT_WHY_BYTES: usize = 256;
 
+/// Admin connects carry names checked at the wire ceiling, independently of the engine's setup name limit.
+pub const FIRST_NAME_BYTES: u32 = 1024;
+
 /// Capacity of each durable top table and its child.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
@@ -119,7 +122,10 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(Map::<u16, crate::AppWay>::worst_case(l.client.repositories)?)?
         .checked_add(Map::<u16, Box<[u8]>>::worst_case(l.client.repositories)?)?
         .checked_add(u64::from(l.client.repositories).checked_mul(u64::try_from(CONNECT_WHY_BYTES).ok()?)?)?
-        .checked_add(u64::from(l.client.repositories).checked_mul(u64::from(l.name_bytes).checked_mul(3)?)?)?
+        .checked_add(
+            u64::from(l.client.repositories)
+                .checked_mul(u64::from(l.name_bytes.max(FIRST_NAME_BYTES)).checked_mul(3)?)?,
+        )?
         .checked_add(skein_forge_client::worst_case(&l.client)?)?
         .checked_add(Map::<skein_forge::api::Repository, Repository>::worst_case(l.repositories)?)?
         .checked_add(Map::<u16, (crate::Connection, Option<(skein_lib::Token, crate::SetUpAnswer)>)>::worst_case(
@@ -240,7 +246,7 @@ pub fn connection_worst_case(forges: u32, installations: u32, name_bytes: u32) -
         .checked_add(Map::<u16, crate::AppWay>::worst_case(forges)?)?
         .checked_add(Map::<u16, Box<[u8]>>::worst_case(forges)?)?
         .checked_add(u64::from(forges).checked_mul(u64::try_from(CONNECT_WHY_BYTES).ok()?)?)?
-        .checked_add(u64::from(forges).checked_mul(u64::from(name_bytes).checked_mul(3)?)?)?
+        .checked_add(u64::from(forges).checked_mul(u64::from(name_bytes.max(FIRST_NAME_BYTES)).checked_mul(3)?)?)?
         .checked_add(Map::<u16, (crate::Connection, Option<(skein_lib::Token, crate::SetUpAnswer)>)>::worst_case(
             forges,
         )?)?

@@ -1133,8 +1133,24 @@ fn routing_connection_states_are_volatile_and_connected_gives_the_writer_once() 
     assert_eq!(restarted.connection(1), Connection::NotConnected, "restored writer is no connection claim");
 }
 const CONFIGURED: [Configured; 2] = [
-    Configured { web: None, read_only: false, number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true },
-    Configured { web: None, read_only: false, number: 2, kind: Kind::GitHub, mode: Mode::Owned, asked: true },
+    Configured {
+        admin_connect: false,
+        web: None,
+        read_only: false,
+        number: 1,
+        kind: Kind::Forgejo,
+        mode: Mode::Owned,
+        asked: true,
+    },
+    Configured {
+        admin_connect: false,
+        web: None,
+        read_only: false,
+        number: 2,
+        kind: Kind::GitHub,
+        mode: Mode::Owned,
+        asked: true,
+    },
 ];
 fn setup_domain(forges: &[Configured], under_box: bool) -> Domain {
     Domain::new(
@@ -1750,6 +1766,7 @@ fn forges_lists_web_and_only_each_forges_adoptions_for_every_kind() {
     for kind in [Kind::Forgejo, Kind::GitHub] {
         let mut d = setup_domain(
             &[Configured {
+                admin_connect: false,
                 number: 1,
                 kind,
                 mode: Mode::Connected,
