@@ -171,7 +171,8 @@ fn webhook_secret(settings: &Settings) -> Result<(), Refused> {
     crate::files::write_private(&path, &secret).map_err(|_| refused("could not write whole".into()))
 }
 const OWNER: Token = Token::new(1);
-struct Running {
+/// A reconcile host whose caller supplies time on each loop iteration.
+pub struct Running {
     settings: Settings,
     io: Io,
     machine: Reconcile,
@@ -194,6 +195,58 @@ struct Running {
     events: Queue<skein_io::Event>,
 }
 impl Running {
+    /// Checks settings and starts a run with a deadline measured from `began`.
+    pub fn new(settings: Settings, began: Time) -> Result<Self, Refused> {
+        let machine = Self::check(&settings)?;
+        Ok(Self::start(settings, machine, began))
+    }
+    fn check(settings: &Settings) -> Result<Reconcile, Refused> {
+        let machine = Reconcile::new(&settings.given).map_err(|why| Refused::Setup {
+            forge: settings.given.forge,
+            problems: given::refusal(settings.setup_index, why),
+        })?;
+        for (name, enough) in [
+            ("intake", settings.io.intake >= skein_http::client::largest_read(&settings.http)),
+            ("output", settings.io.output >= skein_http::client::largest_room(&settings.http)),
+        ] {
+            if !enough {
+                return Err(Refused::Limits { forge: settings.given.forge, name });
+            }
+        }
+        Ok(machine)
+    }
+    fn start(settings: Settings, machine: Reconcile, began: Time) -> Self {
+        let operations = skein_io::operations(&settings.io).expect("usable io limits");
+        Self {
+            machine,
+            io: Io::new(&settings.io),
+            end: began.saturating_add(settings.given.limits.deadline),
+            settings,
+            needs: Queue::with_capacity(reconcile::MAX_OUT),
+            event: Some(Event::Begin),
+            exchange: None,
+            pending: None,
+            socket: None,
+            connected: false,
+            closing: false,
+            first: true,
+            attempt: 0,
+            retry: None,
+            began,
+            result: None,
+            operations,
+            complete: Queue::with_capacity(operations),
+            subs: Queue::with_capacity(operations),
+            events: Queue::with_capacity(
+                skein_io::MAX_OUT_UP.events.max(skein_io::MAX_OUT_RESUME.events).max(skein_io::MAX_OUT_FIRE.events),
+            ),
+        }
+    }
+    /// The terminal answer, available once reconciliation has stopped.
+    #[must_use]
+    pub fn outcome(&self) -> Option<&Result<(), Refused>> {
+        self.result.as_ref()
+    }
     fn down(&mut self, env: &Env<skein_io::Limits>, request: Request) {
         skein_io::down(&mut self.io, env, request, &mut self.subs);
     }
@@ -441,49 +494,14 @@ impl Host for Running {
 }
 /// Runs one reconcile machine to completion on its own kernel and loop.
 pub fn reconcile(settings: Settings, clock: &Clock) -> Result<(), Refused> {
-    let machine = Reconcile::new(&settings.given).map_err(|why| Refused::Setup {
-        forge: settings.given.forge,
-        problems: given::refusal(settings.setup_index, why),
-    })?;
-    for (name, enough) in [
-        ("intake", settings.io.intake >= skein_http::client::largest_read(&settings.http)),
-        ("output", settings.io.output >= skein_http::client::largest_room(&settings.http)),
-    ] {
-        if !enough {
-            return Err(Refused::Limits { forge: settings.given.forge, name });
-        }
-    }
+    let machine = Running::check(&settings)?;
     let operations = skein_io::operations(&settings.io).expect("usable io limits");
     let mut kernel = Kernel::open(Config { operations }).map_err(|_| Refused::File {
         forge: settings.given.forge,
         file: File::AdminToken,
         why: "kernel unavailable".into(),
     })?;
-    let began = clock.now().now;
-    let mut running = Running {
-        machine,
-        io: Io::new(&settings.io),
-        end: began.saturating_add(settings.given.limits.deadline),
-        settings,
-        needs: Queue::with_capacity(reconcile::MAX_OUT),
-        event: Some(Event::Begin),
-        exchange: None,
-        pending: None,
-        socket: None,
-        connected: false,
-        closing: false,
-        first: true,
-        attempt: 0,
-        retry: None,
-        began,
-        result: None,
-        operations,
-        complete: Queue::with_capacity(operations),
-        subs: Queue::with_capacity(operations),
-        events: Queue::with_capacity(
-            skein_io::MAX_OUT_UP.events.max(skein_io::MAX_OUT_RESUME.events).max(skein_io::MAX_OUT_FIRE.events),
-        ),
-    };
+    let mut running = Running::start(settings, machine, clock.now().now);
     skein_shell::drive(&mut kernel, clock, &mut running);
     running.result.expect("terminal reconcile")
 }

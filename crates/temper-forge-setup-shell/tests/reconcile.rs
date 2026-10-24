@@ -84,19 +84,88 @@ fn a_run_ends_at_its_deadline_when_nothing_answers() {
 }
 #[test]
 fn a_forge_that_goes_silent_after_its_answer_ends_the_run_at_the_deadline() {
-    let peer = Peer::reserve();
-    let mut settings = support::settings(peer.address());
-    settings.given.limits.deadline = Duration::from_millis(200); // The whole run, including its second request, is bounded.
-    let clock = Clock::new();
-    let began = clock.now().now;
-    let heard = std::thread::scope(|scope| {
-        let server = scope.spawn(|| peer.serve_after(0, &[(200, ADMIN)]));
-        let refused = reconcile(settings, &clock).expect_err("silent bot request");
+    use skein_lib::Time;
+    use skein_shell::{Config, Host, Kernel, Wait};
+    use std::io::{Read, Write};
+    use temper_forge_setup_shell::reconcile::Running;
+
+    // Bind before starting the host. This peer stays until the host closes the
+    // silent request, rather than racing its close/reconnect against an accept timeout.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("peer binds");
+    let mut settings = support::settings(listener.local_addr().expect("address"));
+    let deadline = Duration::from_millis(200);
+    settings.given.limits.deadline = deadline;
+    let began = Time::from_nanos(0);
+    let end = began.saturating_add(deadline);
+    let wall = Clock::new().now().wall;
+    let mut host = Running::new(settings, began).expect("reconcile host");
+    let mut kernel = Kernel::open(Config { operations: host.operations() }).expect("real kernel");
+    let (sent, heard) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        let (answer, allowed) = std::sync::mpsc::channel();
+        let server = scope.spawn(move || {
+            fn request(listener: &std::net::TcpListener, target: &str) -> std::net::TcpStream {
+                use std::io::BufRead;
+                let (mut socket, _) = listener.accept().expect("request connects");
+                let mut head = std::io::BufReader::new(&mut socket);
+                let mut line = String::new();
+                head.read_line(&mut line).expect("request line");
+                assert_eq!(line, format!("GET {target} HTTP/1.1\r\n"));
+                loop {
+                    line.clear();
+                    assert_ne!(head.read_line(&mut line).expect("request header"), 0, "complete request head");
+                    if line == "\r\n" {
+                        break;
+                    }
+                }
+                socket
+            }
+            let mut admin = request(&listener, "/api/v1/user");
+            sent.send(None).expect("admin request heard");
+            allowed.recv().expect("admin answer allowed");
+            let mut response =
+                format!("HTTP/1.1 200 Answer\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", ADMIN.len())
+                    .into_bytes();
+            response.extend_from_slice(ADMIN);
+            admin.write_all(&response).expect("admin answer");
+            drop(admin);
+            let mut bot = request(&listener, "/api/v1/users/temper-bot");
+            sent.send(Some(())).expect("bot request heard");
+            assert_eq!(bot.read(&mut [0]).expect("silent connection closes"), 0);
+        });
+        // Spend half the run before letting the admin answer, then freeze time
+        // until the bot request arrives. A per-request deadline would end too late.
+        let mut now = began;
+        loop {
+            kernel.reap(host.completions());
+            host.iterate(now, wall);
+            kernel.submit(host.submissions(), Wait::No);
+            assert!(host.outcome().is_none(), "the bot request must stay pending");
+            match heard.try_recv() {
+                Ok(None) => {
+                    now = began.saturating_add(Duration::from_nanos(deadline.as_nanos() / 2));
+                    answer.send(()).expect("allow admin answer");
+                }
+                Ok(Some(())) => break,
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => panic!("peer stopped before bot request"),
+            }
+        }
+        assert_eq!(host.next_deadline(), Some(end), "the second request shares the run's deadline");
+        let before = Time::from_nanos(end.as_nanos() - 1);
+        kernel.reap(host.completions());
+        host.iterate(before, wall);
+        kernel.submit(host.submissions(), Wait::No);
+        assert!(host.outcome().is_none(), "one nanosecond before the whole-run deadline");
+        while !host.is_empty() {
+            kernel.reap(host.completions());
+            host.iterate(end, wall);
+            kernel.submit(host.submissions(), Wait::No);
+        }
+        let refused = host.outcome().expect("terminal reconcile").as_ref().expect_err("silent bot request");
         assert_eq!(refused.line(), "temper forge reconcile: forge 1: bot temper-bot: unavailable\n");
-        server.join().expect("peer thread")
+        server.join().expect("peer thread");
     });
-    assert!(clock.now().now.saturating_since(began) < Duration::from_millis(400));
-    assert_eq!(heard.requests.last().expect("bot request").line, "GET /api/v1/users/temper-bot HTTP/1.1");
 }
 #[test]
 fn a_later_request_that_fails_is_not_made_again() {
