@@ -5070,11 +5070,16 @@ fn batch_unstarted(observed: &Observed, read: Read, pending: &[u64]) -> bool {
     let doc = task_document(observed, read);
     number(doc, "/chip/task") == Some(super::BATCH_STORY)
         && text(doc, "/chip/phase") == "waiting"
-        && doc.pointer("/chip/details/owner/phase/waiting/dependencies") == Some(&serde_json::json!(pending))
+        && same_members(doc.pointer("/chip/details/owner/phase/waiting/dependencies"), &serde_json::json!(pending))
         && pause_activity(observed, read)["cut"] == false
         && pause_activity(observed, read)["before"] == Value::Null
         && pause_activity(observed, read)["after"] == Value::Null
         && check_activity(observed, read).iter().all(|row| row.pointer("/line/run_began").is_none())
+}
+// A task's dependencies are its prerequisites, in no order (jig's domain/tasks.md, 4).
+fn same_members(value: Option<&Value>, expected: &Value) -> bool {
+    let (Some(Value::Array(found)), Value::Array(wanted)) = (value, expected) else { return false };
+    found.len() == wanted.len() && wanted.iter().all(|item| found.contains(item))
 }
 fn batch_done(observed: &Observed, read: Read, task: u64) -> bool {
     let doc = task_document(observed, read);
@@ -5134,8 +5139,10 @@ pub fn step_6_1(observed: &Observed) -> Vec<Miss> {
                     )
                     && args["batch"].as_array().is_some_and(|batch| {
                         batch.len() == 4
-                            && batch[3]["dependencies"]
-                                == serde_json::json!([{"kind":"batch","number":0},{"kind":"batch","number":1}])
+                            && same_members(
+                                Some(&batch[3]["dependencies"]),
+                                &serde_json::json!([{"kind":"batch","number":0},{"kind":"batch","number":1}]),
+                            )
                     })
             })
             && task_document(observed, Read::BatchStoryEnded)["dependency_facts"].as_array().is_some_and(|facts| {
@@ -5514,6 +5521,22 @@ mod batch_tests {
                 journal(BATCH_STORY, &[json!({"run_began":{"attempt":1}})]);
             rejects(&changed, BATCH_PARALLEL);
         }
+        let mut reversed = passing.clone();
+        *reversed
+            .documents
+            .get_mut(&Read::BatchStoryWaiting)
+            .expect("waiting")
+            .pointer_mut("/task/chip/details/owner/phase/waiting/dependencies")
+            .expect("dependencies") = json!([BATCH_TWO, BATCH_ONE]);
+        assert_met(&step_6_1(&reversed));
+        let mut other = passing.clone();
+        *other
+            .documents
+            .get_mut(&Read::BatchStoryWaiting)
+            .expect("waiting")
+            .pointer_mut("/task/chip/details/owner/phase/waiting/dependencies")
+            .expect("dependencies") = json!([BATCH_ONE, BATCH_THREE]);
+        rejects(&other, BATCH_PARALLEL);
         for read in [Read::BatchOneBeforeStory, Read::BatchTwoBeforeStory] {
             let mut changed = passing.clone();
             changed.documents.get_mut(&read).expect("ended")["task"]["result"]["ending"] =
