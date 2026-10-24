@@ -34,13 +34,16 @@ impl<'a> Part<'a> {
     #[must_use]
     pub fn read(value: &'a ReadValue) -> Option<Self> {
         match value {
-            ReadValue::Settings(_) | ReadValue::Setting(_) | ReadValue::Revision(_) | ReadValue::Revisions(_) => None,
             ReadValue::Inbox(value) => Some(Self::InboxPage(value)),
             ReadValue::OwnerInbox(value) => Some(Self::OwnerInboxPage(value)),
             ReadValue::Tasks(value) => Some(Self::TaskPage(value)),
             ReadValue::Task(value) => Some(Self::Task(value)),
             ReadValue::Historical(value) => Some(Self::Task(historical_task(value)?.0)),
-            ReadValue::OwnerProject(_)
+            ReadValue::Settings(_)
+            | ReadValue::Setting(_)
+            | ReadValue::Revision(_)
+            | ReadValue::Revisions(_)
+            | ReadValue::OwnerProject(_)
             | ReadValue::Me(_)
             | ReadValue::Turn(_)
             | ReadValue::Proposal(_)
