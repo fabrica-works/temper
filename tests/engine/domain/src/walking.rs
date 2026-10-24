@@ -122,6 +122,7 @@ pub fn limits() -> engine::Limits {
     };
     let deliveries = 20_u32.max(fleet::max_out(&fleet).checked_add(1).expect("fleet burst plus continuation"));
     let mut limits = engine::Limits {
+        settings: jig_domain_core::settings::Limits { history: 64, alternatives: 16, permissions: 32 },
         templates: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.templates,
         documents: jig_domain_core::documents::DocumentLimits {
             roles: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.documents.roles,
@@ -289,12 +290,15 @@ pub fn config(seed: u64) -> engine::Config {
                 identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
             }]),
             grants: Box::new([]),
-            authority: domain,
+            defaults: jig_domain_core::settings::Defaults {
+                rules: domain.rules().clone(),
+                charters: Box::new([charter()]),
+                templates: crate::fixtures::templates(),
+                policies: skein_lib::Map::with_capacity(authority_limits().projects),
+            },
             settings: jig_domain_core::Settings {
                 key_bytes: 256,
-                templates: crate::fixtures::templates(),
                 deployment_provider: 1,
-                charters: Box::new([charter()]),
                 resume_bytes: 256,
                 tail_bytes: 128,
                 tools: jig_domain_core::ToolFamilies::JIG,
@@ -319,7 +323,6 @@ pub fn config(seed: u64) -> engine::Config {
                     templates: Box::new([]),
                 },
             }]),
-            policies: skein_lib::Map::with_capacity(authority_limits().projects),
             // The forge is the deployment's one connector.
             connectors: Box::new([0]),
         },
