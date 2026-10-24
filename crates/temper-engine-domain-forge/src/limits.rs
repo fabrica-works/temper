@@ -140,6 +140,7 @@ pub fn worst_case(l: &Limits) -> Option<u64> {
         .checked_add(Map::<(u64, Topic), Subscriber>::worst_case(l.subscriptions)?)?
         .checked_add(Map::<Name, BranchHead>::worst_case(l.client.resources)?)?
         .checked_add(Map::<Name, PullState>::worst_case(l.client.resources)?)?
+        .checked_add(Map::<Name, bool>::worst_case(l.client.resources)?)?
         .checked_add(Map::<(skein_forge::api::Repository, skein_forge::api::Commit), crate::CiState>::worst_case(
             l.subscriptions,
         )?)?

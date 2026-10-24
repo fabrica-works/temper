@@ -334,10 +334,10 @@ fn a_changes_saved_pull_replaces_its_base_watch_within_two_names() {
             assert!(domain.work.is_empty(), "before the pull, keep branch and base");
         }
     }
-    let Some(Work::Forge(event @ forge::Event::Names { .. })) = domain.work.pop() else {
+    let Some(Work::Forge(event @ forge::Event::Rename { .. })) = domain.work.pop() else {
         panic!("name the known pull")
     };
-    let forge::Event::Names { task, resources } = &event else { panic!("pull watch") };
+    let forge::Event::Rename { task, resources } = &event else { panic!("pull watch") };
     assert_eq!(*task, 7);
     assert_eq!(*resources, change_names(Some(23)));
     forge::step(&mut domain.forge, &forge_env, event, &mut out);
@@ -370,8 +370,10 @@ fn a_restored_changes_wake_names_its_known_pull_again() {
     out.push(forge::Request::WakeProcedure { task: 7 });
     let mut decision = Decision::new(&env.limits.journal);
     super::outputs(&mut domain, &env, &mut decision, &mut out);
-    let Some(Work::Forge(event @ forge::Event::Names { .. })) = domain.work.pop() else { panic!("restore pull watch") };
-    let forge::Event::Names { task, resources } = &event else { panic!("pull watch") };
+    let Some(Work::Forge(event @ forge::Event::Rename { .. })) = domain.work.pop() else {
+        panic!("restore pull watch")
+    };
+    let forge::Event::Rename { task, resources } = &event else { panic!("pull watch") };
     assert_eq!(*task, 7);
     assert_eq!(*resources, change_names(Some(23)));
     forge::step(&mut domain.forge, &forge_env, event, &mut out);
@@ -389,4 +391,66 @@ fn a_restored_changes_wake_names_its_known_pull_again() {
         panic!("wake the change's procedure")
     };
     assert!(domain.work.is_empty());
+}
+
+/// A change's restored records with its forge state settled and the outputs drained.
+fn restored_change(
+    records: impl IntoIterator<Item = super::forge::Stored>,
+) -> (super::Domain, skein_lib::Env<super::Limits>, skein_lib::Queue<super::forge::Request>) {
+    use super::forge;
+    let (mut domain, mut env) = two_forges();
+    env.limits.forge.resources_per_task = 2;
+    let forge_env = skein_lib::Env { now: env.now, wall: env.wall, limits: env.limits.forge };
+    let mut out = skein_lib::Queue::with_capacity(forge::max_out(&env.limits.forge));
+    for record in records {
+        forge::step(&mut domain.forge, &forge_env, forge::Event::Restore { record }, &mut out);
+    }
+    forge::step(
+        &mut domain.forge,
+        &forge_env,
+        forge::Event::Restored { clock: skein_forge_client::RecoveryClock::Monotonic },
+        &mut out,
+    );
+    while let Some(request) = out.pop() {
+        drop(request);
+    }
+    (domain, env, out)
+}
+
+#[test]
+fn an_ended_changes_pull_wake_names_nothing() {
+    use super::{Decision, Work, forge};
+    // Its release unnamed it: the change row stays, its names row does not.
+    let (mut domain, env, mut out) = restored_change([forge::Stored::Change(change_row(Some(23)))]);
+    out.push(forge::Request::WakeProcedure { task: 7 });
+    let mut decision = Decision::new(&env.limits.journal);
+    super::outputs(&mut domain, &env, &mut decision, &mut out);
+    let Some(Work::Tasks(super::tasks::Event::WakeProcedure { task: 7 })) = domain.work.pop() else {
+        panic!("wake the change's procedure")
+    };
+    assert!(domain.work.is_empty(), "an ended change watches nothing");
+    assert_eq!(domain.forge.names(7), None);
+}
+
+#[test]
+fn a_change_unnamed_after_its_pull_swap_was_queued_stays_unnamed() {
+    use super::{Decision, Work, forge};
+    let (mut domain, env, mut out) = restored_change([
+        forge::Stored::Change(change_row(Some(23))),
+        forge::Stored::Names { task: 7, resources: change_names(None) },
+    ]);
+    let forge_env = skein_lib::Env { now: env.now, wall: env.wall, limits: env.limits.forge };
+    out.push(forge::Request::WakeProcedure { task: 7 });
+    let mut decision = Decision::new(&env.limits.journal);
+    super::outputs(&mut domain, &env, &mut decision, &mut out);
+    let Some(Work::Forge(event @ forge::Event::Rename { .. })) = domain.work.pop() else { panic!("queue pull watch") };
+    // The release completes before the queued swap applies.
+    forge::step(&mut domain.forge, &forge_env, forge::Event::Unnamed { task: 7 }, &mut out);
+    assert_eq!(domain.forge.names(7), None);
+    while let Some(request) = out.pop() {
+        drop(request);
+    }
+    forge::step(&mut domain.forge, &forge_env, event, &mut out);
+    assert_eq!(domain.forge.names(7), None, "the swap revives no watch");
+    assert!(out.is_empty());
 }

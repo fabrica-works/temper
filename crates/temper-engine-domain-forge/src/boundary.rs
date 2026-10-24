@@ -869,6 +869,11 @@ pub enum Event {
         task: u64,
         resources: Box<[Name]>,
     },
+    /// Replace the resources of a task still named; a task its release unnamed stays so.
+    Rename {
+        task: u64,
+        resources: Box<[Name]>,
+    },
     /// Remove all resources and subscriptions of an ended task.
     Unnamed {
         task: u64,

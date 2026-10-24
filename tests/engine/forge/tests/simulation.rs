@@ -1416,6 +1416,47 @@ fn a_live_change_watching_its_pull_reports_another_partys_close_as_drift() {
     assert_eq!(world.writes(), 0);
 }
 
+fn wakes(world: &World) -> usize {
+    world.seen().iter().filter(|request| matches!(request, top::Request::WakeProcedure { task: 51 })).count()
+}
+
+#[test]
+fn a_watched_pulls_unchanged_polls_wake_its_change_no_more() {
+    let mut world = World::new(97);
+    watched_change(&mut world);
+    let calls = world.calls();
+    world.run_for(600);
+    // The keep keeps polling, but the gather has nothing new to read (8.3).
+    assert!(world.calls() > calls, "the pull is polled");
+    assert_eq!(wakes(&world), 0);
+}
+
+#[test]
+fn a_watched_pulls_ci_at_the_same_head_wakes_its_change() {
+    let mut world = World::new(98);
+    watched_change(&mut world);
+    let head = world.branch(b"temper/51");
+    // The fixture's head already passes: a failure is the change in CI.
+    world.status(b"temper/51", skein_fake_forge_domain::api::Check::Failed);
+    world.run_for(600);
+    assert_eq!(world.branch(b"temper/51"), head);
+    assert!(wakes(&world) >= 1, "CI without a delivery wakes: {:?}", world.seen());
+}
+
+#[test]
+fn a_watched_pulls_mergeable_turning_true_at_the_same_head_wakes_its_change() {
+    let mut world = World::new(99);
+    let (pull, _) = watched_change(&mut world);
+    let head = world.branch(b"temper/51");
+    world.check_pull(pull, skein_lib::Duration::from_secs(120));
+    world.run_for(60);
+    world.take_seen();
+    // The forge finishes checking: mergeable alone changes.
+    world.run_for(120);
+    assert_eq!(world.branch(b"temper/51"), head);
+    assert!(wakes(&world) >= 1, "mergeable without a delivery wakes: {:?}", world.seen());
+}
+
 #[test]
 fn an_external_move_of_a_held_branch_is_reported_as_drift() {
     let mut world = World::new(31);

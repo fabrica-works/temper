@@ -1510,8 +1510,10 @@ fn describe_change_effect(
 }
 
 /// Once a pull is known its keep supplies the base and CI, within the same two names.
+/// Only a task still named is renamed: its release's unnamed ends the watch.
 fn watch_change_pull(domain: &mut Domain, env: &Env<Limits>, row: &forge::ChangeRow) {
     let Some(number) = row.pull else { return };
+    let Some(named) = domain.forge.names(row.task) else { return };
     let Some(parts) = branch_parts(&row.branch, env.limits.forge.name_bytes) else { return };
     let resources = Box::new([
         forge::Name {
@@ -1525,8 +1527,8 @@ fn watch_change_pull(domain: &mut Domain, env: &Env<Limits>, row: &forge::Change
             what: forge::What::Pull(number),
         },
     ]);
-    if domain.forge.names(row.task) != Some(resources.as_slice()) {
-        domain.work.push(Work::Forge(forge::Event::Names { task: row.task, resources }));
+    if named != resources.as_slice() {
+        domain.work.push(Work::Forge(forge::Event::Rename { task: row.task, resources }));
     }
 }
 

@@ -124,6 +124,8 @@ pub struct Domain {
     pub(crate) goal_file_reads: Map<Token, topics::Pending>,
     pub(crate) heads: Map<Name, BranchHead>,
     pulls: Map<Name, PullState>,
+    /// Each pull's last mergeable, unsaved: a restart reads it afresh.
+    pull_mergeable: Map<Name, bool>,
     ci: Map<(skein_forge::api::Repository, skein_forge::api::Commit), CiState>,
     entries: Map<u64, Outboxed>,
     named_calls: Map<crate::NamedCall, crate::CallPayload>,
@@ -507,6 +509,7 @@ impl Domain {
             goal_file_reads: Map::with_capacity(l.changes),
             heads: Map::with_capacity(l.client.resources),
             pulls: Map::with_capacity(l.client.resources),
+            pull_mergeable: Map::with_capacity(l.client.resources),
             ci: Map::with_capacity(l.subscriptions),
             entries: Map::with_capacity(l.entries),
             named_calls: Map::with_capacity(l.named_calls),
@@ -1179,6 +1182,11 @@ pub fn step(d: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Req
             }
         },
         Event::Names { task, resources } => names(d, env, task, resources, out),
+        Event::Rename { task, resources } => {
+            if d.names.contains_key(&task) {
+                names(d, env, task, resources, out);
+            }
+        }
         Event::Unnamed { task } => unnamed(d, env, task, out),
         Event::Hold { task, resource, from } => hold(d, env, task, resource, from, out),
         Event::Claim { task, attempt, writes, holders } => claim(d, env, task, attempt, &writes, &holders, out),
@@ -3841,21 +3849,39 @@ fn pull_changed(
     pull: skein_forge::api::Pull,
     out: &mut Queue<Request>,
 ) {
+    let name = from_client(&resource, &env.limits);
+    let prior = match &name {
+        Some(name) => d.pulls.get(name).cloned(),
+        None => None,
+    };
+    // Only what the gather reads wakes the change: an unchanged poll does not (8.3).
+    let wakes = match (&prior, &name) {
+        (Some(row), Some(name)) => {
+            row.head != pull.commit
+                || row.ci != pull.ci
+                || row.state != pull.state
+                || d.pull_mergeable.get(name) != Some(&pull.mergeable)
+        }
+        (Some(_), None) | (None, _) => true,
+    };
     let mut changed = List::with_capacity(env.limits.changes);
     for (_, row) in &d.changes {
         if row.repository == resource.repository && row.pull == Some(pull.number) {
-            d.procedure_wakes.insert(row.task, true).expect("one pending wake per change");
+            if wakes {
+                d.procedure_wakes.insert(row.task, true).expect("one pending wake per change");
+            }
+            // A cancelled change's release closes its own pull (8.6): no drift.
+            let cancelling = match d.releases.get(&row.task) {
+                Some(release) => release.ending == ReleaseEnding::Cancelled,
+                None => false,
+            };
             let change = if row.base != pull.base {
                 Some(crate::DriftChange::Retargeted {
                     number: pull.number,
                     before: row.base.clone(),
                     after: pull.base.clone(),
                 })
-            } else if pull.state == skein_forge::api::State::Closed
-                && pull.merged.is_none()
-                // A cancelled change's release closes its own pull (8.6): no drift.
-                && !d.releases.get(&row.task).is_some_and(|release| release.ending == ReleaseEnding::Cancelled)
-            {
+            } else if pull.state == skein_forge::api::State::Closed && pull.merged.is_none() && !cancelling {
                 Some(crate::DriftChange::PullClosed { number: pull.number })
             } else {
                 None
@@ -3877,12 +3903,12 @@ fn pull_changed(
             out,
         );
     }
-    let Some(name) = from_client(&resource, &env.limits) else { return };
-    let prior = d.pulls.get(&name).cloned();
+    let Some(name) = name else { return };
     let state = PullState { name: name.clone(), head: pull.commit, ci: pull.ci, state: pull.state };
-    if d.pulls.insert(name, state.clone()).is_err() {
+    if d.pulls.insert(name.clone(), state.clone()).is_err() {
         return;
     }
+    d.pull_mergeable.insert(name, pull.mergeable).expect("mergeable beside each pull row");
     emit(out, Request::Save { read_afresh: None, release: None, record: Stored::PullState(state) });
     let topic = Topic::Pull { repository: resource.repository, number: pull.number };
     let changed_pull = match &prior {
