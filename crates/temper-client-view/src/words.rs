@@ -258,6 +258,7 @@ pub enum Word {
     ChoiceReset,
     AccountWaiting,
     WaitRefreshing,
+    WaitMoving,
     WaitHost,
     WaitEmpty,
     WaitCredential,
@@ -552,9 +553,10 @@ pub enum Word {
 // Seven demo start status, failure and retry phrases (5.6).
 // The Model step adds four forge phrases and twenty-two segments.
 // The browser sign-in heading and Google link add two phrases.
-const PHRASES: u32 = 1043;
-const SEGMENTS: u32 = 1826;
-const ALL: [Word; 502] = [
+// Account moves add four account literals and one task-wait phrase.
+const PHRASES: u32 = 1048;
+const SEGMENTS: u32 = 1831;
+const ALL: [Word; 503] = [
     Word::YourForgesTitle,
     Word::YourForges,
     Word::ForgesDescription,
@@ -797,6 +799,7 @@ const ALL: [Word; 502] = [
     Word::ChoiceReset,
     Word::AccountWaiting,
     Word::WaitRefreshing,
+    Word::WaitMoving,
     Word::WaitHost,
     Word::WaitEmpty,
     Word::WaitCredential,
@@ -1317,6 +1320,7 @@ impl Word {
             Self::ChoiceReset => 1010,
             Self::AccountWaiting => 1011,
             Self::WaitRefreshing => 1012,
+            Self::WaitMoving => 1850,
             Self::WaitHost => 1013,
             Self::WaitEmpty => 1014,
             Self::WaitCredential => 1015,
@@ -2004,6 +2008,7 @@ fn english(word: Word, shell: Shell) -> (&'static [&'static [u8]], &'static [Hol
         Word::ChoiceReset => (&[b"Reset choice"], &[]),
         Word::AccountWaiting => (&[b"Starting: waiting for an account"], &[]),
         Word::WaitRefreshing => (&[b"Refreshing account credentials"], &[]),
+        Word::WaitMoving => (&[b"Waiting because the account is moving to another deployment"], &[]),
         Word::WaitHost => (&[b"Waiting for an account on a host"], &[]),
         Word::WaitEmpty => (&[b"No account serving this work"], &[]),
         Word::WaitCredential => (&[b"Waiting for a credential"], &[]),

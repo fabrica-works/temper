@@ -281,11 +281,11 @@ fn program_endpoint(me: &c::Me, provider: Option<u32>) -> Option<bool> {
 }
 fn held(state: c::OwnerAccountState) -> Option<bool> {
     match state {
-        c::OwnerAccountState::Moving => unreachable!("an account's move before temper routes it"),
         c::OwnerAccountState::Asking | c::OwnerAccountState::Granted => Some(false),
         // The public Later state also carries jig's Limited state.
         c::OwnerAccountState::Later { .. } => None,
-        c::OwnerAccountState::SignInAgain
+        c::OwnerAccountState::Moving
+        | c::OwnerAccountState::SignInAgain
         | c::OwnerAccountState::Misconfigured
         | c::OwnerAccountState::Unloaded { .. }
         | c::OwnerAccountState::Cancelled
@@ -792,7 +792,7 @@ fn account_wait(
         b.close();
     }
     match why {
-        R::Source(S::Moving) => unreachable!("an account's move before temper routes it"),
+        R::Source(S::Moving) => line(b, w, W::WaitMoving, &[]),
         R::Refreshing => line(b, w, W::WaitRefreshing, &[]),
         R::Host => line(b, w, W::WaitHost, &[]),
         R::Empty => {
