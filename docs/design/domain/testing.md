@@ -2120,7 +2120,10 @@ by the commands in `docs/development/workflow.md`. In temper:
   under the nextest profiles `process` and `live` by
   `scripts/proof-one-process.sh` and `scripts/proof-live.sh`. The gate
   never runs them; `scripts/after-landing.sh` runs the process tier
-  after each landing (agents' `roles/owners.md`, 4.5).
+  after each landing (agents' `roles/owners.md`, 4.5). After-landing
+  is paused since 10-24, on the user's word, while they design how it
+  should work: until it lifts, the process tier runs only where an
+  owner runs it.
 
 A fuzzy test lives in its world's crate, beside the focused ones, and
 uses that world: a world's settings, random ones included, are the
@@ -2244,7 +2247,7 @@ tools/git-transcripts               git's transcripts, from real git against ske
 tools/gallery                       temper-client-gallery: the browser's pages in named states, printed for screenshots (../client/browser.md, section 7), its tests in the view's world
 scripts/proof-one-process.sh        the process tier
 scripts/proof-live.sh               the live tier
-scripts/after-landing.sh            the process tier, after each landing
+scripts/after-landing.sh            the process tier, after each landing (paused since 10-24)
 ```
 
 - **The worlds and the harness** are skein's world harness
