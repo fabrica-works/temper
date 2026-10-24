@@ -694,7 +694,7 @@ fn pasted_apps_round_trip_and_check_nonzero_id() {
 #[test]
 fn connect_outcomes_round_trip() {
     let limits = fixtures::limits();
-    let mut outcomes = List::with_capacity(9);
+    let mut outcomes = List::with_capacity(10);
     for outcome in [
         v1::Outcome::Connecting,
         v1::Outcome::Link(
@@ -712,6 +712,7 @@ fn connect_outcomes_round_trip() {
         v1::ForgeRefusal::NotConnected,
         v1::ForgeRefusal::Busy,
         v1::ForgeRefusal::NoKey,
+        v1::ForgeRefusal::FirstIsBot,
     ] {
         outcomes
             .push(v1::Outcome::ConnectRefused(

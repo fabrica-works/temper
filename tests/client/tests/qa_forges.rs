@@ -59,6 +59,7 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
         &[
             forge::Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: (mode == forge::Mode::Owned).then(owned_details),
                 web: None,
                 read_only: false,
@@ -69,6 +70,7 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
             },
             forge::Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 web: None,
                 read_only: false,
@@ -132,6 +134,7 @@ fn world_for(number: u16) -> Pages {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,
@@ -142,6 +145,7 @@ fn world_for(number: u16) -> Pages {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,
@@ -158,6 +162,7 @@ fn world_for(number: u16) -> Pages {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,
@@ -168,6 +173,7 @@ fn world_for(number: u16) -> Pages {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,
@@ -385,6 +391,7 @@ fn unoffered_forge_has_no_owned_choose_card() {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,
@@ -395,6 +402,7 @@ fn unoffered_forge_has_no_owned_choose_card() {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,
@@ -466,6 +474,7 @@ fn admin_world() -> Pages {
             forge::Configured {
                 owned: None,
                 admin_connect: true,
+                bot: Box::new([]),
                 web: Some(b"https://git.example.org".as_slice().into()),
                 read_only: false,
                 number: OWNED,
@@ -476,6 +485,7 @@ fn admin_world() -> Pages {
             forge::Configured {
                 owned: None,
                 admin_connect: false,
+                bot: Box::new([]),
                 web: None,
                 read_only: false,
                 number: GITHUB,
@@ -1079,6 +1089,7 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
             &[
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,
@@ -1089,6 +1100,7 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
                 },
                 forge::Configured {
                     admin_connect: false,
+                    bot: Box::new([]),
                     owned: None,
                     web: None,
                     read_only: false,

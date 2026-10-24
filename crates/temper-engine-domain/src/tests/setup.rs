@@ -18,6 +18,7 @@ fn signed_in_on(role: Option<people::Role>, kind: forge::Kind) -> (Domain, Env<L
     let mut config = config(1);
     config.forges = Box::new([forge::Configured {
         admin_connect: false,
+        bot: Box::new([]),
         owned: None,
         web: None,
         read_only: false,
@@ -596,6 +597,7 @@ fn admin_root(role: Option<people::Role>) -> (Domain, Env<Limits>) {
     let mut config = config(1);
     config.forges = Box::new([forge::Configured {
         admin_connect: true,
+        bot: Box::new([]),
         owned: None,
         web: None,
         read_only: false,

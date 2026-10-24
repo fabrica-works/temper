@@ -189,6 +189,10 @@ fn admin(
         Some(ForgeRefusal::Busy)
     } else if carried.is_none() {
         Some(ForgeRefusal::NoKey)
+    } else if let crate::How::ForgejoAdmin { first: Some(first) } = &how
+        && first.org.eq_ignore_ascii_case(&config.expect("admitted configured forge").bot)
+    {
+        Some(ForgeRefusal::FirstIsBot)
     } else {
         None
     };

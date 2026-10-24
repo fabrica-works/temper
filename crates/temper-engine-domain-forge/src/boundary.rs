@@ -194,6 +194,9 @@ pub enum ForgeRefusal {
     NotConnected,
     Busy,
     NoKey,
+    /// A first repository's organization named as the bot's login: Forgejo's users and organizations
+    /// share names (protocol/setup.md, 5.5).
+    FirstIsBot,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ConnectAnswer {
@@ -282,6 +285,8 @@ pub struct Owned {
 pub struct Configured {
     /// The records-only managed string form accepts an admin paste.
     pub admin_connect: bool,
+    /// The setup entry's bot login; empty for a forge with no setup entry.
+    pub bot: Box<[u8]>,
     pub owned: Option<Owned>,
     pub web: Option<Box<[u8]>>,
     pub read_only: bool,

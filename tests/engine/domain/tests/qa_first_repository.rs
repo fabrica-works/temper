@@ -15,6 +15,7 @@ fn driver_with_name_bytes(under_box: bool, name_bytes: u32) -> Driver {
         config.under_box = under_box;
         config.forges = Box::new([forge::Configured {
             admin_connect: false,
+            bot: Box::new([]),
             owned: None,
             web: None,
             read_only: false,
@@ -208,6 +209,7 @@ fn first_repository_row_is_volatile_across_restart() {
             config.under_box = true;
             config.forges = Box::new([forge::Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 web: None,
                 read_only: false,

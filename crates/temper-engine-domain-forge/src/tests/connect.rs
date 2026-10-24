@@ -16,6 +16,7 @@ fn github(kind: Kind, mode: Mode) -> Domain {
         &[Configured {
             owned: None,
             admin_connect: false,
+            bot: Box::new([]),
             web: None,
             read_only: false,
             number: 1,
@@ -321,6 +322,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
         &[
             Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 web: None,
                 read_only: false,
@@ -331,6 +333,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
             },
             Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 web: None,
                 read_only: false,
@@ -341,6 +344,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
             },
             Configured {
                 admin_connect: false,
+                bot: Box::new([]),
                 owned: None,
                 web: None,
                 read_only: false,
@@ -625,6 +629,7 @@ fn admin_ask(forge: u16, first: Option<FirstAsk>) -> Ask {
 fn admin_domain() -> Domain {
     let mut d = github(Kind::Forgejo, Mode::Managed);
     d.configured.get_mut(&1).unwrap().admin_connect = true;
+    d.configured.get_mut(&1).unwrap().bot = b"temper-bot".as_slice().into();
     d
 }
 fn first_ask() -> FirstAsk {
@@ -692,7 +697,42 @@ fn admin_connect_refuses_a_run_on_the_forge_before_no_key() {
 }
 #[test]
 fn admin_connect_requires_a_carried_token() {
-    refused(&mut admin_domain(), admin_ask(1, None), Some(PartyRole::Owner), None, ForgeRefusal::NoKey);
+    for first in [None, Some(FirstAsk { org: b"temper-bot".as_slice().into(), ..first_ask() })] {
+        refused(&mut admin_domain(), admin_ask(1, first), Some(PartyRole::Owner), None, ForgeRefusal::NoKey);
+    }
+}
+#[test]
+fn admin_connect_refuses_a_first_organization_named_as_the_bot() {
+    let mut d = admin_domain();
+    let before = d.forges();
+    let first = FirstAsk { org: b"temper-bot".as_slice().into(), ..first_ask() };
+    refused(&mut d, admin_ask(1, Some(first)), Some(PartyRole::Owner), Some(VALUE), ForgeRefusal::FirstIsBot);
+    assert_eq!(d.forges(), before);
+    assert!(d.first.is_empty());
+}
+#[test]
+fn admin_connect_compares_the_bot_s_login_case_folded() {
+    let first = FirstAsk { org: b"Temper-Bot".as_slice().into(), ..first_ask() };
+    refused(
+        &mut admin_domain(),
+        admin_ask(1, Some(first)),
+        Some(PartyRole::Owner),
+        Some(VALUE),
+        ForgeRefusal::FirstIsBot,
+    );
+}
+#[test]
+fn admin_connect_admits_another_organization_and_no_first() {
+    for first in [Some(first_ask()), None] {
+        let mut d = admin_domain();
+        let out = application(&mut d, 1, admin_ask(1, first.clone()), Some(PartyRole::Owner), Some(VALUE));
+        assert!(out.contains(&Request::Connect {
+            forge: 1,
+            request: Token::new(1),
+            how: How::ForgejoAdmin { first },
+            carried: VALUE,
+        }));
+    }
 }
 #[test]
 fn admitted_admin_connect_marks_connecting_and_keeps_the_first_repository_intent() {
