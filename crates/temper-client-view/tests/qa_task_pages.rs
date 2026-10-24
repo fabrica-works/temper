@@ -148,8 +148,12 @@ mod tests {
         domain::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
         let mut down = Vec::new();
         while let Some(request) = out.pop() {
-            if let Request::Client { request: jig_client::Request::Down { down: value } } = request {
-                down.push(value);
+            match request {
+                Request::Client { request: jig_client::Request::Down { down: value } } => down.push(value),
+                Request::Show { address, .. } => {
+                    down.extend(root_event(root, Event::Went { place: domain::Place::Address(address) }));
+                }
+                _ => {}
             }
         }
         down
