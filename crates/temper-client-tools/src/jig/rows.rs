@@ -406,3 +406,24 @@ pub const VERIFY: Tool = Tool {
     keyed: Keyed::Optional,
     area: 5,
 };
+
+/// Account moves append so existing keyed tool identities stay stable.
+pub const EXPORT: Tool = Tool {
+    name: b"export",
+    line: b"Move a signed-in account out to a new private file, synced before written",
+    result: b"export",
+    forms: &[&[
+        positional(b"account", b"ACCOUNT", Kind::Number, Required, b"Account number"),
+        positional(b"file", b"FILE", Kind::File, Required, b"New private record file; never stdin"),
+    ]],
+    keyed: Keyed::Never,
+    area: 5,
+};
+pub const IMPORT: Tool = Tool {
+    name: b"import",
+    line: b"Move a record in from a private file, then remove the spent file",
+    result: b"import",
+    forms: &[&[positional(b"file", b"FILE", Kind::File, Required, b"Private record file; never stdin")]],
+    keyed: Keyed::Required,
+    area: 5,
+};

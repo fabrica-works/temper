@@ -7,6 +7,7 @@ use skein_io::{
 };
 use skein_lib::{Duration, Queue, Time, Token};
 use std::net::SocketAddr;
+use temper_client_tools::jig::FileEnd;
 const OWNER: Token = Token::new(1);
 // The existing five slots plus the two amendment text parents.
 pub(crate) const FILE_SLOTS: u32 = 7;
@@ -20,6 +21,11 @@ enum Stage {
     Address,
     Token,
     Link,
+    RecordCreate,
+    RecordWrite,
+    RecordSync,
+    RecordDirectory,
+    RecordRemove,
     KeyOpen,
     KeyStat,
     KeyRead,
@@ -45,6 +51,15 @@ pub(crate) struct Directory {
     link_path: Option<Box<[u8]>>,
     link_max: u32,
     key: Option<Token>,
+    record: Option<Token>,
+    record_path: Option<Box<[u8]>>,
+    record_given: Option<Box<[u8]>>,
+    record_bytes: Option<Box<[u8]>>,
+    pub(crate) created: bool,
+    file_end: FileEnd,
+    remove_only_created: Option<()>,
+    pub(crate) recorded: Option<Result<(), Box<[u8]>>>,
+    pub(crate) not_removed: Option<Box<[u8]>>,
     key_bytes: Vec<u8>,
     user: u32,
     pub(crate) link: Option<Box<[u8]>>,
@@ -97,6 +112,15 @@ impl Directory {
             link_path: None,
             link_max: limits::LINK,
             key: None,
+            record: None,
+            record_path: None,
+            record_given: None,
+            record_bytes: None,
+            created: false,
+            file_end: FileEnd::Keep,
+            remove_only_created: None,
+            recorded: None,
+            not_removed: None,
             key_bytes: Vec::new(),
             user,
             link: None,
@@ -113,6 +137,9 @@ impl Directory {
         file_layer::up(&mut self.io, complete, &mut self.events, &mut self.submissions);
     }
     pub(crate) fn close(&mut self) {
+        if self.closing {
+            return;
+        }
         self.closing = true;
         self.retry = None;
         if !self.io.takes() {
@@ -144,7 +171,10 @@ impl Directory {
     }
     fn answer(&mut self, now: Time, event: file::Event) {
         if let file::Event::Opened { file, .. } = &event {
-            if self.stage == Stage::KeyOpen {
+            if self.stage == Stage::RecordCreate {
+                self.record = Some(*file);
+                self.created = true;
+            } else if self.stage == Stage::KeyOpen {
                 self.key = Some(*file);
             } else if self.stage == Stage::Exists {
                 self.check = Some(*file);
@@ -152,7 +182,19 @@ impl Directory {
                 self.private = Some(*file);
             }
         }
+        if self.stage == Stage::RecordRemove {
+            self.file_end = FileEnd::Keep;
+            if let file::Event::Failed { error, .. } = event {
+                self.not_removed = Some(format!("{error:?}").into_bytes().into_boxed_slice());
+            }
+            self.stage = Stage::Ready;
+            return;
+        }
         if self.closing {
+            return;
+        }
+        if matches!(self.stage, Stage::RecordCreate | Stage::RecordWrite | Stage::RecordSync | Stage::RecordDirectory) {
+            self.answer_record(event);
             return;
         }
         if let file::Event::Refused { found, .. } = event {
@@ -161,7 +203,12 @@ impl Directory {
                 Stage::Token => "token",
                 Stage::KeyOpen | Stage::KeyStat | Stage::KeyRead | Stage::KeyClose => "key file",
                 Stage::Link => "link",
-                Stage::Start
+                Stage::RecordCreate
+                | Stage::RecordWrite
+                | Stage::RecordSync
+                | Stage::RecordDirectory
+                | Stage::RecordRemove
+                | Stage::Start
                 | Stage::Exists
                 | Stage::Checked
                 | Stage::Private
@@ -221,7 +268,12 @@ impl Directory {
             }
             (stage, event) => match stage {
                 Stage::KeyOpen | Stage::KeyStat | Stage::KeyRead | Stage::KeyClose => self.answer_key(event),
-                Stage::Start
+                Stage::RecordCreate
+                | Stage::RecordWrite
+                | Stage::RecordSync
+                | Stage::RecordDirectory
+                | Stage::RecordRemove
+                | Stage::Start
                 | Stage::Exists
                 | Stage::Checked
                 | Stage::Private
@@ -300,18 +352,7 @@ impl Directory {
             return;
         }
         if self.closing {
-            if let Some(file) = self
-                .key
-                .take()
-                .or_else(|| self.check.take())
-                .or_else(|| self.private.take())
-                .or_else(|| self.close_text_root())
-                .or_else(|| self.file_root.take())
-                .or_else(|| self.root.take())
-            {
-                self.stage = Stage::Closing;
-                self.request(now, file::Request::Close { owner: OWNER, file });
-            }
+            self.progress_close(now);
             return;
         }
         let Some(root) = self.root else {
@@ -345,6 +386,23 @@ impl Directory {
                 self.stage = Stage::Ready;
                 return;
             }
+            Stage::RecordCreate => file::Request::CreateNoFollow {
+                owner: OWNER,
+                root: self.io.descriptor(self.file_root.expect("record parent")).expect("record descriptor"),
+                name: self.record_path.as_ref().expect("record leaf").clone(),
+                mode: 0o600,
+            },
+            Stage::RecordWrite => file::Request::WriteAt {
+                owner: OWNER,
+                file: self.record.expect("record file"),
+                offset: 0,
+                bytes: self.record_bytes.take().expect("record bytes"),
+            },
+            Stage::RecordSync => file::Request::Sync { owner: OWNER, file: self.record.expect("record file") },
+            Stage::RecordDirectory => file::Request::SyncDirectory {
+                owner: OWNER,
+                root: self.io.descriptor(self.file_root.expect("record parent")).expect("record descriptor"),
+            },
             Stage::KeyOpen => file::Request::OpenReadNoFollow {
                 owner: OWNER,
                 root: self.io.descriptor(self.file_root.expect("key parent")).expect("file parent"),
@@ -379,9 +437,37 @@ impl Directory {
                     no_follow: true,
                 }
             }
-            Stage::Start | Stage::Ready | Stage::Store | Stage::Closing => return,
+            Stage::RecordRemove | Stage::Start | Stage::Ready | Stage::Store | Stage::Closing => return,
         };
         self.request(now, request);
+    }
+    fn progress_close(&mut self, now: Time) {
+        if self.file_end == FileEnd::Remove && (self.remove_only_created.is_none() || self.created) {
+            self.stage = Stage::RecordRemove;
+            self.request(
+                now,
+                file::Request::Remove {
+                    owner: OWNER,
+                    root: self.io.descriptor(self.file_root.expect("record parent")).expect("record descriptor"),
+                    name: self.record_path.as_ref().expect("record leaf").clone(),
+                    directory: false,
+                },
+            );
+            return;
+        }
+        if let Some(file) = self
+            .record
+            .take()
+            .or_else(|| self.key.take())
+            .or_else(|| self.check.take())
+            .or_else(|| self.private.take())
+            .or_else(|| self.close_text_root())
+            .or_else(|| self.file_root.take())
+            .or_else(|| self.root.take())
+        {
+            self.stage = Stage::Closing;
+            self.request(now, file::Request::Close { owner: OWNER, file });
+        }
     }
     pub(crate) fn ready(&self) -> bool {
         self.stage == Stage::Ready && self.io.takes()
@@ -407,6 +493,60 @@ impl Directory {
         }
         self.link_max = max + 1;
         self.stage = Stage::KeyOpen;
+    }
+    pub(crate) fn create_record(&mut self, path: &[u8]) {
+        if self.file_root.is_none() {
+            self.fail(b"record file could not be created: file has no parent");
+            return;
+        }
+        self.record_path = Some(Self::file_leaf(path));
+        self.record_given = Some(path.into());
+        self.remove_only_created = Some(());
+        self.stage = Stage::RecordCreate;
+    }
+    pub(crate) fn record_path(&mut self, path: &[u8]) {
+        self.record_path = Some(Self::file_leaf(path));
+    }
+    fn file_leaf(path: &[u8]) -> Box<[u8]> {
+        let start = path.iter().rposition(|byte| *byte == b'/').map_or(0, |at| at + 1);
+        path[start..].into()
+    }
+    pub(crate) fn write_record(&mut self, record: &skein_lib::Secret) {
+        self.record_bytes = Some(record.expose().into());
+        self.stage = Stage::RecordWrite;
+    }
+    pub(crate) fn end_record(&mut self, end: FileEnd) {
+        if self.record_path.is_some() {
+            self.file_end = end;
+        }
+    }
+    fn answer_record(&mut self, event: file::Event) {
+        match (self.stage, event) {
+            (Stage::RecordCreate, file::Event::Opened { .. }) => self.stage = Stage::Ready,
+            (Stage::RecordCreate, file::Event::Failed { error, .. }) => {
+                let mut message = self.record_given.as_deref().expect("record path").to_vec();
+                message.extend_from_slice(if matches!(error, Error::Exists | Error::TooManyLinks) {
+                    b" exists"
+                } else {
+                    b" could not be created"
+                });
+                self.fail(&message);
+            }
+            (Stage::RecordWrite, file::Event::Written { .. }) => self.stage = Stage::RecordSync,
+            (Stage::RecordSync, file::Event::Synced { .. }) => self.stage = Stage::RecordDirectory,
+            (Stage::RecordDirectory, file::Event::Synced { .. }) => {
+                self.stage = Stage::Ready;
+                self.recorded = Some(Ok(()));
+            }
+            (_, file::Event::Failed { error, .. }) => {
+                self.stage = Stage::Ready;
+                self.recorded = Some(Err(format!("{error:?}").into_bytes().into_boxed_slice()));
+            }
+            _ => {
+                self.stage = Stage::Ready;
+                self.recorded = Some(Err(b"record file operation failed".as_slice().into()));
+            }
+        }
     }
     fn close_text_root(&mut self) -> Option<Token> {
         let (_, root) = self.text_roots.pop()?;

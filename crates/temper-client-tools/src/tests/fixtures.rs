@@ -98,6 +98,8 @@ pub(crate) const EVERY_TOOL: &[&[&str]] = &[
     &["forge-connect", "3", "forgejo", "tokens", "--key", "app"],
     &["forge-install", "3"],
     &["wait", "forges"],
+    &["export", "43", "record"],
+    &["import", "record", "--key", "move-in"],
 ];
 
 /// Parse the printer's bytes back without re-creating argv in each test.
@@ -323,6 +325,7 @@ pub(crate) struct Harness {
     pub answers: BTreeMap<u32, crate::jig::Printed>,
     pub sends: BTreeMap<u32, (Token, skein_lib::RequestKey, client::Ask)>,
     pub carried: BTreeMap<u32, skein_lib::Secret>,
+    pub records: BTreeMap<u32, skein_lib::Secret>,
     pub saved: BTreeMap<u32, skein_lib::RequestKey>,
     pub kept_lines: List<Box<[u8]>>,
     pub progress: List<Box<[u8]>>,
@@ -358,6 +361,7 @@ pub(crate) fn started_with_limits(
         sends: BTreeMap::new(),
         saved: BTreeMap::new(),
         carried: BTreeMap::new(),
+        records: BTreeMap::new(),
         progress: List::with_capacity(OUTPUTS),
         kept_lines: List::with_capacity(OUTPUTS),
         facts: 0,
@@ -434,6 +438,9 @@ impl Harness {
                     self.kept_lines.push(line).expect("bounded recovery lines");
                 }
                 root::Request::Fact { .. } => self.facts = self.facts.checked_add(1).expect("bounded facts"),
+                root::Request::Record { number, record } => {
+                    self.records.insert(number, record);
+                }
                 root::Request::Client { .. } | root::Request::Ready => {}
             }
         }
@@ -606,11 +613,11 @@ pub(crate) const UNKNOWN_ASKER: client::Asker = client::Asker(999);
 /// A stable stored request's engine key, unrelated to its client call prefix.
 const KEPT_KEY: skein_lib::RequestKey = [9; 16];
 /// One slot for each guide call, including the model-choice seam.
-pub(super) const GUIDE_CALLS: u32 = 21;
+pub(super) const GUIDE_CALLS: u32 = 23;
 /// One slot per guide line, including the final line; fewer loses that line.
-const GUIDE_LINES: u32 = 104;
+const GUIDE_LINES: u32 = 122;
 /// One slot per row and form; fewer omits decide's second form.
-pub(super) const TOOL_FORMS: u32 = 43;
+pub(super) const TOOL_FORMS: u32 = 45;
 /// Exactly one example exercises each row and form; zero misses it entirely.
 pub(super) const EXAMPLES_PER_FORM: u32 = 1;
 /// One missing byte exercises the first refused destination; zero would fit.

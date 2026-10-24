@@ -975,6 +975,7 @@ pub fn answered(
             assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
             assert!(world.now() <= start.saturating_add(WITHIN), "agent answered within world time");
             return temper_client_tools::jig::Printed {
+                file: temper_client_tools::jig::FileEnd::Keep,
                 status: printed.status,
                 stdout: printed.stdout.clone(),
                 stderr: printed.stderr.clone(),

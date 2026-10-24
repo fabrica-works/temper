@@ -36,7 +36,13 @@ impl OneShot {
                 self.preparing = false;
                 self.finish(0, false);
             }
+            Parsed::Call { call, .. } if call.tool == 39 => {
+                self.directory.create_record(self.move_file.as_deref().expect("export file"));
+            }
             Parsed::Call { call, .. } if arguments::key_file(call).is_some() => {
+                if call.tool == 40 {
+                    self.directory.record_path(self.move_file.as_deref().expect("import file"));
+                }
                 self.directory.load_key(arguments::key_file(call).expect("key file"), arguments::key_bytes(call));
             }
             Parsed::Call { call, .. } => {
@@ -58,6 +64,13 @@ impl OneShot {
         if self.file_input() {
             self.directory.progress(self.env.now);
         }
+        if self.exporting {
+            if self.directory.created && self.directory.ready() {
+                self.directory.start(self.class);
+                self.preparing = false;
+            }
+            return;
+        }
         let Some(bytes) = self.directory.link.take() else { return };
         match self.call.take().expect("input's call") {
             Parsed::File { file, json } => match jig::json::call(TOOLS, &bytes, file, &self.root_env.limits.tools) {
@@ -78,17 +91,30 @@ impl OneShot {
                 Err(_) => self.fail(b"usage: temper ctl DIRECTORY TOOL [ARGUMENT...]"),
             },
             Parsed::Call { call, json } if arguments::key_file(&call).is_some() => {
-                let stripped = bytes.strip_suffix(b"\n").unwrap_or(&bytes);
+                let stripped =
+                    if call.tool == 40 { bytes.as_ref() } else { bytes.strip_suffix(b"\n").unwrap_or(&bytes) };
                 if stripped.is_empty() || stripped.len() > arguments::key_bytes(&call) as usize {
                     self.key_file_fail(
                         &call,
-                        if arguments::key_bytes(&call) == 4090 {
+                        if call.tool == 40 {
+                            b"record file must contain 1 to 131072 bytes"
+                        } else if arguments::key_bytes(&call) == 4090 {
                             b"key file must contain 1 to 4090 bytes after one final newline"
                         } else {
                             b"key file must contain 1 to 4096 bytes after one final newline"
                         },
                     );
                     return;
+                }
+                if call.tool == 40 && stripped.len() >= 6 && stripped[..4] == jig_protocol_accounts::moved::MAGIC {
+                    let version = u16::from_be_bytes([stripped[4], stripped[5]]);
+                    let reads = jig_protocol_accounts::moved::VERSION;
+                    if version > reads {
+                        let mut line = self.move_file.as_deref().expect("import file").to_vec();
+                        line.extend_from_slice(format!(" holds a moved record of form v{version}; this temper reads up to v{reads}: upgrade temper").as_bytes());
+                        self.fail(&line);
+                        return;
+                    }
                 }
                 self.value = Some(skein_lib::Secret::new(stripped.into()));
                 self.directory.start(self.class);
@@ -112,7 +138,13 @@ impl OneShot {
         }
     }
     pub(super) fn key_file_fail(&mut self, call: &jig::call::Call, reason: &[u8]) {
-        if TOOLS[usize::from(call.tool)].name == b"forge-connect" {
+        if call.tool == 40 {
+            let mut message = b"record file".to_vec();
+            message.extend_from_slice(
+                reason.strip_prefix(b"key file").unwrap_or(reason.strip_prefix(b"record file").unwrap_or(reason)),
+            );
+            self.fail(&message);
+        } else if TOOLS[usize::from(call.tool)].name == b"forge-connect" {
             let mut message = reason.to_vec();
             message.extend_from_slice(b": ");
             message.extend_from_slice(arguments::key_file(call).expect("key file"));
@@ -127,7 +159,9 @@ impl OneShot {
     fn file_input(&self) -> bool {
         match &self.call {
             Some(Parsed::File { file: Source::Path(_), .. }) => true,
-            Some(Parsed::Call { call, .. }) => arguments::key_file(call).is_some() || text_file(call).is_some(),
+            Some(Parsed::Call { call, .. }) => {
+                call.tool == 39 || arguments::key_file(call).is_some() || text_file(call).is_some()
+            }
             _ => false,
         }
     }

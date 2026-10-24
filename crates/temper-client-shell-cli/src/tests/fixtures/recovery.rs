@@ -197,6 +197,10 @@ impl Frame {
         if let Some(value) = keyed.value() {
             self.carried_keys.push(value.clone());
         }
+        if self.move_mode {
+            self.move_reply(fd, &keyed);
+            return;
+        }
         if !if *keyed.key() == KEPT_KEY { self.answer_kept.is_some() } else { self.answer_new.is_some() } {
             return;
         }

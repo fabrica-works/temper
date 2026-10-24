@@ -27,6 +27,7 @@ pub enum Event {
 pub enum Request {
     Client { request: jig_client::Request },
     Ready,
+    Record { number: u32, record: skein_lib::Secret },
     Kept { line: Box<[u8]> },
     Progress { line: Box<[u8]> },
     Printed { number: u32, printed: jig::Printed },
@@ -87,7 +88,11 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 .checked_add(root.forges.calls())
                 .expect("bounded calls");
             if active >= usize::try_from(env.limits.tools.rows).expect("rows fit") {
-                out.push(Request::Printed { number, printed: jig::render::failure(b"call limit", json, 1) });
+                let mut printed = jig::render::failure(b"call limit", json, 1);
+                if call.tool == 39 {
+                    printed.file = jig::FileEnd::Remove;
+                }
+                out.push(Request::Printed { number, printed });
             } else if let Some(call_number) = root.next {
                 root.next = call_number.checked_add(1);
                 let forge = crate::table::TOOLS.get(usize::from(call.tool)).expect("parsed tool").name
@@ -101,7 +106,11 @@ pub fn step(root: &mut Root, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                     runner::call(&mut root.runner, &root.client, &tools_env(env), called, &mut child);
                 }
             } else {
-                out.push(Request::Printed { number, printed: jig::render::failure(b"call number exhausted", json, 1) });
+                let mut printed = jig::render::failure(b"call number exhausted", json, 1);
+                if call.tool == 39 {
+                    printed.file = jig::FileEnd::Remove;
+                }
+                out.push(Request::Printed { number, printed });
             }
         }
     }
@@ -138,6 +147,7 @@ fn drain(
         } else if let Some(request) = child.pop() {
             match request {
                 runner::Out::Client { event } => root.client.step(env.now, env.wall, event, client),
+                runner::Out::Record { number, record } => out.push(Request::Record { number, record }),
                 runner::Out::Ready => out.push(Request::Ready),
                 runner::Out::Kept { line } => out.push(Request::Kept { line }),
                 runner::Out::Progress { line } => out.push(Request::Progress { line }),
@@ -264,3 +274,23 @@ impl jig::render::Parts for Parts {
 #[cfg(test)]
 #[path = "tests/fixtures/root_acts.rs"]
 pub(crate) mod act_fixture;
+
+impl Root {
+    #[must_use]
+    pub fn file_end(&self, number: u32) -> jig::FileEnd {
+        runner::file_end(&self.runner, number)
+    }
+    pub fn recorded(
+        &mut self,
+        env: &Env<Limits>,
+        number: u32,
+        result: Result<(), Box<[u8]>>,
+        out: &mut Queue<Request>,
+    ) {
+        let mut client = Queue::with_capacity(jig_client::max_out(&env.limits.domain.client));
+        let mut child = Queue::with_capacity(env.limits.tools.rows.checked_mul(2).expect("tools outputs fit"));
+        runner::recorded(&mut self.runner, &self.client, &tools_env(env), number, result, &mut child);
+        drain(self, env, &mut client, &mut child, out);
+        self.client.reclaim();
+    }
+}

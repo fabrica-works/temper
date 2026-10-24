@@ -279,6 +279,7 @@ impl Harness {
                 crate::jig::runner::Out::Kept { line } => self.kept_lines.push(line).expect("recovery output"),
                 crate::jig::runner::Out::Progress { line } => self.progress.push(line).expect("bounded progress lines"),
                 crate::jig::runner::Out::Client { .. }
+                | crate::jig::runner::Out::Record { .. }
                 | crate::jig::runner::Out::Ready
                 | crate::jig::runner::Out::DraftAmendment { .. } => panic!("answer output"),
             }
