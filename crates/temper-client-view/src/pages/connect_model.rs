@@ -61,16 +61,17 @@ pub(crate) fn label(me: &c::Me, way: Way, ways: &skein_lib::List<Way>, w: &Words
         }
     }
 }
-fn go(b: &mut Builder, bindings: &mut Bindings, name: &[u8], address: Address) {
+fn go(b: &mut Builder, bindings: &mut Bindings, name: &[u8], address: Address, primary: bool) {
     if let Some(to) = bindings.insert(Meaning::Go(address)) {
-        flow::control(b, Control::Link { name, to });
+        let action = if primary { Control::PrimaryLink { name, to } } else { Control::Link { name, to } };
+        flow::control(b, action);
     }
 }
-fn button(b: &mut Builder, bindings: &mut Bindings, name: &[u8], act: Act, busy: bool) {
+fn button(b: &mut Builder, bindings: &mut Bindings, name: &[u8], act: Act, busy: bool, primary: bool) {
     if busy {
-        flow::control(b, Control::Disabled { name });
+        flow::control(b, if primary { Control::PrimaryDisabled { name } } else { Control::Disabled { name } });
     } else if let Some(to) = bindings.insert(Meaning::Model(act)) {
-        flow::control(b, Control::Button { name, to });
+        flow::control(b, if primary { Control::PrimaryButton { name, to } } else { Control::Button { name, to } });
     }
 }
 fn choice(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, way: Way, ways: &skein_lib::List<Way>) {
@@ -109,7 +110,7 @@ fn choice(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bindings, wa
     };
     let Some(to) = bindings.insert(meaning) else { return };
     let control = if model::model_way(way).kind == WayKind::SignIn {
-        Control::Button { name: &label, to }
+        Control::PrimaryButton { name: &label, to }
     } else {
         Control::Link { name: &label, to }
     };
@@ -233,7 +234,7 @@ pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
         b.close();
         return;
     };
-    go(b, bindings, &say(w, W::AllWays), model::address(root.pages().address(), None));
+    go(b, bindings, &say(w, W::AllWays), model::address(root.pages().address(), None), false);
     if ready(root, way) {
         flow::card(b, &say(w, W::Ready));
         ready_body(b, root, w, bindings, way, &ways);
@@ -252,7 +253,7 @@ pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
             b.open(Role::Form);
             b.name(&say(w, W::Details));
             super::accounts::key_field(b, w, bindings, &page.request, busy);
-            button(b, bindings, &say(w, W::AddKey), Act::Submit { name: root.pages().account_name() }, busy);
+            button(b, bindings, &say(w, W::AddKey), Act::Submit { name: root.pages().account_name() }, busy, true);
             b.close();
         }
         Way::Program { .. } => {
@@ -280,6 +281,7 @@ pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
                 &say(w, W::Declare),
                 Act::Submit { name: root.pages().account_name() },
                 busy || !c::valid_program_name(&name),
+                false,
             );
             b.close();
         }
@@ -290,7 +292,7 @@ pub(crate) fn body(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut Bin
     if let Some(pending) = &page.request.pending
         && let Some(jig_client::Outcome::Lost | jig_client::Outcome::Unsent) = &pending.outcome
     {
-        button(b, bindings, &say(w, W::Cancel), Act::Cancel, false);
+        button(b, bindings, &say(w, W::Cancel), Act::Cancel, false, false);
     }
     b.close();
 }
@@ -352,6 +354,7 @@ fn ready_body(
                         &label(me, way, ways, w),
                         Act::SignIn { name: root.pages().account_name(), way },
                         false,
+                        true,
                     );
                     if declined(end) {
                         for key in ways {
@@ -361,6 +364,7 @@ fn ready_body(
                                     bindings,
                                     &label(me, *key, ways, w),
                                     model::address(root.pages().address(), Some(model::model_way(*key))),
+                                    false,
                                 );
                             }
                         }
@@ -377,9 +381,16 @@ fn ready_body(
     if model::model_way(way).kind != WayKind::Program {
         facts(b, root, w, way);
     }
-    go(b, bindings, &say(w, W::StartChat), Address::Chats { filter: ChatsFilter::All, start: false });
+    go(b, bindings, &say(w, W::StartChat), Address::Chats { filter: ChatsFilter::All, start: false }, true);
     if model::model_way(way).kind == WayKind::SignIn {
-        button(b, bindings, &label(me, way, ways, w), Act::SignIn { name: root.pages().account_name(), way }, false);
+        button(
+            b,
+            bindings,
+            &label(me, way, ways, w),
+            Act::SignIn { name: root.pages().account_name(), way },
+            false,
+            false,
+        );
     }
 }
 pub(super) fn sign_in_end(b: &mut Builder, root: &Domain, w: &Words, way: Way, end: &c::OwnerAccountEnd) -> bool {

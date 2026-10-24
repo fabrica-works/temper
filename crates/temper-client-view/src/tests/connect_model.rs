@@ -76,7 +76,17 @@ fn control_names(root: &d::Domain) -> Vec<Vec<u8>> {
 }
 #[test]
 fn the_model_choose_names_the_plan_sign_in_and_key_ways() {
-    let names = control_names(&offered_root());
+    let root = offered_root();
+    let view = fixtures::page_view(&root);
+    let primary: Vec<_> = view
+        .tree()
+        .nodes()
+        .iter()
+        .filter(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY))
+        .map(|n| n.name.as_deref().unwrap())
+        .collect();
+    assert_eq!(primary, [b"Continue with ChatGPT".as_slice()]);
+    let names = control_names(&root);
     assert!(names.contains(&b"Continue with ChatGPT".to_vec()));
     assert!(names.contains(&b"Use an API key".to_vec()));
 }
@@ -252,6 +262,8 @@ fn a_key_has_details_then_ready_with_its_account_and_chat_link() {
 fn a_program_has_details_then_ready_with_the_declared_name_and_command() {
     let (mut root, _) = flow_fixture(d::WayKind::Program);
     assert!(words(&root).contains("temper program-login claude-pat"));
+    let view = fixtures::page_view(&root);
+    assert!(!view.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY)));
     model_action(&mut root, M::ProgramName { value: Box::from(b"claude-alice".as_slice()) });
     let attempt = sent(&mut root, M::Submit { name: [1; 16] });
     answer(
@@ -290,6 +302,14 @@ fn a_completed_sign_in_is_ready_and_can_be_started_again() {
         assert!(text.contains(expected), "missing {expected}");
     }
     let mut view = fixtures::page_view(&root);
+    let primary: Vec<_> = view
+        .tree()
+        .nodes()
+        .iter()
+        .filter(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY))
+        .map(|n| n.name.as_deref().unwrap())
+        .collect();
+    assert_eq!(primary, [b"Start a chat".as_slice()]);
     assert!(fixtures::find(view.tree(), Role::Link, b"Manage usage").is_some());
     let node = fixtures::find(view.tree(), Role::Button, b"Continue with ChatGPT").unwrap();
     let Some(d::Action::Pages(d::pages::Act::ConnectModel(M::SignIn { .. }))) = crate::act(&mut view, node, Act::Press)

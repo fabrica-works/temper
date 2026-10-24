@@ -91,6 +91,7 @@ fn a_forge_row_opened_offers_its_action() {
     let root = root(Address::Forges, failed);
     assert_eq!(action(&root, Role::Button, b"Set up again"), d::Action::Forge(d::forge::Act::SetUp { forge: HERE }));
     let view = f::page_view(&root);
+    assert!(!view.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY)));
     let row = view
         .tree()
         .nodes()
@@ -286,6 +287,8 @@ fn the_github_row_draws_its_app_installations_and_last_connect() {
 fn install_on_another_account_follows_an_accepted_installation() {
     for (accepted, name) in [(true, b"Install on another account".as_slice()), (false, b"Install on GitHub")] {
         let root = f::forge_root(Address::Forges, cf::github_rows(accepted));
+        let view = f::page_view(&root);
+        assert!(!view.tree().nodes().iter().any(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY)));
         assert_eq!(
             action(&root, Role::Button, name),
             d::Action::Forge(d::forge::Act::Install { forge: 2, back: b"/forges".as_slice().into() })

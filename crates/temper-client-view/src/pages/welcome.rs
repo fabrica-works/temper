@@ -9,7 +9,13 @@ use temper_client_domain::ChatsFilter;
 use temper_client_domain::{Address, Domain, Step, forge::forges::Connection, pages::Act};
 
 fn text(b: &mut Builder, w: &Words, role: Role, word: Word) {
-    crate::cards::text(b, role, &w.say(word, &[]));
+    b.open(role);
+    if word == Word::WelcomeTitle {
+        b.style(look::WELCOME_INTRO);
+    }
+    b.name(&w.say(word, &[]));
+    w.text(b, word, &[]);
+    b.close();
 }
 fn paragraph(b: &mut Builder, w: &Words, word: Word, style: skein_ui::Style) {
     b.open(Role::Paragraph);
@@ -28,6 +34,9 @@ fn control(b: &mut Builder, w: &Words, bindings: &mut Bindings, word: Word, act:
         b.open(Role::Button);
         b.name(&name);
         b.bind(binding);
+    }
+    if word == Word::WelcomePlayground || word == Word::WelcomeSetup {
+        b.style(look::FLOW_PRIMARY);
     }
     b.close();
 }
@@ -352,9 +361,9 @@ fn ready(
     b.close();
     let open = w.say(Word::SetupOpen, &[Hole::Name(project)]);
     if let Some(project) = adopted {
-        flow::control(b, Control::Link { name: &open, to: bindings.insert(Act::OpenProject { project }) });
+        flow::control(b, Control::PrimaryLink { name: &open, to: bindings.insert(Act::OpenProject { project }) });
     } else {
-        flow::control(b, Control::Disabled { name: &open });
+        flow::control(b, Control::PrimaryDisabled { name: &open });
         crate::cards::text(b, Role::Paragraph, &w.say(Word::WelcomeOpensOnce, &[Hole::Name(repository)]));
     }
     connect::setup_ending(b, root, w, forge, row);

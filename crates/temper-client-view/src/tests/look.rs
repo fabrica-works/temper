@@ -13,6 +13,12 @@ fn the_frame_carries_its_tokens() {
 fn the_looks_names_pass_skeins_check() {
     assert!(skein_ui::look::check(&[NAMES]).is_none());
 }
+const FLOW_NAMES: [(skein_ui::Style, &[u8]); 4] = [
+    (FLOW_PRIMARY, b"temper-flow-primary"),
+    (FLOW_FAILED, b"temper-flow-failed"),
+    (FLOW_PAIR, b"temper-flow-pair"),
+    (WELCOME_INTRO, b"temper-welcome-intro"),
+];
 #[test]
 fn each_style_or_region_is_named_under_temper() {
     let named: [(skein_ui::Style, &[u8]); 94] = [
@@ -111,7 +117,7 @@ fn each_style_or_region_is_named_under_temper() {
         (ENDED, b"temper-ended"),
         (MENU, b"temper-menu"),
     ];
-    for (style, name) in named {
+    for (style, name) in named.into_iter().chain(FLOW_NAMES) {
         assert_eq!(NAMES.style(style), Some(name));
     }
     assert_eq!(NAMES.region(crate::frame::link_region()), Some(&b"temper-link"[..]));

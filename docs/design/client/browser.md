@@ -368,6 +368,15 @@ skein's (skein's `ui-web.md`), and how a client of jig's does is jig's
   Every control keeps its words as its name. Nothing a person must know
   is said by colour or icon alone (skein's `ui.md`, section 8): a status
   is its word, and its colour only repeats it.
+- **Connection flows:** the welcome steps use compact 14 px headings and
+  9 px card corners; its opening introduction keeps its larger heading.
+  Standalone connection cards use 5 px corners. The
+  current step takes the accent. The view assigns `FLOW_PRIMARY` to
+  filled terracotta acts and `FLOW_PAIR` to the organization/repository
+  row, stacked below 600 px. Progress draws ✓, ●, ✕ and ○ for done,
+  current, failed and pending; status words remain accessible in the DOM,
+  visually hidden. Back, Later and the playground alternative are quiet
+  underlined text controls.
 - **The task pages' stylesheet,** `task-pages.css`, comes third, after
   `temper.css`, whose variables and rules it builds on: what the task
   pages add to the look, as `task.html` draws it in the terminal
@@ -877,6 +886,9 @@ view draws, never changing a view to suit a sample.
 | `welcome-first-run-0` | the first run's welcome: its two cards |
 | `connect-forge-first-run-6` | the first run's `ConnectForge` at step 6: Forgejo here setting up, the box preparing |
 | `forges-first-run-7` | the first run's Forges at step 7: Forgejo here connected |
+| `welcome-forge-choose` | the welcome's Forge choices, before any forge is connected |
+| `welcome-forge-details` | the welcome's Forgejo Details, with organization and repository paired |
+| `welcome-model-choose` | the welcome's Model choices, with ChatGPT sign-in and an API key |
 | `connect-forge-choose` | `ConnectForge`'s Choose: GitHub, Forgejo here and a Forgejo elsewhere |
 | `chats-setup-strip` | the chats with no demo, no usable account and no forge: the setup strip |
 | `adoption` | the adoption form, empty |

@@ -109,6 +109,14 @@ fn choose_draws_a_card_per_choice_in_order() {
         view.tree().nodes().iter().find(|n| n.styles.as_slice().contains(&crate::look::WELCOME_CHOICES)).unwrap();
     let cards: Vec<_> = view.tree().nodes().iter().filter(|n| parent(view.tree(), n.id) == Some(choices.id)).collect();
     assert_eq!(cards.len(), 3);
+    let primary: Vec<_> = view
+        .tree()
+        .nodes()
+        .iter()
+        .filter(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY))
+        .map(|n| n.name.as_deref().unwrap())
+        .collect();
+    assert_eq!(primary, [b"Connect GitHub".as_slice()]);
     assert!(cards.iter().all(|n| n.role == Role::Region));
     let regions: Vec<_> =
         view.tree().nodes().iter().filter(|n| n.role == Role::Region).filter_map(|n| n.name.as_deref()).collect();
@@ -566,6 +574,14 @@ fn details_show_the_set_ups_fields_with_their_defaults() {
         .unwrap();
     let grandparent = |id| parent(view.tree(), parent(view.tree(), id).unwrap());
     assert_eq!(grandparent(org.id), grandparent(repository.id));
+    let pair = grandparent(org.id).unwrap();
+    assert!(nodes.iter().find(|n| n.id == pair).unwrap().styles.as_slice().contains(&crate::look::FLOW_PAIR));
+    let primary: Vec<_> = nodes
+        .iter()
+        .filter(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY))
+        .map(|n| n.name.as_deref().unwrap())
+        .collect();
+    assert_eq!(primary, [b"Set up a Forgejo here".as_slice()]);
     assert_ne!(grandparent(org.id), grandparent(project.id));
     assert!(!view.tree().nodes().iter().any(|node| node.role == Role::ChoiceGroup));
     let mut view = f::page_view(&root);

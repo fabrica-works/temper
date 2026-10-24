@@ -251,6 +251,14 @@ pub const FORGE_ROW: Style = Style { owner: owner(), token: 121 };
 pub const SETUP_STRIP: Style = Style { owner: owner(), token: 122 };
 /// Browser sign-in page (protocol/sign-in.md, 7).
 pub const SIGN_IN: Style = Style { owner: owner(), token: 123 };
+/// A connection flow's filled primary control.
+pub const FLOW_PRIMARY: Style = Style { owner: owner(), token: 125 };
+/// A failed line in a connection flow's progress.
+pub const FLOW_FAILED: Style = Style { owner: owner(), token: 126 };
+/// Organization and repository fields on one responsive row.
+pub const FLOW_PAIR: Style = Style { owner: owner(), token: 127 };
+/// The opening welcome keeps its introductory heading scale.
+pub const WELCOME_INTRO: Style = Style { owner: owner(), token: 128 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -381,6 +389,10 @@ pub const NAMES: Names<'static> = Names {
         b"temper-setup-strip",
         b"temper-sign-in",
         b"temper-account-row",
+        b"temper-flow-primary",
+        b"temper-flow-failed",
+        b"temper-flow-pair",
+        b"temper-welcome-intro",
     ],
     regions: &[b"temper-link"],
 };

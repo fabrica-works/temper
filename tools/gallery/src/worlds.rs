@@ -86,6 +86,7 @@ fn frame(w: World, connecting: bool) -> c::Me {
             let provider = me.providers.get_mut(index).expect("provider index");
             if provider.name.bytes() == b"OpenAI" {
                 provider.name = doc("openai");
+                provider.sign_in = true;
             } else if provider.name.bytes() == b"Anthropic" {
                 provider.name = doc("anthropic");
             }
@@ -130,7 +131,10 @@ fn needs(w: World) -> c::Needs {
     c::Needs { proposals: u32::from(w == Solo), questions: u32::from(w == Solo), escalations: 0, person_tasks: 0 }
 }
 pub(super) fn world(w: World, address: Address, then: Then) -> Domain {
-    let connecting = matches!(address, Address::ConnectModel { .. });
+    let connecting = matches!(
+        address,
+        Address::ConnectModel { .. } | Address::Welcome { step: temper_client_domain::Step::Model { .. } }
+    );
     let limits = limits();
     let mut root = temper_client_domain::unlinked(&limits, SEED);
     let mut out = Queue::with_capacity(temper_client_domain::max_out(&limits));

@@ -5,6 +5,11 @@ use skein_lib::{Queue, Token};
 use temper_client_domain::{Action, Address, Domain, Event, Request, address::Filter, pages::Act};
 use temper_client_domain::{ChatsFilter, PlanFilter};
 
+use Then::{
+    AccountRefused, Closing, Declined, Filled, Held, KeyReady, OutOfDate, Refused, Rejecting, Releasing, Renewed,
+    Shown, SignInReady, SignInRefused, SignedOut, SigningIn,
+};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum World {
     Reference,
@@ -39,7 +44,7 @@ pub struct Sample {
     pub address: Address,
     pub then: Then,
 }
-pub const N: usize = 50;
+pub const N: usize = 53;
 #[must_use]
 fn task(task: u64) -> Address {
     Address::Task { task, filter: PlanFilter::All }
@@ -48,10 +53,6 @@ fn task(task: u64) -> Address {
 #[must_use]
 pub fn samples() -> [Sample; N] {
     const CHATS: Address = Address::Chats { filter: ChatsFilter::All, start: false };
-    use Then::{
-        AccountRefused, Closing, Declined, Filled, Held, KeyReady, OutOfDate, Refused, Rejecting, Releasing, Renewed,
-        Shown, SignInReady, SignInRefused, SignedOut, SigningIn,
-    };
     use World::{Bare, FirstRun, Reference, Solo};
     [
         Sample { name: "chats-solo", world: Solo, address: CHATS, then: Shown },
@@ -79,6 +80,12 @@ pub fn samples() -> [Sample; N] {
             address: Address::ConnectForge { forge: None },
             then: Shown,
         },
+        welcome_sample("welcome-forge-choose", temper_client_domain::Step::Forge { forge: None }),
+        welcome_sample(
+            "welcome-forge-details",
+            temper_client_domain::Step::Forge { forge: Some(temper_client_domain::Choice::Forge(3)) },
+        ),
+        welcome_sample("welcome-model-choose", temper_client_domain::Step::Model { way: None }),
         owned_sample("forge-details", 0, false),
         owned_sample("forge-setting-up-middle", 6, false),
         owned_sample("welcome-ready-under-way", 6, true),
@@ -146,6 +153,9 @@ pub fn samples() -> [Sample; N] {
         Sample { name: "task-solo-T9", world: Solo, address: task(9), then: Shown },
     ]
 }
+fn welcome_sample(name: &'static str, step: temper_client_domain::Step) -> Sample {
+    Sample { name, world: World::FirstRun { step: 0 }, address: Address::Welcome { step }, then: Then::Shown }
+}
 fn owned_sample(name: &'static str, step: u8, ready: bool) -> Sample {
     Sample {
         name,
@@ -169,6 +179,9 @@ fn model_sample(name: &'static str, kind: temper_client_domain::WayKind, then: T
 #[must_use]
 pub fn mockup(sample: &Sample) -> Option<String> {
     match sample.name {
+        "welcome-forge-choose" => return Some("welcome.html?world=first-run&step=0&at=forge&bare".to_owned()),
+        "welcome-forge-details" => return Some("welcome.html?world=first-run&step=0&at=forge&forge=3&bare".to_owned()),
+        "welcome-model-choose" => return Some("welcome.html?world=first-run&step=0&at=model&bare".to_owned()),
         "welcome-ready-under-way" => return Some("welcome.html?world=first-run-real&step=3&at=ready&bare".to_owned()),
         "welcome-ready-adopted" => return Some("welcome.html?world=first-run-real&step=4&at=ready&bare".to_owned()),
         _ => {}

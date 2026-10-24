@@ -55,6 +55,31 @@ enum Part {
 }
 const HOLDS: [Holds; samples::N] = [
     Holds {
+        name: "welcome-forge-choose",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::Region, name: "GitHub" },
+            Part::Named { role: Role::Region, name: "Forgejo on this machine" },
+            Part::Named { role: Role::Region, name: "A Forgejo elsewhere" },
+        ],
+    },
+    Holds {
+        name: "welcome-forge-details",
+        heading: "Connect a forge",
+        parts: &[
+            Part::Named { role: Role::TextField, name: "Organization" },
+            Part::Named { role: Role::TextField, name: "Repository" },
+        ],
+    },
+    Holds {
+        name: "welcome-model-choose",
+        heading: "Connect a model",
+        parts: &[
+            Part::Named { role: Role::Button, name: "Continue with ChatGPT" },
+            Part::Named { role: Role::Link, name: "Use an API key" },
+        ],
+    },
+    Holds {
         name: "forge-details",
         heading: "Connect a forge",
         parts: &[
@@ -776,4 +801,48 @@ fn model_samples_link_the_mockup_state_that_draws_them() {
         assert_eq!(sample.name, name);
         assert_eq!(samples::mockup(sample).as_deref(), expected, "{name}");
     }
+}
+
+#[test]
+fn connection_samples_assign_priority_and_progress_to_the_bundled_nodes() {
+    use temper_client_view::look;
+    for (name, expected) in [
+        ("welcome-forge-choose", vec!["Connect GitHub"]),
+        ("welcome-forge-details", vec!["Set up a Forgejo here"]),
+        ("welcome-model-choose", vec!["Continue with ChatGPT"]),
+    ] {
+        let sample = samples::samples().into_iter().find(|sample| sample.name == name).expect("sample");
+        let view = view(&sample);
+        let primary: Vec<_> = view
+            .tree()
+            .nodes()
+            .iter()
+            .filter(|node| node.styles.as_slice().contains(&look::FLOW_PRIMARY))
+            .map(|node| std::str::from_utf8(node.name.as_deref().expect("primary name")).expect("UTF-8"))
+            .collect();
+        assert_eq!(primary, expected, "{name}");
+        if name == "welcome-forge-details" {
+            assert_eq!(
+                view.tree().nodes().iter().filter(|node| node.styles.as_slice().contains(&look::FLOW_PAIR)).count(),
+                1
+            );
+        }
+    }
+    let sample =
+        samples::samples().into_iter().find(|sample| sample.name == "forge-setting-up-middle").expect("sample");
+    let view = view(&sample);
+    let progress = view
+        .tree()
+        .nodes()
+        .iter()
+        .position(|node| node.styles.as_slice().contains(&look::FLOW_PROGRESS))
+        .expect("progress");
+    let nodes = view.tree().nodes();
+    let end = progress + usize::try_from(nodes[progress].size).expect("subtree size");
+    let items: Vec<_> = nodes[progress..end].iter().filter(|node| node.role == Role::Item).collect();
+    assert_eq!(items.len(), 5);
+    assert!(items[0].styles.as_slice().contains(&look::FLOW_DONE));
+    assert!(items[1].states.as_slice().contains(&skein_ui::State::Current));
+    assert!(items[2].styles.is_empty());
+    assert!(items[2].states.is_empty());
 }

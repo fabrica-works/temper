@@ -270,6 +270,8 @@ pub(crate) fn app_control(
     word: Word,
     back: Option<Address>,
 ) {
+    // Forges' install/maintenance controls stay secondary, as in its mockup.
+    let primary = back != Some(Address::Forges) && word != Word::ForgeInstallAnother;
     let pending = root.forge().app();
     let busy = match pending {
         Some(pending) => pending.answer.is_none(),
@@ -277,14 +279,21 @@ pub(crate) fn app_control(
     };
     let name = w.say(word, &[]);
     if busy || root.forge().served() == forge::Served::OutOfDate {
-        flow::control(b, Control::Disabled { name: &name });
+        flow::control(
+            b,
+            if primary { Control::PrimaryDisabled { name: &name } } else { Control::Disabled { name: &name } },
+        );
     } else {
         let meaning = match back {
             Some(back) if word == Word::ForgeConnectGitHub => Meaning::ConnectManifest { forge: number, back },
             Some(back) => Meaning::Install { forge: number, back },
             None => Meaning::ConnectApp(number),
         };
-        flow::control(b, Control::Button { name: &name, to: bindings.insert(meaning) });
+        let to = bindings.insert(meaning);
+        flow::control(
+            b,
+            if primary { Control::PrimaryButton { name: &name, to } } else { Control::Button { name: &name, to } },
+        );
     }
     if let Some(pending) = pending
         && pending.forge == number
@@ -303,6 +312,9 @@ pub(crate) fn app_control(
             b.name(&name);
             b.text(Run::Plain, &name);
             b.external(address);
+            if primary {
+                b.style(look::FLOW_PRIMARY);
+            }
             b.close();
         }
     }
@@ -374,15 +386,23 @@ pub(crate) fn setup_control(
     number: u16,
     word: Word,
 ) {
+    let primary = word == Word::ForgeSetUp;
     let pending = match root.forge().set_up() {
         Some(last) => last.progress.is_some(),
         None => false,
     };
     let name = w.say(word, &[]);
     if pending || root.forge().served() == forge::Served::OutOfDate {
-        flow::control(b, Control::Disabled { name: &name });
+        flow::control(
+            b,
+            if primary { Control::PrimaryDisabled { name: &name } } else { Control::Disabled { name: &name } },
+        );
     } else {
-        flow::control(b, Control::Button { name: &name, to: bindings.insert(Meaning::SetUp(number)) });
+        let to = bindings.insert(Meaning::SetUp(number));
+        flow::control(
+            b,
+            if primary { Control::PrimaryButton { name: &name, to } } else { Control::Button { name: &name, to } },
+        );
     }
     if let Some(last) = root.forge().set_up()
         && last.forge == number
@@ -564,7 +584,7 @@ pub(crate) fn ready_card(
         };
         let open = w.say(Word::SetupOpen, &[Hole::Name(project)]);
         if pending {
-            flow::control(b, Control::Disabled { name: &open });
+            flow::control(b, Control::PrimaryDisabled { name: &open });
         } else {
             let project = match root.forge().set_up() {
                 Some(last) if last.forge == row.number => match &last.adoption {
@@ -586,7 +606,10 @@ pub(crate) fn ready_card(
                 },
             };
             if let Some(project) = project {
-                flow::control(b, Control::Link { name: &open, to: bindings.insert(Act::OpenProject { project }) });
+                flow::control(
+                    b,
+                    Control::PrimaryLink { name: &open, to: bindings.insert(Act::OpenProject { project }) },
+                );
             }
         }
         setup_ending(b, root, w, forge, row);
@@ -665,7 +688,7 @@ pub(crate) fn setup_ending(b: &mut Builder, root: &Domain, w: &Words, forge: &mu
             b.close();
             setup_field(b, root, w, forge, SetupField::Project, Word::SetupNew, row.number);
             let label = w.say(Word::SetupAdopt, &[Hole::Name(forge::words::full_name(&first.org, &first.repository))]);
-            flow::control(b, Control::Button { name: &label, to: forge.insert(Meaning::StartIn(row.number)) });
+            flow::control(b, Control::PrimaryButton { name: &label, to: forge.insert(Meaning::StartIn(row.number)) });
         }
         if let Some(last) = root.forge().set_up()
             && last.forge == row.number
@@ -770,6 +793,7 @@ pub(crate) fn each_step(b: &mut Builder, root: &Domain, w: &Words, row: &Row) {
 
 fn setup_fields(b: &mut Builder, root: &Domain, w: &Words, bindings: &mut ForgeBindings, number: u16) {
     b.open(Role::Slot);
+    b.style(look::FLOW_PAIR);
     for (field, word) in
         [(SetupField::Organization, Word::SetupOrganization), (SetupField::Repository, Word::SetupRepository)]
     {

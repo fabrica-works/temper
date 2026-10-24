@@ -42,4 +42,22 @@ fn a_progress_says_each_lines_state() {
     let items: Vec<_> = tree.nodes().iter().filter(|n| n.role == Role::Item).collect();
     assert!(items[0].styles.as_slice().contains(&crate::look::FLOW_DONE));
     assert!(items[1].states.as_slice().contains(&State::Current));
+    assert!(items[2].styles.as_slice().contains(&crate::look::FLOW_FAILED));
+    assert!(items[3].styles.is_empty());
+    assert!(items[3].states.is_empty());
+}
+
+#[test]
+fn only_primary_controls_carry_primary_style() {
+    use crate::flow::Control;
+    let mut b = Builder::new(&f::tree_limits());
+    b.open(Role::Slot);
+    flow::control(&mut b, Control::Disabled { name: b"Later" });
+    flow::control(&mut b, Control::PrimaryDisabled { name: b"Connect" });
+    b.close();
+    let tree = b.finish();
+    let nodes: Vec<_> = tree.nodes().iter().filter(|node| node.role == Role::Button).collect();
+    assert!(!nodes[0].styles.as_slice().contains(&crate::look::FLOW_PRIMARY));
+    assert!(nodes[1].styles.as_slice().contains(&crate::look::FLOW_PRIMARY));
+    assert!(nodes.iter().all(|node| node.states.as_slice().contains(&State::Disabled)));
 }

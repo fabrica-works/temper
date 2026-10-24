@@ -160,6 +160,15 @@ fn the_welcome_has_a_bare_frame_and_no_banner() {
     let root = f::welcome_root(Step::Welcome, true);
     let view = f::page_view(&root);
     let tree = view.tree();
+    assert!(
+        tree.nodes()
+            .iter()
+            .find(|n| n.role == Role::Heading { level: 1 })
+            .unwrap()
+            .styles
+            .as_slice()
+            .contains(&crate::look::WELCOME_INTRO)
+    );
     node(tree, Role::Button, "Sign out");
     assert_eq!(f::banner_statuses(tree).as_ref(), &[Box::from(b"Pat".as_slice())]);
     for role in [Role::Disclosure, Role::Navigation] {
@@ -205,6 +214,14 @@ fn the_welcome_step_says_its_words_and_offers_both_cards() {
         let at = remaining.find(phrase).unwrap_or_else(|| panic!("missing or out of order: {phrase}"));
         remaining = &remaining[at + phrase.len()..];
     }
+    let primary: Vec<_> = view
+        .tree()
+        .nodes()
+        .iter()
+        .filter(|n| n.styles.as_slice().contains(&crate::look::FLOW_PRIMARY))
+        .map(|n| n.name.as_deref().unwrap())
+        .collect();
+    assert_eq!(primary, [b"Try the playground".as_slice(), b"Set up temper"]);
     assert_eq!(press(&root, Role::Button, "Try the playground"), d::Action::Pages(pages::Act::Playground));
     assert_eq!(
         press(&root, Role::Link, "Set up temper"),
@@ -245,6 +262,8 @@ fn the_steps_mark_the_current_one() {
         (Step::Ready, "Ready"),
     ] {
         let view = f::page_view(&f::welcome_root(step, true));
+        let heading = view.tree().nodes().iter().find(|n| n.role == Role::Heading { level: 1 }).unwrap();
+        assert_eq!(heading.styles.as_slice().contains(&crate::look::WELCOME_INTRO), step == Step::Welcome);
         node(view.tree(), Role::List, "Steps");
         let current: Vec<_> =
             view.tree().nodes().iter().filter(|node| node.states.as_slice().contains(&State::Current)).collect();
@@ -299,6 +318,18 @@ fn each_later_step_offers_back_later_and_the_playground_while_the_demo_is_answer
             let view = f::page_view(&root);
             assert_eq!(f::find(view.tree(), Role::Button, b"Try the playground instead").is_some(), demo);
             if demo {
+                let id = node(view.tree(), Role::Button, "Try the playground instead");
+                assert!(
+                    !view
+                        .tree()
+                        .nodes()
+                        .iter()
+                        .find(|n| n.id == id)
+                        .unwrap()
+                        .styles
+                        .as_slice()
+                        .contains(&crate::look::FLOW_PRIMARY)
+                );
                 assert_eq!(
                     press(&root, Role::Button, "Try the playground instead"),
                     d::Action::Pages(pages::Act::Playground)

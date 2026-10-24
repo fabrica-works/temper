@@ -8,6 +8,9 @@ use skein_ui::{Binding, Builder, Role, Run, State};
 pub(crate) enum Control<'a> {
     Link { name: &'a [u8], to: Binding },
     Button { name: &'a [u8], to: Binding },
+    PrimaryLink { name: &'a [u8], to: Binding },
+    PrimaryButton { name: &'a [u8], to: Binding },
+    PrimaryDisabled { name: &'a [u8] },
     Disabled { name: &'a [u8] },
 }
 pub(crate) enum Mark {
@@ -57,7 +60,8 @@ pub(crate) fn progress(b: &mut Builder, w: &Words, name: &[u8], lines: &[(&[u8],
         match mark {
             Mark::Done => b.style(look::FLOW_DONE),
             Mark::UnderWay => b.state(State::Current),
-            Mark::Failed | Mark::ToCome => {}
+            Mark::Failed => b.style(look::FLOW_FAILED),
+            Mark::ToCome => {}
         }
         b.text(Run::Plain, line);
         let word = match mark {
@@ -86,21 +90,28 @@ pub(crate) fn card(b: &mut Builder, heading: &[u8]) {
 }
 /// Draw the control in its given kind.
 pub(crate) fn control(b: &mut Builder, action: Control<'_>) {
+    let primary = match action {
+        Control::PrimaryLink { .. } | Control::PrimaryButton { .. } | Control::PrimaryDisabled { .. } => true,
+        Control::Link { .. } | Control::Button { .. } | Control::Disabled { .. } => false,
+    };
     match action {
-        Control::Link { name, to } => {
+        Control::PrimaryLink { name, to } | Control::Link { name, to } => {
             crate::link(b, name, to);
             b.text(Run::Plain, name);
         }
-        Control::Button { name, to } => {
+        Control::PrimaryButton { name, to } | Control::Button { name, to } => {
             b.open(Role::Button);
             b.name(name);
             b.bind(to);
         }
-        Control::Disabled { name } => {
+        Control::PrimaryDisabled { name } | Control::Disabled { name } => {
             b.open(Role::Button);
             b.name(name);
             b.state(State::Disabled);
         }
+    }
+    if primary {
+        b.style(look::FLOW_PRIMARY);
     }
     b.close();
 }
