@@ -28,7 +28,7 @@ pub(super) fn text(
                 | c::ReadValue::Setting(_)
                 | c::ReadValue::Revision(_)
                 | c::ReadValue::Revisions(_)),
-            )) => super::settings::text(value, limits, out),
+            )) => super::settings::text(value, crate::jig::call::number(call, 0), limits, out),
             Readout::Jig(c::ReadResult::Value(c::ReadValue::Task(task))) => {
                 super::task_text(task, me, book, vocabulary, out);
                 super::subjects::text_digest(b"task", &super::super::Part::Task(task), limits, out);

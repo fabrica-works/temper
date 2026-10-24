@@ -158,14 +158,31 @@ fn values() -> Vec<(c::Setting, c::SettingValue)> {
 }
 fn read(argv: &[&str], value: c::ReadValue) -> jig::Printed {
     let (mut root, call) = fixtures::read_call(argv);
+    if argv.first() == Some(&"setting") {
+        newest_for_setting(&mut root, call);
+    }
     root.serve(call, c::ReadResult::Value(value));
     root.answer(call).expect("read completed")
+}
+fn newest_for_setting(root: &mut fixtures::Harness, call: u32) {
+    if root.reads.get(&call).expect("setting read").1 == c::Read::Settings {
+        root.serve(
+            call,
+            c::ReadResult::Value(c::ReadValue::Settings(Box::new(c::SettingsDocument {
+                newest: 5,
+                settings: list([]),
+                held: list([]),
+                pending: list([]),
+            }))),
+        );
+    }
 }
 fn setting_json(setting: c::Setting, value: c::SettingValue) -> Vec<u8> {
     let mut root = fixtures::signed_in(fixtures::PARTY);
     let mut call = fixtures::call(&["setting", "rules"]);
     call.tool = rows::SETTING_AT;
     let number = root.submit_prepared(call, true, None);
+    newest_for_setting(&mut root, number);
     root.serve(
         number,
         c::ReadResult::Value(c::ReadValue::Setting(Box::new(c::SettingDocument { setting, revision: 5, value }))),
@@ -467,13 +484,35 @@ fn settings_reads_request_the_exact_contract_and_do_not_watch_settings() {
                 revision: 5,
             }),
         ),
-        (vec!["setting", "rules"], c::Read::Setting(c::ReadSetting { setting: c::Setting::Rules, revision: 0 })),
+        (vec!["setting", "rules"], c::Read::Settings),
         (vec!["revision", "5"], c::Read::Revision(c::ReadRevision { number: 5 })),
         (vec!["revisions", "--before", "5"], c::Read::Revisions(c::ReadRevisions { before: Some(5) })),
     ] {
         let (root, call) = fixtures::read_call(&argv);
         assert_eq!(root.reads.get(&call).expect("one read").1, expected);
         assert_eq!(root.watches.len(), 1, "only shared me watch");
+    }
+}
+
+#[test]
+fn an_unqualified_setting_reads_the_inventoried_revision_before_its_value() {
+    for (argv, setting) in [
+        (vec!["setting", "charter", "3"], c::Setting::Charter(c::SettingNumber { number: 3 })),
+        (vec!["setting", "template", "4"], c::Setting::Template(c::SettingNumber { number: 4 })),
+        (vec!["setting", "policy", "5"], c::Setting::Policy(c::SettingNumber { number: 5 })),
+        (vec!["setting", "rules"], c::Setting::Rules),
+    ] {
+        let (mut root, call) = fixtures::read_call(&argv);
+        assert_eq!(root.reads.get(&call).expect("first read").1, c::Read::Settings);
+        newest_for_setting(&mut root, call);
+        assert!(root.answer(call).is_none());
+        assert_eq!(
+            root.reads.get(&call).expect("value read").1,
+            c::Read::Setting(c::ReadSetting { setting, revision: 5 })
+        );
+        root.serve(call, c::ReadResult::None(c::ReadNone::Unknown));
+        assert_eq!(root.answer(call).expect("value refusal").status, 2);
+        assert_eq!(root.watches.len(), 1, "only the shared me watch");
     }
 }
 

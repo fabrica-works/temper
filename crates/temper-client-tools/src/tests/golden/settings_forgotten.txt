@@ -1,1 +1,1 @@
-revision forgotten; oldest kept: revision 2
+revision 1 is forgotten; the oldest kept is revision 2
