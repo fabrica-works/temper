@@ -189,8 +189,8 @@ pub(crate) fn context(b: &mut Builder, root: &Domain, project: u32, words: &Word
         return;
     }
     let Some(me) = root.pages().me(root.client()) else { return };
-    let project = match super::project_name(root.pages(), root.client(), project) {
-        Some(name) => skein_lib::bytes::copy_of(name),
+    let project = match super::project_name(Some(me), root.forge().demo(), project, words) {
+        Some(name) => name,
         None => words.say(Word::Project, &[Hole::Number(u64::from(project))]),
     };
     b.open(Role::Slot);

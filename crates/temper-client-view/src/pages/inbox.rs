@@ -253,16 +253,11 @@ fn entry(
         b.close();
     }
     if let Some(project) = card.project {
-        let fallback = words.say(Word::Project, &[Hole::Number(u64::from(project))]);
-        let mut name = fallback.as_ref();
-        if let Some(me) = root.pages().me(root.client()) {
-            for entry in &me.projects {
-                if entry.project == project {
-                    name = entry.name.bytes();
-                }
-            }
-        }
-        text(b, Role::Paragraph, name);
+        let name = match super::project_name(root.pages().me(root.client()), root.forge().demo(), project, words) {
+            Some(name) => name,
+            None => words.say(Word::Project, &[Hole::Number(u64::from(project))]),
+        };
+        text(b, Role::Paragraph, &name);
     }
     if let Some(task) = source_task(card.object) {
         control(

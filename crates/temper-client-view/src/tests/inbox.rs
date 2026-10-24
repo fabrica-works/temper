@@ -348,6 +348,55 @@ fn an_unknown_project_name_keeps_the_numbered_fallback() {
 }
 
 #[test]
+fn inbox_cards_name_the_demo_project_playground() {
+    let (mut root, _, watch, _, _) = fixtures::root_at_with_demo(
+        Address::Inbox { filter: Filter::ALL },
+        &fixtures::domain_limits(),
+        b"Project 1",
+        Some((fixtures::PROJECT, true)),
+    );
+    let mut entries = skein_lib::List::with_capacity(1);
+    entries
+        .push(c::InboxEntry {
+            reply: None,
+            lineage: skein_lib::List::with_capacity(0),
+            goal: None,
+            recipient: None,
+            stall: None,
+            object: c::ObjectKey::Task(10),
+            project: fixtures::PROJECT,
+            group: c::InboxGroup::Replies,
+            position: 1,
+            at: skein_lib::Wall::EPOCH,
+        })
+        .unwrap();
+    fixtures::root_event(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch: watch.expect("inbox watch"),
+                    event: c::WatchEvent::Delivered(c::Delivery::Inbox(Box::new(c::Inbox {
+                        entries,
+                        needs: c::Needs { proposals: 0, questions: 0, escalations: 0, person_tasks: 0 },
+                        updates: c::Count { value: 1, limited: false },
+                        results_seen: 0,
+                        replies_seen: skein_lib::List::with_capacity(0),
+                        more: false,
+                    }))),
+                },
+            },
+        },
+    );
+    for words in [fixtures::words(), fixtures::browser_words()] {
+        let mut view = fixtures::view_of(words);
+        let tree = fixtures::build(&mut view, &root);
+        let meta = subtree(tree, styled(tree, look::META));
+        assert_eq!(role_node(meta, Role::Paragraph).name.as_deref(), Some(b"Playground".as_slice()));
+    }
+}
+
+#[test]
 fn a_reply_card_names_its_task_after_the_task_ends() {
     use skein_fake_person::{Face, Find, Found, Target, TreeFace};
 

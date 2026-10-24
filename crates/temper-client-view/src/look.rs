@@ -259,6 +259,8 @@ pub const FLOW_FAILED: Style = Style { owner: owner(), token: 126 };
 pub const FLOW_PAIR: Style = Style { owner: owner(), token: 127 };
 /// The opening welcome keeps its introductory heading scale.
 pub const WELCOME_INTRO: Style = Style { owner: owner(), token: 128 };
+/// The navigation's project label when no project remains.
+pub const PROJECT_EMPTY: Style = Style { owner: owner(), token: 129 };
 /// The look's names (skein's ui.md, 8): styles by token, regions by number.
 pub const NAMES: Names<'static> = Names {
     owner: owner(),
@@ -393,6 +395,7 @@ pub const NAMES: Names<'static> = Names {
         b"temper-flow-failed",
         b"temper-flow-pair",
         b"temper-welcome-intro",
+        b"temper-project-empty",
     ],
     regions: &[b"temper-link"],
 };
