@@ -8,7 +8,7 @@ fn worker_wire_schema_matches_generated_code_and_goldens() {
     let source = fs::read_to_string(root.join("schema/worker-wire-v1.schema")).expect("worker wire schema");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = root.join("src/generated/v1.rs");
-    let goldens = root.join("golden/v1");
+    let goldens = root.join("golden");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper-codecs-world --test drift";
     if write {
@@ -32,7 +32,7 @@ fn client_wire_schema_matches_generated_code_and_goldens() {
     let source = fs::read_to_string(root.join("schema/client-wire-v1.schema")).expect("client wire schema");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = root.join("src/generated/v1.rs");
-    let goldens = root.join("golden/v1");
+    let goldens = root.join("golden");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper-codecs-world --test drift";
     if write {
@@ -56,7 +56,7 @@ fn store_schema_matches_generated_code_and_goldens() {
     let source = fs::read_to_string(root.join("schema/store-v10.schema")).expect("store schema");
     let output = generate(&parse(&source).expect("schema valid"));
     let code = root.join("src/generated/v10.rs");
-    let goldens = root.join("golden/v10");
+    let goldens = root.join("golden");
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p temper-codecs-world --test drift";
     if write {

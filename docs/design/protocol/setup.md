@@ -2967,7 +2967,8 @@ Each is intended; what it needs is named with it.
   a GitHub path the Forgejo fake never takes. Default: as 8.4 reads
   them; a family of temper's decisions, `(repository, pull, head)`
   written in the merge's `Entry`'s commit, is the route when a run
-  needs either, a store version's change (store.md, section 4).
+  needs either, a store schema change in place until the first release
+  (store.md, section 4; skein's `codec.md`, section 5).
 
 ## 17. Connecting GitHub
 

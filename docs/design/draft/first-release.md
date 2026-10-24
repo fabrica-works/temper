@@ -26,9 +26,9 @@ them. Nothing here is adopted.
   lane. Anyone may read it without signing in, as an anonymous party
   whose load is capped and who sees nothing an agent wrote (section 5).
 - **Upgrades are patches,** landed with each stored change from a
-  baseline expected at v0.1.0 and applied at start, as `upgrades.md`
-  designs. Workers
-  may keep their runs while the engine alone restarts. Until the
+  baseline at the first release, proposed as v0.1.0, and applied at
+  start, as `upgrades.md` designs. Workers may keep their runs while the
+  engine alone restarts. Until the
   baseline, dev.fabrig.ai's history resets when a format changes
   (section 6).
 - **A person configures temper by talking to it:** they describe their
@@ -194,10 +194,11 @@ read-only; `~/src/rust/tmp/roadmap-3/store-upgrades.md`). In short:
   database: every landing that changes what is stored brings a patch,
   and a start applies the pending ones to a copy of the store and
   switches to it. Any store from the baseline on upgrades to any later
-  `main`, so dev.fabrig.ai may follow `main`. The baseline is expected
-  at v0.1.0, and when it comes is unknown. Until then development
-  proceeds unchanged, and a store whose format changes is made again
-  (section 5.4).
+  `main`, so dev.fabrig.ai may follow `main`. The baseline is the first
+  release, proposed as v0.1.0 (skein's `codec.md`, section 5). Until
+  then versions keep their current numbers, schemas and their one set of
+  golden bytes change in place, and a store from an older build is made
+  again when its families change (section 5.4).
 - **What survives:** every record, live and ended. An agent resumes its
   conversation, its old turns patched as they are read, unless a patch
   says its window starts fresh.
@@ -365,6 +366,6 @@ broken into missions as it starts:
 - **People's names on public pages.** Default: hidden.
 - **Claude for temper-on-temper's first lane,** or ChatGPT alone.
   Default: ChatGPT, roadmap 2's first backend.
-- **When the upgrade policy starts.** Default: at the baseline,
-  expected at v0.1.0; when is unknown.
+- **When the upgrade policy starts.** At the first release, the baseline
+  (skein's `codec.md`, section 5), proposed as v0.1.0; its date is open.
 - **The playground's memory bar.** Default: a phone's browser.

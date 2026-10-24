@@ -10,8 +10,9 @@ user that day, whose turns shaped it: the records before the formats on
 disk, and a patch landed with each change, as an application migrates
 its database. It crosses skein, smith, jig and temper on purpose; an
 owner splits it. Nothing here is adopted, and nothing changes today's
-development: when the baseline comes is unknown, and until then the
-rules of section 4.1 hold. Commands' spellings are placeholders.
+development: the baseline is the first release (skein's `codec.md`,
+section 5), and until then the rules of section 4.1 hold. Commands'
+spellings are placeholders.
 
 ## 1. In one page
 
@@ -33,8 +34,9 @@ rules of section 4.1 hold. Commands' spellings are placeholders.
   with its value, a field dropped, an integer widened. A change every old
   value survives byte for byte needs none.
 - **Any store from the baseline on upgrades to any later `main`,** so a
-  deployment may follow `main`. The baseline is the first landing under
-  these rules; until it, nothing changes (4.1).
+  deployment may follow `main`. The baseline is the first release;
+  until it, versions stay fixed and schemas change in place (4.1;
+  skein's `codec.md`, section 5).
 - **A copy is patched, never the store in use** (section 6): a start
   copies the records' and the secrets' maps into a new generation,
   patches the copy, checks every join, and switches to it by one atomic
@@ -143,30 +145,31 @@ transcripts, the forge or the programs' logins. Online backups stay open
 
 ### 4.1 Before the baseline
 
-Today's rules hold, unchanged: one version of each encoding at a time, a
-reader that refuses another and says so, and nothing translated (jig's
-`protocol/README.md`, section 7; skein's `codec.md`, section 5); each of
-temper's versions moves at most once per plan, plans running at once
-sharing the move (`../protocol/README.md`, section 9); and a deployment
-whose store breaks is made again (`../protocol/store.md`, section 4).
-So a version names no one layout yet: plans may change a schema under a
-shared version, and no patch could tell their stores apart. No promise
-reaches back before the baseline, and nothing in this draft asks
-anything of a change landed before it. The baseline is expected around
-v0.1.0 (`first-release.md`); when it comes is open.
+The baseline is the first release (skein's `codec.md`, section 5).
+Until it, each encoding keeps its current version: changes a reader
+would notice change the schema, generated code and one set of golden
+bytes in place (`../protocol/README.md`, section 9). A reader still
+refuses another version and nothing is translated (jig's
+`protocol/README.md`, section 7). A version names no one layout yet, so a
+store from an older build is started afresh when its families change:
+no patch could tell those layouts apart (`../protocol/store.md`, section
+4). No promise reaches back before the baseline, and nothing in this
+draft asks anything of a change landed before it. Versions move at a
+release, not at a landing; `first-release.md` proposes v0.1.0.
 
 ### 4.2 Levels
 
 - **Each owner keeps a sequence:** jig's patches numbered from the
   baseline, temper's likewise, and smith's and skein's for what of
   theirs is kept (turns, results, OAuth records). A patch changes one or
-  more of its owner's families and moves each one's version.
+  more of its owner's families and prepares each one's next released
+  version.
 - **The format row is the table of applied patches:** each owner's level
   beside each family's version (jig's `protocol/store.md`, 5.3), written
   by the patching's last commit.
-- **A version moves once per landing, not per plan,** so a version names
-  one layout. `../protocol/README.md`, section 9, changes at the
-  baseline.
+- **Versions move at a release,** so a released version names one
+  layout. Before the baseline, schema changes keep the current number
+  (`../protocol/README.md`, section 9; skein's `codec.md`, section 5).
 - **A landed patch never changes.** Until it lands, its author edits it
   with the schema; once on `main`, deployments may have run it. Two
   branches that each add jig's patch 41 meet at `land`, whose rebase and
@@ -577,7 +580,8 @@ upgrade, then the engine alone.
 
 ## 15. Open questions
 
-- **When the baseline is.** Unknown; until then, section 4.1.
+- **When the first release is.** Its date is open; it is the baseline
+  (skein's `codec.md`, section 5). Until then, section 4.1.
 - **A bug in a landed patch,** found after deployments ran it. Default:
   fixed in place for those yet to run it, its fix declared to the gate;
   a later patch repairs those that ran it, where the old evidence allows.
