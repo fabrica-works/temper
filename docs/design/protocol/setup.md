@@ -904,8 +904,9 @@ Then `temper serve`, and the printed command, once, on Forgejo's host.
   takes its client secret only as an argument, where the preparation
   puts no secret (6.3). A source added by Forgejo's command line while
   Forgejo runs works at once, so the order costs a person nothing.
-- **Its code:** the command in `temper`'s `forge.rs`; the key's and the
-  secret's making, and the printed bytes, in `temper-forge-setup`.
+- **Its code:** the command, and the key's and the secret's making, in
+  `temper`'s `forge_sign_in.rs`, dispatched from `forge.rs`; the printed
+  bytes in `temper-forge-setup`'s `sign_in.rs`.
 
 ## 7. The box: wiring only
 

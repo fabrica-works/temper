@@ -606,12 +606,16 @@ section 3), and temper's `application.sign_in.forges`:
   of jig's answers.
 - **Step tests:** `sign_in.forges`' checks; the metas' bytes;
   `temper forge sign-in`'s printed bytes and the files it makes.
-- **One process-tier story** (`../domain/testing.md`, 2.6): skein's
-  throwaway Forgejo, the temper source added by the printed command, a
-  scripted client with a cookie jar that signs in to temper through the
-  fake Google and then to Forgejo through temper, and Forgejo's API
-  naming the member's account by their login. It proves the claims and
-  Forgejo's settings, which no fake can.
+- **One process-tier story** (`../domain/testing.md`, 2.6): an owned
+  Forgejo, the temper source added by the printed command, a scripted
+  client with a cookie jar that signs in to temper by the printed link
+  and then to Forgejo through temper, and Forgejo's API naming the
+  member's account by their login and address. It proves the claims and
+  Forgejo's settings, which no fake can. The printed link, not the fake
+  Google: with `sign_in` configured it signs in the member of Google's
+  provider (2.3), so Forgejo gets the same claims; Google's leg is the
+  service world's; and skein's fake issuer peer cannot yet give its
+  account a verified address.
 - **The browser tier, one story** (`../client/browser.md`, section 4):
   jig's strict cookie absent from a navigation that started on another
   site and present on the page's own exchanges, so the `Authorize` place

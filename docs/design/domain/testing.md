@@ -874,19 +874,22 @@ and 10).
   programs directory readable by another user, are each refused, exit
   1, with nothing made. A deployment started after it, its program
   source declared as `live`, finds the source signed in.
-- **Forgejo signing in through temper,** a test of its own
-  (`crates/temper/tests/forgejo_sign_in.rs`, `support/forgejo_sign_in.rs`;
-  ../protocol/sign-in.md, 9.8): skein's throwaway Forgejo, with 9.4's
-  settings, beside `temper serve` with jig's provider and a Google sign-in
-  answered by skein's fake issuer, in the test; the key and the client's
-  secret made by `temper forge sign-in` in the test's scratch directory,
-  and the temper source added by the command it prints. A scripted
-  client with a cookie jar signs in to temper through the fake Google,
-  opens `/user/oauth2/temper` on Forgejo, follows temper's authorization
-  (its `Authorize` sent as the page sends it) back to Forgejo's
-  callback, and Forgejo's API, by its admin, then names the member's
-  account by their login. It aims at 2 s past Forgejo's start, and shares
-  that start with the other stories of its binary where it can.
+- **Forgejo signing in through temper,** a test of its own at the end of
+  `crates/temper/tests/process.rs`, on `support/forgejo_sign_in.rs`
+  (../protocol/sign-in.md, 9.8): an owned Forgejo prepared by temper's
+  commands, with 9.4's settings in its `app.ini`, beside `temper serve`
+  with jig's provider; the key and the client's secret made by `temper
+  forge sign-in` in the test's scratch directory, and the temper source
+  added by the command it prints. A scripted client with a cookie jar
+  signs in to temper by the printed link (the member of Google's
+  provider, 2.3), opens `/user/oauth2/temper` on Forgejo, follows
+  temper's authorization (its `Authorize` sent by jig's codec, as the
+  page sends it) back to Forgejo's callback, and Forgejo's API, by its
+  admin, then names the member's account by their login and their
+  address, which only Google's provider gives, so the link provider's
+  identity cannot pass. It aims at 2 s past Forgejo's start (about 0.5 s;
+  about 3 s whole, Forgejo's preparation and start being the rest). It
+  shares no start: nextest runs each test in a process of its own.
 - **The throwaway Forgejo** is the one in skein's `fake-forge.md`,
   section 6, never an existing Forgejo: temper's `tools/git-transcripts`
   records real git against it (../protocol/git.md, section 9). temper's
