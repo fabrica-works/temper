@@ -27,7 +27,7 @@ impl Operation {
         let (word, task): (&[u8], Option<u64>) = match ask {
             Ask::Family { .. } => (b"adopt", None),
             Ask::Jig(ask) => match ask.as_ref() {
-                c::Ask::ChangeSettings(_) => unreachable!("temper does not request settings"),
+                c::Ask::ChangeSettings(_) => unreachable!("the engine does not request settings"),
                 c::Ask::Create { .. } | c::Ask::Propose { action: c::ProposeAction::Batch { .. }, .. } => {
                     (b"chat", None)
                 }
@@ -81,7 +81,7 @@ impl Operation {
                     match change {
                         c::AccountChange::MoveOut { .. }
                         | c::AccountChange::Written { .. }
-                        | c::AccountChange::MoveIn { .. } => unreachable!("an account's move before temper routes it"),
+                        | c::AccountChange::MoveIn { .. } => unreachable!("the engine does not render account moves"),
                         c::AccountChange::DeclareProgram { .. } => b"declare".as_slice(),
                         c::AccountChange::CheckProgram { .. } => b"verify",
                         c::AccountChange::AddKey { .. } => b"add-key".as_slice(),
@@ -240,7 +240,7 @@ fn text(operation: &Operation, outcome: &Outcome, me: Option<&c::Me>, limits: &L
         c::Answer::Done(done) => {
             out.put(b"done: ");
             let task = match done {
-                c::Outcome::SettingsChanged(_) => unreachable!("temper does not request settings"),
+                c::Outcome::SettingsChanged(_) => unreachable!("the engine does not request settings"),
                 c::Outcome::Made { what: c::Made::Tasks { tasks } } => tasks.get(0).copied(),
                 c::Outcome::Owner(c::OwnerOutcome::Created { first, .. }) => Some(*first),
                 c::Outcome::Owner(_)
