@@ -1182,10 +1182,10 @@ fn ready_pairs_the_default_model_with_its_selected_account() {
         None,
         false,
     );
-    assert_eq!(
-        crate::choice::ready_model(&root, &fixtures::words()).as_ref(),
-        "ChatGPT · Personal · gpt-6-luna".as_bytes()
-    );
+    // Ready names the account by the heading the accounts page draws, then the model.
+    let heading = crate::pages::accounts::first_usable_heading(&root, &fixtures::words()).expect("a usable account");
+    let expected = [heading.as_ref(), " · gpt-6-luna".as_bytes()].concat();
+    assert_eq!(crate::choice::ready_model(&root, &fixtures::words()).as_ref(), expected.as_slice());
 }
 #[test]
 fn ready_does_not_pair_another_providers_account_with_the_model() {

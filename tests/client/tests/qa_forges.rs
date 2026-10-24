@@ -370,7 +370,12 @@ fn github_details_offer_only_the_app_of_ones_own_with_a_masked_key() {
     assert!(!words.contains("organization"), "{words}");
     assert!(!words.contains("Connect GitHub"), "{words}");
     assert!(!words.contains("not available yet"), "{words}");
-    node(&world, client, Role::Heading { level: 3 }, b"An App of your own");
+    node(&world, client, Role::Heading { level: 2 }, b"An App of your own");
+    follow(
+        &mut world,
+        client,
+        vec![gone(Role::Heading { level: 2 }, b"GitHub"), gone(Role::Heading { level: 3 }, b"An App of your own")],
+    );
     node(&world, client, Role::TextField, b"App id");
     assert!(!node(&world, client, Role::Button, b"Connect the App").states.as_slice().contains(&State::Disabled));
     assert_eq!(node(&world, client, Role::TextField, b"Private key").entry, Some(skein_ui::EntryKind::Secret));
@@ -402,25 +407,50 @@ fn elsewhere_details_keep_configuration_and_restart_instructions() {
 
 #[test]
 fn setup_steps_show_the_reported_step_and_current_flow_step() {
-    for (step, current) in [
-        (None, "Fetching Forgejo and its runner"),
-        (Some(forge::SetUpStep::Fetch), "Fetching Forgejo and its runner"),
-        (Some(forge::SetUpStep::Prepare), "Preparing Forgejo: its database, temper’s admin and your account"),
-        (Some(forge::SetUpStep::Run), "Starting Forgejo and its runner"),
+    for (state, current) in [
+        (forge::Connection::SettingUp { step: None }, None),
+        (forge::Connection::SettingUp { step: Some(forge::SetUpStep::Fetch) }, Some(0)),
+        (forge::Connection::SettingUp { step: Some(forge::SetUpStep::Prepare) }, Some(1)),
+        (forge::Connection::SettingUp { step: Some(forge::SetUpStep::Run) }, Some(2)),
+        (forge::Connection::Connecting, Some(3)),
     ] {
         let mut world = world();
-        connection(&mut world, OWNED, forge::Connection::SettingUp { step });
+        connection(&mut world, OWNED, state);
         let client = open(&mut world, at(OWNED));
         follow(&mut world, client, vec![see(Role::Heading { level: 2 }, b"Setting up Forgejo on this machine")]);
         let words = text(&world, client);
         let nodes = world.tree(client).nodes();
-        assert!(
-            nodes.iter().enumerate().any(|(index, node)| node.role == Role::Item && {
-                let line = rendered(&nodes[index..index + usize::try_from(node.size).expect("tree size")]);
-                line.contains(current) && line.contains("under way")
-            }),
-            "{step:?}: {words}"
-        );
+        let progress = nodes
+            .iter()
+            .position(|node| node.role == Role::List && node.name.as_deref() == Some(b"Each step"))
+            .expect("setup progress list");
+        let progress = &nodes[progress..progress + usize::try_from(nodes[progress].size).expect("tree size")];
+        let items = progress.iter().enumerate().filter(|(_, node)| node.role == Role::Item).collect::<Vec<_>>();
+        let labels = [
+            if current > Some(0) { "Fetched Forgejo and its runner" } else { "Fetching Forgejo and its runner" },
+            "Preparing: its database, temper’s admin, your account",
+            "Starting Forgejo and its runner",
+            "Connecting as temper",
+            "Making the first repository, and adopting it into its project",
+        ];
+        assert_eq!(items.len(), labels.len(), "{words}");
+        for (stage, ((index, item), label)) in items.iter().zip(labels).enumerate() {
+            let subtree = &progress[*index..*index + usize::try_from(item.size).expect("tree size")];
+            assert!(rendered(subtree).contains(label), "stage {stage}: {words}");
+            let under_way = current == Some(stage);
+            let done = current.is_some_and(|current| stage < current);
+            assert_eq!(item.states.as_slice().contains(&State::Current), under_way, "stage {stage}: {words}");
+            for (status, expected) in [(b"under way".as_slice(), under_way), (b"done".as_slice(), done)] {
+                assert_eq!(
+                    subtree.iter().any(|node| node.role == Role::Status && node.name.as_deref() == Some(status)),
+                    expected,
+                    "stage {stage}: {words}"
+                );
+            }
+        }
+        if current.is_none() {
+            node(&world, client, Role::Status, b"under way");
+        }
         current_step(&world, client, b"Setting up");
         assert!(world.front().set_ups().is_empty(), "opening a running setup must not ask again");
     }
@@ -654,10 +684,16 @@ fn welcome_accepted_setup_moves_to_model_and_follows_its_forge() {
         client,
         vec![
             PersonStep::Go { address: Address::Welcome { step: Step::Ready } },
-            see(Role::Heading { level: 2 }, b"Setting up Forgejo on this machine"),
+            see(Role::Heading { level: 1 }, b"Almost ready"),
+            see(Role::Paragraph, b"Project hello, with work/hello"),
+            see(Role::Disclosure, b"Each step"),
+            gone(Role::Heading { level: 2 }, b"Setting up Forgejo on this machine"),
+            gone(Role::Link, b"Later"),
         ],
     );
-    assert!(text(&world, client).contains("work/hello, into hello"), "{}", text(&world, client));
+    node(&world, client, Role::Paragraph, "Forge: Forgejo on this machine · Connected as qa-bot (1)".as_bytes());
+    assert!(!node(&world, client, Role::Disclosure, b"Each step").states.as_slice().contains(&State::Expanded));
+    assert!(node(&world, client, Role::Button, b"Open hello").states.as_slice().contains(&State::Disabled));
     assert_eq!(world.front().set_ups().len(), ONE_SETUP);
 }
 

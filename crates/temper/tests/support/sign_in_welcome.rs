@@ -159,13 +159,12 @@ pub fn run(directory: &Path, issuer: oauth::Peer) {
         .filter(|node| node.role == skein_ui::Role::Paragraph)
         .find_map(|node| node.name.as_deref()?.strip_prefix(b"Model: ChatGPT"))
         .expect("Ready named the made ChatGPT account");
-    // Ready names ACCOUNT · MODEL; Accounts names ACCOUNT · PROVIDER · HOLDER.
-    // This fixture's single grant belongs to OpenAI and the first owner, Owner.
+    // Ready names the account's heading, as Accounts draws it, then " · MODEL".
     let (account, _) = std::str::from_utf8(account)
         .expect("Ready account and model are UTF-8")
         .rsplit_once(" · ")
         .expect("Ready names the selected model after the account");
-    let heading = format!("ChatGPT{account} · OpenAI · held by Owner");
+    let heading = format!("ChatGPT{account}");
     let restarted = super::run(directory, person::kept_chatgpt_account(heading.as_bytes()), None, WITHIN);
     assert!(restarted.finished, "the same account is signed in after restart");
 }

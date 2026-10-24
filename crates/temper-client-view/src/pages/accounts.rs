@@ -627,6 +627,24 @@ fn source_account(root: &Domain, form: &accounts::Accounts, holder: c::AccountHo
     None
 }
 
+/// An account's heading as the accounts page draws it (5.5, An account).
+pub(crate) fn account_heading(root: &Domain, w: &Words, row: &c::OwnerAccountLine) -> Box<[u8]> {
+    let supplied = provider_name(row.provider_name.as_ref()).unwrap_or(b"");
+    let shown = crate::choice::provider_shown(root, row.provider, supplied, w);
+    let name = if supplied.is_empty() { None } else { Some(shown.as_ref()) };
+    heading(
+        w,
+        row.number,
+        row.provider,
+        name,
+        &row.display,
+        row.holder,
+        row.plan,
+        &row.sources,
+        accounts::current_me(root.client()),
+    )
+}
+
 /// The welcome names the same first usable account the accounts page draws.
 #[expect(clippy::manual_map, reason = "step code matches optional facts without closures")]
 pub(crate) fn first_usable_heading(root: &Domain, w: &Words) -> Option<Box<[u8]>> {
@@ -639,20 +657,7 @@ pub(crate) fn first_usable_heading(root: &Domain, w: &Words) -> Option<Box<[u8]>
         if !temper_client_domain::forge::demo::usable_account(row, provider) {
             continue;
         }
-        let supplied = provider_name(row.provider_name.as_ref()).unwrap_or(b"");
-        let shown = crate::choice::provider_shown(root, row.provider, supplied, w);
-        let name = if supplied.is_empty() { None } else { Some(shown.as_ref()) };
-        return Some(heading(
-            w,
-            row.number,
-            row.provider,
-            name,
-            &row.display,
-            row.holder,
-            row.plan,
-            &row.sources,
-            accounts::current_me(root.client()),
-        ));
+        return Some(account_heading(root, w, row));
     }
     let demo = root.forge().demo()?;
     let deployment = temper_client_domain::forge::demo::owner_deployment(root.forge(), root.client())?;

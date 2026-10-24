@@ -401,30 +401,11 @@ pub(crate) fn ready_model(root: &Domain, w: &Words) -> Box<[u8]> {
     if account.cut {
         return model;
     }
-    let SourceChoice::Chosen(index) = chosen_source(account, program) else { return model };
-    let source = account.sources.get(index).expect("chosen account source");
-    let mut supplied = None;
-    for offer in &me.providers {
-        if Some(offer.provider) == provider && !offer.name.cut {
-            supplied = Some(offer.name.bytes());
-            break;
-        }
-    }
-    let Some(supplied) = supplied else { return model };
-    let (brand, plan) = aw::provider_words(supplied);
-    let label = match source.kind {
-        c::OwnerAccountKind::Key => aw::say(w, A::ApiKeyBrand, &[Hole::Name(shown(brand, w))]),
-        c::OwnerAccountKind::SignIn => shown(if account.plan { plan } else { brand }, w),
-        c::OwnerAccountKind::Program => aw::say(w, A::Subscription, &[Hole::Name(shown(plan, w))]),
-        c::OwnerAccountKind::None => return model,
-    };
-    let display = match source.kind {
-        c::OwnerAccountKind::SignIn if !account.display.cut => account.display.bytes(),
-        c::OwnerAccountKind::Program => source.name.as_deref().unwrap_or(b""),
-        c::OwnerAccountKind::Key | c::OwnerAccountKind::SignIn | c::OwnerAccountKind::None => b"",
-    };
+    let SourceChoice::Chosen(_) = chosen_source(account, program) else { return model };
+    // The account the model runs on, by its whole heading, then the model.
     let separator = aw::say(w, A::Separator, &[]);
-    aw::join(&[&label, if display.is_empty() { b"" } else { &separator }, &shown(display, w), &separator, &model])
+    let heading = crate::pages::accounts::account_heading(root, w, account);
+    aw::join(&[&heading, &separator, &model])
 }
 
 /// Ready uses the same model and effort words as a new chat's composer.
