@@ -3085,6 +3085,8 @@ dependencies = [
  "skein-lib",
  "skein-oauth",
  "skein-oauth-accounts",
+ "skein-scratch",
+ "skein-shell",
  "skein-tls",
  "skein-world",
  "smith-channel",

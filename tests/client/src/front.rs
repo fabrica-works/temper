@@ -105,6 +105,7 @@ impl Joint {
             first_run_projects(&mut config, &mut engine_limits);
             config.core.connectors = Box::new([fixtures::FORGE]);
             config.forges = Box::new([forge::Configured {
+                admin_connect: false,
                 number: 1,
                 kind: forge::Kind::GitHub,
                 mode: forge::Mode::Connected,

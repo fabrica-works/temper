@@ -11,6 +11,7 @@ pub(crate) struct State {
     pending: Map<Token, Token>,
     running: Map<u16, (Token, Option<Carried>)>,
     reading: Map<u16, Token>,
+    previous: Map<u16, Connection>,
 }
 impl State {
     pub(crate) fn new(bound: u32) -> Self {
@@ -19,6 +20,7 @@ impl State {
             pending: Map::with_capacity(bound),
             running: Map::with_capacity(bound),
             reading: Map::with_capacity(bound),
+            previous: Map::with_capacity(bound),
         }
     }
     fn answer(&mut self, request: Token, token: Token, answer: Answered, out: &mut Queue<Request>) {
@@ -35,6 +37,8 @@ pub(crate) fn worst_case(bound: u32) -> Option<u64> {
         .checked_add(Map::<Token, Token>::worst_case(bound)?)?
         .checked_add(Map::<u16, (Token, Option<Carried>)>::worst_case(bound)?)?
         .checked_add(Map::<u16, Token>::worst_case(bound)?)?
+        .checked_add(Map::<u16, Connection>::worst_case(bound)?)?
+        .checked_add(u64::from(bound).checked_mul(crate::STOPPED_TEXT_BYTES)?)?
         .checked_add(u64::from(bound).checked_mul(
             2048_u64.max(100_u64.checked_mul(u64::try_from(size_of::<crate::Reached>()).ok()?.checked_add(2048)?)?),
         )?)
@@ -52,12 +56,8 @@ pub(crate) fn start(
         reachable(d, request, token, forge, installation, page, role, carried, out);
         return;
     }
-    // E1 carries the intent but does not admit an admin run yet.
-    if let Ask::Connect { how: crate::How::ForgejoAdmin { .. }, .. } = &ask {
-        if let Some(value) = carried {
-            out.push(Request::CarriedUnused { number: value.number });
-        }
-        d.connect.answer(request, token, Answered::Connect(ConnectAnswer::Refused(ForgeRefusal::NotTaken)), out);
+    if let Ask::Connect { forge, how: how @ crate::How::ForgejoAdmin { .. } } = ask {
+        admin(d, request, token, forge, how, role, carried, out);
         return;
     }
     let (forge, install, manifest) = match &ask {
@@ -118,7 +118,7 @@ pub(crate) fn start(
     }
     d.connect.pending.insert(request, token).expect("room checked");
     match ask {
-        Ask::Connect { how: crate::How::GitHubApp { app }, .. } => {
+        Ask::Connect { how: how @ crate::How::GitHubApp { .. }, .. } => {
             let carried = carried.expect("admitted key");
             d.connect.running.insert(forge, (request, Some(carried))).expect("room checked");
             let kept = match d.connections.get(&forge) {
@@ -127,7 +127,7 @@ pub(crate) fn start(
             };
             d.connections.insert(forge, (Connection::Connecting, kept)).expect("configured forge");
             out.push(Request::MarkedForges);
-            out.push(Request::Connect { forge, request, app, carried });
+            out.push(Request::Connect { forge, request, how, carried });
         }
         Ask::Connect { how: crate::How::GitHubManifest { back }, .. } => {
             if let Some(value) = carried {
@@ -150,6 +150,84 @@ pub(crate) fn start(
         | Ask::StartDemo => unreachable!("connect admission"),
     }
 }
+/// Admission for the string-managed Forgejo form (client/README.md, 8).
+#[expect(clippy::too_many_arguments, reason = "the admitted request and its caller travel together")]
+fn admin(
+    d: &mut Domain,
+    request: Token,
+    token: Token,
+    forge: u16,
+    how: crate::How,
+    role: Option<Role>,
+    carried: Option<Carried>,
+    out: &mut Queue<Request>,
+) {
+    let previous = d.connection(forge);
+    let config = d.configured.get(&forge);
+    let occupied = match &previous {
+        Connection::Connected { .. } | Connection::Connecting | Connection::SettingUp { .. } => true,
+        Connection::NotConnected
+        | Connection::NotSetUp
+        | Connection::SetUpFailed { .. }
+        | Connection::Stopped { .. } => false,
+    };
+    let refusal = if role != Some(Role::Owner) {
+        Some(ForgeRefusal::Role)
+    } else if match config {
+        Some(config) => {
+            config.kind != crate::Kind::Forgejo || config.mode != crate::Mode::Managed || !config.admin_connect
+        }
+        None => true,
+    } {
+        Some(ForgeRefusal::NotTaken)
+    } else if occupied {
+        Some(ForgeRefusal::Connected)
+    } else if d.connect.running.contains_key(&forge)
+        || d.connect.pending.len() == d.connect.pending.capacity()
+        || d.connect.running.len() == d.connect.running.capacity()
+    {
+        Some(ForgeRefusal::Busy)
+    } else if carried.is_none() {
+        Some(ForgeRefusal::NoKey)
+    } else {
+        None
+    };
+    if let Some(why) = refusal {
+        if let Some(value) = carried {
+            out.push(Request::CarriedUnused { number: value.number });
+        }
+        d.connect.answer(request, token, Answered::Connect(ConnectAnswer::Refused(why)), out);
+        return;
+    }
+    let carried = carried.expect("admitted admin token");
+    d.ended.remove(&forge);
+    d.connect.pending.insert(request, token).expect("room checked");
+    d.connect.running.insert(forge, (request, Some(carried))).expect("room checked");
+    d.connect.previous.insert(forge, previous).expect("one previous connection per running connect");
+    let kept = match d.connections.get(&forge) {
+        Some((_, kept)) => *kept,
+        None => None,
+    };
+    d.connections.insert(forge, (Connection::Connecting, kept)).expect("configured forge");
+    if let crate::How::ForgejoAdmin { first } = &how {
+        d.first.remove(&forge);
+        if let Some(first) = first {
+            d.first
+                .insert(
+                    forge,
+                    crate::First {
+                        org: first.org.clone(),
+                        repository: first.repository.clone(),
+                        project: first.project.clone(),
+                        state: crate::FirstState::Making,
+                    },
+                )
+                .expect("configured forges bound first repositories");
+        }
+    }
+    out.push(Request::MarkedForges);
+    out.push(Request::Connect { forge, request, how, carried });
+}
 pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: ConnectAnswer, out: &mut Queue<Request>) {
     if let Some(token) = d.connect.pending.remove(&request) {
         if let ConnectAnswer::Link(_) = &answer
@@ -169,7 +247,8 @@ pub(crate) fn connected(d: &mut Domain, forge: u16, request: Token, answer: Conn
                 Some((_, kept)) => *kept,
                 None => None,
             };
-            d.connections.insert(forge, (Connection::NotConnected, kept)).expect("configured forge");
+            let previous = d.connect.previous.remove(&forge).unwrap_or(Connection::NotConnected);
+            d.connections.insert(forge, (previous, kept)).expect("configured forge");
             out.push(Request::MarkedForges);
         }
         d.connect.answer(request, token, Answered::Connect(answer), out);
@@ -209,7 +288,11 @@ pub(crate) fn ended(
         if let Some((_, Some(carried))) = d.connect.running.remove(&forge) {
             out.push(Request::EraseCarried { number: carried.number });
         }
+        let admin = d.connect.previous.contains_key(&forge);
         if connected {
+            d.connect.previous.remove(&forge);
+        }
+        if connected && !admin {
             d.apps.insert(forge, crate::AppWay::Pasted).expect("configured forge App way");
             out.push(Request::MarkedForges);
         }
@@ -221,7 +304,8 @@ pub(crate) fn ended(
                 Some((_, kept)) => *kept,
                 None => None,
             };
-            d.connections.insert(forge, (Connection::NotConnected, kept)).expect("configured forge");
+            let previous = d.connect.previous.remove(&forge).unwrap_or(Connection::NotConnected);
+            d.connections.insert(forge, (previous, kept)).expect("configured forge");
             out.push(Request::MarkedForges);
         }
     }

@@ -698,6 +698,7 @@ fn paste_row(limits: &domain::Limits, request: Token, connected: bool, why: Opti
         skein_forge_client::Config { namespace: Box::from(b"fixture".as_slice()), writers: Box::new([]) },
         &[],
         &[domain::Configured {
+            admin_connect: false,
             web: None,
             read_only: false,
             number: 1,

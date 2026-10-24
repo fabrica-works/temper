@@ -1624,15 +1624,37 @@ fn forge_configuration_keeps_kind_mode_and_asked_start() {
         settings.forges[0].kind = source;
         assert_eq!(
             application::configured(&settings).as_ref(),
-            [Configured { web: None, read_only: false, number: 1, kind, mode: Mode::Connected, asked: false }]
+            [Configured {
+                admin_connect: false,
+                web: None,
+                read_only: false,
+                number: 1,
+                kind,
+                mode: Mode::Connected,
+                asked: false
+            }]
         );
     }
     settings.forges[0].kind = settings::Kind::Forgejo;
     settings.setup = Box::new([fixtures::owned_setup(1)]);
     assert_eq!(
         application::configured(&settings).as_ref(),
-        [Configured { web: None, read_only: false, number: 1, kind: Kind::Forgejo, mode: Mode::Owned, asked: true }]
+        [Configured {
+            admin_connect: false,
+            web: None,
+            read_only: false,
+            number: 1,
+            kind: Kind::Forgejo,
+            mode: Mode::Owned,
+            asked: true
+        }]
     );
+    for (admin_token, allowed) in [(None, true), (Some(b"admin-file".as_slice().into()), false)] {
+        settings.setup[0].entry.mode = temper_forge_setup::setup::Mode::Managed { admin_token };
+        let configured = application::configured(&settings);
+        assert_eq!(configured[0].mode, Mode::Managed);
+        assert_eq!(configured[0].admin_connect, allowed);
+    }
 }
 
 #[test]

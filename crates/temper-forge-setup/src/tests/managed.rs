@@ -28,7 +28,7 @@ fn managed_string_parses_without_an_admin_token_file() {
     let entry = checked.setup.entry(1).unwrap();
     assert_eq!(entry.mode, Mode::Managed { admin_token: None });
     assert!(entry.directory.is_empty());
-    assert!(checked.records_only.is_empty());
+    assert_eq!(checked.records_only.as_ref(), [1]);
 }
 #[test]
 fn managed_string_names_its_admin_without_temper_prefix() {

@@ -13,10 +13,15 @@ use temper_engine_domain_forge as domain;
 pub(super) enum Caller {
     Manifest { forge: u16, request: Token, back: Option<Box<[u8]>> },
     Redirect { forge: u16, call: Token, back: Option<Box<[u8]>> },
-    Connect { forge: u16, request: Token, number: u64, pem: Option<Secret> },
+    Connect { forge: u16, request: Token, number: u64, pasted: Option<Pasted> },
     Install { forge: u16, request: Token, back: Option<Box<[u8]>> },
     Accept { forge: u16, call: Token, back: Option<Box<[u8]>> },
     Reachable { forge: u16, request: Token },
+}
+#[derive(Debug)]
+pub(super) enum Pasted {
+    App(Secret),
+    Admin(Secret),
 }
 pub(super) struct ReturnTo {
     pub(super) forge: u16,
@@ -36,6 +41,71 @@ fn stage(engine: &mut Engine, run: Token, plan: host::Plan) {
     engine.setup.staged.insert(run, plan).expect("public run room checked");
     super::request(engine, run);
 }
+pub(crate) fn admin_connect(
+    engine: &mut Engine,
+    forge: u16,
+    request: Token,
+    first: Option<domain::FirstAsk>,
+    carried: Carried,
+) {
+    if full(engine, forge) {
+        erase(engine, carried.number);
+        event(
+            engine,
+            domain::Event::ConnectAnswered {
+                forge,
+                request,
+                answer: domain::ConnectAnswer::Refused(domain::ForgeRefusal::Busy),
+            },
+        );
+        return;
+    }
+    let run = super::lifecycle::next_run(&mut engine.setup.lifecycle);
+    event(engine, domain::Event::ConnectAnswered { forge, request, answer: domain::ConnectAnswer::Connecting });
+    let value = engine.store.secrets(run, Secrets::Get { owner: SecretOwner::Application, number: carried.number });
+    let parsed = match value {
+        Some(Event::Secret { value: Some(value), .. })
+            if skein_lib::sha256::digest(value.expose()) == carried.digest =>
+        {
+            pasted(value.expose(), 1).ok_or(b"the pasted value is not a token".as_slice())
+        }
+        Some(_) | None => Err(b"the pasted value changed".as_slice()),
+    };
+    let (pasted, failure) = match parsed {
+        Ok(value) => (Some(Pasted::Admin(value)), None),
+        Err(reason) => (None, Some(reason)),
+    };
+    engine
+        .setup
+        .public
+        .insert(run, Caller::Connect { forge, request, number: carried.number, pasted })
+        .expect("public room checked");
+    let first = match first {
+        Some(first) => {
+            Some(super::lifecycle::Intent { org: first.org, repository: first.repository, label: first.label })
+        }
+        None => None,
+    };
+    engine
+        .setup
+        .runs
+        .insert(
+            run,
+            super::lifecycle::Run {
+                forge,
+                first,
+                kind: super::lifecycle::Kind::AdminReconcile,
+                internal: false,
+                previous: engine.domain.forge_connection(forge),
+            },
+        )
+        .expect("public run room checked");
+    if let Some(reason) = failure {
+        super::lifecycle::refused(engine, run, forge, Box::from(reason));
+    } else {
+        super::run_plan(engine, run, host::Plan::Reconcile { forge, adopted: Box::new([]) });
+    }
+}
 pub(crate) fn connect(engine: &mut Engine, forge: u16, request: Token, app: NonZeroU64, carried: Carried) {
     if full(engine, forge) {
         event(
@@ -54,21 +124,21 @@ pub(crate) fn connect(engine: &mut Engine, forge: u16, request: Token, app: NonZ
     let parsed = match value {
         Some(Event::Secret { value: Some(value), .. }) => {
             if skein_lib::sha256::digest(value.expose()) == carried.digest {
-                pasted(value.expose()).ok_or(b"the pasted value is not a key".as_slice())
+                pasted(value.expose(), 11).ok_or(b"the pasted value is not a key".as_slice())
             } else {
                 Err(b"the pasted value changed".as_slice())
             }
         }
         Some(_) | None => Err(b"the pasted value changed".as_slice()),
     };
-    let (pem, failure) = match parsed {
-        Ok(pem) => (Some(pem), None),
+    let (pasted, failure) = match parsed {
+        Ok(pem) => (Some(Pasted::App(pem)), None),
         Err(reason) => (None, Some(reason)),
     };
     engine
         .setup
         .public
-        .insert(run, Caller::Connect { forge, request, number: carried.number, pem })
+        .insert(run, Caller::Connect { forge, request, number: carried.number, pasted })
         .expect("public room checked");
     if let Some(reason) = failure {
         super::ended(engine, run, root::SetupEnd::Stopped { forge, reason: Box::from(reason) });
@@ -105,12 +175,12 @@ fn manifest_link(engine: &Engine, forge: u16, state: &[u8]) -> Box<[u8]> {
     }
     writer.finish()
 }
-fn pasted(bytes: &[u8]) -> Option<Secret> {
+fn pasted(bytes: &[u8], item: u16) -> Option<Secret> {
     if bytes.len() > 4096 {
         return None;
     }
     let mut reader = skein_lib::Reader::new(bytes);
-    if reader.u8()? != 1 || reader.u8()? != 1 || u16::from_le_bytes(reader.bytes(2)?.try_into().ok()?) != 11 {
+    if reader.u8()? != 1 || reader.u8()? != 1 || u16::from_le_bytes(reader.bytes(2)?.try_into().ok()?) != item {
         return None;
     }
     let size = u32::from(u16::from_le_bytes(reader.bytes(2)?.try_into().ok()?));
@@ -138,6 +208,12 @@ pub(crate) fn install(engine: &mut Engine, forge: u16, request: Token, back: Opt
     let run = super::lifecycle::next_run(&mut engine.setup.lifecycle);
     engine.setup.public.insert(run, Caller::Install { forge, request, back }).expect("public room checked");
     stage(engine, run, host::Plan::Install { forge });
+}
+fn matches_app(pasted: Option<&Pasted>) -> bool {
+    match pasted {
+        Some(Pasted::App(_)) => true,
+        Some(Pasted::Admin(_)) | None => false,
+    }
 }
 fn done(end: &root::SetupEnd) -> bool {
     match end {
@@ -175,8 +251,8 @@ pub(super) fn ended(engine: &mut Engine, run: Token, end: &root::SetupEnd) -> bo
             }
             root::SetupEnd::Done { .. } | root::SetupEnd::Stopped { .. } => super::routes::ended(engine, call, forge),
         },
-        Caller::Connect { forge, request, number, .. } => {
-            if done(end) {
+        Caller::Connect { forge, request, number, pasted } => {
+            if done(end) && matches_app(pasted.as_ref()) {
                 engine.setup.pastes.insert(number, forge).expect("one pending connect per forge");
             }
             event(engine, domain::Event::ConnectEnded { forge, request, connected: done(end), why: stopped });

@@ -437,12 +437,18 @@ otherwise nothing but the setup host runs it or writes what it makes.
 
 - **"Connect as its admin"** (`Connect` with `ForgejoAdmin`;
   `../client/forge.md`, the deployment's page), on a Forgejo not owned
-  and not connecting, whose `setup` entry is managed (section 8): the
-  site admin's token, with the preparation's scopes (6.3), pasted, kept
-  by jig until its run ends, and
-  `Reconcile` run with it. Done, the token is kept as the forge's
-  `AdminToken` record beside reconcile's writes, and the forge connects,
-  managed.
+  and not connecting, whose `setup` entry is the string `"managed"`
+  (section 8): the site admin's token, with the preparation's scopes
+  (6.3), pasted, kept by jig until its run ends. One run holds the paste:
+  `Reconcile` reads it, never an older `AdminToken` record; its writes
+  are kept, then the forge's `Origin`. With `first`, `Create` (6.7) runs
+  with the same paste. Only after both plans are Done is the token kept
+  as the forge's `AdminToken` record, and the forge connects, managed.
+  Without `first`, Create is skipped. Every end erases the carried value
+  and drops the held token; a stop keeps no admin token. Each later start
+  reconciles from that record and connects, with no Create or `TakeOver`;
+  without the record it offers Connect, not connected. This form serves
+  no organizations or organization owner and no listener: it polls.
 - **Its bot:** on a forge with no records, the setup's `bot.login`, made
   when missing; on a forge connected before, the connected user's login,
   taken over when its full name carries `temper:bot`, or the run stops
@@ -813,6 +819,12 @@ its own for any other host.
   them with the forge, the set up's intent: one per forge, in memory
   alone, replaced by the next `SetUp` it admits, and kept until the
   repository is made or the set up has failed.
+- **Asked at a managed connect.** `ForgejoAdmin.first` carries the same
+  organization, repository and project, and the person's runner label.
+  After Reconcile and its Origin are kept, Create makes the repository
+  before the admin token is kept and the forge connects (5.5). A missing
+  organization is owned by the admin Create has verified. No listener is
+  supplied, so Create adds no hook.
 - **Made after reconcile.** At the box's `started FORGE`, once
   `TakeOver` and `Reconcile` are done (6.5), the setup host runs
   `Create { forge, org, repository, files }` (skein's `forge-setup.md`,
@@ -825,7 +837,9 @@ its own for any other host.
   for it are 1 file of at most 4 KiB (skein's `forge-setup.md`, 4.1).
 - **The starter workflow,** `.forgejo/workflows/ci.yml`, its commit
   the bot's, run on a push to `main` and on each pull, on the owned
-  runner's label:
+  runner's label, `temper-host`. At a managed connect it uses `first.label`
+  instead: 1–64 ASCII letters, digits, `.`, `_` or `-`, checked at the wire
+  and again before the YAML is made. The workflow is otherwise the same:
 
   ```
   on:

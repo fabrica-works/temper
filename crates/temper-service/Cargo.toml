@@ -62,6 +62,8 @@ temper-worker-protocol-git.workspace = true
 jig-protocol-worker-link.workspace = true
 
 [dev-dependencies]
+skein-shell.workspace = true
+skein-scratch.workspace = true
 skein-fake-oauth.workspace = true
 skein-fake-forge-domain.workspace = true
 skein-fake-forge-protocol.workspace = true

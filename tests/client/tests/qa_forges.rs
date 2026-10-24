@@ -51,6 +51,7 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
         under_box,
         &[
             forge::Configured {
+                admin_connect: false,
                 web: None,
                 read_only: false,
                 number: OWNED,
@@ -59,6 +60,7 @@ fn configured(owner: bool, under_box: bool, mode: forge::Mode) -> Pages {
                 asked: true,
             },
             forge::Configured {
+                admin_connect: false,
                 web: None,
                 read_only: false,
                 number: GITHUB,
@@ -117,6 +119,7 @@ fn world_for(number: u16) -> Pages {
             true,
             &[
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: GITHUB,
@@ -125,6 +128,7 @@ fn world_for(number: u16) -> Pages {
                     asked: false,
                 },
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: REMOTE,
@@ -139,6 +143,7 @@ fn world_for(number: u16) -> Pages {
             true,
             &[
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: OWNED,
@@ -147,6 +152,7 @@ fn world_for(number: u16) -> Pages {
                     asked: true,
                 },
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: FAKE,
@@ -362,6 +368,7 @@ fn unoffered_forge_has_no_owned_choose_card() {
             true,
             &[
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: OWNED,
@@ -370,6 +377,7 @@ fn unoffered_forge_has_no_owned_choose_card() {
                     asked,
                 },
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: GITHUB,
@@ -895,6 +903,7 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
             true,
             &[
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: OWNED,
@@ -903,6 +912,7 @@ fn accounts_banner_stays_above_setup_strip_on_eligible_pages() {
                     asked: true,
                 },
                 forge::Configured {
+                    admin_connect: false,
                     web: None,
                     read_only: false,
                     number: GITHUB,

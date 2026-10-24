@@ -141,7 +141,15 @@ fn configured(under_box: bool) -> Domain {
         d.configured
             .insert(
                 number,
-                Configured { web: None, read_only: false, number, kind: Kind::Forgejo, mode: Mode::Fake, asked: true },
+                Configured {
+                    admin_connect: false,
+                    web: None,
+                    read_only: false,
+                    number,
+                    kind: Kind::Forgejo,
+                    mode: Mode::Fake,
+                    asked: true,
+                },
             )
             .unwrap();
     }

@@ -23,6 +23,8 @@ pub(super) enum Kind {
     LocalRemoval,
     LocalReconcile,
     LocalCreate,
+    AdminReconcile,
+    AdminCreate,
     LocalConnect,
     Adopt,
     Follow,
@@ -49,11 +51,18 @@ pub(super) struct AdoptionFiles {
 }
 #[derive(Debug)]
 pub(crate) struct Intent {
+    pub(crate) label: Box<[u8]>,
     pub(crate) org: Box<[u8]>,
     pub(crate) repository: Box<[u8]>,
 }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Source {
+    Prepared,
+    Managed,
+}
 #[derive(Debug)]
 pub(super) struct Local {
+    pub(super) source: Source,
     pub(crate) first: Option<Intent>,
     pub(super) repositories: u64,
     pub(super) pending: bool,
@@ -275,13 +284,19 @@ pub(super) enum Purpose {
     Origin(Token),
     PasteOrigin(Token),
     LocalOrigin(Token),
+    AdminOrigin(Token),
+    Admin(Token),
     Deleted(u16),
 }
 pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
     let run = engine.setup.runs.get(&token).expect("ended setup run");
     let (forge, kind) = (run.forge, run.kind);
     if crate::forge::ended(engine, forge) {
-        engine.setup.runs.remove(&token);
+        refused(engine, token, forge, Box::from(b"forge ended".as_slice()));
+        return;
+    }
+    if kind == Kind::AdminReconcile || kind == Kind::AdminCreate {
+        admin_done(engine, token, outcome);
         return;
     }
     if kind == Kind::Reachable {
@@ -376,7 +391,8 @@ pub(super) fn done(engine: &mut crate::engine::Engine, token: Token, outcome: re
 pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure: reconcile::Failure) {
     let run = engine.setup.runs.get(&token).expect("stopped setup run");
     if crate::forge::ended(engine, run.forge) {
-        engine.setup.runs.remove(&token);
+        let forge = run.forge;
+        refused(engine, token, forge, Box::from(b"forge ended".as_slice()));
         return;
     }
     if run.kind == Kind::Reachable {
@@ -385,7 +401,7 @@ pub(super) fn stopped(engine: &mut crate::engine::Engine, token: Token, failure:
         super::public::reached(engine, token, why);
         return;
     }
-    if run.kind == Kind::LocalCreate {
+    if run.kind == Kind::LocalCreate || run.kind == Kind::AdminCreate {
         create_stopped(engine, token, failure);
         return;
     }
@@ -469,6 +485,16 @@ fn finish(engine: &mut crate::engine::Engine, token: Token, end: root::SetupEnd)
 }
 pub(super) fn kept(engine: &mut crate::engine::Engine, purpose: Purpose) {
     match purpose {
+        Purpose::AdminOrigin(run) => admin_create(engine, run),
+        Purpose::Admin(run) => {
+            let forge = engine.setup.runs.get(&run).expect("admin waits on Kept").forge;
+            if crate::forge::ended(engine, forge) {
+                refused(engine, run, forge, Box::from(b"forge ended".as_slice()));
+                return;
+            }
+            connect_local(engine, forge);
+            finish(engine, run, root::SetupEnd::Done { forge, outcome: root::SetupOutcome::Done });
+        }
         Purpose::PasteOrigin(run) => {
             let forge = engine.setup.runs.get(&run).expect("paste waits on Origin").forge;
             finish(engine, run, root::SetupEnd::Done { forge, outcome: root::SetupOutcome::Done });
@@ -820,6 +846,7 @@ fn start_local(engine: &mut crate::engine::Engine, forge: u16) {
         return;
     }
     let local = engine.setup.lifecycle.local_mut(forge).expect("local start");
+    assert!(local.source != Source::Managed || local.handover.is_none(), "managed string form never stages TakeOver");
     local.pending = false;
     if local.trigger == Trigger::StartDemo {
         state(engine, forge, domain::Connection::NotSetUp);
@@ -860,11 +887,11 @@ fn reconcile_local(engine: &mut crate::engine::Engine, forge: u16) {
         return;
     }
     let Some(rows) = engine.forge_records.rows.forge(forge) else {
-        local_stopped(engine, forge, crate::SetupStopped::NotPrepared);
+        missing_admin(engine, forge);
         return;
     };
     if !rows.has(Item::AdminToken) {
-        local_stopped(engine, forge, crate::SetupStopped::NotPrepared);
+        missing_admin(engine, forge);
         return;
     }
     let valid = match rows.get(Item::AdminToken) {
@@ -965,7 +992,7 @@ fn create_local(engine: &mut crate::engine::Engine, forge: u16) -> bool {
         repository: first.repository.clone(),
         files: Box::new([host::File {
             path: temper_forge_setup::STARTER_PATH.into(),
-            content: temper_forge_setup::STARTER_WORKFLOW.into(),
+            content: temper_forge_setup::starter_workflow(b"temper-host").expect("owned runner label"),
         }]),
     };
     assert!(
@@ -992,8 +1019,10 @@ fn create_local(engine: &mut crate::engine::Engine, forge: u16) -> bool {
 }
 #[expect(clippy::disallowed_macros, reason = "closed credential-free Create diagnostic")]
 fn create_stopped(engine: &mut crate::engine::Engine, token: Token, failure: reconcile::Failure) {
-    let run = engine.setup.runs.remove(&token).expect("stopped Create");
-    let first = run.first.expect("Create retains the admitted names");
+    let run = engine.setup.runs.get_mut(&token).expect("stopped Create");
+    let admin = run.kind == Kind::AdminCreate;
+    let forge = run.forge;
+    let first = run.first.take().expect("Create retains the admitted names");
     let step = match failure.step {
         reconcile::Stage::Admin => domain::CreateStep::Admin,
         reconcile::Stage::Org => domain::CreateStep::Org,
@@ -1021,14 +1050,19 @@ fn create_stopped(engine: &mut crate::engine::Engine, token: Token, failure: rec
     }
     let why = bounded_reason(why.finish());
     engine.notes.push(crate::Note::ForgeSetupStopped {
-        number: run.forge,
+        number: forge,
         why: crate::SetupStopped::Stopped {
             plan: crate::SetupPlan::Create,
             step: crate::SetupStep { stage: failure.step, why: failure.why },
         },
     });
-    engine.events.push(root::Event::Forge(Box::new(domain::Event::FirstFailed { forge: run.forge, step })));
-    state(engine, run.forge, domain::Connection::SetUpFailed { why });
+    engine.events.push(root::Event::Forge(Box::new(domain::Event::FirstFailed { forge, step })));
+    if admin {
+        finish(engine, token, root::SetupEnd::Stopped { forge, reason: why });
+    } else {
+        engine.setup.runs.remove(&token).expect("stopped local Create");
+        state(engine, forge, domain::Connection::SetUpFailed { why });
+    }
 }
 fn adopt_local(engine: &mut crate::engine::Engine, forge: u16) {
     if crate::forge::ended(engine, forge) {
@@ -1277,7 +1311,7 @@ pub(crate) fn first(engine: &mut crate::engine::Engine, forge: u16, org: Box<[u8
         return;
     }
     if let Some(local) = engine.setup.lifecycle.local_mut(forge) {
-        local.first = Some(Intent { org, repository });
+        local.first = Some(Intent { org, repository, label: b"temper-host".as_slice().into() });
     }
 }
 
@@ -1329,4 +1363,89 @@ fn reached(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile:
         token,
         domain::ReachableAnswer::Page(domain::Page { rows: reached.into_boxed(), more }),
     );
+}
+
+fn missing_admin(engine: &mut crate::engine::Engine, forge: u16) {
+    if engine.setup.lifecycle.local(forge).expect("local start").source == Source::Managed {
+        state(engine, forge, domain::Connection::NotConnected);
+    } else {
+        local_stopped(engine, forge, crate::SetupStopped::NotPrepared);
+    }
+}
+fn keep_admin(engine: &mut crate::engine::Engine, run: Token) {
+    let forge = engine.setup.runs.get(&run).expect("admin run").forge;
+    if crate::forge::ended(engine, forge) {
+        refused(engine, run, forge, Box::from(b"forge ended".as_slice()));
+        return;
+    }
+    let Some(super::public::Caller::Connect { pasted: Some(super::public::Pasted::Admin(value)), .. }) =
+        engine.setup.public.get(&run)
+    else {
+        unreachable!("admin run holds its paste")
+    };
+    let value = value.clone();
+    keep(engine, forge, Item::AdminToken, value.expose(), Purpose::Admin(run));
+}
+fn admin_create(engine: &mut crate::engine::Engine, token: Token) {
+    let run = engine.setup.runs.get_mut(&token).expect("admin reconcile waits for Origin");
+    let forge = run.forge;
+    let Some(first) = &run.first else {
+        keep_admin(engine, token);
+        return;
+    };
+    let Some(content) = temper_forge_setup::starter_workflow(&first.label) else {
+        refused(engine, token, forge, Box::from(b"the runner label is invalid".as_slice()));
+        return;
+    };
+    let plan = host::Plan::Create {
+        forge,
+        org: first.org.clone(),
+        repository: first.repository.clone(),
+        files: Box::new([host::File { path: temper_forge_setup::STARTER_PATH.into(), content }]),
+    };
+    run.kind = Kind::AdminCreate;
+    let local = engine.setup.lifecycle.local(forge).expect("managed configuration");
+    assert!(
+        skein_forge_setup::given::check_create(&local.limits, engine.setup.env.limits.string_bytes, &plan).is_ok(),
+        "Connect admission and starter profile prove Create inputs"
+    );
+    super::run_plan(engine, token, plan);
+}
+/// A failed store completion ends held callers before the service stops.
+pub(super) fn writes_failed(engine: &mut crate::engine::Engine) {
+    let mut runs = List::with_capacity(engine.setup.runs.len());
+    for (token, run) in &engine.setup.runs {
+        if run.kind == Kind::AdminReconcile || run.kind == Kind::AdminCreate {
+            runs.push(*token).expect("active admin runs");
+        }
+    }
+    for token in runs.into_boxed() {
+        let forge = engine.setup.runs.get(&token).expect("active run").forge;
+        // A failed store stops iteration, so the root cannot route this end's erase.
+        if let Some(super::public::Caller::Connect { number, .. }) = engine.setup.public.get(&token) {
+            let number = *number;
+            super::public::erase(engine, number);
+        }
+        refused(engine, token, forge, Box::from(b"forge records could not be kept".as_slice()));
+    }
+    engine.setup.writes = Map::with_capacity(
+        engine.setup.env.limits.runs.checked_add(engine.setup.env.limits.forges).expect("setup writes"),
+    );
+}
+
+fn admin_done(engine: &mut crate::engine::Engine, token: Token, outcome: reconcile::Outcome) {
+    let run = engine.setup.runs.get(&token).expect("ended admin run");
+    let (forge, kind) = (run.forge, run.kind);
+    if kind == Kind::AdminReconcile {
+        let origin = records::origin(connection::settings::Kind::Forgejo, &configured(engine, forge).api).encode();
+        keep(engine, forge, Item::Origin, &origin, Purpose::AdminOrigin(token));
+        return;
+    }
+    if kind == Kind::AdminCreate {
+        let reconcile::Outcome::Created { id } = outcome else { unreachable!("Create returns its repository") };
+        engine.events.push(root::Event::Forge(Box::new(domain::Event::FirstMade { forge, id: id.get() })));
+        keep_admin(engine, token);
+        return;
+    }
+    unreachable!("admin Done belongs to Reconcile or Create");
 }

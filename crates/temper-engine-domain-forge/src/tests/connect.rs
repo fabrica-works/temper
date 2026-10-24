@@ -13,7 +13,7 @@ fn github(kind: Kind, mode: Mode) -> Domain {
         4,
         skein_forge_client::Config { namespace: Box::from(b"test".as_slice()), writers: Box::new([]) },
         &[],
-        &[Configured { web: None, read_only: false, number: 1, kind, mode, asked: false }],
+        &[Configured { admin_connect: false, web: None, read_only: false, number: 1, kind, mode, asked: false }],
         false,
     )
     .unwrap()
@@ -109,10 +109,12 @@ fn admitted_connect_marks_connecting_answers_then_erases_once_at_its_end() {
         let mut d = github(Kind::GitHub, Mode::Connected);
         let out = application(&mut d, 1, connect(1), Some(PartyRole::Owner), Some(VALUE));
         assert_eq!(d.connection(1), Connection::Connecting);
-        assert!(out.iter().any(|r| if let Request::Connect { forge: 1, request, app, carried } = r {
-            *request == Token::new(1) && app.get() == 7 && *carried == VALUE
-        } else {
-            false
+        assert!(out.iter().any(|r| {
+            if let Request::Connect { forge: 1, request, how: How::GitHubApp { app }, carried } = r {
+                *request == Token::new(1) && app.get() == 7 && *carried == VALUE
+            } else {
+                false
+            }
         }));
         assert_eq!(d.application_answer(Token::new(1)), None);
         outputs(&mut d, Event::ConnectAnswered { forge: 1, request: Token::new(1), answer: ConnectAnswer::Connecting });
@@ -292,6 +294,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
         &[],
         &[
             Configured {
+                admin_connect: false,
                 web: None,
                 read_only: false,
                 number: 1,
@@ -300,6 +303,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
                 asked: false,
             },
             Configured {
+                admin_connect: false,
                 web: None,
                 read_only: false,
                 number: 2,
@@ -308,6 +312,7 @@ fn installation_updates_mark_rows_in_id_order_and_deletion_drops_one() {
                 asked: false,
             },
             Configured {
+                admin_connect: false,
                 web: None,
                 read_only: false,
                 number: 3,
@@ -582,13 +587,183 @@ fn read_only_app_refuses_a_manifest_but_accepts_a_paste() {
     );
 }
 
+fn admin_ask(forge: u16, first: Option<FirstAsk>) -> Ask {
+    Ask::Connect { forge, how: How::ForgejoAdmin { first } }
+}
+fn admin_domain() -> Domain {
+    let mut d = github(Kind::Forgejo, Mode::Managed);
+    d.configured.get_mut(&1).unwrap().admin_connect = true;
+    d
+}
+fn first_ask() -> FirstAsk {
+    FirstAsk {
+        org: b"work".as_slice().into(),
+        repository: b"hello".as_slice().into(),
+        project: SetUpProject::Existing(1),
+        label: b"docker".as_slice().into(),
+    }
+}
 #[test]
-fn forgejo_admin_is_not_taken_and_its_carried_value_is_unused() {
-    refused(
-        &mut github(Kind::Forgejo, Mode::Managed),
-        Ask::Connect { forge: 1, how: How::ForgejoAdmin { first: None } },
-        Some(PartyRole::Owner),
-        Some(VALUE),
-        ForgeRefusal::NotTaken,
+fn admin_connect_requires_the_owner_before_checking_the_forge_or_connection() {
+    for role in [None, Some(PartyRole::Member), Some(PartyRole::Maintainer), Some(PartyRole::Observer)] {
+        for carried in [None, Some(VALUE)] {
+            let mut d = github(Kind::Forgejo, Mode::Owned);
+            outputs(
+                &mut d,
+                Event::Connection { forge: 1, state: Connection::Connected { id: 9, login: b"bot".as_slice().into() } },
+            );
+            refused(&mut d, admin_ask(1, None), role, carried, ForgeRefusal::Role);
+        }
+    }
+}
+#[test]
+fn admin_connect_requires_the_string_managed_forgejo_form_before_checking_state() {
+    for (forge, kind, mode, admin_connect) in [
+        (2, Kind::Forgejo, Mode::Managed, true),
+        (1, Kind::Forgejo, Mode::Owned, false),
+        (1, Kind::Forgejo, Mode::Fake, false),
+        (1, Kind::Forgejo, Mode::Connected, false),
+        (1, Kind::Forgejo, Mode::Managed, false),
+        (1, Kind::GitHub, Mode::Managed, true),
+    ] {
+        for carried in [None, Some(VALUE)] {
+            let mut d = github(kind, mode);
+            d.configured.get_mut(&1).unwrap().admin_connect = admin_connect;
+            outputs(&mut d, Event::Connection { forge: 1, state: Connection::Connecting });
+            refused(&mut d, admin_ask(forge, None), Some(PartyRole::Owner), carried, ForgeRefusal::NotTaken);
+        }
+    }
+}
+#[test]
+fn admin_connect_refuses_connected_connecting_and_setting_up_before_busy_or_no_key() {
+    for state in [
+        Connection::Connected { id: 9, login: b"bot".as_slice().into() },
+        Connection::Connecting,
+        Connection::SettingUp { step: Some(SetUpStep::Prepare) },
+    ] {
+        for carried in [None, Some(VALUE)] {
+            let mut d = admin_domain();
+            application(&mut d, 2, admin_ask(1, None), Some(PartyRole::Owner), Some(VALUE));
+            outputs(&mut d, Event::Connection { forge: 1, state: state.clone() });
+            refused(&mut d, admin_ask(1, None), Some(PartyRole::Owner), carried, ForgeRefusal::Connected);
+        }
+    }
+}
+#[test]
+fn admin_connect_refuses_a_run_on_the_forge_before_no_key() {
+    for carried in [None, Some(VALUE)] {
+        let mut d = admin_domain();
+        application(&mut d, 2, admin_ask(1, None), Some(PartyRole::Owner), Some(VALUE));
+        outputs(&mut d, Event::Connection { forge: 1, state: Connection::NotConnected });
+        refused(&mut d, admin_ask(1, None), Some(PartyRole::Owner), carried, ForgeRefusal::Busy);
+    }
+}
+#[test]
+fn admin_connect_requires_a_carried_token() {
+    refused(&mut admin_domain(), admin_ask(1, None), Some(PartyRole::Owner), None, ForgeRefusal::NoKey);
+}
+#[test]
+fn admitted_admin_connect_marks_connecting_and_keeps_the_first_repository_intent() {
+    for first in [None, Some(first_ask())] {
+        let mut d = admin_domain();
+        let out = application(&mut d, 1, admin_ask(1, first.clone()), Some(PartyRole::Owner), Some(VALUE));
+        assert_eq!(d.connection(1), Connection::Connecting);
+        assert!(out.contains(&Request::Connect {
+            forge: 1,
+            request: Token::new(1),
+            how: How::ForgejoAdmin { first: first.clone() },
+            carried: VALUE
+        }));
+        assert_eq!(
+            d.forges().rows[0].first,
+            first.map(|first| First {
+                org: first.org,
+                repository: first.repository,
+                project: first.project,
+                state: FirstState::Making
+            })
+        );
+        assert!(!out.contains(&Request::CarriedUnused { number: VALUE.number }));
+    }
+}
+#[test]
+fn admin_connect_ends_erase_once_and_restore_the_previous_connection_on_failure() {
+    for success in [false, true] {
+        for previous in [Connection::NotConnected, Connection::Stopped { reason: b"stopped earlier".as_slice().into() }]
+        {
+            let mut d = admin_domain();
+            outputs(&mut d, Event::Connection { forge: 1, state: previous.clone() });
+            application(&mut d, 1, admin_ask(1, Some(first_ask())), Some(PartyRole::Owner), Some(VALUE));
+            outputs(
+                &mut d,
+                Event::ConnectAnswered { forge: 1, request: Token::new(1), answer: ConnectAnswer::Connecting },
+            );
+            let state = Connection::Connected { id: 9, login: b"bot".as_slice().into() };
+            let why = if success {
+                outputs(&mut d, Event::FirstMade { forge: 1, id: 42 });
+                outputs(&mut d, Event::Connection { forge: 1, state: state.clone() });
+                None
+            } else {
+                outputs(&mut d, Event::FirstFailed { forge: 1, step: CreateStep::File });
+                Some(Box::from(b"making work/hello: File (Refused)".as_slice()))
+            };
+            let event = Event::ConnectEnded { forge: 1, request: Token::new(1), connected: success, why: why.clone() };
+            let out = outputs(
+                &mut d,
+                Event::ConnectEnded { forge: 1, request: Token::new(1), connected: success, why: why.clone() },
+            );
+            assert_eq!(out.iter().filter(|r| **r == Request::EraseCarried { number: VALUE.number }).count(), 1);
+            assert!(outputs(&mut d, event).is_empty());
+            assert_eq!(d.connection(1), if success { state } else { previous });
+            assert_eq!(
+                d.forges().rows[0].first.as_ref().unwrap().state,
+                if success { FirstState::Made { id: 42 } } else { FirstState::Failed { step: CreateStep::File } }
+            );
+            assert_eq!(d.forges().rows[0].ended, why);
+            assert_eq!(d.forges().rows[0].app, None);
+        }
+    }
+}
+#[test]
+fn the_next_admitted_admin_connect_replaces_the_intent_and_clears_the_previous_end() {
+    for first in [None, Some(FirstAsk { repository: b"next".as_slice().into(), ..first_ask() })] {
+        let mut d = admin_domain();
+        application(&mut d, 1, admin_ask(1, Some(first_ask())), Some(PartyRole::Owner), Some(VALUE));
+        outputs(
+            &mut d,
+            Event::ConnectEnded {
+                forge: 1,
+                request: Token::new(1),
+                connected: false,
+                why: Some(Box::from(STOP_REASON)),
+            },
+        );
+        refused(&mut d, admin_ask(1, None), None, Some(VALUE), ForgeRefusal::Role);
+        assert_eq!(d.forges().rows[0].first.as_ref().unwrap().repository.as_ref(), b"hello");
+        assert_eq!(d.forges().rows[0].ended.as_deref(), Some(STOP_REASON));
+        application(&mut d, 2, admin_ask(1, first.clone()), Some(PartyRole::Owner), Some(VALUE));
+        assert_eq!(d.forges().rows[0].first.as_ref().map(|f| &f.repository), first.as_ref().map(|f| &f.repository));
+        assert_eq!(d.forges().rows[0].ended, None);
+    }
+}
+#[test]
+fn a_service_refusal_restores_the_admin_connects_previous_connection_and_releases_the_carry() {
+    let mut d = admin_domain();
+    let previous = Connection::Stopped { reason: Box::from(STOP_REASON) };
+    outputs(&mut d, Event::Connection { forge: 1, state: previous.clone() });
+    application(&mut d, 1, admin_ask(1, None), Some(PartyRole::Owner), Some(VALUE));
+    let out = outputs(
+        &mut d,
+        Event::ConnectAnswered {
+            forge: 1,
+            request: Token::new(1),
+            answer: ConnectAnswer::Refused(ForgeRefusal::NotTaken),
+        },
+    );
+    assert!(out.contains(&Request::CarriedUnused { number: VALUE.number }));
+    assert_eq!(d.connection(1), previous);
+    assert!(
+        outputs(&mut d, Event::ConnectEnded { forge: 1, request: Token::new(1), connected: false, why: None })
+            .is_empty()
     );
 }

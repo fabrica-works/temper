@@ -14,6 +14,7 @@ fn driver_with_name_bytes(under_box: bool, name_bytes: u32) -> Driver {
         let mut config = walking::config(701);
         config.under_box = under_box;
         config.forges = Box::new([forge::Configured {
+            admin_connect: false,
             web: None,
             read_only: false,
             number: 1,
@@ -205,6 +206,7 @@ fn first_repository_row_is_volatile_across_restart() {
             let mut config = walking::config(701);
             config.under_box = true;
             config.forges = Box::new([forge::Configured {
+                admin_connect: false,
                 web: None,
                 read_only: false,
                 number: 1,
