@@ -619,6 +619,17 @@ adds:
     reviews, the pull request, attempts, the plan, notes), a brief's
     bytes and the gather's deadline.
 
+    The gather's deadline bounds a connector that never answers. Its
+    default, 30 seconds, outlasts a brief's sequential forge reads: a
+    pull section reads Item, Pull, PullFiles and Compare, each expanded
+    into GitHub requests, with file contents adding reads. Even six to
+    eight sequential requests at a slow but healthy two seconds each,
+    with a token mint first and one retry after backoff, can occupy
+    about 20 seconds. Thirty leaves room that ten cannot, rather than
+    failing a healthy brief for waiting, and still ends a stuck connector
+    within the same sitting. These are planning latencies, not a bound
+    on every forge response.
+
   They give the core its resume limit, within a row's bytes, its
   charters' bytes, its load slots and its briefs'.
 - **Checked against each other** at start: the held outputs at least

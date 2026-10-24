@@ -289,8 +289,8 @@ const ROOT: Root = Root {
         },
         // Assembled brief bytes: the task section and room for the others.
         brief_bytes: 5376,
-        // Time for a gather, from the root world.
-        gather: Duration::from_secs(1),
+        // Outlast sequential forge reads and a retry; bound a stuck connector (domain/root.md, 10).
+        gather: Duration::from_secs(30),
     },
 };
 const CLIENTS: Clients = Clients {
